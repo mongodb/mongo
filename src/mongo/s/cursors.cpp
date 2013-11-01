@@ -222,8 +222,8 @@ namespace mongo {
                 || maxTimeMS == kMaxTimeCursorNoTimeLimit
                 || maxTimeMS > 0 );
         scoped_lock lk( _mutex );
-        _cursors[cursor->getId()] = cursor;
         _cursorsMaxTimeMS[cursor->getId()] = maxTimeMS;
+        _cursors[cursor->getId()] = cursor;
         _shardedTotal++;
     }
 
@@ -239,8 +239,8 @@ namespace mongo {
     void CursorCache::remove( long long id ) {
         verify( id );
         scoped_lock lk( _mutex );
-        _cursors.erase( id );
         _cursorsMaxTimeMS.erase( id );
+        _cursors.erase( id );
     }
     
     void CursorCache::removeRef( long long id ) {
@@ -348,8 +348,8 @@ namespace mongo {
                             id,
                             isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
                     if (isAuthorized) {
-                        _cursors.erase( i );
                         _cursorsMaxTimeMS.erase( i->second->getId() );
+                        _cursors.erase( i );
                     }
                     continue;
                 }
@@ -403,8 +403,8 @@ namespace mongo {
                 continue;
             }
             log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make LOG(1)
-            _cursors.erase( i );
             _cursorsMaxTimeMS.erase( i->second->getId() );
+            _cursors.erase( i );
             i = _cursors.begin(); // possible 2nd entry will get skipped, will get on next pass
             if ( i == _cursors.end() )
                 break;
