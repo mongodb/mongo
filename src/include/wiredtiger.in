@@ -2480,43 +2480,43 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_DH_SWEEPS				41
 /*! files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				42
-/*! log: total user provided log bytes written */
+/*! log: user provided log bytes written */
 #define	WT_STAT_CONN_LOG_BYTES_USER			43
-/*! log: total log bytes written */
+/*! log: log bytes written */
 #define	WT_STAT_CONN_LOG_BYTES_WRITTEN			44
 /*! log: maximum log file size */
 #define	WT_STAT_CONN_LOG_MAX_FILESIZE			45
-/*! log: total log read operations */
+/*! log: log read operations */
 #define	WT_STAT_CONN_LOG_READS				46
-/*! log: total records processed by log scan */
+/*! log: records processed by log scan */
 #define	WT_STAT_CONN_LOG_SCAN_RECORDS			47
 /*! log: log scan records requiring two reads */
 #define	WT_STAT_CONN_LOG_SCAN_REREADS			48
-/*! log: total log scan operations */
+/*! log: log scan operations */
 #define	WT_STAT_CONN_LOG_SCANS				49
-/*! log: total consolidated slot closures */
+/*! log: consolidated slot closures */
 #define	WT_STAT_CONN_LOG_SLOT_CLOSES			50
-/*! log: total logging bytes consolidated */
+/*! log: logging bytes consolidated */
 #define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		51
-/*! log: total consolidated slot joins */
+/*! log: consolidated slot joins */
 #define	WT_STAT_CONN_LOG_SLOT_JOINS			52
-/*! log: total consolidated slot join races */
+/*! log: consolidated slot join races */
 #define	WT_STAT_CONN_LOG_SLOT_RACES			53
 /*! log: record size exceeded maximum */
 #define	WT_STAT_CONN_LOG_SLOT_TOOBIG			54
-/*! log: total consolidated slot join transitions */
+/*! log: consolidated slot join transitions */
 #define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		55
-/*! log: total log sync operations */
+/*! log: log sync operations */
 #define	WT_STAT_CONN_LOG_SYNC				56
-/*! log: total log write operations */
+/*! log: log write operations */
 #define	WT_STAT_CONN_LOG_WRITES				57
 /*! rows merged in an LSM tree */
 #define	WT_STAT_CONN_LSM_ROWS_MERGED			58
-/*! total heap memory allocations */
+/*! memory allocations */
 #define	WT_STAT_CONN_MEMORY_ALLOCATION			59
-/*! total heap memory frees */
+/*! memory frees */
 #define	WT_STAT_CONN_MEMORY_FREE			60
-/*! total heap memory re-allocations */
+/*! memory re-allocations */
 #define	WT_STAT_CONN_MEMORY_GROW			61
 /*! total read I/Os */
 #define	WT_STAT_CONN_READ_IO				62

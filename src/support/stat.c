@@ -359,30 +359,27 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
 	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
-	stats->log_bytes_user.desc =
-	    "log: total user provided log bytes written";
-	stats->log_bytes_written.desc = "log: total log bytes written";
+	stats->log_bytes_user.desc = "log: user provided log bytes written";
+	stats->log_bytes_written.desc = "log: log bytes written";
 	stats->log_max_filesize.desc = "log: maximum log file size";
-	stats->log_reads.desc = "log: total log read operations";
-	stats->log_scan_records.desc =
-	    "log: total records processed by log scan";
+	stats->log_reads.desc = "log: log read operations";
+	stats->log_scan_records.desc = "log: records processed by log scan";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
-	stats->log_scans.desc = "log: total log scan operations";
-	stats->log_slot_closes.desc = "log: total consolidated slot closures";
-	stats->log_slot_consolidated.desc =
-	    "log: total logging bytes consolidated";
-	stats->log_slot_joins.desc = "log: total consolidated slot joins";
-	stats->log_slot_races.desc = "log: total consolidated slot join races";
+	stats->log_scans.desc = "log: log scan operations";
+	stats->log_slot_closes.desc = "log: consolidated slot closures";
+	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
+	stats->log_slot_joins.desc = "log: consolidated slot joins";
+	stats->log_slot_races.desc = "log: consolidated slot join races";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_slot_transitions.desc =
-	    "log: total consolidated slot join transitions";
-	stats->log_sync.desc = "log: total log sync operations";
-	stats->log_writes.desc = "log: total log write operations";
+	    "log: consolidated slot join transitions";
+	stats->log_sync.desc = "log: log sync operations";
+	stats->log_writes.desc = "log: log write operations";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
-	stats->memory_allocation.desc = "total heap memory allocations";
-	stats->memory_free.desc = "total heap memory frees";
-	stats->memory_grow.desc = "total heap memory re-allocations";
+	stats->memory_allocation.desc = "memory allocations";
+	stats->memory_free.desc = "memory frees";
+	stats->memory_grow.desc = "memory re-allocations";
 	stats->read_io.desc = "total read I/Os";
 	stats->rec_pages.desc = "page reconciliation calls";
 	stats->rec_pages_eviction.desc =

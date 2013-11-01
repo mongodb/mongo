@@ -177,12 +177,18 @@ struct __wt_connection_impl {
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/* List of spinlocks: sized 1x the number of spinlocks. */
-	WT_SPINLOCK *spinlock_list[25];
+#define	WT_SPINLOCK_MAX	25
+	/* Spinlock blocking matrix: sized 2x the number of spinlocks. */
+	struct __wt_connection_stats_spinlock {
+		const char *name;		/* Mutex name */
+		const char *file;		/* Caller's file/line */
+		int line;
+						/* Count of blocked calls */
+		u_int blocked[WT_SPINLOCK_MAX * 2];
+	} spinlock_stats[WT_SPINLOCK_MAX * 2];
 
-	/* Blocking matrix: sized 2x the number of spinlocks. */
-	WT_CONNECTION_STATS_SPINLOCK spinlock_stats[50];
-	/*
+	/* Spinlock list: sized 1x the number of spinlocks. */
+	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
 #endif
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
