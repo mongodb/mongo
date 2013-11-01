@@ -66,13 +66,6 @@ __wt_spin_lock_register(WT_SESSION_IMPL *session,
 }
 
 /*
- * Ignore rare acquisition of a spinlock, don't create graphs we don't care
- * about.  (Since the minimum statistics logging interval is a second, we're
- * potentially ignoring 10 spin acquisitions per second).
- */
-#define	WT_SPIN_IGNORE	10
-
-/*
  * __wt_statlog_spinlock_dump --
  *	Log the spin-lock statistics.
  */
@@ -81,7 +74,14 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 {
 	WT_SPINLOCK *spin;
 	WT_CONNECTION_STATS_SPINLOCK *p, *t;
+	uint64_t ignore;
 	u_int i, j;
+
+	/*
+	 * Ignore rare acquisition of a spinlock using a base value of 10 per
+	 * second so we don't create graphs we don't care about.
+	 */
+	ignore = (uint64_t)(conn->stat_usecs / 1000000) * 10;
 
 	/* Dump the reference list. */
 	for (i = 0; i < WT_ELEMENTS(conn->spinlock_list); ++i) {
@@ -92,7 +92,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		WT_RET_TEST((fprintf(conn->stat_fp,
 		    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 		    conn->stat_stamp,
-		    spin->counter <= WT_SPIN_IGNORE ? 0 : spin->counter,
+		    spin->counter <= ignore ? 0 : spin->counter,
 		    tag, spin->name) < 0),
 		    __wt_errno());
 		if (conn->stat_clear)
@@ -113,7 +113,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			WT_RET_TEST((fprintf(conn->stat_fp,
 			    "%s %d %s spinlock %s: %s(%d) blocked by %s(%d)\n",
 			    conn->stat_stamp,
-			    p->blocked[j] <= WT_SPIN_IGNORE ? 0 : p->blocked[j],
+			    p->blocked[j] <= ignore ? 0 : p->blocked[j],
 			    tag,
 			    p->name, p->file, p->line,
 			    t->file, t->line) < 0), __wt_errno());
