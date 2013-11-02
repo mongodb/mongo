@@ -135,10 +135,15 @@ namespace mongo {
             double keysize = keyPattern.objsize() * 3;
             double keynum = 1;
 
+            Collection* collection = cc().database()->getCollection( ns );
+
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            if (newGroup) {
+            if (!collection) {
+                // no-op, not an error, just no results
+            }
+            else if (newGroup) {
                 CanonicalQuery* cq;
                 if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
                     uasserted(17212, "Can't canonicalize query " + query.toString());
