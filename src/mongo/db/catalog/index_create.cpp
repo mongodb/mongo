@@ -55,21 +55,16 @@ namespace mongo {
     /**
      * Add the provided (obj, dl) pair to the provided index.
      */
-    static void addKeysToIndex( Collection* collection, int idxNo,
+    static void addKeysToIndex( Collection* collection, IndexDescriptor* desc,
                                 const BSONObj& obj, const DiskLoc &recordLoc ) {
 
-        IndexDetails& id = collection->details()->idx(idxNo);
-
-        IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor( idxNo );
         verify( desc );
-
         IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
-        verify( iam );
 
         InsertDeleteOptions options;
         options.logIfError = false;
-        options.dupsAllowed = (!KeyPattern::isIdKeyPattern(id.keyPattern()) && !id.unique())
-            || ignoreUniqueIndex(id);
+        options.dupsAllowed = (!KeyPattern::isIdKeyPattern(desc->keyPattern()) && !desc->unique())
+            || ignoreUniqueIndex(desc);
 
         int64_t inserted;
         Status ret = iam->insert(obj, recordLoc, options, &inserted);
@@ -87,11 +82,11 @@ namespace mongo {
             : BackgroundOperation(ns) {
         }
 
-        unsigned long long go( Collection* collection, IndexDetails& idx );
+        unsigned long long go( Collection* collection, IndexDescriptor* idx );
 
     private:
         unsigned long long addExistingToIndex( Collection* collection,
-                                               IndexDetails& idx );
+                                               IndexDescriptor* idx );
 
         void prep(const StringData& ns ) {
             Lock::assertWriteLocked(ns);
@@ -108,7 +103,7 @@ namespace mongo {
 
     };
 
-    unsigned long long BackgroundIndexBuildJob::go( Collection* collection, IndexDetails& idx) {
+    unsigned long long BackgroundIndexBuildJob::go( Collection* collection, IndexDescriptor* idx) {
 
         string ns = collection->ns().ns();
 
@@ -119,7 +114,7 @@ namespace mongo {
         prep( ns );
 
         try {
-            idx.head.writing() = BtreeBasedBuilder::makeEmptyIndex( idx );
+            idx->getOnDisk().head.writing() = BtreeBasedBuilder::makeEmptyIndex( idx->getOnDisk() );
             unsigned long long n = addExistingToIndex( collection, idx );
             // idx may point at an invalid index entry at this point
             done( ns );
@@ -132,12 +127,12 @@ namespace mongo {
     }
 
     unsigned long long BackgroundIndexBuildJob::addExistingToIndex( Collection* collection,
-                                                                    IndexDetails& idx ) {
+                                                                    IndexDescriptor* idx ) {
 
         string ns = collection->ns().ns(); // our copy for sanity
 
-        bool dupsAllowed = !idx.unique();
-        bool dropDups = idx.dropDups();
+        bool dupsAllowed = !idx->unique();
+        bool dropDups = idx->dropDups();
 
         ProgressMeter& progress = cc().curop()->setMessage("bg index build",
                                                            "Background Index Build Progress",
@@ -152,9 +147,7 @@ namespace mongo {
         // happens.
         RunnerYieldPolicy yieldPolicy;
 
-        std::string idxName = idx.indexName();
-        int idxNo = collection->details()->findIndexByName( idxName, true );
-        verify( idxNo >= 0 );
+        std::string idxName = idx->indexName();
 
         // After this yields in the loop, idx may point at a different index (if indexes get
         // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
@@ -166,10 +159,10 @@ namespace mongo {
             try {
                 if ( !dupsAllowed && dropDups ) {
                     LastError::Disabled led( lastError.get() );
-                    addKeysToIndex(collection, idxNo, js, loc);
+                    addKeysToIndex(collection, idx, js, loc);
                 }
                 else {
-                    addKeysToIndex(collection, idxNo, js, loc);
+                    addKeysToIndex(collection, idx, js, loc);
                 }
             }
             catch( AssertionException& e ) {
@@ -218,8 +211,8 @@ namespace mongo {
 
                 progress.setTotalWhileRunning( collection->numRecords() );
                 // Recalculate idxNo if we yielded
-                idxNo = collection->details()->findIndexByName( idxName, true );
-                verify( idxNo >= 0 );
+                idx = collection->getIndexCatalog()->findIndexByName( idxName, true );
+                verify( idx );
             }
         }
 
@@ -233,17 +226,17 @@ namespace mongo {
 
     // throws DBException
     void buildAnIndex( Collection* collection,
-                       IndexDetails& idx,
+                       IndexDescriptor* idx,
                        bool mayInterrupt ) {
 
         string ns = collection->ns().ns(); // our copy
 
-        BSONObj idxInfo = idx.info.obj();
+        const BSONObj& idxInfo = idx->infoObj();
 
         MONGO_TLOG(0) << "build index on: " << ns
-                      << " properties: " << idxInfo.jsonString() << endl;
+                      << " properties: " << idx->toString() << endl;
 
-        audit::logCreateIndex( currentClient.get(), &idxInfo, idx.indexName(), ns );
+        audit::logCreateIndex( currentClient.get(), &idxInfo, idx->indexName(), ns );
 
         Timer t;
         unsigned long long n;
@@ -251,18 +244,15 @@ namespace mongo {
         verify( Lock::isWriteLocked( ns ) );
 
         if( inDBRepair || !idxInfo["background"].trueValue() ) {
-            int idxNo = collection->details()->findIndexByName( idx.info.obj()["name"].valuestr(),
-                                                                true );
-            verify( idxNo >= 0 );
-            n = BtreeBasedBuilder::fastBuildIndex( ns.c_str(), collection->details(),
-                                                   idx, mayInterrupt, idxNo );
-            verify( !idx.head.isNull() );
+            n = BtreeBasedBuilder::fastBuildIndex( collection, idx, mayInterrupt );
+            verify( !idx->getHead().isNull() );
         }
         else {
             BackgroundIndexBuildJob j( ns );
             n = j.go( collection, idx );
         }
-        MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
+        MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. "
+                      << t.millis() / 1000.0 << " secs" << endl;
     }
 
 }  // namespace mongo

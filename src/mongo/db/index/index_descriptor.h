@@ -35,6 +35,8 @@
 #include "mongo/db/namespace_details.h"  // For NamespaceDetails.
 #include "mongo/db/structure/collection.h"
 
+#include "mongo/util/stacktrace.h"
+
 namespace mongo {
 
     class IndexCatalog;
@@ -62,7 +64,8 @@ namespace mongo {
          */
         IndexDescriptor(Collection* collection, int indexNumber, OnDiskIndexData* data,
                         BSONObj infoObj)
-            : _collection(collection), _indexNumber(indexNumber), _onDiskData(data),
+            : _magic(123987),
+              _collection(collection), _indexNumber(indexNumber), _onDiskData(data),
               _infoObj(infoObj.getOwned()),
               _numFields(infoObj.getObjectField("key").nFields()),
               _keyPattern(infoObj.getObjectField("key").getOwned()),
@@ -80,7 +83,10 @@ namespace mongo {
             if ( e.isNumber() ) {
                 _version = e.numberInt();
             }
+        }
 
+        ~IndexDescriptor() {
+            _magic = 555;
         }
 
         // XXX this is terrible
@@ -97,17 +103,17 @@ namespace mongo {
          * Example: {geo: "2dsphere", nonGeo: 1}
          * Example: {foo: 1, bar: -1}
          */
-        const BSONObj& keyPattern() const { return _keyPattern; }
+        const BSONObj& keyPattern() const { _checkOk(); return _keyPattern; }
 
         // How many fields do we index / are in the key pattern?
-        int getNumFields() const { return _numFields; }
+        int getNumFields() const { _checkOk(); return _numFields; }
 
         //
         // Information about the index's namespace / collection.
         //
 
         // Return the name of the index.
-        const string& indexName() const { return _indexName; }
+        const string& indexName() const { _checkOk(); return _indexName; }
 
         // Return the name of the indexed collection.
         const string& parentNS() const { return _parentNS; }
@@ -132,9 +138,9 @@ namespace mongo {
         bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
-        bool isMultikey() const { return _collection->details()->isMultikey(_indexNumber); }
+        bool isMultikey() const { _checkOk(); return _collection->details()->isMultikey(_indexNumber); }
 
-        bool isIdIndex() const { return _isIdIndex; }
+        bool isIdIndex() const { _checkOk(); return _isIdIndex; }
 
         //
         // Properties that are Index-specific.
@@ -149,20 +155,20 @@ namespace mongo {
         //
 
         // Return the memory-mapped index data block.
-        OnDiskIndexData& getOnDisk() { return* _onDiskData; }
+        OnDiskIndexData& getOnDisk() { _checkOk(); return *_onDiskData; }
 
         // Return the mutable head of the index.
-        DiskLoc& getHead() { return _onDiskData->head; }
+        const DiskLoc& getHead() const { _checkOk(); return _onDiskData->head; }
 
         // Return a (rather compact) string representation.
-        string toString() const { return _infoObj.toString(); }
+        string toString() const { _checkOk(); return _infoObj.toString(); }
 
         // Return the info object.
-        const BSONObj& infoObj() const { return _infoObj; }
+        const BSONObj& infoObj() const { _checkOk(); return _infoObj; }
 
         // Set multikey attribute.  We never unset it.
         void setMultikey() {
-            _collection->details()->setIndexIsMultikey(parentNS().c_str(), _indexNumber);
+            _collection->getIndexCatalog()->markMultikey( this );
         }
 
         // Is this index being created in the background?
@@ -178,7 +184,16 @@ namespace mongo {
 
     private:
 
+        void _checkOk() const {
+            if ( _magic == 123987 )
+                return;
+            log() << "uh oh: " << (void*)(this) << " " << _magic;
+            verify(0);
+        }
+
         int getIndexNumber() const { return _indexNumber; }
+
+        int _magic;
 
         // Related catalog information of the parent collection
         Collection* _collection;

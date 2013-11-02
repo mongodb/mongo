@@ -227,12 +227,31 @@ namespace mongo {
         verify( indexBuildBlock.indexDetails() );
 
         try {
-            buildAnIndex( _collection,
-                          *indexBuildBlock.indexDetails(), mayInterrupt);
+            int idxNo = _details->findIndexByName( idxName, true );
+            verify( idxNo >= 0 );
+
+            IndexDetails* id = &_details->idx(idxNo);
+
+            scoped_ptr<IndexDescriptor> desc( new IndexDescriptor( _collection, idxNo,
+                                                                   id, id->info.obj().getOwned() ) );
+            buildAnIndex( _collection, desc.get(), mayInterrupt );
             indexBuildBlock.success();
+
+            // in case we got any access methods or something like that
+            // TEMP until IndexDescriptor has to direct refs
+            idxNo = _details->findIndexByName( idxName, true );
+            verify( idxNo >= 0 );
+            _deleteCacheEntry( idxNo );
+
             return Status::OK();
         }
         catch (DBException& e) {
+            // in case we got any access methods or something like that
+            // TEMP until IndexDescriptor has to direct refs
+            int idxNo = _details->findIndexByName( idxName, true );
+            verify( idxNo >= 0 );
+            _deleteCacheEntry( idxNo );
+
             // save our error msg string as an exception or dropIndexes will overwrite our message
             LastError *le = lastError.get();
             int savecode = 0;
@@ -312,6 +331,8 @@ namespace mongo {
     void IndexCatalog::IndexBuildBlock::success() {
 
         fassert( 17206, _indexDetails );
+        BSONObj keyPattern = _indexDetails->keyPattern().getOwned();
+
         _indexDetails = NULL;
 
         fassert( 17207, _catalog->_collection->ok() );
@@ -326,7 +347,7 @@ namespace mongo {
 
             int toIdxNo = _nsd->getCompletedIndexCount();
 
-            _nsd->swapIndex( _ns.c_str(), idxNo, toIdxNo );
+            _nsd->swapIndex( idxNo, toIdxNo );
 
             // neither of these should be used in queries yet, so nothing should be caching these
             _catalog->_deleteCacheEntry( idxNo );
@@ -342,7 +363,7 @@ namespace mongo {
 
         _catalog->_fixDescriptorCacheNumbers();
 
-        IndexLegacy::postBuildHook( _catalog->_collection, _catalog->getDescriptor( idxNo ) );
+        IndexLegacy::postBuildHook( _catalog->_collection, keyPattern );
     }
 
 
@@ -691,6 +712,11 @@ namespace mongo {
         return Status::OK();
     }
 
+    void IndexCatalog::markMultikey( IndexDescriptor* idx, bool isMultikey ) {
+        if ( _details->setIndexIsMultikey( idx->_indexNumber, isMultikey ) )
+            _collection->infoCache()->clearQueryCache();
+    }
+
     // ---------------------------
 
     int IndexCatalog::numIndexesTotal() const {
@@ -710,15 +736,17 @@ namespace mongo {
         return NULL;
     }
 
-    IndexDescriptor* IndexCatalog::findIndexByName( const StringData& name ) {
-        int idxNo = _details->findIndexByName( name );
+    IndexDescriptor* IndexCatalog::findIndexByName( const StringData& name,
+                                                    bool includeUnfinishedIndexes ) {
+        int idxNo = _details->findIndexByName( name, includeUnfinishedIndexes );
         if ( idxNo < 0 )
             return NULL;
         return getDescriptor( idxNo );
     }
 
-    IndexDescriptor* IndexCatalog::findIndexByKeyPattern( const BSONObj& key ) {
-        int idxNo = _details->findIndexByKeyPattern( key );
+    IndexDescriptor* IndexCatalog::findIndexByKeyPattern( const BSONObj& key,
+                                                          bool includeUnfinishedIndexes ) {
+        int idxNo = _details->findIndexByKeyPattern( key, includeUnfinishedIndexes );
         if ( idxNo < 0 )
             return NULL;
         return getDescriptor( idxNo );
@@ -772,6 +800,25 @@ namespace mongo {
         BtreeAccessMethod* newlyCreated = new BtreeAccessMethod( desc );
         _forcedBtreeAccessMethodCache[idxNo] = newlyCreated;
         return newlyCreated;
+    }
+
+    BtreeBasedAccessMethod* IndexCatalog::getBtreeBasedIndex( IndexDescriptor* desc ) {
+
+        string type = _getAccessMethodName(desc->keyPattern());
+
+        if (IndexNames::HASHED == type ||
+            IndexNames::GEO_2DSPHERE == type ||
+            IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type ||
+            IndexNames::GEO_HAYSTACK == type ||
+            "" == type ||
+            IndexNames::GEO_2D == type ) {
+            IndexAccessMethod* iam = getIndex( desc );
+            return dynamic_cast<BtreeBasedAccessMethod*>( iam );
+        }
+
+        error() << "getBtreeBasedIndex with a non btree index (" << type << ")";
+        verify(0);
+        return NULL;
     }
 
 

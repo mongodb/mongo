@@ -32,16 +32,15 @@
 
 #include <string>
 
-#include "mongo/db/storage/index_details.h"
-
 namespace mongo {
     class Collection;
+    class IndexDescriptor;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
     // If background is true, uses background index builder; blocks until done.
     void buildAnIndex( Collection* collection,
-                       IndexDetails& idx,
+                       IndexDescriptor* idx,
                        bool mayInterrupt );
 
 } // namespace mongo

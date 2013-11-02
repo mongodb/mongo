@@ -71,12 +71,14 @@ namespace mongo {
         /**
          * @return null if cannot find
          */
-        IndexDescriptor* findIndexByName( const StringData& name );
+        IndexDescriptor* findIndexByName( const StringData& name,
+                                          bool includeUnfinishedIndexes = false );
 
         /**
          * @return null if cannot find
          */
-        IndexDescriptor* findIndexByKeyPattern( const BSONObj& key );
+        IndexDescriptor* findIndexByKeyPattern( const BSONObj& key,
+                                                bool includeUnfinishedIndexes = false );
 
         /* Returns the index entry for the first index whose prefix contains
          * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
@@ -125,6 +127,8 @@ namespace mongo {
          * @return the info for a single index to retry
          */
         BSONObj prepOneUnfinishedIndex();
+
+        void markMultikey( IndexDescriptor* idx, bool isMultikey = true );
 
         // --- these probably become private?
 

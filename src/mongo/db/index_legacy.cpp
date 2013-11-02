@@ -87,9 +87,9 @@ namespace mongo {
     }
 
     // static
-    void IndexLegacy::postBuildHook(Collection* collection, IndexDescriptor* desc) {
+    void IndexLegacy::postBuildHook(Collection* collection, const BSONObj& keyPattern) {
         // If it's an FTS index, we want to set the power of 2 flag.
-        string pluginName = collection->getIndexCatalog()->getAccessMethodName(desc->keyPattern());
+        string pluginName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
         if (IndexNames::TEXT == pluginName || IndexNames::TEXT_INTERNAL == pluginName) {
             NamespaceDetails* nsd = collection->details();
             if (nsd->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes)) {

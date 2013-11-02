@@ -127,7 +127,9 @@ namespace mongo {
                 // XXX: do we want to buffer docs and delete them in a group rather than
                 // saving/restoring state repeatedly?
                 runner->saveState();
-                currentClient.get()->database()->getCollection(ns)->deleteDocument(rloc);
+                Collection* collection = currentClient.get()->database()->getCollection(ns);
+                verify( collection );
+                collection->deleteDocument(rloc);
                 runner->restoreState();
 
                 nDeleted++;

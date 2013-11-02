@@ -30,10 +30,11 @@
 
 #pragma once
 
+#include "mongo/bson/optime.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/bson/optime.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
 #include "mongo/db/repl/rs_member.h"
@@ -737,6 +738,34 @@ namespace mongo {
             _hbinfo.health = 1.0;
     }
 
+    inline bool ignoreUniqueIndex(IndexDescriptor* idx) {
+        if (!idx->unique()) {
+            return false;
+        }
+        if (!theReplSet) {
+            return false;
+        }
+        // see SERVER-6671
+        MemberState ms = theReplSet->state();
+        if (! ((ms == MemberState::RS_STARTUP2) ||
+               (ms == MemberState::RS_RECOVERING) ||
+               (ms == MemberState::RS_ROLLBACK))) {
+            return false;
+        }
+        // 2 is the oldest oplog version where operations
+        // are fully idempotent.
+        if (theReplSet->oplogVersion < 2) {
+            return false;
+        }
+        // Never ignore _id index
+        if (idx->isIdIndex()) {
+            return false;
+        }
+
+        return true;
+    }
+
+
     inline bool ignoreUniqueIndex(IndexDetails& idx) {
         if (!idx.unique()) {
             return false;
@@ -760,7 +789,7 @@ namespace mongo {
         if (idx.isIdIndex()) {
             return false;
         }
-        
+
         return true;
     }
 

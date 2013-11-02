@@ -1600,6 +1600,13 @@ namespace NamespaceTests {
                 verify(c);
                 return c;
             }
+            IndexCatalog* indexCatalog() const { 
+                return collection()->getIndexCatalog();
+            }
+            void setIndexIsMultikey( int idxNo, bool isMultikey ) {
+                indexCatalog()->markMultikey( indexCatalog()->getDescriptor( idxNo ),
+                                              isMultikey );
+            }
             CollectionInfoCache* infoCache() const {
                 return collection()->infoCache();
             }
@@ -2266,12 +2273,12 @@ namespace NamespaceTests {
                 
                 ASSERT( !nsd()->isMultikey( 1 ) );
                 
-                nsd()->setIndexIsMultikey( ns(), 1 );
+                indexCatalog()->markMultikey( indexCatalog()->getDescriptor( 1 ) );
                 ASSERT( nsd()->isMultikey( 1 ) );
                 assertCachedIndexKey( BSONObj() );
                 
                 registerIndexKey( BSON( "a" << 1 ) );
-                nsd()->setIndexIsMultikey( ns(), 1 );
+                indexCatalog()->markMultikey( indexCatalog()->getDescriptor( 1 ) );
                 assertCachedIndexKey( BSON( "a" << 1 ) );
             }
         };
@@ -2283,26 +2290,26 @@ namespace NamespaceTests {
                 NamespaceDetails *nsd = nsdetails(ns());
 
                 // Set 2 & 54 as multikey
-                nsd->setIndexIsMultikey(ns(), 2, true);
-                nsd->setIndexIsMultikey(ns(), 54, true);
+                nsd->setIndexIsMultikey(2, true);
+                nsd->setIndexIsMultikey(54, true);
                 ASSERT(nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(54));
 
                 // Flip 2 & 47
-                nsd->setIndexIsMultikey(ns(), 2, false);
-                nsd->setIndexIsMultikey(ns(), 47, true);
+                nsd->setIndexIsMultikey(2, false);
+                nsd->setIndexIsMultikey(47, true);
                 ASSERT(!nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(47));
 
                 // Reset entries that are already true
-                nsd->setIndexIsMultikey(ns(), 54, true);
-                nsd->setIndexIsMultikey(ns(), 47, true);
+                nsd->setIndexIsMultikey(54, true);
+                nsd->setIndexIsMultikey(47, true);
                 ASSERT(nsd->isMultikey(54));
                 ASSERT(nsd->isMultikey(47));
 
                 // Two non-multi-key
-                nsd->setIndexIsMultikey(ns(), 2, false);
-                nsd->setIndexIsMultikey(ns(), 43, false);
+                nsd->setIndexIsMultikey(2, false);
+                nsd->setIndexIsMultikey(43, false);
                 ASSERT(!nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(54));
                 ASSERT(nsd->isMultikey(47));

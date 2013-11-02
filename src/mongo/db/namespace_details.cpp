@@ -436,7 +436,7 @@ namespace mongo {
         return e;
     }
 
-    void NamespaceDetails::setIndexIsMultikey(const char *thisns, int i, bool multikey) {
+    bool NamespaceDetails::setIndexIsMultikey(int i, bool multikey) {
         massert(16577, "index number greater than NIndexesMax", i < NIndexesMax );
 
         unsigned long long mask = 1ULL << i;
@@ -444,7 +444,7 @@ namespace mongo {
         if (multikey) {
             // Shortcut if the bit is already set correctly
             if (_multiKeyIndexBits & mask) {
-                return;
+                return false;
             }
 
             *getDur().writing(&_multiKeyIndexBits) |= mask;
@@ -452,7 +452,7 @@ namespace mongo {
         else {
             // Shortcut if the bit is already set correctly
             if (!(_multiKeyIndexBits & mask)) {
-                return;
+                return false;
             }
 
             // Invert mask: all 1's except a 0 at the ith bit
@@ -460,9 +460,7 @@ namespace mongo {
             *getDur().writing(&_multiKeyIndexBits) &= mask;
         }
 
-        Collection* collection = cc().database()->getCollection( thisns );
-        if ( collection )
-            collection->infoCache()->clearQueryCache();
+        return true;
     }
 
     IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
@@ -753,7 +751,7 @@ namespace mongo {
         d->idx( getTotalIndexCount() ) = IndexDetails();
     }
 
-    void NamespaceDetails::swapIndex( const char* ns, int a, int b ) {
+    void NamespaceDetails::swapIndex( int a, int b ) {
 
         // flip main meta data
         IndexDetails temp = idx(a);
@@ -762,8 +760,8 @@ namespace mongo {
 
         // flip multi key bits
         bool tempMultikey = isMultikey(a);
-        setIndexIsMultikey( ns, a, isMultikey(b) );
-        setIndexIsMultikey( ns, b, tempMultikey );
+        setIndexIsMultikey( a, isMultikey(b) );
+        setIndexIsMultikey( b, tempMultikey );
     }
 
     void NamespaceDetails::orphanDeletedList() {

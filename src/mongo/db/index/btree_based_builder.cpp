@@ -36,6 +36,7 @@
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/util/processinfo.h"
@@ -74,7 +75,7 @@ namespace mongo {
 
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   IndexDetails& idx,
+                                   IndexDescriptor* idx,
                                    BSONObjExternalSorter& sorter,
                                    bool dropDups,
                                    set<DiskLoc>& dupsToDrop,
@@ -83,7 +84,7 @@ namespace mongo {
                                    ProgressMeterHolder& pm,
                                    Timer& t,
                                    bool mayInterrupt ) {
-        BtreeBuilder<V> btBuilder(dupsAllowed, idx);
+        BtreeBuilder<V> btBuilder(dupsAllowed, idx->getOnDisk());
         BSONObj keyLast;
         auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
         // verifies that pm and op refer to the same ProgressMeter
@@ -153,19 +154,21 @@ namespace mongo {
         }
     }
 
-    void BtreeBasedBuilder::addKeysToPhaseOne(NamespaceDetails* d, const char* ns,
-                           const IndexDetails& idx,
-                           const BSONObj& order,
-                           SortPhaseOne* phaseOne,
-                           int64_t nrecords,
-                           ProgressMeter* progressMeter,
-                           bool mayInterrupt, int idxNo) {
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
-        phaseOne->sortCmp.reset(getComparison(idx.version(), idx.keyPattern()));
+    void BtreeBasedBuilder::addKeysToPhaseOne(Collection* collection,
+                                              IndexDescriptor* idx,
+                                              const BSONObj& order,
+                                              SortPhaseOne* phaseOne,
+                                              ProgressMeter* progressMeter,
+                                              bool mayInterrupt ) {
+
+
+        phaseOne->sortCmp.reset(getComparison(idx->version(), idx->keyPattern()));
         phaseOne->sorter.reset(new BSONObjExternalSorter(phaseOne->sortCmp.get()));
-        phaseOne->sorter->hintNumObjects( nrecords );
-        auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(d, idxNo));
-        auto_ptr<BtreeBasedAccessMethod> iam(CatalogHack::getBtreeBasedIndex(desc.get()));
+        phaseOne->sorter->hintNumObjects( collection->numRecords() );
+
+        BtreeBasedAccessMethod* iam =collection->getIndexCatalog()->getBtreeBasedIndex( idx );
+
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(collection->ns().ns()));
         BSONObj o;
         DiskLoc loc;
         Runner::RunnerState state;
@@ -185,20 +188,20 @@ namespace mongo {
 
     }
 
-    uint64_t BtreeBasedBuilder::fastBuildIndex(const char* ns, NamespaceDetails* d,
-                                               IndexDetails& idx, bool mayInterrupt,
-                                               int idxNo) {
+    uint64_t BtreeBasedBuilder::fastBuildIndex( Collection* collection,
+                                                IndexDescriptor* idx,
+                                                bool mayInterrupt ) {
         CurOp * op = cc().curop();
 
         Timer t;
 
-        MONGO_TLOG(1) << "fastBuildIndex " << ns << ' ' << idx.info.obj().toString() << endl;
+        MONGO_TLOG(1) << "fastBuildIndex " << collection->ns() << ' ' << idx->toString() << endl;
 
-        bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
-        bool dropDups = idx.dropDups() || inDBRepair;
-        BSONObj order = idx.keyPattern();
+        bool dupsAllowed = !idx->unique() || ignoreUniqueIndex(idx->getOnDisk());
+        bool dropDups = idx->dropDups() || inDBRepair;
+        BSONObj order = idx->keyPattern();
 
-        getDur().writingDiskLoc(idx.head).Null();
+        getDur().writingDiskLoc(idx->getOnDisk().head).Null();
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
             printMemInfo( "before index start" );
@@ -206,17 +209,16 @@ namespace mongo {
         /* get and sort all the keys ----- */
         ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
                                               "Index: (1/3) External Sort Progress",
-                                              d->numRecords(),
+                                              collection->numRecords(),
                                               10));
         SortPhaseOne phase1;
-        addKeysToPhaseOne(d, ns, idx, order, &phase1, d->numRecords(), pm.get(),
-                          mayInterrupt, idxNo );
+        addKeysToPhaseOne(collection, idx, order, &phase1, pm.get(), mayInterrupt );
         pm.finished();
 
         BSONObjExternalSorter& sorter = *(phase1.sorter);
 
         if( phase1.multi ) {
-            d->setIndexIsMultikey(ns, idxNo);
+            collection->getIndexCatalog()->markMultikey( idx );
         }
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
@@ -231,7 +233,7 @@ namespace mongo {
         set<DiskLoc> dupsToDrop;
 
         /* build index --- */
-        if( idx.version() == 0 )
+        if( idx->version() == 0 )
             buildBottomUpPhases2And3<V0>(dupsAllowed,
                                          idx,
                                          sorter,
@@ -242,7 +244,7 @@ namespace mongo {
                                          pm,
                                          t,
                                          mayInterrupt);
-        else if( idx.version() == 1 ) 
+        else if( idx->version() == 1 )
             buildBottomUpPhases2And3<V1>(dupsAllowed,
                                          idx,
                                          sorter,
@@ -256,27 +258,28 @@ namespace mongo {
         else
             verify(false);
 
-        if( dropDups ) 
+        if( dropDups )
             log() << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
-        BtreeBasedBuilder::doDropDups(ns, d, dupsToDrop, mayInterrupt);
+        doDropDups(collection, dupsToDrop, mayInterrupt);
 
         return phase1.n;
     }
 
-    void BtreeBasedBuilder::doDropDups(const char* ns, NamespaceDetails* d,
+    void BtreeBasedBuilder::doDropDups(Collection* collection,
                                        const set<DiskLoc>& dupsToDrop, bool mayInterrupt) {
-
+        string ns = collection->ns().ns();
         for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
             RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
-            theDataFileMgr.deleteRecord( d,
-                                         ns,
-                                         i->rec(),
-                                         *i,
-                                         false /* cappedOk */,
-                                         true /* noWarn */,
-                                         isMaster( ns ) /* logOp */ );
+            BSONObj toDelete;
+            collection->deleteDocument( *i,
+                                        false /* cappedOk */,
+                                        true /* noWarn */,
+                                        &toDelete );
             getDur().commitIfNeeded();
+            if ( isMaster( ns.c_str() ) ) {
+                logOp( "d", ns.c_str(), toDelete );
+            }
         }
     }
 

@@ -42,8 +42,10 @@ namespace IndexUpdateTests {
 
 namespace mongo {
 
+    class Collection;
     class BSONObjExternalSorter;
     class ExternalSortComparison;
+    class IndexDescriptor;
     class IndexDetails;
     class NamespaceDetails;
     class ProgressMeter;
@@ -55,8 +57,8 @@ namespace mongo {
         /**
          * Want to build an index?  Call this.  Throws DBException.
          */
-        static uint64_t fastBuildIndex(const char* ns, NamespaceDetails* d, IndexDetails& idx,
-                                       bool mayInterrupt, int idxNo);
+        static uint64_t fastBuildIndex(Collection* collection, IndexDescriptor* descriptor,
+                                       bool mayInterrupt);
         static DiskLoc makeEmptyIndex(const IndexDetails& idx);
         static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
 
@@ -67,20 +69,18 @@ namespace mongo {
         friend class IndexUpdateTests::InterruptDoDropDups;
 
 
-        static void addKeysToPhaseOne(NamespaceDetails* d, const char* ns, const IndexDetails& idx,
+        static void addKeysToPhaseOne(Collection* collection, IndexDescriptor* idx,
                                       const BSONObj& order, SortPhaseOne* phaseOne,
-                                      int64_t nrecords, ProgressMeter* progressMeter,
-                                      bool mayInterrupt,
-                                      int idxNo);
+                                      ProgressMeter* progressMeter, bool mayInterrupt );
 
-        static void doDropDups(const char* ns, NamespaceDetails* d, const set<DiskLoc>& dupsToDrop,
+        static void doDropDups(Collection* collection, const set<DiskLoc>& dupsToDrop,
                                bool mayInterrupt );
     };
 
     // Exposed for testing purposes.
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   IndexDetails& idx,
+                                   IndexDescriptor* idx,
                                    BSONObjExternalSorter& sorter,
                                    bool dropDups,
                                    set<DiskLoc>& dupsToDrop,

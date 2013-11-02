@@ -283,7 +283,11 @@ namespace mongo {
            for these, we have to do some dedup work on queries.
         */
         bool isMultikey(int i) const { return (_multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
-        void setIndexIsMultikey(const char *thisns, int i, bool multikey = true);
+
+        /**
+         * @return - if any state was changed
+         */
+        bool setIndexIsMultikey(int i, bool multikey = true);
 
         /**
          * This fetches the IndexDetails for the next empty index slot. The caller must populate
@@ -473,7 +477,7 @@ namespace mongo {
          * a and b are 2 index ids, whose contents will be swapped
          * must have a lock on the entire collection to do this
          */
-        void swapIndex( const char* ns, int a, int b );
+        void swapIndex( int a, int b );
 
         DiskLoc _alloc(const StringData& ns, int len);
         void maybeComplain( const StringData& ns, int len ) const;

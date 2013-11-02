@@ -50,9 +50,12 @@ namespace IndexUpdateTests {
             _client.dropCollection( _ns );
             killCurrentOp.reset();
         }
+        Collection* collection() {
+            return _ctx.ctx().db()->getCollection( _ns );
+        }
     protected:
         /** @return IndexDetails for a new index on a:1, with the info field populated. */
-        IndexDetails& addIndexWithInfo() {
+        IndexDescriptor* addIndexWithInfo() {
             BSONObj indexInfo = BSON( "v" << 1 <<
                                       "key" << BSON( "a" << 1 ) <<
                                       "ns" << _ns <<
@@ -68,13 +71,10 @@ namespace IndexUpdateTests {
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
 
-            Collection* collection = _ctx.ctx().db()->getCollection( _ns );
-            verify( collection );
-
-            IndexCatalog::IndexBuildBlock blk( collection->getIndexCatalog(), "a_1", infoLoc );
-            IndexDetails* id = blk.indexDetails();
+            IndexCatalog::IndexBuildBlock blk( collection()->getIndexCatalog(), "a_1", infoLoc );
             blk.success();
-            return *id;
+
+            return collection()->getIndexCatalog()->findIndexByName( "a_1" );
         }
 
         Client::WriteContext _ctx;
@@ -89,7 +89,8 @@ namespace IndexUpdateTests {
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
-            IndexDetails& id = addIndexWithInfo();
+
+            IndexDescriptor* id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
             ProgressMeterHolder pm (cc().curop()->setMessage("AddKeysToPhaseOne",
@@ -97,8 +98,11 @@ namespace IndexUpdateTests {
                                                              nDocs,
                                                              nDocs));
             // Add keys to phaseOne.
-            BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns, id, BSON( "a" << 1 ), &phaseOne, nDocs, pm.get(), true,
-                                                 nsdetails(_ns)->idxNo(id) );
+            BtreeBasedBuilder::addKeysToPhaseOne( collection(),
+                                                  id,
+                                                  BSON( "a" << 1 ),
+                                                  &phaseOne,
+                                                  pm.get(), true );
             // Keys for all documents were added to phaseOne.
             ASSERT_EQUALS( static_cast<uint64_t>( nDocs ), phaseOne.n );
         }
@@ -117,7 +121,7 @@ namespace IndexUpdateTests {
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
-            IndexDetails& id = addIndexWithInfo();
+            IndexDescriptor* id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
             ProgressMeterHolder pm (cc().curop()->setMessage("InterruptAddKeysToPhaseOne",
@@ -128,27 +132,24 @@ namespace IndexUpdateTests {
             cc().curop()->kill();
             if ( _mayInterrupt ) {
                 // Add keys to phaseOne.
-                ASSERT_THROWS( BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns,
-                                                  id,
-                                                  BSON( "a" << 1 ),
-                                                  &phaseOne,
-                                                  nDocs,
-                                                  pm.get(),
-                                                  _mayInterrupt,
-                                                  nsdetails(_ns)->idxNo(id) ),
+                ASSERT_THROWS( BtreeBasedBuilder::addKeysToPhaseOne( collection(),
+                                                                     id,
+                                                                     BSON( "a" << 1 ),
+                                                                     &phaseOne,
+                                                                     pm.get(),
+                                                                     _mayInterrupt ),
                                UserException );
                 // Not all keys were added to phaseOne due to the interrupt.
                 ASSERT( static_cast<uint64_t>( nDocs ) > phaseOne.n );
             }
             else {
                 // Add keys to phaseOne.
-                BtreeBasedBuilder::addKeysToPhaseOne( nsdetails(_ns), _ns,
-                                   id,
-                                   BSON( "a" << 1 ),
-                                   &phaseOne,
-                                   nDocs,
-                                   pm.get(),
-                                   _mayInterrupt, nsdetails(_ns)->idxNo(id) );
+                BtreeBasedBuilder::addKeysToPhaseOne( collection(),
+                                                      id,
+                                                      BSON( "a" << 1 ),
+                                                      &phaseOne,
+                                                      pm.get(),
+                                                      _mayInterrupt );
                 // All keys were added to phaseOne despite to the kill request, because
                 // mayInterrupt == false.
                 ASSERT_EQUALS( static_cast<uint64_t>( nDocs ), phaseOne.n );
@@ -162,7 +163,7 @@ namespace IndexUpdateTests {
     class BuildBottomUp : public IndexBuildBase {
     public:
         void run() {
-            IndexDetails& id = addIndexWithInfo();
+            IndexDescriptor* id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
             phaseOne.sorter.reset( new BSONObjExternalSorter(_aFirstSort));
@@ -183,7 +184,7 @@ namespace IndexUpdateTests {
             pm.finished();
             Timer timer;
             // The index's root has not yet been set.
-            ASSERT( id.head.isNull() );
+            ASSERT( id->getHead().isNull() );
             // Finish building the index.
             buildBottomUpPhases2And3<V1>( true,
                                           id,
@@ -196,11 +197,11 @@ namespace IndexUpdateTests {
                                           timer,
                                           true );
             // The index's root is set after the build is complete.
-            ASSERT( !id.head.isNull() );
+            ASSERT( !id->getHead().isNull() );
             // Create a cursor over the index.
             scoped_ptr<BtreeCursor> cursor(
                     BtreeCursor::make( nsdetails( _ns ),
-                                       id,
+                                       id->getOnDisk(),
                                        BSON( "" << -1 ),    // startKey below minimum key.
                                        BSON( "" << nKeys ), // endKey above maximum key.
                                        true,                // endKeyInclusive true.
@@ -222,7 +223,7 @@ namespace IndexUpdateTests {
             _mayInterrupt( mayInterrupt ) {
         }
         void run() {
-            IndexDetails& id = addIndexWithInfo();
+            IndexDescriptor* id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
             phaseOne.sorter.reset(new BSONObjExternalSorter(_aFirstSort));
@@ -246,7 +247,7 @@ namespace IndexUpdateTests {
             pm.finished();
             Timer timer;
             // The index's root has not yet been set.
-            ASSERT( id.head.isNull() );
+            ASSERT( id->getHead().isNull() );
             // Register a request to kill the current operation.
             cc().curop()->kill();
             if ( _mayInterrupt ) {
@@ -264,7 +265,7 @@ namespace IndexUpdateTests {
                                                         _mayInterrupt ),
                           UserException );
                 // The root of the index is not set because the build did not complete.
-                ASSERT( id.head.isNull() );
+                ASSERT( id->getHead().isNull() );
             }
             else {
                 // The build is aborted despite the kill request because mayInterrupt == false.
@@ -279,7 +280,7 @@ namespace IndexUpdateTests {
                                               timer,
                                               _mayInterrupt );
                 // The index's root is set after the build is complete.
-                ASSERT( !id.head.isNull() );
+                ASSERT( !id->getHead().isNull() );
             }
         }
     private:
@@ -310,7 +311,7 @@ namespace IndexUpdateTests {
             // Check the expected number of dups.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
             // Drop the dups.
-            BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, true );
+            BtreeBasedBuilder::doDropDups( collection(), dups, true );
             // Check that the expected number of documents remain.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
         }
@@ -347,14 +348,14 @@ namespace IndexUpdateTests {
             cc().curop()->kill();
             if ( _mayInterrupt ) {
                 // doDropDups() aborts.
-                ASSERT_THROWS( BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt ),
+                ASSERT_THROWS( BtreeBasedBuilder::doDropDups( collection(), dups, _mayInterrupt ),
                                UserException );
                 // Not all dups are dropped.
                 ASSERT( static_cast<uint32_t>( nDocs / 4 ) < _client.count( _ns ) );
             }
             else {
                 // doDropDups() succeeds.
-                BtreeBasedBuilder::doDropDups( _ns, nsdetails( _ns ), dups, _mayInterrupt );
+                BtreeBasedBuilder::doDropDups( collection(), dups, _mayInterrupt );
                 // The expected number of documents were dropped.
                 ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
             }
