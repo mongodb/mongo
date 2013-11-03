@@ -951,7 +951,8 @@ namespace mongo {
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
                     result.appendNumber( "size" , collection->details()->dataSize() );
-                    result.appendNumber( "numObjects" , collection->numRecords() );
+                    result.appendNumber( "numObjects",
+                                         static_cast<long long>( collection->numRecords() ) );
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
