@@ -252,9 +252,15 @@ env.StaticLibrary('clientdriver', [
                            'network',
                   ])
 
+env.StaticLibrary('lasterror', [
+                  "db/lasterror.cpp",
+                  ],
+                  LIBDEPS=['network',
+                           'foundation',
+                  ])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
-                "db/lasterror.cpp",
                 "db/catalog/ondisk/namespace.cpp",
                 "shell/mongo.cpp",
                 "util/intrusive_counter.cpp",
@@ -328,6 +334,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'clientdriver',
                            'fail_point',
                            'foundation',
+                           'lasterror',
                            'md5',
                            'mongohasher',
                            'network',

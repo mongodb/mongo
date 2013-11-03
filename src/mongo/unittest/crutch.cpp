@@ -30,5 +30,4 @@
 
 namespace mongo {
     bool inShutdown() { return false; }
-    void setLastError(int code, const char* msg) {}
 }  // namespace mongo

@@ -3,7 +3,14 @@
 Import("env")
 
 env.StaticLibrary("unittest", ['unittest.cpp', 'temp_dir.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/foundation'])
+                  LIBDEPS=['$BUILD_DIR/mongo/foundation',
+# TODO(sverch): 'lasterror' should not be required by 'foundation'.  Even if it is it should be
+# depended on directly rather than here, but we currently have a triangle dependency between
+# 'network', 'foundation' and 'lasterror'.  assert_util.cpp depends on lasterror.cpp which depends
+# on sock.cpp which depends on assert_util.cpp.  Eventually we want to have an assertion library
+# that does not depend on internal server code, and then this can go away.
+                           '$BUILD_DIR/mongo/lasterror',
+                  ])
 
 env.StaticLibrary("unittest_main", ['unittest_main.cpp'],
                   LIBDEPS=['unittest',
