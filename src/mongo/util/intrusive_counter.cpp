@@ -36,11 +36,12 @@ namespace mongo {
     using namespace mongoutils;
 
     intrusive_ptr<const RCString> RCString::create(StringData s) {
-        const size_t sizeWithNUL = s.size() + 1;
-        const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
         uassert(16493, str::stream() << "Tried to create string longer than "
                                      << (BSONObjMaxUserSize/1024/1024) << "MB",
-                bytesNeeded < static_cast<size_t>(BSONObjMaxUserSize));
+                s.size() < static_cast<size_t>(BSONObjMaxUserSize));
+
+        const size_t sizeWithNUL = s.size() + 1;
+        const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
 
         intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString(); // uses custom operator new
 
