@@ -1,54 +1,54 @@
-db.dropAllUsers();
+var mydb = db.getSiblingDB('auth1_db');
+mydb.dropAllUsers();
 
 pass = "a" + Math.random();
 //print( "password [" + pass + "]" );
 
-db.addUser({user: "eliot" ,pwd:  pass, roles: jsTest.basicUserRoles});
+mydb.addUser({user: "eliot" ,pwd:  pass, roles: jsTest.basicUserRoles});
 
-assert( db.auth( "eliot" , pass ) , "auth failed" );
-assert( ! db.auth( "eliot" , pass + "a" ) , "auth should have failed" );
+assert( mydb.auth( "eliot" , pass ) , "auth failed" );
+assert( ! mydb.auth( "eliot" , pass + "a" ) , "auth should have failed" );
 
 pass2 = "b" + Math.random();
-db.changeUserPassword("eliot", pass2);
+mydb.changeUserPassword("eliot", pass2);
 
-assert( ! db.auth( "eliot" , pass ) , "failed to change password failed" );
-assert( db.auth( "eliot" , pass2 ) , "new password didn't take" );
+assert( ! mydb.auth( "eliot" , pass ) , "failed to change password failed" );
+assert( mydb.auth( "eliot" , pass2 ) , "new password didn't take" );
 
-assert( db.auth( "eliot" , pass2 ) , "what?" );
-db.dropUser( "eliot" );
-assert( ! db.auth( "eliot" , pass2 ) , "didn't drop user" );
+assert( mydb.auth( "eliot" , pass2 ) , "what?" );
+mydb.dropUser( "eliot" );
+assert( ! mydb.auth( "eliot" , pass2 ) , "didn't drop user" );
 
 
-var a = db.getMongo().getDB( "admin" );
+var a = mydb.getMongo().getDB( "admin" );
 a.dropAllUsers();
 pass = "c" + Math.random();
 a.addUser({user: "super", pwd: pass, roles: jsTest.adminUserRoles});
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
-db.dropAllUsers();
+mydb.dropAllUsers();
 pass = "a" + Math.random();
 
-db.addUser({user: "eliot" , pwd: pass, roles: jsTest.basicUserRoles});
+mydb.addUser({user: "eliot" , pwd: pass, roles: jsTest.basicUserRoles});
 
-assert.commandFailed( db.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
+assert.commandFailed( mydb.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
 
 // check sanity check SERVER-3003
 
-before = a.system.users.count()
+var before = a.system.users.count({db: mydb.getName()});
 
 assert.throws( function(){
-    db.addUser({ user: "" , pwd: "abc", roles: jsTest.basicUserRoles});
+    mydb.addUser({ user: "" , pwd: "abc", roles: jsTest.basicUserRoles});
 } , null , "C1" )
 assert.throws( function(){
-    db.addUser({ user: "abc" , pwd: "", roles: jsTest.basicUserRoles});
+    mydb.addUser({ user: "abc" , pwd: "", roles: jsTest.basicUserRoles});
 } , null , "C2" )
 
 
-after = a.system.users.count()
+var after = a.system.users.count({db: mydb.getName()});
 assert( before > 0 , "C3" )
 assert.eq( before , after , "C4" )
 
 // Clean up after ourselves so other tests using authentication don't get messed up.
-db.dropAllUsers()
-db.getSiblingDB('admin').dropAllUsers();
+mydb.dropAllUsers()
