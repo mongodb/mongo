@@ -74,12 +74,14 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 			ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
 			ret = pthread_cond_timedwait(
 			    &cond->cond, &cond->mtx, &ts);
-			if (ret == ETIMEDOUT) {
+			if (ret == ETIMEDOUT)
 				ret = 0;
-				break;
-			}
 		} else
 			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
+
+		/* If woken up normally, we're done. */
+		if (ret == 0)
+			break;
 
 		/*
 		 * Check pthread_cond_wait() return for EINTR, ETIME and
@@ -122,6 +124,10 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	if (session != NULL && WT_VERBOSE_ISSET(session, mutex))
 		WT_RET(__wt_verbose(
 		    session, "signal %s cond (%p)", cond->name, cond));
+
+	/* Fast path if already signalled. */
+	if (cond->signalled)
+		return (0);
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = 1;
