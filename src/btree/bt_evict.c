@@ -260,7 +260,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
 			if (F_ISSET(cache, WT_EVICT_STUCK))
 				break;
-			if (loop == 20) {
+			if (loop == 100) {
 				F_SET(cache, WT_EVICT_STUCK);
 				WT_STAT_FAST_CONN_INCR(
 				    session, cache_eviction_slow);
@@ -995,6 +995,7 @@ __evict_get_page(
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
 	WT_REF *ref;
+	uint32_t candidates;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
@@ -1027,9 +1028,17 @@ __evict_get_page(
 		__wt_yield();
 	}
 
+	/*
+	 * The eviction server only tries to evict half of the pages before
+	 * looking for more.
+	 */
+	candidates = cache->evict_candidates;
+	if (!is_app && candidates > 1)
+		candidates /= 2;
+
 	/* Get the next page queued for eviction. */
 	while ((evict = cache->evict_current) != NULL &&
-	    evict < cache->evict + cache->evict_candidates &&
+	    evict < cache->evict + candidates &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
 
@@ -1066,7 +1075,7 @@ __evict_get_page(
 		break;
 	}
 
-	/* Clear the current pointer if there are no more candidates */
+	/* Clear the current pointer if there are no more candidates. */
 	if (evict >= cache->evict + cache->evict_candidates)
 		cache->evict_current = NULL;
 	__wt_spin_unlock(session, &cache->evict_lock);
