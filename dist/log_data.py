@@ -7,45 +7,46 @@
 # operations are described here.
 
 class LogRecordType:
-	def __init__(self, name, fields):
-		self.name = name
-		self.fields = fields
+    def __init__(self, name, fields):
+        self.name = name
+        self.fields = fields
 
-	def macro_name(self):
-		return 'WT_LOGREC_%s' % self.name.upper()
+    def macro_name(self):
+        return 'WT_LOGREC_%s' % self.name.upper()
 
-	def prname(self):
-		return '__logrec_print_' + self.name
+    def prname(self):
+        return '__logrec_print_' + self.name
 
 rectypes = [
-	LogRecordType('invalid', []),
-	LogRecordType('file_sync', [('uint32', 'fileid'), ('int', 'start')]),
-	LogRecordType('checkpoint', [('WT_LSN', 'ckpt_lsn'), ('uint32', 'nsnapshot'), ('item', 'snapshot')]),
-	LogRecordType('commit', [('uint64', 'txnid')]),
-	LogRecordType('debug', [('string', 'message')]),
+    LogRecordType('invalid', []),
+    LogRecordType('file_sync', [('uint32', 'fileid'), ('int', 'start')]),
+    LogRecordType('checkpoint', [
+        ('WT_LSN', 'ckpt_lsn'), ('uint32', 'nsnapshot'), ('item', 'snapshot')]),
+    LogRecordType('commit', [('uint64', 'txnid')]),
+    LogRecordType('debug', [('string', 'message')]),
 ]
 
 class LogOperationType:
-	def __init__(self, name, fields):
-		self.name = name
-		self.fields = fields
+    def __init__(self, name, fields):
+        self.name = name
+        self.fields = fields
 
-	def macro_name(self):
-		return 'WT_LOGOP_%s' % self.name.upper()
+    def macro_name(self):
+        return 'WT_LOGOP_%s' % self.name.upper()
 
 optypes = [
-	LogOperationType('invalid', []),
-	LogOperationType('col_put',
-		[('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
-	LogOperationType('col_remove',
-		[('uint32', 'fileid'), ('recno', 'recno')]),
-	LogOperationType('col_truncate',
-		[('uint32', 'fileid'), ('recno', 'start'), ('recno', 'stop')]),
-	LogOperationType('row_put',
-		[('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
-	LogOperationType('row_remove',
-		[('uint32', 'fileid'), ('item', 'key')]),
-	LogOperationType('row_truncate',
-		[('uint32', 'fileid'), ('item', 'start'), ('item', 'stop'),
-			('uint32', 'mode')]),
+    LogOperationType('invalid', []),
+    LogOperationType('col_put',
+        [('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
+    LogOperationType('col_remove',
+        [('uint32', 'fileid'), ('recno', 'recno')]),
+    LogOperationType('col_truncate',
+        [('uint32', 'fileid'), ('recno', 'start'), ('recno', 'stop')]),
+    LogOperationType('row_put',
+        [('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
+    LogOperationType('row_remove',
+        [('uint32', 'fileid'), ('item', 'key')]),
+    LogOperationType('row_truncate',
+        [('uint32', 'fileid'), ('item', 'start'), ('item', 'stop'),
+            ('uint32', 'mode')]),
 ]

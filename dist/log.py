@@ -10,11 +10,12 @@ tmp_file = '__tmp'
 # Map log record types to:
 # (C type, pack type, printf format, printf arg(s))
 field_types = {
-		'string' : ('const char *', 'S', '%s', 'arg'),
-		'item' : ('WT_ITEM *', 'u', '%.*s', '(int)arg.size, (const char *)arg.data'),
-		'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg'),
-		'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg'),
-		'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg'),
+	'string' : ('const char *', 'S', '%s', 'arg'),
+	'item' : ('WT_ITEM *', 'u', '%.*s',
+	    '(int)arg.size, (const char *)arg.data'),
+	'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg'),
+	'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg'),
+	'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg'),
 }
 
 def cintype(f):
@@ -56,10 +57,10 @@ def printf_arg(f):
 # Update log.h with #defines for types
 #####################################################################
 log_defines = (
-	''.join(
-		'#define\t%s\t%d\n' % (r.macro_name(), i) for i, r in enumerate(log_data.rectypes)) +
-	''.join(
-		'#define\t%s\t%d\n' % (r.macro_name(), i) for i, r in enumerate(log_data.optypes))
+	''.join('#define\t%s\t%d\n' % (r.macro_name(), i)
+		for i, r in enumerate(log_data.rectypes)) +
+	''.join('#define\t%s\t%d\n' % (r.macro_name(), i)
+		for i, r in enumerate(log_data.optypes))
 )
 
 tfile = open(tmp_file, 'w')
@@ -139,7 +140,8 @@ for optype in log_data.optypes:
 	tfile.write('''
 int
 __wt_logop_%(name)s_pack(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec%(arg_decls)s)
+    WT_SESSION_IMPL *session, WT_ITEM *logrec,
+    %(arg_decls)s)
 {
 	const char *fmt = WT_UNCHECKED_STRING(%(fmt)s);
 	size_t size;
@@ -162,7 +164,9 @@ __wt_logop_%(name)s_pack(
 ''' % {
 	'name' : optype.name,
 	'macro' : optype.macro_name(),
-	'arg_decls' : ',\n    ' + ', '.join('%s%s%s' % (cintype(f), '' if cintype(f)[-1] == '*' else ' ', f[1]) for f in optype.fields),
+	'arg_decls' : ', '.join(
+	    '%s%s%s' % (cintype(f), '' if cintype(f)[-1] == '*' else ' ', f[1])
+	    for f in optype.fields),
 	'arg_names' : ''.join(', %s' % f[1] for f in optype.fields),
 	'fmt' : op_pack_fmt(optype)
 })
@@ -170,7 +174,8 @@ __wt_logop_%(name)s_pack(
 	tfile.write('''
 int
 __wt_logop_%(name)s_unpack(
-    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end%(arg_decls)s)
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+    %(arg_decls)s)
 {
 	const char *fmt = WT_UNCHECKED_STRING(%(fmt)s);
 	uint32_t optype, size;
@@ -185,7 +190,8 @@ __wt_logop_%(name)s_unpack(
 ''' % {
 	'name' : optype.name,
 	'macro' : optype.macro_name(),
-	'arg_decls' : ',\n    ' + ', '.join('%s%sp' % (couttype(f), f[1]) for f in optype.fields),
+	'arg_decls' : ', '.join(
+	    '%s%sp' % (couttype(f), f[1]) for f in optype.fields),
 	'arg_names' : ''.join(', %sp' % f[1] for f in optype.fields),
 	'fmt' : op_pack_fmt(optype)
 })
@@ -205,9 +211,14 @@ __wt_logop_%(name)s_print(
 }
 ''' % {
 	'name' : optype.name,
-	'arg_decls' : '\n\t'.join('%s%s%s;' % (clocaltype(f), '' if clocaltype(f)[-1] == '*' else ' ', f[1]) for f in optype.fields),
+	'arg_decls' : '\n\t'.join('%s%s%s;' %
+	    (clocaltype(f), '' if clocaltype(f)[-1] == '*' else ' ', f[1])
+	    for f in optype.fields),
 	'arg_addrs' : ''.join(', &%s' % f[1] for f in optype.fields),
-	'print_args' : '\n\t'.join('fprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' % (f[1], printf_fmt(f), printf_arg(f)) for f in optype.fields),
+	'print_args' : '\n\t'.join(
+	    'fprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' %
+	    (f[1], printf_fmt(f), printf_arg(f))
+	    for f in optype.fields),
 })
 
 # Emit the printlog entry point

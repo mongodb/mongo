@@ -101,7 +101,8 @@ connection_stats = [
 	##########################################
 	Stat('log_buffer_grow',
 	    'log: number of times the log buffer size increased'),
-	Stat('log_buffer_size', 'log: total log buffer size', 'no_clear,no_scale'),
+	Stat('log_buffer_size',
+	    'log: total log buffer size', 'no_clear,no_scale'),
 	Stat('log_bytes_user', 'log: user provided log bytes written'),
 	Stat('log_bytes_written', 'log: log bytes written'),
 	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),

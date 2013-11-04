@@ -206,8 +206,10 @@ static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
 };
 ''' % {
     'name' : c.name,
-    'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s, NULL },' %
-        (subc.name, gettype(subc), checkstr(subc)))) for subc in sorted(c.subconfig)),
+    'check' : '\n\t'.join('"\n\t    "'.join(
+        w.wrap('{ "%s", "%s", %s, NULL },' %
+        (subc.name, gettype(subc), checkstr(subc))))
+        for subc in sorted(c.subconfig)),
 })
 
 def getsubconfigstr(c):
