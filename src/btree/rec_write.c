@@ -2577,6 +2577,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &orig));
 	data = NULL;
 	size = 0;
+	upd = NULL;
 
 	WT_RET(__rec_split_init(
 	    session, r, page, page->u.col_var.recno, btree->maxleafpage));
