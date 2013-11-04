@@ -97,6 +97,10 @@ main(int argc, char *argv[])
 	    strcmp(command, "loadtext") == 0))
 		config = "create";
 
+	/* The "stat" command requires statistics. */
+	if (config == NULL && strcmp(command, "stat") == 0)
+		config = "statistics=(all)";
+
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
 		goto err;
