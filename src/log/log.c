@@ -34,9 +34,13 @@ int
 __wt_log_get_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
 {
 	WT_CONNECTION_IMPL *conn;
+	const char *log_path;
 
 	conn = S2C(session);
-	return (__wt_dirlist(session, conn->log_path, WT_LOG_FILENAME,
+	log_path = conn->log_path;
+	if (log_path == NULL)
+		log_path = "";
+	return (__wt_dirlist(session, log_path, WT_LOG_FILENAME,
 	    WT_DIRLIST_INCLUDE, filesp, countp));
 }
 
@@ -373,6 +377,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint64_t rec;
+	uint32_t allocsize;
 	off_t log_size, off;
 
 	conn = S2C(session);
@@ -381,6 +386,10 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 		return (0);
 	*eof = 0;
 	WT_ERR(__wt_filesize(session, fh, &log_size));
+	if (log == NULL)
+		allocsize = LOG_ALIGN;
+	else
+		allocsize = log->allocsize;
 	/*
 	 * We know all log records are aligned at log->allocsize.  The first
 	 * item in a log record is always the length.  Look for any non-zero
@@ -388,9 +397,9 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	 * it could be the middle of a large record.  But we know no log record
 	 * starts after it.  Return an estimate of the log file size.
 	 */
-	for (off = log_size - (off_t)log->allocsize;
+	for (off = log_size - (off_t)allocsize;
 	    off > 0;
-	    off -= (off_t)log->allocsize) {
+	    off -= (off_t)allocsize) {
 		WT_ERR(__wt_read(session, fh, off, sizeof(uint64_t), &rec));
 		if (rec != 0)
 			break;
@@ -398,7 +407,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	/*
 	 * Set EOF to the last zero-filled record we saw.
 	 */
-	*eof = off + (off_t)log->allocsize;
+	*eof = off + (off_t)allocsize;
 err:
 	return (ret);
 }
@@ -672,17 +681,18 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
 	off_t log_size;
-	uint32_t cksum, rdup_len, reclen;
+	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
+	u_int i, logcount;
 	int done;
+	char **logfiles;
 
 	conn = S2C(session);
 	log = conn->log;
+	logfiles = NULL;
 	WT_CLEAR(buf);
 	/*
 	 * Check for correct usage.
 	 */
-	if (log == NULL)
-		return (ENOTSUP);
 	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
 		return (WT_ERROR);
 	/*
@@ -691,22 +701,58 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	 */
 	if (func == NULL)
 		return (0);
-	/*
-	 * If the offset isn't on an allocation boundary it must be wrong.
-	 */
-	if (lsnp != NULL &&
-	    (lsnp->offset % log->allocsize != 0 || lsnp->file > log->fileid))
-		return (WT_NOTFOUND);
 
-	if (LF_ISSET(WT_LOGSCAN_FIRST))
-		start_lsn = log->first_lsn;
-	else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
-		start_lsn = log->ckpt_lsn;
-	else
-		start_lsn = *lsnp;
-	end_lsn = log->alloc_lsn;
+	if (log == NULL) {
+		/*
+		 * If logging is not configured, we can still print out the log
+		 * if log files exist.  We just need to set the LSNs from what
+		 * is in the files versus what is in the live connection.
+		 */
+		/*
+		 * Set allocsize to the minimum alignment it could be.  Larger
+		 * records and larger allocation boundaries should always be
+		 * a multiple of this.
+		 */
+		allocsize = LOG_ALIGN;
+		lastlog = 0;
+		firstlog = UINT32_MAX;
+		WT_RET(__wt_log_get_files(session, &logfiles, &logcount));
+		if (logcount == 0)
+			/*
+			 * Return it is not supported if none don't exist.
+			 */
+			return (ENOTSUP);
+		for (i = 0; i < logcount; i++) {
+			WT_ERR(__wt_log_extract_lognum(session, logfiles[i],
+			    &lognum));
+			lastlog = WT_MAX(lastlog, lognum);
+			firstlog = WT_MIN(firstlog, lognum);
+		}
+		start_lsn.file = firstlog;
+		end_lsn.file = lastlog;
+		start_lsn.offset = end_lsn.offset = 0;
+		__wt_log_files_free(session, logfiles, logcount);
+		logfiles = NULL;
+	} else {
+		/*
+		 * If the offset isn't on an allocation boundary
+		 * it must be wrong.
+		 */
+		allocsize = log->allocsize;
+		if (lsnp != NULL &&
+		    (lsnp->offset % allocsize != 0 || lsnp->file > log->fileid))
+			return (WT_NOTFOUND);
+
+		if (LF_ISSET(WT_LOGSCAN_FIRST))
+			start_lsn = log->first_lsn;
+		else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
+			start_lsn = log->ckpt_lsn;
+		else
+			start_lsn = *lsnp;
+		end_lsn = log->alloc_lsn;
+	}
 	log_fh = NULL;
-	WT_RET(__log_openfile(session, 0, &log_fh, start_lsn.file));
+	WT_ERR(__log_openfile(session, 0, &log_fh, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	if (LF_ISSET(WT_LOGSCAN_ONE))
 		done = 1;
@@ -742,9 +788,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		/*
 		 * Read the minimum allocation size a record could be.
 		 */
-		WT_ASSERT(session, buf.memsize >= log->allocsize);
+		WT_ASSERT(session, buf.memsize >= allocsize);
 		WT_ERR(__wt_read(
-		    session, log_fh, rd_lsn.offset, log->allocsize, buf.mem));
+		    session, log_fh, rd_lsn.offset, allocsize, buf.mem));
 		/*
 		 * First 8 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
@@ -768,8 +814,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 				WT_ERR(__log_truncate(session, &rd_lsn, 0));
 			break;
 		}
-		rdup_len = __wt_rduppo2(reclen, log->allocsize);
-		if (reclen > log->allocsize) {
+		rdup_len = __wt_rduppo2(reclen, allocsize);
+		if (reclen > allocsize) {
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
 			WT_ERR(__wt_read(
 			    session, log_fh, rd_lsn.offset, reclen, buf.mem));
@@ -800,6 +846,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	} while (!done);
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
+	if (logfiles != NULL)
+		__wt_log_files_free(session, logfiles, logcount);
 	__wt_buf_free(session, &buf);
 	if (ret == ENOENT)
 		ret = 0;
