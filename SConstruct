@@ -689,20 +689,7 @@ def filterExists(paths):
     return filter(os.path.exists, paths)
 
 if darwin:
-
-    if env["CXX"] is None:
-        if os.path.exists( "/usr/bin/g++-4.2" ):
-            env["CXX"] = "g++-4.2"
-
-    if force64:
-       env.Append( EXTRACPPPATH=["/usr/64/include"] )
-       env.Append( EXTRALIBPATH=["/usr/64/lib"] )
-       if installDir == DEFAULT_INSTALL_DIR:
-           installDir = "/usr/64/"
-    else:
-       env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
-       env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
-
+    pass
 elif linux:
 
     env.Append( LIBS=['m'] )
