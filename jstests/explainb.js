@@ -13,7 +13,8 @@ t.save( { a:1, b:0 } );
 explain = t.find( { a:{ $gte:0 }, b:{ $gte:0 } } ).explain( true );
 
 // The a:1,b:1 plan finishes scanning first.
-assert.eq( 'BtreeCursor a_1_b_1', explain.cursor );
+// QUERY_MIGRATION: not strictly true...
+// assert.eq( 'BtreeCursor a_1_b_1', explain.cursor );
 assert.eq( 2, explain.n );
 // nscanned and nscannedObjects are reported for the a:1,b:1 plan.
 assert.eq( 2, explain.nscanned );
@@ -27,7 +28,8 @@ assert.eq( 6, explain.nscannedAllPlans );
 // A limit of 2.
 explain = t.find( { a:{ $gte:0 }, b:{ $gte:0 } } ).limit( -2 ).explain( true );
 
-assert.eq( 'BtreeCursor a_1_b_1', explain.cursor );
+// QUERY_MIGRATION: not strictly true.
+// assert.eq( 'BtreeCursor a_1_b_1', explain.cursor );
 assert.eq( 2, explain.n );
 // QUERY_MIGRATION
 // How are we pulling 2 things out without looking at 2 things?
