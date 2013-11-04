@@ -10,7 +10,7 @@
  *	Wake the eviction server if necessary.
  */
 static inline int
-__wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
+__wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -20,16 +20,15 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	cache = conn->cache;
 
 	/*
-	 * If we're over the maximum cache, shut out reads (which
-	 * include page allocations) until we evict to back under the
-	 * maximum cache.  Eviction will keep pushing out pages so we
-	 * don't run on the edge all the time.
+	 * If we're over the maximum cache, shut out reads (which include page
+	 * allocations) until we evict to back under the maximum cache.
+	 * Eviction will keep pushing out pages so we don't run on the edge all
+	 * the time.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	dirty_inuse = cache->bytes_dirty;
 	bytes_max = conn->cache_size;
-	if (read_lockoutp != NULL)
-		*read_lockoutp = (bytes_inuse > bytes_max);
+	*fullp = (100 * bytes_inuse) / bytes_max;
 
 	/* Wake eviction when we're over the trigger cache size. */
 	if (wake &&
@@ -51,15 +50,21 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	int lockout;
+	int full;
 
 	/*
 	 * Only wake the eviction server the first time through here (if the
 	 * cache is too full).
 	 */
-	WT_RET(__wt_eviction_check(session, &lockout, 1));
+	WT_RET(__wt_eviction_check(session, &full, 1));
 
-	if (!lockout || F_ISSET(session,
+	/*
+	 * If this is an ordinary page read and the cache isn't full, we're
+	 * done.  If we are at the API boundary and the cache is more than 95%
+	 * full, try to evict a page before we check again.  This helps with
+	 * some eviction-dominated workloads.
+	 */
+	if (full < (onepass ? 100 : 95) || F_ISSET(session,
 	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 		return (0);
 
@@ -73,8 +78,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 				return (0);
 		} else if (ret != EBUSY && ret != WT_NOTFOUND)
 			return (ret);
-		WT_RET(__wt_eviction_check(session, &lockout, 0));
-		if (!lockout)
+		WT_RET(__wt_eviction_check(session, &full, 0));
+		if (full < 100)
 			return (0);
 		if (ret == EBUSY)
 			continue;
