@@ -475,11 +475,6 @@ namespace mongo {
         }
     }
 
-    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl,
-                                   bool cappedOK, bool noWarn, bool doLog ) {
-        deleteRecord( nsdetails(ns), ns, todelete, dl, cappedOK, noWarn, doLog );
-    }
-
     void DataFileMgr::deleteRecord(NamespaceDetails* d, const StringData& ns, Record *todelete,
                                    const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
         dassert( todelete == dl.rec() );
@@ -492,24 +487,11 @@ namespace mongo {
 
         BSONObj obj = BSONObj::make( todelete );
 
-        BSONObj toDelete;
-        if ( doLog ) {
-            BSONElement e = obj["_id"];
-            if ( e.type() ) {
-                toDelete = e.wrap();
-            }
-        }
         Collection* collection = cc().database()->getCollection( ns );
         verify( collection );
 
-        /* check if any cursors point to us.  if so, advance them. */
-        ClientCursor::aboutToDelete(ns, d, dl);
-
-        collection->getIndexCatalog()->unindexRecord( obj, dl, noWarn );
-
-        _deleteRecord(d, ns, todelete, dl);
-
-        collection->infoCache()->notifyOfWriteOp();
+        BSONObj toDelete;
+        collection->deleteDocument( dl, cappedOK, noWarn, doLog ? &toDelete : NULL );
 
         if ( ! toDelete.isEmpty() ) {
             // TODO: this is crazy, need to fix logOp
@@ -596,7 +578,7 @@ namespace mongo {
                      "failing update: objects in a capped ns cannot grow",
                      !(collection && collection->details()->isCapped()));
             collection->details()->paddingTooSmall();
-            deleteRecord(ns, toupdate, dl);
+            collection->deleteDocument( dl );
             DiskLoc res = insert(ns, objNew.objdata(), objNew.objsize(), false, god);
 
             if (debug.nmoved == -1) // default of -1 rather than 0

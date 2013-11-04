@@ -131,8 +131,6 @@ namespace mongo {
         static Record* getRecord(const DiskLoc& dl);
         static DeletedRecord* getDeletedRecord(const DiskLoc& dl);
 
-        void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
-
         void deleteRecord(NamespaceDetails* d, const StringData& ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */

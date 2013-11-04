@@ -45,7 +45,6 @@ namespace CountTests {
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
-
             try {
                 uassertStatusOK( _database->dropCollection( ns() ) );
             }

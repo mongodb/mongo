@@ -29,6 +29,7 @@
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/scanandorder.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -42,20 +43,21 @@ namespace QueryTests {
     class Base {
         Lock::GlobalWrite lk;
         Client::Context _context;
+        Database* _database;
+        Collection* _collection;
     public:
         Base() : _context( ns() ) {
+            _database = _context.db();
+            _collection = _database->getCollection( ns() );
+            if ( _collection ) {
+                _database->dropCollection( ns() );
+            }
+            _collection = _database->createCollection( ns(), false, NULL, true );
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
             try {
-                boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
-                vector< DiskLoc > toDelete;
-                for(; c->ok(); c->advance() )
-                    toDelete.push_back( c->currLoc() );
-                for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
-                    theDataFileMgr.deleteRecord( ns(), i->rec(), *i, false );
-                DBDirectClient cl;
-                cl.dropIndexes( ns() );
+                uassertStatusOK( _database->dropCollection( ns() ) );
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
@@ -65,21 +67,20 @@ namespace QueryTests {
         static const char *ns() {
             return "unittests.querytests";
         }
-        static void addIndex( const BSONObj &key ) {
+        void addIndex( const BSONObj &key ) {
             BSONObjBuilder b;
             b.append( "name", key.firstElementFieldName() );
             b.append( "ns", ns() );
             b.append( "key", key );
             BSONObj o = b.done();
-            stringstream indexNs;
-            indexNs << "unittests.system.indexes";
-            theDataFileMgr.insert( indexNs.str().c_str(), o.objdata(), o.objsize() );
+            Status s = _collection->getIndexCatalog()->createIndex( o, false );
+            uassertStatusOK( s );
         }
-        static void insert( const char *s ) {
+        void insert( const char *s ) {
             insert( fromjson( s ) );
         }
-        static void insert( const BSONObj &o ) {
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize() );
+        void insert( const BSONObj &o ) {
+            _collection->insertDocument( o, true );
         }
     };
 
