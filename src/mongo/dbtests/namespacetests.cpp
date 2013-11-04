@@ -38,33 +38,26 @@ namespace NamespaceTests {
 
     namespace IndexDetailsTests {
         class Base {
-            Lock::GlobalWrite lk;
-            Client::Context _context;
         public:
-            Base() : _context(ns()) {
+            Base() {
             }
             virtual ~Base() {
-                if ( id_.info.isNull() )
-                    return;
-                theDataFileMgr.deleteRecord( ns(), id_.info.rec(), id_.info );
-                ASSERT( theDataFileMgr.findAll( ns() )->eof() );
             }
         protected:
             void create( bool sparse = false ) {
-                Collection* collection = _context.db()->getCollection( ns() );
-                if ( collection )
-                    collection->infoCache()->reset();
+
                 BSONObjBuilder builder;
                 builder.append( "ns", ns() );
                 builder.append( "name", "testIndex" );
                 builder.append( "key", key() );
                 builder.append( "sparse", sparse );
+
                 BSONObj bobj = builder.done();
-                id_.info = theDataFileMgr.insert( ns(), bobj.objdata(), bobj.objsize() );
-                // head not needed for current tests
-                // idx_.head = BtreeBucket::addHead( id_ );
+
+                _index.reset( new IndexDescriptor( NULL, -1, NULL, bobj ) );
 
                 _keyPattern = key().getOwned();
+
                 // The key generation wants these values.
                 vector<const char*> fieldNames;
                 vector<BSONElement> fixed;
@@ -74,20 +67,17 @@ namespace NamespaceTests {
                     BSONElement elt = it.next();
                     fieldNames.push_back(elt.fieldName());
                     fixed.push_back(BSONElement());
-                }  
+                }
 
                 _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, sparse));
             }
-
-            scoped_ptr<BtreeKeyGenerator> _keyGen;
-            BSONObj _keyPattern;
 
             static const char* ns() {
                 return "unittests.indexdetailstests";
             }
 
-            IndexDetails& id() {
-                return id_;
+            IndexDescriptor* id() {
+                return _index.get();
             }
 
             // TODO: This is testing Btree key creation, not IndexDetails.
@@ -140,17 +130,19 @@ namespace NamespaceTests {
                 return b.obj();
             }
         private:
-            Lock::GlobalWrite lk_;
-            IndexDetails id_;
+            scoped_ptr<BtreeKeyGenerator> _keyGen;
+            BSONObj _keyPattern;
+            scoped_ptr<IndexDescriptor> _index;
+
         };
 
         class Create : public Base {
         public:
             void run() {
                 create();
-                ASSERT_EQUALS( "testIndex", id().indexName() );
-                ASSERT_EQUALS( ns(), id().parentNS() );
-                assertEquals( key(), id().keyPattern() );
+                ASSERT_EQUALS( "testIndex", id()->indexName() );
+                ASSERT_EQUALS( ns(), id()->parentNS() );
+                assertEquals( key(), id()->keyPattern() );
             }
         };
 

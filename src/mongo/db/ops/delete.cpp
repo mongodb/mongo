@@ -222,7 +222,6 @@ namespace mongo {
                     }
                 }
 
-                //theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
                 currentClient.get()->database()->getCollection( ns )->deleteDocument( rloc );
 
                 nDeleted++;

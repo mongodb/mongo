@@ -154,13 +154,15 @@ namespace ReplTests {
         static void deleteAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
+            Collection* collection = ctx.db()->getCollection( ns );
+
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
             for(; c->ok(); c->advance() ) {
                 toDelete.push_back( c->currLoc() );
             }
             for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-                theDataFileMgr.deleteRecord( ns, i->rec(), *i, true );
+                collection->deleteDocument( *i, true );
             }
         }
         static void insert( const BSONObj &o, bool god = false ) {
