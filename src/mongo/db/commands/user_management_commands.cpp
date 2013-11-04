@@ -190,8 +190,10 @@ namespace mongo {
     }
 
     /*
-     * Checks that every role in "rolesToAdd" exists, and that adding each of those roles to "role"
-     * will not result in a cycle to the role graph.
+     * Checks that every role in "rolesToAdd" exists, that adding each of those roles to "role"
+     * will not result in a cycle to the role graph, and that every role being added comes from the
+     * same database as the role it is being added to (or that the role being added to is from the
+     * "admin" database.
      */
     static Status checkOkayToGrantRolesToRole(const RoleName& role,
                                               const std::vector<RoleName> rolesToAdd,
@@ -204,6 +206,13 @@ namespace mongo {
                               mongoutils::str::stream() << "Cannot grant role " <<
                                       role.getFullName() << " to itself.");
             }
+
+            if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
+                return Status(ErrorCodes::InvalidRoleModification,
+                              str::stream() << "Roles on the \'" << role.getDB() <<
+                                      "\' database cannot be granted roles from other databases");
+            }
+
             BSONObj roleToAddDoc;
             Status status = authzManager->getRoleDescription(roleToAdd, &roleToAddDoc);
             if (status == ErrorCodes::RoleNotFound) {
@@ -229,6 +238,34 @@ namespace mongo {
                                       << " would introduce a cycle in the role graph.");
             }
         }
+        return Status::OK();
+    }
+
+    /**
+     * Checks that every privilege being granted targets just the database the role is from, or that
+     * the role is from the "admin" db.
+     */
+    static Status checkOkayToGrantPrivilegesToRole(const RoleName& role,
+                                                   const PrivilegeVector& privileges) {
+
+        if (role.getDB() == "admin") {
+            return Status::OK();
+        }
+
+        for (PrivilegeVector::const_iterator it = privileges.begin();
+                it != privileges.end(); ++it) {
+            const ResourcePattern& resource = (*it).getResourcePattern();
+            if ((resource.isDatabasePattern() || resource.isExactNamespacePattern()) &&
+                    (resource.databaseToMatch() == role.getDB())) {
+                continue;
+            }
+
+            return Status(ErrorCodes::InvalidRoleModification,
+                          str::stream() << "Roles on the \'" << role.getDB() <<
+                                  "\' database cannot be granted privileges that target other "
+                                  "databases or the cluster");
+        }
+
         return Status::OK();
     }
 
@@ -1269,6 +1306,12 @@ namespace mongo {
                 return false;
             }
 
+            status = checkOkayToGrantPrivilegesToRole(args.roleName, args.privileges);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             audit::logCreateRole(ClientBasic::getCurrent(),
                                  args.roleName,
                                  args.roles,
@@ -1404,6 +1447,14 @@ namespace mongo {
                 }
             }
 
+            if (args.hasPrivileges) {
+                status = checkOkayToGrantPrivilegesToRole(args.roleName, args.privileges);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+            }
+
             audit::logUpdateRole(ClientBasic::getCurrent(),
                                  args.roleName,
                                  args.hasRoles? &args.roles : NULL,
@@ -1503,6 +1554,12 @@ namespace mongo {
                                  str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
                           result);
+                return false;
+            }
+
+            status = checkOkayToGrantPrivilegesToRole(roleName, privilegesToAdd);
+            if (!status.isOK()) {
+                addStatus(status, result);
                 return false;
             }
 

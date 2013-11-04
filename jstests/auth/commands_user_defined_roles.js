@@ -23,13 +23,13 @@ function testProperAuthorization(conn, t, testcase) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(firstDb.runCommand({
+    assert.commandWorked(adminDb.runCommand({
         updateRole: testRole,
         privileges: testcase.requiredPrivileges
     }));
     adminDb.logout();
 
-    assert(firstDb.auth(testUser, "password"));
+    assert(adminDb.auth(testUser, "password"));
 
     var res = runOnDb.runCommand(t.command);
 
@@ -60,13 +60,13 @@ function testInsufficientPrivilege(conn, t, testcase, privilege) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(firstDb.runCommand({
+    assert.commandWorked(adminDb.runCommand({
         updateRole: testRole,
         privileges: [ privilege ]
     }));
     adminDb.logout();
 
-    assert(firstDb.auth(testUser, "password"));
+    assert(adminDb.auth(testUser, "password"));
 
     var res = runOnDb.runCommand(t.command);
 
@@ -151,15 +151,15 @@ function createUsers(conn) {
 
     assert(adminDb.auth("admin", "password"));
 
-    assert.commandWorked(firstDb.runCommand({
+    assert.commandWorked(adminDb.runCommand({
         createRole: testRole,
         privileges: [ ],
         roles: [ ]
     }));
-    assert.commandWorked(firstDb.runCommand({
+    assert.commandWorked(adminDb.runCommand({
         createUser: testUser,
         pwd: "password",
-        roles: [ { role: testRole, db: firstDbName } ]
+        roles: [ { role: testRole, db: adminDbName } ]
     }));
 
     adminDb.logout();
