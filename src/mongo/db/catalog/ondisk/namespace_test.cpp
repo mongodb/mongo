@@ -1,4 +1,4 @@
-// namespace.cpp
+// namespace_test.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -28,18 +28,40 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/unittest/unittest.h"
 
-#include "mongo/db/storage/namespace.h"
-
-#include <boost/static_assert.hpp>
-
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/catalog/ondisk/namespace.h"
 
 namespace mongo {
-    namespace {
-        BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
-        BOOST_STATIC_ASSERT( Namespace::MaxNsLen == MaxDatabaseNameLen );
+
+    TEST( NamespaceTest, Basics ) {
+        Namespace foo( "foo.bar" );
+        Namespace bar( "bar.foo" );
+
+        ASSERT_EQUALS( foo.toString(), foo.toString() );
+        ASSERT_EQUALS( foo.hash(), foo.hash() );
+
+        ASSERT_NOT_EQUALS( foo.hash(), bar.hash() );
+
+        ASSERT( foo == foo );
+        ASSERT( !( foo != foo ) );
+        ASSERT( foo != bar );
+        ASSERT( !( foo == bar ) );
+    }
+
+    TEST( NamespaceTest, ExtraName ) {
+        Namespace foo( "foo.bar" );
+        ASSERT_FALSE( foo.isExtra() );
+
+        string str0 = foo.extraName( 0 );
+        ASSERT_EQUALS( "foo.bar$extra", str0 );
+        Namespace ex0( str0 );
+        ASSERT_TRUE( ex0.isExtra() );
+
+        string str1 = foo.extraName( 1 );
+        ASSERT_EQUALS( "foo.bar$extrb", str1 );
+        Namespace ex1( str1 );
+        ASSERT_TRUE( ex1.isExtra() );
+
     }
 }
-

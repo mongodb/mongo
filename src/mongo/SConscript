@@ -126,7 +126,7 @@ env.CppUnitTest('bsonobjbuilder_test', ['bson/bsonobjbuilder_test.cpp'],
 env.CppUnitTest('namespacestring_test', ['db/namespace_string_test.cpp'],
                 LIBDEPS=['bson'])
 
-env.CppUnitTest('namespace_test', ['db/storage/namespace_test.cpp'],
+env.CppUnitTest('namespace_test', ['db/catalog/ondisk/namespace_test.cpp'],
                 LIBDEPS=['foundation'])
 
 env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
@@ -253,7 +253,7 @@ env.StaticLibrary('clientdriver', [
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/lasterror.cpp",
-                "db/storage/namespace.cpp",
+                "db/catalog/ondisk/namespace.cpp",
                 "shell/mongo.cpp",
                 "util/intrusive_counter.cpp",
                 "util/util.cpp",
@@ -557,7 +557,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/btreeposition.cpp",
                     "db/cloner.cpp",
                     "db/namespace_details.cpp",
-                    "db/storage/namespace_index.cpp",
+                    "db/catalog/ondisk/namespace_index.cpp",
                     "db/cap.cpp",
                     "db/matcher_covered.cpp",
                     "db/dbeval.cpp",
