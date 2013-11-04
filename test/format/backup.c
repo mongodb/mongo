@@ -125,7 +125,7 @@ hot_backup(void *arg)
 			die(ret, "pthread_rwlock_wrlock: hot-backup lock");
 
 		/* Re-create the backup directory. */
-		(void)system("cd RUNDIR && rm -rf BACKUP");
+		UNUSED_RET(system("cd RUNDIR && rm -rf BACKUP"));
 		if (mkdir(RUNDIR_BACKUP, 0777) != 0)
 			die(errno, "mkdir: %s", RUNDIR_BACKUP);
 

@@ -237,7 +237,7 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 *
 	 * Walk the list of updates, looking for obsolete updates at the end.
 	 */
-	for (first = next = NULL; upd != NULL; upd = upd->next)
+	for (first = NULL; upd != NULL; upd = upd->next)
 		if (__wt_txn_visible_all(session, upd->txnid)) {
 			if (first == NULL)
 				first = upd;
@@ -252,10 +252,10 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 */
 	if (first != NULL &&
 	    (next = first->next) != NULL &&
-	    !WT_ATOMIC_CAS(first->next, next, NULL))
-		return (NULL);
+	    WT_ATOMIC_CAS(first->next, next, NULL))
+		return (next);
 
-	return (next);
+	return (NULL);
 }
 
 /*

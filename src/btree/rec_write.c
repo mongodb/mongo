@@ -301,6 +301,9 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
 	}
 
+	/* Record the most recent transaction ID we will *not* write. */
+	page->modify->disk_snap_min = session->txn.snap_min;
+
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
 	r = session->reconcile;
@@ -2574,6 +2577,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &orig));
 	data = NULL;
 	size = 0;
+	upd = NULL;
 
 	WT_RET(__rec_split_init(
 	    session, r, page, page->u.col_var.recno, btree->maxleafpage));
@@ -3914,9 +3918,6 @@ err:			__wt_scr_free(&tkey);
 		F_SET(mod, WT_PM_REC_SPLIT);
 		break;
 	}
-
-	/* Record the most recent transaction ID we have *not* written. */
-	mod->disk_snap_min = session->txn.snap_min;
 
 	/*
 	 * If updates were skipped, the tree isn't clean.  The checkpoint call

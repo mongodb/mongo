@@ -70,6 +70,11 @@ extern WT_EXTENSION_API *wt_api;
 
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
+/*
+ * Quiet compiler warning for unused result.
+ */
+#define	UNUSED_RET(var)						\
+	({ __typeof__(var) __ret = var; (void)sizeof __ret; })
 
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
