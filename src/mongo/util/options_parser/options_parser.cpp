@@ -28,6 +28,7 @@
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace optionenvironment {
@@ -628,6 +629,7 @@ namespace optionenvironment {
             sb << "Error reading config file: " << strerror(current_errno);
             return Status(ErrorCodes::InternalError, sb.str());
         }
+        ON_BLOCK_EXIT(fclose, config);
 
         // Get length of config file by seeking to the end and getting the cursor position
         if (fseek(config, 0L, SEEK_END) != 0) {
@@ -673,7 +675,6 @@ namespace optionenvironment {
 
         // Copy the vector contents into our result string
         *contents = std::string(configVector.begin(), configVector.end());
-        fclose(config);
 
         return Status::OK();
     }
