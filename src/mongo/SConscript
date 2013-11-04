@@ -696,7 +696,9 @@ env.Library( "mongoscore",
                       'db/fts/ftsmongos',
                       'db/query/lite_parsed_query',
                       's/write_ops',
-                      's/write_op_impl'] )
+                      's/write_op_conversion',
+                      's/write_op_impl',
+                     ] )
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                 LIBDEPS=["mongoscore",

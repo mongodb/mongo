@@ -113,8 +113,8 @@ namespace mongo {
         // their size stats incremented. Here, the query object is always used.
         Status result = targetQuery( query, endpoints );
 
-        if ( result.isOK() ) {
-            if ( !_manager->hasShardKey( query )) {
+        if ( result.isOK() && _manager ) {
+            if ( !_manager->hasShardKey( query ) ) {
                 return result;
             }
 

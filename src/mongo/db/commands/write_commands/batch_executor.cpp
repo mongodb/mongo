@@ -167,7 +167,7 @@ namespace mongo {
         // TODO: Audit where we want to queue here
         if ( staleBatch ) {
             ChunkVersion latestShardVersion;
-            shardingState.refreshMetadataIfNeeded( request.getNS(),
+            shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
                                                    request.getShardVersion(),
                                                    &latestShardVersion );
         }
@@ -293,8 +293,11 @@ namespace mongo {
         if ( shardingState.enabled() && request.isShardVersionSet()
              && !ChunkVersion::isIgnoredVersion( request.getShardVersion() ) ) {
 
-            Lock::assertWriteLocked( ns );
-            CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( ns );
+            // Index inserts make the namespace nontrivial for versioning
+            string targetingNS = itemRef.getRequest()->getTargetingNS();
+
+            Lock::assertWriteLocked( targetingNS );
+            CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( targetingNS );
             ChunkVersion shardVersion =
                 metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 

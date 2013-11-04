@@ -38,12 +38,16 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/max_time.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/batch_upconvert.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cursors.h"
@@ -55,6 +59,8 @@
 // error codes 8010-8040
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(useClusterWriteCommands, bool, false);
 
     class ShardStrategy : public Strategy {
 
@@ -1291,9 +1297,22 @@ namespace mongo {
             dbcon.done();
         }
 
-
-
         virtual void writeOp( int op , Request& r ) {
+
+            // Valve for turning on upconversion for all batch write commands
+            if ( useClusterWriteCommands ) {
+
+                auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( r.m() ) );
+                BatchedCommandResponse response;
+
+                clusterWrite( *request, &response, true /* autosplit */);
+
+                LastError* lastErrorForRequest = lastError.get( false /* don't create */);
+                dassert( lastErrorForRequest );
+
+                batchErrorToLastError( *request, response, lastErrorForRequest );
+                return;
+            }
 
             const char *ns = r.getns();
 

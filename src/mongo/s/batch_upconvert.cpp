@@ -142,9 +142,9 @@ namespace mongo {
         return request;
     }
 
-    void toLastError( const BatchedCommandRequest& request,
-                      const BatchedCommandResponse& response,
-                      LastError* error ) {
+    void batchErrorToLastError( const BatchedCommandRequest& request,
+                                const BatchedCommandResponse& response,
+                                LastError* error ) {
 
         // Record an error
         if ( !response.getOk() ) {

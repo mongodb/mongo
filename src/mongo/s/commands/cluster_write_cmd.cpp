@@ -34,61 +34,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/s/batched_command_request.h"
 #include "mongo/s/batched_command_response.h"
-#include "mongo/s/batch_write_exec.h"
-#include "mongo/s/chunk_manager_targeter.h"
-#include "mongo/s/config.h"
-#include "mongo/s/dbclient_multi_command.h"
-#include "mongo/s/dbclient_shard_resolver.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/cluster_write.h"
 
 namespace mongo {
-
-    namespace {
-
-        /**
-         * Splits the chunks touched based from the targeter stats if needed.
-         */
-        void splitIfNeeded( const string& ns, const TargeterStats& stats ) {
-            if ( !Chunk::ShouldAutoSplit ) {
-                return;
-            }
-
-            DBConfigPtr config;
-
-            try {
-                config = grid.getDBConfig( ns );
-            }
-            catch ( const DBException& ex ) {
-                warning() << "failed to get database config for " << ns
-                          << " while checking for auto-split: " << causedBy( ex ) << endl;
-                return;
-            }
-
-            ChunkManagerPtr chunkManager;
-            ShardPtr dummyShard;
-            config->getChunkManagerOrPrimary( ns, chunkManager, dummyShard );
-
-            if ( !chunkManager ) {
-                return;
-            }
-
-            for ( map<BSONObj, int>::const_iterator it = stats.chunkSizeDelta.begin();
-                    it != stats.chunkSizeDelta.end(); ++it ) {
-
-                ChunkPtr chunk;
-                try {
-                    chunk = chunkManager->findIntersectingChunk( it->first );
-                }
-                catch ( const AssertionException& ex ) {
-                    warning() << "could not find chunk while checking for auto-split: "
-                              << causedBy( ex ) << endl;
-                    return;
-                }
-
-                chunk->splitIfShould( it->second );
-            }
-        }
-    }
 
     /**
      * Base class for mongos write commands.  Cluster write commands support batch writes and write
@@ -228,6 +176,9 @@ namespace mongo {
             return true;
         }
 
+        NamespaceString nss( dbName, request.getNS() );
+        request.setNS( nss.ns() );
+
         // App-level validation of a create index insert
         if ( request.isInsertIndexRequest() ) {
             if ( request.sizeWriteOps() != 1 || request.isWriteConcernSet() ) {
@@ -244,36 +195,8 @@ namespace mongo {
             }
         }
 
-        //
-        // Assemble the batch executor and run the batch
-        //
-
-        ChunkManagerTargeter targeter;
-
-        NamespaceString nss( dbName, request.getNS() );
-        request.setNS( nss.ns() );
-
-        Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
-
-        if ( !targetInitStatus.isOK() ) {
-
-            warning() << "could not initialize targeter for"
-                      << ( request.isInsertIndexRequest() ? " index" : "" )
-                      << " write op in collection " << request.getTargetingNS() << endl;
-
-            // Errors will be reported in response if we are unable to target
-        }
-
-        DBClientShardResolver resolver;
-        DBClientMultiCommand dispatcher;
-
-        BatchWriteExec exec( &targeter, &resolver, &dispatcher );
-
-        exec.executeBatch( request, &response );
-
+        clusterWrite( request, &response, true /* autosplit */ );
         result.appendElements( response.toBSON() );
-
-        splitIfNeeded( request.getNS(), *targeter.getStats() );
 
         // TODO
         // There's a pending issue about how to report response here. If we use

@@ -285,6 +285,7 @@ env.StaticLibrary(
     target='write_op_impl',
     source=[
         'chunk_manager_targeter.cpp',
+        'cluster_write.cpp',
         'dbclient_multi_command.cpp',
         'dbclient_safe_writer.cpp',
         'dbclient_shard_resolver.cpp',
