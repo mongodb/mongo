@@ -109,8 +109,6 @@ namespace mongo {
 
         Status okToAddIndex( const BSONObj& spec ) const;
 
-        // Status addIndex( ... )
-
         Status dropAllIndexes( bool includingIdIndex );
 
         Status dropIndex( IndexDescriptor* desc );
