@@ -89,6 +89,10 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 	return (0);
 }
 
+/*
+ * __meta_track_apply --
+ *	Apply the changes in a metadata tracking record.
+ */
 static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
@@ -320,8 +324,8 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 }
 
 /*
- * __wt_meta_track_fs_rename --
- *	Track a filesystem rename operation.
+ * __wt_meta_track_fileop --
+ *	Track a filesystem operation.
  */
 int
 __wt_meta_track_fileop(

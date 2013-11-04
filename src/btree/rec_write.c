@@ -541,7 +541,7 @@ __rec_write_init(
 }
 
 /*
- * __rec_destroy --
+ * __wt_rec_destroy --
  *	Clean up the reconciliation structure.
  */
 void
@@ -2072,8 +2072,12 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 #define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
 
+/*
+ * __rec_col_fix_bulk_insert_split_check --
+ *	Check if a bulk-loaded fixed-length column store page needs to split.
+ */
 static inline int
-__rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
+__rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_RECONCILE *r;
@@ -3705,7 +3709,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_write_wrapup  --
+ * __rec_write_wrapup --
  *	Finish the reconciliation.
  */
 static int
@@ -3951,7 +3955,7 @@ err:			__wt_scr_free(&tkey);
 }
 
 /*
- * __rec_write_wrapup_err  --
+ * __rec_write_wrapup_err --
  *	Finish the reconciliation on error.
  */
 static int

@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __find_next_col --
+ *	Find the next column to use for a plan.
+ */
 static int
 __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
     WT_CONFIG_ITEM *colname, u_int *cgnump, u_int *colnump, char *coltype)
@@ -249,6 +253,10 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	return (0);
 }
 
+/*
+ * __find_column_format --
+ *	Find the format of the named column.
+ */
 static int
 __find_column_format(WT_SESSION_IMPL *session,
     WT_TABLE *table, WT_CONFIG_ITEM *colname, int value_only, WT_PACK_VALUE *pv)

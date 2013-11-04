@@ -27,7 +27,7 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
- * __wt_log_getfiles --
+ * __wt_log_get_files --
  *	Retrieve the list of all existing log files.
  */
 int
@@ -45,8 +45,9 @@ __wt_log_get_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
 }
 
 /*
- * __wt_log_getfiles --
- *	Retrieve the list of all existing log files.
+ * __wt_log_get_active_files --
+ *	Retrieve the list of active log files (those that are not candidates
+ *	for archiving).
  */
 int
 __wt_log_get_active_files(
@@ -257,6 +258,10 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	return (0);
 }
 
+/*
+ * __log_fill --
+ *	Copy a thread's log records into the assigned slot.
+ */
 static int
 __log_fill(WT_SESSION_IMPL *session,
     WT_MYSLOT *myslot, int direct, WT_ITEM *record, WT_LSN *lsnp)
@@ -456,6 +461,10 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	return (0);
 }
 
+/*
+ * __log_release --
+ *	Release a log slot.
+ */
 static int
 __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
@@ -668,6 +677,10 @@ err:
 	return (ret);
 }
 
+/*
+ * __wt_log_scan --
+ *	Scan the logs, calling a function on each record found.
+ */
 int
 __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     int (*func)(WT_SESSION_IMPL *session,
@@ -857,7 +870,8 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 }
 
 /*
- * Write a log record without using the consolidation arrays.
+ * __log_direct_write --
+ *	Write a log record without using the consolidation arrays.
  */
 static int
 __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
@@ -893,6 +907,10 @@ err:	if (locked)
 	return (ret);
 }
 
+/*
+ * __wt_log_write --
+ *	Write a record into the log.
+ */
 int
 __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
@@ -1014,6 +1032,10 @@ err:
 	return (ret);
 }
 
+/*
+ * __wt_log_vprintf --
+ *	Write a message into the log.
+ */
 int
 __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {

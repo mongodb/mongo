@@ -517,7 +517,7 @@ __wt_btree_new_leaf_page(
 }
 
 /*
- * __wt_btree_no_eviction --
+ * __wt_btree_evictable --
  *      Setup or release a cache-resident tree.
  */
 void
@@ -703,6 +703,10 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	return (split_size);
 }
 
+/*
+ * pse1 --
+ *	Page size error message 1.
+ */
 static int
 pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 {
@@ -712,6 +716,10 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 	    type, max, ovfl);
 }
 
+/*
+ * pse2 --
+ *	Page size error message 2.
+ */
 static int
 pse2(WT_SESSION_IMPL *session,
     const char *type, uint32_t max, uint32_t ovfl, int pct)

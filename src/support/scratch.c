@@ -275,7 +275,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 }
 
 /*
- * __wt_scr_alloc --
+ * __wt_scr_alloc_func --
  *	Scratch buffer allocation function.
  */
 int

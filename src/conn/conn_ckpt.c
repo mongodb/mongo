@@ -84,7 +84,7 @@ err:		__wt_err(session, ret, "checkpoint server error");
 }
 
 /*
- * __wt_checkpoint_create -
+ * __wt_checkpoint_create --
  *	Start the checkpoint server thread.
  */
 int
@@ -120,7 +120,7 @@ __wt_checkpoint_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 }
 
 /*
- * __wt_checkpoint_destroy -
+ * __wt_checkpoint_destroy --
  *	Destroy the checkpoint server thread.
  */
 int

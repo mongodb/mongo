@@ -109,7 +109,7 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * ___open_index --
+ * __open_index --
  *	Open an index.
  */
 static int
@@ -203,8 +203,8 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __wt_schema_open_indices --
- *	Open the indices for a table.
+ * __wt_schema_open_index --
+ *	Open one or more indices for a table.
  */
 int
 __wt_schema_open_index(WT_SESSION_IMPL *session,

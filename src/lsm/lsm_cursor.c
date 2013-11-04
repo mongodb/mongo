@@ -33,6 +33,10 @@
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_lookup(WT_CURSOR_LSM *);
 
+/*
+ * __clsm_enter --
+ *	Start an operation on an LSM cursor, update if the tree has changed.
+ */
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
@@ -434,7 +438,8 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 	return (ret);
 }
 
-/* __wt_clsm_init_merge --
+/*
+ * __wt_clsm_init_merge --
  *	Initialize an LSM cursor for a merge.
  */
 int

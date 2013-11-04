@@ -16,7 +16,7 @@ static int  __inmem_row_leaf_entries(
 	WT_SESSION_IMPL *, WT_PAGE_HEADER *, uint32_t *);
 
 /*
- * __wt_page_in --
+ * __wt_page_in_func --
  *	Acquire a hazard pointer to a page; if the page is not in-memory,
  *	read it from the disk and build an in-memory version.
  */

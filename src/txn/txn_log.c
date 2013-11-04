@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __txn_op_log --
+ *	Log an operation for the current transaction.
+ */
 static int
 __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 {
@@ -48,6 +52,10 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 	return (0);
 }
 
+/*
+ * __txn_commit_printlog --
+ *	Print a commit log record.
+ */
 static int
 __txn_commit_printlog(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)

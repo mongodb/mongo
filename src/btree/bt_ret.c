@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 /*
- * __wt_key_get --
+ * __wt_row_key_get --
  *	Get a reference to the current key.
  */
 int

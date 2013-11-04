@@ -22,7 +22,7 @@ __bm_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
- * __bm_addr_string
+ * __bm_addr_string --
  *	Return a printable string representation of an address cookie.
  */
 static int

@@ -26,6 +26,10 @@ typedef struct {
 	int metadata_only;
 } WT_RECOVERY;
 
+/*
+ * __recovery_cursor --
+ *	Get a cursor for a recovery operation.
+ */
 static int
 __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
     WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
@@ -63,6 +67,10 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	return (0);
 }
 
+/*
+ * __txn_op_apply --
+ *	Apply a transactional operation during recovery.
+ */
 static int
 __txn_op_apply(
     WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
@@ -206,6 +214,10 @@ err:	if (ret != 0)
 	return (ret);
 }
 
+/*
+ * __txn_commit_apply --
+ *	Apply a commit record during recovery.
+ */
 static int
 __txn_commit_apply(
     WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
@@ -257,7 +269,7 @@ __txn_log_recover(
 }
 
 /*
- * __recovery_setup_slot --
+ * __recovery_setup_file --
  *	Set up the recovery slot for a file.
  */
 static int

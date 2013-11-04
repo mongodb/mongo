@@ -211,7 +211,8 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 }
 
 /*
- * Discard any session dhandles that are not open.
+ * __session_dhandle_sweep --
+ *	Discard any session dhandles that are not open.
  */
 static int
 __session_dhandle_sweep(WT_SESSION_IMPL *session)
@@ -235,9 +236,10 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 }
 
 /*
- * Wrapper function to first sweep the session and then get the btree.
- * Sweeping is only called when a session notices it has dead dhandles
- * on its session dhandle list.  Must be called with schema lock.
+ * __session_open_btree --
+ *	Wrapper function to first sweep the session and then get the btree.
+ *	Sweeping is only called when a session notices it has dead dhandles on
+ *	its session dhandle list.  Must be called with schema lock.
  */
 static int
 __session_open_btree(WT_SESSION_IMPL *session,

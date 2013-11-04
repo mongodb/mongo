@@ -283,7 +283,7 @@ __wt_update_obsolete_free(
 }
 
 /*
- * __wt_page_obsolete --
+ * __wt_row_leaf_obsolete --
  *	Discard all obsolete updates on a row-store leaf page.
  */
 void

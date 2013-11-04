@@ -19,7 +19,7 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
-/* 
+/*
  * __wt_cursor_noop --
  *	Cursor noop.
  */

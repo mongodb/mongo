@@ -363,6 +363,10 @@ err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
 	return (ret);
 }
 
+/*
+ * __cache_pool_assess --
+ *	Assess the usage of the cache pool.
+ */
 static int
 __cache_pool_assess(uint64_t *phighest)
 {
@@ -405,9 +409,10 @@ __cache_pool_assess(uint64_t *phighest)
 }
 
 /*
- * Adjust the allocation of cache to each connection. If force is set ignore
- * cache load information, and reduce the allocation for every connection
- * allocated more than their reserved size.
+ * __cache_pool_adjust --
+ *	Adjust the allocation of cache to each connection. If force is set
+ *	ignore cache load information, and reduce the allocation for every
+ *	connection allocated more than their reserved size.
  */
 static int
 __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)

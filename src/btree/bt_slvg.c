@@ -2207,7 +2207,7 @@ __slvg_ovfl_discard(WT_SESSION_IMPL *session, WT_STUFF *ss)
 }
 
 /*
- * __slvg_free --
+ * __slvg_cleanup --
  *	Discard memory allocated to the page and overflow arrays.
  */
 static int

@@ -441,6 +441,7 @@ errv
 errx
 esc
 eventv
+evictable
 evictserver
 exactp
 extern
@@ -461,12 +462,14 @@ filefrag
 fileid
 filename
 filenames
+fileop
 fileops
 filesize
 filesystem
 fixup
 flcs
 fmt
+fmterr
 fnv
 foc
 fopen
@@ -681,6 +684,7 @@ printf
 printlog
 priv
 ps
+pse
 psp
 pthread
 putK
@@ -893,6 +897,7 @@ versa
 vlcs
 vmsg
 vpack
+vprintf
 vrfy
 vsize
 vslot

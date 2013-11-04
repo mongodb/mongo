@@ -227,7 +227,7 @@ __wt_log_slot_wait(WT_LOGSLOT *slot)
 }
 
 /*
- * _wt_log_slot_release --
+ * __wt_log_slot_release --
  *	Each thread in a consolidated group releases its portion to
  *	signal it has completed writing its piece of the log.
  */

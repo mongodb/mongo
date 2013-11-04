@@ -109,7 +109,8 @@
 #define	FNV1A_64_INIT ((uint64_t)0xcbf29ce484222325ULL)
 
 /*
- * fnv_64a_buf - perform a 64 bit Fowler/Noll/Vo FNV-1a hash on a buffer
+ * fnv_64a_buf --
+ *	Perform a 64 bit Fowler/Noll/Vo FNV-1a hash on a buffer
  *
  * input:
  *	buf	- start of buffer to hash
