@@ -258,7 +258,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
-			if (loop == 100) {
+			if (F_ISSET(cache, WT_EVICT_STUCK))
+				break;
+			if (loop == 20) {
 				F_SET(cache, WT_EVICT_STUCK);
 				WT_STAT_FAST_CONN_INCR(
 				    session, cache_eviction_slow);
@@ -641,42 +643,46 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
-	uint32_t i, candidates;
+	uint32_t candidates, entries, i;
 
 	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
-	WT_RET(__evict_walk(session, &candidates, clean));
+	WT_RET(__evict_walk(session, &entries, clean));
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
 
 	qsort(cache->evict,
-	    candidates, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
+	    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 
-	while (candidates > 0 && cache->evict[candidates - 1].page == NULL)
-		--candidates;
+	while (entries > 0 && cache->evict[entries - 1].page == NULL)
+		--entries;
 
-	cache->evict_entries = candidates;
+	cache->evict_entries = entries;
 
-	if (candidates == 0) {
+	if (entries == 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
 		return (0);
 	}
 
+	WT_ASSERT(session, cache->evict[0].page != NULL);
+
 	/* Find the bottom 25% of read generations. */
 	cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
-	    __evict_read_gen(&cache->evict[candidates - 1])) / 4;
+	    __evict_read_gen(&cache->evict[entries - 1])) / 4;
 
 	/*
-	 * Don't take less than 10% or more than 50% of candidates, regardless.
-	 * That said, if there is only one candidate page, which is normal when
+	 * Don't take less than 10% or more than 50% of entries, regardless.
+	 * That said, if there is only one entry, which is normal when
 	 * populating an empty file, don't exclude it.
 	 */
-	for (i = candidates / 10; i < candidates / 2; i++)
-		if (__evict_read_gen(&cache->evict[i]) > cutoff)
+	for (candidates = 1 + entries / 10;
+	    candidates < entries / 2;
+	    candidates++)
+		if (__evict_read_gen(&cache->evict[candidates]) > cutoff)
 			break;
-	cache->evict_candidates = i + 1;
+	cache->evict_candidates = candidates;
 
 	/* If we have more than the minimum number of entries, clear them. */
 	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
@@ -856,9 +862,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	 * Get some more eviction candidate pages.
 	 */
 	for (evict = start, restarts = 0;
-	    evict < end && ret == 0;
+	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
+			ret = 0;
 			/*
 			 * Take care with terminating this loop.
 			 *
@@ -953,12 +960,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			 * we can make progress.  This is a heuristic that
 			 * saves repeated attempts to evict the same page.
 			 *
-			 * That said, if eviction is stuck, try anyway: maybe a
-			 * transaction that were running last time we wrote the
-			 * page has since rolled back.
+			 * That said, if eviction is stuck, or the file is
+			 * being checkpointed, try anyway: maybe a transaction
+			 * that were running last time we wrote the page has
+			 * since rolled back, or we can help get the checkpoint
+			 * completed sooner.
 			 */
-			if (modified && !__wt_txn_visible_all(session,
-			    page->modify->disk_txn) &&
+			if (modified && page->modify->disk_snap_min ==
+			    S2C(session)->txn_global.oldest_id &&
 			    !F_ISSET(cache, WT_EVICT_STUCK))
 				continue;
 		}
@@ -986,7 +995,6 @@ __evict_get_page(
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
 	WT_REF *ref;
-	uint32_t candidates;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
@@ -1004,11 +1012,6 @@ __evict_get_page(
 		return (WT_DEADLOCK);
 	}
 
-	candidates = cache->evict_candidates;
-	/* The eviction server only considers half of the entries. */
-	if (!is_app && candidates > 1)
-		candidates /= 2;
-
 	/*
 	 * Avoid the LRU lock if no pages are available.  If there are pages
 	 * available, spin until we get the lock.  If this function returns
@@ -1017,8 +1020,7 @@ __evict_get_page(
 	 * server.
 	 */
 	for (;;) {
-		if (cache->evict_current == NULL ||
-		    cache->evict_current >= cache->evict + candidates)
+		if (cache->evict_current == NULL)
 			return (WT_NOTFOUND);
 		if (__wt_spin_trylock(session, &cache->evict_lock) == 0)
 			break;
@@ -1027,7 +1029,7 @@ __evict_get_page(
 
 	/* Get the next page queued for eviction. */
 	while ((evict = cache->evict_current) != NULL &&
-	    evict >= cache->evict && evict < cache->evict + candidates &&
+	    evict < cache->evict + cache->evict_candidates &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
 
@@ -1064,7 +1066,8 @@ __evict_get_page(
 		break;
 	}
 
-	if (is_app && *pagep == NULL)
+	/* Clear the current pointer if there are no more candidates */
+	if (evict >= cache->evict + cache->evict_candidates)
 		cache->evict_current = NULL;
 	__wt_spin_unlock(session, &cache->evict_lock);
 

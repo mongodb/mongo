@@ -59,7 +59,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 	 */
 	WT_RET(__wt_eviction_check(session, &lockout, 1));
 
-	if (F_ISSET(session,
+	if (!lockout || F_ISSET(session,
 	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 		return (0);
 
