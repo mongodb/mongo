@@ -309,7 +309,7 @@ add_option('propagate-shell-environment',
            0, False)
 
 if darwin:
-    osx_version_choices = ['10.6', '10.7', '10.8']
+    osx_version_choices = ['10.6', '10.7', '10.8', '10.9']
     add_option("osx-version-min", "minimum OS X version to support", 1, True,
                type = 'choice', default = osx_version_choices[0], choices = osx_version_choices)
 
