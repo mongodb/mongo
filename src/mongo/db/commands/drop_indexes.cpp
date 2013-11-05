@@ -234,17 +234,16 @@ namespace mongo {
 
             Status s = collection->getIndexCatalog()->dropAllIndexes( true );
             if ( !s.isOK() ) {
-                appendCommandStatus( result, s );
                 errmsg = "dropIndexes failed";
-                return false;
+                return appendCommandStatus( result, s );
             }
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
                 LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
-                string systemIndexesNs =
-                    NamespaceString( toDeleteNs ).getSystemIndexesCollection();
-                theDataFileMgr.insertWithObjMod( systemIndexesNs.c_str(), o, false, true );
+                Status s = collection->getIndexCatalog()->createIndex( o, false );
+                if ( !s.isOK() )
+                    return appendCommandStatus( result, s );
             }
 
             result.append( "nIndexes" , (int)all.size() );

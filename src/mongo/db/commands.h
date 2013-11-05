@@ -223,7 +223,9 @@ namespace mutablebson {
 
         // Helper for setting errmsg and ok field in command result object.
         static void appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg);
-        static void appendCommandStatus(BSONObjBuilder& result, const Status& status);
+
+        // @return s.isOK()
+        static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
 
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;

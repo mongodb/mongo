@@ -87,6 +87,10 @@ namespace mongo {
                              bool noWarn = false,
                              BSONObj* deletedId = 0 );
 
+        /**
+         * this does NOT modify the doc before inserting
+         * i.e. will not add an _id field for documents that are missing it
+         */
         StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota );
 
         // this is temporary, moving up from DB for now

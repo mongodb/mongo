@@ -207,6 +207,15 @@ namespace mongo {
         return c->locktype();
     }
 
+    bool Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
+        appendCommandStatus(result, status.isOK(), status.reason());
+        BSONObj tmp = result.asTempObj();
+        if (!status.isOK() && !tmp.hasField("code")) {
+            result.append("code", status.code());
+        }
+        return status.isOK();
+    }
+
     void Command::appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg) {
         BSONObj tmp = result.asTempObj();
         bool have_ok = tmp.hasField("ok");
@@ -231,14 +240,6 @@ namespace mongo {
     }
 
     void Command::redactForLogging(mutablebson::Document* cmdObj) {}
-
-    void Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
-        appendCommandStatus(result, status.isOK(), status.reason());
-        BSONObj tmp = result.asTempObj();
-        if (!status.isOK() && !tmp.hasField("code")) {
-            result.append("code", status.code());
-        }
-    }
 
     void Command::logIfSlow( const Timer& timer, const string& msg ) {
         int ms = timer.millis();
