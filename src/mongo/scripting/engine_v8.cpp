@@ -1658,7 +1658,14 @@ namespace mongo {
             v8::Local<v8::Value> value = o->Get(name);
             v8ToMongoElement(b, sname, value, depth + 1, &originalBSON);
         }
-        return b.obj();
+
+        const int sizeWithEOO = b.len() + 1/*EOO*/ - 4/*BSONObj::Holder ref count*/;
+        uassert(17260, str::stream() << "Converting from JavaScript to BSON failed: "
+                                     << "Object size " << sizeWithEOO << " exceeds limit of "
+                                     << BSONObjMaxUserSize << " bytes.",
+                sizeWithEOO <= BSONObjMaxUserSize);
+
+        return b.obj(); // Would give an uglier error than above for oversized objects.
     }
 
     // --- random utils ----
