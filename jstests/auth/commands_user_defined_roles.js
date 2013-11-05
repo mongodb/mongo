@@ -11,7 +11,7 @@ in jstests/auth/commands.js.
 var testUser = "userDefinedRolesTestUser";
 var testRole = "userDefinedRolesTestRole";
 
-load("jstests/auth/commands_lib.js");
+load("jstests/auth/lib/commands_lib.js");
 
 function testProperAuthorization(conn, t, testcase) {
     var out = "";

@@ -7,7 +7,7 @@ in jstests/auth/commands.js.
 
 */
 
-load("jstests/auth/commands_lib.js");
+load("jstests/auth/lib/commands_lib.js");
 
 var roles = [
     {key: "read", role: "read", dbname: firstDbName},
