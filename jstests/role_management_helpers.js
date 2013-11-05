@@ -35,10 +35,12 @@ function assertHasPrivilege(privilegeArray, privilege) {
      db.dropDatabase();
      db.dropAllRoles();
 
-     db.addRole({role:'roleA', roles: [], privileges: [{resource: {db:db.getName(), collection: ""},
-                                                        actions: ['find']}]});
-     db.addRole({role:'roleB', privileges: [], roles: ["roleA"]});
-     db.addRole({role:'roleC', privileges: [], roles: []});
+     db.createRole({role:'roleA',
+                    roles: [],
+                    privileges: [{resource: {db:db.getName(), collection: ""},
+                                  actions: ['find']}]});
+     db.createRole({role:'roleB', privileges: [], roles: ["roleA"]});
+     db.createRole({role:'roleC', privileges: [], roles: []});
 
      // Test getRole
      var roleObj = db.getRole("roleA");

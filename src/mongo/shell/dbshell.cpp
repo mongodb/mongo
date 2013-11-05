@@ -137,7 +137,7 @@ void shellHistoryAdd( const char * line ) {
     // be able to add things like `.author`, so be smart about how this is
     // detected by using regular expresions.
     static pcrecpp::RE hiddenHelpers(
-            "\\.(auth|addUser|updateUser|changeUserPassword)\\s*\\(");
+            "\\.(auth|addUser|createUser|updateUser|changeUserPassword)\\s*\\(");
     // Also don't want the raw user management commands to show in the shell when run directly
     // via runCommand.
     static pcrecpp::RE hiddenCommands(

@@ -261,13 +261,13 @@ DB.prototype.repairDatabase = function() {
 
 DB.prototype.help = function() {
     print("DB methods:");
-    print("\tdb.addUser(userDocument)");
     print("\tdb.adminCommand(nameOrDocument) - switches to 'admin' db, and runs command [ just calls db.runCommand(...) ]");
     print("\tdb.auth(username, password)");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
+    print("\tdb.createUser(userDocument)");
     print("\tdb.currentOp() displays currently executing operations in the db");
     print("\tdb.dropDatabase()");
     print("\tdb.eval(func, args) run code server-side");
@@ -853,17 +853,18 @@ DB.prototype.loadServerScripts = function(){
 
 var _defaultWriteConcern = { w: 'majority', wtimeout: 30 * 1000 }
 
-function printUserObj(userObj) {
+function getUserObjString(userObj) {
     var pwd = userObj.pwd;
     delete userObj.pwd;
-    print(tojson(userObj));
+    var toreturn = tojson(userObj);
     userObj.pwd = pwd;
+    return toreturn;
 }
 
 /**
  * Used for creating users in systems with v1 style user information (ie MongoDB v2.4 and prior)
  */
-DB.prototype._createUserWithInsert = function(userObj, replicatedTo, timeout) {
+DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
     var c = this.getCollection( "system.users" );
     var oldPwd;
     if (userObj.pwd != null) {
@@ -886,7 +887,7 @@ DB.prototype._createUserWithInsert = function(userObj, replicatedTo, timeout) {
         if (userObj.pwd != null)
             userObj.pwd = oldPwd;
     }
-    printUserObj(userObj);
+    print("Successfully added user: " + getUserObjString(userObj));
 
     //
     // When saving users to replica sets, the shell user will want to know if the user hasn't
@@ -936,10 +937,22 @@ DB.prototype._createUserWithInsert = function(userObj, replicatedTo, timeout) {
     throw "couldn't add user: " + le.err;
 }
 
-DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
-    var commandExisted = this._createUserWithCommand(userObj, replicatedTo, timeout);
+/**
+ * Helper method to convert "replicatedTo" and "timeout" fields into a writeConcern object
+ */
+DB.prototype._getWriteConcern = function(replicatedTo, timeout) {
+    return { w: replicatedTo != null ? replicatedTo : _defaultWriteConcern.w,
+             wtimeout: timeout || _defaultWriteConcern.wtimeout };
+}
+
+DB.prototype._addUser = function(userObj, replicatedTo, timeout) {
+    if (typeof replicatedTo == "object") {
+        throw Error("Cannot provide write concern object to addUser shell helper, " +
+                    "use createUser instead");
+    }
+    var commandExisted = this._createUser(userObj, this._getWriteConcern(replicatedTo, timeout));
     if (!commandExisted) {
-        this._createUserWithInsert(userObj, replicatedTo, timeout);
+        this._addUserWithInsert(userObj, replicatedTo, timeout);
     }
 }
 
@@ -966,7 +979,7 @@ DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, userna
 
 // Returns true if it worked, false if the createUser command wasn't found, and throws on all other
 // failures
-DB.prototype._createUserWithCommand = function(userObj, replicatedTo, timeout) {
+DB.prototype._createUser = function(userObj, writeConcern) {
     var name = userObj["user"];
     var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
@@ -974,14 +987,12 @@ DB.prototype._createUserWithCommand = function(userObj, replicatedTo, timeout) {
 
     this._modifyCommandToDigestPasswordIfNecessary(cmdObj, name);
 
-    replicatedTo = replicatedTo != null ? replicatedTo : "majority";
-    timeout = timeout || 30 * 1000;
-    cmdObj["writeConcern"] = { w: replicatedTo, wtimeout: timeout };
+    cmdObj["writeConcern"] = writeConcern ? writeConcern : _defaultWriteConcern;
 
     var res = this.runCommand(cmdObj);
 
     if (res.ok) {
-        printUserObj(userObj);
+        print("Successfully added user: " + getUserObjString(userObj));
         return true;
     }
 
@@ -1012,10 +1023,7 @@ function _hashPassword(username, password) {
 // We need to continue to support the addUser(username, password, readOnly) form of addUser for at
 // least one release, even though its behavior of creating a super-user by default is bad.
 // TODO(spencer): remove this form from v2.8
-DB.prototype._createUserDeprecatedV22Version = function(username, pass, readOnly, replicatedTo, timeout) {
-    print("WARNING: This form of the addUser shell helper (that takes username, password, " +
-          "and readOnly boolean) is DEPRECATED. Use the form that takes a user object instead");
-
+DB.prototype._addUserDeprecatedV22Version = function(username, pass, readOnly, replicatedTo, timeout) {
     if ( pass == null || pass.length == 0 )
         throw "password can't be empty";
 
@@ -1034,26 +1042,38 @@ DB.prototype._createUserDeprecatedV22Version = function(username, pass, readOnly
         }
     }
 
-    var commandExisted = this._createUserWithCommand(userObjForCommand, replicatedTo, timeout);
+    var commandExisted = this._createUser(userObjForCommand,
+                                          this._getWriteConcern(replicatedTo, timeout));
     if (!commandExisted) {
         var userObjForInsert = { user: username, pwd: pass, readOnly: readOnly || false };
-        this._createUserWithInsert(userObjForInsert, replicatedTo, timeout);
+        this._addUserWithInsert(userObjForInsert, replicatedTo, timeout);
     }
 }
 
-// TODO(spencer): properly handle write concern objects in addUser
+/**
+ * TODO(spencer): Remove this from 2.8, in favor of "createUser"
+ */
 DB.prototype.addUser = function() {
+    print("WARNING: The 'addUser' shell helper is DEPRECATED. Please use 'createUser' instead");
+
     if (arguments.length == 0) {
         throw Error("No arguments provided to addUser");
     }
 
     if (typeof arguments[0] == "object") {
-        this._createUser.apply(this, arguments);
+        this._addUser.apply(this, arguments);
     } else {
-        this._createUserDeprecatedV22Version.apply(this, arguments);
+        this._addUserDeprecatedV22Version.apply(this, arguments);
     }
 }
 
+DB.prototype.createUser = function(userObj, writeConcern) {
+    var commandExisted = this._createUser(userObj, writeConcern);
+    if (!commandExisted) {
+        throw Error("'createUser' command not found.  This is most likely because you are " +
+                    "talking to an old (pre v2.6) MongoDB server");
+    }
+}
 /**
  * Used for updating users in systems with V1 style user information
  * (ie MongoDB v2.4 and prior)
@@ -1261,7 +1281,7 @@ DB.prototype.getUsers = function() {
     return res.users;
 }
 
-DB.prototype.addRole = function(roleObj, writeConcern) {
+DB.prototype.createRole = function(roleObj, writeConcern) {
     var name = roleObj["role"];
     var cmdObj = {createRole:name};
     cmdObj = Object.extend(cmdObj, roleObj);

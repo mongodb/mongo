@@ -7,8 +7,8 @@ t.startDB( "foo" );
 
 db = t.db.getSiblingDB("admin")
 
-db.addUser({user: 'user',pwd: 'password', roles: jsTest.basicUserRoles});
-db.addRole({role: 'role', roles: [], privileges:[]});
+db.createUser({user: 'user',pwd: 'password', roles: jsTest.basicUserRoles});
+db.createRole({role: 'role', roles: [], privileges:[]});
 
 assert.eq(1, db.system.users.count(), "setup")
 assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}), "setup2")
@@ -37,9 +37,9 @@ assert.eq(1, db.system.version.count(), "didn't restore version");
 assert.docEq(versionDoc, db.system.version.findOne(), "version doc wasn't restored properly");
 
 db.dropUser('user')
-db.addUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
+db.createUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
 db.dropRole('role')
-db.addRole({role: 'role2', roles: [], privileges:[]});
+db.createRole({role: 'role2', roles: [], privileges:[]});
 
 t.runTool("restore", "--dir", t.ext, "--drop")
 
