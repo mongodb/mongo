@@ -81,7 +81,8 @@ namespace mongo {
         if ( _details->isCapped() ) {
             // TOOD: old god not done
             Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert );
-            uassert(17209, "duplicate key insert for unique index of capped collection", ret.isOK() );
+            if ( !ret.isOK() )
+                return StatusWith<DiskLoc>( ret );
         }
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
