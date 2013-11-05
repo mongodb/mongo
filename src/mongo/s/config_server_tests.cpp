@@ -33,18 +33,6 @@
 
 namespace mongo {
 
-    // Note: these are all crutch and hopefully will eventually go away
-
-    DBClientBase *createDirectClient() { return NULL; }
-
-    void dbexit(ExitCode rc, const char *why){
-        ::_exit(-1);
-    }
-
-    bool haveLocalShardingInfo(const string& ns) {
-        return false;
-    }
-
 namespace {
 
     using std::string;

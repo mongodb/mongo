@@ -21,15 +21,6 @@
 
 namespace mongo {
 
-    // these are all crutch and hopefully will eventually go away
-    DBClientBase *createDirectClient() { return 0; }
-    void dbexit( ExitCode rc, const char *why ){
-        log()  << "dbexit called? :(" << endl;
-        ::_exit(-1);
-    }
-    bool haveLocalShardingInfo( const string& ns ) {
-        return false;
-    }
     namespace {
         
         TEST( BalancerPolicyTests , SizeMaxedShardTest ) {

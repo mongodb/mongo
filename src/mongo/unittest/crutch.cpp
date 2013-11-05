@@ -20,14 +20,30 @@
  * eventually it should contain nothing.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/lasterror.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/goodies.h"
-#include "mongo/util/startup_test.h"
+#include <string>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/util/exit_code.h"
 
 namespace mongo {
-    bool inShutdown() { return false; }
+
+    bool inShutdown() {
+        return false;
+    }
+
+    DBClientBase *createDirectClient() {
+        fassertFailed(17249);
+        return NULL;
+    }
+
+    bool haveLocalShardingInfo(const std::string& ns) {
+        return false;
+    }
+
+    void dbexit(ExitCode rc, const char *why) {
+        fassertFailed(17250);
+    }
+
 }  // namespace mongo

@@ -42,20 +42,6 @@ using mongo::ShardConnection;
 using std::string;
 using std::vector;
 
-namespace mongo {
-    // Note: these are all crutch and hopefully will eventually go away
-
-    DBClientBase *createDirectClient() { return NULL; }
-
-    void dbexit(ExitCode rc, const char *why){
-        ::_exit(-1);
-    }
-
-    bool haveLocalShardingInfo(const string& ns) {
-        return false;
-    }
-}
-
 namespace mongo_test {
     const string TARGET_HOST = "$dummy:27017";
 

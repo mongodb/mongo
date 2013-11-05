@@ -21,22 +21,6 @@
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_options.h"
 
-// Crutches to make the test link
-namespace mongo {
-
-    DBClientBase *createDirectClient() {
-        return 0;
-    }
-
-    bool haveLocalShardingInfo(const std::string& ns) {
-        return false;
-    }
-
-    void dbexit(ExitCode rc, const char *why) {
-        ::_exit(-1);
-    }
-}
-
 namespace {
 
     namespace moe = ::mongo::optionenvironment;
