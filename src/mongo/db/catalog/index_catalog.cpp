@@ -246,28 +246,17 @@ namespace mongo {
             return Status::OK();
         }
         catch (DBException& e) {
+            log() << "index build failed."
+                  << " spec: " << spec
+                  << " error: " << e;
+
             // in case we got any access methods or something like that
             // TEMP until IndexDescriptor has to direct refs
             int idxNo = _details->findIndexByName( idxName, true );
             verify( idxNo >= 0 );
             _deleteCacheEntry( idxNo );
 
-            // save our error msg string as an exception or dropIndexes will overwrite our message
-            LastError *le = lastError.get();
-            int savecode = 0;
-            string saveerrmsg;
-            if ( le ) {
-                savecode = le->code;
-                saveerrmsg = le->msg;
-            }
-            else {
-                savecode = e.getCode();
-                saveerrmsg = e.what();
-            }
-
-            verify(le && !saveerrmsg.empty());
-            setLastError(savecode,saveerrmsg.c_str());
-            throw; // XXX
+            return Status( ErrorCodes::InternalError, e.what(), e.getCode() );
         }
 
 
