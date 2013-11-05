@@ -834,9 +834,13 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
+	int locked;
 
 	WT_RET(__wt_lsm_tree_get(session, uri,
 	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
+	locked = 0;
+	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
+	locked = 1;
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&
@@ -849,6 +853,8 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
 			    file_func, name_func, cfg, open_flags));
 	}
-err:	__wt_lsm_tree_release(session, lsm_tree);
+err:	if (locked)
+		__wt_rwunlock(session, lsm_tree->rwlock);
+	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
 }
