@@ -2567,161 +2567,163 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BLOCK_MAJOR			6
 /*! minor version number */
 #define	WT_STAT_DSRC_BLOCK_MINOR			7
+/*! file bytes available for reuse */
+#define	WT_STAT_DSRC_BLOCK_REUSE_BYTES			8
 /*! block manager file size in bytes */
-#define	WT_STAT_DSRC_BLOCK_SIZE				8
+#define	WT_STAT_DSRC_BLOCK_SIZE				9
 /*! bloom filters in the LSM tree */
-#define	WT_STAT_DSRC_BLOOM_COUNT			9
+#define	WT_STAT_DSRC_BLOOM_COUNT			10
 /*! bloom filter false positives */
-#define	WT_STAT_DSRC_BLOOM_FALSE_POSITIVE		10
+#define	WT_STAT_DSRC_BLOOM_FALSE_POSITIVE		11
 /*! bloom filter hits */
-#define	WT_STAT_DSRC_BLOOM_HIT				11
+#define	WT_STAT_DSRC_BLOOM_HIT				12
 /*! bloom filter misses */
-#define	WT_STAT_DSRC_BLOOM_MISS				12
+#define	WT_STAT_DSRC_BLOOM_MISS				13
 /*! bloom filter pages evicted from cache */
-#define	WT_STAT_DSRC_BLOOM_PAGE_EVICT			13
+#define	WT_STAT_DSRC_BLOOM_PAGE_EVICT			14
 /*! bloom filter pages read into cache */
-#define	WT_STAT_DSRC_BLOOM_PAGE_READ			14
+#define	WT_STAT_DSRC_BLOOM_PAGE_READ			15
 /*! total size of bloom filters */
-#define	WT_STAT_DSRC_BLOOM_SIZE				15
+#define	WT_STAT_DSRC_BLOOM_SIZE				16
 /*! column-store variable-size deleted values */
-#define	WT_STAT_DSRC_BTREE_COLUMN_DELETED		16
+#define	WT_STAT_DSRC_BTREE_COLUMN_DELETED		17
 /*! column-store fixed-size leaf pages */
-#define	WT_STAT_DSRC_BTREE_COLUMN_FIX			17
+#define	WT_STAT_DSRC_BTREE_COLUMN_FIX			18
 /*! column-store internal pages */
-#define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		18
+#define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		19
 /*! column-store variable-size leaf pages */
-#define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		19
+#define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		20
 /*! pages rewritten by compaction */
-#define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		20
+#define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		21
 /*! total LSM, table or file object key/value pairs */
-#define	WT_STAT_DSRC_BTREE_ENTRIES			21
+#define	WT_STAT_DSRC_BTREE_ENTRIES			22
 /*! fixed-record size */
-#define	WT_STAT_DSRC_BTREE_FIXED_LEN			22
+#define	WT_STAT_DSRC_BTREE_FIXED_LEN			23
 /*! maximum tree depth */
-#define	WT_STAT_DSRC_BTREE_MAXIMUM_DEPTH		23
+#define	WT_STAT_DSRC_BTREE_MAXIMUM_DEPTH		24
 /*! maximum internal page item size */
-#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			24
+#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			25
 /*! maximum internal page size */
-#define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			25
+#define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			26
 /*! maximum leaf page item size */
-#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			26
+#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			27
 /*! maximum leaf page size */
-#define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			27
+#define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			28
 /*! overflow pages */
-#define	WT_STAT_DSRC_BTREE_OVERFLOW			28
+#define	WT_STAT_DSRC_BTREE_OVERFLOW			29
 /*! row-store internal pages */
-#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			29
+#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			30
 /*! row-store leaf pages */
-#define	WT_STAT_DSRC_BTREE_ROW_LEAF			30
+#define	WT_STAT_DSRC_BTREE_ROW_LEAF			31
 /*! bytes read into cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_READ			31
+#define	WT_STAT_DSRC_CACHE_BYTES_READ			32
 /*! bytes written from cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			32
+#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			33
 /*! cache: checkpoint blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		33
+#define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		34
 /*! unmodified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		34
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		35
 /*! modified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		35
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		36
 /*! data source pages selected for eviction unable to be evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		36
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		37
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		37
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		38
 /*! internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		38
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		39
 /*! cache: internal page merge operations completed */
-#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE		39
+#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE		40
 /*! cache: internal page merge attempts that could not complete */
-#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_FAIL		40
+#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_FAIL		41
 /*! cache: internal levels merged */
-#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_LEVELS	41
+#define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_LEVELS	42
 /*! pages split because they were unable to be evicted */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			42
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			43
 /*! overflow values cached in memory */
-#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		43
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		44
 /*! pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				44
+#define	WT_STAT_DSRC_CACHE_READ				45
 /*! overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		45
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		46
 /*! pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			46
+#define	WT_STAT_DSRC_CACHE_WRITE			47
 /*! raw compression call failed, no additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			47
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			48
 /*! raw compression call failed, additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	48
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	49
 /*! raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			49
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			50
 /*! compressed pages read */
-#define	WT_STAT_DSRC_COMPRESS_READ			50
+#define	WT_STAT_DSRC_COMPRESS_READ			51
 /*! compressed pages written */
-#define	WT_STAT_DSRC_COMPRESS_WRITE			51
+#define	WT_STAT_DSRC_COMPRESS_WRITE			52
 /*! page written failed to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		52
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		53
 /*! page written was too small to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		53
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		54
 /*! cursor creation */
-#define	WT_STAT_DSRC_CURSOR_CREATE			54
+#define	WT_STAT_DSRC_CURSOR_CREATE			55
 /*! cursor insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			55
+#define	WT_STAT_DSRC_CURSOR_INSERT			56
 /*! bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			56
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			57
 /*! cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		57
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		58
 /*! cursor next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			58
+#define	WT_STAT_DSRC_CURSOR_NEXT			59
 /*! cursor prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			59
+#define	WT_STAT_DSRC_CURSOR_PREV			60
 /*! cursor remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			60
+#define	WT_STAT_DSRC_CURSOR_REMOVE			61
 /*! cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		61
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		62
 /*! cursor reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			62
+#define	WT_STAT_DSRC_CURSOR_RESET			63
 /*! cursor search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			63
+#define	WT_STAT_DSRC_CURSOR_SEARCH			64
 /*! cursor search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			64
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			65
 /*! cursor update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			65
+#define	WT_STAT_DSRC_CURSOR_UPDATE			66
 /*! cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		66
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		67
 /*! chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			67
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			68
 /*! highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			68
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			69
 /*! queries that could have benefited from a Bloom filter that did not
  * exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		69
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		70
 /*! reconciliation dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			70
+#define	WT_STAT_DSRC_REC_DICTIONARY			71
 /*! reconciliation internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		71
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		72
 /*! reconciliation leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		72
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		73
 /*! reconciliation overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			73
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			74
 /*! reconciliation pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			74
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			75
 /*! reconciliation pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			75
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			76
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				76
+#define	WT_STAT_DSRC_REC_PAGES				77
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			77
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			78
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			78
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			79
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			79
+#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			80
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			80
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			81
 /*! reconciliation maximum number of splits created for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			81
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			82
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			82
+#define	WT_STAT_DSRC_SESSION_COMPACT			83
 /*! open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		83
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		84
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		84
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		85
 /*! @} */
 /*
  * Statistics section: END

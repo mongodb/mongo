@@ -18,6 +18,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->block_magic.desc = "file magic number";
 	stats->block_major.desc = "file major version number";
 	stats->block_minor.desc = "minor version number";
+	stats->block_reuse_bytes.desc = "file bytes available for reuse";
 	stats->block_size.desc = "block manager file size in bytes";
 	stats->bloom_count.desc = "bloom filters in the LSM tree";
 	stats->bloom_false_positive.desc = "bloom filter false positives";
@@ -133,6 +134,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->block_magic.v = 0;
 	stats->block_major.v = 0;
 	stats->block_minor.v = 0;
+	stats->block_reuse_bytes.v = 0;
 	stats->block_size.v = 0;
 	stats->bloom_count.v = 0;
 	stats->bloom_false_positive.v = 0;
@@ -222,6 +224,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->block_checkpoint_size.v += c->block_checkpoint_size.v;
 	p->block_extension.v += c->block_extension.v;
 	p->block_free.v += c->block_free.v;
+	p->block_reuse_bytes.v += c->block_reuse_bytes.v;
 	p->block_size.v += c->block_size.v;
 	p->bloom_count.v += c->bloom_count.v;
 	p->bloom_false_positive.v += c->bloom_false_positive.v;

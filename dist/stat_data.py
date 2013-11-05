@@ -243,13 +243,13 @@ dsrc_stats = [
 	Stat('block_allocsize',
 	    'block manager file allocation unit size', 'no_aggregate,no_scale'),
 	Stat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
-	Stat('block_extension',
-	    'block allocations requiring file extension'),
+	Stat('block_extension', 'block allocations requiring file extension'),
 	Stat('block_free', 'blocks freed'),
 	Stat('block_magic', 'file magic number', 'no_aggregate,no_scale'),
 	Stat('block_major',
 	    'file major version number', 'no_aggregate,no_scale'),
 	Stat('block_minor', 'minor version number', 'no_aggregate,no_scale'),
+	Stat('block_reuse_bytes', 'file bytes available for reuse'),
 	Stat('block_size', 'block manager file size in bytes', 'no_scale'),
 
 	##########################################

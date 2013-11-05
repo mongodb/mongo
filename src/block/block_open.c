@@ -317,6 +317,7 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	WT_STAT_SET(stats, block_magic, WT_BLOCK_MAGIC);
 	WT_STAT_SET(stats, block_major, WT_BLOCK_MAJOR_VERSION);
 	WT_STAT_SET(stats, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_STAT_SET(stats, block_reuse_bytes, block->live.avail.bytes);
 	WT_STAT_SET(stats, block_size, block->fh->size);
 	__wt_spin_unlock(session, &block->live_lock);
 }
