@@ -444,7 +444,7 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
-	Config('statistics', 'fast', r'''
+	Config('statistics', '', r'''
 		Specify the statistics to be gathered.  Choosing "all" gathers
 		statistics regardless of cost and may include traversing
 		on-disk files; "fast" gathers a subset of relatively
