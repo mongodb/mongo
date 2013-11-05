@@ -713,12 +713,10 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                          "mongocommon",
                          "coreserver",
                          "coredb",
-                         "message_server_port"],
-                NO_CRUTCH=True)
+                         "message_server_port"])
 
 env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
                  LIBDEPS=['clientdriver', 'mocklib'])
-
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
                     "coredb",
@@ -738,8 +736,7 @@ env.CppUnitTest("shard_conn_test", [ "s/shard_conn_test.cpp" ],
                     "coredb",
                     "message_server_port",
                     "mocklib",
-                    "$BUILD_DIR/mongo/db/auth/authmocks"],
-                 NO_CRUTCH=True)
+                    "$BUILD_DIR/mongo/db/auth/authmocks"])
 
 env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
                 LIBDEPS=[ "mongoscore",
@@ -748,8 +745,7 @@ env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
                           "coreserver",
                           "coredb",
                           "message_server_port",
-                          "mocklib"],
-                NO_CRUTCH=True)
+                          "mocklib"])
 
 env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
                 LIBDEPS=[ "mongoscore",
@@ -758,8 +754,7 @@ env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
                           "coreserver",
                           "coredb",
                           "message_server_port",
-                          "mocklib"],
-                NO_CRUTCH=True)
+                          "mocklib"])
 
 
 # Should only need stuff from util, unittest and platform
@@ -954,8 +949,7 @@ env.Library("mongos_options", ["s/mongos_options.cpp"],
                      'coredb',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser'])
 env.CppUnitTest('mongos_options_test', 's/mongos_options_test.cpp',
-                LIBDEPS=['mongos_options'],
-                NO_CRUTCH=True)
+                LIBDEPS=['mongos_options'])
 
 # mongos
 mongos = env.Program(

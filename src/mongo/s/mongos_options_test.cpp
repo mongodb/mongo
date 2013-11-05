@@ -23,9 +23,6 @@
 
 // Crutches to make the test link
 namespace mongo {
-    bool inShutdown() {
-        return false;
-    }
 
     DBClientBase *createDirectClient() {
         return 0;

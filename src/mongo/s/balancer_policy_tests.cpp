@@ -22,7 +22,6 @@
 namespace mongo {
 
     // these are all crutch and hopefully will eventually go away
-    bool inShutdown() { return false; }
     DBClientBase *createDirectClient() { return 0; }
     void dbexit( ExitCode rc, const char *why ){
         log()  << "dbexit called? :(" << endl;

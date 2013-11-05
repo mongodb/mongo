@@ -237,9 +237,8 @@ env.CppUnitTest(
         'base',
         'write_ops',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/clientandshell', # for ConnectionString::parse only
+        '$BUILD_DIR/mongo/clientdriver',
     ],
-    NO_CRUTCH=True,
 )
 
 env.StaticLibrary(
