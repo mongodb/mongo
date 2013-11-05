@@ -681,7 +681,7 @@ struct __wt_session {
 	 * cleared\, while the count of cursor insert operations will be
 	 * cleared). See @ref statistics for more information., a list\, with
 	 * values chosen from the following options: \c "all"\, \c "fast"\, \c
-	 * "clear"; default \c fast.}
+	 * "clear"; default empty.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend
