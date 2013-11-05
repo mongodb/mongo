@@ -98,11 +98,7 @@ namespace mongo {
 
     AndHashNode::AndHashNode() { }
 
-    AndHashNode::~AndHashNode() {
-        for (size_t i = 0; i < children.size(); ++i) {
-            delete children[i];
-        }
-    }
+    AndHashNode::~AndHashNode() { }
 
     void AndHashNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -147,11 +143,7 @@ namespace mongo {
 
     AndSortedNode::AndSortedNode() { }
 
-    AndSortedNode::~AndSortedNode() {
-        for (size_t i = 0; i < children.size(); ++i) {
-            delete children[i];
-        }
-    }
+    AndSortedNode::~AndSortedNode() { }
 
     void AndSortedNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -195,11 +187,7 @@ namespace mongo {
 
     OrNode::OrNode() : dedup(true) { }
 
-    OrNode::~OrNode() {
-        for (size_t i = 0; i < children.size(); ++i) {
-            delete children[i];
-        }
-    }
+    OrNode::~OrNode() { }
 
     void OrNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -249,11 +237,7 @@ namespace mongo {
 
     MergeSortNode::MergeSortNode() : dedup(true) { }
 
-    MergeSortNode::~MergeSortNode() {
-        for (size_t i = 0; i < children.size(); ++i) {
-            delete children[i];
-        }
-    }
+    MergeSortNode::~MergeSortNode() { }
 
     void MergeSortNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);

@@ -46,7 +46,11 @@ namespace mongo {
      */
     struct QuerySolutionNode {
         QuerySolutionNode() { }
-        virtual ~QuerySolutionNode() { }
+        virtual ~QuerySolutionNode() {
+            for (size_t i = 0; i < children.size(); ++i) {
+                delete children[i];
+            }
+        }
 
         /**
          * Return a string representation of this node and any children.
