@@ -952,7 +952,7 @@ namespace mongo {
         if (old) { qlogOn(); }
         //QLOG() << "Exit planning for bounds for sort\n";
 
-        // TODO: are there ever >1 solns?
+        // TODO: are there ever >1 solns?  If so, do we look for a specific soln?
         if (1 == solns.size()) {
             IndexScanNode* ixScan = NULL;
             QuerySolutionNode* rootNode = solns[0]->root.get();
@@ -960,6 +960,7 @@ namespace mongo {
             if (rootNode->getType() == STAGE_FETCH) {
                 FetchNode* fetchNode = static_cast<FetchNode*>(rootNode);
                 if (fetchNode->children[0]->getType() != STAGE_IXSCAN) {
+                    delete solns[0];
                     // No bounds.
                     return;
                 }
@@ -972,6 +973,10 @@ namespace mongo {
 
             node->bounds = ixScan->bounds;
             node->hasBounds = true;
+        }
+
+        for (size_t i = 0; i < solns.size(); ++i) {
+            delete solns[i];
         }
     }
 
