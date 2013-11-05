@@ -400,13 +400,64 @@ namespace mongo {
         if ( name[0] != '$' )
             return false;
 
-        if ( mongoutils::str::equals( "$ref", name ) )
+        if ( _isDBRefDocument( o ) ) {
             return false;
+        }
 
         return true;
     }
 
+    /**
+     * DBRef fields are ordered
+     * Required fields: $ref and $id (in that order)
+     * Optional field: $db
+     * Field names are checked but not field types.
+     */
+    bool MatchExpressionParser::_isDBRefDocument( const BSONObj& obj ) {
+        BSONObjIterator i( obj );
+        BSONElement element;
+        const char* fieldName;
 
+        // $ref
+        if ( !i.more() ) {
+            return false;
+        }
+        element = i.next();
+        fieldName = element.fieldName();
+        if ( !mongoutils::str::equals( "$ref", fieldName ) ) {
+            return false;
+        }
+
+        // $id
+        if ( !i.more() ) {
+            return false;
+        }
+        element = i.next();
+        fieldName = element.fieldName();
+        if ( !mongoutils::str::equals( "$id", fieldName ) ) {
+            return false;
+        }
+
+        // $db
+        if ( !i.more() ) {
+            // $db is optional
+            return true;
+        }
+        element = i.next();
+        fieldName = element.fieldName();
+        if ( !mongoutils::str::equals( "$db", fieldName ) ) {
+            return false;
+        }
+
+        // Additional fields encountered beyond $db
+        // should invalidate the DBRef
+        if ( !i.more() ) {
+            return true;
+        }
+
+        // Document has more than 3 fields - invalid DBRef
+        return false;
+    }
 
     StatusWithMatchExpression MatchExpressionParser::_parseMOD( const char* name,
                                                       const BSONElement& e ) {
@@ -499,6 +550,11 @@ namespace mongo {
         BSONObjIterator i( theArray );
         while ( i.more() ) {
             BSONElement e = i.next();
+
+            // allow DBRefs but reject all fields with names starting wiht $
+            if ( _isExpressionDocument( e ) ) {
+                return Status( ErrorCodes::BadValue, "cannot nest $ under $in" );
+            }
 
             if ( e.type() == RegEx ) {
                 std::auto_ptr<RegexMatchExpression> r( new RegexMatchExpression() );

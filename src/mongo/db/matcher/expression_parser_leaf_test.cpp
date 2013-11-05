@@ -156,6 +156,142 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
+    TEST( MatchExpressionParserLeafTest, INSingleDBRef ) {
+        OID oid = OID::gen();
+        BSONObj query =
+            BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        OID oidx = OID::gen();
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oid << "$db" << "dbx" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON(  "$db" << "db" << "$ref" << "coll" << "$id" << oid ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
+    }
+
+    TEST( MatchExpressionParserLeafTest, INMultipleDBRef ) {
+        OID oid = OID::gen();
+        OID oidy = OID::gen();
+        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+            BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) <<
+            BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        OID oidx = OID::gen();
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oidy << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "colly" << "$id" << oid << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$id" << oid << "$ref" << "coll" << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "dbx" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$id" << oidy << "$ref" << "colly" << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
+                BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
+                BSON( "$ref" << "colly" << "$id" << oidx << "$db" << "db" ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "dbx" ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
+                BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "$db" << "db" ) <<
+                BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) ) );
+    }
+
+    TEST( MatchExpressionParserLeafTest, INInvalidDBRefs ) {
+        // missing $id
+        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+            BSON( "$ref" << "coll" ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        result = MatchExpressionParser::parse( query );
+
+        // second field is not $id
+        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                    BSON( "$ref" << "coll" <<
+                          "$foo" << 1 ) ) ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
+        // optional third field is not $db
+        OID oid = OID::gen();
+        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                    BSON( "$ref" << "coll" <<
+                          "$id" << oid <<
+                          "$foo" << 1 ) ) ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
+        // fourth field should result in invalid DBRef
+        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                    BSON( "$ref" << "coll" <<
+                          "$id" << oid <<
+                          "$db" << "db" <<
+                          "$foo" << 1 ) ) ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
+
+    TEST( MatchExpressionParserLeafTest, INExpressionDocument ) {
+        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( BSON( "$foo" << 1 ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
 
     TEST( MatchExpressionParserLeafTest, INNotArray ) {
         BSONObj query = BSON( "x" << BSON( "$in" << 5 ) );

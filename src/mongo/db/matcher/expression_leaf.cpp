@@ -379,11 +379,6 @@ namespace mongo {
     }
 
     Status ArrayFilterEntries::addEquality( const BSONElement& e ) {
-        if ( e.isABSONObj() ) {
-            if ( e.Obj().firstElement().fieldName()[0] == '$' )
-                return Status( ErrorCodes::BadValue, "cannot next $ under $in" );
-        }
-
         if ( e.type() == RegEx )
             return Status( ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be a regex" );
 
