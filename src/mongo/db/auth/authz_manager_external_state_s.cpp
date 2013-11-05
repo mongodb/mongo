@@ -130,7 +130,18 @@ namespace {
                 if (code == 0) code = ErrorCodes::UnknownError;
                 return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
             }
-            *result = cmdResult["users"]["0"].Obj().getOwned();
+
+            std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
+            if (foundUsers.size() == 0) {
+                return Status(ErrorCodes::UserNotFound, "User not found");
+            }
+            if (foundUsers.size() > 1) {
+                return Status(ErrorCodes::UserDataInconsistent,
+                              mongoutils::str::stream() << "Found multiple users on the \"" <<
+                                      userName.getDB() << "\" database with name \"" <<
+                                      userName.getUser() << "\"");
+            }
+            *result = foundUsers[0].Obj().getOwned();
             conn->done();
             return Status::OK();
         } catch (const DBException& e) {
