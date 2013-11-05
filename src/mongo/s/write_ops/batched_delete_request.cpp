@@ -24,12 +24,13 @@ namespace mongo {
     using mongoutils::str::stream;
 
     const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";
-        const BSONField<std::string> BatchedDeleteRequest::collName("delete");
-        const BSONField<std::vector<BatchedDeleteDocument*> > BatchedDeleteRequest::deletes("deletes");
-        const BSONField<BSONObj> BatchedDeleteRequest::writeConcern("writeConcern");
-        const BSONField<bool> BatchedDeleteRequest::ordered("ordered", true);
-        const BSONField<ChunkVersion> BatchedDeleteRequest::shardVersion("shardVersion");
-        const BSONField<long long> BatchedDeleteRequest::session("session");
+    const BSONField<std::string> BatchedDeleteRequest::collName( "delete" );
+    const BSONField<std::vector<BatchedDeleteDocument*> > BatchedDeleteRequest::deletes( "deletes" );
+    const BSONField<BSONObj> BatchedDeleteRequest::writeConcern( "writeConcern" );
+    const BSONField<bool> BatchedDeleteRequest::ordered( "ordered", true );
+    const BSONField<string> BatchedDeleteRequest::shardName("shardName");
+    const BSONField<ChunkVersion> BatchedDeleteRequest::shardVersion( "shardVersion" );
+    const BSONField<long long> BatchedDeleteRequest::session( "session" );
 
     BatchedDeleteRequest::BatchedDeleteRequest() {
         clear();
@@ -79,6 +80,8 @@ namespace mongo {
 
         if (_isOrderedSet) builder.append(ordered(), _ordered);
 
+        if (_isShardNameSet) builder.append(shardName(), _shardName);
+
         if (_shardVersion.get()) {
             // ChunkVersion wants to be an array.
             builder.append(shardVersion(), static_cast<BSONArray>(_shardVersion->toBSON()));
@@ -112,6 +115,10 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isOrderedSet = fieldState == FieldParser::FIELD_SET;
 
+        fieldState = FieldParser::extract(source, shardName, &_shardName, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isShardNameSet = fieldState == FieldParser::FIELD_SET;
+
         ChunkVersion* tempChunkVersion = NULL;
         fieldState = FieldParser::extract(source, shardVersion, &tempChunkVersion, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -135,6 +142,9 @@ namespace mongo {
 
         _ordered = false;
         _isOrderedSet = false;
+
+        _shardName.clear();
+        _isShardNameSet = false;
 
         _shardVersion.reset();
 
@@ -163,6 +173,9 @@ namespace mongo {
 
         other->_ordered = _ordered;
         other->_isOrderedSet = _isOrderedSet;
+
+        other->_shardName = _shardName;
+        other->_isShardNameSet = _isShardNameSet;
 
         if (other->_shardVersion.get()) _shardVersion->cloneTo(other->_shardVersion.get());
 
@@ -275,6 +288,24 @@ namespace mongo {
         else {
             return ordered.getDefault();
         }
+    }
+
+    void BatchedDeleteRequest::setShardName( const StringData& shardName ) {
+        _shardName = shardName.toString();
+        _isShardNameSet = true;
+    }
+
+    void BatchedDeleteRequest::unsetShardName() {
+        _isShardNameSet = false;
+    }
+
+    bool BatchedDeleteRequest::isShardNameSet() const {
+        return _isShardNameSet;
+    }
+
+    const string& BatchedDeleteRequest::getShardName() const {
+        dassert( _isShardNameSet );
+        return _shardName;
     }
 
     void BatchedDeleteRequest::setShardVersion(const ChunkVersion& shardVersion) {

@@ -47,6 +47,7 @@ namespace mongo {
         static const BSONField<std::vector<BSONObj> > documents;
         static const BSONField<BSONObj> writeConcern;
         static const BSONField<bool> ordered;
+        static const BSONField<string> shardName;
         static const BSONField<ChunkVersion> shardVersion;
         static const BSONField<long long> session;
 
@@ -97,6 +98,11 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
+        void setShardName(const StringData& shardName);
+        void unsetShardName();
+        bool isShardNameSet() const;
+        const std::string& getShardName() const;
+
         void setShardVersion(const ChunkVersion& shardVersion);
         void unsetShardVersion();
         bool isShardVersionSet() const;
@@ -125,6 +131,10 @@ namespace mongo {
         // (O)  whether batch is issued in parallel or not
         bool _ordered;
         bool _isOrderedSet;
+
+        // (O)  shard name we're sending this batch to
+        std::string _shardName;
+        bool _isShardNameSet;
 
         // (O)  version for this collection on a given shard
         boost::scoped_ptr<ChunkVersion> _shardVersion;

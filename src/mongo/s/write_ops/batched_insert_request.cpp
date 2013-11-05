@@ -28,6 +28,7 @@ namespace mongo {
     const BSONField<std::vector<BSONObj> > BatchedInsertRequest::documents("documents");
     const BSONField<BSONObj> BatchedInsertRequest::writeConcern("writeConcern");
     const BSONField<bool> BatchedInsertRequest::ordered("ordered", true);
+    const BSONField<string> BatchedInsertRequest::shardName("shardName");
     const BSONField<ChunkVersion> BatchedInsertRequest::shardVersion("shardVersion");
     const BSONField<long long> BatchedInsertRequest::session("session");
 
@@ -77,6 +78,8 @@ namespace mongo {
 
         if (_isOrderedSet) builder.append(ordered(), _ordered);
 
+        if (_isShardNameSet) builder.append(shardName(), _shardName);
+
         if (_shardVersion.get()) {
             // ChunkVersion wants to be an array.
             builder.append(shardVersion(), static_cast<BSONArray>(_shardVersion->toBSON()));
@@ -110,6 +113,10 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isOrderedSet = fieldState == FieldParser::FIELD_SET;
 
+        fieldState = FieldParser::extract(source, shardName, &_shardName, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isShardNameSet = fieldState == FieldParser::FIELD_SET;
+
         ChunkVersion* tempChunkVersion = NULL;
         fieldState = FieldParser::extract(source, shardVersion, &tempChunkVersion, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -134,6 +141,9 @@ namespace mongo {
 
         _ordered = false;
         _isOrderedSet = false;
+
+        _shardName.clear();
+        _isShardNameSet = false;
 
         _shardVersion.reset();
 
@@ -160,6 +170,9 @@ namespace mongo {
 
         other->_ordered = _ordered;
         other->_isOrderedSet = _isOrderedSet;
+
+        other->_shardName = _shardName;
+        other->_isShardNameSet = _isShardNameSet;
 
         if (other->_shardVersion.get()) _shardVersion->cloneTo(other->_shardVersion.get());
 
@@ -266,6 +279,25 @@ namespace mongo {
             return ordered.getDefault();
         }
     }
+
+    void BatchedInsertRequest::setShardName( const StringData& shardName ) {
+        _shardName = shardName.toString();
+        _isShardNameSet = true;
+    }
+
+    void BatchedInsertRequest::unsetShardName() {
+        _isShardNameSet = false;
+    }
+
+    bool BatchedInsertRequest::isShardNameSet() const {
+        return _isShardNameSet;
+    }
+
+    const string& BatchedInsertRequest::getShardName() const {
+        dassert( _isShardNameSet );
+        return _shardName;
+    }
+
 
     void BatchedInsertRequest::setShardVersion(const ChunkVersion& shardVersion) {
         auto_ptr<ChunkVersion> temp(new ChunkVersion);

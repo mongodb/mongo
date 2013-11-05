@@ -61,10 +61,9 @@ namespace mongo {
         static void initialize(const string& server);
 
         void gotShardName( const string& name );
-        void gotShardHost( string host );
+        bool setShardName( const string& name ); // Same as above, does not throw
 
-        string getShardName() { return _shardName; }
-        string getShardHost() { return _shardHost; }
+        string getShardName() { scoped_lock lk(_mutex); return _shardName; }
 
         /** Reverts back to a state where this mongod is not sharded. */
         void resetShardingState(); 
@@ -261,7 +260,6 @@ namespace mongo {
         string _configServer;
 
         string _shardName;
-        string _shardHost;
 
         // protects state below
         mutable mongo::mutex _mutex;

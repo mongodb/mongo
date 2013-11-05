@@ -116,6 +116,11 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
+        void setShardName(const StringData& shardName);
+        void unsetShardName();
+        bool isShardNameSet() const;
+        const std::string& getShardName() const;
+
         void setShardVersion( const ChunkVersion& shardVersion );
         void unsetShardVersion();
         bool isShardVersionSet() const;

@@ -188,20 +188,34 @@ namespace mongo {
             // TODO: save writtenTo, waitedJournal/waitedRepl stats
         }
 
-        // TODO: Audit where we want to queue here
-        if ( staleBatch ) {
-            ChunkVersion latestShardVersion;
-            shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
-                                                   request.getShardVersion(),
-                                                   &latestShardVersion );
-        }
-
         // Set the main body of the response. We assume that, if there was an error, the error
         // code would already be set.
         response->setOk( !response->isErrCodeSet() );
         response->setN( stats.numInserted + stats.numUpserted + stats.numUpdated
                         + stats.numDeleted );
         dassert( response->isValid( NULL ) );
+
+        // TODO: Audit where we want to queue here - the shardingState calls may block for remote
+        // data
+        if ( staleBatch ) {
+
+            // Make sure our shard name is set or is the same as what was set previously
+            if ( !shardingState.setShardName( request.getShardName() ) ) {
+
+                // If our shard name is stale, our version must have been stale as well
+                dassert( numItemErrors == numBatchItems );
+                warning() << "shard name " << request.getShardName()
+                          << " in batch does not match previously-set shard name "
+                          << shardingState.getShardName() << ", not reloading metadata" << endl;
+            }
+            else {
+                // Refresh our shard version
+                ChunkVersion latestShardVersion;
+                shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
+                                                       request.getShardVersion(),
+                                                       &latestShardVersion );
+            }
+        }
     }
 
     namespace {

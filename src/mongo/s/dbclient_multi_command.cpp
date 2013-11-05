@@ -128,7 +128,11 @@ namespace mongo {
     // THROWS
     static void recvAsCmd( DBClientBase* conn, Message* toRecv, BSONObj* result ) {
 
-        conn->recv( *toRecv );
+        if ( !conn->recv( *toRecv ) ) {
+            // Confusingly, socket exceptions here are written to the log, not thrown.
+            uasserted( 17255, "error receiving write command response, "
+                       "possible socket exception - see logs" );
+        }
 
         // A query result is returned from commands
         QueryResult* recvdQuery = reinterpret_cast<QueryResult*>( toRecv->singleData() );
@@ -161,8 +165,21 @@ namespace mongo {
             }
             catch ( const DBException& ex ) {
                 command->status = ex.toStatus();
-                if ( NULL != command->conn ) delete command->conn;
-                command->conn = NULL;
+
+                if ( NULL != command->conn ) {
+
+                    // Confusingly, the pool needs to know about failed connections so that it can
+                    // invalidate other connections which might be bad.  But if the connection
+                    // doesn't seem bad, don't send it back, because we don't want to reuse it.
+                    if ( !command->conn->isFailed() ) {
+                        delete command->conn;
+                    }
+                    else {
+                        shardConnectionPool.release( command->endpoint.toString(), command->conn );
+                    }
+
+                    command->conn = NULL;
+                }
             }
         }
     }
@@ -208,7 +225,15 @@ namespace mongo {
         }
         catch ( const DBException& ex ) {
 
-            delete command->conn;
+            // Confusingly, the pool needs to know about failed connections so that it can
+            // invalidate other connections which might be bad.  But if the connection doesn't seem
+            // bad, don't send it back, because we don't want to reuse it.
+            if ( !command->conn->isFailed() ) {
+                delete command->conn;
+            }
+            else {
+                shardConnectionPool.release( command->endpoint.toString(), command->conn );
+            }
             command->conn = NULL;
 
             return ex.toStatus();

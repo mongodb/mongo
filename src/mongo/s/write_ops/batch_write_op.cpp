@@ -217,6 +217,7 @@ namespace mongo {
                                           BatchedCommandRequest* request ) const {
 
         request->setNS( _clientRequest->getNS() );
+        request->setShardName( targetedBatch.getEndpoint().shardName );
         request->setShardVersion( targetedBatch.getEndpoint().shardVersion );
 
         const vector<TargetedWrite*>& targetedWrites = targetedBatch.getWrites();

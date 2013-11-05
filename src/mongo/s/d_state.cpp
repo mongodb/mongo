@@ -89,15 +89,22 @@ namespace mongo {
         configServer.init(server);
     }
 
-    void ShardingState::gotShardName( const string& name ) {
+    bool ShardingState::setShardName( const string& name ) {
         scoped_lock lk(_mutex);
         if ( _shardName.size() == 0 ) {
-            // TODO SERVER-2299 verify the name is sound w.r.t IPs
+            // TODO SERVER-2299 remotely verify the name is sound w.r.t IPs
             _shardName = name;
-            return;
+            return true;
         }
 
         if ( _shardName == name )
+            return true;
+
+        return false;
+    }
+
+    void ShardingState::gotShardName( const string& name ) {
+        if ( setShardName( name ) )
             return;
 
         stringstream ss;
@@ -108,35 +115,12 @@ namespace mongo {
         msgasserted( 13298 , ss.str() );
     }
 
-    void ShardingState::gotShardHost( string host ) {
-        scoped_lock lk(_mutex);
-        size_t slash = host.find( '/' );
-        if ( slash != string::npos )
-            host = host.substr( 0 , slash );
-
-        if ( _shardHost.size() == 0 ) {
-            _shardHost = host;
-            return;
-        }
-
-        if ( _shardHost == host )
-            return;
-
-        stringstream ss;
-        ss << "gotShardHost different than what i had before "
-           << " before [" << _shardHost << "] "
-           << " got [" << host << "] "
-           ;
-        msgasserted( 13299 , ss.str() );
-    }
-
     void ShardingState::resetShardingState() {
         scoped_lock lk(_mutex);
         
         _enabled = false;
         _configServer.clear();
         _shardName.clear();
-        _shardHost.clear();
         _collMetadata.clear();
     }
 
@@ -664,7 +648,6 @@ namespace mongo {
 
         b.append( "configServer" , _configServer );
         b.append( "shardName" , _shardName );
-        b.append( "shardHost" , _shardHost );
 
         {
             BSONObjBuilder bb( b.subobjStart( "versions" ) );
@@ -915,7 +898,6 @@ namespace mongo {
             // check shard name/hosts are correct
             if ( cmdObj["shard"].type() == String ) {
                 shardingState.gotShardName( cmdObj["shard"].String() );
-                shardingState.gotShardHost( cmdObj["shardHost"].String() );
             }
             
 

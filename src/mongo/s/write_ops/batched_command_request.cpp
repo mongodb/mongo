@@ -297,6 +297,22 @@ namespace mongo {
         INVOKE( getOrdered );
     }
 
+    void BatchedCommandRequest::setShardName( const StringData& shardName ) {
+        INVOKE( setShardName, shardName );
+    }
+
+    void BatchedCommandRequest::unsetShardName() {
+        INVOKE( unsetShardName );
+    }
+
+    bool BatchedCommandRequest::isShardNameSet() const {
+        INVOKE( isShardNameSet );
+    }
+
+    const string& BatchedCommandRequest::getShardName() const {
+        INVOKE( getShardName );
+    }
+
     void BatchedCommandRequest::setShardVersion( const ChunkVersion& shardVersion ) {
         INVOKE( setShardVersion, shardVersion );
     }
