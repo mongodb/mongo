@@ -245,7 +245,7 @@ namespace mongo {
             string commandSetName = servers.getSetName();
             if ( commandSetName.empty() && ! setName.empty() ) {
                 ostringstream ss;
-                ss << "host is part of set: " << setName << " use replica set url format <setname>/<server1>,<server2>,....";
+                ss << "host is part of set " << setName << ", use replica set url format <setname>/<server1>,<server2>,....";
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;
