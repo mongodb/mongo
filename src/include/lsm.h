@@ -119,7 +119,7 @@ struct __wt_lsm_tree {
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 
-#define	WT_LSM_TREE_LOCKED	0x01
+#define	WT_LSM_TREE_BUSY	0x01
 #define	WT_LSM_TREE_NEED_SWITCH	0x02
 #define	WT_LSM_TREE_OPEN	0x04
 #define	WT_LSM_TREE_THROTTLE	0x08

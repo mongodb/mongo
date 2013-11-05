@@ -293,6 +293,12 @@ __wt_lsm_merge(
 	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
+	 * Atomically mark the lsm_tree busy because the schema worker
+	 * needs to walk the chunk array but cannot hold the lock.
+	 */
+	__wt_lsm_tree_busy(session, lsm_tree);
+
+	/*
 	 * Check whether we raced with another merge, and adjust the chunk
 	 * array offset as necessary.
 	 */
@@ -315,6 +321,7 @@ __wt_lsm_merge(
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	lsm_tree->dsk_gen++;
+	F_CLR(lsm_tree, WT_LSM_TREE_BUSY);
 	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 err:	if (src != NULL)

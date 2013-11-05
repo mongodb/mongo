@@ -774,6 +774,7 @@ extern int __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session,
     const char *name,
     const char *cfg[]);
+extern void __wt_lsm_tree_busy(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
     int (*file_func)(WT_SESSION_IMPL *,

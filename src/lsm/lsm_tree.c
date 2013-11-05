@@ -819,6 +819,25 @@ err:	if (locked)
 	return (ret);
 }
 
+void
+__wt_lsm_tree_busy(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	uint32_t cur_flags, new_flags, old_flags;
+
+	WT_UNUSED(session);
+retry:
+	while ((old_flags = lsm_tree->flags) & WT_LSM_TREE_BUSY) {
+		__wt_yield();
+		goto retry;
+	}
+	old_flags = lsm_tree->flags;
+	new_flags = old_flags | WT_LSM_TREE_BUSY;
+	cur_flags = WT_ATOMIC_CAS_VAL(lsm_tree->flags, old_flags, new_flags);
+	if (cur_flags != old_flags)
+		goto retry;
+	return;
+}
+
 /*
  * __wt_lsm_tree_worker --
  *	Run a schema worker operation on each level of a LSM tree.
@@ -834,13 +853,15 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
-	int locked;
 
 	WT_RET(__wt_lsm_tree_get(session, uri,
 	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
-	locked = 0;
-	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
-	locked = 1;
+	/*
+	 * We mark that we're busy using the tree to coordinate
+	 * with merges so that merging doesn't change the chunk
+	 * array out from underneath us.
+	 */
+	__wt_lsm_tree_busy(session, lsm_tree);
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&
@@ -853,8 +874,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
 			    file_func, name_func, cfg, open_flags));
 	}
-err:	if (locked)
-		__wt_rwunlock(session, lsm_tree->rwlock);
+err:	F_CLR(lsm_tree, WT_LSM_TREE_BUSY);
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
 }
