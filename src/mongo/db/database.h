@@ -133,7 +133,7 @@ namespace mongo {
         Status dropCollection( const StringData& fullns );
 
         Collection* createCollection( const StringData& ns,
-                                      bool capped = true,
+                                      bool capped = false,
                                       const BSONObj* options = NULL,
                                       bool allocateDefaultSpace = true );
 
