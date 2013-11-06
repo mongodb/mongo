@@ -226,10 +226,12 @@ namespace mongo {
             _details->paddingTooSmall();
             deleteDocument( oldLocation );
 
-            if (debug->nmoved == -1) // default of -1 rather than 0
-                debug->nmoved = 1;
-            else
-                debug->nmoved += 1;
+            if ( debug ) {
+                if (debug->nmoved == -1) // default of -1 rather than 0
+                    debug->nmoved = 1;
+                else
+                    debug->nmoved += 1;
+            }
 
             return insertDocument( objNew, enforceQuota );
         }
@@ -237,7 +239,8 @@ namespace mongo {
         _infoCache.notifyOfWriteOp();
         _details->paddingFits();
 
-        debug->keyUpdates = 0;
+        if ( debug )
+            debug->keyUpdates = 0;
 
         for (int i = 0; i < _indexCatalog.numIndexesTotal(); ++i) {
             IndexDescriptor* descriptor = _indexCatalog.getDescriptor( i );
@@ -247,7 +250,8 @@ namespace mongo {
             Status ret = iam->update(*updateTickets.vector()[i], &updatedKeys);
             if ( !ret.isOK() )
                 return StatusWith<DiskLoc>( ret );
-            debug->keyUpdates += updatedKeys;
+            if ( debug )
+                debug->keyUpdates += updatedKeys;
         }
 
         //  update in place

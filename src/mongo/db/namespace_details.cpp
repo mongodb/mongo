@@ -653,25 +653,32 @@ namespace mongo {
 
 
     /**
+     * // TODO: this should move to Collection
      * keeping things in sync this way is a bit of a hack
      * and the fact that we have to pass in ns again
      * should be changed, just not sure to what
      */
     void NamespaceDetails::syncUserFlags( const string& ns ) {
         Lock::assertWriteLocked( ns );
-        
+
         string system_namespaces = nsToDatabaseSubstring(ns).toString() + ".system.namespaces";
 
-        BSONObj oldEntry;
-        verify( Helpers::findOne( system_namespaces , BSON( "name" << ns ) , oldEntry ) );
+        DiskLoc oldLocation = Helpers::findOne( system_namespaces, BSON( "name" << ns ), false );
+        fassert( 17247, !oldLocation.isNull() );
+
+        Collection* coll = cc().database()->getCollection( system_namespaces );
+        BSONObj oldEntry = coll->docFor( oldLocation );
+
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
-        
-        verify( 1 == deleteObjects( system_namespaces , oldEntry , true , false , true ) );
-        theDataFileMgr.insert( system_namespaces.c_str(),
-                               newEntry.objdata(),
-                               newEntry.objsize(),
-                               false,
-                               true );
+
+        StatusWith<DiskLoc> loc = coll->updateDocument( oldLocation, newEntry, false, NULL );
+        if ( !loc.isOK() ) {
+            // TODO: should this be an fassert?
+            error() << "syncUserFlags failed! "
+                    << " ns: " << ns
+                    << " error: " << loc.toString();
+        }
+
     }
 
     bool NamespaceDetails::setUserFlag( int flags ) {
