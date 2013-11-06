@@ -69,6 +69,9 @@ struct __wt_table {
 
 #define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
 	int schema_locked = 0;						\
+	WT_ASSERT(session,						\
+	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
+	    !F_ISSET(session, WT_SESSION_NO_SCHEMA_LOCK));		\
 	while (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))		\
 		if (__wt_spin_trylock(					\
 		    session, &S2C(session)->schema_lock) == 0) {	\

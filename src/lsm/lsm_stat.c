@@ -7,42 +7,19 @@
 
 #include "wt_internal.h"
 
-static int __lsm_stat_init(WT_SESSION_IMPL *, WT_LSM_TREE *, WT_CURSOR_STAT *);
-
-/*
- * __wt_curstat_lsm_init --
- *	Initialize the statistics for a LSM tree.
- */
-int
-__wt_curstat_lsm_init(
-    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
-{
-	WT_DECL_RET;
-	WT_LSM_TREE *lsm_tree;
-
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
-	WT_RET(ret);
-
-	ret = __lsm_stat_init(session, lsm_tree, cst);
-
-	__wt_lsm_tree_release(session, lsm_tree);
-	return (ret);
-}
-
 /*
  * __lsm_stat_init --
  *	Initialize a LSM statistics structure.
  */
 static int
-__lsm_stat_init(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_CURSOR_STAT *cst)
+__lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(uribuf);
 	WT_DECL_RET;
 	WT_DSRC_STATS *new, *stats;
 	WT_LSM_CHUNK *chunk;
+	WT_LSM_TREE *lsm_tree;
 	u_int i;
 	int locked;
 	char config[64];
@@ -53,6 +30,7 @@ __lsm_stat_init(
 	   "checkpoint=WiredTigerCheckpoint", NULL, NULL };
 
 	locked = 0;
+	WT_RET(__wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
 	/* Propagate all, fast and/or clear to the cursors we open. */
@@ -75,7 +53,7 @@ __lsm_stat_init(
 	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
-	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));
 	locked = 1;
 
 	/*
@@ -157,8 +135,24 @@ __lsm_stat_init(
 		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
 
 err:	if (locked)
-		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+	__wt_lsm_tree_release(session, lsm_tree);
 	__wt_scr_free(&uribuf);
+
+	return (ret);
+}
+
+/*
+ * __wt_curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
+ */
+int
+__wt_curstat_lsm_init(
+    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session, ret = __lsm_stat_init(session, uri, cst));
 
 	return (ret);
 }

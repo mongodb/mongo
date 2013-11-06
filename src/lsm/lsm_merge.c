@@ -20,11 +20,6 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	size_t chunks_after_merge;
 	u_int i;
 
-	/*
-	 * Atomically mark the lsm_tree busy because the schema worker
-	 * needs to walk the chunk array but cannot hold the lock.
-	 */
-	__wt_lsm_tree_busy(session, lsm_tree);
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 
 	/* Setup the array of obsolete chunks. */
@@ -45,7 +40,6 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	memset(lsm_tree->chunk + lsm_tree->nchunks, 0,
 	    (nchunks - 1) * sizeof(*lsm_tree->chunk));
 	lsm_tree->chunk[start_chunk] = chunk;
-	F_CLR(lsm_tree, WT_LSM_TREE_BUSY);
 
 	return (0);
 }
@@ -90,7 +84,7 @@ __wt_lsm_merge(
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a
@@ -180,7 +174,7 @@ __wt_lsm_merge(
 		generation = WT_MAX(generation,
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
+	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 	if (nchunks == 0)
 		return (WT_NOTFOUND);
@@ -296,7 +290,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -321,7 +315,7 @@ __wt_lsm_merge(
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	lsm_tree->dsk_gen++;
-	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 err:	if (src != NULL)
 		WT_TRET(src->close(src));
