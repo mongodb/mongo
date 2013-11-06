@@ -205,10 +205,6 @@ namespace mongo {
                 continue;
             }
 
-            // Let's fetch the next candidate object for this update.
-            DiskLoc loc = cursor->currLoc();
-            const BSONObj oldObj = loc.obj();
-
             // We count how many documents we scanned even though we may skip those that are
             // deemed duplicated. The final 'numUpdated' and 'nscanned' numbers may differ for
             // that reason.
