@@ -465,9 +465,9 @@ namespace mongo {
     void ProjectionNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "PROJ\n";
-        verify(NULL != projection);
+        verify(NULL != liteProjection);
         addIndent(ss, indent + 1);
-        *ss << "proj = " << projection->toString() << endl;
+        *ss << "proj = " << liteProjection->getProjectionSpec().toString() << endl;
         addCommon(ss, indent);
         *ss << "Child:" << endl;
         children[0]->appendToString(ss, indent + 2);

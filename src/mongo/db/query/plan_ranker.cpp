@@ -96,12 +96,12 @@ namespace mongo {
         }
     }
 
-    bool hasSort(const PlanStageStats* stats) {
-        if (STAGE_SORT == stats->stageType) {
+    bool hasStage(const StageType type, const PlanStageStats* stats) {
+        if (type == stats->stageType) {
             return true;
         }
         for (size_t i = 0; i < stats->children.size(); ++i) {
-            if (hasSort(stats->children[i])) {
+            if (hasStage(type, stats->children[i])) {
                 return true;
             }
         }
@@ -119,18 +119,35 @@ namespace mongo {
         double productivity = static_cast<double>(stats->common.advanced)
                             / static_cast<double>(stats->common.works);
 
+        // double score = baseScore + productivity;
+
         // Does a plan have a sort?
         // bool sort = hasSort(stats);
+        // double sortPenalty = sort ? 0.5 : 0;
+        // double score = baseScore + productivity - sortPenalty;
 
         // How selective do we think an index is?
-        //double selectivity = computeSelectivity(stats);
-        //return baseScore + productivity + selectivity;
+        // double selectivity = computeSelectivity(stats);
+        // return baseScore + productivity + selectivity;
 
-        //double sortPenalty = sort ? 0.5 : 0;
-        //double score = baseScore + productivity - sortPenalty;
-        double score = baseScore + productivity;
+        // If we have to perform a fetch, that's not great.
+        //
+        // We only do this when we have a projection stage because we have so many jstests that
+        // check bounds even when a collscan plan is just as good as the ixscan'd plan :(
+        double noFetchBonus = 1;
 
-        QLOG() << "score (" << score << ") = baseScore (" << baseScore << ") + productivity(" << productivity << ")\n";
+        // We prefer covered projections.
+        if (hasStage(STAGE_PROJECTION, stats) && hasStage(STAGE_FETCH, stats)) {
+            // Just enough to break a tie.
+            noFetchBonus = 1 - 0.001;
+        }
+
+        double score = baseScore + productivity + noFetchBonus;
+
+        QLOG() << "score (" << score << ") = baseScore (" << baseScore << ")"
+                                     <<  " + productivity(" << productivity << ")"
+                                     <<  " + noFetchBonus(" << noFetchBonus << ")"
+                                     << endl;
 
         return score;
     }

@@ -124,15 +124,7 @@ namespace mongo {
 
         const LiteParsedQuery& pq = cq->getParsed();
 
-        // Things we know we fail at:
-
-        // Projections.
-        if (!pq.getProj().isEmpty()) {
-            QLOG() << "rejecting query w/proj\n";
-            return false;
-        }
-
-        // Obscure arguments to .find().
+        // We fail to deal well with obscure arguments to .find().
         if (pq.returnKey() || pq.showDiskLoc() || (0 != pq.getMaxScan()) || !pq.getMin().isEmpty()
             || !pq.getMax().isEmpty()) {
             QLOG() << "rejecting wacky query args query\n";

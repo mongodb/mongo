@@ -95,7 +95,7 @@ namespace mongo {
         _ntoskip = ntoskip;
         _ntoreturn = ntoreturn;
         _options = queryOptions;
-        _proj = proj;
+        _proj = proj.getOwned();
 
         if (_ntoskip < 0) {
             return Status(ErrorCodes::BadValue, "bad skip value in query");

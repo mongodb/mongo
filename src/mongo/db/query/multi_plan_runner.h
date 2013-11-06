@@ -156,6 +156,7 @@ namespace mongo {
 
         QuerySolution* _backupSolution;
         PlanExecutor* _backupPlan;
+        std::list<WorkingSetID> _backupAlreadyProduced;
     };
 
 }  // namespace mongo

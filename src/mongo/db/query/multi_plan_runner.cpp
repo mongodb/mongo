@@ -149,6 +149,21 @@ namespace mongo {
             }
             if (NULL != _backupPlan) {
                 _backupPlan->invalidate(dl);
+                for (list<WorkingSetID>::iterator it = _backupAlreadyProduced.begin();
+                        it != _backupAlreadyProduced.end();) {
+                    WorkingSetMember* member = _backupPlan->getWorkingSet()->get(*it);
+                    if (member->hasLoc() && member->loc == dl) {
+                        list<WorkingSetID>::iterator next = it;
+                        next++;
+                        WorkingSetCommon::fetchAndInvalidateLoc(member);
+                        _backupPlan->getWorkingSet()->flagForReview(*it);
+                        _backupAlreadyProduced.erase(it);
+                        it = next;
+                    }
+                    else {
+                        it++;
+                    }
+                }
             }
         }
         else {
@@ -248,7 +263,8 @@ namespace mongo {
             _backupPlan = NULL;
             _bestSolution.reset(_backupSolution);
             _backupSolution = NULL;
-            return _bestPlan->getNext(objOut, dlOut);
+            _alreadyProduced = _backupAlreadyProduced;
+            return getNext(objOut, dlOut);
         }
 
         if (NULL != _backupSolution && Runner::RUNNER_ADVANCED == state) {
@@ -257,6 +273,8 @@ namespace mongo {
             delete _backupPlan;
             _backupSolution = NULL;
             _backupPlan = NULL;
+            // TODO: free from WS?
+            _backupAlreadyProduced.clear();
         }
 
         return state;
@@ -288,12 +306,11 @@ namespace mongo {
         if (_bestSolution->hasSortStage && (0 == _alreadyProduced.size())) {
             QLOG() << "Winner has blocked sort, looking for backup plan...\n";
             for (size_t i = 0; i < _candidates.size(); ++i) {
-                // TODO: if we drastically change plan ranking, this will die.
-                verify(0 == _candidates[i].results.size());
                 if (!_candidates[i].solution->hasSortStage) {
                     QLOG() << "Candidate " << i << " is backup child\n";
                     backupChild = i;
                     _backupSolution = _candidates[i].solution;
+                    _backupAlreadyProduced = _candidates[i].results;
                     _backupPlan = new PlanExecutor(_candidates[i].ws, _candidates[i].root);
                     _backupPlan->setYieldPolicy(_policy);
                     break;

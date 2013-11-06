@@ -1066,6 +1066,9 @@ namespace mongo {
                                << solnRoot->toString() << endl;
                     }
                     else {
+                        // XXX TODO: Can we pull values out of the key and if so in what
+                        // cases?  (covered_index_sort_3.js)
+
                         if (!solnRoot->fetched()) {
                             FetchNode* fetch = new FetchNode();
                             fetch->children.push_back(solnRoot);
@@ -1085,10 +1088,10 @@ namespace mongo {
         }
 
         // Project the results.
-        if (NULL != query.getProj()) {
+        if (NULL != query.getLiteProj()) {
             QLOG() << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
-            QLOG() << "PROJECTION: Current plan is " << solnRoot->toString() << endl;
-            if (query.getProj()->requiresDocument()) {
+            QLOG() << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
+            if (query.getLiteProj()->requiresDocument()) {
                 QLOG() << "PROJECTION: claims to require doc adding fetch.\n";
                 // If the projection requires the entire document, somebody must fetch.
                 if (!solnRoot->fetched()) {
@@ -1099,7 +1102,8 @@ namespace mongo {
             }
             else {
                 QLOG() << "PROJECTION: requires fields\n";
-                const vector<string>& fields = query.getProj()->requiredFields();
+                vector<string> fields;
+                query.getLiteProj()->getRequiredFields(&fields);
                 bool covered = true;
                 for (size_t i = 0; i < fields.size(); ++i) {
                     if (!solnRoot->hasField(fields[i])) {
@@ -1109,6 +1113,7 @@ namespace mongo {
                         break;
                     }
                 }
+                cout << "PROJECTION: fields provided = " << covered << endl;
                 // If any field is missing from the list of fields the projection wants,
                 // a fetch is required.
                 if (!covered) {
@@ -1120,8 +1125,9 @@ namespace mongo {
 
             // We now know we have whatever data is required for the projection.
             ProjectionNode* projNode = new ProjectionNode();
-            projNode->projection = query.getProj();
+            projNode->liteProjection = query.getLiteProj();
             projNode->children.push_back(solnRoot);
+            projNode->fullExpression = query.root();
             solnRoot = projNode;
         }
         else {

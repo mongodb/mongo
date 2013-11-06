@@ -32,7 +32,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/parsed_projection.h"
+#include "mongo/db/query/lite_projection.h"
 
 namespace mongo {
 
@@ -41,8 +41,13 @@ namespace mongo {
      */
     class ProjectionStage : public PlanStage {
     public:
-        ProjectionStage(ParsedProjection* projection, WorkingSet* ws, PlanStage* child,
+        ProjectionStage(LiteProjection* liteProj,
+                        bool covered,
+                        const MatchExpression* fullExpression,
+                        WorkingSet* ws,
+                        PlanStage* child,
                         const MatchExpression* filter);
+
         virtual ~ProjectionStage();
 
         virtual bool isEOF();
@@ -56,7 +61,8 @@ namespace mongo {
 
     private:
         // Not owned by us.
-        ParsedProjection* _projection;
+        LiteProjection* _liteProjection;
+        bool _covered;
 
         // _ws is not owned by us.
         WorkingSet* _ws;
@@ -67,6 +73,9 @@ namespace mongo {
 
         // Stats
         CommonStats _commonStats;
+
+        // Not owned here.  Used when we have a positional projection.
+        const MatchExpression* _fullExpression;
     };
 
 }  // namespace mongo

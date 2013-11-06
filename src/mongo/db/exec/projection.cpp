@@ -30,15 +30,24 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    ProjectionStage::ProjectionStage(ParsedProjection* projection, WorkingSet* ws, PlanStage* child,
+    ProjectionStage::ProjectionStage(LiteProjection* liteProjection,
+                                     bool covered,
+                                     const MatchExpression* fullExpression,
+                                     WorkingSet* ws,
+                                     PlanStage* child,
                                      const MatchExpression* filter)
-        : _projection(projection), _ws(ws), _child(child), _filter(filter) { }
+        : _liteProjection(liteProjection),
+          _covered(covered),
+          _ws(ws),
+          _child(child),
+          _filter(filter),
+          _fullExpression(fullExpression) { }
 
     ProjectionStage::~ProjectionStage() { }
 
@@ -53,11 +62,57 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == status) {
             WorkingSetMember* member = _ws->get(id);
-            Status status = ProjectionExecutor::apply(_projection, member);
-            if (!status.isOK()) {
-                warning() << "Couldn't execute projection: " << status.toString() << endl;
-                return PlanStage::FAILURE;
+
+            BSONObj newObj;
+            if (_covered) {
+                // TODO: Rip execution out of the lite_projection and pass a WSM to something
+                // which does the right thing depending on the covered vs. noncovered cases.
+                BSONObjBuilder bob;
+                if (_liteProjection->_includeID) {
+                    BSONElement elt;
+                    member->getFieldDotted("_id", &elt);
+                    verify(!elt.eoo());
+                    bob.appendAs(elt, "_id");
+                }
+
+                BSONObjIterator it(_liteProjection->_source);
+                while (it.more()) {
+                    BSONElement specElt = it.next();
+                    if (mongoutils::str::equals("_id", specElt.fieldName())) {
+                        continue;
+                    }
+
+                    BSONElement keyElt;
+                    // We can project a field that doesn't exist.  We just ignore it.
+                    if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
+                        bob.appendAs(keyElt, specElt.fieldName());
+                    }
+                }
+                newObj = bob.obj();
             }
+            else {
+                // Planner should have done this.
+                verify(member->hasObj());
+
+                MatchDetails matchDetails;
+                matchDetails.requestElemMatchKey();
+
+                if (_liteProjection->transformRequiresDetails()) {
+                    verify(_fullExpression->matchesBSON(member->obj, &matchDetails));
+                }
+
+                Status projStatus = _liteProjection->transform(member->obj, &newObj, &matchDetails);
+                if (!projStatus.isOK()) {
+                    warning() << "Couldn't execute projection, status = " << projStatus.toString() << endl;
+                    return PlanStage::FAILURE;
+                }
+            }
+
+            member->state = WorkingSetMember::OWNED_OBJ;
+            member->obj = newObj;
+            member->keyData.clear();
+            member->loc = DiskLoc();
+
             *out = id;
             ++_commonStats.advanced;
         }

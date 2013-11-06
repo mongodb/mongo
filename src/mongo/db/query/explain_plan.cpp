@@ -135,6 +135,7 @@ namespace mongo {
             res->setCursor("BasicCursor");
             res->setNScanned(csStats->docsTested);
             res->setNScannedObjects(csStats->docsTested);
+            res->setIndexOnly(false);
         }
         else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
             // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.

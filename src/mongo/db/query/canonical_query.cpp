@@ -30,7 +30,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 
@@ -242,12 +241,12 @@ namespace mongo {
         _root.reset(root);
 
         if (!_pq->getProj().isEmpty()) {
-            ParsedProjection* proj;
-            Status projStatus = ProjectionParser::parseFindSyntax(_pq->getProj(), &proj);
-            if (!projStatus.isOK()) {
-                return projStatus;
+            LiteProjection* liteProj = NULL;
+            Status liteProjStatus = LiteProjection::make(_pq->getFilter(), _pq->getProj(), &liteProj);
+            if (!liteProjStatus.isOK()) {
+                return liteProjStatus;
             }
-            _proj.reset(proj);
+            _liteProj.reset(liteProj);
         }
 
         return Status::OK();

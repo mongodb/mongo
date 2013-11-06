@@ -39,10 +39,4 @@ var plan = coll.find({_id:{$in:[5,8]}}, {_id:1}).hint({_id:1}).explain()
 assert.eq(true, plan.indexOnly, "simple.id.6 - indexOnly should be true on covered query")
 assert.eq(0, plan.nscannedObjects, "simple.id.6 - nscannedObjects should be 0 for covered query")
 
-// Test not in query
-var plan = coll.find({_id:{$nin:[5,8]}}, {_id:1}).hint({_id:1}).explain()
-assert.eq(true, plan.indexOnly, "simple.id.7 - indexOnly should be true on covered query")
-// this should be 0 but is not due to bug https://jira.mongodb.org/browse/SERVER-3187
-assert.eq(13, plan.nscannedObjects, "simple.id.7 - nscannedObjects should be 0 for covered query")
-
 print ('all tests pass')

@@ -38,9 +38,8 @@ assert.eq(true, plan.indexOnly, "compound.1.6 - indexOnly should be true on cove
 assert.eq(0, plan.nscannedObjects, "compound.1.6 - nscannedObjects should be 0 for covered query")
 
 // Test no result
-var plan = coll.find({a:38, b:"strvar_12", c:55},{a:1, b:1, c:1}).hint({a:1, b:-1, c:1}).explain()
-// This should be a covered query but has indexOnly=false due to https://jira.mongodb.org/browse/SERVER-8560
-assert.eq(false, plan.indexOnly, "compound.1.7 - indexOnly should be true on covered query")
+var plan = coll.find({a:38, b:"strvar_12", c:55},{a:1, b:1, c:1, _id:0}).hint({a:1, b:-1, c:1}).explain()
+assert.eq(true, plan.indexOnly, "compound.1.7 - indexOnly should be true on covered query")
 assert.eq(0, plan.nscannedObjects, "compound.1.7 - nscannedObjects should be 0 for covered query")
 
 print('all tests passed')

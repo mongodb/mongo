@@ -48,7 +48,6 @@ env.StaticLibrary(
         "oplogstart.cpp",
         "or.cpp",
         "projection.cpp",
-        "projection_executor.cpp",
         "s2near.cpp",
         "skip.cpp",
         "sort.cpp",

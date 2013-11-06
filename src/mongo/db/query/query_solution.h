@@ -33,7 +33,7 @@
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/lite_projection.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
@@ -359,7 +359,7 @@ namespace mongo {
     };
 
     struct ProjectionNode : public QuerySolutionNode {
-        ProjectionNode() : projection(NULL) { }
+        ProjectionNode() : liteProjection(NULL) { }
         virtual ~ProjectionNode() { }
 
         virtual StageType getType() const { return STAGE_PROJECTION; }
@@ -394,8 +394,12 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        // Points into the CanonicalQuery.
-        ParsedProjection* projection;
+        // Points into the CanonicalQuery, not owned here.
+        LiteProjection* liteProjection;
+
+        // The full query tree.  Needed when we have positional operators.
+        // Owned in the CanonicalQuery, not here.
+        MatchExpression* fullExpression;
     };
 
     struct SortNode : public QuerySolutionNode {
