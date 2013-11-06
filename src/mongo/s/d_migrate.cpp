@@ -1603,13 +1603,15 @@ namespace mongo {
                     Database* db = ctx.ctx().db();
                     Collection* collection = db->getCollection( ns );
                     if ( !collection ) {
-                        collection = db->createCollection( ns, false, NULL, true );
-                        verify( collection );
+                        collection = db->createCollection( ns,
+                                                           false /* capped */,
+                                                           NULL /* options */,
+                                                           true /* allocateDefaultSpace */ );
                     }
 
                     Status status = collection->getIndexCatalog()->createIndex( idx, false );
                     if ( !status.isOK() && status.code() != ErrorCodes::IndexAlreadyExists ) {
-                        errmsg = str::stream() << "failed to create index during migration. "
+                        errmsg = str::stream() << "failed to create index before migrating data. "
                                                << " idx: " << idx
                                                << " error: " << status.toString();
                         warning() << errmsg;
