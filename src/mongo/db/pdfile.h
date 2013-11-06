@@ -78,14 +78,6 @@ namespace mongo {
         DataFileMgr();
         void init(const string& path );
 
-        /** @return DiskLoc where item ends up */
-        // changedId should be initialized to false
-        const DiskLoc updateRecord(
-            const char *ns,
-            Collection* collection,
-            Record *toupdate, const DiskLoc& dl,
-            const char *buf, int len, OpDebug& debug, bool god=false);
-
         // The object o may be updated if modified on insert.
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false, bool fromMigrate = false );
 

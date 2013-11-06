@@ -30,14 +30,19 @@
 
 #include "mongo/db/structure/collection.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/database.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/pdfile.h" // XXX-ERH
+#include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
 namespace mongo {
 
@@ -157,6 +162,98 @@ namespace mongo {
         _recordStore.deallocRecord( loc, rec );
 
         _infoCache.notifyOfWriteOp();
+    }
+
+    Counter64 moveCounter;
+    ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", &moveCounter );
+
+    StatusWith<DiskLoc> Collection::updateDocument( const DiskLoc& oldLocation,
+                                                    const BSONObj& objNew,
+                                                    bool enforceQuota,
+                                                    OpDebug* debug ) {
+
+        Record* oldRecord = getExtentManager()->recordFor( oldLocation );
+        BSONObj objOld = BSONObj::make( oldRecord );
+
+        if ( objOld.hasElement( "_id" ) ) {
+            BSONElement oldId = objOld["_id"];
+            BSONElement newId = objNew["_id"];
+            if ( oldId != newId )
+                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                            "in Collection::updateDocument _id mismatch",
+                                            13596 );
+        }
+
+        if ( ns().coll() == "system.users" ) {
+            // XXX - andy and spencer think this should go away now
+            V2UserDocumentParser parser;
+            Status s = parser.checkValidUserDocument(objNew);
+            if ( !s.isOK() )
+                return StatusWith<DiskLoc>( s );
+        }
+
+        /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further
+           below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
+        */
+        OwnedPointerVector<UpdateTicket> updateTickets;
+        updateTickets.mutableVector().resize(_indexCatalog.numIndexesTotal());
+        for (int i = 0; i < _indexCatalog.numIndexesTotal(); ++i) {
+            IndexDescriptor* descriptor = _indexCatalog.getDescriptor( i );
+            IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
+
+            InsertDeleteOptions options;
+            options.logIfError = false;
+            options.dupsAllowed =
+                !(KeyPattern::isIdKeyPattern(descriptor->keyPattern()) || descriptor->unique())
+                || ignoreUniqueIndex(descriptor);
+            updateTickets.mutableVector()[i] = new UpdateTicket();
+            Status ret = iam->validateUpdate(objOld, objNew, oldLocation, options,
+                                             updateTickets.mutableVector()[i]);
+            if ( !ret.isOK() ) {
+                return StatusWith<DiskLoc>( ret );
+            }
+        }
+
+        if ( oldRecord->netLength() < objNew.objsize() ) {
+            // doesn't fit.  reallocate -----------------------------------------------------
+
+            if ( _details->isCapped() )
+                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                            "failing update: objects in a capped ns cannot grow",
+                                            10003 );
+
+            moveCounter.increment();
+            _details->paddingTooSmall();
+            deleteDocument( oldLocation );
+
+            if (debug->nmoved == -1) // default of -1 rather than 0
+                debug->nmoved = 1;
+            else
+                debug->nmoved += 1;
+
+            return insertDocument( objNew, enforceQuota );
+        }
+
+        _infoCache.notifyOfWriteOp();
+        _details->paddingFits();
+
+        debug->keyUpdates = 0;
+
+        for (int i = 0; i < _indexCatalog.numIndexesTotal(); ++i) {
+            IndexDescriptor* descriptor = _indexCatalog.getDescriptor( i );
+            IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
+
+            int64_t updatedKeys;
+            Status ret = iam->update(*updateTickets.vector()[i], &updatedKeys);
+            if ( !ret.isOK() )
+                return StatusWith<DiskLoc>( ret );
+            debug->keyUpdates += updatedKeys;
+        }
+
+        //  update in place
+        int sz = objNew.objsize();
+        memcpy(getDur().writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
+        return StatusWith<DiskLoc>( oldLocation );
     }
 
 
