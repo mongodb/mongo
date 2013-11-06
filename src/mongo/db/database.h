@@ -151,6 +151,7 @@ namespace mongo {
 
         static Status validateDBName( const StringData& dbname );
 
+        const string& getSystemIndexesName() const { return _indexesName; }
     private:
 
         void _clearCollectionCache( const StringData& fullns );

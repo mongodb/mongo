@@ -62,6 +62,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
@@ -1598,12 +1599,25 @@ namespace mongo {
 
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
-                    Client::WriteContext ct( ns );
-                    string system_indexes = cc().database()->name() + ".system.indexes";
-                    theDataFileMgr.insertAndLog( system_indexes.c_str(),
-                                                 idx,
-                                                 true, /* god mode */
-                                                 true /* flag fromMigrate in oplog */ );
+                    Client::WriteContext ctx( ns );
+                    Database* db = ctx.ctx().db();
+                    Collection* collection = db->getCollection( ns );
+                    if ( !collection ) {
+                        collection = db->createCollection( ns, false, NULL, true );
+                        verify( collection );
+                    }
+
+                    Status status = collection->getIndexCatalog()->createIndex( idx, false );
+                    if ( !status.isOK() && status.code() != ErrorCodes::IndexAlreadyExists ) {
+                        errmsg = str::stream() << "failed to create index during migration. "
+                                               << " idx: " << idx
+                                               << " error: " << status.toString();
+                        warning() << errmsg;
+                        state = FAIL;
+                        return;
+                    }
+                    logOp( "i", db->getSystemIndexesName().c_str(), idx,
+                           NULL, NULL, true /* fromMigrate */ );
                 }
 
                 timing.done(1);
