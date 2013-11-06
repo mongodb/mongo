@@ -1573,7 +1573,10 @@ namespace mongo {
                 // 0. copy system.namespaces entry if collection doesn't already exist
                 Client::WriteContext ctx( ns );
                 // Only copy if ns doesn't already exist
-                if ( ! nsdetails( ns ) ) {
+                Database* db = ctx.ctx().db();
+                Collection* collection = db->getCollection( ns );
+
+                if ( !collection ) {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {
@@ -1581,6 +1584,12 @@ namespace mongo {
                         if ( ! userCreateNS( ns.c_str(), entry["options"].Obj(), errmsg, true, 0 ) )
                             warning() << "failed to create collection with options: " << errmsg
                                       << endl;
+                    }
+                    else {
+                        db->createCollection( ns,
+                                              false /* capped */,
+                                              NULL /* options */,
+                                              true /* allocateDefaultSpace */ );
                     }
                 }
             }
@@ -1593,7 +1602,7 @@ namespace mongo {
                     auto_ptr<DBClientCursor> indexes = conn->getIndexes( ns );
                     
                     while ( indexes->more() ) {
-                        all.push_back( indexes->next().getOwned() );
+                        all.push_back( indexes->nextSafe().getOwned() );
                     }
                 }
 
@@ -1603,10 +1612,10 @@ namespace mongo {
                     Database* db = ctx.ctx().db();
                     Collection* collection = db->getCollection( ns );
                     if ( !collection ) {
-                        collection = db->createCollection( ns,
-                                                           false /* capped */,
-                                                           NULL /* options */,
-                                                           true /* allocateDefaultSpace */ );
+                        errmsg = str::stream() << "collection dropped during migration: " << ns;
+                        warning() << errmsg;
+                        state = FAIL;
+                        return;
                     }
 
                     Status status = collection->getIndexCatalog()->createIndex( idx, false );
@@ -1614,10 +1623,13 @@ namespace mongo {
                         errmsg = str::stream() << "failed to create index before migrating data. "
                                                << " idx: " << idx
                                                << " error: " << status.toString();
+                        errmsg = str::stream() << "collection dropped during migration: " << ns;
                         warning() << errmsg;
                         state = FAIL;
                         return;
                     }
+
+                    // make sure to create index on secondaries as well
                     logOp( "i", db->getSystemIndexesName().c_str(), idx,
                            NULL, NULL, true /* fromMigrate */ );
                 }
