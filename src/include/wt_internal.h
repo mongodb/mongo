@@ -217,6 +217,7 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "gcc.h"
 #include "hardware.h"
 #include "misc.h"
 #include "mutex.h"
