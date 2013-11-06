@@ -20,6 +20,30 @@ The directory to which the files are copied may subsequently be
 specified as an directory to the ::wiredtiger_open function and accessed
 as a WiredTiger database home.
 
+Notes:
+
+- Copying the database files for a hot backup does not require any
+special alignment or block size (specifically, Linux or Windows
+filesystems that do not support read/write isolation can be safely read
+for hot backups).
+
+- The cursor must not be closed until all of the files have been copied,
+however, there is no requirement the files be copied in any order or in
+any relationship to the WT_CURSOR::next calls, only that all files have
+been copied before the cursor is closed.  For example, applications might
+aggregate the file names from the cursor and then list the file names as
+arguments to a file archiver such as the system tar utility.
+
+- During the period the hot backup cursor is open, database checkpoints
+can be created, but no checkpoints can be deleted.  This may result in
+significant file growth.
+
+- Many Linux systems do not support mixing \c O_DIRECT and memory
+mapping or normal I/O to the same file.   If \c O_DIRECT is configured
+for data files on Linux systems (using the wiredtiger_open \c direct_io
+configuration), the utilities used to copy the database files should
+probably also specify \c O_DIRECT when configuring their file access.
+
 The following is a programmatic example of creating a hot backup:
 
 @snippet ex_all.c Hot backup
@@ -38,27 +62,5 @@ rm -rf /path/database.backup &&
     mkdir /path/database.backup &&
     wt -h /path/database.source backup /path/database.backup
 @endcode
-
-Notes:
-
-- Copying the database files for a hot backup does not require any
-special alignment or block size (specifically, Linux or Windows
-filesystems that do not support read/write isolation can be safely read
-for hot backups).
-
-- The cursor must not be closed until all of the files have been copied,
-however, there is no requirement that the files be copied in any order
-or in any relationship to the WT_CURSOR::next calls, only that all files
-have been copied before the cursor is closed.
-
-- During the period the hot backup cursor is open, database checkpoints
-can be created, but no checkpoints can be deleted.  This may result in
-significant file growth.
-
-- Many Linux systems do not support mixing \c O_DIRECT and memory
-mapping or normal I/O to the same file.   If \c O_DIRECT is configured
-for data files on Linux systems (using the wiredtiger_open \c direct_io
-configuration), the utilities used to copy the database files should
-probably also specify \c O_DIRECT when configuring their file access.
 
 */
