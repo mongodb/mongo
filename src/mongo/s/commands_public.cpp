@@ -552,6 +552,9 @@ namespace mongo {
                                                                               dbname,
                                                                               cmdObj);
             }
+            virtual bool adminOnly() const {
+                return true;
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();
                 string dbNameFrom = nsToDatabase( fullnsFrom );

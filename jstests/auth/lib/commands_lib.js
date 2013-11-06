@@ -1516,10 +1516,8 @@ var authCommandsLib = {
                         { resource: {db: firstDbName, collection: ""}, actions: ["renameCollectionSameDB"] }
                     ]
                 },
-                /* SERVER-11085
                 { runOnDb: firstDbName, rolesAllowed: {} },
                 { runOnDb: secondDbName, rolesAllowed: {} }
-                */
             ]
         },
         {
@@ -1544,10 +1542,8 @@ var authCommandsLib = {
                         { resource: {db: secondDbName, collection: "y"}, actions: ["insert", "createIndex"] }
                     ]
                 },
-                /* SERVER-11085
                 { runOnDb: firstDbName, rolesAllowed: {} },
                 { runOnDb: secondDbName, rolesAllowed: {} }
-                */
             ]
         },
         {
