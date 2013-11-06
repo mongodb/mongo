@@ -477,7 +477,7 @@ namespace {
             bool set = false;
             // match facility string to facility value
             for (unsigned long i = 0; i < sizeof(facilitynames)/sizeof(facilitynames[0]); i++) {
-                if (!facility.compare(facilitynames[i].c_name)) {
+                if (facilitynames[i].c_name && !facility.compare(facilitynames[i].c_name)) {
                     serverGlobalParams.syslogFacility = facilitynames[i].c_val;
                     set = true;
                 }
