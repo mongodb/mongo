@@ -617,7 +617,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * for a lock.
 	 */
 	if ((nchunks = lsm_tree->nchunks) != 0 &&
-	    F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) &&
+	    !F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
 
