@@ -73,7 +73,7 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isQuerySet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, limit, &_limit, errMsg);
+        fieldState = FieldParser::extractNumber(source, limit, &_limit, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isLimitSet = fieldState == FieldParser::FIELD_SET;
 
