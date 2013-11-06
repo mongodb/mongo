@@ -16,11 +16,6 @@
 #define	WT_PETABYTE	((uint64_t)1125899906842624)
 
 /*
- * Size to build an entry prefix with a pathname.
- */
-#define	ENTRY_SIZE	128
-
-/*
  * Number of directory entries can grow dynamically.
  */
 #define	WT_DIR_ENTRY	32
