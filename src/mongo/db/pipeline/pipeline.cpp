@@ -332,8 +332,6 @@ namespace mongo {
         BSONForEach(stageElem, pipeline) {
             BSONObj stage = stageElem.embeddedObjectUserCheck();
             if (str::equals(stage.firstElementFieldName(), "$out")) {
-                // TODO Figure out how to handle temp collection privileges. For now, using the
-                // output ns is ok since we only do db-level privilege checks.
                 NamespaceString outputNs(db, stage.firstElement().str());
                 uassert(17139,
                         mongoutils::str::stream() << "Invalid $out target namespace, " <<
@@ -341,19 +339,9 @@ namespace mongo {
                         outputNs.isValid());
 
                 ActionSet actions;
-                // logically on output ns
                 actions.addAction(ActionType::remove);
                 actions.addAction(ActionType::insert);
-
-                // on temp ns due to implementation, but not logically on output ns
-                actions.addAction(ActionType::createIndex);
-                actions.addAction(ActionType::dropCollection);
-                actions.addAction(ActionType::renameCollectionSameDB);
-
                 out->push_back(Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-                out->push_back(Privilege(ResourcePattern::forExactNamespace(
-                                                 NamespaceString(db, "system.indexes")),
-                                         ActionType::find));
             }
         }
     }

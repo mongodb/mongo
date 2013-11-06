@@ -273,24 +273,20 @@ var authCommandsLib = {
                 {
                     runOnDb: firstDbName,
                     rolesAllowed: roles_write,
-                    /* SERVER-10963
                     requiredPrivileges: [
                         { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] },
                         { resource: {db: firstDbName, collection: "foo_out"}, actions: ["insert"] },
                         { resource: {db: firstDbName, collection: "foo_out"}, actions: ["remove"] }
                     ]
-                    */
                 },
                 {
                     runOnDb: secondDbName,
                     rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1},
-                    /* SERVER-10963
                     requiredPrivileges: [
                         { resource: {db: secondDbName, collection: "foo"}, actions: ["find"] },
                         { resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"] },
                         { resource: {db: secondDbName, collection: "foo_out"}, actions: ["remove"] }
                     ]
-                    */
                 }
             ]
         },
