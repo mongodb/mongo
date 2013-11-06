@@ -51,13 +51,9 @@ namespace mongo {
         
         SSLThreadInfo() {
             _id = ++_next;
-            CRYPTO_set_id_callback(_ssl_id_callback);
-            CRYPTO_set_locking_callback(_ssl_locking_callback);
         }
         
-        ~SSLThreadInfo() {
-            CRYPTO_set_id_callback(0);
-        }
+        ~SSLThreadInfo() {}
 
         unsigned long id() const { return _id; }
         
@@ -152,6 +148,9 @@ namespace mongo {
 
         // Disable session caching (see SERVER-10261)
         SSL_CTX_set_session_cache_mode(_context, SSL_SESS_CACHE_OFF);
+
+        CRYPTO_set_id_callback(_ssl_id_callback);
+        CRYPTO_set_locking_callback(_ssl_locking_callback);
 
         SSLThreadInfo::init();
         SSLThreadInfo::get();
