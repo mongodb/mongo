@@ -281,6 +281,7 @@ namespace {
         if (!Helpers::findOne(usersNamespace, query, *result)) {
             return userNotFoundStatus;
         }
+        *result = result->getOwned();
         return Status::OK();
     }
 
@@ -311,6 +312,7 @@ namespace {
 
         Client::ReadContext ctx(usersNamespace);
 
+        // TODO(spencer): This is not safe as the BSONObjs in the resulting list may not be owned
         *privDocs = Helpers::findAll(usersNamespace, BSONObj());
         return Status::OK();
     }
