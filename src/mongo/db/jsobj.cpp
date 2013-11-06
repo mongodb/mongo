@@ -78,13 +78,12 @@ namespace mongo {
             s << '"' << escape( string(valuestr(), valuestrsize()-1) ) << '"';
             break;
         case NumberLong:
-/* TODO: Enable when SERVER-11135 fixed
-               if(format == JS) {
+            if (format == JS) {
                 s << "NumberLong(" << _numberLong() << ")";
             }
-            else
-*/
+            else {
                 s << _numberLong();
+            }
             break;
         case NumberInt:
             if(format == JS) {

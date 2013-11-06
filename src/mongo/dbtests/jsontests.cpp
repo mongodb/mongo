@@ -2303,13 +2303,9 @@ namespace JsonTests {
 
         class NumericLongMin : public Base {
             virtual BSONObj bson() const {
-/* TODO: Enable when SERVER-11135 fixed
                 BSONObjBuilder b;
                 b.appendNumber("a", std::numeric_limits<long long>::min());
                 return b.obj();
-*/
-                return BSON("a" << std::numeric_limits<long long>::min());
-
             }
             virtual string json() const {
                 std::stringstream ss;
