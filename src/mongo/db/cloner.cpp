@@ -229,10 +229,8 @@ namespace mongo {
                  i != storedForLater.end();
                  ++i) {
                 BSONObj js = *i;
-                scoped_lock precalcLock(theDataFileMgr._precalcedMutex);
                 try {
                     theDataFileMgr.insertWithObjMod(to_collection, js);
-                    theDataFileMgr.setPrecalced(NULL);
 
                     if ( logForRepl )
                         logOp("i", to_collection, js);
@@ -240,12 +238,10 @@ namespace mongo {
                     getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {
-                    theDataFileMgr.setPrecalced(NULL);
                     error() << "error: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
                     throw;
                 }
                 catch(const DBException&) {
-                    theDataFileMgr.setPrecalced(NULL);
                     throw;
                 }
             }

@@ -335,16 +335,7 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    DataFileMgr::DataFileMgr() : _precalcedMutex("PrecalcedMutex"), _precalced(NULL) {
-    }
-
-    SortPhaseOne* DataFileMgr::getPrecalced() const {
-        return _precalced;
-    }
-
-    void DataFileMgr::setPrecalced(SortPhaseOne* precalced) {
-        _precalced = precalced;
-    }
+    DataFileMgr::DataFileMgr(){}
 
     shared_ptr<Cursor> DataFileMgr::findAll(const StringData& ns, const DiskLoc &startLoc) {
         NamespaceDetails * d = nsdetails( ns );

@@ -136,21 +136,8 @@ namespace mongo {
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const StringData& ns, Record *todelete, const DiskLoc& dl);
 
-        /**
-         * accessor/mutator for the 'precalced' keys (that is, sorted index keys)
-         *
-         * NB: 'precalced' is accessed from fastBuildIndex(), which is called from insert-related
-         * methods like insertWithObjMod().  It is mutated from various callers of the insert
-         * methods, which assume 'precalced' will not change while in the insert method.  This
-         * should likely be refactored so theDataFileMgr takes full responsibility.
-         */
-        SortPhaseOne* getPrecalced() const;
-        void setPrecalced(SortPhaseOne* precalced);
-        mongo::mutex _precalcedMutex;
-
     private:
         vector<DataFile *> files;
-        SortPhaseOne* _precalced;
     };
 
     extern DataFileMgr theDataFileMgr;
