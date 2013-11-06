@@ -132,8 +132,10 @@ namespace mongo {
 
         Status dropCollection( const StringData& fullns );
 
-        Collection* createCollection( const StringData& ns, bool capped,
-                                      const BSONObj* options, bool allocateDefaultSpace );
+        Collection* createCollection( const StringData& ns,
+                                      bool capped = true,
+                                      const BSONObj* options = NULL,
+                                      bool allocateDefaultSpace = true );
 
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???

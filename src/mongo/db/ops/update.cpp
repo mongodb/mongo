@@ -382,7 +382,10 @@ namespace mongo {
 
         BSONObj newObj = doc.getObject();
 
-        theDataFileMgr.insertWithObjMod( nsString.ns().c_str(), newObj, false, request.isGod() );
+        if ( !collection )
+            collection = cc().database()->createCollection( request.getNamespaceString().ns() );
+
+        collection->insertDocument( newObj, !request.isGod() /* enforceQuota */ );
         if ( request.shouldUpdateOpLog() ) {
             logOp( "i", nsString.ns().c_str(), newObj,
                    NULL, NULL, request.isFromMigration(), &newObj );
