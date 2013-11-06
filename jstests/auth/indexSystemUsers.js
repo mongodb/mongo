@@ -9,10 +9,10 @@ function assertGLENotOK(status) {
 
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("test");
-adminDB.addUser({user:'admin', pwd:'x', roles:['userAdminAnyDatabase']});
+adminDB.createUser({user:'admin', pwd:'x', roles:['userAdminAnyDatabase']});
 adminDB.auth('admin','x');
-adminDB.addUser({user:'mallory', pwd:'x', roles:['readWriteAnyDatabase']});
-testDB.addUser({user:'user', pwd:'x', roles:['read']});
+adminDB.createUser({user:'mallory', pwd:'x', roles:['readWriteAnyDatabase']});
+testDB.createUser({user:'user', pwd:'x', roles:['read']});
 assert.eq(3, adminDB.system.users.count());
 adminDB.logout();
 

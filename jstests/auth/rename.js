@@ -10,11 +10,11 @@ db2 = m.getDB( baseName + '_other' )
 admin = m.getDB( 'admin' )
 
 // Setup initial data
-admin.addUser({user:'admin', pwd: 'password', roles: jsTest.adminUserRoles});
+admin.createUser({user:'admin', pwd: 'password', roles: jsTest.adminUserRoles});
 admin.auth('admin', 'password')
 
-db1.addUser({user: "foo", pwd: "bar", roles: jsTest.basicUserRoles});
-db2.addUser({user: "bar", pwd: "foo", roles: jsTest.basicUserRoles});
+db1.createUser({user: "foo", pwd: "bar", roles: jsTest.basicUserRoles});
+db2.createUser({user: "bar", pwd: "foo", roles: jsTest.basicUserRoles});
 
 printjson(db1.a.count());
 db1.a.save({});

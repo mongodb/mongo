@@ -52,7 +52,9 @@ if (user) {
 }
 else {
     print("adding user");
-    s.getDB(adminUser.db).addUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
+    s.getDB(adminUser.db).createUser({user: adminUser.username,
+                                      pwd: adminUser.password,
+                                      roles: jsTest.adminUserRoles});
 }
 
 login(adminUser);
@@ -112,11 +114,14 @@ s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
 d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 )
 
-s.getDB(testUser.db).addUser({user: testUser.username, pwd: testUser.password , roles: jsTest.basicUserRoles}, 3 )
-s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username,
-                                     testUserReadOnly.password,
-                                     jsTest.readOnlyUserRoles,
-                                     3);
+s.getDB(testUser.db).createUser({user: testUser.username,
+                                 pwd: testUser.password,
+                                 roles: jsTest.basicUserRoles},
+                                {w: 3, wtimeout: 30000} )
+s.getDB(testUserReadOnly.db).createUser({user: testUserReadOnly.username,
+                                         pwd: testUserReadOnly.password,
+                                         roles: jsTest.readOnlyUserRoles},
+                                        {w: 3, wtimeout:30000});
 
 logout(adminUser);
 
@@ -238,12 +243,14 @@ logout(adminUser);
 d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 )
 
 // add admin on shard itself, hack to prevent localhost auth bypass
-d1.getMaster().getDB(adminUser.db).addUser(adminUser.username,
-                                           adminUser.password,
-                                           jsTest.adminUserRoles, 3);
-d2.getMaster().getDB(adminUser.db).addUser(adminUser.username,
-                                           adminUser.password,
-                                           jsTest.adminUserRoles, 3);
+d1.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,
+                                               pwd: adminUser.password,
+                                               roles: jsTest.adminUserRoles},
+                                              {w: 3, wtimeout: 30000});
+d2.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,
+                                               pwd: adminUser.password,
+                                               roles: jsTest.adminUserRoles},
+                                              {w: 3, wtimeout: 30000});
 
 login(testUser);
 print( "testing map reduce" );

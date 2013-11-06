@@ -97,7 +97,7 @@ function runOneTest(conn, t) {
 
 function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
-    adminDb.addUser({
+    adminDb.createUser({
         user: "admin",
         pwd: "password",
         roles: ["__system"]
@@ -107,7 +107,7 @@ function createUsers(conn) {
     for (var i = 0; i < roles.length; i++) {
         r = roles[i];
         r.db = conn.getDB(r.dbname);
-        r.db.addUser({user: "user|" + r.role, pwd: "password", roles: [r.role]});
+        r.db.createUser({user: "user|" + r.role, pwd: "password", roles: [r.role]});
     }
     adminDb.logout();
 }

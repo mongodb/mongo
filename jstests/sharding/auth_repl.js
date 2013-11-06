@@ -26,11 +26,13 @@ assert(doc != null);
 
 // Add admin user using direct connection to primary to simulate connection from remote host
 var adminDB = primary.getDB('admin');
-adminDB.addUser({user: 'user', pwd: 'user', roles: jsTest.adminUserRoles}, nodeCount);
+adminDB.createUser({user: 'user', pwd: 'user', roles: jsTest.adminUserRoles},
+                   {w: nodeCount, wtimeout: 30000});
 adminDB.auth('user', 'user');
 
 var priTestDB = primary.getDB('test');
-priTestDB.addUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles}, nodeCount);
+priTestDB.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles},
+                     {w: nodeCount, wtimeout: 30000});
 
 // Authenticate the replSet connection
 assert.eq(1, testDB.auth('a', 'a'));

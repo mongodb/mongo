@@ -33,10 +33,10 @@ var conn = MongoRunner.runMongod({ auth: "", smallfiles: "" });
 var admin = conn.getDB("admin");
 var test = conn.getDB("test");
 
-admin.addUser({user:'admin', pwd: 'a', roles: jsTest.adminUserRoles});
+admin.createUser({user:'admin', pwd: 'a', roles: jsTest.adminUserRoles});
 assert(admin.auth('admin', 'a'));
-test.addUser({user: 'reader', pwd: 'a', roles: [ "read" ]});
-test.addUser({user: 'writer', pwd: 'a', roles: [ "readWrite" ]});
+test.createUser({user: 'reader', pwd: 'a', roles: [ "read" ]});
+test.createUser({user: 'writer', pwd: 'a', roles: [ "readWrite" ]});
 admin.logout();
 
 // Nothing logged in, can neither read nor write.

@@ -3,8 +3,8 @@ var conn = startMongodTest();
 var db1 = conn.getDB("profile-a");
 var db2 = db1.getSisterDB("profile-b");
 var username = "user";
-db1.addUser({user:username, pwd: "password", roles: jsTest.basicUserRoles});
-db2.addUser({user:username, pwd: "password", roles: jsTest.basicUserRoles});
+db1.createUser({user:username, pwd: "password", roles: jsTest.basicUserRoles});
+db2.createUser({user:username, pwd: "password", roles: jsTest.basicUserRoles});
 
 
 function lastOp(db) {

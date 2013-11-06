@@ -16,8 +16,8 @@ function assertHasRole(rolesArray, roleName, roleDB) {
      db.dropDatabase();
      db.dropAllUsers();
 
-     db.addUser({user: "spencer", pwd: "password", roles: ['readWrite']});
-     db.addUser({user: "andy", pwd: "password", roles: ['readWrite']});
+     db.createUser({user: "spencer", pwd: "password", roles: ['readWrite']});
+     db.createUser({user: "andy", pwd: "password", roles: ['readWrite']});
 
      // Test getUser
      var userObj = db.getUser('spencer');
@@ -73,13 +73,13 @@ function assertHasRole(rolesArray, roleName, roleDB) {
 
      // Test password digestion
      assert.throws(function() {
-                       db.addUser({user:'user1', pwd:'x', roles:[], digestPassword: true});});
+                       db.createUser({user:'user1', pwd:'x', roles:[], digestPassword: true});});
      assert.throws(function() {
-                       db.addUser({user:'user1', pwd:'x', roles:[], digestPassword: false});});
+                       db.createUser({user:'user1', pwd:'x', roles:[], digestPassword: false});});
      assert.throws(function() {
-                       db.addUser({user:'user1', pwd:'x', roles:[], passwordDigestor: 'foo'});});
-     db.addUser({user:'user1', pwd:'x', roles:[], passwordDigestor:"server"});
-     db.addUser({user:'user2', pwd:'x', roles:[], passwordDigestor:"client"});
+                       db.createUser({user:'user1', pwd:'x', roles:[], passwordDigestor: 'foo'});});
+     db.createUser({user:'user1', pwd:'x', roles:[], passwordDigestor:"server"});
+     db.createUser({user:'user2', pwd:'x', roles:[], passwordDigestor:"client"});
      assert(db.auth('user1', 'x'));
      assert(db.auth('user2', 'x'));
 

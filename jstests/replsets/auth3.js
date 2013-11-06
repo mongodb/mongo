@@ -7,7 +7,8 @@ rs.initiate();
 
 master = rs.getMaster();
 print("adding user");
-master.getDB("admin").addUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles}, 2);
+master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
+                                 {w: 2, wtimeout: 30000});
 
 var checkValidState = function(i) {
     assert.soon(function() {

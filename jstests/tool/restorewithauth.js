@@ -52,7 +52,7 @@ conn = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath +
 
 // admin user
 var admin = conn.getDB( "admin" )
-admin.addUser({user:  "admin" , pwd: "admin", roles: jsTest.adminUserRoles});
+admin.createUser({user:  "admin" , pwd: "admin", roles: jsTest.adminUserRoles});
 admin.auth( "admin" , "admin" );
 
 var foo = conn.getDB( "foo" )
@@ -92,7 +92,7 @@ foo.dropDatabase();
 assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 0);
 assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 0);
 
-foo.addUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
+foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
 // now try to restore dump with foo database credentials
 x = runMongoProgram("mongorestore",

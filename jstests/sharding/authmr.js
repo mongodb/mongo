@@ -45,11 +45,11 @@ var cluster = new ShardingTest("authwhere", 1, 0, 1,
     var test2DB = adminDB.getSiblingDB('test2');
     var ex;
     try {
-        adminDB.addUser(adminUser)
+        adminDB.createUser(adminUser)
         assert(adminDB.auth(adminUser.user, adminUser.pwd));
 
         adminDB.dropUser(test1User.user);
-        adminDB.addUser(test1User);
+        adminDB.createUser(test1User);
 
         assertInsert(test1DB.foo, { a: 1 });
         assertInsert(test1DB.foo, { a: 2 });

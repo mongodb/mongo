@@ -77,7 +77,7 @@ var doTest = function(conn1, conn2) {
 
     var loginUser = function(connInfo, connAuth) {
         var db = connInfo.mongo.getDB(connAuth.db);
-        db.addUser({user: connAuth.user, pwd: connAuth.pwd, roles: jsTest.adminUserRoles});
+        db.createUser({user: connAuth.user, pwd: connAuth.pwd, roles: jsTest.adminUserRoles});
         db.auth(connAuth.user, connAuth.pwd);
         connInfo.users[connAuth.db] = connAuth.user;
     };

@@ -49,9 +49,9 @@ with_mongod( ['--noauth'], function setupTest( mongod ) {
     conn = new Mongo( mongod.host );
     admin = conn.getDB( 'admin' );
     somedb = conn.getDB( 'somedb' );
-    admin.addUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
+    admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
     admin.auth('admin', 'admin');
-    somedb.addUser({user: 'frim', pwd: 'fram', roles: jsTest.basicUserRoles});
+    somedb.createUser({user: 'frim', pwd: 'fram', roles: jsTest.basicUserRoles});
     somedb.data.drop();
     for (var i = 0; i < 10; ++i) {
         somedb.data.insert( { val: i } );

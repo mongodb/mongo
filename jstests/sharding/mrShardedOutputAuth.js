@@ -53,7 +53,7 @@ var st = new ShardingTest( testName = "mrShardedOutputAuth",
 // setup the users to the input, output and admin databases
 var mongos = st.s;
 var adminDb = mongos.getDB("admin");
-adminDb.addUser({user: "user", pwd: "pass", roles: jsTest.adminUserRoles});
+adminDb.createUser({user: "user", pwd: "pass", roles: jsTest.adminUserRoles});
 
 var authenticatedConn = new Mongo(mongos.host);
 authenticatedConn.getDB('admin').auth("user", "pass");
@@ -62,10 +62,10 @@ adminDb = authenticatedConn.getDB("admin");
 var configDb = authenticatedConn.getDB("config");
 
 var inputDb = authenticatedConn.getDB("input")
-inputDb.addUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
+inputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 
 var outputDb = authenticatedConn.getDB("output");
-outputDb.addUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
+outputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 
 // setup the input db
 inputDb.numbers.drop();

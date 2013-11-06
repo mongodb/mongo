@@ -193,7 +193,7 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
-        db.addUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
+        db.createUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
         db.dropUser('a');
     }, db);
 
@@ -486,8 +486,8 @@ var runTests = function(conn) {
             adminDB.kill_cursor.insert({ x: x });
         }
 
-        adminDB.addUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
-                          roles: AUTH_INFO.admin.root.roles });
+        adminDB.createUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
+                             roles: AUTH_INFO.admin.root.roles });
         adminDB.auth('root', AUTH_INFO.admin.root.pwd);
 
         for (var dbName in AUTH_INFO) {
@@ -500,7 +500,7 @@ var runTests = function(conn) {
                 }
 
                 var info = dbObj[userName];
-                conn.getDB(dbName).addUser({ user: userName,
+                conn.getDB(dbName).createUser({ user: userName,
                     pwd: info.pwd, roles: info.roles });
             }
         }

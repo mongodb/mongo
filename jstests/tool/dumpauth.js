@@ -13,7 +13,7 @@ for(var i = 0; i < 100; i++) {
   t["testcol"].save({ "x": i });
 }
 
-db.addUser({user:  "testuser" , pwd: "testuser", roles: jsTest.adminUserRoles});
+db.createUser({user:  "testuser" , pwd: "testuser", roles: jsTest.adminUserRoles});
 
 assert( db.auth( "testuser" , "testuser" ) , "auth failed" );
 

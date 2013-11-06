@@ -13,7 +13,7 @@ var fromDb = MongoRunner.runMongod({ port: 29000 });
 // Setup toDb with auth
 var toDb = MongoRunner.runMongod({auth : "", port : 31001});
 var admin = toDb.getDB("admin");
-admin.addUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
+admin.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
 admin.auth("foo","bar");
   
 admin.copyDatabase('test', 'test', fromDb.host)

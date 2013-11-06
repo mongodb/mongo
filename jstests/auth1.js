@@ -4,7 +4,7 @@ mydb.dropAllUsers();
 pass = "a" + Math.random();
 //print( "password [" + pass + "]" );
 
-mydb.addUser({user: "eliot" ,pwd:  pass, roles: jsTest.basicUserRoles});
+mydb.createUser({user: "eliot" ,pwd:  pass, roles: jsTest.basicUserRoles});
 
 assert( mydb.auth( "eliot" , pass ) , "auth failed" );
 assert( ! mydb.auth( "eliot" , pass + "a" ) , "auth should have failed" );
@@ -23,14 +23,14 @@ assert( ! mydb.auth( "eliot" , pass2 ) , "didn't drop user" );
 var a = mydb.getMongo().getDB( "admin" );
 a.dropAllUsers();
 pass = "c" + Math.random();
-a.addUser({user: "super", pwd: pass, roles: jsTest.adminUserRoles});
+a.createUser({user: "super", pwd: pass, roles: jsTest.adminUserRoles});
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
 mydb.dropAllUsers();
 pass = "a" + Math.random();
 
-mydb.addUser({user: "eliot" , pwd: pass, roles: jsTest.basicUserRoles});
+mydb.createUser({user: "eliot" , pwd: pass, roles: jsTest.basicUserRoles});
 
 assert.commandFailed( mydb.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
 
@@ -39,10 +39,10 @@ assert.commandFailed( mydb.runCommand( { authenticate: 1, user: "eliot", nonce: 
 var before = a.system.users.count({db: mydb.getName()});
 
 assert.throws( function(){
-    mydb.addUser({ user: "" , pwd: "abc", roles: jsTest.basicUserRoles});
+    mydb.createUser({ user: "" , pwd: "abc", roles: jsTest.basicUserRoles});
 } , null , "C1" )
 assert.throws( function(){
-    mydb.addUser({ user: "abc" , pwd: "", roles: jsTest.basicUserRoles});
+    mydb.createUser({ user: "abc" , pwd: "", roles: jsTest.basicUserRoles});
 } , null , "C2" )
 
 

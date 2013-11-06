@@ -8,7 +8,7 @@ b.dropAllUsers();
 
 a.foo.save( { a : 1 } );
 
-a.addUser({user: "chevy" , pwd: "chase", roles: jsTest.basicUserRoles});
+a.createUser({user: "chevy" , pwd: "chase", roles: jsTest.basicUserRoles});
 
 assert.eq( 1 , a.foo.count() , "A" );
 assert.eq( 0 , b.foo.count() , "B" );

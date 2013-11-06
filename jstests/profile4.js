@@ -31,7 +31,7 @@ function checkLastOp( spec ) {
 
 try {
     username = "jstests_profile4_user";
-    db.addUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
+    db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
     db.auth( username, "password" );
     
     db.setProfilingLevel(0);

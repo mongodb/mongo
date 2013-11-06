@@ -9,19 +9,19 @@ var CodeUnauthorized = 13;
 
 var backdoorUserDoc = { user: 'backdoor', db: 'admin', pwd: 'hashed', roles: ['root'] }
 
-adminDB.addUser({user:'userAdmin',
-                 pwd:'password',
-                 roles:['userAdminAnyDatabase']});
+adminDB.createUser({user:'userAdmin',
+                    pwd:'password',
+                    roles:['userAdminAnyDatabase']});
 
 adminDB.auth('userAdmin', 'password');
-adminDB.addUser({user:'readWriteAdmin',
-                 pwd:'password',
-                 roles:['readWriteAnyDatabase']});
-adminDB.addUser({user:'readWriteAndUserAdmin',
-                 pwd:'password',
-                 roles:['readWriteAnyDatabase', 'userAdminAnyDatabase']});
-adminDB.addUser({user: 'root', pwd: 'password', roles: ['root']});
-adminDB.addUser({user: 'rootier', pwd: 'password', roles: ['__system']});
+adminDB.createUser({user:'readWriteAdmin',
+                    pwd:'password',
+                    roles:['readWriteAnyDatabase']});
+adminDB.createUser({user:'readWriteAndUserAdmin',
+                    pwd:'password',
+                    roles:['readWriteAnyDatabase', 'userAdminAnyDatabase']});
+adminDB.createUser({user: 'root', pwd: 'password', roles: ['root']});
+adminDB.createUser({user: 'rootier', pwd: 'password', roles: ['__system']});
 adminDB.logout();
 
 

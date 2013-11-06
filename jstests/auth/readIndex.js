@@ -6,9 +6,9 @@ var testDB = conn.getDB("testdb");
 
 testDB.foo.insert({a:1});
 
-testDB.addUser({user:'dbAdmin',
-                pwd:'password',
-                roles:['dbAdmin']});
+testDB.createUser({user:'dbAdmin',
+                   pwd:'password',
+                   roles:['dbAdmin']});
 
 testDB.auth('dbAdmin', 'password');
 testDB.foo.ensureIndex({a:1});

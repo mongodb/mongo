@@ -15,7 +15,7 @@ if (cmdOut.ok) {
     external = conn.getDB("$external")
     
     // Add user using localhost exception
-    external.addUser({user: CLIENT_USER, roles:[
+    external.createUser({user: CLIENT_USER, roles:[
             {'role':'userAdminAnyDatabase', 'db':'admin'}, 
             {'role':'readWriteAnyDatabase', 'db':'admin'}]})
 

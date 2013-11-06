@@ -11,10 +11,10 @@ var baseName = "jstests_clone_copyauth";
 var source = startMongod( "--auth", "--port", ports[ 0 ], "--dbpath", MongoRunner.dataPath + baseName + "_source", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 var target = startMongod( "--port", ports[ 1 ], "--dbpath", MongoRunner.dataPath + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 
-source.getDB( "admin" ).addUser( "super", "super" );
+source.getDB( "admin" ).createUser({user: "super", pwd: "super", roles: jsTest.adminUserRoles});
 source.getDB( "admin" ).auth( "super", "super" );
 source.getDB( baseName )[ baseName ].save( {i:1} );
-source.getDB( baseName ).addUser( "foo", "bar" );
+source.getDB( baseName ).createUser({user: "foo", pwd: "bar", roles: jsTest.basicUserRoles});
 source.getDB( "admin" ).logout();
 
 assert.throws( function() { source.getDB( baseName )[ baseName ].findOne(); } );
@@ -31,7 +31,7 @@ assert.eq( 1, target.getDB( baseName )[ baseName ].findOne().i );
 stopMongod( ports[ 1 ] );
 var target = startMongod( "--auth", "--port", ports[ 1 ], "--dbpath", MongoRunner.dataPath + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 
-target.getDB( "admin" ).addUser( "super1", "super1" );
+target.getDB( "admin" ).createUser({user: "super1", pwd: "super1", roles: jsTest.adminUserRoles});
 assert.throws( function() { source.getDB( baseName )[ baseName ].findOne(); } );
 target.getDB( "admin" ).auth( "super1", "super1" );
 

@@ -5,10 +5,10 @@ t = new ToolTest("dumprestore_auth", { auth : "" });
 c = t.startDB("foo");
 
 adminDB = c.getDB().getSiblingDB('admin');
-adminDB.addUser({user: 'admin', pwd: 'password', roles: ['root']});
+adminDB.createUser({user: 'admin', pwd: 'password', roles: ['root']});
 adminDB.auth('admin','password');
-adminDB.addUser({user: 'backup', pwd: 'password', roles: ['backup']});
-adminDB.addUser({user: 'restore', pwd: 'password', roles: ['restore']});
+adminDB.createUser({user: 'backup', pwd: 'password', roles: ['backup']});
+adminDB.createUser({user: 'restore', pwd: 'password', roles: ['restore']});
 
 assert.eq(0 , c.count() , "setup1");
 c.save({ a : 22 });

@@ -8,7 +8,7 @@ var mongos = st.s;
 var adminDB = mongos.getDB('admin');
 var db = mongos.getDB('test')
 
-adminDB.addUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
+adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
 
 jsTestLog( "Add user was successful" );
 

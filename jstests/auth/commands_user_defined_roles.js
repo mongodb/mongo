@@ -143,7 +143,7 @@ function runOneTest(conn, t) {
 function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
     var firstDb = conn.getDB(firstDbName);
-    adminDb.addUser({
+    adminDb.createUser({
         user: "admin",
         pwd: "password",
         roles: ["__system"]

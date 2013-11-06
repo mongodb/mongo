@@ -24,7 +24,7 @@ function authAndTest(mongo) {
     test = mongo.getDB("test");
 
     // Add user using localhost exception
-    external.addUser({user: CLIENT_USER, roles:[
+    external.createUser({user: CLIENT_USER, roles:[
             {'role':'userAdminAnyDatabase', 'db':'admin'}, 
             {'role':'readWriteAnyDatabase', 'db':'admin'}]})
 
@@ -37,7 +37,7 @@ function authAndTest(mongo) {
             "authentication with valid user failed" )
 
     // Check that we can add a user and read data
-    test.addUser({user: "test", pwd: "test", roles:[ 
+    test.createUser({user: "test", pwd: "test", roles:[ 
             {'role': 'readWriteAnyDatabase', 'db': 'admin'}]})
     test.foo.findOne()
 

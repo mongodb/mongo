@@ -10,9 +10,9 @@ var password = "bar";
 var port = allocatePorts(1)[0];
 var host = "localhost:" + port;
 
-var addUser = function(mongo) {
+var createUser = function(mongo) {
     print("============ adding a user.");
-    mongo.getDB("admin").addUser({user:username,pwd:  password, roles: jsTest.adminUserRoles});
+    mongo.getDB("admin").createUser({user:username,pwd:  password, roles: jsTest.adminUserRoles});
 };
 
 var assertCannotRunCommands = function(mongo) {
@@ -83,7 +83,7 @@ var runTest = function(useHostName) {
 
     assertCanRunCommands(mongo);
 
-    addUser(mongo);
+    createUser(mongo);
 
     assertCannotRunCommands(mongo);
 

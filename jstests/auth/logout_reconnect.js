@@ -15,9 +15,9 @@ conn = MongoRunner.runMongod({
 // create user with rw permissions and login
 var testDB = conn.getDB('test');
 var adminDB = conn.getDB('admin');
-adminDB.addUser({user:'admin', pwd:'admin', roles:['userAdminAnyDatabase']});
+adminDB.createUser({user:'admin', pwd:'admin', roles:['userAdminAnyDatabase']});
 adminDB.auth('admin','admin');
-testDB.addUser({user:'rwuser', pwd:'rwuser', roles:['readWrite']})
+testDB.createUser({user:'rwuser', pwd:'rwuser', roles:['readWrite']})
 adminDB.logout();
 testDB.auth('rwuser', 'rwuser');
 

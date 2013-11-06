@@ -35,7 +35,7 @@
     //
     // Preliminary set up.
     //
-    admin.addUser({user:'admin', pwd: 'a', roles: jsTest.adminUserRoles});
+    admin.createUser({user:'admin', pwd: 'a', roles: jsTest.adminUserRoles});
     admin.auth('admin', 'a');
 
     //
@@ -43,10 +43,10 @@
     // add one on "local"
     //
 
-    test.addUser({user: '__system', pwd: 'a', roles: []});
-    admin.addUser({user: '__system', pwd: 'a', roles: []});
+    test.createUser({user: '__system', pwd: 'a', roles: []});
+    admin.createUser({user: '__system', pwd: 'a', roles: []});
     assert.throws(function() {
-        local.addUser({user: '__system', pwd: 'a', roles: []});
+        local.createUser({user: '__system', pwd: 'a', roles: []});
     });
 
     //

@@ -2,7 +2,7 @@ var conn = MongoRunner.runMongod({auth : "", port : 31001});
 
 var admin = conn.getDB("admin");
 
-admin.addUser({user:"foo",pwd: "bar", roles: jsTest.adminUserRoles});
+admin.createUser({user:"foo",pwd: "bar", roles: jsTest.adminUserRoles});
 
 print("make sure curop, killop, and unlock fail");
 

@@ -18,10 +18,10 @@ tRO = dbRO[ baseName ];
 
 db.dropAllUsers();
 
-db.getSisterDB( "admin" ).addUser({user: "super", pwd: "super", roles: ["__system"] });
+db.getSisterDB( "admin" ).createUser({user: "super", pwd: "super", roles: ["__system"] });
 db.getSisterDB("admin").auth("super", "super");
-db.addUser({user: "eliot" , pwd: "eliot", roles: jsTest.basicUserRoles });
-db.addUser({user: "guest" , pwd: "guest", roles: jsTest.readOnlyUserRoles});
+db.createUser({user: "eliot" , pwd: "eliot", roles: jsTest.basicUserRoles });
+db.createUser({user: "guest" , pwd: "guest", roles: jsTest.readOnlyUserRoles});
 db.getSisterDB("admin").logout();
 
 assert.throws( function() { t.findOne() }, [], "read without login" );
