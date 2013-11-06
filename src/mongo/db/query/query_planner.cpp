@@ -969,10 +969,11 @@ namespace mongo {
             else if (rootNode->getType() == STAGE_IXSCAN) {
                 ixScan = static_cast<IndexScanNode*>(rootNode);
             }
-            verify(ixScan);
 
-            node->bounds = ixScan->bounds;
-            node->hasBounds = true;
+            if (ixScan) {
+                node->bounds = ixScan->bounds;
+                node->hasBounds = true;
+            }
         }
 
         for (size_t i = 0; i < solns.size(); ++i) {
