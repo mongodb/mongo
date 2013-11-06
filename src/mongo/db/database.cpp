@@ -408,9 +408,8 @@ namespace mongo {
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
 
         // move index namespaces
-        string indexName = _name + ".system.indexes";
         BSONObj oldIndexSpec;
-        while( Helpers::findOne( indexName, BSON( "ns" << fromNS ), oldIndexSpec ) ) {
+        while( Helpers::findOne( _indexesName, BSON( "ns" << fromNS ), oldIndexSpec ) ) {
             oldIndexSpec = oldIndexSpec.getOwned();
 
             BSONObj newIndexSpec;
@@ -427,23 +426,22 @@ namespace mongo {
                 newIndexSpec = b.obj();
             }
 
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( indexName.c_str(),
-                                                             newIndexSpec.objdata(),
-                                                             newIndexSpec.objsize(),
-                                                             false,
-                                                             true,
-                                                             false );
+            StatusWith<DiskLoc> newIndexSpecLoc =
+                getCollection( _indexesName )->insertDocument( newIndexSpec, false );
+            if ( !newIndexSpecLoc.isOK() )
+                return newIndexSpecLoc.getStatus();
+
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();
-            indexDetails.info = newIndexSpecLoc;
+            indexDetails.info = newIndexSpecLoc.getValue();
             string newIndexNs = indexDetails.indexNamespace();
 
             Status s = _renameSingleNamespace( oldIndexNs, newIndexNs, false );
             if ( !s.isOK() )
                 return s;
 
-            deleteObjects( indexName, oldIndexSpec, true, false, true );
+            deleteObjects( _indexesName, oldIndexSpec, true, false, true );
         }
 
         Top::global.collectionDropped( fromNS.toString() );
@@ -599,7 +597,10 @@ namespace mongo {
             b.append("options", *options);
         BSONObj obj = b.done();
 
-        theDataFileMgr.insert( _namespacesName.c_str(), obj.objdata(), obj.objsize(), false, true);
+        Collection* collection = getCollection( _namespacesName );
+        if ( !collection )
+            collection = createCollection( _namespacesName );
+        collection->insertDocument( obj, false );
     }
 
     Status Database::_dropNS( const StringData& ns ) {
