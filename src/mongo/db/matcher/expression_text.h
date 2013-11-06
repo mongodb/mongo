@@ -43,7 +43,6 @@ namespace mongo {
 
         Status init( const std::string& query, const std::string& language );
 
-        // This shouldn't be called and as such will crash.  GeoNear always requires an index.
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;

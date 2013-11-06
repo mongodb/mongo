@@ -41,12 +41,10 @@ namespace mongo {
     }
 
     bool TextMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        // This shouldn't be called.
-        massert( 17195,
-                 "attempted to match $text without consulting text index; "
-                    "perhaps operation is not using new query framework?",
-                 0 );
-        return false;
+        // See ops/update.cpp.
+        // This node is removed by the query planner.  It's only ever called if we're getting an
+        // elemMatchKey.
+        return true;
     }
 
     void TextMatchExpression::debugString( StringBuilder& debug, int level ) const {

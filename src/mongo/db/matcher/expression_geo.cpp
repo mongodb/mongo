@@ -101,9 +101,10 @@ namespace mongo {
     }
 
     bool GeoNearMatchExpression::matchesSingleElement( const BSONElement& e ) const {
-        // This shouldn't be called.
-        verify(0);
-        return false;
+        // See ops/update.cpp.
+        // This node is removed by the query planner.  It's only ever called if we're getting an
+        // elemMatchKey.
+        return true;
     }
 
     void GeoNearMatchExpression::debugString( StringBuilder& debug, int level ) const {
