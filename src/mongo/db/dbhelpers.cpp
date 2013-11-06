@@ -48,6 +48,7 @@
 #include "mongo/db/query_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/new_find.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/storage_options.h"
@@ -95,12 +96,13 @@ namespace mongo {
     */
     DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
         CanonicalQuery* cq;
-        uassert(17244, "Could not canonicalize " + query.toString(),
+        massert(17244, "Could not canonicalize " + query.toString(),
                 CanonicalQuery::canonicalize(ns.toString(), query, &cq).isOK());
 
         Runner* rawRunner;
-        uassert(17245, "Could not get runner for query " + query.toString(),
-                getRunner(cq, &rawRunner).isOK());
+        size_t options = requireIndex ? QueryPlanner::NO_TABLE_SCAN : QueryPlanner::DEFAULT;
+        massert(17245, "Could not get runner for query " + query.toString(),
+                getRunner(cq, &rawRunner, options).isOK());
 
         auto_ptr<Runner> runner(rawRunner);
         Runner::RunnerState state;
