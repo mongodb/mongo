@@ -410,9 +410,10 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(),
                           clusterMonitorRoleDatabaseActions));
+        addReadOnlyDbPrivileges(privileges, "config");
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(ResourcePattern::forDatabaseName("config"), readRoleActions));
+                Privilege(ResourcePattern::forCollectionName("system.profile"), ActionType::find));
     }
 
     void addHostManagerPrivileges(PrivilegeVector* privileges) {
@@ -433,9 +434,8 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(),
                           clusterManagerRoleDatabaseActions));
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forDatabaseName("config"), readRoleActions));
+        addReadOnlyDbPrivileges(privileges, "config");
+
         ActionSet configSettingsActions;
         configSettingsActions << ActionType::insert << ActionType::update << ActionType::remove;
         Privilege::addPrivilegeToPrivilegeVector(

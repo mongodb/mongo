@@ -92,7 +92,7 @@ var READ_WRITE_PERM = { insert: 1, update: 1, remove: 1, query: 1,
     index_r: 1, index_w: 1, killCursor: 1 };
 var ADMIN_PERM = { index_r: 1, index_w: 1, profile_r: 1 };
 var UADMIN_PERM = { user_r: 1, user_w: 1 };
-var CLUSTER_PERM = { killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1 };
+var CLUSTER_PERM = { killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, profile_r: 1 };
 
 /**
  * Checks whether an error occurs after running an operation.
