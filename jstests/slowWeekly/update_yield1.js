@@ -15,17 +15,17 @@ while ( true ){
             t.insert( { _id : i , n : 1 } )
         }
     }
-    
+
      function timeUpdate(){
-        return Date.timeFunc( 
+        return Date.timeFunc(
             function(){
                 t.update( {} , { $inc : { n : 1 } } , false , true );
                 var r = db.getLastErrorObj();
             }
         );
-        
+
     }
-    
+
     fill();
     timeUpdate();
     timeUpdate();
@@ -33,26 +33,30 @@ while ( true ){
     print( N + "\t" + time );
     if ( time > 8000 )
         break;
-    
+
     N *= 2;
+}
+
+function haveInProgressUpdate() {
+    ops = db.currentOp();
+    printjson(ops);
+    return ops.inprog.some(
+        function(elt) {
+            return elt.op == "update";
+        });
 }
 
 // --- test 1
 
 join = startParallelShell( "db.update_yield1.update( {} , { $inc : { n : 1 } } , false , true ); db.getLastError()" );
-
-assert.soon( 
-    function(){
-        return db.currentOp().inprog.length > 0;
-    } , "never doing update"
-);
+assert.soon(haveInProgressUpdate, "never doing update");
 
 num = 0;
 start = new Date();
 while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
     var me = Date.timeFunc( function(){ t.findOne(); } );
     if (me > 50) print("time: " + me);
-    
+
     if ( num++ == 0 ){
         var x = db.currentOp()
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
@@ -69,23 +73,17 @@ assert.eq( 0 , x.inprog.length , "weird 2" );
 // --- test 2
 
 join = startParallelShell( "db.update_yield1.update( { $atomic : true } , { $inc : { n : 1 } } , false , true ); db.getLastError()" );
-
-sleep(1000); // wait for shell startup ops to finish
-
-var x = db.currentOp();
-printjson(x);
-assert.eq(1, x.inprog.length, "never doing update 2");
-assert.eq("update", x.inprog[0].op);
+assert.soon(haveInProgressUpdate, "never doing update 2");
 
 while ( 1 ) {
     t.findOne(); // should wait for update to finish
-    
+
     var x = db.currentOp()
     if ( x.inprog.length == 0 )
         break;
 
     assert( x.inprog.length == 1 && x.inprog[0].op == "update" , tojson( x ) );
-    
+
     assert( x.inprog[0].numYields == 0 , tojson( x ) );
 
     sleep( 100 );
