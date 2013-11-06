@@ -73,7 +73,9 @@ namespace mongo {
             if (NULL == d) {
                 return 0;
             }
-            uassert(10101, "can't remove from a capped collection", !d->isCapped());
+            uassert(10101,
+                    str::stream() << "can't remove from a capped collection: " << ns,
+                    !d->isCapped());
         }
 
         string nsForLogOp = ns.toString(); // XXX-ERH
