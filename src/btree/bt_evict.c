@@ -915,8 +915,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			/*
 			 * If the oldest transaction hasn't changed since the
 			 * last time this page was written, it's unlikely that
-			 * we can make progress.  This is a heuristic that
-			 * saves repeated attempts to evict the same page.
+			 * we can make progress.  Similarly, if the most recent
+			 * update on the page is not yet globally visible,
+			 * eviction will fail.  These heuristics attempt to
+			 * avoid repeated attempts to evict the same page.
 			 *
 			 * That said, if eviction is stuck, or the file is
 			 * being checkpointed, try anyway: maybe a transaction
@@ -924,9 +926,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			 * since rolled back, or we can help get the checkpoint
 			 * completed sooner.
 			 */
-			if (modified && page->modify->disk_snap_min ==
-			    S2C(session)->txn_global.oldest_id &&
-			    !F_ISSET(cache, WT_EVICT_STUCK))
+			if (modified && !F_ISSET(cache, WT_EVICT_STUCK) &&
+			    (page->modify->disk_snap_min ==
+			    S2C(session)->txn_global.oldest_id ||
+			    !__wt_txn_visible_all(session,
+			    page->modify->update_txn)))
 				continue;
 		}
 
