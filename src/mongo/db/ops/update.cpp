@@ -382,8 +382,23 @@ namespace mongo {
 
         BSONObj newObj = doc.getObject();
 
-        if ( !collection )
-            collection = cc().database()->createCollection( request.getNamespaceString().ns() );
+        if ( newObj["_id"].eoo() ) {
+            BSONObjBuilder b;
+
+            OID oid;
+            oid.init();
+            b.appendOID( "_id", &oid );
+
+            b.appendElements( newObj );
+            newObj = b.obj();
+        }
+
+        if ( !collection ) {
+            collection = cc().database()->getCollection( request.getNamespaceString().ns() );
+            if ( !collection ) {
+                collection = cc().database()->createCollection( request.getNamespaceString().ns() );
+            }
+        }
 
         collection->insertDocument( newObj, !request.isGod() /* enforceQuota */ );
         if ( request.shouldUpdateOpLog() ) {
