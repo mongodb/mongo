@@ -105,22 +105,78 @@ namespace mongo {
         return Status::OK();
     }
 
+    namespace {
+
+        enum UpdateType {
+            UpdateType_Replacement, UpdateType_OpStyle, UpdateType_Unknown
+        };
+
+        static UpdateType getUpdateType( const BSONObj& update ) {
+
+            UpdateType updateType = UpdateType_Unknown;
+
+            // Empty update is replacement-style, by default
+            if ( update.isEmpty() ) return UpdateType_Replacement;
+
+            BSONObjIterator it( update );
+            while ( it.more() ) {
+                BSONElement next = it.next();
+
+                if ( next.fieldName()[0] == '$' ) {
+                    if ( updateType == UpdateType_Unknown ) updateType = UpdateType_OpStyle;
+                    else if ( updateType == UpdateType_Replacement ) return UpdateType_Unknown;
+                }
+                else {
+                    if ( updateType == UpdateType_Unknown ) updateType = UpdateType_Replacement;
+                    else if ( updateType == UpdateType_OpStyle ) return UpdateType_Unknown;
+                }
+            }
+
+            return updateType;
+        }
+    }
+
+
     Status ChunkManagerTargeter::targetUpdate( const BSONObj& query,
                                                const BSONObj& update,
                                                vector<ShardEndpoint*>* endpoints ) const {
-        // Pre-2.6 implementation differentiates between $op and replacement style and
-        // will use the update object for routing as well as deciding which chunk will have
-        // their size stats incremented. Here, the query object is always used.
-        Status result = targetQuery( query, endpoints );
 
-        if ( result.isOK() && _manager ) {
-            if ( !_manager->hasShardKey( query ) ) {
-                return result;
-            }
+        //
+        // Update targeting may use either the query or the update.  This is to support save-style
+        // updates, of the form:
+        //
+        // db.update({ _id : xxx }, { _id : xxx, shardKey : 1, foo : bar }, { upsert : true })
+        //
+        // Because drivers do not know the shard key, they can't pull the shard key automatically
+        // into the query doc, and to correctly support upsert we must target a single shard.
+        //
+        // The rule is simple - If the update is replacement style (no '$set'), we target using the
+        // update.  If the update is replacement style, we target using the query.
+        //
 
+        UpdateType updateType = getUpdateType( update );
+
+        if ( updateType == UpdateType_Unknown ) {
+            return Status( ErrorCodes::UnsupportedFormat,
+                           stream() << "update document " << update
+                                    << " has mixed $operator and non-$operator style fields" );
+        }
+
+        Status result = Status::OK();
+        if ( updateType == UpdateType_OpStyle ) {
+            result = targetQuery( query, endpoints );
+        }
+        else {
+            dassert( updateType == UpdateType_Replacement );
+            result = targetQuery( update, endpoints );
+        }
+
+        // Track autosplit stats
+        BSONObj targetedDoc = updateType == UpdateType_OpStyle ? query : update;
+        if ( result.isOK() && _manager && _manager->hasShardKey( targetedDoc ) ) {
             // Note: this is only best effort accounting and is not accurate.
-            ChunkPtr chunk = _manager->findChunkForDoc( query );
-            _stats->chunkSizeDelta[chunk->getMin()] += (query.objsize() + update.objsize());
+            ChunkPtr chunk = _manager->findChunkForDoc( targetedDoc );
+            _stats->chunkSizeDelta[chunk->getMin()] += ( query.objsize() + update.objsize() );
         }
 
         return result;
