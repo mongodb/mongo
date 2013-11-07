@@ -34,7 +34,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_name.h"
 
@@ -43,18 +43,12 @@ namespace mongo {
     /**
      * The implementation of AuthzManagerExternalState functionality for mongod.
      */
-    class AuthzManagerExternalStateMongod : public AuthzManagerExternalState {
+    class AuthzManagerExternalStateMongod : public AuthzManagerExternalStateLocal {
         MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongod);
 
     public:
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
-
-        virtual Status initialize();
-
-        virtual Status getStoredAuthorizationVersion(int* outVersion);
-        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
-        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
@@ -88,41 +82,8 @@ namespace mongo {
         virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
         virtual void releaseAuthzUpdateLock();
 
-        virtual void logOp(
-                const char* op,
-                const char* ns,
-                const BSONObj& o,
-                BSONObj* o2,
-                bool* b);
-
     private:
-        enum RoleGraphState {
-            roleGraphStateInitial = 0,
-            roleGraphStateConsistent,
-            roleGraphStateHasCycle
-        };
-
-        /**
-         * Initializes the role graph from the contents of the admin.system.roles collection.
-         */
-        Status _initializeRoleGraph();
-
-        /**
-         * Eventually consistent, in-memory representation of all roles in the system (both
-         * user-defined and built-in).  Synchronized via _roleGraphMutex.
-         */
-        RoleGraph _roleGraph;
-
-        /**
-         * State of _roleGraph, one of "initial", "consistent" and "has cycle".  Synchronized via
-         * _roleGraphMutex.
-         */
-        RoleGraphState _roleGraphState;
-
-        /**
-         * Guards _roleGraphState and _roleGraph.
-         */
-        boost::mutex _roleGraphMutex;
+        virtual Status _getUserDocument(const UserName& userName, BSONObj* userDoc);
 
         boost::timed_mutex _authzDataUpdateLock;
     };

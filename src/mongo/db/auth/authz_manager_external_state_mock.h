@@ -35,7 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -45,7 +45,7 @@ namespace mongo {
     /**
      * Mock of the AuthzManagerExternalState class used only for testing.
      */
-    class AuthzManagerExternalStateMock : public AuthzManagerExternalState {
+    class AuthzManagerExternalStateMock : public AuthzManagerExternalStateLocal {
         MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMock);
 
     public:
@@ -53,13 +53,9 @@ namespace mongo {
         AuthzManagerExternalStateMock();
         virtual ~AuthzManagerExternalStateMock();
 
-        void setAuthzVersion(int v) { _authzVersion = v; }
+        void setAuthzVersion(int version);
 
-        virtual Status initialize();
         virtual Status getStoredAuthorizationVersion(int* outVersion);
-        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
-        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
-
 
         virtual Status insertPrivilegeDocument(const std::string& dbname,
                                                const BSONObj& userObj,
@@ -73,8 +69,6 @@ namespace mongo {
         virtual Status removePrivilegeDocuments(const BSONObj& query,
                                                 const BSONObj& writeConcern,
                                                 int* numRemoved);
-
-        void clearPrivilegeDocuments();
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
@@ -128,6 +122,8 @@ namespace mongo {
         typedef std::vector<BSONObj> BSONObjCollection;
         typedef std::map<NamespaceString, BSONObjCollection> NamespaceDocumentMap;
 
+        virtual Status _getUserDocument(const UserName& userName, BSONObj* userDoc);
+
         Status _findOneIter(const NamespaceString& collectionName,
                             const BSONObj& query,
                             BSONObjCollection::iterator* result);
@@ -138,8 +134,6 @@ namespace mongo {
 
 
         NamespaceDocumentMap _documents; // Mock database.
-        RoleGraph _roleGraph;
-        int _authzVersion;
     };
 
 } // namespace mongo

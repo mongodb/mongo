@@ -334,7 +334,12 @@ namespace {
         ASSERT(user->isValid());
 
         // Change the user to be read-only
-        managerState->clearPrivilegeDocuments();
+        int ignored;
+        managerState->remove(
+                AuthorizationManager::usersCollectionNamespace,
+                BSONObj(),
+                BSONObj(),
+                &ignored);
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
@@ -357,7 +362,11 @@ namespace {
         ASSERT(user->isValid());
 
         // Delete the user.
-        managerState->clearPrivilegeDocuments();
+        managerState->remove(
+                AuthorizationManager::usersCollectionNamespace,
+                BSONObj(),
+                BSONObj(),
+                &ignored);
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUserByName(user->getName());
         authzSession->startRequest(); // Refreshes cached data for invalid users
@@ -390,8 +399,13 @@ namespace {
         ASSERT(user->isValid());
 
         // Change the user to be read-only
+        int ignored;
         managerState->setFindsShouldFail(true);
-        managerState->clearPrivilegeDocuments();
+        managerState->remove(
+                AuthorizationManager::usersCollectionNamespace,
+                BSONObj(),
+                BSONObj(),
+                &ignored);
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<

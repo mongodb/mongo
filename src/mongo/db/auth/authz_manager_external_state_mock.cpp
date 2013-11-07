@@ -82,78 +82,55 @@ namespace {
     AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() {}
     AuthzManagerExternalStateMock::~AuthzManagerExternalStateMock() {}
 
-    Status AuthzManagerExternalStateMock::initialize() {
-        return Status::OK();
+    void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
+        uassertStatusOK(
+                updateOne(AuthorizationManager::versionCollectionNamespace,
+                          AuthorizationManager::versionDocumentQuery,
+                          BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
+                                              version)),
+                          true,
+                          BSONObj()));
     }
 
     Status AuthzManagerExternalStateMock::getStoredAuthorizationVersion(int* outVersion) {
-        if (_authzVersion < 0) {
-            return Status(ErrorCodes::UnknownError,
-                          "Mock configured to fail getStoredAuthorizationVersion()");
+        Status status = AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(outVersion);
+        if (status.isOK() && outVersion < 0) {
+            status = Status(ErrorCodes::UnknownError,
+                            "Mock configured to fail getStoredAuthorizationVersion()");
         }
-        *outVersion = _authzVersion;
-        return Status::OK();
+        return status;
     }
 
-    Status AuthzManagerExternalStateMock::getUserDescription(
-            const UserName& userName, BSONObj* result) {
-        BSONObj privDoc;
-        Status status = _findUser(
-                "admin.system.users",
-                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
-                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
-                &privDoc);
+    Status AuthzManagerExternalStateMock::_getUserDocument(const UserName& userName,
+                                                           BSONObj* userDoc) {
+        int authzVersion;
+        Status status = getStoredAuthorizationVersion(&authzVersion);
         if (!status.isOK())
             return status;
 
-        unordered_set<RoleName> indirectRoles;
-        PrivilegeVector allPrivileges;
-        for (BSONObjIterator iter(privDoc["roles"].Obj()); iter.more(); iter.next()) {
-            if (!(*iter)["hasRole"].trueValue())
-                continue;
-            RoleName roleName((*iter)[AuthorizationManager::ROLE_NAME_FIELD_NAME].str(),
-                              (*iter)[AuthorizationManager::ROLE_SOURCE_FIELD_NAME].str());
-            indirectRoles.insert(roleName);
-            for (RoleNameIterator subordinates = _roleGraph.getIndirectSubordinates(
-                         roleName);
-                 subordinates.more();
-                 subordinates.next()) {
-
-                indirectRoles.insert(subordinates.get());
-            }
-            const PrivilegeVector& rolePrivileges(_roleGraph.getAllPrivileges(roleName));
-            for (PrivilegeVector::const_iterator priv = rolePrivileges.begin(),
-                     end = rolePrivileges.end();
-                 priv != end;
-                 ++priv) {
-
-                Privilege::addPrivilegeToPrivilegeVector(&allPrivileges, *priv);
-            }
+        switch (authzVersion) {
+        case AuthorizationManager::schemaVersion26Upgrade:
+        case AuthorizationManager::schemaVersion26Final:
+            break;
+        default:
+            return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
+                          "Unsupported schema version for getUserDescription(): " <<
+                          authzVersion);
         }
 
-        mutablebson::Document userDoc(privDoc, mutablebson::Document::kInPlaceDisabled);
-        mutablebson::Element indirectRolesElement = userDoc.makeElementArray("indirectRoles");
-        mutablebson::Element privilegesElement = userDoc.makeElementArray("privileges");
-        mutablebson::Element warningsElement = userDoc.makeElementArray("warnings");
-        fassert(17180, userDoc.root().pushBack(privilegesElement));
-        fassert(17181, userDoc.root().pushBack(indirectRolesElement));
-
-        addRoleNameObjectsToArrayElement(indirectRolesElement,
-                                         makeRoleNameIteratorForContainer(indirectRoles));
-        addPrivilegeObjectsOrWarningsToArrayElement(
-                privilegesElement, warningsElement, allPrivileges);
-        if (warningsElement.hasChildren()) {
-            fassert(17182, userDoc.root().pushBack(warningsElement));
+        status = findOne(
+                (authzVersion == AuthorizationManager::schemaVersion26Final ?
+                 AuthorizationManager::usersCollectionNamespace :
+                 AuthorizationManager::usersAltCollectionNamespace),
+                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
+                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
+                userDoc);
+        if (status == ErrorCodes::NoMatchingDocument) {
+            status = Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
+                            "Could not find user " << userName.getFullName());
         }
-        *result = userDoc.getObject();
-        return Status::OK();
+        return status;
     }
-
-    Status AuthzManagerExternalStateMock::getRoleDescription(
-            const RoleName& roleName, BSONObj* result) {
-        return Status(ErrorCodes::RoleNotFound, "Not implemented");
-    }
-
 
     Status AuthzManagerExternalStateMock::updatePrivilegeDocument(const UserName& user,
                                                                   const BSONObj& updateObj,
@@ -174,10 +151,6 @@ namespace {
         return insert(usersCollection, userObj, writeConcern);
     }
 
-    void AuthzManagerExternalStateMock::clearPrivilegeDocuments() {
-        _documents.clear();
-    }
-
     Status AuthzManagerExternalStateMock::getAllDatabaseNames(
             std::vector<std::string>* dbnames) {
         unordered_set<std::string> dbnameSet;
@@ -193,12 +166,11 @@ namespace {
             const std::string& usersNamespace,
             const BSONObj& query,
             BSONObj* result) {
-        Status status = findOne(NamespaceString(usersNamespace), query, result);
-        if (status == ErrorCodes::NoMatchingDocument) {
-            status = Status(ErrorCodes::UserNotFound,
-                            "No matching user for query " + query.toString());
+        if (!findOne(NamespaceString(usersNamespace), query, result).isOK()) {
+            return Status(ErrorCodes::UserNotFound,
+                          "No matching user for query " + query.toString());
         }
-        return status;
+        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMock::findOne(

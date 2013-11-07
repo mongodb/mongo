@@ -33,14 +33,9 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
-#include "mongo/db/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
@@ -49,245 +44,40 @@
 
 namespace mongo {
 
-    AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() :
-        _roleGraphState(roleGraphStateInitial) {}
-
+    AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
-    Status AuthzManagerExternalStateMongod::initialize() {
-        Status status = _initializeRoleGraph();
-        if (!status.isOK()) {
-            if (status == ErrorCodes::GraphContainsCycle) {
-                error() << "Cycle detected in admin.system.roles; role inheritance disabled. "
-                    "Remove the listed cycle and any others to re-enable role inheritance. " <<
-                    status.reason();
-            }
-            else {
-                error() << "Could not generate role graph from admin.system.roles; "
-                    "only system roles available. TODO EXPLAIN REMEDY. " << status;
-            }
-        }
+    Status AuthzManagerExternalStateMongod::_getUserDocument(const UserName& userName,
+                                                             BSONObj* userDoc) {
 
-        return Status::OK();
-    }
-
-namespace {
-    const Status userNotFoundStatus(ErrorCodes::UserNotFound, "User not found");
-
-    void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
-        fassert(17153, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, role.getRole()));
-        fassert(17154, object.appendString(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, role.getDB()));
-    }
-
-    void addRoleNameObjectsToArrayElement(mutablebson::Element array, RoleNameIterator roles) {
-        for (; roles.more(); roles.next()) {
-            mutablebson::Element roleElement = array.getDocument().makeElementObject("");
-            addRoleNameToObjectElement(roleElement, roles.get());
-            fassert(17155, array.pushBack(roleElement));
-        }
-    }
-
-    void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privilegesElement,
-                                                     mutablebson::Element warningsElement,
-                                                     const PrivilegeVector& privileges) {
-        std::string errmsg;
-        for (size_t i = 0; i < privileges.size(); ++i) {
-            ParsedPrivilege pp;
-            if (ParsedPrivilege::privilegeToParsedPrivilege(privileges[i], &pp, &errmsg)) {
-                fassert(17156, privilegesElement.appendObject("", pp.toBSON()));
-            } else {
-                fassert(17157,
-                        warningsElement.appendString(
-                        "",
-                        std::string(mongoutils::str::stream() <<
-                                    "Skipped privileges on resource " <<
-                                    privileges[i].getResourcePattern().toString() <<
-                                    ". Reason: " << errmsg)));
-            }
-        }
-    }
-}  // namespace
-
-    Status AuthzManagerExternalStateMongod::getStoredAuthorizationVersion(int* outVersion) {
-        {
-            Client::ReadContext ctx(AuthorizationManager::versionCollectionNamespace.ns());
-            BSONObj versionDoc;
-            if (Helpers::findOne(AuthorizationManager::versionCollectionNamespace.ns(),
-                                 AuthorizationManager::versionDocumentQuery,
-                                 versionDoc)) {
-                BSONElement versionElement = versionDoc[
-                        AuthorizationManager::schemaVersionFieldName];
-                if (versionElement.isNumber()) {
-                    *outVersion = versionElement.numberInt();
-                    return Status::OK();
-                }
-                else if (versionElement.eoo()) {
-                    return Status(ErrorCodes::NoSuchKey, "No currentVersion field in version document.");
-                }
-                else {
-                    return Status(ErrorCodes::TypeMismatch, mongoutils::str::stream() <<
-                                  "Bad (non-numeric) type " << versionElement.type() <<
-                                  "for currentVersion field in version document");
-                }
-            }
-        }
-        if (hasAnyPrivilegeDocuments()) {
-            *outVersion = AuthorizationManager::schemaVersion24;
-        }
-        else {
-            *outVersion = AuthorizationManager::schemaVersion26Final;
-        }
-        return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMongod::getUserDescription(const UserName& userName,
-                                                               BSONObj* result) {
-
-        BSONObj userDoc;
-        {
-            Client::ReadContext ctx("admin");
-            int authzVersion;
-            Status status = getStoredAuthorizationVersion(&authzVersion);
-            if (!status.isOK())
-                return status;
-
-            switch (authzVersion) {
-            case AuthorizationManager::schemaVersion26Upgrade:
-            case AuthorizationManager::schemaVersion26Final:
-                break;
-            default:
-                return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
-                              "Unsupported schema version for getUserDescription(): " <<
-                              authzVersion);
-            }
-
-            status = findOne(
-                    (authzVersion == AuthorizationManager::schemaVersion26Final ?
-                     AuthorizationManager::usersCollectionNamespace :
-                     AuthorizationManager::usersAltCollectionNamespace),
-                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
-                         AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
-                    &userDoc);
-            if (status == ErrorCodes::NoMatchingDocument) {
-                status = Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
-                                "Could not find description of user " << userName.getFullName());
-            }
-            if (!status.isOK())
-                return status;
-        }
-
-        BSONElement directRolesElement;
-        Status status = bsonExtractTypedField(userDoc, "roles", Array, &directRolesElement);
-        if (!status.isOK())
-            return status;
-        std::vector<RoleName> directRoles;
-        status = V2UserDocumentParser::parseRoleVector(BSONArray(directRolesElement.Obj()),
-                                                       &directRoles);
+        Client::ReadContext ctx("admin");
+        int authzVersion;
+        Status status = getStoredAuthorizationVersion(&authzVersion);
         if (!status.isOK())
             return status;
 
-        unordered_set<RoleName> indirectRoles;
-        PrivilegeVector allPrivileges;
-        bool isRoleGraphInconsistent;
-        {
-            boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
-            isRoleGraphInconsistent = _roleGraphState == roleGraphStateConsistent;
-            for (size_t i = 0; i < directRoles.size(); ++i) {
-                const RoleName& role(directRoles[i]);
-                indirectRoles.insert(role);
-                if (isRoleGraphInconsistent) {
-                    for (RoleNameIterator subordinates = _roleGraph.getIndirectSubordinates(role);
-                         subordinates.more();
-                         subordinates.next()) {
-
-                        indirectRoles.insert(subordinates.get());
-                    }
-                }
-                const PrivilegeVector& rolePrivileges(
-                        isRoleGraphInconsistent ?
-                        _roleGraph.getAllPrivileges(role) :
-                        _roleGraph.getDirectPrivileges(role));
-                for (PrivilegeVector::const_iterator priv = rolePrivileges.begin(),
-                         end = rolePrivileges.end();
-                     priv != end;
-                     ++priv) {
-
-                    Privilege::addPrivilegeToPrivilegeVector(&allPrivileges, *priv);
-                }
-            }
+        switch (authzVersion) {
+        case AuthorizationManager::schemaVersion26Upgrade:
+        case AuthorizationManager::schemaVersion26Final:
+            break;
+        default:
+            return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
+                          "Unsupported schema version for getUserDescription(): " <<
+                          authzVersion);
         }
 
-        mutablebson::Document resultDoc(userDoc, mutablebson::Document::kInPlaceDisabled);
-        mutablebson::Element indirectRolesElement = resultDoc.makeElementArray("indirectRoles");
-        mutablebson::Element privilegesElement = resultDoc.makeElementArray("privileges");
-        mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
-        fassert(17158, resultDoc.root().pushBack(privilegesElement));
-        fassert(17159, resultDoc.root().pushBack(indirectRolesElement));
-        if (!isRoleGraphInconsistent) {
-            fassert(17160, warningsElement.appendString(
-                            "", "Role graph inconsistent, only direct privileges available."));
+        status = findOne(
+                (authzVersion == AuthorizationManager::schemaVersion26Final ?
+                 AuthorizationManager::usersCollectionNamespace :
+                 AuthorizationManager::usersAltCollectionNamespace),
+                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
+                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
+                userDoc);
+        if (status == ErrorCodes::NoMatchingDocument) {
+            status = Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
+                            "Could not find user " << userName.getFullName());
         }
-        addRoleNameObjectsToArrayElement(indirectRolesElement,
-                                         makeRoleNameIteratorForContainer(indirectRoles));
-        addPrivilegeObjectsOrWarningsToArrayElement(
-                privilegesElement, warningsElement, allPrivileges);
-        if (warningsElement.hasChildren()) {
-            fassert(17161, resultDoc.root().pushBack(warningsElement));
-        }
-        *result = resultDoc.getObject();
-        return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMongod::getRoleDescription(const RoleName& roleName,
-                                                               BSONObj* result) {
-        boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
-        if (!_roleGraph.roleExists(roleName))
-            return Status(ErrorCodes::RoleNotFound, "No role named " + roleName.toString());
-
-        mutablebson::Document resultDoc;
-        fassert(17162, resultDoc.root().appendString(
-                        AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole()));
-        fassert(17163, resultDoc.root().appendString(
-                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME, roleName.getDB()));
-        mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");
-        fassert(17164, resultDoc.root().pushBack(rolesElement));
-        mutablebson::Element indirectRolesElement = resultDoc.makeElementArray("indirectRoles");
-        fassert(17165, resultDoc.root().pushBack(indirectRolesElement));
-        mutablebson::Element privilegesElement = resultDoc.makeElementArray("privileges");
-        fassert(17166, resultDoc.root().pushBack(privilegesElement));
-        mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
-
-        addRoleNameObjectsToArrayElement(rolesElement, _roleGraph.getDirectSubordinates(roleName));
-        if (_roleGraphState == roleGraphStateConsistent) {
-            addRoleNameObjectsToArrayElement(
-                    indirectRolesElement, _roleGraph.getIndirectSubordinates(roleName));
-            addPrivilegeObjectsOrWarningsToArrayElement(
-                    privilegesElement, warningsElement, _roleGraph.getAllPrivileges(roleName));
-        }
-        else {
-            warningsElement.appendString(
-                    "", "Role graph state inconsistent; only direct privileges available.");
-            addPrivilegeObjectsOrWarningsToArrayElement(
-                    privilegesElement, warningsElement, _roleGraph.getDirectPrivileges(roleName));
-        }
-        if (warningsElement.hasChildren()) {
-            fassert(17167, resultDoc.root().pushBack(warningsElement));
-        }
-        *result = resultDoc.getObject();
-        return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMongod::findOne(const NamespaceString& collectionName,
-                                                    const BSONObj& query,
-                                                    BSONObj* result) {
-        Client::ReadContext ctx(collectionName);
-
-        if (!Helpers::findOne(collectionName.ns(), query, *result)) {
-            return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
-                          "No document in " << collectionName.ns() << " matches " << query);
-        }
-        *result = result->getOwned();
-        return Status::OK();
+        return status;
     }
 
     Status AuthzManagerExternalStateMongod::query(
@@ -309,6 +99,23 @@ namespace {
         Lock::GlobalRead lk;
         getDatabaseNames(*dbnames);
         return Status::OK();
+    }
+
+    Status AuthzManagerExternalStateMongod::findOne(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            BSONObj* result) {
+
+        Client::ReadContext ctx(collectionName.ns());
+        BSONObj found;
+        if (Helpers::findOne(collectionName.ns(),
+                             query,
+                             found)) {
+            *result = found.getOwned();
+            return Status::OK();
+        }
+        return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
+                      "No document in " << collectionName.ns() << " matches " << query);
     }
 
     Status AuthzManagerExternalStateMongod::insert(
@@ -399,13 +206,48 @@ namespace {
             const BSONObj& pattern,
             bool unique,
             const BSONObj& writeConcern) {
-        fassertFailed(17095);
+        DBDirectClient client;
+        try {
+            if (client.ensureIndex(collectionName.ns(),
+                                   pattern,
+                                   unique)) {
+                BSONObjBuilder gleBuilder;
+                gleBuilder.append("getLastError", 1);
+                gleBuilder.appendElements(writeConcern);
+                BSONObj res;
+                client.runCommand("admin", gleBuilder.done(), res);
+                string errstr = client.getLastErrorString(res);
+                if (!errstr.empty()) {
+                    return Status(ErrorCodes::UnknownError, errstr);
+                }
+            }
+            return Status::OK();
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongod::dropIndexes(
             const NamespaceString& collectionName,
             const BSONObj& writeConcern) {
-        fassertFailed(0);
+        DBDirectClient client;
+        try {
+            client.dropIndexes(collectionName.ns());
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
+            string errstr = client.getLastErrorString(res);
+            if (!errstr.empty()) {
+                return Status(ErrorCodes::UnknownError, errstr);
+            }
+            return Status::OK();
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
     }
 
     bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {
@@ -416,97 +258,6 @@ namespace {
 
     void AuthzManagerExternalStateMongod::releaseAuthzUpdateLock() {
         return _authzDataUpdateLock.unlock();
-    }
-
-namespace {
-
-    /**
-     * Adds the role described in "doc" to "roleGraph".  If the role cannot be added, due to
-     * some error in "doc", logs a warning.
-     */
-    void addRoleFromDocumentOrWarn(RoleGraph* roleGraph, const BSONObj& doc) {
-        Status status = roleGraph->addRoleFromDocument(doc);
-        if (!status.isOK()) {
-            warning() << "Skipping invalid role document.  " << status << "; document " << doc;
-        }
-    }
-
-
-}  // namespace
-
-    Status AuthzManagerExternalStateMongod::_initializeRoleGraph() {
-        boost::lock_guard<boost::mutex> lkInitialzeRoleGraph(_roleGraphMutex);
-
-        _roleGraphState = roleGraphStateInitial;
-        _roleGraph = RoleGraph();
-
-        RoleGraph newRoleGraph;
-        Status status = query(
-                AuthorizationManager::rolesCollectionNamespace,
-                BSONObj(),
-                BSONObj(),
-                boost::bind(addRoleFromDocumentOrWarn, &newRoleGraph, _1));
-        if (!status.isOK())
-            return status;
-
-        status = newRoleGraph.recomputePrivilegeData();
-
-        RoleGraphState newState;
-        if (status == ErrorCodes::GraphContainsCycle) {
-            error() << "Inconsistent role graph during authorization manager intialization.  Only "
-                "direct privileges available. " << status.reason();
-            newState = roleGraphStateHasCycle;
-            status = Status::OK();
-        }
-        else if (status.isOK()) {
-            newState = roleGraphStateConsistent;
-        }
-        else {
-            newState = roleGraphStateInitial;
-        }
-
-        if (status.isOK()) {
-            _roleGraph.swap(newRoleGraph);
-            _roleGraphState = newState;
-        }
-        return status;
-    }
-
-    void AuthzManagerExternalStateMongod::logOp(
-            const char* op,
-            const char* ns,
-            const BSONObj& o,
-            BSONObj* o2,
-            bool* b) {
-
-        if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
-            ns == AuthorizationManager::adminCommandNamespace.ns()) {
-
-            boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
-            Status status = _roleGraph.handleLogOp(op, NamespaceString(ns), o, o2);
-
-            if (status == ErrorCodes::OplogOperationUnsupported) {
-                _roleGraph = RoleGraph();
-                _roleGraphState = roleGraphStateInitial;
-                error() << "Unsupported modification to roles collection in oplog; "
-                    "TODO how to remedy. " << status << " Oplog entry: " << op;
-            }
-            else if (!status.isOK()) {
-                warning() << "Skipping bad update to roles collection in oplog. " << status <<
-                    " Oplog entry: " << op;
-            }
-            status = _roleGraph.recomputePrivilegeData();
-            if (status == ErrorCodes::GraphContainsCycle) {
-                _roleGraphState = roleGraphStateHasCycle;
-                error() << "Inconsistent role graph during authorization manager intialization.  "
-                    "Only direct privileges available. " << status.reason() <<
-                    " after applying oplog entry " << op;
-            }
-            else {
-                fassert(17183, status);
-                _roleGraphState = roleGraphStateConsistent;
-            }
-        }
     }
 
 } // namespace mongo
