@@ -37,7 +37,7 @@ function assertHasPrivilege(privilegeArray, privilege) {
 
      db.createRole({role:'roleA',
                     roles: [],
-                    privileges: [{resource: {db:db.getName(), collection: ""},
+                    privileges: [{resource: {db:db.getName(), collection: "foo"},
                                   actions: ['find']}]});
      db.createRole({role:'roleB', privileges: [], roles: ["roleA"]});
      db.createRole({role:'roleC', privileges: [], roles: []});
@@ -47,11 +47,11 @@ function assertHasPrivilege(privilegeArray, privilege) {
      assert.eq(0, roleObj.roles.length);
      assert.eq(1, roleObj.privileges.length);
      assertHasPrivilege(roleObj.privileges,
-                        {resource: {db:db.getName(), collection:""}, actions:['find']});
+                        {resource: {db:db.getName(), collection:"foo"}, actions:['find']});
      roleObj = db.getRole("roleB");
      assert.eq(1, roleObj.privileges.length); // inherited from roleA
      assertHasPrivilege(roleObj.privileges,
-                        {resource: {db:db.getName(), collection:""}, actions:['find']});
+                        {resource: {db:db.getName(), collection:"foo"}, actions:['find']});
      assert.eq(1, roleObj.roles.length);
      assertHasRole(roleObj.roles, "roleA", db.getName());
 
@@ -85,26 +85,26 @@ function assertHasPrivilege(privilegeArray, privilege) {
 
      // Privileges on the same resource get collapsed
      db.grantPrivilegesToRole("roleA",
-                              [{resource: {cluster:true}, actions:['listDatabases']},
-                               {resource: {db:db.getName(), collection:""}, actions:['insert']}]);
+                              [{resource: {db:db.getName(), collection:""}, actions:['dropDatabase']},
+                               {resource: {db:db.getName(), collection:"foo"}, actions:['insert']}]);
      roleObj = db.getRole("roleA");
      assert.eq(0, roleObj.roles.length);
      assert.eq(2, roleObj.privileges.length);
      assertHasPrivilege(roleObj.privileges,
-                        {resource: {db:db.getName(), collection:""}, actions:['find', 'insert']});
+                        {resource: {db:db.getName(), collection:"foo"}, actions:['find', 'insert']});
      assertHasPrivilege(roleObj.privileges,
-                        {resource: {cluster:true}, actions:['listDatabases']});
+                        {resource: {db:db.getName(), collection:""}, actions:['dropDatabase']});
 
      // Update role
      db.updateRole("roleA", {roles:['roleB'],
-                             privileges:[{resource: {db: db.getName(), collection:""},
+                             privileges:[{resource: {db: db.getName(), collection:"foo"},
                                           actions:['find']}]});
      roleObj = db.getRole("roleA");
      assert.eq(1, roleObj.roles.length);
      assertHasRole(roleObj.roles, "roleB", db.getName());
      assert.eq(1, roleObj.privileges.length);
      assertHasPrivilege(roleObj.privileges,
-                        {resource: {db:db.getName(), collection:""}, actions:['find']});
+                        {resource: {db:db.getName(), collection:"foo"}, actions:['find']});
 
      // Test dropRole
      db.dropRole('roleC');
