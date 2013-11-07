@@ -1302,6 +1302,12 @@ namespace mongo {
             // Valve for turning on upconversion for all batch write commands
             if ( useClusterWriteCommands ) {
 
+                // Ignore all messages from the WBL if we're using cluster write commands
+                // TODO: We'll have to turn it off at some point, but this is an easy way to ensure
+                // it has no impact.
+                bool fromWBL = r.d().reservedField() & Reserved_FromWriteback;
+                if ( fromWBL ) return;
+
                 auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( r.m() ) );
                 BatchedCommandResponse response;
 

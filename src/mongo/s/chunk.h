@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/client/distlock.h"
 #include "mongo/s/chunk_version.h"
@@ -436,6 +437,7 @@ namespace mongo {
 
         string toString() const;
 
+        ChunkVersion getVersion( const StringData& shardName ) const;
         ChunkVersion getVersion( const Shard& shard ) const;
         ChunkVersion getVersion() const;
 

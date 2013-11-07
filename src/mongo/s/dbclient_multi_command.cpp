@@ -90,10 +90,9 @@ namespace mongo {
             BatchedCommandRequest request( getBatchWriteType( cmdRequest ) );
 
             // This should *always* parse correctly
-            string errMsg;
-            bool parsed = !request.parseBSON( cmdRequest, &errMsg );
+            bool parsed = request.parseBSON( cmdRequest, NULL );
             (void) parsed; // for non-debug compile
-            dassert( parsed && request.isValid( &errMsg ) );
+            dassert( parsed && request.isValid( NULL ) );
 
             // Collection name is sent without db to the dispatcher
             request.setNS( dbName.toString() + "." + request.getNS() );
@@ -104,7 +103,7 @@ namespace mongo {
             batchSafeWriter.safeWriteBatch( conn, request, &response );
 
             // Back to BSON
-            dassert( response.isValid( &errMsg ) );
+            dassert( response.isValid( NULL ) );
             *cmdResponse = response.toBSON();
         }
     }

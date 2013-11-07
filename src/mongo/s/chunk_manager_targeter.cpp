@@ -177,26 +177,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    void ChunkManagerTargeter::noteStaleResponse( const ShardEndpoint& endpoint,
-                                                  const BSONObj& staleInfo ) {
-        dassert( !_needsTargetingRefresh );
-
-        ChunkVersion remoteShardVersion = ChunkVersion::fromBSON( staleInfo, "vWanted" );
-
-        // We assume here that we can't have more than one stale config per-shard
-        dassert( _remoteShardVersions.find( endpoint.shardName ) == _remoteShardVersions.end() );
-        _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
-    }
-
-    void ChunkManagerTargeter::noteCouldNotTarget() {
-        dassert( _remoteShardVersions.empty() );
-        _needsTargetingRefresh = true;
-    }
-
-    const TargeterStats* ChunkManagerTargeter::getStats() const {
-        return _stats.get();
-    }
-
     namespace {
 
         //
@@ -230,8 +210,7 @@ namespace mongo {
             else return CompareResult_GTE;
         }
 
-        // NOTE: CAN THROW, since Shard() throws
-        ChunkVersion getShardVersion( const string& shardName,
+        ChunkVersion getShardVersion( const StringData& shardName,
                                       const ChunkManagerPtr& manager,
                                       const ShardPtr& primary ) {
 
@@ -240,7 +219,7 @@ namespace mongo {
 
             if ( primary ) return ChunkVersion::UNSHARDED();
 
-            return manager->getVersion( Shard( shardName ) );
+            return manager->getVersion( shardName );
         }
 
         /**
@@ -323,6 +302,36 @@ namespace mongo {
             dassert( NULL != primaryA.get() );
             return primaryA->getName() != primaryB->getName();
         }
+    }
+
+    void ChunkManagerTargeter::noteStaleResponse( const ShardEndpoint& endpoint,
+                                                  const BSONObj& staleInfo ) {
+        dassert( !_needsTargetingRefresh );
+
+        ChunkVersion remoteShardVersion;
+        if ( staleInfo["vWanted"].eoo() ) {
+            // If we don't have a vWanted sent, assume the version is higher than our current
+            // version.
+            remoteShardVersion = getShardVersion( endpoint.shardName, _manager, _primary );
+            remoteShardVersion.incMajor();
+        }
+        else {
+            remoteShardVersion = ChunkVersion::fromBSON( staleInfo, "vWanted" );
+        }
+
+        // We assume here that we can't have more than one stale config per-shard
+        dassert( _remoteShardVersions.find( endpoint.shardName ) == _remoteShardVersions.end() );
+
+        _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+    }
+
+    void ChunkManagerTargeter::noteCouldNotTarget() {
+        dassert( _remoteShardVersions.empty() );
+        _needsTargetingRefresh = true;
+    }
+
+    const TargeterStats* ChunkManagerTargeter::getStats() const {
+        return _stats.get();
     }
 
     Status ChunkManagerTargeter::refreshIfNeeded() {

@@ -35,12 +35,11 @@ namespace mongo {
     void SafeWriter::fillLastError( const BSONObj& gleResult, LastError* error ) {
         if ( gleResult["code"].isNumber() ) error->code = gleResult["code"].numberInt();
         if ( !gleResult["err"].eoo() ) {
-            if ( gleResult["err"].type() == jstNULL ) {
-                error->msg = "empty error message";
+            if ( gleResult["err"].type() == String ) {
+                error->msg = gleResult["err"].String();
             }
             else {
-                dassert( gleResult["err"].type() == String );
-                error->msg = gleResult["err"].String();
+                dassert( gleResult["err"].type() == jstNULL );
             }
         }
         if ( gleResult["n"].isNumber() ) error->nObjects = gleResult["n"].numberInt();
@@ -55,6 +54,11 @@ namespace mongo {
             dassert( gleResult["upserted"].isABSONObj() );
             error->upsertedId = gleResult["upserted"].Obj();
         }
+        // Needed b/c we detect stale config on legacy hosts via this field
+        if ( !gleResult["writeback"].eoo() ) {
+            dassert( gleResult["writeback"].type() == jstOID );
+            error->writebackId = gleResult["writeback"].OID();
+        }
     }
 
     bool BatchSafeWriter::isFailedOp( const LastError& error ) {
@@ -63,11 +67,22 @@ namespace mongo {
 
     BatchedErrorDetail* BatchSafeWriter::lastErrorToBatchError( const LastError& lastError ) {
 
-        if ( BatchSafeWriter::isFailedOp( lastError ) ) {
+        bool isFailedOp = lastError.msg != "";
+        bool isStaleOp = lastError.writebackId.isSet();
+        dassert( !( isFailedOp && isStaleOp ) );
+
+        if ( isFailedOp ) {
             BatchedErrorDetail* batchError = new BatchedErrorDetail;
             if ( lastError.code != 0 ) batchError->setErrCode( lastError.code );
             else batchError->setErrCode( ErrorCodes::UnknownError );
             batchError->setErrMessage( lastError.msg );
+            return batchError;
+        }
+        else if ( isStaleOp ) {
+            BatchedErrorDetail* batchError = new BatchedErrorDetail;
+            batchError->setErrCode( ErrorCodes::StaleShardVersion );
+            batchError->setErrInfo( BSON( "downconvert" << true ) ); // For debugging
+            batchError->setErrMessage( "shard version was stale" );
             return batchError;
         }
 
@@ -78,6 +93,9 @@ namespace mongo {
                                           const BatchedCommandRequest& request,
                                           BatchedCommandResponse* response ) {
 
+        // N starts at zero, and we add to it for each item
+        response->setN( 0 );
+
         for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
 
             BatchItemRef itemRef( &request, static_cast<int>( i ) );
@@ -87,13 +105,46 @@ namespace mongo {
 
             // Register the error if we need to
             BatchedErrorDetail* batchError = lastErrorToBatchError( lastError );
-            batchError->setIndex( i );
-            response->addToErrDetails( batchError );
+            if ( batchError ) {
+                batchError->setIndex( i );
+                response->addToErrDetails( batchError );
+            }
 
-            // TODO: Other stats, etc.
+            response->setN( response->getN() + lastError.nObjects );
+
+            if ( !lastError.upsertedId.isEmpty() ) {
+                BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
+                upsertedId->setIndex( i );
+                upsertedId->setUpsertedID( lastError.upsertedId );
+                response->addToUpsertDetails( upsertedId );
+            }
 
             // Break on first error if we're ordered
             if ( request.getOrdered() && BatchSafeWriter::isFailedOp( lastError ) ) break;
         }
+
+        if ( request.sizeWriteOps() == 1 && response->isErrDetailsSet()
+             && !response->isErrCodeSet() ) {
+
+            // Promote single error to batch error
+            const BatchedErrorDetail* error = response->getErrDetailsAt( 0 );
+            response->setErrCode( error->getErrCode() );
+            if ( error->isErrInfoSet() ) response->setErrInfo( error->getErrInfo() );
+            response->setErrMessage( error->getErrMessage() );
+
+            response->unsetErrDetails();
+        }
+
+        if ( request.sizeWriteOps() == 1 && response->isUpsertDetailsSet() ) {
+
+            // Promote single upsert to batch upsert
+            const BatchedUpsertDetail* upsertedId = response->getUpsertDetailsAt( 0 );
+            response->setSingleUpserted( upsertedId->getUpsertedID() );
+
+            response->unsetUpsertDetails();
+        }
+
+        response->setOk( !response->isErrCodeSet() );
+        dassert( response->isValid( NULL ) );
     }
 }

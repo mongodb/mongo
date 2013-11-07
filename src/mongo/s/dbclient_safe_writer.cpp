@@ -28,6 +28,7 @@
 
 #include "mongo/s/dbclient_safe_writer.h"
 
+#include "mongo/s/version_manager.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -39,6 +40,17 @@ namespace mongo {
         const BatchedCommandRequest* request = itemRef.getRequest();
 
         try {
+
+            // Default settings for checkShardVersion
+            const bool authoritative = false;
+            const int tryNum = 1;
+
+            // We need to set our version using setShardVersion, managed by checkShardVersionCB
+            versionManager.checkShardVersionCB( conn,
+                                                request->getTargetingNS(),
+                                                authoritative,
+                                                tryNum );
+
             if ( request->getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
                 conn->insert( request->getNS(),
                               request->getInsertRequest()->getDocumentsAt( itemRef.getItemIndex() ),

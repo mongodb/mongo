@@ -1303,6 +1303,11 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
 
+    ChunkVersion ChunkManager::getVersion( const StringData& shardName ) const {
+        // NOTE: The empty-address Shard constructor is needed to avoid triggering a reload
+        return getVersion( Shard( shardName.toString(), "" ) );
+    }
+
     ChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
         ShardVersionMap::const_iterator i = _shardVersions.find( shard );
         if ( i == _shardVersions.end() )
