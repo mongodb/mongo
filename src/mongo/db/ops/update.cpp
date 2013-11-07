@@ -383,6 +383,8 @@ namespace mongo {
         BSONObj newObj = doc.getObject();
 
         if ( newObj["_id"].eoo() ) {
+            // TODO: this should move up to before we call doc.getObject()
+            // and be done on mutable
             BSONObjBuilder b;
 
             OID oid;
