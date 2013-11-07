@@ -77,16 +77,24 @@ __wt_page_in_func(
 			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
-			 * Make sure the page isn't too big.  Only do this
-			 * check if the transaction hasn't made any updates
-			 * and limit the number of attempts to avoid getting
-			 * stuck if the page doesn't become available.
+			 * Force evict pages that are too big.  Only do this
+			 * check if there is a chance of eviction succeeding.
+			 * That is, if the updates on the page are visible to
+			 * the running transaction.
 			 */
-			if (!WT_TXN_ACTIVE(txn) &&
-			    txn->force_evict_attempts < 4 &&
-			    __wt_eviction_page_force(session, page)) {
-				++txn->force_evict_attempts;
-				page->read_gen = WT_READ_GEN_OLDEST;
+			if (txn->force_evict_attempts < 4 &&
+			    __wt_eviction_page_force(session, page) &&
+			    (page->modify == NULL ||
+			    !F_ISSET(&session->txn, TXN_RUNNING) ||
+			    TXNID_LT(page->modify->update_txn,
+			    session->txn.snap_min))) {
+				__wt_txn_update_oldest(session);
+				if (page->modify == NULL ||
+				    __wt_txn_visible_all(session,
+				    page->modify->update_txn)) {
+					++txn->force_evict_attempts;
+					page->read_gen = WT_READ_GEN_OLDEST;
+				}
 				WT_RET(__wt_page_release(session, page));
 				break;
 			}

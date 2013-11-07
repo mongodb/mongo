@@ -291,6 +291,10 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (F_ISSET(&session->txn, TXN_RUNNING))
 			page->modify->disk_snap_min = session->txn.snap_min;
 	}
+
+	/* Check if this is the largest transaction ID to update the page. */
+	if (TXNID_LT(page->modify->update_txn, session->txn.id))
+		page->modify->update_txn = session->txn.id;
 }
 
 /*
