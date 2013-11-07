@@ -382,7 +382,8 @@ namespace mongo {
 
         BSONObj newObj = doc.getObject();
 
-        if ( newObj["_id"].eoo() ) {
+        if ( newObj["_id"].eoo() &&
+             ( collection == NULL || collection->getIndexCatalog()->findIdIndex() ) ) {
             // TODO: this should move up to before we call doc.getObject()
             // and be done on mutable
             BSONObjBuilder b;
@@ -402,7 +403,8 @@ namespace mongo {
             }
         }
 
-        collection->insertDocument( newObj, !request.isGod() /* enforceQuota */ );
+        StatusWith<DiskLoc> newLoc = collection->insertDocument( newObj, !request.isGod() /* enforceQuota */ );
+        uassertStatusOK( newLoc.getStatus() );
         if ( request.shouldUpdateOpLog() ) {
             logOp( "i", nsString.ns().c_str(), newObj,
                    NULL, NULL, request.isFromMigration(), &newObj );

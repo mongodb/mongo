@@ -109,7 +109,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
 
-        if ( requiresIdIndex() ) {
+        if ( _indexCatalog.findIdIndex() ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                             "Collection::insertDocument got document without _id" );

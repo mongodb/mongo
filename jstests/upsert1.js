@@ -46,7 +46,11 @@ assert( l.upserted , "G1 - " + tojson(l) );
 assert.eq( l.upserted , {a:1, b:2} , "G2 - " + tojson(l) );
 
 // test with no _id inserted
+db.no_id.drop();
 db.createCollection("no_id", {autoIndexId:false})
 db.no_id.update({foo:1}, {$set:{a:1}}, true)
 l = db.getLastErrorCmd();
 assert.eq( l.upserted , undefined , "H1 - " + tojson(l) );
+assert.eq( 0, db.no_id.getIndexes().length, "H2" );
+assert.eq( 1, db.no_id.count(), "H3" );
+assert.eq( { foo : 1, a : 1 }, db.no_id.findOne(), "H4" );
