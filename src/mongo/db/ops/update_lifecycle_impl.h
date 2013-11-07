@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,32 +28,33 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/update_lifecycle.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
-    class FieldRef;
+    class UpdateLifecycleImpl : public UpdateLifecycle {
+        MONGO_DISALLOW_COPYING(UpdateLifecycleImpl);
 
-    namespace fieldchecker {
-
-        /**
-         * Returns OK if all the below conditions on 'field' are valid:
-         *   + Non-empty
-         *   + Does not start or end with a '.'
-         * Otherwise returns a code indicating cause of failure.
-         */
-        Status isUpdatable(const FieldRef& field);
+    public:
 
         /**
-         * Returns true, the position 'pos' of the first $-sign if present in 'fieldRef', and
-         * how many other $-signs were found in 'count'. Otherwise return false.
+         * ignoreVersion is for shard version checking and
+         * means that version checks will not be done
          *
-         * Note:
-         *   isPositional assumes that the field is updatable. Call isUpdatable() above to
-         *   verify.
+         * nsString represents the namespace for the
          */
-        bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = NULL);
+        UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsString);
 
-    } // namespace fieldchecker
+        virtual const bool canContinue() const;
+        virtual const void getIndexKeys(IndexPathSet* returnedIndexPathSet) const;
+        virtual const std::vector<FieldRef*>* getImmutableFields() const;
 
-} // namespace mongo
+    private:
+        const NamespaceString& _nsString;
+        ChunkVersion _shardVersion;
+    };
+
+} /* namespace mongo */

@@ -83,7 +83,7 @@ namespace mongo {
 
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
-        Status status = fieldchecker::isUpdatableLegacy(_fieldRef);
+        Status status = fieldchecker::isUpdatable(_fieldRef);
         if (! status.isOK()) {
             return status;
         }

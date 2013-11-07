@@ -114,18 +114,6 @@ namespace mongo {
                 }
             }
 
-            // Check if no invalid data (such as fields with '$'s) are being used in the $each
-            // clause.
-            BSONObjIterator itEach(eachElem->embeddedObject());
-            while (itEach.more()) {
-                BSONElement eachItem = itEach.next();
-                if (eachItem.type() == Object || eachItem.type() == Array) {
-                    Status s = eachItem.Obj().storageValidEmbedded();
-                    if (!s.isOK())
-                        return s;
-                }
-            }
-
             // Slice, sort, position are optional and may be present in any order.
             bool seenSlice = false;
             bool seenSort = false;
@@ -244,12 +232,6 @@ namespace mongo {
         switch (modExpr.type()) {
 
         case Array:
-            {
-                Status s = modExpr.Obj().storageValidEmbedded();
-                if (!s.isOK())
-                    return s;
-            }
-
             if (_pushMode == PUSH_ALL) {
                 _eachMode = true;
                 Status status = parseEachMode(PUSH_ALL,
@@ -289,10 +271,6 @@ namespace mongo {
                 }
             }
             else {
-                Status s = modExpr.Obj().storageValidEmbedded();
-                if (!s.isOK())
-                    return s;
-
                 _val = modExpr;
             }
             break;

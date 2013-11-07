@@ -31,6 +31,8 @@
 #include <set>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/status.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
@@ -70,7 +72,7 @@ namespace mongo {
 
         /**
          * Returns true if the field 'toInsert' can be added in the set without
-         * conflicts. Otwerwise returns false and fill in '*conflict' with the field 'toInsert'
+         * conflicts. Otherwise returns false and fill in '*conflict' with the field 'toInsert'
          * clashed with.
          *
          * There is no ownership transfer of 'toInsert'. The caller is responsible for
@@ -78,6 +80,16 @@ namespace mongo {
          * 'conflict' can only be referred to while the FieldRefSet can.
          */
         bool insert(const FieldRef* toInsert, const FieldRef** conflict);
+
+        /**
+         * Fills the set with the supplied FieldRef*s
+         */
+        void fillFrom(const std::vector<FieldRef*>& fields);
+
+        /**
+         * Replace any existing conflicting FieldRef with the shortest (closest to root) one
+         */
+        void keepShortest(const FieldRef* toInsert);
 
         /**
          * Find all inserted fields which conflict with the FieldRef 'toCheck' by the semantics
@@ -88,6 +100,11 @@ namespace mongo {
         void clear() {
             _fieldSet.clear();
         }
+
+        /**
+         * A debug/log-able string
+         */
+        const std::string toString() const;
 
     private:
         // A set of field_ref pointers, none of which is owned here.

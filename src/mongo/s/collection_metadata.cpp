@@ -96,6 +96,7 @@ namespace mongo {
         auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
+        metadata->fillKeyPatternFields();
         metadata->_pendingMap = this->_pendingMap;
         metadata->_chunksMap = this->_chunksMap;
         metadata->_chunksMap.erase( chunk.getMin() );
@@ -146,6 +147,7 @@ namespace mongo {
         auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
+        metadata->fillKeyPatternFields();
         metadata->_pendingMap = this->_pendingMap;
         metadata->_chunksMap = this->_chunksMap;
         metadata->_chunksMap.insert( make_pair( chunk.getMin().getOwned(),
@@ -189,6 +191,7 @@ namespace mongo {
         auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
+        metadata->fillKeyPatternFields();
         metadata->_pendingMap = this->_pendingMap;
         metadata->_pendingMap.erase( pending.getMin() );
         metadata->_chunksMap = this->_chunksMap;
@@ -224,6 +227,7 @@ namespace mongo {
         auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
+        metadata->fillKeyPatternFields();
         metadata->_pendingMap = this->_pendingMap;
         metadata->_chunksMap = this->_chunksMap;
         metadata->_rangesMap = this->_rangesMap;
@@ -324,6 +328,7 @@ namespace mongo {
         auto_ptr<CollectionMetadata> metadata(new CollectionMetadata);
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
+        metadata->fillKeyPatternFields();
         metadata->_pendingMap = this->_pendingMap;
         metadata->_chunksMap = this->_chunksMap;
         metadata->_shardVersion = newShardVersion; // will increment 2nd, 3rd,... chunks below
@@ -411,6 +416,7 @@ namespace mongo {
         auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
+        metadata->fillKeyPatternFields();
         metadata->_pendingMap = this->_pendingMap;
         metadata->_chunksMap = this->_chunksMap;
         metadata->_rangesMap = this->_rangesMap;
@@ -704,5 +710,18 @@ namespace mongo {
 
         _rangesMap.insert(make_pair(min, max));
     }
+
+    void CollectionMetadata::fillKeyPatternFields() {
+        // Parse the shard keys into the states 'keys' and 'keySet' members.
+        BSONObjIterator patternIter = _keyPattern.begin();
+        while (patternIter.more())  {
+            BSONElement current = patternIter.next();
+
+            _keyFields.mutableVector().push_back(new FieldRef);
+            FieldRef* const newFieldRef = _keyFields.mutableVector().back();
+            newFieldRef->parse(current.fieldNameStringData());
+        }
+    }
+
 
 } // namespace mongo

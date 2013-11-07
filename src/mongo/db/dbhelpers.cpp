@@ -41,6 +41,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/pagefault.h"
@@ -216,6 +217,8 @@ namespace mongo {
         request.setUpsert();
         request.setUpdateOpLog();
         request.setFromMigration(fromMigrate);
+        UpdateLifecycleImpl updateLifecycle(true, requestNs);
+        request.setLifecycle(&updateLifecycle);
 
         update(request, &debug);
     }
@@ -230,6 +233,8 @@ namespace mongo {
         request.setUpdates(obj);
         request.setUpsert();
         request.setUpdateOpLog();
+        UpdateLifecycleImpl updateLifecycle(true, requestNs);
+        request.setLifecycle(&updateLifecycle);
 
         update(request, &debug);
 

@@ -1,4 +1,4 @@
-
+// This tests that $setOnInsert works and allow setting the _id
 t = db.update_setOnInsert;
 
 db.setProfilingLevel( 2 );
@@ -29,3 +29,19 @@ function dotest( useIndex ) {
 
 dotest( false );
 dotest( true );
+
+
+// Cases for SERVER-9958 -- Allow _id $setOnInsert during insert (if upsert:true, and not doc found)
+t.drop();
+
+t.update( {_id: 1} , { $setOnInsert: { "_id.a": new Date() } } , true );
+assert.gleError(db, function(gle) {
+    return "$setOnInsert _id.a - " + tojson(gle) + tojson(t.findOne()) } );
+
+t.update( {"_id.a": 4} , { $setOnInsert: { "_id.b": 1 } } , true );
+assert.gleError(db, function(gle) {
+    return "$setOnInsert _id.b - " + tojson(gle) + tojson(t.findOne()) } );
+
+t.update( {"_id.a": 4} , { $setOnInsert: { "_id": {a:4, b:1} } } , true );
+assert.gleError(db, function(gle) {
+    return "$setOnInsert _id 3 - " + tojson(gle) + tojson(t.findOne()) } );

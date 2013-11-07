@@ -168,13 +168,6 @@ namespace {
                            ModifierInterface::Options::normal()));
     }
 
-    TEST(Init, SimplePushNotOkForStorage) {
-        BSONObj modObj = fromjson("{$push: {$inc: {x: 1}}}");
-        ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
     //
     // If present, is the $each clause valid?
     //
@@ -209,28 +202,11 @@ namespace {
                                ModifierInterface::Options::normal()));
     }
 
-    // TODO Should we check this? We currently don't.
-    // TEST(Init, PushEachDotted) {
-    //     // Push does not create structure; so dotted fields are invalid
-    //     BSONObj modObj = fromjson("{$push: {x: {$each: [{'a.b': 1}]}}}}");
-    //     ModifierPush mod;
-    //     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-    //                            ModifierInterface::Options::normal()));
-    // }
-
     TEST(Init, PushEachEmpty) {
         BSONObj modObj = fromjson("{$push: {x: {$each: []}}}");
         ModifierPush mod;
         ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
-    }
-
-    TEST(Init, PushEachWithNotOkForStorage) {
-        // $each items shouldn't contain '$' in field names.
-        BSONObj modObj = fromjson("{$push: {x: {$each: [{$inc: {b: 1}}]}}}");
-        ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachInvalidType) {

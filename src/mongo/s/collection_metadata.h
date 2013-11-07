@@ -29,6 +29,8 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/range_arithmetic.h"
@@ -189,6 +191,10 @@ namespace mongo {
             return _keyPattern;
         }
 
+        const std::vector<FieldRef*>& getKeyPatternFields() const {
+            return _keyFields.vector();
+        }
+
         BSONObj getMinKey() const;
 
         BSONObj getMaxKey() const;
@@ -271,6 +277,9 @@ namespace mongo {
         // key pattern for chunks under this range
         BSONObj _keyPattern;
 
+        // A vector owning the FieldRefs parsed from the shard-key pattern of field names.
+        OwnedPointerVector<FieldRef> _keyFields;
+
         //
         // RangeMaps represent chunks by mapping the min key to the chunk's max key, allowing
         // efficient lookup and intersection.
@@ -297,6 +306,10 @@ namespace mongo {
          */
         void fillRanges();
 
+        /**
+         * Creates the _keyField* local data
+         */
+        void fillKeyPatternFields();
     };
 
 } // namespace mongo

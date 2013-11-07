@@ -30,6 +30,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/ops/log_builder.h"
@@ -42,12 +43,15 @@
 namespace mongo {
 
     namespace str = mongoutils::str;
+    namespace mb = mongo::mutablebson;
 
     UpdateDriver::UpdateDriver(const Options& opts)
-        : _multi(opts.multi)
+        : _replacementMode(false)
+        , _multi(opts.multi)
         , _upsert(opts.upsert)
         , _logOp(opts.logOp)
-        , _modOptions(opts.modOptions) {
+        , _modOptions(opts.modOptions)
+        , _affectIndices(false) {
     }
 
     UpdateDriver::~UpdateDriver() {
@@ -117,23 +121,10 @@ namespace mongo {
             while (innerIter.more()) {
                 BSONElement innerModElem = innerIter.next();
 
-                if (innerModElem.eoo()) {
-                    return Status(ErrorCodes::FailedToParse,
-                                  str::stream() << outerModElem.fieldName()
-                                                << "." << innerModElem.fieldName()
-                                                << " has no value: " << innerModElem
-                                                << " which is not allowed for any $<mod>.");
-                }
-
-                auto_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(modType));
-                dassert(mod.get());
-
-                Status status = mod->init(innerModElem, _modOptions);
+                Status status = addAndParse(modType, innerModElem);
                 if (!status.isOK()) {
                     return status;
                 }
-
-                _mods.push_back(mod.release());
             }
         }
 
@@ -144,71 +135,114 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status UpdateDriver::createFromQuery(const BSONObj& query, mutablebson::Document& doc) {
-        BSONObjIteratorSorted i(query);
-        while (i.more()) {
-            BSONElement e = i.next();
-            // TODO: get this logic/exclude-list from the query system?
-            if (e.fieldName()[0] == '$' || e.fieldNameStringData() == "_id")
-                continue;
+    inline Status UpdateDriver::addAndParse(const modifiertable::ModifierType type,
+                                            const BSONElement& elem) {
+        if (elem.eoo()) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "'" << elem.fieldName()
+                                        << "' has no value in : " << elem
+                                        << " which is not allowed for any $" << type << " mod.");
+        }
 
+        auto_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(type));
+        dassert(mod.get());
 
-            if (e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$') {
-                // we have something like { x : { $gt : 5 } }
-                // this can be a query piece
-                // or can be a dbref or something
+        Status status = mod->init(elem, _modOptions);
+        if (!status.isOK()) {
+            return status;
+        }
 
-                int op = e.embeddedObject().firstElement().getGtLtOp();
-                if (op > 0) {
-                    // This means this is a $gt type filter, so don't make it part of the new
-                    // object.
+        _mods.push_back(mod.release());
+
+        return Status::OK();
+    }
+
+    Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
+                                                         mutablebson::Document& doc) const {
+        if (isDocReplacement()) {
+            BSONElement idElem = query.getField("_id");
+            // Replacement mods need the _id field copied explicitly.
+            if (idElem.ok()) {
+                mb::Element elem = doc.makeElement(idElem);
+                return doc.root().pushFront(elem);
+            }
+        }
+        else {
+            // Create a new UpdateDriver to create the base doc from the query
+            Options opts;
+            opts.logOp = false;
+            opts.multi = false;
+            opts.upsert = true;
+            opts.modOptions = modOptions();
+
+            UpdateDriver insertDriver(opts);
+            insertDriver.setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
+
+            // parse query $set mods, removing non-equality stuff
+            BSONObjIteratorSorted i(query);
+            while (i.more()) {
+                BSONElement e = i.next();
+                // TODO: get this logic/exclude-list from the query system?
+                if (e.fieldName()[0] == '$')
                     continue;
+
+
+                if (e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$') {
+                    // we have something like { x : { $gt : 5 } }
+                    // this can be a query piece
+                    // or can be a dbref or something
+
+                    int op = e.embeddedObject().firstElement().getGtLtOp();
+                    if (op > 0) {
+                        // This means this is a $gt type filter, so don't make it part of the new
+                        // object.
+                        continue;
+                    }
+
+                    if (mongoutils::str::equals(e.embeddedObject().firstElement().fieldName(),
+                                                  "$not")) {
+                        // A $not filter operator is not detected in getGtLtOp() and should not
+                        // become part of the new object.
+                        continue;
+                    }
                 }
 
-                if (mongoutils::str::equals(e.embeddedObject().firstElement().fieldName(),
-                                              "$not")) {
-                    // A $not filter operator is not detected in getGtLtOp() and should not
-                    // become part of the new object.
-                    continue;
-                }
+                // Add this element as a $set modifier
+                Status s = insertDriver.addAndParse(modifiertable::MOD_SET, e);
+                if (!s.isOK())
+                    return s;
             }
 
-            // Add to the field to doc after expanding and checking for conflicts.
-            FieldRef elemName;
-            const StringData& elemNameSD(e.fieldNameStringData());
-            elemName.parse(elemNameSD);
-
-            size_t pos;
-            mutablebson::Element* elemFound = NULL;
-
-            Status status = pathsupport::findLongestPrefix(elemName, doc.root(), &pos, elemFound);
-            // Not NonExistentPath, of OK, return
-            if (!(status.code() == ErrorCodes::NonExistentPath || status.isOK()))
-                return status;
-
-            status = pathsupport::createPathAt(elemName,
-                                               0,
-                                               doc.root(),
-                                               doc.makeElementWithNewFieldName(
-                                                       elemName.getPart(elemName.numParts()-1),
-                                                       e));
-            if (!status.isOK())
-                return status;
+            // update the document with base field
+            Status s = insertDriver.update(StringData(), &doc);
+            if (!s.isOK()) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              str::stream() << "Cannot create base during"
+                                               " insert of update. Caused by :"
+                                            << s.toString());
+            }
         }
         return Status::OK();
     }
 
     Status UpdateDriver::update(const StringData& matchedField,
                                 mutablebson::Document* doc,
-                                BSONObj* logOpRec) {
+                                BSONObj* logOpRec,
+                                FieldRefSet* updatedFields) {
         // TODO: assert that update() is called at most once in a !_multi case.
 
-        FieldRefSet targetFields;
+        // Use the passed in FieldRefSet
+        FieldRefSet* targetFields = updatedFields;
+
+        // If we didn't get a FieldRefSet* from the caller, allocate storage and use
+        // the scoped_ptr for lifecycle management
+        scoped_ptr<FieldRefSet> targetFieldScopedPtr;
+        if (!targetFields) {
+            targetFieldScopedPtr.reset(new FieldRefSet());
+            targetFields = targetFieldScopedPtr.get();
+        }
 
         _affectIndices = false;
-
-        if (_shardKeyState)
-            _shardKeyState->affectedKeySet.clear();
 
         _logDoc.reset();
         LogBuilder logBuilder(_logDoc.root());
@@ -242,21 +276,15 @@ namespace mongo {
                     break;
                 }
 
-                if (!execInfo.noOp && _shardKeyState)
-                    _shardKeyState->keySet.getConflicts(
-                        execInfo.fieldRef[i],
-                        &_shardKeyState->affectedKeySet);
-
-                if (!targetFields.empty() || _mods.size() > 1) {
-                    const FieldRef* other;
-                    if (!targetFields.insert(execInfo.fieldRef[i], &other)) {
-                        return Status(ErrorCodes::ConflictingUpdateOperators,
-                                      str::stream() << "Cannot update '"
-                                                    << other->dottedField()
-                                                    << "' and '"
-                                                    << execInfo.fieldRef[i]->dottedField()
-                                                    << "' at the same time");
-                    }
+                // Record each field being updated but check for conflicts first
+                const FieldRef* other;
+                if (!targetFields->insert(execInfo.fieldRef[i], &other)) {
+                    return Status(ErrorCodes::ConflictingUpdateOperators,
+                                  str::stream() << "Cannot update '"
+                                                << other->dottedField()
+                                                << "' and '"
+                                                << execInfo.fieldRef[i]->dottedField()
+                                                << "' at the same time");
                 }
 
                 // We start with the expectation that a mod will be in-place. But if the mod
@@ -312,152 +340,6 @@ namespace mongo {
         _indexedFields = indexedFields;
     }
 
-    void UpdateDriver::refreshShardKeyPattern(const BSONObj& shardKeyPattern) {
-
-        // An empty pattern object means no shard keys.
-        if (shardKeyPattern.isEmpty()) {
-            _shardKeyState.reset();
-            return;
-        }
-
-        // If we have already parsed an identical shard key pattern, don't do it again.
-        if (_shardKeyState && (_shardKeyState->pattern.woCompare(shardKeyPattern) == 0))
-            return;
-
-        // Reset the shard key state and capture the new pattern.
-        _shardKeyState.reset(new ShardKeyState);
-        _shardKeyState->pattern = shardKeyPattern;
-
-        // Parse the shard keys into the states 'keys' and 'keySet' members.
-        BSONObjIterator patternIter = _shardKeyState->pattern.begin();
-        while (patternIter.more())  {
-            BSONElement current = patternIter.next();
-
-            _shardKeyState->keys.mutableVector().push_back(new FieldRef);
-            FieldRef* const newFieldRef = _shardKeyState->keys.mutableVector().back();
-            newFieldRef->parse(current.fieldNameStringData());
-
-            // TODO: what about bad parse?
-
-            const FieldRef* conflict;
-            if ( !_shardKeyState->keySet.insert( newFieldRef, &conflict ) ) {
-                // This seems pretty unlikely in practice.
-                uasserted(
-                    17152, str::stream()
-                    << "Shard key '"
-                    << newFieldRef->dottedField()
-                    << "' conflicts with shard key '"
-                    << conflict->dottedField()
-                    << "'" );
-            }
-        }
-    }
-
-    bool UpdateDriver::modsAffectShardKeys() const {
-        // If we have no shard key state, the mods could not have affected them.
-        if (!_shardKeyState)
-            return false;
-
-        // In replacement mode, we always assume that all shard keys need to be checked. For
-        // upsert, we are inserting a new object, so it must have all shard keys. Otherwise, it
-        // depends on whether any shard keys were added to the affectedKeySet state.
-        return (_replacementMode || !_shardKeyState->affectedKeySet.empty());
-    }
-
-    Status UpdateDriver::checkShardKeysUnaltered(const BSONObj& original,
-                                                 const mutablebson::Document& updated) const {
-
-        if (!_shardKeyState)
-            return Status::OK();
-
-        // In replacement mode, we validate the values for all shard keys. Otherwise, only the
-        // ones tagged as being potentially invalidated. For an upsert, we check all keys.
-        const FieldRefSet& affected = (_replacementMode || original.isEmpty()) ?
-            _shardKeyState->keySet :
-            _shardKeyState->affectedKeySet;
-
-        const mutablebson::ConstElement id = updated.root()["_id"];
-
-        FieldRefSet::const_iterator where = affected.begin();
-        const FieldRefSet::const_iterator end = affected.end();
-        for( ; where != end; ++where ) {
-            const FieldRef& current = **where;
-
-            // Find the affected field in the updated document.
-            mutablebson::ConstElement elt = updated.root();
-            size_t currentPart = 0;
-            while (elt.ok() && currentPart < current.numParts())
-                elt = elt[current.getPart(currentPart++)];
-
-            if (!elt.ok()) {
-                if (original.isEmpty()) {
-                    return Status(ErrorCodes::NoSuchKey,
-                                  mongoutils::str::stream()
-                                  << "After applying modifiers of replacement in an upsert"
-                                  << "', the shard key field '" << current.dottedField() <<
-                                  "' was not found in the resulting document.");
-
-                }
-                else {
-                    return Status(ErrorCodes::ImmutableShardKeyField,
-                                  mongoutils::str::stream()
-                                  << "After applying updates to the object with _id '"
-                                  << id.toString()
-                                  << "', the shard key field '" << current.dottedField() <<
-                                  "' was found to have been removed from the document");
-                }
-            }
-
-            // For upserts, we don't have an original object to compare against. The existence
-            // check above must be sufficient for now. Potentially, we could do keyBelongsTo me
-            // here.
-            //
-            // TODO: Investigate calling keyBelongsToMe here. We'd need to do this if we want
-            // mongod to be a full backstop for incorrect updates in a forward compatible way,
-            // looking at the day where we open up the floodgates for updates through mongod.
-            if (!original.isEmpty()) {
-
-                // Find the potentially affected field in the original document.
-                const BSONElement foundInOld = original.getFieldDotted(current.dottedField());
-                if (foundInOld.eoo()) {
-
-                    // NOTE: These errors should really never occur. It would mean that the base
-                    // document on disk was missing the shard key, so we have no way to validate
-                    // that it wasn't changed.
-
-                    BSONElement id;
-                    if (original.getObjectID(id)) {
-                        return Status(ErrorCodes::NoSuchKey,
-                                      mongoutils::str::stream()
-                                      << "While updating object with _id '" << id << "', the field"
-                                      << " for shard key '"
-                                      << current.dottedField() << "' was not found "
-                                      << "in the original document");
-                    }
-                    else {
-                        return Status(ErrorCodes::NoSuchKey,
-                                      mongoutils::str::stream()
-                                      << "While updating an object with no '_id' field, the field"
-                                      << " for shard key '"
-                                      << current.dottedField() << "' was not found "
-                                      << "in the original document");
-                    }
-                }
-
-                if (elt.compareWithBSONElement(foundInOld, false) != 0) {
-                    return Status(ErrorCodes::ImmutableShardKeyField,
-                                  mongoutils::str::stream()
-                                  << "After applying updates to the object with _id '" <<
-                                  id.toString()
-                                  << "', the shard key field '" << current.dottedField() <<
-                                  "' was found to have been altered");
-                }
-            }
-        }
-
-        return Status::OK();
-    }
-
     bool UpdateDriver::multi() const {
         return _multi;
     }
@@ -498,7 +380,7 @@ namespace mongo {
         _context = context;
     }
 
-    BSONObj UpdateDriver::makeOplogEntryQuery(const BSONObj doc, bool multi) const {
+    BSONObj UpdateDriver::makeOplogEntryQuery(const BSONObj& doc, bool multi) const {
         BSONObjBuilder idPattern;
         BSONElement id;
         // NOTE: If the matching object lacks an id, we'll log
@@ -523,7 +405,6 @@ namespace mongo {
         }
         _indexedFields.clear();
         _replacementMode = false;
-        _shardKeyState.reset();
     }
 
 } // namespace mongo

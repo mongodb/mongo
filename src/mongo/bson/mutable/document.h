@@ -327,6 +327,9 @@ namespace mutablebson {
         /** Create a new undefined Element with the given field name. */
         Element makeElementUndefined(const StringData& fieldName);
 
+        /** Create a new OID + Element with the given field name. */
+        Element makeElementNewOID(const StringData& fieldName);
+
         /** Create a new OID Element with the given value and field name. */
         Element makeElementOID(const StringData& fieldName, mongo::OID value);
 

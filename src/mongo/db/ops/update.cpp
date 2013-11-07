@@ -34,6 +34,7 @@
 
 #include <cstring>  // for memcpy
 
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
@@ -41,54 +42,232 @@
 #include "mongo/db/index_set.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
+#include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query_optimizer.h"
+#include "mongo/db/query_runner.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/runner_yield_policy.h"
-#include "mongo/db/query_optimizer.h"
-#include "mongo/db/query_runner.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/collection.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
+    namespace mb = mutablebson;
     namespace {
 
+        const char idFieldName[] = "_id";
+
         // TODO: Make this a function on NamespaceString, or make it cleaner.
-        inline void validateUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
-            uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
-            if ( strstr(ns, ".system.") ) {
+        inline void validateUpdate(const char* ns ,
+                                   const BSONObj& updateobj,
+                                   const BSONObj& patternOrig) {
+            uassert(10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0);
+            if (strstr(ns, ".system.")) {
                 /* dm: it's very important that system.indexes is never updated as IndexDetails
                    has pointers into it */
-                uassert( 10156,
+                uassert(10156,
                          str::stream() << "cannot update system collection: "
                          << ns << " q: " << patternOrig << " u: " << updateobj,
-                         legalClientSystemNS( ns , true ) );
+                         legalClientSystemNS(ns , true));
             }
         }
 
         /**
-         * return a BSONObj with the _id field of the doc passed in. If no _id and multi, error.
+         * This will verify that all updated fields are
+         *   1.) Valid for storage (checking parent to make sure things like DBRefs are valid)
+         *   2.) Compare updated immutable fields do not change values
+         *
+         * If updateFields is empty then it was replacement and/or we need to check all fields
          */
-        BSONObj makeOplogEntryQuery(const BSONObj doc, bool multi) {
-            BSONObjBuilder idPattern;
-            BSONElement id;
-            // NOTE: If the matching object lacks an id, we'll log
-            // with the original pattern.  This isn't replay-safe.
-            // It might make sense to suppress the log instead
-            // if there's no id.
-            if ( doc.getObjectID( id ) ) {
-                idPattern.append( id );
-                return idPattern.obj();
+        inline Status validate(const bool idRequired,
+                               const BSONObj& original,
+                               const FieldRefSet& updatedFields,
+                               const mb::Document& updated,
+                               const std::vector<FieldRef*>* immutableAndSingleValueFields,
+                               const ModifierInterface::Options& opts) {
+
+            LOG(3) << "update validate options -- "
+                   << " id required: " << idRequired
+                   << " updatedFields: " << updatedFields
+                   << " immutableAndSingleValueFields.size:"
+                   << (immutableAndSingleValueFields ? immutableAndSingleValueFields->size() : 0)
+                   << " fromRepl: " << opts.fromReplication
+                   << " validate:" << opts.enforceOkForStorage;
+
+            // 1.) Loop through each updated field and validate for storage
+            // and detect immutable updates
+
+            // Once we check the root once, there is no need to do it again
+            bool checkedRoot = false;
+
+            // TODO: Replace with mutablebson implementation -- this is wasteful to make a copy.
+            BSONObj doc = updated.getObject();
+
+            // The set of possibly changed immutable fields -- we will need to check their vals
+            FieldRefSet changedImmutableFields;
+
+            // Check to see if there were no fields specified or if we are not validating
+            // The case if a range query, or query that didn't result in saved fields
+            if (updatedFields.empty() || !opts.enforceOkForStorage) {
+                if (opts.enforceOkForStorage) {
+                    // No specific fields were updated so the whole doc must be checked
+                    Status s = doc.storageValid(true);
+                    if (!s.isOK())
+                        return s;
+                }
+
+                // Check all immutable fields
+                if (immutableAndSingleValueFields)
+                    changedImmutableFields.fillFrom(*immutableAndSingleValueFields);
             }
             else {
-                uassert( 10157, "multi-update requires all modified objects to have an _id" , ! multi );
-                return doc;
+
+                // TODO: Change impl so we don't need to create a new FieldRefSet
+                //       -- move all conflict logic into static function on FieldRefSet?
+                FieldRefSet immutableFieldRef;
+                if (immutableAndSingleValueFields)
+                    immutableFieldRef.fillFrom(*immutableAndSingleValueFields);
+
+
+                FieldRefSet::const_iterator where = updatedFields.begin();
+                const FieldRefSet::const_iterator end = updatedFields.end();
+                for( ; where != end; ++where) {
+                    const FieldRef& current = **where;
+
+                    //TODO: don't check paths more than once
+
+                    const bool isTopLevelField = (current.numParts() == 1);
+                    if (isTopLevelField) {
+                        // We check the top level since the current implementation checks BSONObj,
+                        // not BSONElements. NOTE: in the mutablebson version we can just check elem
+                        if (!checkedRoot) {
+                            // Check the root level (top level fields) only once, and don't go deep
+                            Status s = doc.storageValid(false);
+                            if (!s.isOK()) {
+                               return s;
+                            }
+                            checkedRoot = true;
+                        }
+
+                        // Check if the updated field conflicts with immutable fields
+                        immutableFieldRef.getConflicts(&current, &changedImmutableFields);
+
+                        // Traverse (deep)
+                        BSONElement elem = doc.getFieldDotted(current.dottedField());
+                        if (elem.isABSONObj()) {
+                            Status s = elem.embeddedObject().storageValid(true);
+                            if (!s.isOK()) {
+                               return s;
+                            }
+                        }
+                    }
+                    else {
+                        // Remove the right-most part, to get the parent.
+                        // "a.b.c" -> "a.b"
+                        StringData path = current.dottedField().substr(
+                                            0,
+                                            current.dottedField().size() -
+                                                current.getPart(current.numParts() - 1).size() - 1);
+
+                        BSONElement elem = doc.getFieldDotted(path);
+                        Status s = elem.embeddedObject().storageValid(true);
+                        if (!s.isOK()) {
+                           return s;
+                        }
+
+                    }
+                }
             }
+
+            LOG(4) << "Changed immutable fields: " << changedImmutableFields;
+            // 2.) Now compare values of the changed immutable fields (to make sure they haven't)
+
+            const mutablebson::ConstElement newIdElem = updated.root()[idFieldName];
+
+            // Add _id to fields to check since it too is immutable
+            FieldRef idFR;
+            idFR.parse(idFieldName);
+            changedImmutableFields.keepShortest(&idFR);
+
+            FieldRefSet::const_iterator where = changedImmutableFields.begin();
+            const FieldRefSet::const_iterator end = changedImmutableFields.end();
+            for( ; where != end; ++where ) {
+                const FieldRef& current = **where;
+
+                // Find the updated field in the updated document.
+                mutablebson::ConstElement newElem = updated.root();
+                size_t currentPart = 0;
+                while (newElem.ok() && currentPart < current.numParts())
+                    newElem = newElem[current.getPart(currentPart++)];
+
+                if (!newElem.ok()) {
+                    if (original.isEmpty()) {
+                        // If the _id is missing and not required, then skip this check
+                        if (!(current.dottedField() == idFieldName && idRequired))
+                            return Status(ErrorCodes::NoSuchKey,
+                                          mongoutils::str::stream()
+                                          << "After applying the update, the new"
+                                          << " document was missing the '"
+                                          << current.dottedField()
+                                          << "' (required and immutable) field.");
+
+                    }
+                    else {
+                        if (current.dottedField() != idFieldName ||
+                                (current.dottedField() != idFieldName && idRequired))
+                            return Status(ErrorCodes::ImmutableField,
+                                          mongoutils::str::stream()
+                                          << "After applying the update to the document with "
+                                          << newIdElem.toString()
+                                          << ", the '" << current.dottedField()
+                                          << "' (required and immutable) field was "
+                                             "found to have been removed --"
+                                          << original);
+                    }
+                }
+                else {
+
+                    // Find the potentially affected field in the original document.
+                    const BSONElement oldElem = original.getFieldDotted(current.dottedField());
+                    const BSONElement oldIdElem = original.getField(idFieldName);
+
+                    // Ensure no arrays since neither _id nor shard keys can be in an array, or one.
+                    mb::ConstElement currElem = newElem;
+                    while (currElem.ok()) {
+                        if (currElem.getType() == Array) {
+                            return Status(ErrorCodes::NotSingleValueField,
+                                          mongoutils::str::stream()
+                                          << "After applying the update to the document {"
+                                          << (oldIdElem.ok() ? oldIdElem.toString() :
+                                                               newIdElem.toString())
+                                          << " , ...}, the (immutable) field '"
+                                          << current.dottedField()
+                                          << "' was found to be an array or array descendant.");
+                        }
+                        currElem = currElem.parent();
+                    }
+
+                    // If we have both (old and new), compare them. If we just have new we are good
+                    if (oldElem.ok() && newElem.compareWithBSONElement(oldElem, false) != 0) {
+                        return Status(ErrorCodes::ImmutableField,
+                                      mongoutils::str::stream()
+                                      << "After applying the update to the document {"
+                                      << (oldIdElem.ok() ? oldIdElem.toString() :
+                                                           newIdElem.toString())
+                                      << " , ...}, the (immutable) field '" << current.dottedField()
+                                      << "' was found to have been altered to "
+                                      << newElem.toString());
+                    }
+                }
+            }
+
+            return Status::OK();
         }
 
     } // namespace
@@ -100,20 +279,21 @@ namespace mongo {
         // Config db docs shouldn't get checked for valid field names since the shard key can have
         // a dot (".") in it.
         bool shouldValidate = !(request.isFromReplication() ||
-                                request.getNamespaceString().isConfigDB());
+                                request.getNamespaceString().isConfigDB() ||
+                                request.isFromMigration());
 
         // TODO: Consider some sort of unification between the UpdateDriver, ModifierInterface
         // and UpdateRequest structures.
         UpdateDriver::Options opts;
         opts.multi = request.isMulti();
         opts.upsert = request.isUpsert();
-        opts.logOp = request.shouldUpdateOpLog();
-        opts.modOptions = ModifierInterface::Options( request.isFromReplication(), shouldValidate );
-        UpdateDriver driver( opts );
+        opts.logOp = request.shouldCallLogOp();
+        opts.modOptions = ModifierInterface::Options(request.isFromReplication(), shouldValidate);
+        UpdateDriver driver(opts);
 
-        Status status = driver.parse( request.getUpdates() );
-        if ( !status.isOK() ) {
-            uasserted( 16840, status.reason() );
+        Status status = driver.parse(request.getUpdates());
+        if (!status.isOK()) {
+            uasserted(16840, status.reason());
         }
 
         return update(request, opDebug, &driver);
@@ -124,19 +304,20 @@ namespace mongo {
         LOG(3) << "processing update : " << request;
         const NamespaceString& nsString = request.getNamespaceString();
 
-        validateUpdate( nsString.ns().c_str(), request.getUpdates(), request.getQuery() );
+        validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
-        Collection* collection = cc().database()->getCollection( nsString.ns() );
+        Collection* collection = cc().database()->getCollection(nsString.ns());
 
         // TODO: This seems a bit circuitious.
         opDebug->updateobj = request.getUpdates();
 
-        if ( collection )
-            driver->refreshIndexKeys( collection->infoCache()->indexKeys() );
+        if (request.getLifecycle()) {
+            IndexPathSet indexes;
+            request.getLifecycle()->getIndexKeys(&indexes);
+            driver->refreshIndexKeys(indexes);
+        }
 
         CanonicalQuery* cq;
-        // We pass -limit because a positive limit means 'batch size' but negative limit is a
-        // hard limit.
         if (!CanonicalQuery::canonicalize(nsString, request.getQuery(), &cq).isOK()) {
             uasserted(17242, "could not canonicalize query " + request.getQuery().toString());
         }
@@ -160,7 +341,7 @@ namespace mongo {
 
         // We record that this will not be an upsert, in case a mod doesn't want to be applied
         // when in strict update mode.
-        driver->setContext( ModifierInterface::ExecInfo::UPDATE_CONTEXT );
+        driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
 
         int numMatched = 0;
         unordered_set<DiskLoc, DiskLoc::Hasher> updatedLocs;
@@ -179,9 +360,10 @@ namespace mongo {
         DiskLoc loc;
         Runner::RunnerState state;
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&oldObj, &loc))) {
-            if ( !isolated && opDebug->nscanned != 0 ) {
+            if (!isolated && opDebug->nscanned != 0) {
                 if (yieldPolicy.shouldYield()) {
                     if (!yieldPolicy.yieldAndCheckIfOK(runner.get())) {
+                        // TODO: Error?
                         break;
                     }
 
@@ -190,13 +372,18 @@ namespace mongo {
                     // them here. If we can't do so, escape the update loop. Otherwise, refresh
                     // the driver so that it knows about what is currently indexed.
 
-                    collection = cc().database()->getCollection( nsString.ns() );
-                    if (NULL == collection) {
-                        break;
+                    const UpdateLifecycle* lifecycle = request.getLifecycle();
+                    collection = cc().database()->getCollection(nsString.ns());
+                    if (!collection || (lifecycle && !lifecycle->canContinue())) {
+                        uasserted(17270,
+                                  "Update aborted due to invalid state transitions after yield.");
                     }
 
-                    // TODO: This copies the index keys, but it may not need to do so.
-                    driver->refreshIndexKeys( collection->infoCache()->indexKeys() );
+                    if (lifecycle && lifecycle->canContinue()) {
+                        IndexPathSet indexes;
+                        lifecycle->getIndexKeys(&indexes);
+                        driver->refreshIndexKeys(indexes);
+                    }
                 }
             }
 
@@ -218,23 +405,38 @@ namespace mongo {
             // place", that is, some values of the old document just get adjusted without any
             // change to the binary layout on the bson layer. It may be that a whole new
             // document is needed to accomodate the new bson layout of the resulting document.
-            doc.reset( oldObj, mutablebson::Document::kInPlaceEnabled );
+            doc.reset(oldObj, mutablebson::Document::kInPlaceEnabled);
             BSONObj logObj;
 
             // If there was a matched field, obtain it.
-            // XXX: do we always want to do this additional match?
+            // TODO: Only do this when needed (need requirements from update_driver/mods)
             MatchDetails matchDetails;
             matchDetails.requestElemMatchKey();
+            // TODO: Find out if can move this to the query side so we don't need to double match
             verify(cq->root()->matchesBSON(oldObj, &matchDetails));
 
             string matchedField;
             if (matchDetails.hasElemMatchKey())
                 matchedField = matchDetails.elemMatchKey();
 
-            Status status = driver->update( matchedField, &doc, &logObj );
-            if ( !status.isOK() ) {
-                uasserted( 16837, status.reason() );
+            FieldRefSet updatedFields;
+            Status status = driver->update(matchedField, &doc, &logObj, &updatedFields);
+            if (!status.isOK()) {
+                uasserted(16837, status.reason());
             }
+
+            dassert(collection->details());
+            const bool idRequired = collection->details()->haveIdIndex();
+
+            // Move _id as first element
+            mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
+            if (idElem.ok()) {
+                if (idElem.leftSibling().ok()) {
+                    uassertStatusOK(idElem.remove());
+                    uassertStatusOK(doc.root().pushFront(idElem));
+                }
+            }
+
 
             // If the driver applied the mods in place, we can ask the mutable for what
             // changed. We call those changes "damages". :) We use the damages to inform the
@@ -251,16 +453,31 @@ namespace mongo {
             const char* source = NULL;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
 
-            // If something changed in the document, verify that no shard keys were altered.
-            if ((!inPlace || !damages.empty()) && driver->modsAffectShardKeys())
-                uassertStatusOK( driver->checkShardKeysUnaltered (oldObj, doc ) );
+            // If something changed in the document, verify that no immutable fields were changed
+            // and data is valid for storage.
+            if ((!inPlace || !damages.empty()) ) {
+                if (!(request.isFromReplication() || request.isFromMigration())) {
+                    const std::vector<FieldRef*>* immutableFields = NULL;
+                    if (const UpdateLifecycle* lifecycle = request.getLifecycle())
+                        immutableFields = lifecycle->getImmutableFields();
+
+                    uassertStatusOK(validate(idRequired,
+                                             oldObj,
+                                             updatedFields,
+                                             doc,
+                                             immutableFields,
+                                             driver->modOptions()) );
+                }
+            }
 
             runner->saveState();
 
-            if ( inPlace && !driver->modsAffectIndices() ) {
+            if (inPlace && !driver->modsAffectIndices()) {
+
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
+
                     collection->details()->paddingFits();
 
                     // All updates were in place. Apply them via durability and writing pointer.
@@ -282,11 +499,11 @@ namespace mongo {
 
                 // The updates were not in place. Apply them through the file manager.
                 newObj = doc.getObject();
-                StatusWith<DiskLoc> res = collection->updateDocument( loc,
-                                                                      newObj,
-                                                                      true,
-                                                                      opDebug );
-                uassertStatusOK( res.getStatus() );
+                StatusWith<DiskLoc> res = collection->updateDocument(loc,
+                                                                     newObj,
+                                                                     true,
+                                                                     opDebug);
+                uassertStatusOK(res.getStatus());
                 DiskLoc newLoc = res.getValue();
 
                 // If we've moved this object to a new location, make sure we don't apply
@@ -295,16 +512,16 @@ namespace mongo {
                 // We also take note that the diskloc if the updates are affecting indices.
                 // Chances are that we're traversing one of them and they may be multi key and
                 // therefore duplicate disklocs.
-                if ( newLoc != loc || driver->modsAffectIndices()  ) {
-                    updatedLocs.insert( newLoc );
+                if (newLoc != loc || driver->modsAffectIndices()) {
+                    updatedLocs.insert(newLoc);
                 }
 
                 objectWasChanged = true;
             }
 
-            // Log Obj
-            if ( request.shouldUpdateOpLog() ) {
-                if ( driver->isDocReplacement() || !logObj.isEmpty() ) {
+            // Call logOp if requested.
+            if (request.shouldCallLogOp()) {
+                if (driver->isDocReplacement() || !logObj.isEmpty()) {
                     BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
                     logOp("u", nsString.ns().c_str(), logObj , &idQuery,
                           NULL, request.isFromMigration(), &newObj);
@@ -329,10 +546,10 @@ namespace mongo {
         // TODO: Can this be simplified?
         if ((numMatched > 0) || (numMatched == 0 && !request.isUpsert()) ) {
             opDebug->nupdated = numMatched;
-            return UpdateResult( numMatched > 0 /* updated existing object(s) */,
-                                 !driver->isDocReplacement() /* $mod or obj replacement */,
-                                 numMatched /* # of docments update, even no-ops */,
-                                 BSONObj() );
+            return UpdateResult(numMatched > 0 /* updated existing object(s) */,
+                                !driver->isDocReplacement() /* $mod or obj replacement */,
+                                numMatched /* # of docments update, even no-ops */,
+                                BSONObj());
         }
 
         //
@@ -345,92 +562,112 @@ namespace mongo {
         // as an insert in the oplog. We don't need the driver's help to build the
         // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
         // Some mods may only work in that context (e.g. $setOnInsert).
-        driver->setLogOp( false );
-        driver->setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
+        driver->setLogOp(false);
+        driver->setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
 
         // Reset the document we will be writing to
         doc.reset();
-        if ( request.getQuery().hasElement("_id") ) {
-            uassertStatusOK(doc.root().appendElement(request.getQuery().getField("_id")));
-        }
-
 
         // This remains the empty object in the case of an object replacement, but in the case
         // of an upsert where we are creating a base object from the query and applying mods,
-        // we capture the query as the original so that we can detect shard key mutations.
+        // we capture the query as the original so that we can detect immutable field mutations.
         BSONObj original = BSONObj();
 
-        // If this is a $mod base update, we need to generate a document by examining the
-        // query and the mods. Otherwise, we can use the object replacement sent by the user
-        // update command that was parsed by the driver before.
-        // In the following block we handle the query part, and then do the regular mods after.
-        if ( *request.getUpdates().firstElementFieldName() == '$' ) {
-            original = request.getQuery();
-            uassertStatusOK(UpdateDriver::createFromQuery(original, doc));
+        // Calling createFromQuery will populate the 'doc' with fields from the query which
+        // creates the base of the update for the inserterd doc (because upsert was true)
+        uassertStatusOK(driver->populateDocumentWithQueryFields(request.getQuery(), doc));
+        if (!driver->isDocReplacement()) {
             opDebug->fastmodinsert = true;
+            // We need all the fields from the query to compare against for validation below.
+            original = doc.getObject();
         }
 
         // Apply the update modifications and then log the update as an insert manually.
-        Status status = driver->update( StringData(), &doc, NULL /* no oplog record */);
-        if ( !status.isOK() ) {
-            uasserted( 16836, status.reason() );
+        FieldRefSet updatedFields;
+        Status status = driver->update(StringData(), &doc, NULL, &updatedFields);
+        if (!status.isOK()) {
+            uasserted(16836, status.reason());
         }
 
-        // Validate that the object replacement or modifiers resulted in a document
-        // that contains all the shard keys.
-        uassertStatusOK( driver->checkShardKeysUnaltered(original, doc) );
-
-        BSONObj newObj = doc.getObject();
-
-        if ( newObj["_id"].eoo() &&
-             ( collection == NULL || collection->getIndexCatalog()->findIdIndex() ) ) {
-            // TODO: this should move up to before we call doc.getObject()
-            // and be done on mutable
-            BSONObjBuilder b;
-
-            OID oid;
-            oid.init();
-            b.appendOID( "_id", &oid );
-
-            b.appendElements( newObj );
-            newObj = b.obj();
-        }
-
-        if ( !collection ) {
-            collection = cc().database()->getCollection( request.getNamespaceString().ns() );
-            if ( !collection ) {
-                collection = cc().database()->createCollection( request.getNamespaceString().ns() );
+        if (!collection) {
+            collection = cc().database()->getCollection(request.getNamespaceString().ns());
+            if (!collection) {
+                collection = cc().database()->createCollection(request.getNamespaceString().ns());
             }
         }
 
-        StatusWith<DiskLoc> newLoc = collection->insertDocument( newObj, !request.isGod() /* enforceQuota */ );
-        uassertStatusOK( newLoc.getStatus() );
-        if ( request.shouldUpdateOpLog() ) {
-            logOp( "i", nsString.ns().c_str(), newObj,
-                   NULL, NULL, request.isFromMigration(), &newObj );
+        dassert(collection->details());
+        const bool idRequired = collection->details()->haveIdIndex();
+
+        mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
+
+        // Move _id as first element if it exists
+        if (idElem.ok()) {
+            if (idElem.leftSibling().ok()) {
+                uassertStatusOK(idElem.remove());
+                uassertStatusOK(doc.root().pushFront(idElem));
+            }
+        }
+        else {
+            // Create _id if an _id is required but the document does not currently have one.
+            if (idRequired) {
+                // TODO: don't search for _id again, get it from above somewhere
+                idElem = doc.makeElementNewOID(idFieldName);
+                if (!idElem.ok())
+                    uasserted(17268, "Could not create new _id ObjectId element.");
+                Status s = doc.root().pushFront(idElem);
+                if (!s.isOK())
+                    uasserted(17269,
+                            str::stream() << "Could not create new _id for insert: " << s.reason());
+            }
+        }
+
+        // Validate that the object replacement or modifiers resulted in a document
+        // that contains all the immutable keys and can be stored.
+        if (!(request.isFromReplication() || request.isFromMigration())){
+            const std::vector<FieldRef*>* immutableFields = NULL;
+            if (const UpdateLifecycle* lifecycle = request.getLifecycle())
+                immutableFields = lifecycle->getImmutableFields();
+
+            uassertStatusOK(validate(idRequired,
+                                     original,
+                                     updatedFields,
+                                     doc,
+                                     immutableFields,
+                                     driver->modOptions()) );
+        }
+
+        // Insert the doc
+        BSONObj newObj = doc.getObject();
+        StatusWith<DiskLoc> newLoc = collection->insertDocument(newObj,
+                                                                !request.isGod() /*enforceQuota*/);
+        uassertStatusOK(newLoc.getStatus());
+        if (request.shouldCallLogOp()) {
+            logOp("i", nsString.ns().c_str(), newObj,
+                   NULL, NULL, request.isFromMigration(), &newObj);
         }
 
         opDebug->nupdated = 1;
-        return UpdateResult( false /* updated a non existing document */,
-                             !driver->isDocReplacement() /* $mod or obj replacement? */,
-                             1 /* count of updated documents */,
-                             newObj /* object that was upserted */ );
+        return UpdateResult(false /* updated a non existing document */,
+                            !driver->isDocReplacement() /* $mod or obj replacement? */,
+                            1 /* count of updated documents */,
+                            newObj /* object that was upserted */ );
     }
 
-    BSONObj applyUpdateOperators( const BSONObj& from, const BSONObj& operators ) {
+    BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
         UpdateDriver::Options opts;
         opts.multi = false;
         opts.upsert = false;
-        UpdateDriver driver( opts );
-        Status status = driver.parse( operators );
-        if ( !status.isOK() ) {
-            uasserted( 16838, status.reason() );
+        UpdateDriver driver(opts);
+        Status status = driver.parse(operators);
+        if (!status.isOK()) {
+            uasserted(16838, status.reason());
         }
 
-        mutablebson::Document doc( from, mutablebson::Document::kInPlaceDisabled );
-        status = driver.update( StringData(), &doc, NULL /* not oplogging */ );
-        if ( !status.isOK() ) {
-            uasserted( 16839, status.reason() );
+        mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
+        status = driver.update(StringData(), &doc);
+        if (!status.isOK()) {
+            uasserted(16839, status.reason());
         }
 
         return doc.getObject();

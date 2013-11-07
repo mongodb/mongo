@@ -251,11 +251,11 @@ namespace {
             if (query.hasField("_id")) {
                 document.root().appendElement(query["_id"]);
             }
-            status = driver.createFromQuery(query, document);
+            status = driver.populateDocumentWithQueryFields(query, document);
             if (!status.isOK()) {
                 return status;
             }
-            status = driver.update(StringData(), &document, NULL);
+            status = driver.update(StringData(), &document);
             if (!status.isOK()) {
                 return status;
             }

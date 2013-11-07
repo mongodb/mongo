@@ -51,6 +51,7 @@ db.createCollection("no_id", {autoIndexId:false})
 db.no_id.update({foo:1}, {$set:{a:1}}, true)
 l = db.getLastErrorCmd();
 assert.eq( l.upserted , undefined , "H1 - " + tojson(l) );
+assert( !l.err, "H1.5 No error expected - " + tojson(l) )
 assert.eq( 0, db.no_id.getIndexes().length, "H2" );
 assert.eq( 1, db.no_id.count(), "H3" );
 assert.eq( { foo : 1, a : 1 }, db.no_id.findOne(), "H4" );

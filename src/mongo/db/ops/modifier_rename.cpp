@@ -86,13 +86,11 @@ namespace mongo {
         // Extract the field names from the mod expression
 
         _fromFieldRef.parse(modExpr.fieldName());
-        // The 'from' field is checked with legacy so that we can rename away from malformed values.
-        Status status = fieldchecker::isUpdatableLegacy(_fromFieldRef);
+        Status status = fieldchecker::isUpdatable(_fromFieldRef);
         if (!status.isOK())
             return status;
 
         _toFieldRef.parse(modExpr.String());
-        // The 'to' field is checked normally so we can't create new malformed values.
         status = fieldchecker::isUpdatable(_toFieldRef);
         if (!status.isOK())
             return status;
@@ -159,15 +157,16 @@ namespace mongo {
 
         // Ensure no array in ancestry if what we found is not at the root
         mutablebson::Element curr = _preparedState->fromElemFound.parent();
-        while (curr.ok()) {
-            if (curr.getType() == Array)
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The source field cannot be an array element, '"
-                              << _fromFieldRef.dottedField() << "' in doc with "
-                              << findElementNamed(root.leftChild(), "_id").toString()
-                              << " has an array field called '" << curr.getFieldName() << "'");
-            curr = curr.parent();
-        }
+        if (curr != curr.getDocument().root())
+            while (curr.ok() && (curr != curr.getDocument().root())) {
+                if (curr.getType() == Array)
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << "The source field cannot be an array element, '"
+                                  << _fromFieldRef.dottedField() << "' in doc with "
+                                  << findElementNamed(root.leftChild(), "_id").toString()
+                                  << " has an array field called '" << curr.getFieldName() << "'");
+                curr = curr.parent();
+            }
 
         // "To" side validation below
 
@@ -176,29 +175,30 @@ namespace mongo {
                                                 &_preparedState->toIdxFound,
                                                 &_preparedState->toElemFound);
 
-        // FindLongestPrefix may say the path does not exist at all, which is fine here, or
-        // that the path was not viable or otherwise wrong, in which case, the mod cannot
-        // proceed.
+        // FindLongestPrefix may return not viable or any other error and then we cannot proceed.
         if (status.code() == ErrorCodes::NonExistentPath) {
-            _preparedState->toElemFound = root.getDocument().end();
+            // Not an error condition as we will create the "to" path as needed.
         } else if (!status.isOK()) {
             return status;
         }
 
-        // Ensure no array in ancestry of to Element
-        // Set to either parent, or node depending if the full path element was found
-        curr = (_preparedState->toElemFound != root.getDocument().end() ?
-                                        _preparedState->toElemFound.parent() :
-                                        _preparedState->toElemFound);
-        curr = _preparedState->toElemFound;
-        while (curr.ok()) {
-            if (curr.getType() == Array)
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The destination field cannot be an array element, '"
-                              << _fromFieldRef.dottedField() << "' in doc with "
-                              << findElementNamed(root.leftChild(), "_id").toString()
-                              << " has an array field called '" << curr.getFieldName() << "'");
-            curr = curr.parent();
+        const bool destExists = _preparedState->toElemFound.ok() &&
+                                (_preparedState->toIdxFound == (_toFieldRef.numParts()-1));
+
+        // Ensure no array in ancestry of "to" Element
+        // Set to either parent, or node depending on if the full path element was found
+        curr = (destExists ? _preparedState->toElemFound.parent() : _preparedState->toElemFound);
+        if (curr != curr.getDocument().root()) {
+            while (curr.ok()) {
+                if (curr.getType() == Array)
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream()
+                                  << "The destination field cannot be an array element, '"
+                                  << _fromFieldRef.dottedField() << "' in doc with "
+                                  << findElementNamed(root.leftChild(), "_id").toString()
+                                  << " has an array field called '" << curr.getFieldName() << "'");
+                curr = curr.parent();
+            }
         }
 
         // We register interest in the field name. The driver needs this info to sort out if

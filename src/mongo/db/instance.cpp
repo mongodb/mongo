@@ -65,6 +65,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/query.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/is_master.h"
@@ -653,17 +654,6 @@ namespace mongo {
                 if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
                     return;
 
-                // See if we have any sharding keys, and if we find that we do, inject them
-                // into the driver. If we don't, the empty BSONObj will reset any shard key
-                // state in the driver.
-                BSONObj shardKeyPattern;
-                if (shardingState.needCollectionMetadata( ns ) ) {
-                    const CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( ns );
-                    if ( metadata )
-                        shardKeyPattern = metadata->getKeyPattern();
-                }
-                driver.refreshShardKeyPattern( shardKeyPattern );
-
                 Client::Context ctx( ns );
 
                 const NamespaceString requestNs(ns);
@@ -674,7 +664,8 @@ namespace mongo {
                 request.setQuery(query);
                 request.setUpdates(toupdate);
                 request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
-
+                UpdateLifecycleImpl updateLifecycle(broadcast, requestNs);
+                request.setLifecycle(&updateLifecycle);
                 UpdateResult res = update(request, &op.debug(), &driver);
 
                 // for getlasterror
@@ -1339,7 +1330,6 @@ namespace {
                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
                             << "*************";
                     }
-
 
                 }
             }

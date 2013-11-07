@@ -183,13 +183,12 @@ namespace {
         status = AuthorizationManager::getBSONForRole(
                 roleGraph, roleToUpdate, roleDocument.root());
         if (status == ErrorCodes::RoleNotFound) {
-            roleDocument.root().appendElement(queryPattern["_id"]);
-            status = driver.createFromQuery(queryPattern, roleDocument);
+            status = driver.populateDocumentWithQueryFields(queryPattern, roleDocument);
         }
         if (!status.isOK())
             return status;
 
-        status = driver.update(StringData(), &roleDocument, NULL);
+        status = driver.update(StringData(), &roleDocument);
         if (!status.isOK())
             return status;
 

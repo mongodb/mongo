@@ -24,6 +24,9 @@ function check( note ){
             return;
         sleep( 200 );
     }
+    lastOpLogEntry = m.getDB("local").oplog.$main.find({op:{$ne:"n"}}).sort({$natural:-1}).limit(-1).next();
+    note = note + tojson(am.a.find().toArray()) + " != " + tojson(as.a.find().toArray())  
+                + "last oplog:" + tojson(lastOpLogEntry);
     assert.eq( x.md5 , y.md5 , note );
 }
 

@@ -235,7 +235,16 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
+        ASSERT_NOT_OK(mod.apply());
+    }
 
+    TEST(IdImmutable, ReplaceIdNumberSameVal){
+        Document doc(fromjson("{_id:1, a:1}"));
+        Mod mod(fromjson("{_id:2}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
         ASSERT_NOT_OK(mod.apply());
     }
 
@@ -246,78 +255,7 @@ namespace {
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_FALSE(execInfo.noOp);
-
         ASSERT_NOT_OK(mod.apply());
-    }
-
-    // Test for bad paths
-    TEST(ValidatePath, FailDottedField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{'a.a':10}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(ValidatePath, FailEmbeddedDottedField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{a:{'a.a':10}}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(ValidatePath, FailDollarPrefixField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{$a:10}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(ValidatePath, FailEmbeddedDollarPrefixField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{a:{$foo:1}}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(ValidatePath, FailArrayIdField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{_id:[9]}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-        input = fromjson("{blah:1, _id:[9]}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(ValidatePath, FailRegexIdField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{_id: /a/}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-        input = fromjson("{foo:1, _id: /a/}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    // These are similar to ones above but are allowed for embedded doc/elements
-    TEST(ValidatePath, EmbeddedArrayIdField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{a: {_id:[10]}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-        input = fromjson("{a: {blah:1, _id:[10]}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(ValidatePath, HasEmbeddedRegexIdField){
-        ModifierObjectReplace mod;
-        BSONObj input = fromjson("{a: {_id: /a/, hi:1}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
-        input = fromjson("{a: {hi:1, _id: /a/}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
-                               ModifierInterface::Options::normal()));
     }
 
 } // unnamed namespace

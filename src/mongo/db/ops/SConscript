@@ -222,6 +222,7 @@ env.CppUnitTest(
     target='update_driver_test',
     source='update_driver_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
         'update_driver',
     ],
 )

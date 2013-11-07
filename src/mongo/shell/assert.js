@@ -308,3 +308,41 @@ assert.close = function(a, b, msg, places){
     doassert(a + " is not equal to " + b + " within " + places +
               " places, diff: " + (a-b) + " : " + msg);
 };
+
+assert.gleSuccess = function(db, msg) {
+    var gle = db.getLastErrorObj();
+    if (gle.err) {
+        if (typeof(msg) == "function") 
+            msg = msg(gle);
+        doassert("getLastError not null:" + tojson(gle) + " :" + msg);
+    }
+}
+
+assert.gleError = function(db, msg) {
+    var gle = db.getLastErrorObj();
+    if (!gle.err) {
+        if (typeof(msg) == "function") 
+            msg = msg(gle);
+        doassert("getLastError is null: " + tojson(gle) + " :" + msg);
+    }
+}
+
+assert.gleErrorCode = function(db, code, msg) {
+    var gle = db.getLastErrorObj();
+    if (gle.err && (gle.code == code)) {
+        if (typeof(msg) == "function") 
+            msg = msg(gle);
+        doassert("getLastError not null or missing code( " + code + "): " 
+                 + tojson(gle) + " :" + msg);
+    }
+}
+
+assert.gleErrorRegex = function(db, regex, msg) {
+    var gle = db.getLastErrorObj();
+    if (!gle.err || !regex.test(gle.err)) {
+        if (typeof(msg) == "function") 
+            msg = msg(gle);
+        doassert("getLastError is null or doesn't match regex (" + regex + "): " 
+                 + tojson(gle) + " :" + msg);
+    }
+}

@@ -103,13 +103,6 @@ namespace {
                                ModifierInterface::Options::normal() ));
     }
 
-    TEST(Init, NotOkForStorage) {
-        BSONObj modObj = fromjson("{$set: {a: {$inc: {b: 1}}}}");
-        ModifierSet mod;
-        ASSERT_NOT_OK(mod.init(modObj["$set"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal() ));
-    }
-
     //
     // Simple Mods
     //

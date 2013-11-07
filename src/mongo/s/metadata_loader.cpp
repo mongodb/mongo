@@ -160,6 +160,7 @@ namespace mongo {
             // Sharded collection, need to load chunks
 
             metadata->_keyPattern = collInfo.getKeyPattern();
+            metadata->fillKeyPatternFields();
             metadata->_shardVersion = ChunkVersion( 0, 0, collInfo.getEpoch() );
             metadata->_collVersion = ChunkVersion( 0, 0, collInfo.getEpoch() );
 
@@ -173,6 +174,7 @@ namespace mongo {
             dassert( collInfo.getPrimary() != "" );
 
             metadata->_keyPattern = BSONObj();
+            metadata->fillKeyPatternFields();
             metadata->_shardVersion = ChunkVersion( 1, 0, collInfo.getEpoch() );
             metadata->_collVersion = metadata->_shardVersion;
 

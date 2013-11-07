@@ -37,6 +37,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
@@ -490,6 +491,9 @@ namespace mongo {
             request.setUpsert( upsert );
             request.setMulti( multi );
             request.setUpdateOpLog();
+            // TODO(greg) We need to send if we are ignoring the shard version below, but for now yes
+            UpdateLifecycleImpl updateLifecycle(true, requestNs);
+            request.setLifecycle(&updateLifecycle);
 
             UpdateResult res = update( request, &opDebug );
 

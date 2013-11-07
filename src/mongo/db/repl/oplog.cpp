@@ -45,6 +45,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replication_server_status.h"
@@ -521,6 +522,8 @@ namespace mongo {
                     request.setUpdates(o);
                     request.setUpsert();
                     request.setFromReplication();
+                    UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                    request.setLifecycle(&updateLifecycle);
 
                     update(request, &debug);
 
@@ -548,6 +551,8 @@ namespace mongo {
                     request.setUpdates(o);
                     request.setUpsert();
                     request.setFromReplication();
+                    UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                    request.setLifecycle(&updateLifecycle);
 
                     update(request, &debug);
                 }
@@ -573,6 +578,8 @@ namespace mongo {
             request.setUpdates(o);
             request.setUpsert(upsert);
             request.setFromReplication();
+            UpdateLifecycleImpl updateLifecycle(true, requestNs);
+            request.setLifecycle(&updateLifecycle);
 
             UpdateResult ur = update(request, &debug);
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,59 +26,39 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/field_checker.h"
+#pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/structure/collection.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
-    using mongoutils::str::stream;
+    class UpdateLifecycle {
+    public:
 
-namespace fieldchecker {
+        virtual ~UpdateLifecycle() {}
 
-    Status isUpdatable(const FieldRef& field) {
-        const size_t numParts = field.numParts();
+        /**
+         * Can the update continue?
+         *
+         * The (only) implementation will check the following:
+         *  1.) Collection still exists
+         *  2.) Shard version has not changed (indicating that the query/update is not valid
+         */
+        virtual const bool canContinue() const = 0;
 
-        if (numParts == 0) {
-            return Status(ErrorCodes::EmptyFieldName,
-                          "An empty update path is not valid.");
-        }
+        /**
+         * Set the out parameter if there is a collection and it has indexes
+         */
+        virtual const void getIndexKeys(IndexPathSet* returnedIndexPathSet) const = 0;
 
-        for (size_t i = 0; i != numParts; ++i) {
-            const StringData part = field.getPart(i);
+        /**
+         * Returns the shard keys as immutable fields
+         * Immutable fields in this case mean that they are required to exist, cannot change values
+         * and must not be multi-valued (in an array, or an array)
+         */
+        virtual const std::vector<FieldRef*>* getImmutableFields() const = 0;
+    };
 
-            if (part.empty()) {
-                return Status(ErrorCodes::EmptyFieldName,
-                              mongoutils::str::stream() << "The update path '"
-                              << field.dottedField()
-                              << "' contains an empty field, which is not allowed.");
-            }
-        }
-
-        return Status::OK();
-    }
-
-    bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
-
-        // 'count' is optional.
-        size_t dummy;
-        if (count == NULL) {
-            count = &dummy;
-        }
-
-        *count = 0;
-        size_t size = fieldRef.numParts();
-        for (size_t i=0; i<size; i++) {
-            StringData fieldPart = fieldRef.getPart(i);
-            if ((fieldPart.size() == 1) && (fieldPart[0] == '$')) {
-                if (*count == 0) *pos = i;
-                (*count)++;
-            }
-        }
-        return *count > 0;
-    }
-
-} // namespace fieldchecker
 } // namespace mongo

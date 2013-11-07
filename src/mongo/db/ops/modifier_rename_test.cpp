@@ -88,23 +88,14 @@ namespace {
     /**
      * These test negative cases:
      *  -- No '$' support for positional operator
-     *  -- Cannot move immutable field, or parts, of '_id' field
      *  -- No empty field names (ex. .a, b. )
-     *  -- Can't rename to an invalid fieldname.
+     *  -- Can't rename to an invalid fieldname (empty fieldname part)
      */
     TEST(InvalidInit, FromDbTests) {
         ModifierRename mod;
         ASSERT_NOT_OK(mod.init(fromjson("{'a.$':'b'}").firstElement(),
                                ModifierInterface::Options::normal()));
         ASSERT_NOT_OK(mod.init(fromjson("{'a':'b.$'}").firstElement(),
-                               ModifierInterface::Options::normal()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'_id.a':'b'}").firstElement(),
-                               ModifierInterface::Options::normal()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'b':'_id.a'}").firstElement(),
-                               ModifierInterface::Options::normal()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'_id.a':'_id.b'}").firstElement(),
-                               ModifierInterface::Options::normal()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'_id.b':'_id.a'}").firstElement(),
                                ModifierInterface::Options::normal()));
         ASSERT_NOT_OK(mod.init(fromjson("{'.b':'a'}").firstElement(),
                                ModifierInterface::Options::normal()));
@@ -113,8 +104,6 @@ namespace {
         ASSERT_NOT_OK(mod.init(fromjson("{'b':'.a'}").firstElement(),
                                ModifierInterface::Options::normal()));
         ASSERT_NOT_OK(mod.init(fromjson("{'b':'a.'}").firstElement(),
-                               ModifierInterface::Options::normal()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'a':'$a'}").firstElement(),
                                ModifierInterface::Options::normal()));
     }
 
@@ -319,6 +308,51 @@ namespace {
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_NOT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    }
+
+    TEST(Arrays, ReplaceArrayField) {
+        Document doc(fromjson("{a: 2, b: []}"));
+        Mod setMod(fromjson("{$rename: {'a':'b'}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(doc, fromjson("{b:2}"));
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        BSONObj logObj = fromjson("{$set:{ 'b': 2}, $unset: {'a': true}}");
+        ASSERT_OK(setMod.log(&logBuilder));
+        ASSERT_EQUALS(logDoc, logObj);
+    }
+
+
+    TEST(Arrays, ReplaceWithArrayField) {
+        Document doc(fromjson("{a: [], b: 2}"));
+        Mod setMod(fromjson("{$rename: {'a':'b'}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(doc, fromjson("{b:[]}"));
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        BSONObj logObj = fromjson("{$set:{ 'b': []}, $unset: {'a': true}}");
+        ASSERT_OK(setMod.log(&logBuilder));
+        ASSERT_EQUALS(logDoc, logObj);
     }
 
     TEST(LegacyData, CanRenameFromInvalidFieldName) {

@@ -91,24 +91,6 @@ namespace mongo {
                                         << modExpr.type());
         }
 
-        if (opts.enforceOkForStorage) {
-            Status s = modExpr.embeddedObject().storageValid();
-            if (!s.isOK())
-                return s;
-        } else {
-            // storageValid checks for $-prefixed field names, so only run if we didn't do that.
-            BSONObjIterator it(modExpr.embeddedObject());
-            while (it.more()) {
-                BSONElement elem = it.next();
-                if (*elem.fieldName() == '$') {
-                    return Status(ErrorCodes::BadValue,
-                                  str::stream() << "A replace document can't"
-                                                   " contain update modifiers: "
-                                                << elem.fieldNameStringData());
-                }
-            }
-        }
-
         // We make a copy of the object here because the update driver does not guarantees, in
         // the case of object replacement, that the modExpr is going to outlive this mod.
         _val = modExpr.embeddedObject().getOwned();
@@ -165,6 +147,10 @@ namespace mongo {
 
                 // Do not duplicate _id field
                 if (srcIdElement.ok()) {
+                    if (srcIdElement.compareWithBSONElement(dstIdElement, true) != 0) {
+                        return Status(ErrorCodes::ImmutableField,
+                                      "The _id field cannot be changed.");
+                    }
                     continue;
                 }
             }
