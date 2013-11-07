@@ -56,7 +56,7 @@ assert.eq(passwordHash('andy', 'newpassword'), userObj['credentials']['MONGODB-C
 assert.throws(function() {db.addUser({user:'andy', pwd:'password', roles:['read']});});
 
 // Create valid extended form external user
-db.getSiblingDB("$external").addUser({user:'spencer', roles:['readWrite']});
+db.getSiblingDB("$external").addUser({user:'spencer', roles:[{role: 'readWrite', db:'test'}]});
 assert.eq(2, admin.system.users.count());
 userObj = admin.system.users.findOne({user:'spencer', db:'$external'});
 assert.eq('spencer', userObj['user']);

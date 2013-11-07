@@ -1252,6 +1252,13 @@ namespace mongo {
                 return false;
             }
 
+            if (args.roleName.getDB() == "$external") {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "Cannot create roles in the $external database"),
+                          result);
+                return false;
+            }
+
             if (!args.hasRoles) {
                 addStatus(Status(ErrorCodes::BadValue,
                                  "\"createRole\" command requires a \"roles\" array"),

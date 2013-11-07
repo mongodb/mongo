@@ -656,6 +656,10 @@ namespace {
     }
 
     bool RoleGraph::isBuiltinRole(const RoleName& role) {
+        if (!NamespaceString::validDBName(role.getDB()) || role.getDB() == "$external") {
+            return false;
+        }
+
         bool isAdminDB = role.getDB() == ADMIN_DBNAME;
 
         if (role.getRole() == BUILTIN_ROLE_READ) {
