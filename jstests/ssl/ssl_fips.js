@@ -5,7 +5,7 @@ var baseName = "jstests_ssl_ssl_fips";
 
 
 var md = startMongod("--port", port1, "--dbpath",
-                     MongoRunner.dataPath + baseName, "--sslOnNormalPorts",
+                     MongoRunner.dataPath + baseName, "--sslMode", "sslOnly",
                      "--sslPEMKeyFile", "jstests/libs/server.pem",
                      "--sslFIPSMode");
 
