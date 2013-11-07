@@ -78,8 +78,6 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
-	uint32_t	force_evict_attempts;
-
 	/* Requested notification when transactions are resolved. */
 	WT_TXN_NOTIFY *notify;
 
