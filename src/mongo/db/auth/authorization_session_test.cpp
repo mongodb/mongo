@@ -181,6 +181,29 @@ namespace {
                              testFooCollResource, ActionType::collMod));
     }
 
+    TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
+        // Add a user with doubled-up readWrite and single dbAdmin on the test DB
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("user" << "spencer" <<
+                     "db" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
+                                                "db" << "test") <<
+                                           BSON("role" << "dbAdmin" <<
+                                                "db" << "test") <<
+                                           BSON("role" << "readWrite" <<
+                                                "db" << "test"))),
+                BSONObj()));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+
+        ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
+                            testFooCollResource, ActionType::insert));
+        ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
+                            testDBResource, ActionType::dbStats));
+        ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
+                             otherFooCollResource, ActionType::insert));
+    }
+
     TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("user" << "rw" <<

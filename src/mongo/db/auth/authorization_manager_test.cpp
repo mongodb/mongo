@@ -232,7 +232,6 @@ namespace {
     }
 
     TEST_F(AuthorizationManagerTest, initializeAllV1UserData) {
-        return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
@@ -376,16 +375,22 @@ namespace {
     class AuthzUpgradeTest : public AuthorizationManagerTest {
     public:
         void setUpV1UserData() {
+
+            // Docs for "readOnly@test"
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readOnly" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("read")),
                               BSONObj()));
+
+            // Docs for "clusterAdmin@$external"
             ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
                               BSON("user" << "clusterAdmin" <<
                                    "userSource" << "$external" <<
                                    "roles" << BSON_ARRAY("clusterAdmin")),
                               BSONObj()));
+
+            // Docs for "readWriteMultiDB@test"
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readWriteMultiDB" <<
                                    "pwd" << "password" <<
@@ -397,6 +402,39 @@ namespace {
                                    "roles" << BSON_ARRAY("readWrite")),
                               BSONObj()));
 
+            // Docs for otherdbroles@test
+            ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
+                              BSON("user" << "otherdbroles" <<
+                                   "pwd" << "password" <<
+                                   "roles" << BSON_ARRAY("readWrite")),
+                              BSONObj()));
+            ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
+                              BSON("user" << "otherdbroles" <<
+                                   "userSource" << "test" <<
+                                   "roles" << BSONArray() <<
+                                   "otherDBRoles" << BSON("test3" << BSON_ARRAY("readWrite"))),
+                              BSONObj()));
+
+            // Docs for mixedroles@test
+            ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
+                              BSON("user" << "mixedroles" <<
+                                   "pwd" << "password" <<
+                                   "roles" << BSON_ARRAY("readWrite")),
+                              BSONObj()));
+            ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
+                              BSON("user" << "mixedroles" <<
+                                   "userSource" << "test" <<
+                                   "roles" << BSONArray() <<
+                                   "otherDBRoles" << BSON("test3" << BSON_ARRAY("readWrite" <<
+                                                                                "dbAdmin") <<
+                                                          "test2" << BSON_ARRAY("readWrite"))),
+                              BSONObj()));
+            ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
+                              BSON("user" << "mixedroles" <<
+                                   "userSource" << "test" <<
+                                   "roles" << BSON_ARRAY("readWrite")),
+                              BSONObj()));
+
             ASSERT_OK(authzManager->initialize());
         }
 
@@ -404,7 +442,7 @@ namespace {
             BSONObj doc;
 
             // Verify that the expected users are present.
-            ASSERT_EQUALS(1U, externalState->getCollectionContents(collectionName).size());
+            ASSERT_EQUALS(3U, externalState->getCollectionContents(collectionName).size());
             ASSERT_OK(externalState->findOne(collectionName,
                                              BSON("user" << "clusterAdmin" <<
                                                   "userSource" << "$external"),
@@ -414,6 +452,20 @@ namespace {
             ASSERT_TRUE(doc["pwd"].eoo());
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
             ASSERT_EQUALS("clusterAdmin", doc["roles"].Array()[0].str());
+
+            ASSERT_OK(externalState->findOne(collectionName,
+                                             BSON("user" << "otherdbroles" <<
+                                                  "userSource" << "test"),
+                                             &doc));
+            ASSERT_TRUE(doc["pwd"].eoo());
+            ASSERT_EQUALS(0U, doc["roles"].Array().size());
+
+            ASSERT_OK(externalState->findOne(collectionName,
+                                             BSON("user" << "mixedroles" <<
+                                                  "userSource" << "test"),
+                                             &doc));
+            ASSERT_TRUE(doc["pwd"].eoo());
+            ASSERT_EQUALS(0U, doc["roles"].Array().size());
         }
 
         void validateV2UserData() {
@@ -431,10 +483,12 @@ namespace {
                                   AuthorizationManager::versionCollectionNamespace).size());
 
             // Verify that the expected users are present.
-            ASSERT_EQUALS(3U, externalState->getCollectionContents(
+            ASSERT_EQUALS(5U, externalState->getCollectionContents(
                                   AuthorizationManager::usersAltCollectionNamespace).size());
-            ASSERT_EQUALS(3U, externalState->getCollectionContents(
+            ASSERT_EQUALS(5U, externalState->getCollectionContents(
                                   AuthorizationManager::usersCollectionNamespace).size());
+
+            // "readOnly@test" user
             ASSERT_OK(externalState->findOne(AuthorizationManager::usersCollectionNamespace,
                                              BSON("user" << "readOnly" << "db" << "test"),
                                              &doc));
@@ -443,6 +497,7 @@ namespace {
             ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
 
+            // "clusterAdmin@$external" user
             ASSERT_OK(externalState->findOne(
                               AuthorizationManager::usersCollectionNamespace,
                               BSON("user" << "clusterAdmin" << "db" << "$external"),
@@ -451,6 +506,7 @@ namespace {
             ASSERT_EQUALS("$external", doc["db"].str());
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
 
+            // "readWriteMultiDB@test" user
             ASSERT_OK(externalState->findOne(
                               AuthorizationManager::usersCollectionNamespace,
                               BSON("user" << "readWriteMultiDB" << "db" << "test"),
@@ -459,6 +515,42 @@ namespace {
             ASSERT_EQUALS("test", doc["db"].str());
             ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
             ASSERT_EQUALS(2U, doc["roles"].Array().size());
+
+            // "otherdbroles@test" user
+            ASSERT_OK(externalState->findOne(
+                              AuthorizationManager::usersCollectionNamespace,
+                              BSON("user" << "otherdbroles" << "db" << "test"),
+                              &doc));
+            ASSERT_EQUALS("test.otherdbroles", doc["_id"].str());
+            ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
+            std::vector<BSONElement> roles = doc["roles"].Array();
+            std::set<std::pair<std::string, std::string> > rolePairs;
+            for (size_t i = 0; i < roles.size(); ++i) {
+                BSONElement roleElement = roles[i];
+                rolePairs.insert(make_pair(roleElement["role"].str(), roleElement["db"].str()));
+            }
+            ASSERT_EQUALS(2U, rolePairs.size());
+            ASSERT_EQUALS(1U, rolePairs.count(make_pair("readWrite", "test")));
+            ASSERT_EQUALS(1U, rolePairs.count(make_pair("readWrite", "test3")));
+
+            // "mixedroles@test" user
+            ASSERT_OK(externalState->findOne(
+                              AuthorizationManager::usersCollectionNamespace,
+                              BSON("user" << "mixedroles" << "db" << "test"),
+                              &doc));
+            ASSERT_EQUALS("test.mixedroles", doc["_id"].str());
+            ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
+            rolePairs.clear();
+            roles = doc["roles"].Array();
+            for (size_t i = 0; i < roles.size(); ++i) {
+                BSONElement roleElement = roles[i];
+                rolePairs.insert(make_pair(roleElement["role"].str(), roleElement["db"].str()));
+            }
+            ASSERT_EQUALS(4U, rolePairs.size());
+            ASSERT_EQUALS(1U, rolePairs.count(make_pair("readWrite", "test")));
+            ASSERT_EQUALS(1U, rolePairs.count(make_pair("readWrite", "test2")));
+            ASSERT_EQUALS(1U, rolePairs.count(make_pair("readWrite", "test3")));
+            ASSERT_EQUALS(1U, rolePairs.count(make_pair("dbAdmin", "test3")));
         }
 
         void upgradeAuthCollections() {
@@ -472,7 +564,6 @@ namespace {
     };
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2Clean) {
-        return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
         setUpV1UserData();
         upgradeAuthCollections();
@@ -482,7 +573,6 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2WithSysVerDoc) {
-        return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
         setUpV1UserData();
         upgradeAuthCollections();
@@ -492,7 +582,6 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2FailsWithBadInitialVersionDoc) {
-        return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
         setUpV1UserData();
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
