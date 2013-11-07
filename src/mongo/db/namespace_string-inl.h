@@ -182,4 +182,8 @@ namespace mongo {
         return db().toString() + ".system.indexes";
     }
 
+    inline std::string NamespaceString::getCommandNS() const {
+        return db().toString() + ".$cmd";
+    }
+
 }

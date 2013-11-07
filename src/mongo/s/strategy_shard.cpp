@@ -1309,11 +1309,23 @@ namespace mongo {
                 if ( fromWBL ) return;
 
                 auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( r.m() ) );
+
+                // Adjust namespaces for command
+                NamespaceString fullNS( request->getNS() );
+                string cmdNS = fullNS.getCommandNS();
+                // We only pass in collection name to command
+                request->setNS( fullNS.coll() );
+
+                BSONObjBuilder builder;
+                BSONObj requestBSON = request->toBSON();
+                Command::runAgainstRegistered( cmdNS.c_str(), requestBSON, builder, 0 );
+
                 BatchedCommandResponse response;
+                bool parsed = response.parseBSON( builder.obj(), NULL );
+                (void)parsed;
+                dassert( parsed && response.isValid( NULL ) );
 
-                clusterWrite( *request, &response, true /* autosplit */);
-
-                LastError* lastErrorForRequest = lastError.get( false /* don't create */);
+                LastError* lastErrorForRequest = lastError.get( false /* don't create */ );
                 dassert( lastErrorForRequest );
 
                 batchErrorToLastError( *request, response, lastErrorForRequest );

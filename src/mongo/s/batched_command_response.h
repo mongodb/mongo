@@ -144,7 +144,7 @@ namespace mongo {
         string _errMessage;
         bool _isErrMessageSet;
 
-        // (M)  number of documents affected
+        // (O)  number of documents affected
         long long _n;
         bool _isNSet;
 

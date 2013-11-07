@@ -23,7 +23,7 @@ namespace mongo {
 
     using mongoutils::str::stream;
         const BSONField<int> BatchedErrorDetail::index("index");
-        const BSONField<int> BatchedErrorDetail::errCode("errCode");
+        const BSONField<int> BatchedErrorDetail::errCode("code");
         const BSONField<BSONObj> BatchedErrorDetail::errInfo("errInfo");
         const BSONField<std::string> BatchedErrorDetail::errMessage("errmsg");
 

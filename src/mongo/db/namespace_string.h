@@ -100,6 +100,9 @@ namespace mongo {
         // @return db() + ".system.indexes"
         std::string getSystemIndexesCollection() const;
 
+        // @return db() + ".$cmd"
+        std::string getCommandNS() const;
+
         /**
          * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
          * which do not contain BSON objects in their records. ("oplog.$main" is the exception)

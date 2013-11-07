@@ -24,10 +24,10 @@ namespace mongo {
     using mongoutils::str::stream;
 
     const BSONField<int> BatchedCommandResponse::ok("ok");
-    const BSONField<int> BatchedCommandResponse::errCode("errCode");
+    const BSONField<int> BatchedCommandResponse::errCode("code", ErrorCodes::UnknownError);
     const BSONField<BSONObj> BatchedCommandResponse::errInfo("errInfo");
     const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
-    const BSONField<long long> BatchedCommandResponse::n("n");
+    const BSONField<long long> BatchedCommandResponse::n("n", 0);
     const BSONField<BSONObj> BatchedCommandResponse::singleUpserted("upserted");
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
@@ -52,12 +52,6 @@ namespace mongo {
         // All the mandatory fields must be present.
         if (!_isOkSet) {
             *errMsg = stream() << "missing " << ok.name() << " field";
-            return false;
-        }
-
-        // All the mandatory fields must be present.
-        if (!_isNSet) {
-            *errMsg = stream() << "missing " << n.name() << " field";
             return false;
         }
 
@@ -122,7 +116,7 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, ok, &_ok, errMsg);
+        fieldState = FieldParser::extractNumber(source, ok, &_ok, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isOkSet = fieldState == FieldParser::FIELD_SET;
 
@@ -296,8 +290,12 @@ namespace mongo {
     }
 
     int BatchedCommandResponse::getErrCode() const {
-        dassert(_isErrCodeSet);
-        return _errCode;
+        if ( _isErrCodeSet ) {
+            return _errCode;
+        }
+        else {
+            return errCode.getDefault();
+        }
     }
 
     void BatchedCommandResponse::setErrInfo(const BSONObj& errInfo) {
@@ -350,8 +348,12 @@ namespace mongo {
     }
 
     long long BatchedCommandResponse::getN() const {
-        dassert(_isNSet);
-        return _n;
+        if ( _isNSet ) {
+            return _n;
+        }
+        else {
+            return n.getDefault();
+        }
     }
 
     void BatchedCommandResponse::setSingleUpserted(const BSONObj& singleUpserted) {
