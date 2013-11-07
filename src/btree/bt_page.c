@@ -31,9 +31,11 @@ __wt_page_in_func(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_TXN *txn;
+	WT_TXN_STATE *txn_state;
 	int busy, oldgen;
 
 	txn = &session->txn;
+	txn_state = &S2C(session)->txn_global.states[session->id];
 
 	for (oldgen = 0;;) {
 		switch (ref->state) {
@@ -82,19 +84,18 @@ __wt_page_in_func(
 			 * That is, if the updates on the page are visible to
 			 * the running transaction.
 			 */
-			if (txn->force_evict_attempts < 4 &&
+			if (txn->force_evict_attempts < 20 &&
 			    __wt_eviction_page_force(session, page) &&
-			    (page->modify == NULL ||
-			    !F_ISSET(&session->txn, TXN_RUNNING) ||
+			    (txn_state->snap_min == WT_TXN_NONE ||
+			    page->modify == NULL ||
 			    TXNID_LT(page->modify->update_txn,
-			    session->txn.snap_min))) {
+			    txn_state->snap_min))) {
 				__wt_txn_update_oldest(session);
+				++txn->force_evict_attempts;
 				if (page->modify == NULL ||
 				    __wt_txn_visible_all(session,
-				    page->modify->update_txn)) {
-					++txn->force_evict_attempts;
+				    page->modify->update_txn))
 					page->read_gen = WT_READ_GEN_OLDEST;
-				}
 				WT_RET(__wt_page_release(session, page));
 				break;
 			}
