@@ -80,7 +80,17 @@ namespace QueryTests {
             insert( fromjson( s ) );
         }
         void insert( const BSONObj &o ) {
-            _collection->insertDocument( o, true );
+            if ( o["_id"].eoo() ) {
+                BSONObjBuilder b;
+                OID oid;
+                oid.init();
+                b.appendOID( "_id", &oid );
+                b.appendElements( o );
+                _collection->insertDocument( b.obj(), false );
+            }
+            else {
+                _collection->insertDocument( o, false );
+            }
         }
     };
 

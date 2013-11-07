@@ -66,6 +66,34 @@ namespace mongo {
         _magic = 0;
     }
 
+    bool Collection::requiresIdIndex() const {
+
+        if ( _ns.ns().find( '$' ) != string::npos ) {
+            // no indexes on indexes
+            return false;
+        }
+
+        if ( _ns == _database->_namespacesName ||
+             _ns == _database->_indexesName ||
+             _ns == _database->_extentFreelistName ||
+             _ns == _database->_profileName ) {
+            return false;
+        }
+
+        if ( _ns.db() == "local" ) {
+            if ( _ns.coll().startsWith( "oplog." ) )
+                return false;
+        }
+
+        if ( !_ns.isSystem() ) {
+            // non system collections definitely have an _id index
+            return true;
+        }
+
+
+        return true;
+    }
+
     CollectionIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
                                                      const CollectionScanParams::Direction& dir) const {
         verify( ok() );
@@ -80,6 +108,14 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
+
+        if ( requiresIdIndex() ) {
+            if ( docToInsert["_id"].eoo() ) {
+                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                            "Collection::insertDocument got document without _id" );
+            }
+        }
+
         int lenWHdr = _details->getRecordAllocationSize( docToInsert.objsize() + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( docToInsert.objsize() + Record::HeaderSize ) );
 

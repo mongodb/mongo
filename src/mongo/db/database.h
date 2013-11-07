@@ -223,6 +223,7 @@ namespace mongo {
         CollectionMap _collections;
         mutex _collectionLock;
 
+        friend class Collection;
         friend class NamespaceDetails;
         friend class IndexDetails;
         friend class IndexCatalog;

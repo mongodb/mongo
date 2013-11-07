@@ -575,6 +575,17 @@ namespace mongo {
             collection->increaseStorageSize( Extent::initialSize( 128 ), false );
         }
 
+        if ( collection->requiresIdIndex() ) {
+            if ( options &&
+                 options->getField("autoIndexId").type() &&
+                 !options->getField("autoIndexId").trueValue() ) {
+                // do not create
+            }
+            else {
+                uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
+            }
+        }
+
         return collection;
     }
 

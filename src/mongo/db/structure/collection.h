@@ -79,6 +79,8 @@ namespace mongo {
         const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
         IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
 
+        bool requiresIdIndex() const;
+
         BSONObj docFor( const DiskLoc& loc );
 
         // ---- things that should move to a CollectionAccessMethod like thing
