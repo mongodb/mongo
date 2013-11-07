@@ -161,13 +161,17 @@ namespace {
                               authzVersion);
             }
 
-            status = _findUser(
+            status = findOne(
                     (authzVersion == AuthorizationManager::schemaVersion26Final ?
-                     AuthorizationManager::usersCollectionNamespace.ns() :
-                     AuthorizationManager::usersAltCollectionNamespace.ns()),
+                     AuthorizationManager::usersCollectionNamespace :
+                     AuthorizationManager::usersAltCollectionNamespace),
                     BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
                          AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
                     &userDoc);
+            if (status == ErrorCodes::NoMatchingDocument) {
+                status = Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
+                                "Could not find description of user " << userName.getFullName());
+            }
             if (!status.isOK())
                 return status;
         }
@@ -273,13 +277,14 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
-                                                      const BSONObj& query,
-                                                      BSONObj* result) {
-        Client::ReadContext ctx(usersNamespace);
+    Status AuthzManagerExternalStateMongod::findOne(const NamespaceString& collectionName,
+                                                    const BSONObj& query,
+                                                    BSONObj* result) {
+        Client::ReadContext ctx(collectionName);
 
-        if (!Helpers::findOne(usersNamespace, query, *result)) {
-            return userNotFoundStatus;
+        if (!Helpers::findOne(collectionName.ns(), query, *result)) {
+            return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
+                          "No document in " << collectionName.ns() << " matches " << query);
         }
         *result = result->getOwned();
         return Status::OK();
@@ -304,24 +309,6 @@ namespace {
         Lock::GlobalRead lk;
         getDatabaseNames(*dbnames);
         return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMongod::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname, std::vector<BSONObj>* privDocs) {
-        std::string usersNamespace = dbname + ".system.users";
-
-        Client::ReadContext ctx(usersNamespace);
-
-        // TODO(spencer): This is not safe as the BSONObjs in the resulting list may not be owned
-        *privDocs = Helpers::findAll(usersNamespace, BSONObj());
-        return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMongod::findOne(
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            BSONObj* result) {
-        fassertFailed(17091);
     }
 
     Status AuthzManagerExternalStateMongod::insert(
@@ -415,24 +402,10 @@ namespace {
         fassertFailed(17095);
     }
 
-    Status AuthzManagerExternalStateMongod::dropCollection(
+    Status AuthzManagerExternalStateMongod::dropIndexes(
             const NamespaceString& collectionName,
             const BSONObj& writeConcern) {
-        fassertFailed(17096);
-    }
-
-    Status AuthzManagerExternalStateMongod::renameCollection(
-            const NamespaceString& oldName,
-            const NamespaceString& newName,
-            const BSONObj& writeConcern) {
-        fassertFailed(17097);
-    }
-
-    Status AuthzManagerExternalStateMongod::copyCollection(
-            const NamespaceString& fromName,
-            const NamespaceString& toName,
-            const BSONObj& writeConcern) {
-        fassertFailed(17098);
+        fassertFailed(0);
     }
 
     bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {

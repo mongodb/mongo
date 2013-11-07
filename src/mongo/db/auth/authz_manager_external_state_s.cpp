@@ -45,10 +45,6 @@
 
 namespace mongo {
 
-namespace {
-    static Status userNotFoundStatus(ErrorCodes::UserNotFound, "User not found");
-}
-
     AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() {}
 
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
@@ -176,16 +172,17 @@ namespace {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::_findUser(const string& usersNamespace,
-                                                      const BSONObj& query,
-                                                      BSONObj* result) {
+    Status AuthzManagerExternalStateMongos::findOne(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            BSONObj* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::usersCollectionNamespace));
-            *result = conn->get()->findOne(usersNamespace, query).getOwned();
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            *result = conn->get()->findOne(collectionName, query).getOwned();
             conn->done();
             if (result->isEmpty()) {
-                return userNotFoundStatus;
+                return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
+                              "No document in " << collectionName.ns() << " matches " << query);
             }
             return Status::OK();
         } catch (const DBException& e) {
@@ -228,30 +225,6 @@ namespace {
         } catch (const DBException& e) {
             return e.toStatus();
         }
-    }
-
-    Status AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname, std::vector<BSONObj>* privDocs) {
-        try {
-            NamespaceString usersNamespace(dbname, "system.users");
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(usersNamespace));
-            auto_ptr<DBClientCursor> c = conn->get()->query(usersNamespace, Query());
-
-            while (c->more()) {
-                privDocs->push_back(c->nextSafe().getOwned());
-            }
-            conn->done();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
-    Status AuthzManagerExternalStateMongos::findOne(
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            BSONObj* result) {
-        fassertFailed(17101);
     }
 
     Status AuthzManagerExternalStateMongos::insert(
@@ -351,26 +324,55 @@ namespace {
             const BSONObj& pattern,
             bool unique,
             const BSONObj& writeConcern) {
-        fassertFailed(17105);
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+
+            if (conn->get()->ensureIndex(collectionName.ns(), pattern, unique)) {
+
+                // Handle write concern
+                BSONObjBuilder gleBuilder;
+                gleBuilder.append("getLastError", 1);
+                gleBuilder.appendElements(writeConcern);
+                BSONObj res;
+                conn->get()->runCommand("admin", gleBuilder.done(), res);
+                string err = conn->get()->getLastErrorString(res);
+
+                if (!err.empty()) {
+                    conn->done();
+                    return Status(ErrorCodes::UnknownError, err);
+                }
+            }
+            conn->done();
+            return Status::OK();
+
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
     }
 
-    Status AuthzManagerExternalStateMongos::dropCollection(
-            const NamespaceString& collectionName, const BSONObj& writeConcern) {
-        fassertFailed(17106);
-    }
-
-    Status AuthzManagerExternalStateMongos::renameCollection(
-            const NamespaceString& oldName,
-            const NamespaceString& newName,
+    Status AuthzManagerExternalStateMongos::dropIndexes(
+            const NamespaceString& collectionName,
             const BSONObj& writeConcern) {
-        fassertFailed(17107);
-    }
 
-    Status AuthzManagerExternalStateMongos::copyCollection(
-            const NamespaceString& fromName,
-            const NamespaceString& toName,
-            const BSONObj& writeConcern) {
-        fassertFailed(17108);
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+        try {
+            conn->get()->dropIndexes(collectionName.ns());
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
+            string errstr = conn->get()->getLastErrorString(res);
+            if (!errstr.empty()) {
+                conn->done();
+                return Status(ErrorCodes::UnknownError, errstr);
+            }
+            conn->done();
+            return Status::OK();
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
     }
 
     bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(const StringData& why) {

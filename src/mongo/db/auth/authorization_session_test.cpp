@@ -41,13 +41,16 @@ namespace {
 
         void setFindsShouldFail(bool enable) { _findsShouldFail = enable; }
 
-        virtual Status _findUser(const std::string& usersNamespace,
-                                 const BSONObj& query,
-                                 BSONObj* result) {
-            if (_findsShouldFail) {
-                return Status(ErrorCodes::UnknownError, "_findUser set to fail in mock.");
+        virtual Status findOne(const NamespaceString& collectionName,
+                               const BSONObj& query,
+                               BSONObj* result) {
+            if (_findsShouldFail &&
+                collectionName == AuthorizationManager::usersCollectionNamespace) {
+
+                return Status(ErrorCodes::UnknownError,
+                              "findOne on admin.system.users set to fail in mock.");
             }
-            return AuthzManagerExternalStateMock::_findUser(usersNamespace, query, result);
+            return AuthzManagerExternalStateMock::findOne(collectionName, query, result);
         }
 
     private:

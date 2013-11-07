@@ -54,9 +54,9 @@ namespace mongo {
         }
 
         // Build the query needed to get the privilege document
-        std::string usersNamespace;
+
         BSONObjBuilder queryBuilder;
-        usersNamespace = mongoutils::str::stream() << dbname << ".system.users";
+        const NamespaceString usersNamespace(dbname, "system.users");
         queryBuilder.append(AuthorizationManager::V1_USER_NAME_FIELD_NAME, userName.getUser());
         if (dbname == userName.getDB()) {
             queryBuilder.appendNull(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME);
@@ -67,13 +67,13 @@ namespace mongo {
 
         // Query for the privilege document
         BSONObj userBSONObj;
-        Status found = _findUser(usersNamespace, queryBuilder.done(), &userBSONObj);
+        Status found = findOne(usersNamespace, queryBuilder.done(), &userBSONObj);
         if (!found.isOK()) {
-            if (found.code() == ErrorCodes::UserNotFound) {
+            if (found.code() == ErrorCodes::NoMatchingDocument) {
                 // Return more detailed status that includes user name.
                 return Status(ErrorCodes::UserNotFound,
                               mongoutils::str::stream() << "auth: couldn't find user " <<
-                                      userName.toString() << ", " << usersNamespace,
+                              userName.toString() << ", " << usersNamespace.ns(),
                               0);
             } else {
                 return found;
@@ -85,11 +85,11 @@ namespace mongo {
     }
 
     bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() {
-        std::string usersNamespace = "admin.system.users";
-
         BSONObj userBSONObj;
-        BSONObj query;
-        return _findUser(usersNamespace, query, &userBSONObj).isOK();
+        return findOne(
+                AuthorizationManager::usersCollectionNamespace,
+                BSONObj(),
+                &userBSONObj).isOK();
     }
 
 

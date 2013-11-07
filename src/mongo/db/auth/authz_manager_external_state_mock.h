@@ -50,7 +50,8 @@ namespace mongo {
 
     public:
 
-        AuthzManagerExternalStateMock() {};
+        AuthzManagerExternalStateMock();
+        virtual ~AuthzManagerExternalStateMock();
 
         void setAuthzVersion(int v) { _authzVersion = v; }
 
@@ -76,13 +77,6 @@ namespace mongo {
         void clearPrivilegeDocuments();
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
-
-        virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
-                                                  std::vector<BSONObj>* privDocs);
-
-        virtual Status _findUser(const std::string& usersNamespace,
-                                 const BSONObj& query,
-                                 BSONObj* result);
 
         virtual Status findOne(const NamespaceString& collectionName,
                                const BSONObj& query,
@@ -120,17 +114,14 @@ namespace mongo {
                                    const BSONObj& pattern,
                                    bool unique,
                                    const BSONObj& writeConcern);
-        virtual Status dropCollection(const NamespaceString& collectionName,
-                                      const BSONObj& writeConcern);
-        virtual Status renameCollection(const NamespaceString& oldName,
-                                        const NamespaceString& newName,
-                                        const BSONObj& writeConcern);
-        virtual Status copyCollection(const NamespaceString& fromName,
-                                      const NamespaceString& toName,
-                                      const BSONObj& writeConcern);
+        virtual Status dropIndexes(const NamespaceString& collectionName,
+                                   const BSONObj& writeConcern);
         virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
         virtual void releaseAuthzUpdateLock();
 
+        Status _findUser(const std::string& usersNamespace,
+                                 const BSONObj& query,
+                                 BSONObj* result);
         std::vector<BSONObj> getCollectionContents(const NamespaceString& collectionName);
 
     private:

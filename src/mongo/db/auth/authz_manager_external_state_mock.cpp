@@ -79,6 +79,8 @@ namespace {
     }
 }  // namespace
 
+    AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() {}
+    AuthzManagerExternalStateMock::~AuthzManagerExternalStateMock() {}
 
     Status AuthzManagerExternalStateMock::initialize() {
         return Status::OK();
@@ -187,28 +189,16 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMock::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname, BSONObjCollection* privDocs) {
-        NamespaceDocumentMap::const_iterator iter =
-            _documents.find(NamespaceString(dbname + ".system.users"));
-        if (iter == _documents.end())
-            return Status::OK();  // No system.users collection in DB "dbname".
-        const BSONObjCollection& dbDocs = iter->second;
-        for (BSONObjCollection::const_iterator it = dbDocs.begin(); it != dbDocs.end(); ++it) {
-            privDocs->push_back(*it);
-        }
-        return Status::OK();
-    }
-
     Status AuthzManagerExternalStateMock::_findUser(
             const std::string& usersNamespace,
             const BSONObj& query,
             BSONObj* result) {
-        if (!findOne(NamespaceString(usersNamespace), query, result).isOK()) {
-            return Status(ErrorCodes::UserNotFound,
-                          "No matching user for query " + query.toString());
+        Status status = findOne(NamespaceString(usersNamespace), query, result);
+        if (status == ErrorCodes::NoMatchingDocument) {
+            status = Status(ErrorCodes::UserNotFound,
+                            "No matching user for query " + query.toString());
         }
-        return Status::OK();
+        return status;
     }
 
     Status AuthzManagerExternalStateMock::findOne(
@@ -332,36 +322,9 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMock::dropCollection(const NamespaceString& collectionName,
-                                                         const BSONObj&) {
-        _documents.erase(collectionName);
-        return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMock::renameCollection(const NamespaceString& oldName,
-                                                           const NamespaceString& newName,
-                                                           const BSONObj& writeConcern) {
-        if (_documents.count(oldName) == 0) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          "No collection to rename named " + oldName.ns());
-        }
-        std::swap(_documents[newName], _documents[oldName]);
-        return dropCollection(oldName, writeConcern);
-    }
-
-    Status AuthzManagerExternalStateMock::copyCollection(const NamespaceString& fromName,
-                                                         const NamespaceString& toName,
-                                                         const BSONObj&) {
-        if (_documents.count(fromName) == 0) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          "No collection to copy named " + fromName.ns());
-        }
-        if (_documents.count(toName) > 0) {
-            return Status(ErrorCodes::NamespaceExists,
-                          "Cannot copy into existing namespace " + fromName.ns());
-        }
-
-        _documents[toName] = _documents[fromName];
+    Status AuthzManagerExternalStateMock::dropIndexes(
+            const NamespaceString& collectionName,
+            const BSONObj& writeConcern) {
         return Status::OK();
     }
 
@@ -405,8 +368,7 @@ namespace {
 
         NamespaceDocumentMap::iterator mapIt = _documents.find(collectionName);
         if (mapIt == _documents.end())
-            return Status(ErrorCodes::NoMatchingDocument,
-                          "No collection named " + collectionName.ns());
+            return Status::OK();
 
         for (BSONObjCollection::iterator vecIt = mapIt->second.begin();
              vecIt != mapIt->second.end();

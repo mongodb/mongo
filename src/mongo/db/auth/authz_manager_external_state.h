@@ -136,13 +136,6 @@ namespace mongo {
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) = 0;
 
         /**
-         * Puts into the *privDocs vector every privilege document from the given database's
-         * system.users collection.
-         */
-        virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
-                                                  std::vector<BSONObj>* privDocs) = 0;
-
-        /**
          * Finds a document matching "query" in "collectionName", and store a shared-ownership
          * copy into "result".
          *
@@ -213,26 +206,10 @@ namespace mongo {
                                    const BSONObj& writeConcern) = 0;
 
         /**
-         * Drops the named collection.
+         * Drops indexes other than the _id index on "collectionName".
          */
-        virtual Status dropCollection(const NamespaceString& collectionName,
-                                      const BSONObj& writeConcern) = 0;
-
-        /**
-         * Renames collection "oldName" to "newName", possibly dropping the previous
-         * collection named "newName".
-         */
-        virtual Status renameCollection(const NamespaceString& oldName,
-                                        const NamespaceString& newName,
-                                        const BSONObj& writeConcern) = 0;
-
-        /**
-         * Copies the contents of collection "fromName" into "toName".  Fails
-         * if "toName" is already a collection.
-         */
-        virtual Status copyCollection(const NamespaceString& fromName,
-                                      const NamespaceString& toName,
-                                      const BSONObj& writeConcern) = 0;
+        virtual Status dropIndexes(const NamespaceString& collectionName,
+                                   const BSONObj& writeConcern) = 0;
 
         /**
          * Tries to acquire the global lock guarding modifications to all persistent data related
@@ -258,16 +235,6 @@ namespace mongo {
 
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
-
-        /**
-         * Queries the userNamespace with the given query and returns the privilegeDocument found
-         * in *result.  Returns Status::OK if it finds a document matching the query.  If it doesn't
-         * find a document matching the query, returns a Status with code UserNotFound.  Other
-         * errors may return other Status codes.
-         */
-        virtual Status _findUser(const std::string& usersNamespace,
-                                 const BSONObj& query,
-                                 BSONObj* result) = 0;
 
         static const long long _authzUpdateLockAcquisitionTimeoutMillis = 5000;
     };
