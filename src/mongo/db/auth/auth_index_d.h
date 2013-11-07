@@ -28,21 +28,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace authindex {
-
-    /**
-     * Ensures that exactly the appropriate indexes are present on system collections supporting
-     * authentication and authorization in database "dbname".
-     *
-     * It is appropriate to call this function on new or existing databases, though it is primarily
-     * intended for use on existing databases.  Under no circumstances may it be called on databases
-     * with running operations.
-     */
-    void configureSystemIndexes(const StringData& dbname);
 
     /**
      * Creates the appropriate indexes on _new_ system collections supporting authentication and

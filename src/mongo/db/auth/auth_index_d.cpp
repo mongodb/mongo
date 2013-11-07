@@ -43,17 +43,12 @@ namespace mongo {
 namespace authindex {
 
 namespace {
-    BSONObj v0SystemUsersKeyPattern;
-    BSONObj v1SystemUsersKeyPattern;
     BSONObj v2SystemUsersKeyPattern;
     BSONObj v2SystemRolesKeyPattern;
     std::string v2SystemUsersIndexName;
     std::string v2SystemRolesIndexName;
 
     MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
-        v0SystemUsersKeyPattern = BSON(AuthorizationManager::V1_USER_NAME_FIELD_NAME << 1);
-        v1SystemUsersKeyPattern = BSON(AuthorizationManager::V1_USER_NAME_FIELD_NAME << 1 <<
-                                       AuthorizationManager::V1_USER_SOURCE_FIELD_NAME << 1);
         v2SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::USER_DB_FIELD_NAME << 1);
         v2SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
@@ -69,65 +64,7 @@ namespace {
         return Status::OK();
     }
 
-    void configureSystemUsersIndexes(const StringData& dbname) {
-        if (dbname != "admin") return;
-        if (getGlobalAuthorizationManager()->getAuthorizationVersion() !=
-            AuthorizationManager::schemaVersion26Final) {
-
-            return;
-        }
-        std::string systemUsers = dbname.toString() + ".system.users";
-        Client::WriteContext wctx(systemUsers);
-
-        NamespaceString systemUsersNS( systemUsers );
-        createSystemIndexes(systemUsersNS);
-
-        Collection* collection = wctx.ctx().db()->getCollection( systemUsers );
-        if (collection == NULL)
-            return;
-
-        NamespaceDetails::IndexIterator indexIter = collection->details()->ii();
-        std::vector<std::string> namedIndexesToDrop;
-
-        while (indexIter.more()) {
-            IndexDetails& idetails = indexIter.next();
-            if (idetails.keyPattern() == v0SystemUsersKeyPattern ||
-                    idetails.keyPattern() == v1SystemUsersKeyPattern)
-                namedIndexesToDrop.push_back(idetails.indexName());
-        }
-
-        IndexCatalog* indexCatalog = collection->getIndexCatalog();
-        for (size_t i = 0; i < namedIndexesToDrop.size(); ++i) {
-            IndexDescriptor* desc = indexCatalog->findIndexByName( namedIndexesToDrop[i] );
-            verify( desc );
-
-            Status status = indexCatalog->dropIndex( desc );
-            if ( status.isOK() ) {
-                log() << "Dropped index " << namedIndexesToDrop[i] << " from " << systemUsers <<
-                    " because it is incompatible with v2 form privilege documents." << endl;
-            }
-            else {
-                // Only reason should be orphaned index, which dropIndexes logged.
-                LOG(2) << "configureSystemUsersIndexes couldn't drop index: "
-                       << namedIndexesToDrop[i]
-                       << " but should not matter";
-            }
-        }
-    }
-
-    void configureSystemRolesIndexes(const StringData& dbname) {
-        std::string systemRoles = dbname.toString() + ".system.roles";
-        Client::WriteContext wctx(systemRoles);
-
-        NamespaceString systemRolesNS( systemRoles );
-        createSystemIndexes(systemRolesNS);
-    }
 }  // namespace
-
-    void configureSystemIndexes(const StringData& dbname) {
-        configureSystemUsersIndexes(dbname);
-        configureSystemRolesIndexes(dbname);
-    }
 
     void createSystemIndexes(const NamespaceString& ns) {
         if (ns == AuthorizationManager::usersCollectionNamespace) {
