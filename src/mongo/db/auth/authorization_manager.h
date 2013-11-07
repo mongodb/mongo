@@ -379,20 +379,19 @@ namespace mongo {
         void releaseAuthzUpdateLock();
 
         /**
-         * Upgrades authorization data stored in collections from the v1 form (one system.users
-         * collection per database) to the v2 form (a single admin.system.users collection).
+         * Perform one step in the process of upgrading the stored authorization data to the
+         * newest schema.
          *
-         * Returns Status::OK() if the AuthorizationManager and the admin.system.version collection
-         * agree that the system is already upgraded, or if the upgrade completes successfully.
+         * On success, returns Status::OK(), and *isDone will indicate whether there are more
+         * steps to perform.
          *
-         * This method will create and destroy an admin._newusers collection in addition to writing
-         * to admin.system.users and admin.system.version.
+         * If the authorization data is already fully upgraded, returns Status::OK and sets *isDone
+         * to true, so this is safe to call on a fully upgraded system.
          *
-         * User information is taken from the in-memory user cache, constructed at start-up.  This
-         * is safe to do because MongoD and MongoS build complete copies of the data stored in
-         * *.system.users at start-up if they detect that the upgrade has not yet completed.
+         * On failure, returns a status other than Status::OK().  In this case, is is typically safe
+         * to try again.
          */
-        Status upgradeAuthCollections();
+        Status upgradeSchemaStep(const BSONObj& writeConcern, bool* isDone);
 
         /**
          * Hook called by replication code to let the AuthorizationManager observe changes
@@ -416,15 +415,6 @@ namespace mongo {
          * Should only be called when already holding _cacheMutex.
          */
         void _invalidateUserCache_inlock();
-
-        /**
-         * Initializes the user cache with User objects for every v0 and v1 user document in the
-         * system, by reading the system.users collection of every database.  If this function
-         * returns a non-ok Status, the _userCache should be considered corrupt and must be
-         * discarded.  This function should be called once at startup (only if the system hasn't yet
-         * been upgraded to V2 user data format) and never again after that.
-         */
-        Status _initializeAllV1UserData();
 
         /**
          * Fetches user information from a v2-schema user document for the named user,

@@ -785,7 +785,6 @@ namespace mongo {
         }
     }
 
-
     void AuthorizationManager::addInternalUser(User* user) {
         CacheGuard guard(this);
         _userCache.insert(make_pair(user->getName(), user));
@@ -823,77 +822,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status AuthorizationManager::_initializeAllV1UserData() {
-        CacheGuard guard(this);
-        _invalidateUserCache_inlock();
-        V1UserDocumentParser parser;
-
-        try {
-            std::vector<std::string> dbNames;
-            Status status = _externalState->getAllDatabaseNames(&dbNames);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            for (std::vector<std::string>::iterator dbIt = dbNames.begin();
-                    dbIt != dbNames.end(); ++dbIt) {
-                std::string dbname = *dbIt;
-                std::vector<BSONObj> privDocs;
-                Status status = _externalState->getAllV1PrivilegeDocsForDB(dbname, &privDocs);
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                for (std::vector<BSONObj>::iterator docIt = privDocs.begin();
-                        docIt != privDocs.end(); ++docIt) {
-                    const BSONObj& privDoc = *docIt;
-
-                    std::string source;
-                    if (privDoc.hasField("userSource")) {
-                        source = privDoc["userSource"].String();
-                    } else {
-                        source = dbname;
-                    }
-                    UserName userName(privDoc["user"].String(), source);
-                    if (userName == internalSecurity.user->getName()) {
-                        // Don't let clients override the internal user by creating a user with the
-                        // same name.
-                        continue;
-                    }
-
-                    User* user = mapFindWithDefault(_userCache, userName, static_cast<User*>(NULL));
-                    if (!user) {
-                        user = new User(userName);
-                        // Make sure the user always has a refCount of at least 1 so it's
-                        // effectively "pinned" and will never be removed from the _userCache
-                        // unless the whole cache is invalidated.
-                        user->incrementRefCount();
-                        _userCache.insert(make_pair(userName, user));
-                    }
-
-                    if (source == dbname || source == "$external") {
-                        status = parser.initializeUserCredentialsFromUserDocument(user,
-                                                                                  privDoc);
-                        if (!status.isOK()) {
-                            return status;
-                        }
-                    }
-                    status = parser.initializeUserRolesFromUserDocument(user, privDoc, dbname);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                    _initializeUserPrivilegesFromRolesV1(user);
-                }
-            }
-        } catch (const DBException& e) {
-            return e.toStatus();
-        } catch (const std::exception& e) {
-            return Status(ErrorCodes::InternalError, e.what());
-        }
-
-        return Status::OK();
-    }
-
     bool AuthorizationManager::tryAcquireAuthzUpdateLock(const StringData& why) {
         return _externalState->tryAcquireAuthzUpdateLock(why);
     }
@@ -902,170 +830,20 @@ namespace mongo {
         return _externalState->releaseAuthzUpdateLock();
     }
 
-    namespace {
-        BSONObj userAsV2PrivilegeDocument(const User& user) {
-            BSONObjBuilder builder;
-
-            const UserName& name = user.getName();
-            builder.append(AuthorizationManager::USER_NAME_FIELD_NAME, name.getUser());
-            builder.append(AuthorizationManager::USER_DB_FIELD_NAME, name.getDB());
-
-            const User::CredentialData& credentials = user.getCredentials();
-            if (!credentials.isExternal) {
-                BSONObjBuilder credentialsBuilder(builder.subobjStart("credentials"));
-                credentialsBuilder.append("MONGODB-CR", credentials.password);
-                credentialsBuilder.doneFast();
-            }
-
-            BSONArrayBuilder rolesArray(builder.subarrayStart("roles"));
-            RoleNameIterator roles = user.getRoles();
-            while(roles.more()) {
-                const RoleName& role = roles.next();
-                BSONObjBuilder roleBuilder(rolesArray.subobjStart());
-                roleBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, role.getRole());
-                roleBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, role.getDB());
-                roleBuilder.doneFast();
-            }
-            rolesArray.doneFast();
-            return builder.obj();
-        }
-
-        const NamespaceString newusersCollectionNamespace(
-                AuthorizationManager::usersAltCollectionNamespace);
-        const NamespaceString backupUsersCollectionNamespace("admin.backup.users");
-
-        /**
-         * Fetches the admin.system.version document and extracts the currentVersion field's
-         * value, supposing it is an integer, and writes it to outVersion.
-         */
-        Status readAuthzVersion(AuthzManagerExternalState* externalState, int* outVersion) {
-            BSONObj versionDoc;
-            Status status = externalState->findOne(
-                    AuthorizationManager::versionCollectionNamespace,
-                    AuthorizationManager::versionDocumentQuery,
-                    &versionDoc);
-            if (!status.isOK() && ErrorCodes::NoMatchingDocument != status) {
-                return status;
-            }
-            BSONElement currentVersionElement = versionDoc["currentVersion"];
-            if (!versionDoc.isEmpty() && !currentVersionElement.isNumber()) {
-                return Status(ErrorCodes::TypeMismatch,
-                              "Field 'currentVersion' in admin.system.version must be a number.");
-            }
-            *outVersion = currentVersionElement.numberInt();
-            return Status::OK();
-        }
-    }  // namespace
-
-    Status AuthorizationManager::upgradeAuthCollections() {
-        AuthzDocumentsUpdateGuard lkUpgrade(this);
-        if (!lkUpgrade.tryLock("Upgrade authorization data")) {
-            return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
-        }
-        CacheGuard guard(this);
-        int durableVersion = schemaVersionInvalid;
-        Status status = readAuthzVersion(_externalState.get(), &durableVersion);
-        if (!status.isOK())
-            return status;
-
-        if (_version == 2) {
-            switch (durableVersion) {
-            case 0:
-            case 1: {
-                const char msg[] = "User data format version in memory and on disk inconsistent; "
-                    "please restart this node.";
-                error() << msg;
-                return Status(ErrorCodes::UserDataInconsistent, msg);
-            }
-            case 2:
-                return Status::OK();
-            default:
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() <<
-                              "Cannot upgrade admin.system.version to 2 from " <<
-                              durableVersion);
-            }
-        }
-        fassert(17113, _version == 1);
-        switch (durableVersion) {
-        case 0:
-        case 1:
-            break;
-        case 2: {
-            const char msg[] = "User data format version in memory and on disk inconsistent; "
-                "please restart this node.";
-            error() << msg;
-            return Status(ErrorCodes::UserDataInconsistent, msg);
-        }
-        default:
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() <<
-                              "Cannot upgrade admin.system.version from 2 to " <<
-                              durableVersion);
-        }
-
-        BSONObj writeConcern;
-        // Upgrade from v1 to v2.
-        status = _externalState->copyCollection(usersCollectionNamespace,
-                                                backupUsersCollectionNamespace,
-                                                writeConcern);
-        if (!status.isOK())
-            return status;
-        status = _externalState->dropCollection(newusersCollectionNamespace, writeConcern);
-        if (!status.isOK())
-            return status;
-        status = _externalState->createIndex(
-                newusersCollectionNamespace,
-                BSON(USER_NAME_FIELD_NAME << 1 << USER_DB_FIELD_NAME << 1),
-                true, // unique
-                writeConcern
-                );
-        if (!status.isOK())
-            return status;
-
-        for (unordered_map<UserName, User*>::const_iterator iter = _userCache.begin();
-             iter != _userCache.end(); ++iter) {
-
-            // Do not create a user document for the internal user.
-            if (iter->second == internalSecurity.user)
-                continue;
-
-            status = _externalState->insert(
-                    newusersCollectionNamespace, userAsV2PrivilegeDocument(*iter->second),
-                    writeConcern);
-            if (!status.isOK())
-                return status;
-        }
-        status = _externalState->renameCollection(newusersCollectionNamespace,
-                                                  usersCollectionNamespace,
-                                                  writeConcern);
-        if (!status.isOK())
-            return status;
-        status = _externalState->updateOne(
-                versionCollectionNamespace,
-                versionDocumentQuery,
-                BSON("$set" << BSON("currentVersion" << 2)),
-                true,
-                writeConcern);
-        if (!status.isOK())
-            return status;
-        _version = 2;
-        return status;
-    }
-
-    static bool isAuthzNamespace(const StringData& ns) {
+namespace {
+    bool isAuthzNamespace(const StringData& ns) {
         return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
                 ns == AuthorizationManager::usersCollectionNamespace.ns() ||
                 ns == AuthorizationManager::versionCollectionNamespace.ns());
     }
 
-    static bool isAuthzCollection(const StringData& coll) {
+    bool isAuthzCollection(const StringData& coll) {
         return (coll == AuthorizationManager::rolesCollectionNamespace.coll() ||
                 coll == AuthorizationManager::usersCollectionNamespace.coll() ||
                 coll == AuthorizationManager::versionCollectionNamespace.coll());
     }
 
-    static bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
+    bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
         if (ns != AuthorizationManager::adminCommandNamespace.ns())
             return false;
         const StringData cmdName(cmdObj.firstElement().fieldNameStringData());
@@ -1088,7 +866,7 @@ namespace mongo {
         }
     }
 
-    static bool appliesToAuthzData(
+    bool appliesToAuthzData(
             const char* op,
             const char* ns,
             const BSONObj& o) {
@@ -1107,6 +885,7 @@ namespace mongo {
             return true;
         }
     }
+}  // namespace
 
     void AuthorizationManager::logOp(
             const char* op,

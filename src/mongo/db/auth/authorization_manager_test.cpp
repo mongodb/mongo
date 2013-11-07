@@ -262,7 +262,7 @@ namespace {
         ASSERT_OK(authzManager->acquireUser(UserName("readOnly", "test"), &readOnly));
         ASSERT_EQUALS(UserName("readOnly", "test"), readOnly->getName());
         ASSERT(readOnly->isValid());
-        ASSERT_EQUALS((uint32_t)2, readOnly->getRefCount());
+        ASSERT_EQUALS(1U, readOnly->getRefCount());
         RoleNameIterator roles = readOnly->getRoles();
         ASSERT_EQUALS(RoleName("read", "test"), roles.next());
         ASSERT_FALSE(roles.more());
@@ -273,7 +273,7 @@ namespace {
         ASSERT_OK(authzManager->acquireUser(UserName("clusterAdmin", "$external"), &clusterAdmin));
         ASSERT_EQUALS(UserName("clusterAdmin", "$external"), clusterAdmin->getName());
         ASSERT(clusterAdmin->isValid());
-        ASSERT_EQUALS((uint32_t)2, clusterAdmin->getRefCount());
+        ASSERT_EQUALS(1U, clusterAdmin->getRefCount());
         RoleNameIterator clusterRoles = clusterAdmin->getRoles();
         ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
         ASSERT_FALSE(clusterRoles.more());
@@ -288,14 +288,27 @@ namespace {
         ASSERT_OK(authzManager->acquireUser(UserName("readWriteMultiDB", "test"), &multiDB));
         ASSERT_EQUALS(UserName("readWriteMultiDB", "test"), multiDB->getName());
         ASSERT(multiDB->isValid());
-        ASSERT_EQUALS((uint32_t)2, multiDB->getRefCount());
+        ASSERT_EQUALS(1U, multiDB->getRefCount());
+        User* multiDBProbed;
+        ASSERT_OK(authzManager->acquireV1UserProbedForDb(
+                          UserName("readWriteMultiDB", "test"),
+                          "test2",
+                          &multiDBProbed));
+        authzManager->releaseUser(multiDB);
+        multiDB = multiDBProbed;
+        ASSERT_EQUALS(UserName("readWriteMultiDB", "test"), multiDB->getName());
+        ASSERT(multiDB->isValid());
+        ASSERT_EQUALS(1U, multiDB->getRefCount());
 
         RoleNameIterator multiDBRoles = multiDB->getRoles();
+        ASSERT(multiDBRoles.more());
         RoleName role = multiDBRoles.next();
         if (role == RoleName("readWrite", "test")) {
+            ASSERT(multiDBRoles.more());
             ASSERT_EQUALS(RoleName("readWrite", "test2"), multiDBRoles.next());
         } else {
             ASSERT_EQUALS(RoleName("readWrite", "test2"), role);
+            ASSERT(multiDBRoles.more());
             ASSERT_EQUALS(RoleName("readWrite", "test"), multiDBRoles.next());
         }
         ASSERT_FALSE(multiDBRoles.more());
@@ -340,7 +353,7 @@ namespace {
         ASSERT_OK(authzManager->acquireUser(UserName("v2read", "test"), &v2read));
         ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
         ASSERT(v2read->isValid());
-        ASSERT_EQUALS((uint32_t)1, v2read->getRefCount());
+        ASSERT_EQUALS(1U, v2read->getRefCount());
         RoleNameIterator roles = v2read->getRoles();
         ASSERT_EQUALS(RoleName("read", "test"), roles.next());
         ASSERT_FALSE(roles.more());
@@ -351,7 +364,7 @@ namespace {
         ASSERT_OK(authzManager->acquireUser(UserName("v2cluster", "admin"), &v2cluster));
         ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
         ASSERT(v2cluster->isValid());
-        ASSERT_EQUALS((uint32_t)1, v2cluster->getRefCount());
+        ASSERT_EQUALS(1U, v2cluster->getRefCount());
         RoleNameIterator clusterRoles = v2cluster->getRoles();
         ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
         ASSERT_FALSE(clusterRoles.more());
@@ -361,11 +374,6 @@ namespace {
 
     class AuthzUpgradeTest : public AuthorizationManagerTest {
     public:
-        static const NamespaceString versionCollectionName;
-        static const NamespaceString usersCollectionName;
-        static const NamespaceString backupUsersCollectionName;
-        static const NamespaceString newUsersCollectioName;
-
         void setUpV1UserData() {
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readOnly" <<
@@ -411,18 +419,22 @@ namespace {
             BSONObj doc;
 
             // Verify that the admin.system.version document reflects correct upgrade.
-            ASSERT_OK(externalState->findOne(versionCollectionName,
-                                             BSON("_id" << 1 << "currentVersion" << 2),
-                                             &doc));
+            ASSERT_OK(externalState->findOne(
+                              AuthorizationManager::versionCollectionNamespace,
+                              BSON("_id" << "authSchema" <<
+                                   AuthorizationManager::schemaVersionFieldName <<
+                                   AuthorizationManager::schemaVersion26Final),
+                              &doc));
             ASSERT_EQUALS(2, doc.nFields());
-            ASSERT_EQUALS(1U, externalState->getCollectionContents(versionCollectionName).size());
-
-            // Verify that the admin._newusers collection was dropped.
-            ASSERT_EQUALS(0U, externalState->getCollectionContents(newUsersCollectioName).size());
+            ASSERT_EQUALS(1U, externalState->getCollectionContents(
+                                  AuthorizationManager::versionCollectionNamespace).size());
 
             // Verify that the expected users are present.
-            ASSERT_EQUALS(3U, externalState->getCollectionContents(usersCollectionName).size());
-            ASSERT_OK(externalState->findOne(usersCollectionName,
+            ASSERT_EQUALS(3U, externalState->getCollectionContents(
+                                  AuthorizationManager::usersAltCollectionNamespace).size());
+            ASSERT_EQUALS(3U, externalState->getCollectionContents(
+                                  AuthorizationManager::usersCollectionNamespace).size());
+            ASSERT_OK(externalState->findOne(AuthorizationManager::usersCollectionNamespace,
                                              BSON("user" << "readOnly" << "db" << "test"),
                                              &doc));
             ASSERT_EQUALS("readOnly", doc["user"].str());
@@ -431,7 +443,7 @@ namespace {
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
 
             ASSERT_OK(externalState->findOne(
-                              usersCollectionName,
+                              AuthorizationManager::usersCollectionNamespace,
                               BSON("user" << "clusterAdmin" << "db" << "$external"),
                               &doc));
             ASSERT_EQUALS("clusterAdmin", doc["user"].str());
@@ -439,7 +451,7 @@ namespace {
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
 
             ASSERT_OK(externalState->findOne(
-                              usersCollectionName,
+                              AuthorizationManager::usersCollectionNamespace,
                               BSON("user" << "readWriteMultiDB" << "db" << "test"),
                               &doc));
             ASSERT_EQUALS("readWriteMultiDB", doc["user"].str());
@@ -447,33 +459,34 @@ namespace {
             ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
             ASSERT_EQUALS(2U, doc["roles"].Array().size());
         }
-    };
 
-    const NamespaceString AuthzUpgradeTest::versionCollectionName("admin.system.version");
-    const NamespaceString AuthzUpgradeTest::usersCollectionName("admin.system.users");
-    const NamespaceString AuthzUpgradeTest::backupUsersCollectionName("admin.backup.users");
-    const NamespaceString AuthzUpgradeTest::newUsersCollectioName("admin._newusers");
+        void upgradeAuthCollections() {
+            bool done = false;
+            int iters = 0;
+            while (!done) {
+                ASSERT_OK(authzManager->upgradeSchemaStep(BSONObj(), &done));
+                ASSERT_LESS_THAN(iters++, 10);
+            }
+        }
+    };
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2Clean) {
         return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
         setUpV1UserData();
-        ASSERT_OK(authzManager->upgradeAuthCollections());
+        upgradeAuthCollections();
 
         validateV2UserData();
-        validateV1AdminUserData(backupUsersCollectionName);
+        validateV1AdminUserData(AuthorizationManager::usersBackupCollectionNamespace);
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2WithSysVerDoc) {
         return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
         setUpV1UserData();
-        ASSERT_OK(externalState->insert(versionCollectionName,
-                                        BSON("_id" << 1 << "currentVersion" << 1),
-                                        BSONObj()));
-        ASSERT_OK(authzManager->upgradeAuthCollections());
+        upgradeAuthCollections();
 
-        validateV1AdminUserData(backupUsersCollectionName);
+        validateV1AdminUserData(AuthorizationManager::usersBackupCollectionNamespace);
         validateV2UserData();
     }
 
@@ -481,27 +494,19 @@ namespace {
         return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
         setUpV1UserData();
-        ASSERT_OK(externalState->insert(versionCollectionName,
-                                        BSON("_id" << 1 << "currentVersion" << 3),
-                                        BSONObj()));
-        ASSERT_NOT_OK(authzManager->upgradeAuthCollections());
-        validateV1AdminUserData(usersCollectionName);
+        externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        bool done;
+        ASSERT_OK(authzManager->upgradeSchemaStep(BSONObj(), &done));
+        ASSERT_TRUE(done);
+        validateV1AdminUserData(AuthorizationManager::usersCollectionNamespace);
         int numRemoved;
-        ASSERT_OK(externalState->remove(versionCollectionName, BSONObj(), BSONObj(), &numRemoved));
-        ASSERT_OK(authzManager->upgradeAuthCollections());
-        validateV1AdminUserData(backupUsersCollectionName);
+        ASSERT_OK(externalState->remove(AuthorizationManager::versionCollectionNamespace,
+                                        BSONObj(),
+                                        BSONObj(),
+                                        &numRemoved));
+        upgradeAuthCollections();
+        validateV1AdminUserData(AuthorizationManager::usersBackupCollectionNamespace);
         validateV2UserData();
-    }
-
-    TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2FailsWithVersionDocMispatch) {
-        return;
-        externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
-        setUpV1UserData();
-        ASSERT_OK(externalState->insert(versionCollectionName,
-                                        BSON("_id" << 1 << "currentVersion" << 2),
-                                        BSONObj()));
-        ASSERT_NOT_OK(authzManager->upgradeAuthCollections());
-        validateV1AdminUserData(usersCollectionName);
     }
 
 }  // namespace
