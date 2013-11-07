@@ -316,37 +316,8 @@ int
 __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
-	WT_PAGE_MODIFY *mod;
-	WT_TXN saved_txn, *txn;
-	int was_running;
-
-	txn = &session->txn;
-
-	/*
-	 * Fast path for never modified pages, or pages marked clean with no
-	 * data required by other running transactions.  This fast path is only
-	 * for leaf pages: attempting to evict an internal page will cause the
-	 * whole subtree to be flushed with the current transaction context,
-	 * and there could be a newer change in a child page.
-	 *
-	 * We can't use __wt_page_is_modified by itself: a checkpoint may have
-	 * written the page and marked it clean, even though it contains some
-	 * changes a running transaction needs.  If the page is marked clean,
-	 * do a further check that the maximum transaction written for the page
-	 * is visible to all running transactions.
-	 *
-	 * If the page was ever modified, also make sure that there is a
-	 * sufficiently up-to-date transaction context, otherwise we need to
-	 * set one up anyway.
-	 */
-	mod = page->modify;
-	if (page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    (mod == NULL ||
-	    (!__wt_page_is_modified(page) &&
-	    __wt_txn_visible_all(session, mod->disk_txn) &&
-	    txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
-	    !__wt_txn_visible_all(session, txn->snap_min))))
-		return (__wt_rec_evict(session, page, 0));
+	WT_TXN *txn;
+	WT_TXN_ISOLATION saved_iso;
 
 	/*
 	 * We have to take care when evicting pages not to write a change that:
@@ -354,36 +325,23 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 *  (b) is committed more recently than an in-progress checkpoint.
 	 *
 	 * We handle both of these cases by setting up the transaction context
-	 * before evicting, using the oldest reading ID in the system to create
-	 * the snapshot.  If a transaction is in progress in the evicting
-	 * session, we save and restore its state.
+	 * before evicting, using a special "eviction" isolation level, where
+	 * only globally visible updates can be evicted.
 	 */
-	saved_txn = *txn;
-	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
-
-	if (was_running)
-		WT_RET(__wt_txn_init(session));
-
-	__wt_txn_get_evict_snapshot(session);
-	txn->isolation = TXN_ISO_READ_COMMITTED;
+	__wt_txn_update_oldest(session);
+	txn = &session->txn;
+	saved_iso = txn->isolation;
+	txn->isolation = TXN_ISO_EVICTION;
 
 	/*
 	 * Sanity check: if a transaction is running, its updates should not
 	 * be visible to eviction.
 	 */
-	WT_ASSERT(session, !was_running ||
-	    !__wt_txn_visible(session, saved_txn.id));
+	WT_ASSERT(session, !F_ISSET(txn, TXN_RUNNING) ||
+	    !__wt_txn_visible(session, txn->id));
 
 	ret = __wt_rec_evict(session, page, 0);
-
-	if (was_running) {
-		WT_ASSERT(session, txn->snapshot == NULL ||
-		    txn->snapshot != saved_txn.snapshot);
-		__wt_txn_destroy(session);
-	} else
-		__wt_txn_release_evict_snapshot(session);
-
-	*txn = saved_txn;
+	txn->isolation = saved_iso;
 	return (ret);
 }
 
@@ -957,8 +915,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			/*
 			 * If the oldest transaction hasn't changed since the
 			 * last time this page was written, it's unlikely that
-			 * we can make progress.  This is a heuristic that
-			 * saves repeated attempts to evict the same page.
+			 * we can make progress.  Similarly, if the most recent
+			 * update on the page is not yet globally visible,
+			 * eviction will fail.  These heuristics attempt to
+			 * avoid repeated attempts to evict the same page.
 			 *
 			 * That said, if eviction is stuck, or the file is
 			 * being checkpointed, try anyway: maybe a transaction
@@ -966,9 +926,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			 * since rolled back, or we can help get the checkpoint
 			 * completed sooner.
 			 */
-			if (modified && page->modify->disk_snap_min ==
-			    S2C(session)->txn_global.oldest_id &&
-			    !F_ISSET(cache, WT_EVICT_STUCK))
+			if (modified && !F_ISSET(cache, WT_EVICT_STUCK) &&
+			    (page->modify->disk_snap_min ==
+			    S2C(session)->txn_global.oldest_id ||
+			    !__wt_txn_visible_all(session,
+			    page->modify->update_txn)))
 				continue;
 		}
 

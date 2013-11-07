@@ -43,6 +43,7 @@
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
+#include <gcc.h>				/* WiredTiger internal */
 
 #ifndef F_CLR
 #define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
@@ -133,10 +134,7 @@ int find_table_count(CONFIG *);
 void indent_lines(const char *, const char *);
 void *insert_thread(void *);
 void lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
-#ifdef __GNUC__
-    __attribute__((format (printf, 4, 5)))
-#endif
-;
+    WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);

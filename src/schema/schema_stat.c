@@ -68,9 +68,9 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	const char *name;
 
 	name = uri + strlen("table:");
+	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
-	WT_RET(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	/*
 	 * Set the cursor to reference the data source statistics; we don't
@@ -107,7 +107,8 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
-err:	__wt_scr_free(&buf);
-	__wt_schema_release_table(session, table);
+err:	__wt_schema_release_table(session, table);
+
+	__wt_scr_free(&buf);
 	return (ret);
 }

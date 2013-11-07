@@ -83,6 +83,22 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_visible_all --
+ *	Check if a given transaction ID is "globally visible".	This is, if
+ *	all sessions in the system will see the transaction ID.
+ */
+static inline int
+__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
+{
+	WT_TXN_GLOBAL *txn_global;
+	uint64_t oldest_id;
+
+	txn_global = &S2C(session)->txn_global;
+	oldest_id = txn_global->oldest_id;
+	return (TXNID_LT(id, oldest_id));
+}
+
+/*
  * __wt_txn_visible --
  *	Can the current transaction see the given ID?
  */
@@ -91,17 +107,18 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
 
+	txn = &session->txn;
+
+	/* Eviction only sees globally visible updates. */
+	if (txn->isolation == TXN_ISO_EVICTION)
+		return (__wt_txn_visible_all(session, id));
+
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_ABORTED)
 		return (0);
 
 	/* Changes with no associated transaction are always visible. */
 	if (id == WT_TXN_NONE)
-		return (1);
-
-	/* Transactions see their own changes. */
-	txn = &session->txn;
-	if (id == txn->id)
 		return (1);
 
 	/*
@@ -116,6 +133,10 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
 	    S2BT_SAFE(session) == session->metafile)
+		return (1);
+
+	/* Transactions see their own changes. */
+	if (id == txn->id)
 		return (1);
 
 	/*
@@ -134,22 +155,6 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
 	    sizeof(uint64_t), __wt_txnid_cmp) == NULL);
-}
-
-/*
- * __wt_txn_visible_all --
- *	Check if a given transaction ID is "globally visible".	This is, if
- *	all sessions in the system will see the transaction ID.
- */
-static inline int
-__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
-{
-	WT_TXN_GLOBAL *txn_global;
-	uint64_t oldest_id;
-
-	txn_global = &S2C(session)->txn_global;
-	oldest_id = txn_global->oldest_id;
-	return (TXNID_LT(id, oldest_id));
 }
 
 /*

@@ -203,16 +203,16 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	UNUSED_RET(system("rm -f WiredTiger* __wt*"));
+	WT_UNUSED_RET(system("rm -f WiredTiger* __wt*"));
 }
 
 static int
 handle_error(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, int error, const char *errmsg)
 {
-	UNUSED(handler);
-	UNUSED(session);
-	UNUSED(error);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
+	WT_UNUSED(error);
 
 	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
@@ -221,8 +221,8 @@ static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
-	UNUSED(handler);
-	UNUSED(session);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	if (logfp != NULL)
 		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);
@@ -237,7 +237,7 @@ handle_message(WT_EVENT_HANDLER *handler,
 static void
 onint(int signo)
 {
-	UNUSED(signo);
+	WT_UNUSED(signo);
 
 	shutdown();
 

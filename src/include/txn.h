@@ -45,6 +45,7 @@ struct __wt_txn_global {
 };
 
 enum __wt_txn_isolation {
+	TXN_ISO_EVICTION,		/* Internal: eviction context */
 	TXN_ISO_READ_UNCOMMITTED,
 	TXN_ISO_READ_COMMITTED,
 	TXN_ISO_SNAPSHOT
@@ -112,8 +113,6 @@ struct __wt_txn {
 	WT_TXN_OP      *mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
-
-	uint32_t	force_evict_attempts;
 
 	/* Requested notification when transactions are resolved. */
 	WT_TXN_NOTIFY *notify;

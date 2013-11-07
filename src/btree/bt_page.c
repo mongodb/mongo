@@ -30,12 +30,9 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_TXN *txn;
-	int busy, oldgen;
+	int busy, force_attempts, oldgen;
 
-	txn = &session->txn;
-
-	for (oldgen = 0;;) {
+	for (force_attempts = oldgen = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
@@ -77,17 +74,16 @@ __wt_page_in_func(
 			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
-			 * Make sure the page isn't too big.  Only do this
-			 * check if the transaction hasn't made any updates
-			 * and limit the number of attempts to avoid getting
-			 * stuck if the page doesn't become available.
+			 * Force evict pages that are too big.  Only do this
+			 * check if there is a chance of eviction succeeding.
+			 * That is, if the updates on the page are visible to
+			 * the running transaction.
 			 */
-			if (!WT_TXN_ACTIVE(txn) &&
-			    txn->force_evict_attempts < 4 &&
-			    __wt_eviction_page_force(session, page)) {
-				++txn->force_evict_attempts;
-				page->read_gen = WT_READ_GEN_OLDEST;
-				WT_RET(__wt_page_release(session, page));
+			if (force_attempts < 10 &&
+			    __wt_eviction_force_check(session, page) &&
+			    __wt_eviction_force_txn_check(session, page)) {
+				++force_attempts;
+				WT_RET(__wt_eviction_force(session, page));
 				break;
 			}
 

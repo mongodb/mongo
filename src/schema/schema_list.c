@@ -80,7 +80,7 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	table = NULL;
+	*tablep = table = NULL;
 	ret = __schema_find_table(session, name, namelen, &table);
 
 	if (ret == WT_NOTFOUND)

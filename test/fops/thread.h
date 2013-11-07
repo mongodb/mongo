@@ -38,13 +38,7 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
-
-#define	UNUSED(v)	(void)(v)		/* Quiet unused var warnings */
-/*
- * Quiet compiler warning for unused result.
- */
-#define	UNUSED_RET(var)						\
-	({ __typeof__(var) __ret = var; (void)sizeof __ret; })
+#include <gcc.h>				/* WiredTiger internal */
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
@@ -53,11 +47,7 @@ extern u_int nops;				/* Operations per thread */
 extern const char *uri;				/* Object */
 extern const char *config;			/* Object config */
 
-#if defined (__GNUC__)
-void die(const char *, int) __attribute__((noreturn));
-#else
-void die(const char *, int);
-#endif
+void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
 int  fop_start(u_int);
 void obj_bulk(void);
 void obj_checkpoint(void);

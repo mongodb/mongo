@@ -34,8 +34,8 @@ Makefiles
 Memrata
 Mewhort
 NOTFOUND
-NoSQL
 NUMA
+NoSQL
 RepMgr
 Rrx
 Seward's
@@ -55,6 +55,7 @@ ao
 api
 apiflags
 ar
+archiver
 arg
 autoconf
 automake

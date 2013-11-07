@@ -450,8 +450,8 @@ methods = {
 	    ignore the encodings for the key and value, manage data as if
 	    the formats were \c "u".  See @ref cursor_raw for details''',
 	    type='boolean'),
-	Config('statistics', 'fast', r'''
-	    Specify the statistics to be gathered.	Choosing "all" gathers
+	Config('statistics', '', r'''
+	    Specify the statistics to be gathered.  Choosing "all" gathers
 	    statistics regardless of cost and may include traversing
 	    on-disk files; "fast" gathers a subset of relatively
 	    inexpensive statistics.  The selection must agree with the
@@ -461,7 +461,7 @@ methods = {
 	    configured with "all", but the cursor open will fail if "all"
 	    is specified when the database is configured with "fast",
 	    and the cursor open will fail in all cases when the database
-	    is configured with "none".	If \c statistics is not configured,
+	    is configured with "none".  If \c statistics is not configured,
 	    the default configuration is the database configuration.
 	    The "clear" configuration resets statistics after gathering
 	    them, where appropriate (for example, a cache size statistic

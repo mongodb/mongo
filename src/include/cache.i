@@ -28,6 +28,8 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	dirty_inuse = cache->bytes_dirty;
 	bytes_max = conn->cache_size;
+
+	/* Calculate the cache full percentage. */
 	*fullp = (int)((100 * bytes_inuse) / bytes_max);
 
 	/* Wake eviction when we're over the trigger cache size. */

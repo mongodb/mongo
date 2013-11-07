@@ -201,7 +201,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * This is particularly important for compact, so that all dirty pages
 	 * can be fully written.
 	 */
-	__wt_txn_refresh_force(session);
+	__wt_txn_update_oldest(session);
 
 	/*
 	 * Only one checkpoint can be active at a time, and checkpoints must run

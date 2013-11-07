@@ -124,6 +124,7 @@ struct __wt_dsrc_stats {
 	WT_STATS block_magic;
 	WT_STATS block_major;
 	WT_STATS block_minor;
+	WT_STATS block_reuse_bytes;
 	WT_STATS block_size;
 	WT_STATS bloom_count;
 	WT_STATS bloom_false_positive;

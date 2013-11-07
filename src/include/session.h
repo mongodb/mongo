@@ -111,7 +111,10 @@ struct __wt_session_impl {
 	 * Putting the hazard pointer at the end of the structure allows us to
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard pointer.
+	 *
+	 * The number of hazard pointers that can be in use grows dynamically.
 	 */
+#define	WT_HAZARD_INCR		10
 	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
 	uint32_t   nhazard;		/* Count of active hazard pointers */
 

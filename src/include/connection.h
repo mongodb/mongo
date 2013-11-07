@@ -83,11 +83,12 @@ struct __wt_connection_impl {
 	/*
 	 * We distribute the btree page locks across a set of spin locks; it
 	 * can't be an array, we impose cache-line alignment and gcc doesn't
-	 * support that for arrays.
+	 * support that for arrays.  Don't use too many: they are only held for
+	 * very short operations, each one is 64 bytes, so 256 will fill the L1
+	 * cache on most CPUs.
 	 */
-#define	WT_PAGE_LOCKS(conn)						\
-	(sizeof((conn)->page_lock) / sizeof((conn)->page_lock[0]))
-	WT_SPINLOCK *page_lock[256];	/* Btree page spinlocks */
+#define	WT_PAGE_LOCKS(conn)	WT_ELEMENTS((conn)->page_lock)
+	WT_SPINLOCK *page_lock[17];	/* Btree page spinlocks */
 	u_int	     page_lock_cnt;	/* Next spinlock to use */
 
 					/* Connection queue */

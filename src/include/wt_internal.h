@@ -223,6 +223,7 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "gcc.h"
 #include "hardware.h"
 #include "misc.h"
 #include "mutex.h"
@@ -260,10 +261,10 @@ struct __wt_update;
 #include "cell.i"
 
 #include "mutex.i"			/* required by btree.i */
+#include "txn.i"			/* required by btree.i */
 
 #include "btree.i"			/* required by cursor.i */
 #include "cache.i"			/* required by cursor.i */
-#include "txn.i"			/* required by cursor.i */
 #include "cursor.i"
 
 #include "bitstring.i"

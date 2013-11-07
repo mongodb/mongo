@@ -69,29 +69,28 @@ int
 __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size, int *skipp)
 {
-	WT_FH *fh;
+	WT_EXT *ext;
+	WT_EXTLIST *el;
 	off_t offset;
 	uint32_t size, cksum;
 
 	WT_UNUSED(addr_size);
-	*skipp = 0;			/* Paranoia: skip on error. */
-
-	fh = block->fh;
+	*skipp = 1;				/* Return a default skip. */
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/*
-	 * If this block appears in the last half of the file, rewrite it.
-	 *
-	 * It's unclear we need to lock: the chances of a smashed read are close
-	 * to non-existent and the worst thing that can happen is we rewrite a
-	 * block we didn't want to rewrite.   On the other hand, compaction is
-	 * not expected to be a common operation in WiredTiger, we shouldn't be
-	 * here a lot.
+	 * If there's a block on the available list that's closer to the start
+	 * of the file, rewrite the block.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	*skipp = offset > fh->size / 2 ? 0 : 1;
+	el = &block->live.avail;
+	WT_EXT_FOREACH(ext, el->off)
+		if (ext->off < offset && ext->size >= size) {
+			*skipp = 0;
+			break;
+		}
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (0);
