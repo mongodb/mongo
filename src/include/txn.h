@@ -45,6 +45,7 @@ struct __wt_txn_global {
 };
 
 enum __wt_txn_isolation {
+	TXN_ISO_EVICTION,		/* Internal: eviction context */
 	TXN_ISO_READ_UNCOMMITTED,
 	TXN_ISO_READ_COMMITTED,
 	TXN_ISO_SNAPSHOT

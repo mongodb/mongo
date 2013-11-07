@@ -280,7 +280,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			chunk = cookie.chunk_array[i];
 
 			/* Stop if a running transaction needs the chunk. */
-			__wt_txn_refresh_force(session);
+			__wt_txn_update_oldest(session);
 			if (!__wt_txn_visible_all(session, chunk->txnid_max))
 				break;
 
