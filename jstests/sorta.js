@@ -19,11 +19,9 @@ t.insert( {_id:8,a:MaxKey}, true );
 
 function sorted( arr ) {
     assert.eq( 9, arr.length );
-    /*
  	for( i = 1; i < arr.length; ++i ) {
      	assert.lte( arr[ i-1 ]._id, arr[ i ]._id );
     }
-    */
 }
 
 sorted( t.find().sort( {a:1} ).toArray() );

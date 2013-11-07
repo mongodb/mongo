@@ -85,6 +85,10 @@ namespace mongo {
         struct SortableDataItem {
             WorkingSetID wsid;
             BSONObj sortKey;
+            // Since we must replicate the behavior of a covered sort as much as possible we use the
+            // DiskLoc to break sortKey ties.
+            // See sorta.js.
+            DiskLoc loc;
         };
         vector<SortableDataItem> _data;
 

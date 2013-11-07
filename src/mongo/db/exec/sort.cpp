@@ -49,7 +49,11 @@ namespace mongo {
         explicit WorkingSetComparator(BSONObj p) : pattern(p) { }
 
         bool operator()(const SortableDataItem& lhs, const SortableDataItem rhs) const {
-            return lhs.sortKey.woCompare(rhs.sortKey, pattern, false /* ignore field names */) < 0;
+            int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false /* ignore field names */);
+            if (0 != result) {
+                return result < 0;
+            }
+            return lhs.loc < rhs.loc;
         }
 
         BSONObj pattern;
@@ -171,6 +175,9 @@ namespace mongo {
                 SortableDataItem item;
                 item.wsid = id;
                 item.sortKey = sortKey;
+                if (member->hasLoc()) {
+                    item.loc = member->loc;
+                }
                 _data.push_back(item);
 
                 ++_commonStats.needTime;
