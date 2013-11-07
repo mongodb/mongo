@@ -614,6 +614,14 @@ __wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page->modify == NULL)
 		return (0);
 
+	/*
+	 * If we have already tried forced eviction and the oldest ID hasn't
+	 * moved on, we're not going to succeed.
+	 */
+	if (page->modify->disk_snap_min ==
+	    S2C(session)->txn_global.oldest_id)
+		return (0);
+
 	return (1);
 }
 
@@ -627,12 +635,14 @@ __wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_TXN_STATE *txn_state;
 
 	/*
-	 * Only try if there is a chance of success.  If this transaction is
-	 * already pinning the oldest ID so that the page can't be evicted, it
-	 * has to complete before eviction can succeed.
+	 * Only try if there is a chance of success.  If the page has already
+	 * been split and this transaction is already pinning the oldest ID so
+	 * that the page can't be evicted, it has to complete before eviction
+	 * can succeed.
 	 */
 	txn_state = &S2C(session)->txn_global.states[session->id];
-	if (txn_state->snap_min == WT_TXN_NONE ||
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
+	    txn_state->snap_min == WT_TXN_NONE ||
 	    TXNID_LT(page->modify->update_txn, txn_state->snap_min))
 		return (1);
 
@@ -646,7 +656,10 @@ __wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline int
 __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* Check if eviction has a chance of succeeding, otherwise stall. */
+	/*
+	 * Check if eviction or splitting has a chance of succeeding, otherwise
+	 * stall to give other transactions a chance to complete.
+	 */
 	__wt_txn_update_oldest(session);
 	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
 	    __wt_txn_visible_all(session, page->modify->update_txn)) {
