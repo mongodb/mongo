@@ -128,13 +128,9 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false) <<
+                                                "db" << "test") <<
                                            BSON("role" << "dbAdmin" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
@@ -151,9 +147,7 @@ namespace {
                      "db" << "admin" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "readWriteAnyDatabase" <<
-                                                "db" << "admin" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "admin"))),
                 BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
 
@@ -193,44 +187,32 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false) <<
+                                                "db" << "test") <<
                                            BSON("role" << "dbAdmin" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("user" << "useradmin" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "userAdmin" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("user" << "rwany" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "readWriteAnyDatabase" <<
-                                                "db" << "admin" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false) <<
+                                                "db" << "admin") <<
                                            BSON("role" << "dbAdminAnyDatabase" <<
-                                                "db" << "admin" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "admin"))),
                 BSONObj()));
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("user" << "useradminany" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "userAdminAnyDatabase" <<
-                                                "db" << "admin" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "admin"))),
                 BSONObj()));
 
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("rwany", "test")));
@@ -319,9 +301,7 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
@@ -345,9 +325,7 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "read" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
 
         // Make sure that invalidating the user causes the session to reload its privileges.
@@ -384,9 +362,7 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
@@ -411,9 +387,7 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "read" <<
-                                                "db" << "test" <<
-                                                "hasRole" << true <<
-                                                "canDelegate" << false))),
+                                                "db" << "test"))),
                 BSONObj()));
 
         // Even though the user's privileges have been reduced, since we've configured user
