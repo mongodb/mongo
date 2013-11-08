@@ -38,10 +38,9 @@ __wt_page_in_func(
 		case WT_REF_DELETED:
 			/*
 			 * The page isn't in memory, attempt to read it.
-			 *
-			 * First make sure there is space in the cache.
+			 * Make sure there is space in the cache.
 			 */
-			WT_RET(__wt_cache_full_check(session, 0));
+			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
 			continue;

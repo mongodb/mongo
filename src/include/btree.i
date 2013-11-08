@@ -504,18 +504,18 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-                ret = __wt_evict_page(session, page);
-                if (ret == 0)
-                        WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-                else
-                        WT_STAT_FAST_CONN_INCR(
-                            session, cache_eviction_force_fail);
-                if (ret == EBUSY)
-                        ret = 0;
-                return (ret);
-        }
+		ret = __wt_evict_page(session, page);
+		if (ret == 0)
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+		else
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_force_fail);
+		if (ret == EBUSY)
+			ret = 0;
+		return (ret);
+	}
 
-        return (__wt_hazard_clear(session, page));
+	return (__wt_hazard_clear(session, page));
 }
 
 /*
