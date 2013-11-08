@@ -82,7 +82,7 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	 * but the one we just closed might help eviction make progress.
 	 */
 	if (F_ISSET(&session->txn, TXN_AUTOCOMMIT))
-		WT_RET(__wt_cache_full_check(session, 1));
+		WT_RET(__wt_cache_full_check(session));
 
 	return (0);
 }
