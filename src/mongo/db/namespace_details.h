@@ -456,12 +456,6 @@ namespace mongo {
         // Start from lastExtent by default.
         DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
-        int averageObjectSize() {
-            if ( _stats.nrecords == 0 )
-                return 5;
-            return (int) (_stats.datasize / _stats.nrecords);
-        }
-
         NamespaceDetails *writingWithoutExtra() {
             return ( NamespaceDetails* ) getDur().writingPtr( this, sizeof( NamespaceDetails ) );
         }

@@ -476,10 +476,12 @@ namespace mongo {
             int allocSize;
             {
                 Client::ReadContext ctx( _ns );
-                NamespaceDetails *d = nsdetails( _ns );
-                verify( d );
+                Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                verify( collection );
                 scoped_spinlock lk( _trackerLocks );
-                allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
+                allocSize =
+                    std::min(BSONObjMaxUserSize,
+                             (int)((12 + collection->averageObjectSize()) * _cloneLocs.size()));
             }
             BSONArrayBuilder a (allocSize);
             

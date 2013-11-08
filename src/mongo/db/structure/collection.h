@@ -128,6 +128,13 @@ namespace mongo {
 
         uint64_t dataSize() const;
 
+        int averageObjectSize() const {
+            uint64_t n = numRecords();
+            if ( n == 0 )
+                return 5;
+            return static_cast<int>( dataSize() / n );
+        }
+
     private:
 
         // @return 0 for inf., otherwise a number of files
