@@ -56,23 +56,6 @@ namespace mongo {
         return *_error;
     }
 
-    //
-    // TODO: Mongos targeting checks for updates/deletes go here, i.e. we can only do multi-ops if
-    // we've got the right flags set.
-    //
-
-    static Status updateTargetsOk( const WriteOp& writeOp,
-                                   const vector<ShardEndpoint*>& endpoints ) {
-        // TODO: Multi, etc.
-        return Status::OK();
-    }
-
-    static Status deleteTargetsOk( const WriteOp& writeOp,
-                                   const vector<ShardEndpoint*>& endpoints ) {
-        // TODO: Single, etc.
-        return Status::OK();
-    }
-
     Status WriteOp::targetWrites( const NSTargeter& targeter,
                                   std::vector<TargetedWrite*>* targetedWrites ) {
 
@@ -80,42 +63,23 @@ namespace mongo {
         bool isDelete = _itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete;
         bool isIndexInsert = _itemRef.getRequest()->isInsertIndexRequest();
 
-        // In case of error, don't leak.
+        Status targetStatus = Status::OK();
         OwnedPointerVector<ShardEndpoint> endpointsOwned;
         vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
 
         if ( isUpdate ) {
-            Status targetStatus = targeter.targetUpdate( _itemRef.getUpdate()->getQuery(),
-                                                         _itemRef.getUpdate()->getUpdateExpr(),
-                                                         &endpoints );
-
-            if ( targetStatus.isOK() ) {
-                targetStatus = updateTargetsOk( *this, endpoints );
-            }
-
-            if ( !targetStatus.isOK() ) return targetStatus;
+            targetStatus = targeter.targetUpdate( *_itemRef.getUpdate(), &endpoints );
         }
         else if ( isDelete ) {
-
-            BSONObj queryDoc = _itemRef.getDelete()->getQuery();
-            Status targetStatus = targeter.targetDelete( queryDoc, &endpoints );
-
-            if ( targetStatus.isOK() ) {
-                targetStatus = deleteTargetsOk( *this, endpoints );
-            }
-
-            if ( !targetStatus.isOK() ) return targetStatus;
+            targetStatus = targeter.targetDelete( *_itemRef.getDelete(), &endpoints );
         }
         else {
             dassert( _itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert );
 
-            // Inserts targeted by doc itself
             ShardEndpoint* endpoint = NULL;
-            Status targetStatus = Status::OK();
-
             // TODO: Remove the index targeting stuff once there is a command for it
             if ( !isIndexInsert ) {
-                targetStatus = targeter.targetDoc( _itemRef.getDocument(), &endpoint );
+                targetStatus = targeter.targetInsert( _itemRef.getDocument(), &endpoint );
             }
             else {
                 // TODO: Retry index writes with stale version?
@@ -130,6 +94,9 @@ namespace mongo {
             // Store single endpoint result if we targeted a single endpoint
             if ( endpoint ) endpoints.push_back( endpoint );
         }
+
+        // If we had an error, stop here
+        if ( !targetStatus.isOK() ) return targetStatus;
 
         for ( vector<ShardEndpoint*>::iterator it = endpoints.begin(); it != endpoints.end();
             ++it ) {

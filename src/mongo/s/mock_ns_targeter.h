@@ -91,7 +91,7 @@ namespace mongo {
         /**
          * Returns a ShardEndpoint for the doc from the mock ranges
          */
-        Status targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const {
+        Status targetInsert( const BSONObj& doc, ShardEndpoint** endpoint ) const {
 
             const std::vector<MockRange*>& ranges = getRanges();
             for ( std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
@@ -112,18 +112,18 @@ namespace mongo {
          * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
          * queries of the form { field : { $gte : <value>, $lt : <value> } }.
          */
-        Status targetUpdate( const BSONObj& query,
-                             const BSONObj& update,
+        Status targetUpdate( const BatchedUpdateDocument& updateDoc,
                              std::vector<ShardEndpoint*>* endpoints ) const {
-            return targetQuery( query, endpoints );
+            return targetQuery( updateDoc.getQuery(), endpoints );
         }
 
         /**
          * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
          * queries of the form { field : { $gte : <value>, $lt : <value> } }.
          */
-        Status targetDelete( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const {
-            return targetQuery( query, endpoints );
+        Status targetDelete( const BatchedDeleteDocument& deleteDoc,
+                             std::vector<ShardEndpoint*>* endpoints ) const {
+            return targetQuery( deleteDoc.getQuery(), endpoints );
         }
 
         Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const {

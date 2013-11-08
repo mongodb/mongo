@@ -80,26 +80,36 @@ namespace mongo {
         return _nss;
     }
 
-    Status ChunkManagerTargeter::targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const {
+    Status ChunkManagerTargeter::targetInsert( const BSONObj& doc,
+                                               ShardEndpoint** endpoint ) const {
 
         if ( !_primary && !_manager ) return Status( ErrorCodes::NamespaceNotFound, "" );
 
-        if ( _manager ) {
+        if ( _primary ) {
+            *endpoint = new ShardEndpoint( _primary->getName(),
+                                           ChunkVersion::UNSHARDED() );
+        }
+        else {
+
+            //
+            // Sharded collections have the following requirements for targeting:
+            //
+            // Inserts must contain the exact shard key.
+            //
+
             if ( !_manager->hasShardKey( doc ) ) {
                 return Status( ErrorCodes::ShardKeyNotFound,
                                stream() << "document " << doc
                                         << " does not contain shard key for pattern "
                                         << _manager->getShardKey().key() );
             }
+
             ChunkPtr chunk = _manager->findChunkForDoc( doc );
             *endpoint = new ShardEndpoint( chunk->getShard().getName(),
                                            _manager->getVersion( chunk->getShard() ) );
 
+            // Track autosplit stats for sharded collections
             _stats->chunkSizeDelta[chunk->getMin()] += doc.objsize();
-        }
-        else {
-            *endpoint = new ShardEndpoint( _primary->getName(),
-                                           ChunkVersion::UNSHARDED() );
         }
 
         return Status::OK();
@@ -107,45 +117,72 @@ namespace mongo {
 
     namespace {
 
+        // TODO: Expose these for unit testing via dbtests
+
         enum UpdateType {
             UpdateType_Replacement, UpdateType_OpStyle, UpdateType_Unknown
         };
 
-        static UpdateType getUpdateType( const BSONObj& update ) {
+        /**
+         * There are two styles of update expressions:
+         * coll.update({ x : 1 }, { y : 2 }) // Replacement style
+         * coll.update({ x : 1 }, { $set : { y : 2 } }) // OpStyle
+         */
+        UpdateType getUpdateExprType( const BSONObj& updateExpr ) {
 
             UpdateType updateType = UpdateType_Unknown;
 
             // Empty update is replacement-style, by default
-            if ( update.isEmpty() ) return UpdateType_Replacement;
+            if ( updateExpr.isEmpty() ) return UpdateType_Replacement;
 
-            BSONObjIterator it( update );
+            BSONObjIterator it( updateExpr );
             while ( it.more() ) {
                 BSONElement next = it.next();
 
                 if ( next.fieldName()[0] == '$' ) {
-                    if ( updateType == UpdateType_Unknown ) updateType = UpdateType_OpStyle;
-                    else if ( updateType == UpdateType_Replacement ) return UpdateType_Unknown;
+                    if ( updateType == UpdateType_Unknown ) {
+                        updateType = UpdateType_OpStyle;
+                    }
+                    else if ( updateType == UpdateType_Replacement ) {
+                        return UpdateType_Unknown;
+                    }
                 }
                 else {
-                    if ( updateType == UpdateType_Unknown ) updateType = UpdateType_Replacement;
-                    else if ( updateType == UpdateType_OpStyle ) return UpdateType_Unknown;
+                    if ( updateType == UpdateType_Unknown ) {
+                        updateType = UpdateType_Replacement;
+                    }
+                    else if ( updateType == UpdateType_OpStyle ) {
+                        return UpdateType_Unknown;
+                    }
                 }
             }
 
             return updateType;
         }
+
+        /**
+         * This returns "does the query have an _id field" and "is the _id field
+         * querying for a direct value like _id : 3 and not _id : { $gt : 3 }"
+         *
+         * Ex: { _id : 1 } => true
+         *     { foo : <anything>, _id : 1 } => true
+         *     { _id : { $lt : 30 } } => false
+         *     { foo : <anything> } => false
+         */
+        bool isExactIdQuery( const BSONObj& query ) {
+            return query.hasField( "_id" ) && getGtLtOp( query["_id"] ) == BSONObj::Equality;
+        }
     }
 
 
-    Status ChunkManagerTargeter::targetUpdate( const BSONObj& query,
-                                               const BSONObj& update,
+    Status ChunkManagerTargeter::targetUpdate( const BatchedUpdateDocument& updateDoc,
                                                vector<ShardEndpoint*>* endpoints ) const {
 
         //
         // Update targeting may use either the query or the update.  This is to support save-style
         // updates, of the form:
         //
-        // db.update({ _id : xxx }, { _id : xxx, shardKey : 1, foo : bar }, { upsert : true })
+        // coll.update({ _id : xxx }, { _id : xxx, shardKey : 1, foo : bar }, { upsert : true })
         //
         // Because drivers do not know the shard key, they can't pull the shard key automatically
         // into the query doc, and to correctly support upsert we must target a single shard.
@@ -154,37 +191,86 @@ namespace mongo {
         // update.  If the update is replacement style, we target using the query.
         //
 
-        UpdateType updateType = getUpdateType( update );
+        BSONObj query = updateDoc.getQuery();
+        BSONObj updateExpr = updateDoc.getUpdateExpr();
+
+        UpdateType updateType = getUpdateExprType( updateDoc.getUpdateExpr() );
 
         if ( updateType == UpdateType_Unknown ) {
             return Status( ErrorCodes::UnsupportedFormat,
-                           stream() << "update document " << update
+                           stream() << "update document " << updateExpr
                                     << " has mixed $operator and non-$operator style fields" );
         }
 
-        Status result = Status::OK();
-        if ( updateType == UpdateType_OpStyle ) {
-            result = targetQuery( query, endpoints );
-        }
-        else {
-            dassert( updateType == UpdateType_Replacement );
-            result = targetQuery( update, endpoints );
-        }
+        BSONObj targetedDoc = updateType == UpdateType_OpStyle ? query : updateExpr;
+        Status result = targetQuery( targetedDoc, endpoints );
+        if ( !result.isOK() ) return result;
 
-        // Track autosplit stats
-        BSONObj targetedDoc = updateType == UpdateType_OpStyle ? query : update;
-        if ( result.isOK() && _manager && _manager->hasShardKey( targetedDoc ) ) {
-            // Note: this is only best effort accounting and is not accurate.
-            ChunkPtr chunk = _manager->findChunkForDoc( targetedDoc );
-            _stats->chunkSizeDelta[chunk->getMin()] += ( query.objsize() + update.objsize() );
+        if ( _manager ) {
+
+            //
+            // Sharded collections have the following futher requirements for targeting:
+            //
+            // Upserts must be targeted exactly by shard key.
+            // Non-multi updates must be targeted exactly by shard key *or* exact _id.
+            //
+
+            bool exactShardKeyQuery = _manager->hasShardKey( targetedDoc );
+
+            if ( updateDoc.getUpsert() && !exactShardKeyQuery ) {
+                return Status( ErrorCodes::ShardKeyNotFound,
+                               stream() << "upsert " << updateDoc.toBSON()
+                                        << " does not contain shard key for pattern "
+                                        << _manager->getShardKey().key() );
+            }
+
+            bool exactIdQuery = isExactIdQuery( updateDoc.getQuery() );
+
+            if ( !updateDoc.getMulti() && !exactShardKeyQuery && !exactIdQuery ) {
+                return Status( ErrorCodes::ShardKeyNotFound,
+                               stream() << "update " << updateDoc.toBSON()
+                                        << " does not contain _id or shard key for pattern "
+                                        << _manager->getShardKey().key() );
+            }
+
+            // Track autosplit stats for sharded collections
+            if ( exactShardKeyQuery ) {
+                // Note: this is only best effort accounting and is not accurate.
+                ChunkPtr chunk = _manager->findChunkForDoc( targetedDoc );
+                _stats->chunkSizeDelta[chunk->getMin()] +=
+                    ( query.objsize() + updateExpr.objsize() );
+            }
         }
 
         return result;
     }
 
-    Status ChunkManagerTargeter::targetDelete( const BSONObj& query,
+    Status ChunkManagerTargeter::targetDelete( const BatchedDeleteDocument& deleteDoc,
                                                vector<ShardEndpoint*>* endpoints ) const {
-        return targetQuery( query, endpoints );
+
+        Status result = targetQuery( deleteDoc.getQuery(), endpoints );
+        if ( !result.isOK() ) return result;
+
+        if ( _manager ) {
+
+            //
+            // Sharded collections have the following further requirements for targeting:
+            //
+            // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
+            //
+
+            bool exactShardKeyQuery = _manager->hasShardKey( deleteDoc.getQuery() );
+            bool exactIdQuery = isExactIdQuery( deleteDoc.getQuery() );
+
+            if ( deleteDoc.getLimit() == 1 && !exactShardKeyQuery && !exactIdQuery ) {
+                return Status( ErrorCodes::ShardKeyNotFound,
+                               stream() << "delete " << deleteDoc.toBSON()
+                                        << " does not contain _id or shard key for pattern "
+                                        << _manager->getShardKey().key() );
+            }
+        }
+
+        return result;
     }
 
 

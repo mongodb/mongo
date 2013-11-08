@@ -34,6 +34,8 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/batched_update_document.h"
+#include "mongo/s/batched_delete_document.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -79,18 +81,16 @@ namespace mongo {
         /**
          * Returns a ShardEndpoint for a single document write.
          *
-         * Returns ShardKeyNotFound if document does not have a full shard key.
          * Returns !OK with message if document could not be targeted for other reasons.
          */
-        virtual Status targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const = 0;
+        virtual Status targetInsert( const BSONObj& doc, ShardEndpoint** endpoint ) const = 0;
 
         /**
          * Returns a vector of ShardEndpoints for a potentially multi-shard update.
          *
          * Returns OK and fills the endpoints; returns a status describing the error otherwise.
          */
-        virtual Status targetUpdate( const BSONObj& query,
-                                     const BSONObj& update,
+        virtual Status targetUpdate( const BatchedUpdateDocument& updateDoc,
                                      std::vector<ShardEndpoint*>* endpoints ) const = 0;
 
         /**
@@ -98,7 +98,7 @@ namespace mongo {
          *
          * Returns OK and fills the endpoints; returns a status describing the error otherwise.
          */
-        virtual Status targetDelete( const BSONObj& query,
+        virtual Status targetDelete( const BatchedDeleteDocument& deleteDoc,
                                      std::vector<ShardEndpoint*>* endpoints ) const = 0;
 
         /**

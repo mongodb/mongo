@@ -50,13 +50,16 @@ namespace mongo {
 
         const NamespaceString& getNS() const;
 
-        Status targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const;
+        // Returns ShardKeyNotFound if document does not have a full shard key.
+        Status targetInsert( const BSONObj& doc, ShardEndpoint** endpoint ) const;
 
-        Status targetUpdate( const BSONObj& query,
-                             const BSONObj& update,
+        // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
+        Status targetUpdate( const BatchedUpdateDocument& updateDoc,
                              std::vector<ShardEndpoint*>* endpoints ) const;
 
-        Status targetDelete( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
+        // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
+        Status targetDelete( const BatchedDeleteDocument& deleteDoc,
+                             std::vector<ShardEndpoint*>* endpoints ) const;
 
         Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const;
 
