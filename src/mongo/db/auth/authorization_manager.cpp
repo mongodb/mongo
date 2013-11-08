@@ -830,6 +830,10 @@ namespace mongo {
         return _externalState->releaseAuthzUpdateLock();
     }
 
+    Status AuthorizationManager::upgradeSchemaStep(const BSONObj& writeConcern, bool* isDone) {
+        return Status(ErrorCodes::InternalError, "Not implemented");
+    }
+
 namespace {
     bool isAuthzNamespace(const StringData& ns) {
         return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
