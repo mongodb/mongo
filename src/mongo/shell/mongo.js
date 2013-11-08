@@ -156,12 +156,5 @@ connect = function(url, user, pass) {
 }
 
 // {Boolean} If true, uses the write commands instead of the legacy write ops.
-if (typeof(_useWriteCommandsDefault) == 'function') {
-    // For mongo shell
-    Mongo.prototype.useWriteCommands = _useWriteCommandsDefault();
-}
-else {
-    // For other places using the v8 engine other than the mongo shell, like map reduce
-    Mongo.prototype.useWriteCommands = false;
-}
+Mongo.prototype.useWriteCommands = _useWriteCommandsDefault();
 

@@ -176,7 +176,7 @@ namespace mongo {
         }
 
         void initScope( Scope &scope ) {
-            // Need to define this method before JSFiles::mongo is executed.
+            // Need to define this method before JSFiles::utils is executed.
             scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
             scope.externalSetup();
             mongo::shell_utils::installShellUtils( scope );

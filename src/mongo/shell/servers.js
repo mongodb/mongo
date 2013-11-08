@@ -895,8 +895,9 @@ startMongoProgram = function(){
 
 runMongoProgram = function() {
     var args = argumentsToArray( arguments );
+    var progName = args[0];
+
     if ( jsTestOptions().auth ) {
-        var progName = args[0];
         args = args.slice(1);
         args.unshift( progName,
                       '-u', jsTestOptions().adminUser,
@@ -905,6 +906,13 @@ runMongoProgram = function() {
                       '--authenticationDatabase=admin'
                     );
     }
+
+    if (progName == 'mongo' && !_useWriteCommandsDefault()) {
+        progName = args[0];
+        args = args.slice(1);
+        args.unshift(progName, '--useLegacyWriteOps');
+    }
+
     return _runMongoProgram.apply( null, args );
 }
 
@@ -913,8 +921,9 @@ runMongoProgram = function() {
 // command line arguments to the program.  Returns pid of the spawned program.
 startMongoProgramNoConnect = function() {
     var args = argumentsToArray( arguments );
+    var progName = args[0];
+
     if ( jsTestOptions().auth ) {
-        var progName = args[0];
         args = args.slice(1);
         args.unshift(progName,
                      '-u', jsTestOptions().adminUser,
@@ -922,6 +931,12 @@ startMongoProgramNoConnect = function() {
                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }
+
+    if (progName == 'mongo' && !_useWriteCommandsDefault()) {
+        args = args.slice(1);
+        args.unshift(progName, '--useLegacyWriteOps');
+    }
+
     return _startMongoProgram.apply( null, args );
 }
 

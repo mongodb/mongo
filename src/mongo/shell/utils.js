@@ -610,6 +610,11 @@ isMasterStatePrompt = function() {
     return state + '> ';
 }
 
+if (typeof(_useWriteCommandsDefault) == 'undefined') {
+    // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
+    _useWriteCommandsDefault = function() { return false; };
+};
+
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
         // Make sure that we have a db var before we use it
