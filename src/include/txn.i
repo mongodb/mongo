@@ -304,7 +304,7 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t id, my_id, my_snap_min, snap_min;
+	uint64_t id, my_id;
 	uint32_t i, session_cnt;
 
 	/* Cache the result: if we're the oldest, don't keep checking. */
@@ -320,17 +320,14 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	 * has been hijacked for eviction.
 	 */
 	s = &txn_global->states[session->id];
-	if ((my_id = s->id) == WT_TXN_NONE &&
-	    (my_snap_min = WT_TXN_NONE /* s->snap_min */) == WT_TXN_NONE)
+	if ((my_id = s->id) == WT_TXN_NONE)
 		return (0);
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;
 	    i < session_cnt;
 	    i++, s++)
-		if (((id = s->id) != WT_TXN_NONE && TXNID_LT(id, my_id)) ||
-		    ((snap_min = s->snap_min) != WT_TXN_NONE &&
-		    TXNID_LT(snap_min, my_snap_min)))
+		if ((id = s->id) != WT_TXN_NONE && TXNID_LT(id, my_id))
 			return (0);
 
 	F_SET(txn, TXN_OLDEST);
