@@ -827,7 +827,7 @@ extern int __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
 extern int __wt_log_slot_notify(WT_LOGSLOT *slot);
 extern int __wt_log_slot_wait(WT_LOGSLOT *slot);
 extern int64_t __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size);
-extern int __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
+extern int __wt_log_slot_free(WT_LOGSLOT *slot);
 extern int __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session,
     int64_t newsize);
 extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
