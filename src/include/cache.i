@@ -50,6 +50,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 	int busy, full;
 
@@ -60,8 +61,10 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 * Otherwise, we are at a transaction boundary and we can work harder
 	 * to make sure there is free space in the cache.
 	 */
-	txn_state = &S2C(session)->txn_global.states[session->id];
-	busy = (txn_state->snap_min != WT_TXN_NONE);
+	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
+	busy = (txn_state->snap_min != WT_TXN_NONE &&
+	    txn_global->current != txn_global->oldest_id);
 
 	/*
 	 * Only wake the eviction server the first time through here (if the
@@ -102,7 +105,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		 * wait forever.  We'll block next time we are not busy.
 		 */
 		__wt_txn_update_oldest(session);
-		if (txn_state->snap_min == S2C(session)->txn_global.oldest_id)
+		if (busy &&
+		    txn_state->snap_min == S2C(session)->txn_global.oldest_id)
 			return (0);
 
 		/* Wait for the queue to re-populate before trying again. */
