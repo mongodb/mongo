@@ -398,19 +398,23 @@ namespace auth {
 
     Status parseRolesInfoCommand(const BSONObj& cmdObj,
                                  const StringData& dbname,
-                                 std::vector<RoleName>* parsedRoleNames) {
+                                 RolesInfoArgs* parsedArgs) {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert("rolesInfo");
+        validFieldNames.insert("showPrivileges");
+        validFieldNames.insert("showBuiltinRoles");
 
         Status status = _checkNoExtraFields(cmdObj, "rolesInfo", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
-        if (cmdObj["rolesInfo"].type() == Array) {
+        if (cmdObj["rolesInfo"].numberInt() == 1) {
+            parsedArgs->allForDB = true;
+        } else if (cmdObj["rolesInfo"].type() == Array) {
             status = parseRoleNamesFromBSONArray(BSONArray(cmdObj["rolesInfo"].Obj()),
                                                  dbname,
-                                                 parsedRoleNames);
+                                                 &parsedArgs->roleNames);
             if (!status.isOK()) {
                 return status;
             }
@@ -424,7 +428,23 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
-            parsedRoleNames->push_back(name);
+            parsedArgs->roleNames.push_back(name);
+        }
+
+        status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                    "showPrivileges",
+                                                    false,
+                                                    &parsedArgs->showPrivileges);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                    "showBuiltinRoles",
+                                                    false,
+                                                    &parsedArgs->showBuiltinRoles);
+        if (!status.isOK()) {
+            return status;
         }
 
         return Status::OK();

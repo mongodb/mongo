@@ -55,7 +55,13 @@ namespace mongo {
 
         virtual Status getStoredAuthorizationVersion(int* outVersion);
         virtual Status getUserDescription(const UserName& userName, BSONObj* result);
-        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
+        virtual Status getRoleDescription(const RoleName& roleName,
+                                          bool showPrivileges,
+                                          BSONObj* result);
+        virtual Status getRoleDescriptionsForDB(const std::string dbname,
+                                                bool showPrivileges,
+                                                bool showBuiltinRoles,
+                                                vector<BSONObj>* result);
 
         virtual void logOp(
                 const char* op,
@@ -84,6 +90,9 @@ namespace mongo {
          */
         virtual Status _getUserDocument(const UserName& userName, BSONObj* result) = 0;
 
+        Status _getRoleDescription_inlock(const RoleName& roleName,
+                                          bool showPrivileges,
+                                          BSONObj* result);
         /**
          * Eventually consistent, in-memory representation of all roles in the system (both
          * user-defined and built-in).  Synchronized via _roleGraphMutex.

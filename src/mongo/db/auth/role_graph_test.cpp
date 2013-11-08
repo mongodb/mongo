@@ -35,6 +35,7 @@
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/sequence_util.h"
 
 namespace mongo {
 namespace {
@@ -670,6 +671,55 @@ namespace {
         ASSERT(graph.roleExists(RoleName("root", "admin")));
         ASSERT(graph.roleExists(RoleName("__system", "admin")));
         ASSERT(!graph.roleExists(RoleName("MyRole", "admin")));
+    }
+
+    TEST(RoleGraphTest, getRolesForDatabase) {
+        RoleGraph graph;
+        graph.createRole(RoleName("myRole", "test"));
+        // Make sure that a role on "test2" doesn't show up in the roles list for "test"
+        graph.createRole(RoleName("anotherRole", "test2"));
+        graph.createRole(RoleName("myAdminRole", "admin"));
+
+        // Non-admin DB with no user-defined roles
+        RoleNameIterator it = graph.getRolesForDatabase("fakedb");
+        ASSERT_EQUALS(RoleName("dbAdmin", "fakedb"), it.next());
+        ASSERT_EQUALS(RoleName("dbOwner", "fakedb"), it.next());
+        ASSERT_EQUALS(RoleName("read", "fakedb"), it.next());
+        ASSERT_EQUALS(RoleName("readWrite", "fakedb"), it.next());
+        ASSERT_EQUALS(RoleName("userAdmin", "fakedb"), it.next());
+        ASSERT_FALSE(it.more());
+
+        // Non-admin DB with a user-defined role
+        it = graph.getRolesForDatabase("test");
+        ASSERT_EQUALS(RoleName("dbAdmin", "test"), it.next());
+        ASSERT_EQUALS(RoleName("dbOwner", "test"), it.next());
+        ASSERT_EQUALS(RoleName("myRole", "test"), it.next());
+        ASSERT_EQUALS(RoleName("read", "test"), it.next());
+        ASSERT_EQUALS(RoleName("readWrite", "test"), it.next());
+        ASSERT_EQUALS(RoleName("userAdmin", "test"), it.next());
+        ASSERT_FALSE(it.more());
+
+        // Admin DB
+        it = graph.getRolesForDatabase("admin");
+        ASSERT_EQUALS(RoleName("__system", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("backup", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("clusterManager", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("clusterMonitor", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("dbAdmin", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("dbAdminAnyDatabase", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("dbOwner", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("hostManager", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("myAdminRole", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("read", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("readAnyDatabase", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("readWrite", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("readWriteAnyDatabase", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("restore", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("root", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("userAdmin", "admin"), it.next());
+        ASSERT_EQUALS(RoleName("userAdminAnyDatabase", "admin"), it.next());
+        ASSERT_FALSE(it.more());
     }
 
 }  // namespace

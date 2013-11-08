@@ -29,6 +29,7 @@
 #pragma once
 
 #include <algorithm>
+#include <set>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -88,7 +89,7 @@ namespace mongo {
         RoleNameIterator getDirectMembers(const RoleName& role);
 
         /**
-         * Returns an iterator over the RoleNames of the "subordninates" of the given role.
+         * Returns an iterator over the RoleNames of the "subordinates" of the given role.
          * Subordinate roles are the roles that this role has been granted directly (roles
          * that have been granted transitively through another role are not included).  These are
          * the "children" of this node in the graph.
@@ -101,6 +102,12 @@ namespace mongo {
          * of its subordinates, and so on.
          */
         RoleNameIterator getIndirectSubordinates(const RoleName& role);
+
+        /**
+         * Returns an iterator that can be used to get a full list of roles (in lexicographical
+         * order) that are defined on the given database.
+         */
+        RoleNameIterator getRolesForDatabase(const std::string& dbname);
 
         /**
          * Returns a vector of the privileges that the given role has been directly granted.
@@ -266,6 +273,12 @@ namespace mongo {
         void _createBuiltinRoleIfNeeded(const RoleName& role);
 
         /**
+         * Adds the built-in roles for the given database name to the role graph if they aren't
+         * already present.
+         */
+        void _createBuiltinRolesForDBIfNeeded(const std::string& dbname);
+
+        /**
          * Returns whether or not the given role exists strictly within the role graph.
          */
         bool _roleExistsDontCreateBuiltin(const RoleName& role);
@@ -293,6 +306,7 @@ namespace mongo {
         EdgeSet _roleToMembers;
         RolePrivilegeMap _directPrivilegesForRole;
         RolePrivilegeMap _allPrivilegesForRole;
+        set<RoleName> _allRoles;
     };
 
     void swap(RoleGraph& lhs, RoleGraph& rhs);

@@ -89,7 +89,10 @@ namespace mongo {
     }
 
     static inline bool operator<(const RoleName& lhs, const RoleName& rhs) {
-        return lhs.getFullName() < rhs.getFullName();
+        if (lhs.getDB() == rhs.getDB()) {
+            return lhs.getRole() < rhs.getRole();
+        }
+        return lhs.getDB() < rhs.getDB();
     }
 
     std::ostream& operator<<(std::ostream& os, const RoleName& name);

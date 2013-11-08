@@ -146,6 +146,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::getRoleDescription(const RoleName& roleName,
+                                                               bool showPrivileges,
                                                                BSONObj* result) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
@@ -157,7 +158,8 @@ namespace mongo {
                          BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                          roleName.getRole() <<
                                          AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
-                                         roleName.getDB()))),
+                                         roleName.getDB())) <<
+                         "showPrivileges" << showPrivileges),
                     cmdResult);
             if (!cmdResult["ok"].trueValue()) {
                 int code = cmdResult["code"].numberInt();
@@ -165,6 +167,35 @@ namespace mongo {
                 return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
             }
             *result = cmdResult["roles"]["0"].Obj().getOwned();
+            conn->done();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+    Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(const std::string dbname,
+                                                                     bool showPrivileges,
+                                                                     bool showBuiltinRoles,
+                                                                     vector<BSONObj>* result) {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                    AuthorizationManager::rolesCollectionNamespace));
+            BSONObj cmdResult;
+            conn->get()->runCommand(
+                    dbname,
+                    BSON("rolesInfo" << 1 <<
+                         "showPrivileges" << showPrivileges <<
+                         "showBuiltinRoles" << showBuiltinRoles),
+                    cmdResult);
+            if (!cmdResult["ok"].trueValue()) {
+                int code = cmdResult["code"].numberInt();
+                if (code == 0) code = ErrorCodes::UnknownError;
+                return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
+            }
+            for (BSONObjIterator it(cmdResult["roles"].Obj()); it.more(); it.next()) {
+                result->push_back((*it).Obj().getOwned());
+            }
             conn->done();
             return Status::OK();
         } catch (const DBException& e) {

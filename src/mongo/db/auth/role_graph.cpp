@@ -29,6 +29,7 @@
 #include "mongo/db/auth/role_graph.h"
 
 #include <algorithm>
+#include <set>
 #include <vector>
 
 #include "mongo/db/auth/privilege.h"
@@ -47,7 +48,8 @@ namespace {
             _roleToIndirectSubordinates(other._roleToIndirectSubordinates),
             _roleToMembers(other._roleToMembers),
             _directPrivilegesForRole(other._directPrivilegesForRole),
-            _allPrivilegesForRole(other._allPrivilegesForRole) {}
+            _allPrivilegesForRole(other._allPrivilegesForRole),
+            _allRoles(other._allRoles) {}
     RoleGraph::~RoleGraph() {};
 
     void RoleGraph::swap(RoleGraph& other) {
@@ -57,6 +59,7 @@ namespace {
         swap(this->_roleToMembers, other._roleToMembers);
         swap(this->_directPrivilegesForRole, other._directPrivilegesForRole);
         swap(this->_allPrivilegesForRole, other._allPrivilegesForRole);
+        swap(this->_allRoles, other._allRoles);
     }
 
     void swap(RoleGraph& lhs, RoleGraph& rhs) {
@@ -103,6 +106,7 @@ namespace {
         _roleToMembers[role];
         _directPrivilegesForRole[role];
         _allPrivilegesForRole[role];
+        _allRoles.insert(role);
     }
 
     Status RoleGraph::deleteRole(const RoleName& role) {
@@ -136,6 +140,7 @@ namespace {
         _roleToMembers.erase(role);
         _directPrivilegesForRole.erase(role);
         _allPrivilegesForRole.erase(role);
+        _allRoles.erase(role);
         return Status::OK();
     }
 
@@ -527,5 +532,14 @@ namespace {
         return Status::OK();
     }
 
+    RoleNameIterator RoleGraph::getRolesForDatabase(const std::string& dbname) {
+        _createBuiltinRolesForDBIfNeeded(dbname);
+
+        std::set<RoleName>::const_iterator lower = _allRoles.lower_bound(RoleName("", dbname));
+        std::string afterDB = dbname;
+        afterDB.push_back('\0');
+        std::set<RoleName>::const_iterator upper = _allRoles.lower_bound(RoleName("", afterDB));
+        return makeRoleNameIterator(lower, upper);
+    }
 
 } // namespace mongo

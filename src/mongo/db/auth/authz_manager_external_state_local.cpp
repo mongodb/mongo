@@ -204,10 +204,16 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateLocal::getRoleDescription(
-            const RoleName& roleName,
-            BSONObj* result) {
+    Status AuthzManagerExternalStateLocal::getRoleDescription(const RoleName& roleName,
+                                                              bool showPrivileges,
+                                                              BSONObj* result) {
         boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
+        return _getRoleDescription_inlock(roleName, showPrivileges, result);
+    }
+
+    Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName& roleName,
+                                                                      bool showPrivileges,
+                                                                      BSONObj* result) {
         if (!_roleGraph.roleExists(roleName))
             return Status(ErrorCodes::RoleNotFound, "No role named " + roleName.toString());
 
@@ -221,17 +227,23 @@ namespace {
         mutablebson::Element indirectRolesElement = resultDoc.makeElementArray("indirectRoles");
         fassert(17165, resultDoc.root().pushBack(indirectRolesElement));
         mutablebson::Element privilegesElement = resultDoc.makeElementArray("privileges");
-        fassert(17166, resultDoc.root().pushBack(privilegesElement));
+        if (showPrivileges) {
+            fassert(17166, resultDoc.root().pushBack(privilegesElement));
+        }
+        fassert(17267,
+                resultDoc.root().appendBool("isBuiltin", _roleGraph.isBuiltinRole(roleName)));
         mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
 
         addRoleNameObjectsToArrayElement(rolesElement, _roleGraph.getDirectSubordinates(roleName));
         if (_roleGraphState == roleGraphStateConsistent) {
             addRoleNameObjectsToArrayElement(
                     indirectRolesElement, _roleGraph.getIndirectSubordinates(roleName));
-            addPrivilegeObjectsOrWarningsToArrayElement(
-                    privilegesElement, warningsElement, _roleGraph.getAllPrivileges(roleName));
+            if (showPrivileges) {
+                addPrivilegeObjectsOrWarningsToArrayElement(
+                        privilegesElement, warningsElement, _roleGraph.getAllPrivileges(roleName));
+            }
         }
-        else {
+        else if (showPrivileges) {
             warningsElement.appendString(
                     "", "Role graph state inconsistent; only direct privileges available.");
             addPrivilegeObjectsOrWarningsToArrayElement(
@@ -241,6 +253,27 @@ namespace {
             fassert(17167, resultDoc.root().pushBack(warningsElement));
         }
         *result = resultDoc.getObject();
+        return Status::OK();
+    }
+
+    Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(const std::string dbname,
+                                                                    bool showPrivileges,
+                                                                    bool showBuiltinRoles,
+                                                                    vector<BSONObj>* result) {
+        boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
+
+        for (RoleNameIterator it = _roleGraph.getRolesForDatabase(dbname);
+                it.more(); it.next()) {
+            if (!showBuiltinRoles && _roleGraph.isBuiltinRole(it.get())) {
+                continue;
+            }
+            BSONObj roleDoc;
+            Status status = _getRoleDescription_inlock(it.get(), showPrivileges, &roleDoc);
+            if (!status.isOK()) {
+                return status;
+            }
+            result->push_back(roleDoc);
+        }
         return Status::OK();
     }
 

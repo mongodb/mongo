@@ -530,8 +530,20 @@ namespace mongo {
         return _externalState->getUserDescription(userName, result);
     }
 
-    Status AuthorizationManager::getRoleDescription(const RoleName& roleName, BSONObj* result) {
-        return _externalState->getRoleDescription(roleName, result);
+    Status AuthorizationManager::getRoleDescription(const RoleName& roleName,
+                                                    bool showPrivileges,
+                                                    BSONObj* result) {
+        return _externalState->getRoleDescription(roleName, showPrivileges, result);
+    }
+
+    Status AuthorizationManager::getRoleDescriptionsForDB(const std::string dbname,
+                                                          bool showPrivileges,
+                                                          bool showBuiltinRoles,
+                                                          vector<BSONObj>* result) {
+        return _externalState->getRoleDescriptionsForDB(dbname,
+                                                        showPrivileges,
+                                                        showBuiltinRoles,
+                                                        result);
     }
 
     Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {

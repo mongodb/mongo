@@ -214,7 +214,7 @@ namespace mongo {
             }
 
             BSONObj roleToAddDoc;
-            Status status = authzManager->getRoleDescription(roleToAdd, &roleToAddDoc);
+            Status status = authzManager->getRoleDescription(roleToAdd, false, &roleToAddDoc);
             if (status == ErrorCodes::RoleNotFound) {
                 return Status(ErrorCodes::RoleNotFound,
                               "Cannot grant nonexistent role " + roleToAdd.toString());
@@ -433,7 +433,7 @@ namespace mongo {
             // Role existence has to be checked after acquiring the update lock
             for (size_t i = 0; i < args.roles.size(); ++i) {
                 BSONObj ignored;
-                status = authzManager->getRoleDescription(args.roles[i], &ignored);
+                status = authzManager->getRoleDescription(args.roles[i], false, &ignored);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -585,7 +585,7 @@ namespace mongo {
             if (args.hasRoles) {
                 for (size_t i = 0; i < args.roles.size(); ++i) {
                     BSONObj ignored;
-                    status = authzManager->getRoleDescription(args.roles[i], &ignored);
+                    status = authzManager->getRoleDescription(args.roles[i], false, &ignored);
                     if (!status.isOK()) {
                         addStatus(status, result);
                         return false;
@@ -893,7 +893,7 @@ namespace mongo {
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
                 BSONObj roleDoc;
-                status = authzManager->getRoleDescription(roleName, &roleDoc);
+                status = authzManager->getRoleDescription(roleName, false, &roleDoc);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -1006,7 +1006,7 @@ namespace mongo {
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
                 BSONObj roleDoc;
-                status = authzManager->getRoleDescription(roleName, &roleDoc);
+                status = authzManager->getRoleDescription(roleName, false, &roleDoc);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -1440,7 +1440,7 @@ namespace mongo {
 
             // Role existence has to be checked after acquiring the update lock
             BSONObj ignored;
-            status = authzManager->getRoleDescription(args.roleName, &ignored);
+            status = authzManager->getRoleDescription(args.roleName, false, &ignored);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1571,7 +1571,7 @@ namespace mongo {
             }
 
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            status = authzManager->getRoleDescription(roleName, true, &roleDoc);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1718,7 +1718,7 @@ namespace mongo {
             }
 
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            status = authzManager->getRoleDescription(roleName, true, &roleDoc);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1873,7 +1873,7 @@ namespace mongo {
 
             // Role existence has to be checked after acquiring the update lock
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            status = authzManager->getRoleDescription(roleName, false, &roleDoc);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -2003,7 +2003,7 @@ namespace mongo {
             }
 
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            status = authzManager->getRoleDescription(roleName, false, &roleDoc);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -2130,7 +2130,7 @@ namespace mongo {
             }
 
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            status = authzManager->getRoleDescription(roleName, false, &roleDoc);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -2382,23 +2382,32 @@ namespace mongo {
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
-            std::vector<RoleName> roleNames;
-            Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &roleNames);
+            auth::RolesInfoArgs args;
+            Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
             if (!status.isOK()) {
                 return status;
             }
 
-            for (size_t i = 0; i < roleNames.size(); ++i) {
-                if (authzSession->isAuthenticatedAsUserWithRole(roleNames[i])) {
-                    continue; // Can always see roles that you are a member of
-                }
-
+            if (args.allForDB) {
                 if (!authzSession->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName(roleNames[i].getDB()),
-                        ActionType::viewRole)) {
+                        ResourcePattern::forDatabaseName(dbname), ActionType::viewRole)) {
                     return Status(ErrorCodes::Unauthorized,
                                   str::stream() << "Not authorized to view roles from the " <<
                                           dbname << " database");
+                }
+            } else {
+                for (size_t i = 0; i < args.roleNames.size(); ++i) {
+                    if (authzSession->isAuthenticatedAsUserWithRole(args.roleNames[i])) {
+                        continue; // Can always see roles that you are a member of
+                    }
+
+                    if (!authzSession->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forDatabaseName(args.roleNames[i].getDB()),
+                            ActionType::viewRole)) {
+                        return Status(ErrorCodes::Unauthorized,
+                                      str::stream() << "Not authorized to view roles from the " <<
+                                              args.roleNames[i].getDB() << " database");
+                    }
                 }
             }
 
@@ -2412,8 +2421,8 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl) {
 
-            std::vector<RoleName> roleNames;
-            Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &roleNames);
+            auth::RolesInfoArgs args;
+            Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -2426,18 +2435,32 @@ namespace mongo {
             }
 
             BSONArrayBuilder rolesArrayBuilder;
-            for (size_t i = 0; i < roleNames.size(); ++i) {
-                BSONObj roleDetails;
-                status = getGlobalAuthorizationManager()->getRoleDescription(
-                        roleNames[i], &roleDetails);
-                if (status.code() == ErrorCodes::RoleNotFound) {
-                    continue;
-                }
+            if (args.allForDB) {
+                std::vector<BSONObj> rolesDocs;
+                status = getGlobalAuthorizationManager()->getRoleDescriptionsForDB(
+                        dbname, args.showPrivileges, args.showBuiltinRoles, &rolesDocs);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
                 }
-                rolesArrayBuilder.append(roleDetails);
+
+                for (size_t i = 0; i < rolesDocs.size(); ++i) {
+                    rolesArrayBuilder.append(rolesDocs[i]);
+                }
+            } else {
+                for (size_t i = 0; i < args.roleNames.size(); ++i) {
+                    BSONObj roleDetails;
+                    status = getGlobalAuthorizationManager()->getRoleDescription(
+                            args.roleNames[i], args.showPrivileges, &roleDetails);
+                    if (status.code() == ErrorCodes::RoleNotFound) {
+                        continue;
+                    }
+                    if (!status.isOK()) {
+                        addStatus(status, result);
+                        return false;
+                    }
+                    rolesArrayBuilder.append(roleDetails);
+                }
             }
             result.append("roles", rolesArrayBuilder.arr());
             return true;

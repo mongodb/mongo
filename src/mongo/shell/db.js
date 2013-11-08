@@ -1373,11 +1373,13 @@ DB.prototype.revokePrivilegesFromRole = function(rolename, privileges, writeConc
     }
 }
 
-DB.prototype.getRole = function(rolename) {
+DB.prototype.getRole = function(rolename, args) {
     if (typeof rolename != "string") {
         throw Error("Role name for getRole shell helper must be a string");
     }
-    var res = this.runCommand({rolesInfo: rolename});
+    var cmdObj = {rolesInfo:rolename};
+    Object.extend(cmdObj, args);
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
@@ -1386,6 +1388,17 @@ DB.prototype.getRole = function(rolename) {
         throw Error("Role " + rolename + "@" + db.getName() + " not found");
     }
     return res.roles[0];
+}
+
+DB.prototype.getRoles = function(args) {
+    var cmdObj = {rolesInfo:1};
+    Object.extend(cmdObj, args);
+    var res = this.runCommand(cmdObj);
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+
+    return res.roles;
 }
 
 }());

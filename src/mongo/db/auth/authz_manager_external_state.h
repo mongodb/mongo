@@ -79,15 +79,36 @@ namespace mongo {
 
         /**
          * Writes into "result" a document describing the named role and returns Status::OK().  The
-         * description includes the role's in which the named role has membership, a full list of
-         * the role's privileges, and a full list of the roles of which the named role is a member,
-         * including those roles memberships held implicitly through other roles (indirect roles).
+         * description includes the roles in which the named role has membership and a full list of
+         * the roles of which the named role is a member, including those roles memberships held
+         * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
+         * description documents will also include a full list of the role's privileges.
          * In the event that some of this information is inconsistent, the document will contain a
          * "warnings" array, with string messages describing inconsistencies.
          *
          * If the role does not exist, returns ErrorCodes::RoleNotFound.
          */
-        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result) = 0;
+        virtual Status getRoleDescription(const RoleName& roleName,
+                                          bool showPrivileges,
+                                          BSONObj* result) = 0;
+
+        /**
+         * Writes into "result" documents describing the roles that are defined on the given
+         * database. Each role description document includes the other roles in which the role has
+         * membership and a full list of the roles of which the named role is a member,
+         * including those roles memberships held implicitly through other roles (indirect roles).
+         * If showPrivileges is true, then the description documents will also include a full list
+         * of the role's privileges.  If showBuiltinRoles is true, then the result array will
+         * contain description documents for all the builtin roles for the given database, if it
+         * is false the result will just include user defined roles.
+         * In the event that some of the information in a given role description is inconsistent,
+         * the document will contain a "warnings" array, with string messages describing
+         * inconsistencies.
+         */
+        virtual Status getRoleDescriptionsForDB(const std::string dbname,
+                                                bool showPrivileges,
+                                                bool showBuiltinRoles,
+                                                vector<BSONObj>* result) = 0;
 
         /**
          * Gets the privilege document for "userName" stored in the system.users collection of

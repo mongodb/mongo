@@ -114,13 +114,21 @@ namespace auth {
                                  const StringData& dbname,
                                  UsersInfoArgs* parsedArgs);
 
+    struct RolesInfoArgs {
+        std::vector<RoleName> roleNames;
+        bool allForDB;
+        bool showPrivileges;
+        bool showBuiltinRoles;
+        RolesInfoArgs() : allForDB(false), showPrivileges(false), showBuiltinRoles(false) {}
+    };
+
     /**
      * Takes a command object describing an invocation of the "rolesInfo" command  and parses out
-     * the role names requested into the "parsedRoleNames" output param.
+     * the arguments into the "parsedArgs" output param.
      */
     Status parseRolesInfoCommand(const BSONObj& cmdObj,
                                  const StringData& dbname,
-                                 std::vector<RoleName>* parsedRoleNames);
+                                 RolesInfoArgs* parsedArgs);
 
     struct CreateOrUpdateRoleArgs {
         RoleName roleName;
