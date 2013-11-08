@@ -30,7 +30,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int i;
+	int32_t i;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -44,7 +44,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < SLOT_ACTIVE; i++) {
 		slot = &log->slot_pool[i];
-		slot->slot_index = i;
+		slot->slot_index = (uint32_t)i;
 		slot->slot_state = WT_LOG_SLOT_READY;
 		log->slot_array[i] = slot;
 	}
@@ -288,7 +288,8 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t old_size, orig_state, total_growth;
+	int64_t orig_state;
+	uint64_t old_size, total_growth;
 	int i;
 
 	conn = S2C(session);
