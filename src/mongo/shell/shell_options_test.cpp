@@ -267,6 +267,19 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
+            else if (iterator->_dottedName == "useLegacyWriteOps") {
+                ASSERT_EQUALS(iterator->_singleName, "useLegacyWriteOps");
+                ASSERT_EQUALS(iterator->_type, moe::Switch);
+                ASSERT_EQUALS(iterator->_description,
+                              "use legacy write ops instead of write commands");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
 #ifdef MONGO_SSL
             else if (iterator->_dottedName == "ssl") {
                 ASSERT_EQUALS(iterator->_singleName, "ssl");
