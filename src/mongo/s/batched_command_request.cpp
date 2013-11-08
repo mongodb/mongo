@@ -71,6 +71,15 @@ namespace mongo {
         return NamespaceString( getNS() ).isSystemDotIndexes();
     }
 
+    static bool extractUniqueIndex( const BSONObj& indexDesc ) {
+        return indexDesc["unique"].trueValue();
+    }
+
+    bool BatchedCommandRequest::isUniqueIndexRequest() const {
+        if ( !isInsertIndexRequest() ) return false;
+        return extractUniqueIndex( getInsertRequest()->getDocumentsAt( 0 ) );
+    }
+
     static void extractIndexNSS( const BSONObj& indexDesc, NamespaceString* indexNSS ) {
         *indexNSS = NamespaceString( indexDesc["ns"].str() );
     }
@@ -80,6 +89,15 @@ namespace mongo {
         NamespaceString nss;
         extractIndexNSS( getInsertRequest()->getDocumentsAt( 0 ), &nss );
         return nss.toString();
+    }
+
+    static BSONObj extractIndexKeyPattern( const BSONObj& indexDesc ) {
+        return indexDesc["key"].Obj();
+    }
+
+    BSONObj BatchedCommandRequest::getIndexKeyPattern() const {
+        dassert( isInsertIndexRequest() );
+        return extractIndexKeyPattern( getInsertRequest()->getDocumentsAt( 0 ) );
     }
 
     bool BatchedCommandRequest::isVerboseWC() const {

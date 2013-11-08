@@ -84,8 +84,6 @@ namespace mongo {
             request->getInsertRequest()->addToDocuments( *it );
         }
         request->setOrdered( ordered );
-        // TODO: XXX should have default
-        request->setWriteConcern( BSONObj() );
 
         return request;
     }
@@ -112,8 +110,6 @@ namespace mongo {
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Update );
         request->setNS( nss.ns() );
         request->getUpdateRequest()->addToUpdates( updateDoc );
-        // TODO: XXX should have default
-        request->setWriteConcern( BSONObj() );
 
         return request;
     }
@@ -136,8 +132,6 @@ namespace mongo {
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Delete );
         request->setNS( nss.ns() );
         request->getDeleteRequest()->addToDeletes( deleteDoc );
-        // TODO: XXX should have default
-        request->setWriteConcern( BSONObj() );
 
         return request;
     }

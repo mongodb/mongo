@@ -44,9 +44,12 @@
 #include "mongo/s/batched_upsert_detail.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using mongoutils::str::stream;
 
     WriteBatchExecutor::WriteBatchExecutor( const BSONObj& wc,
                                             Client* client,
@@ -276,6 +279,32 @@ namespace mongo {
         error->setErrMessage( ex.what() );
     }
 
+    static void buildStaleError( const ChunkVersion& shardVersionRecvd,
+                                 const ChunkVersion& shardVersionWanted,
+                                 BatchedErrorDetail* error ) {
+
+        // Write stale error to results
+        error->setErrCode( ErrorCodes::StaleShardVersion );
+
+        BSONObjBuilder infoB;
+        shardVersionWanted.addToBSON( infoB, "vWanted" );
+        error->setErrInfo( infoB.obj() );
+
+        string errMsg = stream() << "stale shard version detected before write, received "
+                                 << shardVersionRecvd.toString() << " but local version is "
+                                 << shardVersionWanted.toString();
+        error->setErrMessage( errMsg );
+    }
+
+    static void buildUniqueIndexError( const BSONObj& keyPattern,
+                                       const BSONObj& indexPattern,
+                                       BatchedErrorDetail* error ) {
+        error->setErrCode( ErrorCodes::CannotCreateIndex );
+        string errMsg = stream() << "cannot create unique index over " << indexPattern
+                                 << " with shard key pattern " << keyPattern;
+        error->setErrMessage( errMsg );
+    }
+
     bool WriteBatchExecutor::doWrite( const string& ns,
                                       const BatchItemRef& itemRef,
                                       CurOp* currentOp,
@@ -290,34 +319,26 @@ namespace mongo {
         // Check our shard version if we need to (must be in the write lock)
         //
 
-        if ( shardingState.enabled() && request.isShardVersionSet()
-             && !ChunkVersion::isIgnoredVersion( request.getShardVersion() ) ) {
+        CollectionMetadataPtr metadata;
+        if ( shardingState.enabled() ) {
 
             // Index inserts make the namespace nontrivial for versioning
             string targetingNS = itemRef.getRequest()->getTargetingNS();
-
             Lock::assertWriteLocked( targetingNS );
-            CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( targetingNS );
-            ChunkVersion shardVersion =
-                metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+            metadata = shardingState.getCollectionMetadata( targetingNS );
 
-            if ( !request.getShardVersion() //
-                .isWriteCompatibleWith( shardVersion ) ) {
+            if ( request.isShardVersionSet()
+                 && !ChunkVersion::isIgnoredVersion( request.getShardVersion() ) ) {
 
-                // Write stale error to results
-                error->setErrCode( ErrorCodes::StaleShardVersion );
+                ChunkVersion shardVersion =
+                    metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
-                BSONObjBuilder infoB;
-                shardVersion.addToBSON( infoB, "vWanted" );
-                error->setErrInfo( infoB.obj() );
+                if ( !request.getShardVersion() //
+                    .isWriteCompatibleWith( shardVersion ) ) {
 
-                string errMsg = mongoutils::str::stream()
-                    << "stale shard version detected before write, received "
-                    << request.getShardVersion().toString() << " but local version is "
-                    << shardVersion.toString();
-                error->setErrMessage( errMsg );
-
-                return false;
+                    buildStaleError( request.getShardVersion(), shardVersion, error );
+                    return false;
+                }
             }
         }
 
@@ -327,6 +348,18 @@ namespace mongo {
 
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
 
+            // Need to check for unique index problems
+            if ( metadata && request.isUniqueIndexRequest() ) {
+                if ( !isUniqueIndexCompatible( metadata->getKeyPattern(),
+                                               request.getIndexKeyPattern() ) ) {
+
+                    buildUniqueIndexError( metadata->getKeyPattern(),
+                                           request.getIndexKeyPattern(),
+                                           error );
+                    return false;
+                }
+            }
+
             // Insert
             return doInsert( ns,
                              request.getInsertRequest()->getDocumentsAt( index ),
@@ -335,6 +368,8 @@ namespace mongo {
                              error );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
+
+            // TODO: Pass down immutable shard key fields
 
             // Update
             return doUpdate( ns,

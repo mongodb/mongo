@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/s/chunk.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/startup_test.h"
@@ -77,11 +78,7 @@ namespace mongo {
     }
 
     bool ShardKeyPattern::isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const {
-        if ( ! uniqueIndexPattern.toBSON().isEmpty() &&
-             str::equals( uniqueIndexPattern.toBSON().firstElementFieldName(), "_id" ) ){
-            return true;
-        }
-        return pattern.toBSON().isFieldNamePrefixOf( uniqueIndexPattern.toBSON() );
+        return mongo::isUniqueIndexCompatible( pattern.toBSON(), uniqueIndexPattern.toBSON() );
     }
 
     string ShardKeyPattern::toString() const {

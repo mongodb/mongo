@@ -35,6 +35,12 @@
 
 namespace mongo {
 
+    /**
+     * THIS FUNCTIONALITY IS DEPRECATED
+     * Everything BSON related in this file should migrate gradually to s/shard_key_pattern.h, new
+     * functionality should not go here.
+     */
+
     class Chunk;
     class FieldRangeSet;
 

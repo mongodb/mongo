@@ -80,7 +80,9 @@ namespace mongo {
         BatchedDeleteRequest* getDeleteRequest() const;
         // Index creation is also an insert, but a weird one.
         bool isInsertIndexRequest() const;
+        bool isUniqueIndexRequest() const;
         std::string getTargetingNS() const;
+        BSONObj getIndexKeyPattern() const;
 
         //
         // individual field accessors
