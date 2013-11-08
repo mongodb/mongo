@@ -170,6 +170,14 @@ namespace auth {
     Status parseDropAllRolesFromDatabaseCommand(const BSONObj& cmdObj,
                                                 const std::string& dbname,
                                                 BSONObj* parsedWriteConcern);
+
+    /**
+     * Takes a command object describing an invocation of the "authSchemaUpgradeStep" command and
+     * parses out the write concern.
+     */
+    Status parseAuthSchemaUpgradeStepCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             BSONObj* parsedWriteConcern);
     /**
      * Parses the privileges described in "privileges" into a vector of Privilege objects.
      * Returns Status::OK() upon successfully parsing all the elements of "privileges".

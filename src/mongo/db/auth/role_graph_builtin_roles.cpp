@@ -350,6 +350,9 @@ namespace {
                 Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
+                Privilege(ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"),
                           readRoleActions));
         Privilege::addPrivilegeToPrivilegeVector(

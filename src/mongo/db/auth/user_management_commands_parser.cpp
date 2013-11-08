@@ -615,5 +615,26 @@ namespace auth {
 
         return Status::OK();
     }
+
+    Status parseAuthSchemaUpgradeStepCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("authSchemaUpgradeStep");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "authSchemaUpgradeStep", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
 } // namespace auth
 } // namespace mongo

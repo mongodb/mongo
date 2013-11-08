@@ -2487,4 +2487,57 @@ namespace mongo {
         }
 
     } cmdInvalidateUserCache;
+
+    class CmdAuthSchemaUpgradeStep : public Command {
+    public:
+        CmdAuthSchemaUpgradeStep() : Command("authSchemaUpgradeStep") {}
+
+        virtual bool slaveOk() const { return false; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Performs the next step in the process of upgrading the auth schema.";
+        }
+
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
+                return Status(ErrorCodes::Unauthorized,
+                              "Not authorized to run authSchemaUpgradeStep command.");
+            }
+            return Status::OK();
+        }
+
+        virtual bool run(
+                const string& dbname,
+                BSONObj& cmdObj,
+                int options,
+                string& errmsg,
+                BSONObjBuilder& result,
+                bool fromRepl) {
+
+            BSONObj writeConcern;
+            Status status = auth::parseAuthSchemaUpgradeStepCommand(cmdObj, dbname, &writeConcern);
+            if (!status.isOK()) {
+                appendCommandStatus(result, status);
+                return false;
+            }
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            bool done;
+            status = authzManager->upgradeSchemaStep(writeConcern, &done);
+            if (!status.isOK()) {
+                appendCommandStatus(result, status);
+                return false;
+            }
+            result.append("done", done);
+            return true;
+        }
+
+    } cmdAuthSchemaUpgradeStep;
 }
