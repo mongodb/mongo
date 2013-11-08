@@ -28,10 +28,9 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/s/batched_command_request.h"
 #include "mongo/s/batched_command_response.h"
 #include "mongo/s/cluster_write.h"
@@ -64,12 +63,14 @@ namespace mongo {
             return Command::NONE;
         }
 
-        void addRequiredPrivileges( const std::string& dbname,
-                                    const BSONObj& cmdObj,
-                                    std::vector<Privilege>* out ) {
-            ActionSet actions;
-            actions.addAction( _action );
-            out->push_back( Privilege( parseResourcePattern( dbname, cmdObj ), actions ) );
+        Status checkAuthForCommand( ClientBasic* client,
+                                    const std::string& dbname,
+                                    const BSONObj& cmdObj ) {
+
+            return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                                                   _writeType,
+                                                   NamespaceString( parseNs( dbname, cmdObj ) ),
+                                                   cmdObj );
         }
 
         // Cluster write command entry point.
@@ -86,16 +87,11 @@ namespace mongo {
          * Instantiates a command that can be invoked by "name", which will be capable of issuing
          * write batches of type "writeType", and will require privilege "action" to run.
          */
-        ClusterWriteCmd( const StringData& name,
-                         BatchedCommandRequest::BatchType writeType,
-                         ActionType action ) :
-            Command( name ), _action( action ), _writeType( writeType ) {
+        ClusterWriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
+            Command( name ), _writeType( writeType ) {
         }
 
     private:
-
-        // Privilege required to execute command.
-        ActionType _action;
 
         // Type of batch (e.g. insert).
         BatchedCommandRequest::BatchType _writeType;
@@ -105,9 +101,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(ClusterCmdInsert);
     public:
         ClusterCmdInsert() :
-            ClusterWriteCmd( "insert",
-                             BatchedCommandRequest::BatchType_Insert,
-                             ActionType::insert ) {
+            ClusterWriteCmd( "insert", BatchedCommandRequest::BatchType_Insert ) {
         }
 
         void help( stringstream& help ) const {
@@ -119,9 +113,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(ClusterCmdUpdate);
     public:
         ClusterCmdUpdate() :
-            ClusterWriteCmd( "update",
-                             BatchedCommandRequest::BatchType_Update,
-                             ActionType::update ) {
+            ClusterWriteCmd( "update", BatchedCommandRequest::BatchType_Update ) {
         }
 
         void help( stringstream& help ) const {
@@ -133,9 +125,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(ClusterCmdDelete);
     public:
         ClusterCmdDelete() :
-            ClusterWriteCmd( "delete",
-                             BatchedCommandRequest::BatchType_Delete,
-                             ActionType::remove ) {
+            ClusterWriteCmd( "delete", BatchedCommandRequest::BatchType_Delete ) {
         }
 
         void help( stringstream& help ) const {

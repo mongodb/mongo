@@ -16,6 +16,7 @@
 
 #include "mongo/s/batched_command_request.h"
 
+#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -326,6 +327,54 @@ namespace mongo {
 
     long long BatchedCommandRequest::getSession() const {
         INVOKE( getSession );
+    }
+
+    bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {
+
+        BSONElement updatesEl = writeCmdObj[BatchedUpdateRequest::updates()];
+        if ( updatesEl.type() != Array ) {
+            return false;
+        }
+
+        BSONObjIterator it( updatesEl.Obj() );
+        while ( it.more() ) {
+            BSONElement updateEl = it.next();
+            if ( !updateEl.isABSONObj() ) continue;
+            if ( updateEl.Obj()[BatchedUpdateDocument::upsert()].trueValue() ) return true;
+        }
+
+        return false;
+    }
+
+    bool BatchedCommandRequest::getIndexedNS( const BSONObj& writeCmdObj,
+                                              string* nsToIndex,
+                                              string* errMsg ) {
+
+        BSONElement documentsEl = writeCmdObj[BatchedInsertRequest::documents()];
+        if ( documentsEl.type() != Array ) {
+            *errMsg = "index write batch is invalid";
+            return false;
+        }
+
+        BSONObjIterator it( documentsEl.Obj() );
+        if ( !it.more() ) {
+            *errMsg = "index write batch is empty";
+            return false;
+        }
+
+        BSONElement indexDescEl = it.next();
+        *nsToIndex = indexDescEl["ns"].str();
+        if ( *nsToIndex == "" ) {
+            *errMsg = "index write batch contains an invalid index descriptor";
+            return false;
+        }
+
+        if ( it.more() ) {
+            *errMsg = "index write batches may only contain a single index descriptor";
+            return false;
+        }
+
+        return true;
     }
 
 } // namespace mongo

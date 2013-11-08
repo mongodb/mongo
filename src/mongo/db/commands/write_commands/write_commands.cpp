@@ -29,8 +29,8 @@
 #include "mongo/db/commands/write_commands/write_commands.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands/write_commands/batch_executor.h"
+#include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/server_parameters.h"
@@ -50,10 +50,8 @@ namespace mongo {
 
     } // namespace
 
-    WriteCmd::WriteCmd( const StringData& name,
-                        BatchedCommandRequest::BatchType writeType,
-                        ActionType action ) :
-            Command( name ), _action( action ), _writeType( writeType ) {
+    WriteCmd::WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
+        Command( name ), _writeType( writeType ) {
     }
 
     // Write commands are fanned out in oplog as single writes.
@@ -65,12 +63,14 @@ namespace mongo {
     // Write commands acquire write lock, but not for entire length of execution.
     Command::LockType WriteCmd::locktype() const { return NONE; }
 
-    void WriteCmd::addRequiredPrivileges(const std::string& dbname,
-                                         const BSONObj& cmdObj,
-                                         std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(_action);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    Status WriteCmd::checkAuthForCommand( ClientBasic* client,
+                                          const std::string& dbname,
+                                          const BSONObj& cmdObj ) {
+
+        return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                                               _writeType,
+                                               NamespaceString( parseNs( dbname, cmdObj ) ),
+                                               cmdObj );
     }
 
     // Write commands are counted towards their corresponding opcounters, not command opcounters.
@@ -142,7 +142,7 @@ namespace mongo {
     }
 
     CmdInsert::CmdInsert() :
-            WriteCmd( "insert", BatchedCommandRequest::BatchType_Insert, ActionType::insert ) {
+        WriteCmd( "insert", BatchedCommandRequest::BatchType_Insert ) {
     }
 
     void CmdInsert::help( stringstream& help ) const {
@@ -150,7 +150,7 @@ namespace mongo {
     }
 
     CmdUpdate::CmdUpdate() :
-            WriteCmd( "update", BatchedCommandRequest::BatchType_Update, ActionType::update ) {
+        WriteCmd( "update", BatchedCommandRequest::BatchType_Update ) {
     }
 
     void CmdUpdate::help( stringstream& help ) const {
@@ -158,7 +158,7 @@ namespace mongo {
     }
 
     CmdDelete::CmdDelete() :
-            WriteCmd( "delete", BatchedCommandRequest::BatchType_Delete, ActionType::remove ) {
+        WriteCmd( "delete", BatchedCommandRequest::BatchType_Delete ) {
     }
 
     void CmdDelete::help( stringstream& help ) const {

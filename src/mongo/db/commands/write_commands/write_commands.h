@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/commands.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/s/batched_command_request.h"
 
 namespace mongo {
@@ -54,9 +55,7 @@ namespace mongo {
          * Instantiates a command that can be invoked by "name", which will be capable of issuing
          * write batches of type "writeType", and will require privilege "action" to run.
          */
-        WriteCmd( const StringData& name,
-                  BatchedCommandRequest::BatchType writeType,
-                  ActionType action );
+        WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType );
 
     private:
         virtual bool logTheOp();
@@ -65,9 +64,9 @@ namespace mongo {
 
         virtual LockType locktype() const;
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                   const BSONObj& cmdObj,
-                                   std::vector<Privilege>* out);
+        virtual Status checkAuthForCommand( ClientBasic* client,
+                                            const std::string& dbname,
+                                            const BSONObj& cmdObj );
 
         virtual bool shouldAffectCommandCounter() const;
 
@@ -78,9 +77,6 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl);
-
-        // Privilege required to execute command.
-        ActionType _action;
 
         // Type of batch (e.g. insert).
         BatchedCommandRequest::BatchType _writeType;

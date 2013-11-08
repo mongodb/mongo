@@ -126,6 +126,25 @@ namespace mongo {
         bool isSessionSet() const;
         long long getSession() const;
 
+        //
+        // Helpers for auth pre-parsing
+        //
+
+        /**
+         * Helper to determine whether or not there are any upserts in the batch
+         */
+        static bool containsUpserts( const BSONObj& writeCmdObj );
+
+        /**
+         * Helper to extract the namespace being indexed from a raw BSON write command.
+         *
+         * Returns false with errMsg if the index write command seems invalid.
+         * TODO: Remove when we have parsing hooked before authorization
+         */
+        static bool getIndexedNS( const BSONObj& writeCmdObj,
+                                  std::string* nsToIndex,
+                                  std::string* errMsg );
+
     private:
 
         BatchType _batchType;
