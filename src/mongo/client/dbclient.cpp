@@ -412,10 +412,10 @@ namespace mongo {
         return QueryOptions(0);
     }
 
-    inline bool DBClientWithCommands::runCommand(const string &dbname,
-                                                 const BSONObj& cmd,
-                                                 BSONObj &info,
-                                                 int options) {
+    bool DBClientWithCommands::runCommand(const string &dbname,
+                                          const BSONObj& cmd,
+                                          BSONObj &info,
+                                          int options) {
         string ns = dbname + ".$cmd";
         info = findOne(ns, cmd, 0 , options);
         return isOk(info);
@@ -923,10 +923,10 @@ namespace mongo {
         runCommand(dbname, BSON("logout" << 1), info);
     }
 
-    inline bool DBClientConnection::runCommand(const string &dbname,
-                                               const BSONObj& cmd,
-                                               BSONObj &info,
-                                               int options) {
+    bool DBClientConnection::runCommand(const string &dbname,
+                                        const BSONObj& cmd,
+                                        BSONObj &info,
+                                        int options) {
         if (DBClientWithCommands::runCommand(dbname, cmd, info, options))
             return true;
         
