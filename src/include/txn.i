@@ -267,18 +267,13 @@ static inline void
 __wt_txn_read_last(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
-	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn_state = &S2C(session)->txn_global.states[session->id];
 
 	/* Release the snap_min ID we put in the global table. */
-	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    (!F_ISSET(txn, TXN_RUNNING) &&
-	    txn->isolation == TXN_ISO_SNAPSHOT))
+	if (!F_ISSET(txn, TXN_RUNNING) ||
+	    txn->isolation != TXN_ISO_SNAPSHOT)
 		__wt_txn_release_snapshot(session);
-	else if (!F_ISSET(txn, TXN_RUNNING))
-		txn_state->snap_min = WT_TXN_NONE;
 }
 
 /*
@@ -307,7 +302,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * oldest_id may move past this ID if a scan races with this
 	 * value being published.  That said, read-uncommitted operations
 	 * always take the most recent version of a value, so for that version
-	 * to be freed, two newer versions would have to be committed.  Putting
+	 * to be freed, two newer versions would have to be committed.	Putting
 	 * this snap_min ID in the table prevents the oldest ID from moving
 	 * further forward, so that once a read-uncommitted cursor is
 	 * positioned on a value, it can't be freed.

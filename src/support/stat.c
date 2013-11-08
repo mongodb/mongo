@@ -327,6 +327,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
+	stats->cache_eviction_force.desc =
+	    "cache: pages evicted because they exceeded the in memory maxiumum";
+	stats->cache_eviction_force_fail.desc =
+	    "cache: failed eviction of pages that exceeded the in memory maxiumum";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
@@ -427,6 +431,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
+	stats->cache_eviction_force.v = 0;
+	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_merge.v = 0;
