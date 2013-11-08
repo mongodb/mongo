@@ -733,10 +733,10 @@ namespace mongo {
         DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
 
         if ( loc.isNull() ) {
-            log() << "insert: couldn't alloc space for object ns:" << ns
-                  << " capped:" << d->isCapped() << endl;
-            verify(d->isCapped());
-            return DiskLoc();
+            string errmsg = str::stream() << "insert: couldn't alloc space for object ns:" << ns
+                                          << " capped:" << d->isCapped();
+            log() << errmsg;
+            uasserted( 17248, errmsg );
         }
 
         Record *r = loc.rec();

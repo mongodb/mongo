@@ -380,13 +380,12 @@ namespace mongo {
             ns = rsoplog;
 
         Client::Context ctx(ns);
+        Collection* collection = ctx.db()->getCollection( ns );
 
-        NamespaceDetails * nsd = nsdetails( ns );
-
-        if ( nsd ) {
+        if ( collection ) {
 
             if (replSettings.oplogSize != 0) {
-                int o = (int)(nsd->storageSize() / ( 1024 * 1024 ) );
+                int o = (int)(collection->storageSize() / ( 1024 * 1024 ) );
                 int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;

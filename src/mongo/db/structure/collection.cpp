@@ -296,6 +296,33 @@ namespace mongo {
         return StatusWith<DiskLoc>( oldLocation );
     }
 
+    long long Collection::storageSize( int* numExtents, BSONArrayBuilder* extentInfo ) const {
+        if ( _details->firstExtent().isNull() ) {
+            if ( numExtents )
+                *numExtents = 0;
+            return 0;
+        }
+
+        Extent* e = getExtentManager()->getExtent( _details->firstExtent() );
+
+        long long total = 0;
+        int n = 0;
+        while ( e ) {
+            total += e->length;
+            n++;
+
+            if ( extentInfo ) {
+                extentInfo->append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
+            }
+
+            e = getExtentManager()->getNextExtent( e );
+        }
+
+        if ( numExtents )
+            *numExtents = n;
+
+        return total;
+    }
 
     ExtentManager* Collection::getExtentManager() {
         verify( ok() );
@@ -329,6 +356,10 @@ namespace mongo {
 
     uint64_t Collection::numRecords() const {
         return _details->numRecords();
+    }
+
+    uint64_t Collection::dataSize() const {
+        return _details->dataSize();
     }
 
 }

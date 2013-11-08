@@ -110,6 +110,8 @@ namespace mongo {
                                             bool enforceQuota,
                                             OpDebug* debug );
 
+        long long storageSize( int* numExtents = NULL, BSONArrayBuilder* extentInfo = NULL ) const;
+
         // -----------
 
         // this is temporary, moving up from DB for now
@@ -123,6 +125,8 @@ namespace mongo {
         //
 
         uint64_t numRecords() const;
+
+        uint64_t dataSize() const;
 
     private:
 

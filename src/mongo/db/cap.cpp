@@ -214,13 +214,18 @@ namespace mongo {
     }
 
     DiskLoc NamespaceDetails::cappedAlloc(const StringData& ns, int len) {
-        
+
         if ( len > theCapExtent()->length ) {
             // the extent check is a way to try and improve performance
-            uassert( 16328 , str::stream() << "document is larger than capped size " 
-                     << len << " > " << storageSize() , len <= storageSize() );
+            // since we have to iterate all the extents (for now) to get
+            // storage size
+            Collection* collection = cc().database()->getCollection( ns );
+            uassert( 16328,
+                     str::stream() << "document is larger than capped size "
+                     << len << " > " << collection->storageSize(),
+                     len <= collection->storageSize() );
         }
-        
+
         // signal done allocating new extents.
         if ( !cappedLastDelRecLastExtent().isValid() )
             getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();

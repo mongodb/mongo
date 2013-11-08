@@ -1082,12 +1082,13 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::Context cx( ns );
-
-            NamespaceDetails * nsd = nsdetails( ns );
-            if ( ! nsd ) {
+            Collection* collection = cx.db()->getCollection( ns );
+            if ( !collection ) {
                 errmsg = "ns not found";
                 return false;
             }
+
+            NamespaceDetails* nsd = collection->details();
 
             result.append( "ns" , ns.c_str() );
 
@@ -1115,7 +1116,7 @@ namespace mongo {
             int numExtents;
             BSONArrayBuilder extents;
 
-            result.appendNumber( "storageSize" , nsd->storageSize( &numExtents , verbose ? &extents : 0  ) / scale );
+            result.appendNumber( "storageSize" , collection->storageSize( &numExtents , verbose ? &extents : 0  ) / scale );
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->getCompletedIndexCount() );
             result.append( "lastExtentSize" , nsd->lastExtentSize() / scale );
@@ -1298,22 +1299,22 @@ namespace mongo {
             for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
                 const string ns = *it;
 
-                NamespaceDetails * nsd = nsdetails( ns );
-                if ( ! nsd ) {
+                Collection* collection = d->getCollection( ns );
+                if ( !collection ) {
                     errmsg = "missing ns: ";
                     errmsg += ns;
                     return false;
                 }
 
                 ncollections += 1;
-                objects += nsd->numRecords();
-                size += nsd->dataSize();
+                objects += collection->numRecords();
+                size += collection->dataSize();
 
                 int temp;
-                storageSize += nsd->storageSize( &temp );
+                storageSize += collection->storageSize( &temp, NULL );
                 numExtents += temp;
 
-                indexes += nsd->getCompletedIndexCount();
+                indexes += collection->getIndexCatalog()->numIndexesTotal();
                 indexSize += getIndexSizeForCollection(dbname, ns);
             }
 

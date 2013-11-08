@@ -27,6 +27,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -707,9 +708,9 @@ namespace {
     /**
      * @param ex requested extent; if NULL analyze entire namespace
      */ 
-    bool runInternal(const NamespaceDetails* nsd, const Extent* ex, SubCommand subCommand,
+    bool runInternal(const Collection* collection, const Extent* ex, SubCommand subCommand,
                      AnalyzeParams& globalParams, string& errmsg, BSONObjBuilder& result) {
-
+        const NamespaceDetails* nsd = collection->details();
         BSONObjBuilder outputBuilder; // temporary builder to avoid output corruption in case of
                                       // failure
         bool success = false;
@@ -723,7 +724,7 @@ namespace {
                 return false;
             }
 
-            long long storageSize = nsd->storageSize(NULL, NULL);
+            long long storageSize = collection->storageSize(NULL, NULL);
 
             if (globalParams.numberOfSlices != 0) {
                 globalParams.granularity = ceilingDiv(storageSize, globalParams.numberOfSlices);
@@ -778,14 +779,18 @@ namespace {
         }
 
         const string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-        const NamespaceDetails* nsd = nsdetails(ns);
+
         if (!serverGlobalParams.quiet) {
             MONGO_TLOG(0) << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
         }
-        if (!nsd) {
+
+        Database* db = cc().database();
+        const Collection* collection = db->getCollection( ns );
+        if (!collection) {
             errmsg = "ns not found";
             return false;
         }
+        const NamespaceDetails* nsd = collection->details();
 
         const Extent* extent = NULL;
 
@@ -853,7 +858,7 @@ namespace {
 
         params.showRecords = cmdObj["showRecords"].trueValue();
 
-        return runInternal(nsd, extent, subCommand, params, errmsg, result);
+        return runInternal(collection, extent, subCommand, params, errmsg, result);
     }
 
 }  // namespace

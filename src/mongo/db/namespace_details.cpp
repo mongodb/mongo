@@ -510,35 +510,6 @@ namespace mongo {
         return -1;
     }
 
-    long long NamespaceDetails::storageSize( int * numExtents , BSONArrayBuilder * extentInfo ) const {
-        if ( _firstExtent.isNull() ) {
-            if ( numExtents )
-                *numExtents = 0;
-            return 0;
-        }
-
-        Extent * e = _firstExtent.ext();
-        verify( e );
-
-        long long total = 0;
-        int n = 0;
-        while ( e ) {
-            total += e->length;
-            n++;
-
-            if ( extentInfo ) {
-                extentInfo->append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
-            }
-
-            e = e->getNextExtent();
-        }
-
-        if ( numExtents )
-            *numExtents = n;
-
-        return total;
-    }
-
     NamespaceDetails *NamespaceDetails::writingWithExtra() {
         vector< pair< long long, unsigned > > writeRanges;
         writeRanges.push_back( make_pair( 0, sizeof( NamespaceDetails ) ) );
