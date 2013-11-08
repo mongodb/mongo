@@ -472,7 +472,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	uint32_t write_size;
+	uint32_t i, write_size;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -496,7 +496,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	}
 
 	/*
-	 * Wait for earlier groups to finish.
+	 * Wait for earlier groups to finish, otherwise there could be holes
+	 * in the log file.
 	 */
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
@@ -1011,6 +1012,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ERR(__log_release(session, myslot.slot));
 		WT_ERR(__wt_log_slot_free(myslot.slot));
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
+		/* Wait for our slot to be finalized */
 		while (LOG_CMP(&log->sync_lsn, &tmp_lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			__wt_yield();

@@ -53,18 +53,37 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * Allocate memory for buffers now that the arrays are setup. Split
 	 * this out to make error handling simpler.
 	 */
-	for (i = 0; i < SLOT_ACTIVE; i++) {
+	for (i = 0; i < SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
 		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
-	    log_buffer_size, WT_LOG_SLOT_BUF_INIT_SIZE * SLOT_ACTIVE);
+	    log_buffer_size, WT_LOG_SLOT_BUF_INIT_SIZE * SLOT_POOL);
 	if (0) {
 err:		while (--i >= 0)
 			__wt_buf_free(session, &log->slot_pool[i].slot_buf);
 	}
 	return (ret);
+}
+
+/*
+ * __wt_log_slot_destroy --
+ *	Clean up the slot array on shutdown.
+ */
+int
+__wt_log_slot_destroy(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	int i;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	for (i = 0; i < SLOT_ACTIVE; i++)
+		__wt_buf_free(session, &log->slot_pool[i].slot_buf);
+	return (0);
 }
 
 /*

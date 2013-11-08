@@ -251,6 +251,7 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		conn->arch_session = NULL;
 	}
+	WT_TRET(__wt_log_slot_destroy(session));
 	__wt_spin_destroy(session, &log->log_lock);
 	__wt_spin_destroy(session, &log->log_slot_lock);
 	__wt_free(session, conn->log);
