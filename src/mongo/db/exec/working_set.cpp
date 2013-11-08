@@ -82,6 +82,13 @@ namespace mongo {
 
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
 
+    WorkingSetMember::~WorkingSetMember() {
+        unordered_map<size_t, WorkingSetComputedData*>::const_iterator it;
+        for (it = _computed.begin(); it != _computed.end(); it++) {
+            delete it->second;
+        }
+    }
+
     bool WorkingSetMember::hasLoc() const {
         return state == LOC_AND_IDX || state == LOC_AND_UNOWNED_OBJ;
     }
@@ -96,6 +103,21 @@ namespace mongo {
 
     bool WorkingSetMember::hasUnownedObj() const {
         return state == LOC_AND_UNOWNED_OBJ;
+    }
+
+    bool WorkingSetMember::hasComputed(const WorkingSetComputedDataType type) const {
+        return _computed.end() != _computed.find(type);
+    }
+
+    const WorkingSetComputedData* WorkingSetMember::getComputed(const WorkingSetComputedDataType type) const {
+        unordered_map<size_t, WorkingSetComputedData*>::const_iterator it = _computed.find(type);
+        verify(_computed.end() != it);
+        return it->second;
+    }
+
+    void WorkingSetMember::addComputed(WorkingSetComputedData* data) {
+        verify(!hasComputed(data->type()));
+        _computed[data->type()] = data;
     }
 
     bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {

@@ -116,6 +116,30 @@ namespace mongo {
     };
 
     /**
+     * What types of computed data can we have?
+     */
+    enum WorkingSetComputedDataType {
+        WSM_COMPUTED_TEXT_SCORE = 0,
+        WSM_COMPUTED_GEO_DISTANCE = 1,
+    };
+
+    /**
+     * Data that is a computed function of a WSM.
+     */
+    class WorkingSetComputedData {
+    public:
+        WorkingSetComputedData(const WorkingSetComputedDataType type) : _type(type) { }
+        virtual ~WorkingSetComputedData() { }
+
+        WorkingSetComputedDataType type() const { return _type; }
+
+        virtual WorkingSetComputedData* clone() const = 0;
+
+    private:
+        WorkingSetComputedDataType _type;
+    };
+
+    /**
      * The type of the data passed between query stages.  In particular:
      *
      * Index scan stages return a WorkingSetMember in the LOC_AND_IDX state.
@@ -126,6 +150,7 @@ namespace mongo {
      */
     struct WorkingSetMember {
         WorkingSetMember();
+        ~WorkingSetMember();
 
         enum MemberState {
             // Initial state.
@@ -142,6 +167,10 @@ namespace mongo {
             OWNED_OBJ,
         };
 
+        //
+        // Core attributes
+        //
+
         DiskLoc loc;
         BSONObj obj;
         vector<IndexKeyDatum> keyData;
@@ -151,6 +180,14 @@ namespace mongo {
         bool hasObj() const;
         bool hasOwnedObj() const;
         bool hasUnownedObj() const;
+
+        //
+        // Computed data
+        //
+
+        bool hasComputed(const WorkingSetComputedDataType type) const;
+        const WorkingSetComputedData* getComputed(const WorkingSetComputedDataType type) const;
+        void addComputed(WorkingSetComputedData* data);
 
         /**
          * getFieldDotted uses its state (obj or index data) to produce the field with the provided
@@ -162,6 +199,9 @@ namespace mongo {
          * Returns false otherwise.  Returning false indicates a query planning error.
          */
         bool getFieldDotted(const string& field, BSONElement* out) const;
+
+    private:
+        unordered_map<size_t, WorkingSetComputedData*> _computed;
     };
 
 }  // namespace mongo

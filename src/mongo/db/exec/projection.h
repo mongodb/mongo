@@ -41,7 +41,7 @@ namespace mongo {
      */
     class ProjectionStage : public PlanStage {
     public:
-        ProjectionStage(LiteProjection* liteProj,
+        ProjectionStage(LiteProjection* proj,
                         bool covered,
                         const MatchExpression* fullExpression,
                         WorkingSet* ws,
@@ -61,7 +61,7 @@ namespace mongo {
 
     private:
         // Not owned by us.
-        LiteProjection* _liteProjection;
+        LiteProjection* _proj;
         bool _covered;
 
         // _ws is not owned by us.

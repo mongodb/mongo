@@ -1113,7 +1113,7 @@ namespace mongo {
                         break;
                     }
                 }
-                cout << "PROJECTION: fields provided = " << covered << endl;
+                QLOG() << "PROJECTION: is covered?: = " << covered << endl;
                 // If any field is missing from the list of fields the projection wants,
                 // a fetch is required.
                 if (!covered) {

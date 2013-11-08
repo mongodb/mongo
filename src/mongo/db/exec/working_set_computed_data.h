@@ -26,41 +26,42 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/db/exec/working_set.h"
+
 namespace mongo {
 
-    class AndCommon {
+    class TextScoreComputedData : public WorkingSetComputedData {
     public:
-        /**
-         * If src has any data dest doesn't, add that data to dest.
-         */
-        static void mergeFrom(WorkingSetMember* dest, WorkingSetMember* src) {
-            verify(dest->hasLoc());
-            verify(src->hasLoc());
-            verify(dest->loc == src->loc);
+        TextScoreComputedData(double score)
+            : WorkingSetComputedData(WSM_COMPUTED_TEXT_SCORE),
+              _score(score) { }
 
-            // This is N^2 but N is probably pretty small.  Easy enough to revisit.
-            // Merge key data.
-            for (size_t i = 0; i < src->keyData.size(); ++i) {
-                bool found = false;
-                for (size_t j = 0; j < dest->keyData.size(); ++j) {
-                    if (dest->keyData[j].indexKeyPattern == src->keyData[i].indexKeyPattern) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) { dest->keyData.push_back(src->keyData[i]); }
-            }
+        double getScore() const { return _score; }
 
-            // Merge computed data.
-            if (!dest->hasComputed(WSM_COMPUTED_TEXT_SCORE) && src->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-                dest->addComputed(src->getComputed(WSM_COMPUTED_TEXT_SCORE)->clone());
-            }
-
-            if (!dest->hasComputed(WSM_COMPUTED_GEO_DISTANCE) && src->hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
-                dest->addComputed(src->getComputed(WSM_COMPUTED_GEO_DISTANCE)->clone());
-            }
+        virtual TextScoreComputedData* clone() const {
+            return new TextScoreComputedData(_score);
         }
+
+    private:
+        double _score;
+    };
+
+    class GeoDistanceComputedData : public WorkingSetComputedData {
+    public:
+        GeoDistanceComputedData(double score)
+            : WorkingSetComputedData(WSM_COMPUTED_GEO_DISTANCE),
+              _score(score) { }
+
+        double getScore() const { return _score; }
+
+        virtual GeoDistanceComputedData* clone() const {
+            return new GeoDistanceComputedData(_score);
+        }
+
+    private:
+        double _score;
     };
 
 }  // namespace mongo
-

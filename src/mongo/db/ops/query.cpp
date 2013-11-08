@@ -1029,28 +1029,16 @@ namespace mongo {
      * @asserts on scan and order memory exhaustion and other cases.
      */
     string runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
-        shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
-        ParsedQuery& pq( *pq_shared );
         BSONObj jsobj = q.query;
         int queryOptions = q.queryOptions;
         const char *ns = q.ns;
-        
-        uassert( 16332 , "can't have an empty ns" , ns[0] );
-
-        LOG(2) << "runQuery called " << ns << " " << jsobj << endl;
-
-        curop.debug().ns = ns;
-        curop.debug().ntoreturn = pq.getNumToReturn();
-        curop.debug().query = jsobj;
-        curop.setQuery(jsobj);
 
         const NamespaceString nsString( ns );
         uassert( 16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
         // Run a command.
-
         if ( nsString.isCommand() ) {
-            int nToReturn = pq.getNumToReturn();
+            int nToReturn = q.ntoreturn;
             uassert( 16979, str::stream() << "bad numberToReturn (" << nToReturn
                                           << ") for $cmd type ns - can only be 1 or -1",
                      nToReturn == 1 || nToReturn == -1 );
@@ -1081,6 +1069,26 @@ namespace mongo {
             return "";
         }
 
+        if (isNewQueryFrameworkEnabled()) {
+            // TODO: Copy prequel curop debugging into runNewQuery
+            CanonicalQuery* cq = NULL;
+            if (canUseNewSystem(q, &cq)) {
+                return newRunQuery(cq, curop, result);
+            }
+        }
+
+        shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
+        ParsedQuery& pq( *pq_shared );
+        
+        uassert( 16332 , "can't have an empty ns" , ns[0] );
+
+        LOG(2) << "runQuery called " << ns << " " << jsobj << endl;
+
+        curop.debug().ns = ns;
+        curop.debug().ntoreturn = pq.getNumToReturn();
+        curop.debug().query = jsobj;
+        curop.setQuery(jsobj);
+
         bool explain = pq.isExplain();
         BSONObj order = pq.getOrder();
         BSONObj query = pq.getFilter();
@@ -1094,14 +1102,6 @@ namespace mongo {
             out() << jsobj.toString() << "\n  query:";
             out() << query.toString() << endl;
             uassert( 10110 , "bad query object", false);
-        }
-
-        if (isNewQueryFrameworkEnabled()) {
-            // TODO: Copy prequel curop debugging into runNewQuery
-            CanonicalQuery* cq = NULL;
-            if (canUseNewSystem(q, &cq)) {
-                return newRunQuery(cq, curop, result);
-            }
         }
 
         // Handle query option $maxTimeMS (not used with commands).

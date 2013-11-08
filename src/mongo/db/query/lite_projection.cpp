@@ -154,6 +154,11 @@ namespace mongo {
 
                     add(e.fieldName(), true);
                 }
+                else if (mongoutils::str::equals(e2.fieldName(), "$textScore")) {
+                    // TODO: Do we want to check this for :0 or :1 or just assume presence implies
+                    // projection?
+                    _textScoreFieldName = e.fieldName();
+                }
                 else {
                     return Status(ErrorCodes::BadValue,
                                   string("Unsupported projection option: ") + e.toString());
@@ -303,18 +308,6 @@ namespace mongo {
     //
     // Execution
     //
-
-    Status LiteProjection::transform(const BSONObj& in,
-                                     BSONObj* out,
-                                     const MatchDetails* details) const {
-        BSONObjBuilder bob;
-        Status status = transform(in, &bob, details);
-        if (!status.isOK()) {
-            return status;
-        }
-        *out = bob.obj();
-        return Status::OK();
-    }
 
     Status LiteProjection::transform(const BSONObj& in,
                                      BSONObjBuilder* bob,

@@ -30,19 +30,20 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    ProjectionStage::ProjectionStage(LiteProjection* liteProjection,
+    ProjectionStage::ProjectionStage(LiteProjection* proj,
                                      bool covered,
                                      const MatchExpression* fullExpression,
                                      WorkingSet* ws,
                                      PlanStage* child,
                                      const MatchExpression* filter)
-        : _liteProjection(liteProjection),
+        : _proj(proj),
           _covered(covered),
           _ws(ws),
           _child(child),
@@ -68,14 +69,14 @@ namespace mongo {
                 // TODO: Rip execution out of the lite_projection and pass a WSM to something
                 // which does the right thing depending on the covered vs. noncovered cases.
                 BSONObjBuilder bob;
-                if (_liteProjection->_includeID) {
+                if (_proj->_includeID) {
                     BSONElement elt;
                     member->getFieldDotted("_id", &elt);
                     verify(!elt.eoo());
                     bob.appendAs(elt, "_id");
                 }
 
-                BSONObjIterator it(_liteProjection->_source);
+                BSONObjIterator it(_proj->_source);
                 while (it.more()) {
                     BSONElement specElt = it.next();
                     if (mongoutils::str::equals("_id", specElt.fieldName())) {
@@ -95,17 +96,31 @@ namespace mongo {
                 verify(member->hasObj());
 
                 MatchDetails matchDetails;
-                matchDetails.requestElemMatchKey();
 
-                if (_liteProjection->transformRequiresDetails()) {
+                // If it's a positional projection we need a MatchDetails.
+                if (_proj->transformRequiresDetails()) {
+                    matchDetails.requestElemMatchKey();
                     verify(_fullExpression->matchesBSON(member->obj, &matchDetails));
                 }
 
-                Status projStatus = _liteProjection->transform(member->obj, &newObj, &matchDetails);
+                BSONObjBuilder bob;
+                Status projStatus = _proj->transform(member->obj, &bob, &matchDetails);
                 if (!projStatus.isOK()) {
                     warning() << "Couldn't execute projection, status = " << projStatus.toString() << endl;
                     return PlanStage::FAILURE;
                 }
+
+                StringData textField = _proj->getTextScoreFieldName();
+                if (!textField.empty()) {
+                    // TODO: Do we want to warn() or otherwise error if there's no text stage?
+                    if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
+                        const TextScoreComputedData* score
+                            = static_cast<const TextScoreComputedData*>(member->getComputed(WSM_COMPUTED_TEXT_SCORE));
+                        bob.append(textField, score->getScore());
+                    }
+                }
+
+                newObj = bob.obj();
             }
 
             member->state = WorkingSetMember::OWNED_OBJ;

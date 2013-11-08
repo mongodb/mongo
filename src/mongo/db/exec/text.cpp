@@ -29,6 +29,7 @@
 #include "mongo/db/exec/text.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 
@@ -71,6 +72,9 @@ namespace mongo {
         member->loc = _results[_curResult].loc;
         member->obj = member->loc.obj();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        // TODO: Planner can tell us whether or not to do this depending on whether or not we have a
+        // $textScore projection.
+        member->addComputed(new TextScoreComputedData(_results[_curResult].score));
 
         // Advance to next result.
         ++_curResult;

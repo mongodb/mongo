@@ -78,14 +78,22 @@ namespace mongo {
         void getRequiredFields(vector<string>* fields) const;
 
         /**
+         * Return a StringData for which field we're projecting the text score into.
+         */
+        StringData getTextScoreName() const { return _textScoreFieldName; }
+
+        /**
          * Apply the projection that 'this' represents to the object 'in'.  'details' is the result
          * of a match evaluation of the full query on the object 'in'.  This is only required
          * if the projection is positional.
          *
-         * If the projection is successfully computed, returns Status::OK() and populates 'out'.
+         * If the projection is successfully computed, returns Status::OK() and stuff the result in
+         * 'bob'.
          * Otherwise, returns error.
          */
-        Status transform(const BSONObj& in, BSONObj* out, const MatchDetails* details = NULL) const;
+        Status transform(const BSONObj& in,
+                         BSONObjBuilder* bob,
+                         const MatchDetails* details = NULL) const;
 
         /**
          * See transform(...) above.
@@ -98,6 +106,8 @@ namespace mongo {
          * Used for debugging.
          */
         const BSONObj& getProjectionSpec() const { return _source; }
+
+        StringData getTextScoreFieldName() const { return _textScoreFieldName; }
 
     private:
         friend class ProjectionStage;
@@ -130,13 +140,6 @@ namespace mongo {
         // Execution
         // TODO: Move into exec/projection.cpp or elsewhere.
         //
-
-        /**
-         * See transform(...) above.
-         */
-        Status transform(const BSONObj& in,
-                         BSONObjBuilder* bob,
-                         const MatchDetails* details = NULL) const;
 
         /**
          * Appends the element 'e' to the builder 'bob', possibly descending into sub-fields of 'e'
@@ -183,6 +186,9 @@ namespace mongo {
 
         // Is there a projection over a dotted field?
         bool _hasDottedField;
+
+        // The field name for a $textScore projection
+        StringData _textScoreFieldName;
     };
 
 }  // namespace mongo
