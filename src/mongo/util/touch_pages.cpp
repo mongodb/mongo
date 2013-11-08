@@ -31,55 +31,13 @@
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
-    struct touch_location {
-        HANDLE fd;
-        int offset;
-        size_t length;
-        Extent *ext;
-    };
-        
-    void touchNs( const std::string& ns ) { 
-        std::vector< touch_location > ranges;
-        boost::scoped_ptr<LockMongoFilesShared> mongoFilesLock;
-        {
-            Client::ReadContext ctx(ns);
-            NamespaceDetails *nsd = nsdetails(ns);
-            uassert( 16154, "namespace does not exist", nsd );
-
-            for( DiskLoc L = nsd->firstExtent(); !L.isNull(); L = L.ext()->xnext )  {
-                DataFile* mdf = cc().database()->getFile( L.a() );
-                massert( 16238, "can't fetch extent file structure", mdf );
-                touch_location tl;
-                tl.fd = mdf->getFd();
-                tl.offset = L.getOfs();
-                tl.ext = L.ext();
-                tl.length = tl.ext->length;
-
-                ranges.push_back(tl);
-            }
-            mongoFilesLock.reset(new LockMongoFilesShared());
-        }
-        // DB read lock is dropped; no longer needed after this point.
-
-        std::string progress_msg = "touch " + ns + " extents";
-        ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
-                                                        "Touch Progress",
-                                                        ranges.size()));
-        for ( std::vector< touch_location >::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
-            touch_pages( it->fd, it->offset, it->length, it->ext );
-            pm.hit();
-            killCurrentOp.checkForInterrupt(false);
-        }
-        pm.finished();
-    }
 
     char _touch_pages_char_reader; // goes in .bss
-  
-    void touch_pages( HANDLE fd, int offset, size_t length, const Extent* ext ) {
+
+    void touch_pages( const char* buf, size_t length ) {
         // read first byte of every page, in order
-        const char *p = static_cast<const char *>(static_cast<const void *> (ext));
-        for( size_t i = 0; i < length; i += g_minOSPageSizeBytes ) { 
-            _touch_pages_char_reader += p[i];
+        for( size_t i = 0; i < length; i += g_minOSPageSizeBytes ) {
+            _touch_pages_char_reader += buf[i];
         }
     }
 }

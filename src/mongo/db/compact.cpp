@@ -87,15 +87,12 @@ namespace mongo {
             // page the whole thing in sequentially
             log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
             Timer t;
-            DataFile* mdf = db->getFile( diskloc.a() );
-            HANDLE fd = mdf->getFd();
-            int offset = diskloc.getOfs();
-            Extent* ext = diskloc.ext();
+            Extent* ext = db->getExtentManager().getExtent( diskloc );
             size_t length = ext->length;
-                
-            touch_pages(fd, offset, length, ext);
+
+            touch_pages( reinterpret_cast<const char*>(ext), length );
             int ms = t.millis();
-            if( ms > 1000 ) 
+            if( ms > 1000 )
                 log() << "compact end paging in " << ms << "ms "
                       << e->length/1000000.0/ms << "MB/sec" << endl;
         }

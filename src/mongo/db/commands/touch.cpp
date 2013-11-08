@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -45,10 +46,55 @@
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
+
+    struct touch_location {
+        const char* root;
+        size_t length;
+    };
+
+    /** @return numRnages touched */
+    int touchNs( const std::string& ns ) {
+        std::vector< touch_location > ranges;
+        boost::scoped_ptr<LockMongoFilesShared> mongoFilesLock;
+        {
+            Client::ReadContext ctx(ns);
+
+            Database* db = ctx.ctx().db();
+            ExtentManager& em = db->getExtentManager();
+
+            Collection* collection = db->getCollection( ns );
+            uassert( 16154, "namespace does not exist", collection );
+
+            Extent* ext = em.getExtent( collection->details()->firstExtent() );
+            while ( ext ) {
+                touch_location tl;
+                tl.root = reinterpret_cast<const char*>(ext);
+                tl.length = ext->length;
+                ranges.push_back(tl);
+                ext = em.getNextExtent( ext );
+            }
+            mongoFilesLock.reset(new LockMongoFilesShared());
+        }
+        // DB read lock is dropped; no longer needed after this point.
+
+        std::string progress_msg = "touch " + ns + " extents";
+        ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
+                                                        "Touch Progress",
+                                                        ranges.size()));
+        for ( std::vector< touch_location >::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
+            touch_pages( it->root, it->length );
+            pm.hit();
+            killCurrentOp.checkForInterrupt(false);
+        }
+        pm.finished();
+
+        return static_cast<int>( ranges.size() );
+    }
 
     class TouchCmd : public Command {
     public:
@@ -109,29 +155,41 @@ namespace mongo {
 
             if (touch_data) {
                 log() << "touching namespace " << ns << endl;
-                touchNs( ns );
+                Timer t;
+                int numRanges = touchNs( ns );
+                result.append( "data", BSON( "numRanges" << numRanges <<
+                                             "millis" << t.millis() ) );
                 log() << "touching namespace " << ns << " complete" << endl;
             }
 
             if (touch_indexes) {
+                Timer t;
                 // enumerate indexes
                 std::vector< std::string > indexes;
                 {
                     Client::ReadContext ctx(ns);
                     NamespaceDetails *nsd = nsdetails(ns);
                     massert( 16153, "namespace does not exist", nsd );
-                    
+
                     NamespaceDetails::IndexIterator ii = nsd->ii(); 
                     while ( ii.more() ) {
                         IndexDetails& idx = ii.next();
                         indexes.push_back( idx.indexNamespace() );
                     }
                 }
+
+                int numRanges = 0;
+
                 for ( std::vector<std::string>::const_iterator it = indexes.begin(); 
                       it != indexes.end(); 
                       it++ ) {
-                    touchNs( *it );
+                    numRanges += touchNs( *it );
                 }
+
+                result.append( "indexes", BSON( "num" << static_cast<int>(indexes.size()) <<
+                                                "numRanges" << numRanges <<
+                                                "millis" << t.millis() ) );
+
             }
             return true;
         }
