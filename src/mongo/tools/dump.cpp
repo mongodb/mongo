@@ -25,6 +25,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -303,7 +304,8 @@ public:
     }
 
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
-        const NamespaceDetails * nsd = nsdetails( ns );
+        Collection* collection = db->getCollection( ns );
+        const NamespaceDetails * nsd = collection->details();
         toolInfoLog() << "nrecords: " << nsd->numRecords()
                       << " datasize: " << nsd->dataSize()
                       << " firstExtent: " << nsd->firstExtent()
