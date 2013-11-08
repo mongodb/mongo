@@ -81,7 +81,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	log = conn->log;
 
-	for (i = 0; i < SLOT_ACTIVE; i++)
+	for (i = 0; i < SLOT_POOL; i++)
 		__wt_buf_free(session, &log->slot_pool[i].slot_buf);
 	return (0);
 }
