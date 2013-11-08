@@ -65,8 +65,10 @@ namespace mongo {
         const PlanStageStats* logicalStage = NULL;
         const PlanStageStats* root = &stats;
         const PlanStageStats* leaf = root;
-        while (leaf->children.size() > 0) {
 
+        uint64_t chunkSkips = 0;
+
+        while (leaf->children.size() > 0) {
             // We're failing a plan with multiple children other than OR.
             // TODO: explain richer plans.
             if (leaf->children.size() > 1 && !isLogicalStage(leaf->stageType)) {
@@ -81,12 +83,21 @@ namespace mongo {
                 logicalStage = leaf;
                 break;
             }
+
             if (leaf->stageType == STAGE_FETCH) {
                 covered = false;
             }
+
             if (leaf->stageType == STAGE_SORT) {
                 sortPresent = true;
             }
+
+            if (STAGE_SHARDING_FILTER == leaf->stageType) {
+                const ShardingFilterStats* sfs
+                    = static_cast<const ShardingFilterStats*>(leaf->specific.get());
+                chunkSkips = sfs->chunkSkips;
+            }
+
             leaf = leaf->children[0];
         }
 
@@ -178,6 +189,8 @@ namespace mongo {
         }
 
         res->setScanAndOrder(sortPresent);
+
+        res->setNChunkSkips(chunkSkips);
 
         // Statistics for the plan (appear only in a detailed mode)
         // TODO: if we can get this from the runner, we can kill "detailed mode"

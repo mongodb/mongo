@@ -49,6 +49,7 @@ env.StaticLibrary(
         "or.cpp",
         "projection.cpp",
         "s2near.cpp",
+        "shard_filter.cpp",
         "skip.cpp",
         "sort.cpp",
         "stagedebug_cmd.cpp",

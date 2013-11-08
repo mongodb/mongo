@@ -79,6 +79,7 @@ namespace mongo {
         (*explain)->setIsMultiKey(false);
         (*explain)->setIndexOnly(false);
         (*explain)->setNYields(0);
+        (*explain)->setNChunkSkips(0);
 
         TypeExplain* allPlans = new TypeExplain;
         allPlans->setCursor("BasicCursor");

@@ -528,4 +528,27 @@ namespace mongo {
         BSONObj indexKeyPattern;
     };
 
+    //
+    // Internal nodes used to provide functionality
+    //
+
+    /**
+     * If we're answering a query on a sharded cluster, docs must be checked against the shard key
+     * to ensure that we don't return data that shouldn't be there.  This must be done prior to
+     * projection, and in fact should be done as early as possible to avoid propagating stale data
+     * through the pipeline.
+     */
+    struct ShardingFilterNode : public QuerySolutionNode {
+        ShardingFilterNode() { }
+        virtual ~ShardingFilterNode() { }
+
+        virtual StageType getType() const { return STAGE_SHARDING_FILTER; }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return children[0]->fetched(); }
+        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
+        const BSONObjSet& getSort() const { return children[0]->getSort(); }
+    };
+
 }  // namespace mongo

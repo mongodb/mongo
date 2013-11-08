@@ -100,7 +100,7 @@ namespace mongo {
                 CanonicalQuery::canonicalize(ns.toString(), query, &cq).isOK());
 
         Runner* rawRunner;
-        size_t options = requireIndex ? QueryPlanner::NO_TABLE_SCAN : QueryPlanner::DEFAULT;
+        size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
         massert(17245, "Could not get runner for query " + query.toString(),
                 getRunner(cq, &rawRunner, options).isOK());
 

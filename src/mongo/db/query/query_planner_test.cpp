@@ -63,11 +63,11 @@ namespace {
             // The first false means not multikey.
             // The second false means not sparse.
             // The third arg is the index name and I am egotistical.
-            keyPatterns.push_back(IndexEntry(keyPattern, false, false, "hari_king_of_the_stove"));
+            params.indices.push_back(IndexEntry(keyPattern, false, false, "hari_king_of_the_stove"));
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            keyPatterns.push_back(IndexEntry(keyPattern, multikey, sparse, "note_to_self_dont_break_build"));
+            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse, "note_to_self_dont_break_build"));
         }
 
         //
@@ -78,13 +78,15 @@ namespace {
             solns.clear();
             queryObj = query.getOwned();
             ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, &cq));
-            QueryPlanner::plan(*cq, keyPatterns, QueryPlanner::INCLUDE_COLLSCAN, &solns);
+            params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+            QueryPlanner::plan(*cq, params, &solns);
         }
 
         void runDetailedQuery(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
             solns.clear();
             ASSERT_OK(CanonicalQuery::canonicalize(ns, query, sort, proj, &cq));
-            QueryPlanner::plan(*cq, keyPatterns, QueryPlanner::INCLUDE_COLLSCAN, &solns);
+            params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+            QueryPlanner::plan(*cq, params, &solns);
             ASSERT_GREATER_THAN(solns.size(), 0U);;
         }
 
@@ -174,7 +176,7 @@ namespace {
 
         BSONObj queryObj;
         CanonicalQuery* cq;
-        vector<IndexEntry> keyPatterns;
+        QueryPlannerParams params;
         vector<QuerySolution*> solns;
     };
 

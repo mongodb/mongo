@@ -34,12 +34,7 @@
 
 namespace mongo {
 
-    /**
-     * QueryPlanner's job is to provide an entry point to the query planning and optimization
-     * process.
-     */
-    class QueryPlanner {
-    public:
+    struct QueryPlannerParams {
         enum Options {
             // You probably want to set this.
             DEFAULT = 0,
@@ -50,17 +45,38 @@ namespace mongo {
 
             // Set this if you want a collscan outputted even if there's an ixscan.
             INCLUDE_COLLSCAN = 2,
+
+            // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
+            // shouldn't be on this shard" stage before projection.
+            INCLUDE_SHARD_FILTER = 4,
         };
 
+        // See Options enum above.
+        size_t options;
+
+        // What indices are available for planning?
+        vector<IndexEntry> indices;
+
+        // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
+        // stage.  If we know the shard key, we can perform covering analysis instead of always
+        // forcing a fetch.
+        BSONObj shardKey;
+    };
+
+    /**
+     * QueryPlanner's job is to provide an entry point to the query planning and optimization
+     * process.
+     */
+    class QueryPlanner {
+    public:
         /**
          * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
-         * provided indices to generate a solution.
+         * indices and other data in 'params' to plan with.
          *
          * Caller owns pointers in *out.
          */
         static void plan(const CanonicalQuery& query,
-                         const vector<IndexEntry>& indices,
-                         size_t options,
+                         const QueryPlannerParams& params,
                          vector<QuerySolution*>* out);
     private:
 
@@ -120,7 +136,9 @@ namespace mongo {
         /**
          * Return a CollectionScanNode that scans as requested in 'query'.
          */
-        static QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable, size_t options);
+        static QuerySolution* makeCollectionScan(const CanonicalQuery& query,
+                                                 bool tailable,
+                                                 const QueryPlannerParams& params);
 
         //
         // Indexed Data Access methods.
@@ -232,14 +250,15 @@ namespace mongo {
          * Caller owns the returned QuerySolution.
          */
         static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
-                                                size_t options,
+                                                const QueryPlannerParams& params,
                                                 QuerySolutionNode* solnRoot);
 
         /**
          * Return a plan that uses the provided index as a proxy for a collection scan.
          */
-        static QuerySolution* scanWholeIndex(const IndexEntry& index, size_t options,
+        static QuerySolution* scanWholeIndex(const IndexEntry& index,
                                              const CanonicalQuery& query,
+                                             const QueryPlannerParams& params,
                                              int direction = 1);
 
         /**

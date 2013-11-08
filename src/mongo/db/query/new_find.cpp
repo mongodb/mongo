@@ -176,11 +176,12 @@ namespace mongo {
 
         NamespaceDetails* nsd = collection->details();
 
-        // If it's not NULL, we may have indices.
-        vector<IndexEntry> indices;
+        // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
+        QueryPlannerParams plannerParams;
         for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
             IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor( i );
-            indices.push_back(IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse(), desc->indexName()));
+            plannerParams.indices.push_back(
+                IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse(), desc->indexName()));
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -200,8 +201,8 @@ namespace mongo {
             }
         }
 
-        vector<QuerySolution*> solutions;
-        size_t options = plannerOptions;
+        // Process the planning options.
+        plannerParams.options = plannerOptions;
         if (storageGlobalParams.noTableScan) {
             const string& ns = canonicalQuery->ns();
             // There are certain cases where we ignore this restriction:
@@ -209,13 +210,29 @@ namespace mongo {
                           || (string::npos != ns.find(".system."))
                           || (0 == ns.find("local."));
             if (!ignore) {
-                options |= QueryPlanner::NO_TABLE_SCAN;
+                plannerParams.options |= QueryPlannerParams::NO_TABLE_SCAN;
             }
         }
-        if (!(options & QueryPlanner::NO_TABLE_SCAN)) {
-            options |= QueryPlanner::INCLUDE_COLLSCAN;
+
+        if (!(plannerParams.options & QueryPlannerParams::NO_TABLE_SCAN)) {
+            plannerParams.options |= QueryPlannerParams::INCLUDE_COLLSCAN;
         }
-        QueryPlanner::plan(*canonicalQuery, indices, options, &solutions);
+
+        // If the caller wants a shard filter, make sure we're actually sharded.
+        if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            CollectionMetadataPtr collMetadata = shardingState.getCollectionMetadata(canonicalQuery->ns());
+            if (collMetadata) {
+                plannerParams.shardKey = collMetadata->getKeyPattern();
+            }
+            else {
+                // If there's no metadata don't bother w/the shard filter since we won't know what
+                // the key pattern is anyway...
+                plannerParams.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+        }
+
+        vector<QuerySolution*> solutions;
+        QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
 
         /*
         for (size_t i = 0; i < solutions.size(); ++i) {
@@ -329,13 +346,6 @@ namespace mongo {
             BSONObj obj;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
-                // If we're sharded make sure that we don't return any data that hasn't been
-                // migrated off of our shard yet.
-                if (collMetadata) {
-                    KeyPattern kp(collMetadata->getKeyPattern());
-                    if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) { continue; }
-                }
-
                 // Add result to output buffer.
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
 
@@ -509,7 +519,11 @@ namespace mongo {
         }
         else {
             // Takes ownership of cq.
-            status = getRunner(cq, &rawRunner);
+            size_t options = QueryPlannerParams::DEFAULT;
+            if (shardingState.needCollectionMetadata(pq.ns())) {
+                options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+            status = getRunner(cq, &rawRunner, options);
         }
 
         if (!status.isOK()) {
@@ -566,28 +580,13 @@ namespace mongo {
 
         BSONObj obj;
         Runner::RunnerState state;
-        uint64_t numMisplacedDocs = 0;
+        // uint64_t numMisplacedDocs = 0;
 
         // set this outside loop. we will need to use this both within loop and when deciding
         // to fill in explain information
         const bool isExplain = pq.isExplain();
 
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
-            // cout << "pulled out of runner: " << obj.toString() << endl;
-
-            // If we're sharded make sure that we don't return any data that hasn't been migrated
-            // off of our shared yet.
-            if (collMetadata) {
-                // This information can change if we yield and as such we must make sure to re-fetch
-                // it if we yield.
-                KeyPattern kp(collMetadata->getKeyPattern());
-                // This performs excessive BSONObj creation but that's OK for now.
-                if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) {
-                    ++numMisplacedDocs;
-                    continue;
-                }
-            }
-
             // Add result to output buffer. This is unnecessary if explain info is requested
             if (!isExplain) {
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
@@ -694,14 +693,6 @@ namespace mongo {
 
                 // We might have skipped some results due to chunk migration etc. so our count is
                 // correct.
-                explain->setN(numResults);
-
-                // Fill in the number of documents consummed that were involved in an ongoing
-                // (or aborted) migration.
-                explain->setNChunkSkips(numMisplacedDocs);
-
-                // We might have skipped some results due to chunk migration etc. so our count is
-                // correct and explain's is not.
                 explain->setN(numResults);
 
                 // Clock the whole operation.

@@ -28,34 +28,47 @@
 
 #pragma once
 
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/stale_exception.h"
+
 namespace mongo {
 
     /**
-     * These map to implementations of the PlanStage interface, all of which live in db/exec/
+     * This stage drops documents that don't belong to the shard we're executing on.
+     *
+     * Preconditions: Child must be fetched.  TODO XXX: when covering analysis is in just build doc
+     * and check that against shard key.
      */
-    enum StageType {
-        STAGE_AND_HASH,
-        STAGE_AND_SORTED,
-        STAGE_COLLSCAN,
-        STAGE_FETCH,
+    class ShardFilterStage : public PlanStage {
+    public:
+        ShardFilterStage(const string& ns, WorkingSet* ws, PlanStage* child);
+        virtual ~ShardFilterStage();
 
-        // TODO: This is probably an expression index, but would take even more time than
-        // STAGE_2DSPHERE to straighten out.
-        STAGE_GEO_2D,
-        // The two $geoNear impls imply a fetch+sort and as such are not IXSCANs.
-        STAGE_GEO_NEAR_2D,
-        STAGE_GEO_NEAR_2DSPHERE,
+        virtual bool isEOF();
+        virtual StageState work(WorkingSetID* out);
 
-        STAGE_IXSCAN,
-        STAGE_LIMIT,
-        STAGE_OR,
-        STAGE_PROJECTION,
-        STAGE_SHARDING_FILTER,
-        STAGE_SKIP,
-        STAGE_SORT,
-        STAGE_SORT_MERGE,
-        STAGE_TEXT,
-        STAGE_UNKNOWN,
+        virtual void prepareToYield();
+        virtual void recoverFromYield();
+        virtual void invalidate(const DiskLoc& dl);
+
+        virtual PlanStageStats* getStats();
+
+    private:
+        WorkingSet* _ws;
+        scoped_ptr<PlanStage> _child;
+        string _ns;
+
+        // Stats
+        CommonStats _commonStats;
+        ShardingFilterStats _specificStats;
+
+        bool _initted;
+        CollectionMetadataPtr _metadata;
     };
 
 }  // namespace mongo
+

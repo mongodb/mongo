@@ -40,6 +40,7 @@
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/s2near.h"
+#include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/text.h"
@@ -223,6 +224,12 @@ namespace mongo {
             params.query = ftsq;
 
             return new TextStage(params, ws, node->filter.get());
+        }
+        else if (STAGE_SHARDING_FILTER == root->getType()) {
+            const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
+            PlanStage* childStage = buildStages(ns, fn->children[0], ws);
+            if (NULL == childStage) { return NULL; }
+            return new ShardFilterStage(ns, ws, childStage);
         }
         else {
             stringstream ss;

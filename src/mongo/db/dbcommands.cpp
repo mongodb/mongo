@@ -839,7 +839,7 @@ namespace mongo {
             }
 
             Runner* rawRunner;
-            if (!getRunner(cq, &rawRunner, QueryPlanner::NO_TABLE_SCAN).isOK()) {
+            if (!getRunner(cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
                 uasserted(17241, "Can't get runner for query " + query.toString());
                 return 0;
             }

@@ -575,4 +575,24 @@ namespace mongo {
         return false;
     }
 
+    //
+    // ShardingFilterNode
+    //
+
+    void ShardingFilterNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "SHARDING_FILTER\n";
+        if (NULL != filter) {
+            addIndent(ss, indent + 1);
+            StringBuilder sb;
+            *ss << "filter:\n";
+            filter->debugString(sb, indent + 2);
+            *ss << sb.str();
+        }
+        addCommon(ss, indent);
+        addIndent(ss, indent + 1);
+        *ss << "Child:" << endl;
+        children[0]->appendToString(ss, indent + 2);
+    }
+
 }  // namespace mongo

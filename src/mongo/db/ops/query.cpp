@@ -1032,9 +1032,17 @@ namespace mongo {
         BSONObj jsobj = q.query;
         int queryOptions = q.queryOptions;
         const char *ns = q.ns;
+        uassert( 16332 , "can't have an empty ns" , ns[0] );
 
         const NamespaceString nsString( ns );
         uassert( 16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
+
+        LOG(2) << "runQuery called " << ns << " " << jsobj << endl;
+
+        curop.debug().ns = ns;
+        curop.debug().ntoreturn = q.ntoreturn;
+        curop.debug().query = jsobj;
+        curop.setQuery(jsobj);
 
         // Run a command.
         if ( nsString.isCommand() ) {
@@ -1070,7 +1078,6 @@ namespace mongo {
         }
 
         if (isNewQueryFrameworkEnabled()) {
-            // TODO: Copy prequel curop debugging into runNewQuery
             CanonicalQuery* cq = NULL;
             if (canUseNewSystem(q, &cq)) {
                 return newRunQuery(cq, curop, result);
@@ -1079,15 +1086,6 @@ namespace mongo {
 
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
-        
-        uassert( 16332 , "can't have an empty ns" , ns[0] );
-
-        LOG(2) << "runQuery called " << ns << " " << jsobj << endl;
-
-        curop.debug().ns = ns;
-        curop.debug().ntoreturn = pq.getNumToReturn();
-        curop.debug().query = jsobj;
-        curop.setQuery(jsobj);
 
         bool explain = pq.isExplain();
         BSONObj order = pq.getOrder();

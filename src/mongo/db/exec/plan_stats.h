@@ -259,4 +259,10 @@ namespace mongo {
         uint64_t forcedFetches;
     };
 
+    struct ShardingFilterStats : public SpecificStats {
+        ShardingFilterStats() : chunkSkips(0) { }
+
+        uint64_t chunkSkips;
+    };
+
 }  // namespace mongo

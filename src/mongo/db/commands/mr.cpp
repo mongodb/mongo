@@ -889,7 +889,7 @@ namespace mongo {
             verify(CanonicalQuery::canonicalize(_config.incLong, BSONObj(), sortKey, BSONObj(), &cq).isOK());
 
             Runner* rawRunner;
-            verify(getRunner(cq, &rawRunner, QueryPlanner::NO_TABLE_SCAN).isOK());
+            verify(getRunner(cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
             auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;

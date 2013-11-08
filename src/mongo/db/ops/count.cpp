@@ -111,15 +111,36 @@ namespace mongo {
             auto_ptr<Runner> runner(rawRunner);
             auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
 
-            ClientCursor::registerRunner(runner.get());
-            runner->setYieldPolicy(Runner::YIELD_AUTO);
-            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+            try {
+                ClientCursor::registerRunner(runner.get());
+                runner->setYieldPolicy(Runner::YIELD_AUTO);
+                safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
-                ++count;
+                Runner::RunnerState state;
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
+                    ++count;
+                }
+                if (Runner::RUNNER_EOF == state) {
+                    return count;
+                }
+                else {
+                    // Query ended due to an error.
+                    return -2;
+                }
             }
-            return count;
+            catch ( const DBException &e ) {
+                err = e.toString();
+                errCode = e.getCode();
+            } 
+            catch ( const std::exception &e ) {
+                err = e.what();
+                errCode = 0;
+            } 
+            // Historically we have returned zero in many count assertion cases - see SERVER-2291.
+            log() << "Count with ns: " << ns << " and query: " << query
+                  << " failed with exception: " << err << " code: " << errCode
+                  << endl;
+            return -2;
         }
         else {
 
