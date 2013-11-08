@@ -472,7 +472,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	uint32_t i, write_size;
+	uint32_t write_size;
 
 	conn = S2C(session);
 	log = conn->log;
