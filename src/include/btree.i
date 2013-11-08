@@ -620,14 +620,6 @@ __wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page->modify == NULL)
 		return (0);
 
-	/*
-	 * If we have already tried forced eviction and the oldest ID hasn't
-	 * moved on, we're not going to succeed.
-	 */
-	if (page->modify->disk_snap_min ==
-	    S2C(session)->txn_global.oldest_id)
-		return (0);
-
 	return (1);
 }
 
