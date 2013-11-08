@@ -87,9 +87,6 @@ namespace mongo {
             return (Record *) (((char *) this) + x);
         }
 
-        Extent* getNextExtent();
-        Extent* getPrevExtent();
-
         static int maxSize();
         static int minSize() { return 0x1000; }
         /**

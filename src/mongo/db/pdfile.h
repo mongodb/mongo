@@ -273,14 +273,6 @@ namespace mongo {
 
     // XXX-ERH
 
-    inline Extent* Extent::getNextExtent() {
-        return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext);
-    }
-
-    inline Extent* Extent::getPrevExtent() {
-        return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev);
-    }
-
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
         _accessing();
         if ( _nextOfs != DiskLoc::NullOfs ) {

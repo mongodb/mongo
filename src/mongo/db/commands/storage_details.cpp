@@ -367,11 +367,11 @@ namespace {
     /**
      * @return the requested extent if it exists, otherwise NULL
      */
-    const Extent* getNthExtent(int extentNum, const NamespaceDetails* nsd) {
+    const Extent* getNthExtent(Database* db, int extentNum, const NamespaceDetails* nsd) {
         int curExtent = 0;
-        for (Extent* ex = DataFileMgr::getExtent(nsd->firstExtent());
+        for (Extent* ex = db->getExtentManager().getExtent(nsd->firstExtent());
              ex != NULL;
-             ex = ex->getNextExtent()) {
+             ex = db->getExtentManager().getNextExtent(ex)) {
 
             if (curExtent == extentNum) return ex;
             curExtent++;
@@ -708,9 +708,11 @@ namespace {
     /**
      * @param ex requested extent; if NULL analyze entire namespace
      */ 
-    bool runInternal(const Collection* collection, const Extent* ex, SubCommand subCommand,
-                     AnalyzeParams& globalParams, string& errmsg, BSONObjBuilder& result) {
+    bool runInternal(const Database* db, const Collection* collection, const Extent* ex,
+                     SubCommand subCommand, AnalyzeParams& globalParams,
+                     string& errmsg, BSONObjBuilder& result) {
         const NamespaceDetails* nsd = collection->details();
+        const ExtentManager& em = db->getExtentManager();
         BSONObjBuilder outputBuilder; // temporary builder to avoid output corruption in case of
                                       // failure
         bool success = false;
@@ -731,9 +733,9 @@ namespace {
             }
 
             BSONArrayBuilder extentsArrayBuilder(outputBuilder.subarrayStart("extents"));
-            for (Extent* curExtent = dl.ext();
+            for (Extent* curExtent = em.getExtent(dl);
                  curExtent != NULL;
-                 curExtent = curExtent->getNextExtent()) {
+                 curExtent = em.getNextExtent(curExtent)) {
 
                 AnalyzeParams extentParams(globalParams);
                 extentParams.numberOfSlices = 0; // use the specified or calculated granularity;
@@ -802,7 +804,7 @@ namespace {
                 return false;
             }
             int extentNum = extentElm.numberInt();
-            extent = getNthExtent(extentNum, nsd);
+            extent = getNthExtent(db, extentNum, nsd);
             if (extent == NULL) {
                 errmsg = str::stream() << "extent " << extentNum << " does not exist";
                 return false;
@@ -858,7 +860,7 @@ namespace {
 
         params.showRecords = cmdObj["showRecords"].trueValue();
 
-        return runInternal(collection, extent, subCommand, params, errmsg, result);
+        return runInternal(db, collection, extent, subCommand, params, errmsg, result);
     }
 
 }  // namespace

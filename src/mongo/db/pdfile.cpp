@@ -338,10 +338,11 @@ namespace mongo {
     DataFileMgr::DataFileMgr(){}
 
     shared_ptr<Cursor> DataFileMgr::findAll(const StringData& ns, const DiskLoc &startLoc) {
-        NamespaceDetails * d = nsdetails( ns );
-        if ( ! d )
+        Database* db = cc().database();
+        Collection* collection = db->getCollection( ns );
+        if ( !collection )
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
-
+        NamespaceDetails* d = collection->details();
         DiskLoc loc = d->firstExtent();
         if ( loc.isNull() )
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
@@ -353,13 +354,13 @@ namespace mongo {
             set<DiskLoc> extents;
 
             while ( 1 ) {
-                Extent *f = getExtent(tmp);
+                Extent *f = db->getExtentManager().getExtent(tmp);
                 out() << "extent: " << tmp.toString() << endl;
                 extents.insert(tmp);
                 tmp = f->xnext;
                 if ( tmp.isNull() )
                     break;
-                f = f->getNextExtent();
+                f = db->getExtentManager().getNextExtent( f );
             }
 
             out() << endl;
@@ -379,7 +380,7 @@ namespace mongo {
             RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead. ns:" << ns << endl;
             // find a nonempty extent
             // it might be nice to free the whole extent here!  but have to clean up free recs then.
-            e = e->getNextExtent();
+            e = db->getExtentManager().getNextExtent( e );
         }
         return shared_ptr<Cursor>(new BasicCursor( e->firstRecord ));
     }
@@ -394,10 +395,12 @@ namespace mongo {
             return DataFileMgr::findAll(ns, startLoc);
 
         // "reverse natural order"
-        NamespaceDetails *d = nsdetails(ns);
-
-        if ( !d )
+        Database* db = cc().database();
+        Collection* collection = db->getCollection( ns );
+        if ( !collection )
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
+
+        NamespaceDetails* d = collection->details();
 
         if ( !d->isCapped() ) {
             if ( !startLoc.isNull() )
@@ -405,7 +408,7 @@ namespace mongo {
             Extent *e = d->lastExtent().ext();
             while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
                 OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
-                e = e->getPrevExtent();
+                e = db->getExtentManager().getPrevExtent(e);
             }
             return shared_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
         }

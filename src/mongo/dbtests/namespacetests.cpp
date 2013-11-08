@@ -1716,7 +1716,8 @@ namespace NamespaceTests {
                 BSONObjBuilder bob;
                 bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
                 BSONObj bigger = bob.done();
-                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
+                ASSERT_THROWS( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ),
+                               UserException );
                 ASSERT_EQUALS( 0, nRecords() );
             }
         private:
@@ -2166,7 +2167,8 @@ namespace NamespaceTests {
 				bob.appendOID("_id", 0, true);
                 bob.append( "a", string( MinExtentSize + 300, 'a' ) );
                 BSONObj bigger = bob.done();
-                ASSERT( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ).isNull() );
+                ASSERT_THROWS( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ),
+                               UserException );
                 ASSERT_EQUALS( 0, nRecords() );
             }
         public:
