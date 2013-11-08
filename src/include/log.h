@@ -11,9 +11,13 @@
 #define	LOG_ALIGN		128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
+/*
+ * We rely on this structure being aligned at 64 bits by the compiler,
+ * if we were paranoid we could add an unused field to ensure the padding
+ * is correct.
+ */
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
-	uint32_t	unused;
 	off_t		offset;		/* Log file offset */
 };
 
