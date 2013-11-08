@@ -73,10 +73,8 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     class DataFileMgr {
-        friend class BasicCursor;
     public:
         DataFileMgr();
-        void init(const string& path );
 
         // The object o may be updated if modified on insert.
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false, bool fromMigrate = false );
@@ -127,9 +125,6 @@ namespace mongo {
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const StringData& ns, Record *todelete, const DiskLoc& dl);
-
-    private:
-        vector<DataFile *> files;
     };
 
     extern DataFileMgr theDataFileMgr;
