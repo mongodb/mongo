@@ -1177,7 +1177,9 @@ namespace mongo {
         return false;
     }
 
-    QuerySolution* QueryPlanner::scanWholeIndex(const IndexEntry& index, size_t options, const CanonicalQuery& query) {
+    QuerySolution* QueryPlanner::scanWholeIndex(const IndexEntry& index, size_t options,
+                                                const CanonicalQuery& query,
+                                                int direction) {
         QuerySolutionNode* solnRoot = NULL;
 
         // Build an ixscan over the id index, use it, and return it.
@@ -1194,6 +1196,11 @@ namespace mongo {
             ++field;
         }
         alignBounds(&isn->bounds, isn->indexKeyPattern);
+
+        if (-1 == direction) {
+            reverseScans(isn);
+            isn->direction = -1;
+        }
 
         MatchExpression* filter = query.root()->shallowClone();
 
@@ -1494,6 +1501,12 @@ namespace mongo {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."
                                << endl;
                         out->push_back(scanWholeIndex(indices[i], options, query));
+                        break;
+                    }
+                    if (providesSort(query, reverseSortObj(kp))) {
+                        QLOG() << "Planner: outputting soln that uses (reverse) index "
+                               << "to provide sort." << endl;
+                        out->push_back(scanWholeIndex(indices[i], options, query, -1));
                         break;
                     }
                 }

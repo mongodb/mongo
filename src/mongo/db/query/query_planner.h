@@ -239,7 +239,8 @@ namespace mongo {
          * Return a plan that uses the provided index as a proxy for a collection scan.
          */
         static QuerySolution* scanWholeIndex(const IndexEntry& index, size_t options,
-                                             const CanonicalQuery& query);
+                                             const CanonicalQuery& query,
+                                             int direction = 1);
 
         /**
          * Traverse the tree rooted at 'root' reversing ixscans and other sorts.

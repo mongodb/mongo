@@ -696,6 +696,12 @@ namespace {
         dumpSolutions();
     }
 
+    TEST_F(IndexAssignmentTest, ReverseScanForSort) {
+        addIndex(BSON("_id" << 1));
+        runDetailedQuery(BSONObj(), fromjson("{_id: -1}"), BSONObj());
+        dumpSolutions();
+    }
+
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
     //                second is not working (until the machinery is in place)
     //
