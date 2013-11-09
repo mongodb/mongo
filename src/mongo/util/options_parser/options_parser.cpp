@@ -21,6 +21,7 @@
 #include <fstream>
 #include <stdio.h>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -29,6 +30,7 @@
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/scopeguard.h"
+#include "third_party/yaml-cpp-0.5.1/include/yaml-cpp/yaml.h"
 
 namespace mongo {
 namespace optionenvironment {
@@ -47,11 +49,11 @@ namespace optionenvironment {
         // mongo JSON parser for JSON config files.  Our destination storage in both cases is an
         // Environment which stores Value objects.
         //
-        // 1. JSON Config Files
-        //     The mongo JSON parser parses a JSON string into a BSON object.  Therefore, we need:
-        //         a. A function to convert a BSONElement to a Value (BSONElementToValue)
-        //         b. A function to iterate a BSONObj, convert the BSONElements to Values, and add
-        //            them to our Environment (addBSONElementsToEnvironment)
+        // 1. YAML Config Files
+        //     The YAML parser parses a YAML config file into a YAML::Node.  Therefore, we need:
+        //         a. A function to convert a YAML::Node to a Value (YAMLNodeToValue)
+        //         b. A function to iterate a YAML::Node, convert the leaf Nodes to Values, and add
+        //            them to our Environment (addYAMLNodesToEnvironment)
         //
         // 2. INI Config Files and command line
         //     The boost::program_options parsers store their output in a
@@ -101,6 +103,123 @@ namespace optionenvironment {
                 return Status(ErrorCodes::InternalError, sb.str());
             }
             return Status::OK();
+        }
+
+        // Convert a YAML::Node to a Value.  See comments at the beginning of this section.
+        Status YAMLNodeToValue(const YAML::Node& YAMLNode,
+                               const std::vector<OptionDescription>& options_vector,
+                               const Key& key, Value* value) {
+
+            bool isRegistered = false;
+
+            // The logic below should ensure that we don't use this uninitialized, but we need to
+            // initialize it here to avoid a compiler warning.  Initializing it to a "Bool" since
+            // that's the most restricted type we have and is most likely to result in an early
+            // failure if we have a logic error.
+            OptionType type = Bool;
+
+            // Get expected type
+            for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
+                iterator != options_vector.end(); iterator++) {
+                if (key == iterator->_dottedName && (iterator->_sources & SourceJSONConfig)) {
+                    isRegistered = true;
+                    type = iterator->_type;
+                }
+            }
+
+            if (!isRegistered) {
+                StringBuilder sb;
+                sb << "Unrecognized option: " << key;
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+
+            // Handle multi keys
+            if (type == StringVector) {
+                if (!YAMLNode.IsSequence()) {
+                    StringBuilder sb;
+                    sb << "Option: " << key
+                       << " is of type StringVector, but value in YAML config is not a list type";
+                    return Status(ErrorCodes::BadValue, sb.str());
+                }
+                std::vector<std::string> stringVector;
+                for (YAML::const_iterator it = YAMLNode.begin(); it != YAMLNode.end(); ++it) {
+                    if (it->IsSequence()) {
+                        StringBuilder sb;
+                        sb << "Option: " << key
+                           << " has nested lists, which is not allowed";
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    stringVector.push_back(it->Scalar());
+                }
+                *value = Value(stringVector);
+                return Status::OK();
+            }
+
+            Status ret = Status::OK();
+            std::string stringVal = YAMLNode.Scalar();
+            switch (type) {
+                double doubleVal;
+                int intVal;
+                long longVal;
+                unsigned long long unsignedLongLongVal;
+                unsigned unsignedVal;
+                case Switch:
+                case Bool:
+                    if (stringVal == "true") {
+                        *value = Value(true);
+                        return Status::OK();
+                    }
+                    else if (stringVal == "true") {
+                        *value = Value(false);
+                        return Status::OK();
+                    }
+                    else {
+                        StringBuilder sb;
+                        sb << "Expected boolean but found string: " << stringVal
+                           << " for option: " << key;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                case Double:
+                    ret = parseNumberFromString(stringVal, &doubleVal);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+                    *value = Value(doubleVal);
+                    return Status::OK();
+                case Int:
+                    ret = parseNumberFromString(stringVal, &intVal);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+                    *value = Value(intVal);
+                    return Status::OK();
+                case Long:
+                    ret = parseNumberFromString(stringVal, &longVal);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+                    *value = Value(longVal);
+                    return Status::OK();
+                case String:
+                    *value = Value(stringVal);
+                    return Status::OK();
+                case UnsignedLongLong:
+                    ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+                    *value = Value(unsignedLongLongVal);
+                    return Status::OK();
+                case Unsigned:
+                    ret = parseNumberFromString(stringVal, &unsignedVal);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+                    *value = Value(unsignedVal);
+                    return Status::OK();
+                default: /* XXX: should not get here */
+                    return Status(ErrorCodes::InternalError, "Unrecognized option type");
+            }
         }
 
         // Add all the values in the given variables_map to our environment.  See comments at the
@@ -230,6 +349,82 @@ namespace optionenvironment {
                 sb << "Exception thrown by BSON conversion: " << e.what();
                 return Status(ErrorCodes::InternalError, sb.str());
             }
+        }
+
+        // Add all the values in the given YAML Node to our environment.  See comments at the
+        // beginning of this section.
+        Status addYAMLNodesToEnvironment(const YAML::Node& root,
+                                         const OptionSection& options,
+                                         const std::string parentPath,
+                                         Environment* environment) {
+
+            std::vector<OptionDescription> options_vector;
+            Status ret = options.getAllOptions(&options_vector);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            // Don't return an error on empty config files
+            if (root.IsNull()) {
+                return Status::OK();
+            }
+
+            if (!root.IsMap() && parentPath.empty()) {
+                StringBuilder sb;
+                sb << "No map found at top level of YAML config";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+
+            for (YAML::const_iterator it = root.begin(); it != root.end(); ++it) {
+                std::string fieldName = it->first.Scalar();
+                YAML::Node YAMLNode = it->second;
+
+                std::string dottedName;
+                if (parentPath.empty()) {
+
+                    // We are at the top level, so the full specifier is just the current field name
+                    dottedName = fieldName;
+                }
+                else {
+
+                    // If our field name is "value", assume this contains the value for the parent
+                    if (fieldName == "value") {
+                        dottedName = parentPath;
+                    }
+
+                    // If this is not a special field name, and we are in a sub object, append our
+                    // current fieldName to the selector for the sub object we are traversing
+                    else {
+                        dottedName = parentPath + '.' + fieldName;
+                    }
+                }
+
+                if (YAMLNode.IsMap()) {
+                    addYAMLNodesToEnvironment(YAMLNode, options, dottedName, environment);
+                }
+                else {
+                    Value optionValue;
+                    Status ret = YAMLNodeToValue(YAMLNode, options_vector, dottedName,
+                                                 &optionValue);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+
+                    Value dummyVal;
+                    if (environment->get(dottedName, &dummyVal).isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing YAML config: duplcate key: " << dottedName;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+
+                    ret = environment->set(dottedName, optionValue);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
+                }
+            }
+
+            return Status::OK();
         }
 
         // Add all the values in the given BSONObj to our environment.  See comments at the
@@ -560,6 +755,51 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+namespace {
+
+    /**
+     * This function delegates the YAML config parsing to the third party YAML parser.  It does no
+     * error checking other than the parse error checking done by the YAML parser.
+     */
+    Status parseYAMLConfigFile(const std::string& config,
+                               YAML::Node* YAMLConfig) {
+
+        try {
+            *YAMLConfig = YAML::Load(config);
+        } catch (const YAML::Exception &e) {
+            StringBuilder sb;
+            sb << "Error parsing YAML config file: " << e.what();
+            return Status(ErrorCodes::BadValue, sb.str());
+        } catch (const std::runtime_error &e) {
+            StringBuilder sb;
+            sb << "Unexpected exception parsing YAML config file: " << e.what();
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+
+        return Status::OK();
+    }
+
+    bool isYAMLConfig(const YAML::Node& config) {
+        // The YAML parser is very forgiving, and for the INI config files we've parsed so far using
+        // the YAML parser, the YAML parser just slurps the entire config file into a single string
+        // rather than erroring out.  Thus, we assume that having a scalar (string) as the root node
+        // means that this is not meant to be a YAML config file, since even a very simple YAML
+        // config file should be parsed as a Map, and thus "config.IsScalar()" would return false.
+        //
+        // This requires more testing, both to ensure that all INI style files get parsed as a
+        // single string, and to ensure that the user experience does not suffer (in terms of this
+        // causing confusing error messages for users writing a brand new YAML config file that
+        // incorrectly triggers this check).
+        if (config.IsScalar()) {
+            return false;
+        }
+        else {
+            return true;
+        }
+    }
+
+} // namespace
+
     /**
      * This function delegates the JSON config parsing to the MongoDB JSON parser.
      *
@@ -746,16 +986,14 @@ namespace optionenvironment {
                 return ret;
             }
 
-            if (isJSONConfig(config_file)) {
-                ret = parseJSONConfigFile(options, config_file, &configEnvironment);
-                if (!ret.isOK()) {
-                    return ret;
-                }
-                ret = addTypeConstraints(options, &configEnvironment);
-                if (!ret.isOK()) {
-                    return ret;
-                }
-                ret = configEnvironment.validate();
+            YAML::Node YAMLConfig;
+            ret = parseYAMLConfigFile(config_file, &YAMLConfig);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            if (isYAMLConfig(YAMLConfig)) {
+                ret = addYAMLNodesToEnvironment(YAMLConfig, options, "", &configEnvironment);
                 if (!ret.isOK()) {
                     return ret;
                 }

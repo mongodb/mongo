@@ -1181,19 +1181,32 @@ namespace {
         argv.push_back("config.json");
         std::map<std::string, std::string> env_map;
 
-        parser.setConfig("config.json", "{ multival : [ 1 ] }");
+        // NOTE: The yaml config file just reads things as strings, and it's up to us to decide what
+        // the type should be later.  This means that we can't tell the difference between when a
+        // user provides a non string value or a string value in some cases.
+        parser.setConfig("config.json", "{ multival : [ 1, true ] }");
 
-        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::vector<std::string> multival;
+        std::vector<std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(*multivalit, "1");
+        multivalit++;
+        ASSERT_EQUALS(*multivalit, "true");
     }
 
     TEST(JSONConfigFile, Over16Megabytes) {
-        // Test to make sure that we fail gracefully when we try to parse a JSON config file that
-        // results in a BSON object larger than the current limit of 16MB
+        // Test to make sure that we can parse a JSON config file that results in a BSON object
+        // larger than the current limit of 16MB, now that we no longer store the result in BSON
         OptionsParserTester parser;
         moe::Environment environment;
 
         moe::OptionSection testOpts;
         testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("largeArray", "largeArray", moe::StringVector, "Large array");
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -1237,7 +1250,7 @@ namespace {
         parser.setConfig("config.json", largeConfigString);
 
         moe::Value value;
-        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
     TEST(JSONConfigFile, DefaultValueOverride) {
@@ -1483,209 +1496,6 @@ namespace {
         }
         catch ( std::exception &e ) {
         }
-    }
-
-    TEST(JSONConfigFile, NestedComments) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ port : { comment : \"comment on port\", value : 5 },"
-                         "host : { comment : \"comment on host\", value : \"localhost\" } }");
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-        ASSERT_OK(environment.get(moe::Key("port"), &value));
-        int port;
-        ASSERT_OK(value.get(&port));
-        ASSERT_EQUALS(port, 5);
-        ASSERT_OK(environment.get(moe::Key("host"), &value));
-        std::string host;
-        ASSERT_OK(value.get(&host));
-        ASSERT_EQUALS(host, "localhost");
-    }
-
-    TEST(JSONConfigFile, FlatComments) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ comment : \"comment on port\", port : 5 ,"
-                         "  comment : \"comment on host\", host : \"localhost\" }");
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-        ASSERT_OK(environment.get(moe::Key("port"), &value));
-        int port;
-        ASSERT_OK(value.get(&port));
-        ASSERT_EQUALS(port, 5);
-        ASSERT_OK(environment.get(moe::Key("host"), &value));
-        std::string host;
-        ASSERT_OK(value.get(&host));
-        ASSERT_EQUALS(host, "localhost");
-    }
-
-    TEST(JSONConfigFile, MixedComments) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ port : { comment : \"comment on port\", value : 5 },"
-                         "  comment : \"comment on host\", host : \"localhost\" }");
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-        ASSERT_OK(environment.get(moe::Key("port"), &value));
-        int port;
-        ASSERT_OK(value.get(&port));
-        ASSERT_EQUALS(port, 5);
-        ASSERT_OK(environment.get(moe::Key("host"), &value));
-        std::string host;
-        ASSERT_OK(value.get(&host));
-        ASSERT_EQUALS(host, "localhost");
-    }
-
-    TEST(JSONConfigFile, NestedCommentsBadValue) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ port : { comment : \"comment on port\", value : \"string\" },"
-                         "host : { comment : \"comment on host\", value : \"localhost\" } }");
-
-        moe::Value value;
-        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
-    }
-
-    TEST(JSONConfigFile, FlatCommentsBadValue) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ comment : \"comment on port\", port : \"string\" ,"
-                         "  comment : \"comment on host\", host : \"localhost\" }");
-
-        moe::Value value;
-        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
-    }
-
-    TEST(JSONConfigFile, NestedCommentsOtherTypes) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ port : { comment : [ \"can\", \"be\", \"array\", true ], value : 5 },"
-                         "  host : { comment : { nestedcomment : \"really descriptive\" },"
-                                               " value : \"localhost\" } }");
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-        ASSERT_OK(environment.get(moe::Key("port"), &value));
-        int port;
-        ASSERT_OK(value.get(&port));
-        ASSERT_EQUALS(port, 5);
-        ASSERT_OK(environment.get(moe::Key("host"), &value));
-        std::string host;
-        ASSERT_OK(value.get(&host));
-        ASSERT_EQUALS(host, "localhost");
-    }
-
-    TEST(JSONConfigFile, FlatCommentsOtherTypes) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
-        testOpts.addOptionChaining("host", "host", moe::String, "Host");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json",
-                         "{ comment : [ \"can\", \"be\", \"array\", true ], port : 5,"
-                         "  comment : { nestedcomment : \"really descriptive\" },"
-                         "  host : \"localhost\" }");
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-        ASSERT_OK(environment.get(moe::Key("port"), &value));
-        int port;
-        ASSERT_OK(value.get(&port));
-        ASSERT_EQUALS(port, 5);
-        ASSERT_OK(environment.get(moe::Key("host"), &value));
-        std::string host;
-        ASSERT_OK(value.get(&host));
-        ASSERT_EQUALS(host, "localhost");
     }
 
     TEST(ChainingInterface, GoodReference) {
@@ -2552,5 +2362,319 @@ namespace {
         ASSERT_OK(environment.get(moe::Key("port"), &value));
         ASSERT_OK(value.get(&port));
         ASSERT_EQUALS(port, 1000);
+    }
+
+    TEST(YAMLConfigFile, Basic) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "port: 5");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(YAMLConfigFile, Empty) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(YAMLConfigFile, Override) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        argv.push_back("--port");
+        argv.push_back("6");
+        std::map<std::string, std::string> env_map;
+
+
+        parser.setConfig("config.yaml", "port: 5");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 6);
+    }
+
+    TEST(YAMLConfigFile, UnregisteredOption) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "port: 5");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(YAMLConfigFile, DuplicateOption) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "port: 5\nport: 5");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(YAMLConfigFile, BadType) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "port: \"string\"");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(YAMLConfigFile, Nested) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("nested.port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "nested:\n    port: 5");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("nested.port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(YAMLConfigFile, Dotted) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("dotted.port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "dotted.port: 5");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("dotted.port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(YAMLConfigFile, DottedAndNested) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("dottednested.var1", "var1", moe::Int, "Var1");
+        testOpts.addOptionChaining("dottednested.var2", "var2", moe::Int, "Var2");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml",
+                         "dottednested.var1: 5\ndottednested:\n    var2: 6");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("dottednested.var1"), &value));
+        int var1;
+        ASSERT_OK(value.get(&var1));
+        ASSERT_EQUALS(var1, 5);
+        ASSERT_OK(environment.get(moe::Key("dottednested.var2"), &value));
+        int var2;
+        ASSERT_OK(value.get(&var2));
+        ASSERT_EQUALS(var2, 6);
+    }
+
+    TEST(YAMLConfigFile, ListBrackets) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringVector, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "multival: [ \"val1\", \"val2\" ]");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::vector<std::string> multival;
+        std::vector<std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(*multivalit, "val1");
+        multivalit++;
+        ASSERT_EQUALS(*multivalit, "val2");
+    }
+
+    TEST(YAMLConfigFile, ListDashes) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringVector, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "multival:\n - \"val1\"\n - \"val2\"");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::vector<std::string> multival;
+        std::vector<std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(*multivalit, "val1");
+        multivalit++;
+        ASSERT_EQUALS(*multivalit, "val2");
+    }
+
+    TEST(YAMLConfigFile, DefaultValueOverride) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port").setDefault(moe::Value(5));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "port: 6");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 6);
+    }
+
+    TEST(YAMLConfigFile, Comments) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+        testOpts.addOptionChaining("host", "host", moe::String, "Host");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml",
+                         "# comment on port\nport: 5\n"
+                         "# comment on host\nhost: localhost\n");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+        ASSERT_OK(environment.get(moe::Key("host"), &value));
+        std::string host;
+        ASSERT_OK(value.get(&host));
+        ASSERT_EQUALS(host, "localhost");
     }
 } // unnamed namespace

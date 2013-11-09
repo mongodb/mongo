@@ -76,3 +76,14 @@ else:
     env.SConscript('libstemmer_c/SConscript')
     env.StaticLibrary("shim_stemmer", ['shim_stemmer.cpp'],
                       LIBDEPS=['libstemmer_c/stemmer'])
+
+if use_system_version_of_library("yaml"):
+    env.StaticLibrary("shim_yaml", ['shim_yaml.cpp'],
+                      SYSLIBDEPS=[
+                        env['LIBDEPS_YAML_SYSLIBDEP']
+                      ] )
+else:
+    env.Append(CPPPATH='$BUILD_DIR/third_party/yaml-cpp-0.5.1/include')
+    env.SConscript('yaml-cpp-0.5.1/SConscript')
+    env.StaticLibrary("shim_yaml", ['shim_yaml.cpp'],
+                      LIBDEPS=['yaml-cpp-0.5.1/yaml'])

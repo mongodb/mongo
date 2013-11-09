@@ -293,6 +293,8 @@ add_option( "use-system-v8", "use system version of v8 library", 0, True )
 
 add_option( "use-system-stemmer", "use system version of stemmer", 0, True )
 
+add_option( "use-system-yaml", "use system version of yaml", 0, True )
+
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
 add_option( "use-cpu-profiler",
@@ -1366,6 +1368,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("stemmer"):
         conf.FindSysLibDep("stemmer", ["stemmer"])
+
+    if use_system_version_of_library("yaml"):
+        conf.FindSysLibDep("yaml", ["yaml"])
 
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
