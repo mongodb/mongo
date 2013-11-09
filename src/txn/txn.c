@@ -43,19 +43,6 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 }
 
 /*
- * __wt_txn_release_evict_snapshot --
- *	Release the snapshot in the current transaction without sanity checks.
- */
-void
-__wt_txn_release_evict_snapshot(WT_SESSION_IMPL *session)
-{
-	WT_TXN_STATE *txn_state;
-
-	txn_state = &S2C(session)->txn_global.states[session->id];
-	txn_state->snap_min = WT_TXN_NONE;
-}
-
-/*
  * __wt_txn_release_snapshot --
  *	Release the snapshot in the current transaction.
  */
@@ -65,18 +52,20 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn_state = &S2C(session)->txn_global.states[session->id];
-	WT_ASSERT(session, session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
-	    txn_state->snap_min == WT_TXN_NONE ||
-	    !__wt_txn_visible_all(session, txn_state->snap_min));
-	txn_state->snap_min = WT_TXN_NONE;
+	if (txn_state->snap_min != WT_TXN_NONE) {
+		WT_ASSERT(session,
+		    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
+		    !__wt_txn_visible_all(session, txn_state->snap_min));
+		txn_state->snap_min = WT_TXN_NONE;
+	}
 }
 
 /*
- * __wt_txn_refresh_force --
- *	Refresh the transaction state, called when the connection closes.
+ * __wt_txn_update_oldest --
+ *	Sweep the running transactions to update the oldest ID required.
  */
 void
-__wt_txn_refresh_force(WT_SESSION_IMPL *session)
+__wt_txn_update_oldest(WT_SESSION_IMPL *session)
 {
 	/*
 	 * !!!
@@ -230,34 +219,6 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 }
 
 /*
- * __wt_txn_get_evict_snapshot --
- *	Set up a snapshot in the current transaction for eviction.
- *	Only changes that visible to all active transactions can be evicted.
- */
-void
-__wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
-{
-	WT_TXN_GLOBAL *txn_global;
-	uint64_t oldest_id;
-
-	txn_global = &S2C(session)->txn_global;
-
-	/*
-	 * The oldest active snapshot ID in the system that should *not* be
-	 * visible to eviction.  Create a snapshot containing that ID.
-	 */
-	__wt_txn_refresh(session, WT_TXN_NONE, 0);
-	oldest_id = txn_global->oldest_id;
-	__txn_sort_snapshot(session, 0, oldest_id);
-
-	/*
-	 * Note that we carefully don't update the global table with this
-	 * snap_min value: there may already be a running transaction in this
-	 * session with its own value in the global table.
-	 */
-}
-
-/*
  * __wt_txn_begin --
  *	Begin a transaction.
  */
@@ -356,7 +317,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	txn->force_evict_attempts = 0;
 	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
 }
 

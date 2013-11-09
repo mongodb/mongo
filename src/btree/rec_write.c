@@ -613,9 +613,10 @@ __rec_txn_read(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
 {
 	uint64_t txnid;
-	int skip;
+	int skip, retried;
 
-	*updp = __wt_txn_read_skip(session, upd, &skip);
+	retried = 0;
+retry:	*updp = __wt_txn_read_skip(session, upd, &skip);
 	if (!skip) {
 		/*
 		 * Track the largest transaction ID written to disk for this
@@ -630,6 +631,17 @@ __rec_txn_read(
 				r->max_txn = txnid;
 		}
 		return (0);
+	}
+
+	/*
+	 * If skipping this update will cause reconciliation to quit, update
+	 * the oldest transaction ID and retry, in case some transactions have
+	 * committed while we have been working.
+	 */
+	if (F_ISSET(r, WT_SKIP_UPDATE_QUIT) && !retried) {
+		__wt_txn_update_oldest(session);
+		retried = 1;
+		goto retry;
 	}
 
 	return (__rec_txn_skip_chk(session, r));

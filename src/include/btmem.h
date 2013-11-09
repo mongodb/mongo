@@ -194,6 +194,9 @@ struct __wt_page_modify {
 	/* The largest transaction ID written to disk for the page. */
 	uint64_t disk_txn;
 
+	/* The largest update transaction ID (approximate). */
+	uint64_t update_txn;
+
 	/*
 	 * When pages are reconciled, the result can be a replacement page or a
 	 * split page.
