@@ -1116,7 +1116,8 @@ namespace mongo {
             int numExtents;
             BSONArrayBuilder extents;
 
-            result.appendNumber( "storageSize" , collection->storageSize( &numExtents , verbose ? &extents : 0  ) / scale );
+            result.appendNumber( "storageSize",
+                                 static_cast<long long>( collection->storageSize( &numExtents , verbose ? &extents : 0  ) / scale ) );
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->getCompletedIndexCount() );
             result.append( "lastExtentSize" , nsd->lastExtentSize() / scale );

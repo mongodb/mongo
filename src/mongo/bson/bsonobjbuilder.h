@@ -230,10 +230,6 @@ namespace mongo {
             return *this;
         }
 
-        BSONObjBuilder& appendNumber( const StringData& fieldName, int64_t llNumber ) {
-            return appendNumber( fieldName, static_cast<long long>( llNumber ) );
-        }
-
         BSONObjBuilder& appendNumber( const StringData& fieldName, long long llNumber ) {
             static const long long maxInt = ( 1LL << 30 );
             static const long long minInt = -maxInt;
