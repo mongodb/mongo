@@ -49,9 +49,10 @@ extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
     int data_cksum);
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
-extern int __wt_block_compact_skip( WT_SESSION_IMPL *session,
+extern int __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_compact_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    int trigger,
     int *skipp);
 extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block,

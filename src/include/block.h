@@ -147,9 +147,11 @@ struct __wt_bm {
 	int (*checkpoint_resolve)(WT_BM *, WT_SESSION_IMPL *);
 	int (*checkpoint_unload)(WT_BM *, WT_SESSION_IMPL *);
 	int (*close)(WT_BM *, WT_SESSION_IMPL *);
+	int (*compact_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*compact_page_skip)
 	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t, int *);
-	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int, int *);
+	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int *);
+	int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
 	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
 	int (*read)
@@ -194,13 +196,15 @@ struct __wt_block {
 	TAILQ_ENTRY(__wt_block) q;	/* Linked list of handles */
 
 	/* Configuration information, set when the file is opened. */
+	int	 allocfirst;		/* Allocation is first-fit */
+	int	 allocfirst_save;	/* Allocation is first-fit, saved */
 	uint32_t allocsize;		/* Allocation size */
-	u_int	 block_header;		/* Header length */
-
 	int64_t	 os_cache;		/* System buffer cache flush max */
 	int64_t	 os_cache_max;
 	int64_t	 os_cache_dirty;	/* System buffer cache write max */
 	int64_t	 os_cache_dirty_max;
+
+	u_int	 block_header;		/* Header length */
 
 	/*
 	 * There is only a single checkpoint in a file that can be written.  The

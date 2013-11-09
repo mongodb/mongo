@@ -76,7 +76,7 @@ __create_file(WT_SESSION_IMPL *session,
 
 	/* Sanity check the allocation size. */
 	WT_RET(__wt_direct_io_size_check(
-	    session, filecfg, "allocation_size", &allocsize));
+	    session, filecfg, "block_allocation_size", &allocsize));
 
 	/* Create the file. */
 	WT_ERR(__wt_block_manager_create(session, filename, allocsize));

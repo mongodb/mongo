@@ -82,7 +82,7 @@ __wt_block_ext_cleanup(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Search a by-offset skiplist (either the primary by-offset list, or the
  * by-offset list referenced by a size entry), for the specified offset.
  */
-static void
+static inline void
 __block_off_srch(WT_EXT **head, off_t off, WT_EXT ***stack, int skip_off)
 {
 	WT_EXT **extp;
@@ -107,10 +107,34 @@ __block_off_srch(WT_EXT **head, off_t off, WT_EXT ***stack, int skip_off)
 }
 
 /*
+ * __block_first_srch --
+ *	Search the skiplist for the first available slot.
+ */
+static inline int
+__block_first_srch(WT_EXT **head, off_t size, WT_EXT ***stack)
+{
+	WT_EXT *ext;
+
+	/*
+	 * Linear walk of the available chunks in offset order; take the first
+	 * one that's large enough.
+	 */
+	WT_EXT_FOREACH(ext, head)
+		if (ext->size >= size)
+			break;
+	if (ext == NULL)
+		return (0);
+
+	/* Build a stack for the offset we want. */
+	__block_off_srch(head, ext->off, stack, 0);
+	return (1);
+}
+
+/*
  * __block_size_srch --
  *	Search the by-size skiplist for the specified size.
  */
-static void
+static inline void
 __block_size_srch(WT_SIZE **head, off_t size, WT_SIZE ***stack)
 {
 	WT_SIZE **szp;
@@ -134,7 +158,7 @@ __block_size_srch(WT_SIZE **head, off_t size, WT_SIZE ***stack)
  *	Search a by-offset skiplist for before/after records of the specified
  * offset.
  */
-static void
+static inline void
 __block_off_srch_pair(
     WT_EXTLIST *el, off_t off, WT_EXT **beforep, WT_EXT **afterp)
 {
@@ -171,7 +195,7 @@ __block_off_srch_pair(
  * __block_extlist_last --
  *	Return the last extent in the skiplist.
  */
-static WT_EXT *
+static inline WT_EXT *
 __block_extlist_last(WT_EXT **head)
 {
 	WT_EXT *ext, **extp;
@@ -500,7 +524,7 @@ int
 __wt_block_alloc(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
-	WT_EXT *ext;
+	WT_EXT *ext, **estack[WT_SKIP_MAXDEPTH];
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
 
 	WT_STAT_FAST_DATA_INCR(session, block_alloc);
@@ -511,21 +535,35 @@ __wt_block_alloc(
 		    (intmax_t)size, block->allocsize);
 
 	/*
-	 * Allocation is first-fit by size, then by lowest offset: search the
-	 * by-size skiplist for the requested size and take the first entry on
-	 * the by-size offset list.  This means we prefer best-fit over lower
-	 * offset, but within a size we'll prefer an offset appearing earlier
-	 * in the file.  If we don't have anything big enough, extend the file.
+	 * Allocation is either first-fit (lowest offset), or best-fit (best
+	 * size).  If it's first-fit, walk the offset list linearly until we
+	 * find an entry that will work.
+	 *
+	 * If it's best-fit by size, search the by-size skiplist for the size
+	 * and take the first entry on the by-size offset list.  This means we
+	 * prefer best-fit over lower offset, but within a size we'll prefer an
+	 * offset appearing earlier in the file.
+	 *
+	 * If we don't have anything big enough, extend the file.
 	 */
-	__block_size_srch(block->live.avail.sz, size, sstack);
-	szp = *sstack[0];
-	if (szp == NULL) {
-		WT_RET(__block_extend(session, block, offp, size));
-		goto done;
+	if (block->allocfirst) {
+		if (!__block_first_srch(block->live.avail.off, size, estack)) {
+			WT_RET(__block_extend(session, block, offp, size));
+			goto done;
+		}
+		ext = *estack[0];
+	} else {
+		__block_size_srch(block->live.avail.sz, size, sstack);
+		if ((szp = *sstack[0]) == NULL) {
+			WT_RET(__block_extend(session, block, offp, size));
+			goto done;
+		}
+
+		/* Take the first record. */
+		ext = szp->off[0];
 	}
 
-	/* Remove the first record, and set the returned offset. */
-	ext = szp->off[0];
+	/* Remove the record, and set the returned offset. */
 	WT_RET(__block_off_remove(
 	    session, block, &block->live.avail, ext->off, &ext));
 	*offp = ext->off;

@@ -9,7 +9,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	memset(stats, 0, sizeof(*stats));
 
 	stats->block_alloc.desc = "blocks allocated";
-	stats->block_allocsize.desc =
+	stats->block_allocation_size.desc =
 	    "block manager file allocation unit size";
 	stats->block_checkpoint_size.desc = "checkpoint size";
 	stats->block_extension.desc =
@@ -127,7 +127,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 
 	stats = (WT_DSRC_STATS *)stats_arg;
 	stats->block_alloc.v = 0;
-	stats->block_allocsize.v = 0;
+	stats->block_allocation_size.v = 0;
 	stats->block_checkpoint_size.v = 0;
 	stats->block_extension.v = 0;
 	stats->block_free.v = 0;

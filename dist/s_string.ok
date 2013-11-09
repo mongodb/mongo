@@ -460,6 +460,7 @@ filenames
 fileops
 filesize
 filesystem
+firstfit
 fixup
 flcs
 fmt

@@ -104,7 +104,6 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	WT_UNUSED(cfg);
 	WT_VERBOSE_TRET(session, block, "open: %s", filename);
 
 	conn = S2C(session);
@@ -126,6 +125,10 @@ __wt_block_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 	block->allocsize = allocsize;
+
+	WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
+	block->allocfirst =
+	    WT_STRING_MATCH("first", cval.str, cval.len) ? 1 : 0;
 
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
@@ -312,7 +315,7 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	 * isn't like this is a common function for an application to call.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	WT_STAT_SET(stats, block_allocsize, block->allocsize);
+	WT_STAT_SET(stats, block_allocation_size, block->allocsize);
 	WT_STAT_SET(stats, block_checkpoint_size, block->live.ckpt_size);
 	WT_STAT_SET(stats, block_magic, WT_BLOCK_MAGIC);
 	WT_STAT_SET(stats, block_major, WT_BLOCK_MAJOR_VERSION);

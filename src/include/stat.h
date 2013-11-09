@@ -117,7 +117,7 @@ struct __wt_stats {
  */
 struct __wt_dsrc_stats {
 	WT_STATS block_alloc;
-	WT_STATS block_allocsize;
+	WT_STATS block_allocation_size;
 	WT_STATS block_checkpoint_size;
 	WT_STATS block_extension;
 	WT_STATS block_free;

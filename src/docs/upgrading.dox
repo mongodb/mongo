@@ -3,6 +3,24 @@
 @section version_166 Upgrading to Version 1.6.6
 <dl>
 
+<dt>WT_SESSION::create allocation_size configuration</dt>
+<dd>
+In previous releases, the \c allocation_size configuration string to the
+WT_SESSION::create method specified the file unit allocation size; in the
+1.6.6 release, this configuration string has been renamed to
+\c block_allocation_size for consistency with other configuration options.
+Applications may require modifications to resolve run-time errors.
+</dd>
+
+<dt>WT_SESSION::compact trigger configuration</dt>
+<dd>
+In previous releases, the \c trigger configuration string to the
+WT_SESSION::compact method specified a requirement to initiate compaction; in
+the 1.6.6 release, this configuration string has been removed, and compaction
+will be attempted if it seems likely at least 10% of the file can be recovered.
+Applications may require modifications to resolve run-time errors.
+</dd>
+
 <dt>Statistics configuration</dt>
 <dd>
 In previous releases, the ::wiredtiger_open function took a \c statistics

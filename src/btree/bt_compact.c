@@ -15,22 +15,22 @@ int
 __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BM *bm;
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int trigger, skip;
+	int skip;
+
+	WT_UNUSED(cfg);
 
 	bm = S2BT(session)->bm;
-
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
-	WT_RET(__wt_config_gets(session, cfg, "trigger", &cval));
-	trigger = (int)cval.val;
-
 	/* Check if compaction might be useful. */
-	WT_RET(bm->compact_skip(bm, session, trigger, &skip));
+	WT_RET(bm->compact_skip(bm, session, &skip));
 	if (skip)
 		return (0);
+
+	/* Start compaction. */
+	WT_RET(bm->compact_start(bm, session));
 
 	/*
 	 * Walk the cache reviewing in-memory pages to see if they need to be
@@ -42,15 +42,16 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * can reconcile a page.
 	 */
 	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-	WT_RET(__wt_bt_cache_op(session, NULL, WT_SYNC_COMPACT));
+	ret = __wt_bt_cache_op(session, NULL, WT_SYNC_COMPACT);
 	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+	WT_ERR(ret);
 
 	/*
 	 * Walk the tree, reviewing on-disk pages to see if they need to be
 	 * re-written.
 	 */
 	for (page = NULL;;) {
-		WT_RET(__wt_tree_walk(session, &page, WT_TREE_COMPACT));
+		WT_ERR(__wt_tree_walk(session, &page, WT_TREE_COMPACT));
 		if (page == NULL)
 			break;
 
@@ -60,13 +61,14 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		if ((ret = __wt_page_modify_init(session, page)) != 0) {
 			WT_TRET(__wt_page_release(session, page));
-			WT_RET(ret);
+			WT_ERR(ret);
 		}
 		__wt_page_modify_set(session, page);
 
 		WT_STAT_FAST_DATA_INCR(session, btree_compact_rewrite);
 	}
 
+err:	WT_TRET(bm->compact_end(bm, session));
 	return (0);
 }
 
