@@ -110,7 +110,7 @@ namespace mongo {
                                             bool enforceQuota,
                                             OpDebug* debug );
 
-        long long storageSize( int* numExtents = NULL, BSONArrayBuilder* extentInfo = NULL ) const;
+        int64_t storageSize( int* numExtents = NULL, BSONArrayBuilder* extentInfo = NULL ) const;
 
         // -----------
 

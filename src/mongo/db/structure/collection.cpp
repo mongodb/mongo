@@ -296,7 +296,7 @@ namespace mongo {
         return StatusWith<DiskLoc>( oldLocation );
     }
 
-    long long Collection::storageSize( int* numExtents, BSONArrayBuilder* extentInfo ) const {
+    int64_t Collection::storageSize( int* numExtents, BSONArrayBuilder* extentInfo ) const {
         if ( _details->firstExtent().isNull() ) {
             if ( numExtents )
                 *numExtents = 0;
