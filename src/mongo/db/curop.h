@@ -302,6 +302,13 @@ namespace mongo {
         void setKillWaiterFlags();
 
         /**
+         * this should be used very sparingly
+         * generally the Context should set this up
+         * but sometimes you want to do it ahead of time
+         */
+        void setNS( const StringData& ns );
+
+        /**
          * Find a currently running operation matching the given criteria. This assumes that you're
          * going to kill the operation, so it must be called multiple times to get multiple matching
          * operations.

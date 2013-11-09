@@ -31,6 +31,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/write_commands/batch_executor.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
@@ -84,7 +85,6 @@ namespace mongo {
 
         // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
         dassert( !fromRepl );
-
         BatchedCommandRequest request( _writeType );
         BatchedCommandResponse response;
 
@@ -115,16 +115,8 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
 
-        {
-            // Commands with locktype == NONE need to acquire a Context in order to set
-            // CurOp::_ns.  Setting a CurOp's namespace is necessary for higher-level
-            // functionality (e.g. profiling) to operate on the correct database (note that
-            // WriteBatchExecutor doesn't do this for us, since its job is to create child CurOp
-            // objects and operate on them).
-            //
-            // Acquire ReadContext momentarily, for satisfying this purpose.
-            Client::ReadContext ctx( dbName + ".$cmd" );
-        }
+        if ( cc().curop() )
+            cc().curop()->setNS( nss.ns() );
 
         // TODO: there can be a default write concern for the replica set. If so, use
         // that instead.

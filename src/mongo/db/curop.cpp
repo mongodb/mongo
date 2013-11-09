@@ -170,6 +170,11 @@ namespace mongo {
         _client = 0;
     }
 
+    void CurOp::setNS( const StringData& ns ) {
+        ns.substr( 0, Namespace::MaxNsLen ).copyTo( _ns, true );
+    }
+
+
     void CurOp::ensureStarted() {
         if ( _start == 0 )
             _start = curTimeMicros64();
