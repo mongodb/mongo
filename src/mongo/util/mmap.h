@@ -16,8 +16,15 @@
  */
 
 #pragma once
+
+#include <set>
+#include <sstream>
+#include <vector>
+
 #include <boost/thread/xtime.hpp>
-#include "concurrency/rwlock.h"
+
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/goodies.h"
 
 namespace mongo {
 
@@ -87,7 +94,7 @@ namespace mongo {
 
         /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. 
 */
-        static set<MongoFile*>& getAllFiles();
+        static std::set<MongoFile*>& getAllFiles();
 
         // callbacks if you need them
         static void (*notifyPreFlush)();
@@ -95,7 +102,7 @@ namespace mongo {
 
         static int flushAll( bool sync ); // returns n flushed
         static long long totalMappedLength();
-        static void closeAllFiles( stringstream &message );
+        static void closeAllFiles( std::stringstream &message );
 
         virtual bool isDurableMappedFile() { return false; }
 
@@ -204,7 +211,7 @@ namespace mongo {
 
         HANDLE fd;
         HANDLE maphandle;
-        vector<void *> views;
+        std::vector<void *> views;
         unsigned long long len;
         
 #ifdef _WIN32
@@ -227,8 +234,8 @@ namespace mongo {
     template < class F >
     inline void MongoFile::forEach( F p ) {
         LockMongoFilesShared lklk;
-        const set<MongoFile*>& mmfiles = MongoFile::getAllFiles();
-        for ( set<MongoFile*>::const_iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+        const std::set<MongoFile*>& mmfiles = MongoFile::getAllFiles();
+        for ( std::set<MongoFile*>::const_iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
 

@@ -14,21 +14,9 @@
  */
 
 
-#include "mongo/pch.h"
-
 #include "mongo/util/touch_pages.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <fcntl.h>
-#include <list>
-#include <string>
-
-#include "mongo/db/curop.h"
-#include "mongo/db/kill_current_op.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/database.h"
 #include "mongo/util/mmap.h"
-#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 

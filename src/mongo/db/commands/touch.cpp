@@ -57,7 +57,7 @@ namespace mongo {
         size_t length;
     };
 
-    /** @return numRnages touched */
+    /** @return numRanges touched */
     int touchNs( const std::string& ns ) {
         std::vector< touch_location > ranges;
         boost::scoped_ptr<LockMongoFilesShared> mongoFilesLock;

@@ -30,13 +30,18 @@
 
 #pragma once
 
-#include "mutex.h"
-#include "../time_support.h"
-#include "rwlockimpl.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/concurrency/rwlockimpl.h"
+#include "mongo/util/concurrency/simplerwlock.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
+
 #if defined(_DEBUG)
-#include "mutexdebugger.h"
+#include "mongo/util/concurrency/mutexdebugger.h"
 #endif
-#include "simplerwlock.h"
+
+
 
 namespace mongo {
 
@@ -246,7 +251,7 @@ namespace mongo {
                 i += ( sleep - 1 );
             }
             if ( ! got ) {
-                log() << "couldn't lazily get rwlock" << endl;
+                log() << "couldn't lazily get rwlock";
                 RWLockBase::lock();
             }
         }
