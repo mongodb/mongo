@@ -50,6 +50,10 @@ namespace mongo {
 
     } // namespace
 
+    // This is set in rs.cpp when the replica set is initialized, and is stored in dbcommands.cpp
+    // for now.  See dbcommands.cpp
+    extern BSONObj* getLastErrorDefault;
+
     WriteCmd::WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
         Command( name ), _writeType( writeType ) {
     }
@@ -118,11 +122,16 @@ namespace mongo {
         if ( cc().curop() )
             cc().curop()->setNS( nss.ns() );
 
-        // TODO: there can be a default write concern for the replica set. If so, use
-        // that instead.
-        BSONObjBuilder b;
-        b.append("w",1);
-        BSONObj defaultWriteConcern = b.obj();
+        BSONObj defaultWriteConcern;
+        // This is really bad - it's only safe because we leak the defaults by overriding them with
+        // new defaults and because we never reset to an empty default.
+        // TODO: fix this for sane behavior where we query repl set object
+        if ( getLastErrorDefault ) defaultWriteConcern = *getLastErrorDefault;
+        if ( defaultWriteConcern.isEmpty() ) {
+            BSONObjBuilder b;
+            b.append( "w", 1 );
+            defaultWriteConcern = b.obj();
+        }
 
         WriteBatchExecutor writeBatchExecutor(defaultWriteConcern,
                                               &cc(),

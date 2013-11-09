@@ -58,6 +58,30 @@ namespace mongo {
         : _defaultWriteConcern(wc), _client( client ), _opCounters( opCounters ), _le( le ) {
     }
 
+    static void maybeBuildWCError( const BSONObj& wcResult,
+                                   const string& wcErrMsg,
+                                   BatchedCommandResponse* response ) {
+
+        // Error reported is either the errmsg or err from wc
+        string errMsg;
+        if ( !wcErrMsg.empty() ) errMsg = wcErrMsg;
+        else if ( wcResult["err"].type() == String ) errMsg = wcResult["err"].String();
+
+        // Sometimes the jnote/wnote has more error info
+        if ( !errMsg.empty() && wcResult["jnote"].type() == String ) {
+            errMsg = wcResult["jnote"].String();
+        }
+        if ( !errMsg.empty() && wcResult["wnote"].type() == String ) {
+            errMsg = wcResult["wnote"].String();
+        }
+
+        if ( errMsg.empty() ) return;
+
+        response->setErrCode( ErrorCodes::WriteConcernFailed );
+        if ( wcResult["wtimeout"].trueValue() ) response->setErrInfo( BSON( "wtimeout" << true ) );
+        response->setErrMessage( errMsg );
+    }
+
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
                                            BatchedCommandResponse* response ) {
 
@@ -65,16 +89,16 @@ namespace mongo {
 
         WriteStats stats;
         std::auto_ptr<BatchedErrorDetail> error( new BatchedErrorDetail );
-        BSONObj upsertedID = BSONObj();
-        bool batchSuccess = true;
-        bool staleBatch = false;
+        bool verbose = request.isVerboseWC();
 
         // Apply each batch item, stopping on an error if we were asked to apply the batch
         // sequentially.
-        size_t numBatchOps = request.sizeWriteOps();
-        bool verbose = request.isVerboseWC();
-        for ( size_t i = 0; i < numBatchOps; i++ ) {
+        size_t numBatchItems = request.sizeWriteOps();
+        size_t numItemErrors = 0;
+        bool staleBatch = false;
+        for ( size_t i = 0; i < numBatchItems; i++ ) {
 
+            BSONObj upsertedID = BSONObj();
             if ( applyWriteItem( BatchItemRef( &request, i ),
                                  &stats,
                                  &upsertedID,
@@ -83,7 +107,7 @@ namespace mongo {
                 // In case updates turned out to be upserts, the callers may be interested
                 // in learning what _id was used for that document.
                 if ( !upsertedID.isEmpty() ) {
-                    if ( numBatchOps == 1 ) {
+                    if ( numBatchItems == 1 ) {
                         response->setSingleUpserted(upsertedID);
                     }
                     else if ( verbose ) {
@@ -92,9 +116,7 @@ namespace mongo {
                         upsertDetail->setUpsertedID(upsertedID);
                         response->addToUpsertDetails(upsertDetail.release());
                     }
-                    upsertedID = BSONObj();
                 }
-
             }
             else {
 
@@ -106,12 +128,12 @@ namespace mongo {
                 // Don't bother recording if the user doesn't want a verbose answer. We want to
                 // keep the error if this is a one-item batch, since we already compact the
                 // response for those.
-                if (verbose || numBatchOps == 1) {
+                if (verbose || numBatchItems == 1) {
                     error->setIndex( static_cast<int>( i ) );
                     response->addToErrDetails( error.release() );
                 }
 
-                batchSuccess = false;
+                ++numItemErrors;
 
                 if ( request.getOrdered() ) break;
 
@@ -124,9 +146,9 @@ namespace mongo {
         // more specific error, we'd replace for the intermediate error here. Note that we
         // "compatct" the error messge if this is an one-item batch. (See rationale later in
         // this file.)
-        if ( !batchSuccess ) {
+        if ( numItemErrors > 0 ) {
 
-            if (numBatchOps > 1) {
+            if (numBatchItems > 1) {
                 // TODO
                 // Define the final error code here.
                 // Might be used as a final error, depending on write concern success.
@@ -144,27 +166,26 @@ namespace mongo {
             }
         }
 
-        // Apply write concern. Note, again, that we're only assembling a full response if the
-        // user is interested in it.
-        BSONObj writeConcern;
-        if ( request.isWriteConcernSet() ) {
-            writeConcern = request.getWriteConcern();
-        }
-        else {
-            writeConcern = _defaultWriteConcern;
-        }
+        // Apply write concern if we had any successful writes
+        if ( numItemErrors < numBatchItems ) {
 
-        string errMsg;
-        BSONObjBuilder wcResultsB;
-        if ( !waitForWriteConcern( writeConcern, !batchSuccess, &wcResultsB, &errMsg ) ) {
-
-            // TODO Revisit when user visible family error codes are set
-            response->setErrCode( ErrorCodes::WriteConcernFailed );
-            response->setErrMessage( errMsg );
-
-            if ( verbose ) {
-                response->setErrInfo( wcResultsB.obj() );
+            BSONObj writeConcern;
+            if ( request.isWriteConcernSet() ) {
+                writeConcern = request.getWriteConcern();
             }
+            else {
+                writeConcern = _defaultWriteConcern;
+            }
+
+            string errMsg;
+            BSONObjBuilder wcResultsB;
+            waitForWriteConcern( writeConcern,
+                                 false /* always wait for secondaries since we wrote something */,
+                                 &wcResultsB,
+                                 &errMsg );
+
+            maybeBuildWCError( wcResultsB.obj(), errMsg, response );
+            // TODO: save writtenTo, waitedJournal/waitedRepl stats
         }
 
         // TODO: Audit where we want to queue here
