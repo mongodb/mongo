@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/index_bounds_builder.h"
 
+#include <limits>
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/index/expression_index.h"
@@ -255,7 +256,13 @@ namespace mongo {
             }
 
             BSONObjBuilder bob;
-            bob.appendMinForType("", dataElt.type());
+            // Use -infinity for one-sided numerical bounds
+            if (dataElt.isNumber()) {
+                bob.appendNumber("", -std::numeric_limits<double>::infinity());
+            }
+            else {
+                bob.appendMinForType("", dataElt.type());
+            }
             bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
@@ -275,7 +282,13 @@ namespace mongo {
             }
 
             BSONObjBuilder bob;
-            bob.appendMinForType("", dataElt.type());
+            // Use -infinity for one-sided numerical bounds
+            if (dataElt.isNumber()) {
+                bob.appendNumber("", -std::numeric_limits<double>::infinity());
+            }
+            else {
+                bob.appendMinForType("", dataElt.type());
+            }
             bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
@@ -304,7 +317,12 @@ namespace mongo {
 
             BSONObjBuilder bob;
             bob.appendAs(node->getData(), "");
-            bob.appendMaxForType("", dataElt.type());
+            if (dataElt.isNumber()) {
+                bob.appendNumber("", std::numeric_limits<double>::infinity());
+            }
+            else {
+                bob.appendMaxForType("", dataElt.type());
+            }
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             Interval interval = makeRangeInterval(dataObj, false, typeMatch(dataObj));
@@ -331,7 +349,12 @@ namespace mongo {
 
             BSONObjBuilder bob;
             bob.appendAs(dataElt, "");
-            bob.appendMaxForType("", dataElt.type());
+            if (dataElt.isNumber()) {
+                bob.appendNumber("", std::numeric_limits<double>::infinity());
+            }
+            else {
+                bob.appendMaxForType("", dataElt.type());
+            }
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
 

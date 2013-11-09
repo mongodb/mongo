@@ -46,6 +46,8 @@ namespace {
 
     double numberMin = -numeric_limits<double>::max();
     double numberMax = numeric_limits<double>::max();
+    double negativeInfinity = -numeric_limits<double>::infinity();
+    double positiveInfinity = numeric_limits<double>::infinity();
 
     /**
      * Utility function to create MatchExpression
@@ -58,7 +60,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLteNumber) {
-        BSONObj obj = BSON("a" << BSON("$lte" << 1));
+        BSONObj obj = fromjson("{a: {$lte: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
@@ -67,7 +69,7 @@ namespace {
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(BSON("" << numberMin << "" << 1), true, true)));
+            Interval(fromjson("{'': -Infinity, '': 1}"), true, true)));
         ASSERT(exact);
     }
 
@@ -81,12 +83,12 @@ namespace {
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(BSON("" << numberMin << "" << numberMin), true, true)));
+            Interval(BSON("" << negativeInfinity << "" << numberMin), true, true)));
         ASSERT(exact);
     }
 
-    TEST(IndexBoundsBuilderTest, TranslateLtNumber) {
-        BSONObj obj = BSON("a" << BSON("$lt" << 1));
+    TEST(IndexBoundsBuilderTest, TranslateLteNegativeInfinity) {
+        BSONObj obj = fromjson("{a: {$lte: -Infinity}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
@@ -95,7 +97,21 @@ namespace {
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(BSON("" << numberMin << "" << 1), true, false)));
+            Interval(fromjson("{'': -Infinity, '': -Infinity}"), true, true)));
+        ASSERT(exact);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateLtNumber) {
+        BSONObj obj = fromjson("{a: {$lt: 1}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        bool exact;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': -Infinity, '': 1}"), true, false)));
         ASSERT(exact);
     }
 
@@ -107,12 +123,26 @@ namespace {
         bool exact;
         IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
         ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(BSON("" << negativeInfinity << "" << numberMin), true, false)));
+        ASSERT(exact);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateLtNegativeInfinity) {
+        BSONObj obj = fromjson("{a: {$lt: -Infinity}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        bool exact;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
         ASSERT(exact);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumber) {
-        BSONObj obj = BSON("a" << BSON("$gt" << 1));
+        BSONObj obj = fromjson("{a: {$gt: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
@@ -121,7 +151,7 @@ namespace {
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(BSON("" << 1 << "" << numberMax), false, true)));
+            Interval(fromjson("{'': 1, '': Infinity}"), false, true)));
         ASSERT(exact);
     }
 
@@ -133,12 +163,26 @@ namespace {
         bool exact;
         IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
         ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(BSON("" << numberMax << "" << positiveInfinity), false, true)));
+        ASSERT(exact);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateGtPositiveInfinity) {
+        BSONObj obj = fromjson("{a: {$gt: Infinity}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        bool exact;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
         ASSERT(exact);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumber) {
-        BSONObj obj = BSON("a" << BSON("$gte" << 1));
+        BSONObj obj = fromjson("{a: {$gte: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
@@ -147,7 +191,7 @@ namespace {
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(BSON("" << 1 << "" << numberMax), true, true)));
+            Interval(fromjson("{'': 1, '': Infinity}"), true, true)));
         ASSERT(exact);
     }
 
@@ -161,7 +205,21 @@ namespace {
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(BSON("" << numberMax << "" << numberMax), true, true)));
+            Interval(BSON("" << numberMax << "" << positiveInfinity), true, true)));
+        ASSERT(exact);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateGtePositiveInfinity) {
+        BSONObj obj = fromjson("{a: {$gte: Infinity}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        bool exact;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': Infinity, '': Infinity}"), true, true)));
         ASSERT(exact);
     }
 

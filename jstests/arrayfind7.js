@@ -40,7 +40,7 @@ checkIndexCharacterBasedBounds( { 'a.b.c':1 },
                                { a:[ { b:[ { c:1 } ] } ] },
                                { a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1, $lte:1 } } } } } },
                                [ [ 1, 1 ] ],
-                               [ [ 1, 1.7976931348623157e+308 ] ] );
+                               [ [ 1, Infinity ] ] );
 
 var QUERY_MIGRATION_COMPLETE = false;
 
@@ -65,7 +65,7 @@ if (QUERY_MIGRATION_COMPLETE) {
                                    { a:[ { b:[ { c:1 } ], d:[ { e:1 } ] } ] },
                                    { a:{ $elemMatch:{ d:{ $elemMatch:{ e:{ $lte:1 } } },
                                                       b:{ $elemMatch:{ c:{ $gte:1 } } } } } },
-                                   [ [ 1, 1.7976931348623157e+308 ] ],
+                                   [ [ 1, Infinity ] ],
                                    [ [ { $minElement:1 }, { $maxElement:1 } ] ] );
 
     // A non $elemMatch expression and a nested $elemMatch expression.
@@ -77,7 +77,7 @@ if (QUERY_MIGRATION_COMPLETE) {
     checkIndexCharacterBasedBounds( { 'a.x':1, 'a.b.c':1 },
                                    { a:[ { b:[ { c:1 } ], x:1 } ] },
                                    { 'a.x':1, a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1 } } } } } },
-                                   [ [ 1, 1.7976931348623157e+308 ] ],
+                                   [ [ 1, Infinity ] ],
                                    [ [ { $minElement:1 }, { $maxElement:1 } ] ] );
 }
 

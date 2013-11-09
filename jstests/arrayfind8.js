@@ -143,7 +143,7 @@ function checkBoundsAndMatch( subQuery, singleKeyBounds, bothMatch, elemMatch,
     assertBounds( multiKeyBounds, elemMatchQuery, 'multikey index' );
 }
 
-maxNumber = 1.7976931348623157e+308;
+maxNumber = Infinity;
 
 // Basic test.
 checkBoundsAndMatch( { $gt:4 }, [[ 4, maxNumber ]], [ 5 ] );
