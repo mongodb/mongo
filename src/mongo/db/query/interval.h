@@ -80,6 +80,11 @@ namespace mongo {
             return startInclusive && endInclusive && 0 == start.woCompare(end, false);
         }
 
+        /** Returns true if start is same as end and interval is open at either end */
+        bool isNull() const {
+            return (!startInclusive || !endInclusive) && 0 == start.woCompare(end, false);
+        }
+
         /**
          * Swap start and end points of interval.
          */

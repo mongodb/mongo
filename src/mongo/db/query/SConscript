@@ -6,11 +6,9 @@ env.Library(
     target='query_planner',
     source=[
         "canonical_query.cpp",
-        "index_bounds_builder.cpp",
         "index_tag.cpp",
         "lite_projection.cpp",
         "plan_enumerator.cpp",
-        "qlog.cpp",
         "query_planner.cpp",
         "query_solution.cpp",
     ],
@@ -18,10 +16,7 @@ env.Library(
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
-        "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/expressions",
-        "$BUILD_DIR/mongo/expressions_geo",
-        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 
@@ -50,10 +45,14 @@ env.Library(
     target="index_bounds",
     source=[
         "index_bounds.cpp",
+        "index_bounds_builder.cpp",
         "interval.cpp",
     ],
     LIBDEPS=[
+        "query_logger",
         "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/mongohasher",
     ],
 )
 
@@ -67,10 +66,30 @@ env.Library(
     ],
 )
 
+env.StaticLibrary(
+    target="query_logger",
+    source=[
+        "qlog.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/server_parameters",
+    ],
+)
+
 env.CppUnitTest(
     target="index_bounds_test",
     source=[
         "index_bounds_test.cpp"
+    ],
+    LIBDEPS=[
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="index_bounds_builder_test",
+    source=[
+        "index_bounds_builder_test.cpp"
     ],
     LIBDEPS=[
         "index_bounds",

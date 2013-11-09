@@ -280,7 +280,14 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             QLOG() << "data obj is " << dataObj.toString() << endl;
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), false));
+            Interval interval = makeRangeInterval(dataObj, typeMatch(dataObj), false);
+
+            // If the operand to LT is equal to the lower bound X, the interval [X, X) is invalid
+            // and should not be added to the bounds.
+            if (!interval.isNull()) {
+                oilOut->intervals.push_back(interval);
+            }
+
             // XXX: only exact if not (null or array)
             *exactOut = true;
         }
@@ -300,7 +307,14 @@ namespace mongo {
             bob.appendMaxForType("", dataElt.type());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, false, typeMatch(dataObj)));
+            Interval interval = makeRangeInterval(dataObj, false, typeMatch(dataObj));
+
+            // If the operand to GT is equal to the upper bound X, the interval (X, X] is invalid
+            // and should not be added to the bounds.
+            if (!interval.isNull()) {
+                oilOut->intervals.push_back(interval);
+            }
+
             // XXX: only exact if not (null or array)
             *exactOut = true;
         }
