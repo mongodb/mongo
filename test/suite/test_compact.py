@@ -29,6 +29,7 @@ import os
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate, key_populate
 from suite_subprocess import suite_subprocess
+from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios
 
 # test_compact.py
@@ -39,11 +40,13 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     # Use a small page size because we want to create lots of pages.
     config = 'block_allocation_size=512,' +\
         'leaf_page_max=512,value_format=S,key_format=S'
-    nentries = 40000
+    nentries = 50000
 
+    # The table is a complex object, give it roughly 5 pages per underlying
+    # file.
     types = [
-        ('file', dict(uri='file:')),
-        ('table', dict(uri='table:'))
+        ('file', dict(type='file:', pop=simple_populate, maxpages=5)),
+        ('table', dict(type='table:', pop=complex_populate, maxpages=30))
         ]
     compact = [
         ('method', dict(utility=0,reopen=0)),
@@ -52,14 +55,18 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     scenarios = number_scenarios(multiply_scenarios('.', types, compact))
 
+    # Override WiredTigerTestCase, we have extensions.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,cache_size=100MB,statistics=(all),' +
+            'error_prefix="%s: "' % self.shortid())
+        return conn
+
     # Test compaction.
     def test_compact(self):
         # Populate an object
-        uri = self.uri + self.name
-        if self.uri == "file:":
-            simple_populate(self, uri, self.config, self.nentries - 1)
-        else:
-            complex_populate(self, uri, self.config, self.nentries - 1)
+        uri = self.type + self.name
+        self.pop(self, uri, self.config, self.nentries - 1)
 
         # Reopen the connection to force the object to disk.
         self.reopen_conn()
@@ -86,9 +93,10 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
 
             self.session.compact(uri, None)
 
-        # If it's a simple object, confirm it worked.
-        if self.uri == "file:":
-            self.assertLess(os.stat(self.name).st_size, 10 * 1024)
+        # Confirm compaction worked.
+        stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
+        self.assertLess(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
+        stat_cursor.close()
 
 
 if __name__ == '__main__':

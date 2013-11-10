@@ -90,13 +90,11 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	WT_VERBOSE_ERR(session, compact,
 	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
 	    "90%% of the file, require 10%% or %" PRIuMAX "MB (%" PRIuMAX
-	    ") to perform compaction",
+	    ") to perform compaction, compaction %s",
 	    block->name,
 	    (uintmax_t)avail / WT_MEGABYTE, (uintmax_t)avail,
-	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10);
-	WT_VERBOSE_ERR(session, compact,
-	    "%s: compaction %s",
-	    block->name, *skipp ? "skipped" : "proceeding");
+	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
+	    *skipp ? "skipped" : "proceeding");
 
 err:	__wt_spin_unlock(session, &block->live_lock);
 
@@ -161,7 +159,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_EXTLIST *el;
 	WT_EXT *ext;
-	off_t bytes[100], size, total;
+	off_t decile[10], percentile[100], size, v;
 	u_int i;
 
 	el = &block->live.avail;
@@ -177,28 +175,35 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	if (el->entries == 0)
 		return (0);
 
-	/* Count up the available chunks. */
-	memset(bytes, 0, sizeof(bytes));
+	/*
+	 * Bucket the available memory into file deciles/percentiles.  Large
+	 * pieces of memory will cross over multiple buckets, assign to the
+	 * decile/percentile in 512B chunks.
+	 */
+	memset(decile, 0, sizeof(decile));
+	memset(percentile, 0, sizeof(percentile));
 	WT_EXT_FOREACH(ext, el->off)
-		bytes[(ext->off * 100) / size] += ext->size;
-
-#ifdef __VERBOSE_OUTPUT_OF_EACH_PERCENT
-	for (i = 0; i < WT_ELEMENTS(bytes); ++i)
-		WT_RET(__wt_verbose(
-		    session, "%2u: %12" PRIuMAX "MB, (%" PRIuMAX "%%)",
-		    i, (uintmax_t)bytes[i] / WT_MEGABYTE,
-		    ((uintmax_t)bytes[i] * 100) / el->bytes));
-#endif
-	for (i = 0, total = 0; i < WT_ELEMENTS(bytes); ++i) {
-		if ((i + 1) % 10 == 0) {
-			WT_RET(__wt_verbose(session,
-			    "%2u-%3u%% of the file has %2" PRIuMAX
-			    "%% of the space available",
-			    (i + 1) - 10, i + 1,
-			    ((uintmax_t)total * 100) / el->bytes));
-			total = 0;
+		for (v = ext->off; v < ext->off + ext->size; v += 512) {
+			++decile[(v * 10) / size];
+			++percentile[(v * 100) / size];
 		}
-		total += bytes[i];
+
+	for (i = 0; i < WT_ELEMENTS(percentile); ++i) {
+		v = percentile[i] * 512;
+		WT_RET(__wt_verbose(
+		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
+		    PRIuMAX "%%)",
+		    i, v / WT_MEGABYTE, v, (v * 100) / (off_t)el->bytes));
 	}
+#ifdef __VERBOSE_OUTPUT_PERCENTILE
+#endif
+	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
+		v = decile[i] * 512;
+		WT_RET(__wt_verbose(
+		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
+		    PRIuMAX "%%)",
+		    i * 10, v / WT_MEGABYTE, v, (v * 100) / (off_t)el->bytes));
+	}
+
 	return (0);
 }
