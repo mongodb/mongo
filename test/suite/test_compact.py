@@ -25,7 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate, key_populate
 from suite_subprocess import suite_subprocess
