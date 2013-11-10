@@ -237,6 +237,7 @@ TXNC
 TXNID
 Timestamp
 TxnID
+UID
 UIDs
 UINT
 ULINE

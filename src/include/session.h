@@ -103,6 +103,8 @@ struct __wt_session_impl {
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
 
+	int compaction;			/* Compaction did some work */
+
 	uint32_t flags;
 
 	/*

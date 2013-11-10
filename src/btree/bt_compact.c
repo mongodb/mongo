@@ -24,10 +24,15 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	bm = S2BT(session)->bm;
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
-	/* Check if compaction might be useful. */
+	/*
+	 * Check if compaction might be useful -- the API layer will quit trying
+	 * to compact the data source if we make no progress, set a flag if the
+	 * block layer thinks compaction is possible.
+	 */
 	WT_RET(bm->compact_skip(bm, session, &skip));
 	if (skip)
 		return (0);
+	session->compaction = 1;
 
 	/* Start compaction. */
 	WT_RET(bm->compact_start(bm, session));
