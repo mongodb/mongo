@@ -869,10 +869,19 @@ namespace mongo {
 
                 // Save state, yield, run the MD5, and reacquire lock.
                 runner->saveState();
-                auto_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
+                // auto_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
+                scoped_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
+
                 md5_append( &st , (const md5_byte_t*)(data) , len );
                 n++;
-                yield.reset();
+
+                try {
+                    yield.reset();
+                }
+                catch (SendStaleConfigException& e) {
+                    log() << "metadata changed during filemd5" << endl;
+                    break;
+                }
 
                 // Have the lock again.  See if we were killed.
                 if (!runner->restoreState()) {
@@ -882,8 +891,8 @@ namespace mongo {
                 }
 
                 if (!shardingState.getVersion(ns).isWriteCompatibleWith(shardVersionAtStart)) {
-                    // return partial results.
-                    // Mongos will get the error at the start of the next call if it doesn't update first.
+                    // return partial results.  Mongos will get the error at the start of the next
+                    // call if it doesn't update first.
                     log() << "Config changed during filemd5 - command will resume " << endl;
                     break;
                 }
