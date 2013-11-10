@@ -506,6 +506,7 @@ def runTest(test, result):
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
                      'TestData.setParameters = "' + ternary( set_parameters, set_parameters, "" )  + '";' + \
+                     'TestData.setParametersMongos = "' + ternary( set_parameters_mongos, set_parameters_mongos, "" )  + '";' + \
                      'TestData.noJournal = ' + ternary( no_journal )  + ";" + \
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
@@ -844,7 +845,7 @@ def add_exe(e):
 
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
-    global no_journal, set_parameters, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
     global use_ssl, use_x509
     global file_of_commands_mode
     global report_file, use_write_commands
@@ -874,6 +875,7 @@ def set_globals(options, tests):
         small_oplog_rs = options.small_oplog_rs
     no_journal = options.no_journal
     set_parameters = options.set_parameters
+    set_parameters_mongos = options.set_parameters_mongos
     no_preallocj = options.no_preallocj
     if options.mode == 'suite' and tests == ['client']:
         # The client suite doesn't work with authentication
@@ -981,7 +983,7 @@ def add_to_failfile(tests, options):
 
 def main():
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
-    global no_journal, set_parameters, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
     global use_write_commands
 
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
@@ -1046,7 +1048,9 @@ def main():
                       action='store_true',
                       help='Run mongo shell and mongod instances with SSL encryption')
     parser.add_option('--set-parameters', dest='set_parameters', default="",
-                      help='Adds --setParameter for each passed in items in the csv list - ex. "param1=1,param2=foo" ')
+                      help='Adds --setParameter to mongod for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
+    parser.add_option('--set-parameters-mongos', dest='set_parameters_mongos', default="",
+                      help='Adds --setParameter to mongos for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
                       action="store", help='Set the "builder name" for buildlogger')

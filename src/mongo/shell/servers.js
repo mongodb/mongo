@@ -792,10 +792,20 @@ function appendSetParameterArgs(argArray) {
             }
         }
 
-        //TODO: support mongos setParameter options
-
+        // mongos only options
+        if (programName.endsWith('mongos')) {
+            // apply setParameters for mongos
+            if (jsTest.options().setParametersMongos) {
+                var params = jsTest.options().setParametersMongos.split(",");
+                if (params && params.length > 0) {
+                    params.forEach(function(p) {
+                        if (p) argArray.push.apply(argArray, ['--setParameter', p])
+                    });
+                }
+            }
+        }
         // mongod only options
-        if (programName.endsWith('mongod')) {
+        else if (programName.endsWith('mongod')) {
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
                 var params = jsTest.options().setParameters.split(",");
