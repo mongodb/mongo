@@ -863,7 +863,7 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Compact a row- or column-store btree (log-structured merge
+	 * Compact a live row- or column-store btree (log-structured merge
 	 * trees cannot be compacted).
 	 *
 	 * @snippet ex_all.c Compact a table
