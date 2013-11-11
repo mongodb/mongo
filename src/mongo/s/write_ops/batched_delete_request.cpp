@@ -154,7 +154,7 @@ namespace mongo {
             ++it) {
             auto_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
             (*it)->cloneTo(tempBatchDeleteDocument.get());
-            other->addToDeletes(*it);
+            other->addToDeletes(tempBatchDeleteDocument.release());
         }
         other->_isDeletesSet = _isDeletesSet;
 

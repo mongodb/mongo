@@ -154,7 +154,7 @@ namespace mongo {
             ++it) {
             auto_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
             (*it)->cloneTo(tempBatchUpdateDocument.get());
-            other->addToUpdates(*it);
+            other->addToUpdates(tempBatchUpdateDocument.release());
         }
         other->_isUpdatesSet = _isUpdatesSet;
 

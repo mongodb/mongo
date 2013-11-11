@@ -149,50 +149,28 @@ namespace mongo {
 
         // TODO: if we do namespace parsing, push this to the type
         if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+
             // Batch parse failure
             response.setOk( false );
-            response.setN( 0 );
             response.setErrCode( ErrorCodes::FailedToParse );
             response.setErrMessage( errMsg );
 
             dassert( response.isValid( &errMsg ) );
-            result.appendElements( response.toBSON() );
-
-            // TODO
-            // There's a pending issue about how to report response here. If we use
-            // the command infra-structure, we should reuse the 'errmsg' field. But
-            // we have already filed that message inside the BatchCommandResponse.
-            // return response.getOk();
-            return true;
         }
+        else {
 
-        NamespaceString nss( dbName, request.getNS() );
-        request.setNS( nss.ns() );
-
-        // App-level validation of a create index insert
-        if ( request.isInsertIndexRequest() ) {
-            if ( request.sizeWriteOps() != 1 || request.isWriteConcernSet() ) {
-                // Invalid request to create index
-                response.setOk( false );
-                response.setN( 0 );
-                response.setErrCode( ErrorCodes::CannotCreateIndex );
-                response.setErrMessage( "invalid batch request for index creation" );
-
-                dassert( response.isValid( &errMsg ) );
-                result.appendElements( response.toBSON() );
-
-                return false;
-            }
+            // Fixup the namespace to be a full ns internally
+            NamespaceString nss( dbName, request.getNS() );
+            request.setNS( nss.ns() );
+            clusterWrite( request, &response, true /* autosplit */ );
         }
-
-        clusterWrite( request, &response, true /* autosplit */ );
-        result.appendElements( response.toBSON() );
 
         // TODO
         // There's a pending issue about how to report response here. If we use
         // the command infra-structure, we should reuse the 'errmsg' field. But
         // we have already filed that message inside the BatchCommandResponse.
         // return response.getOk();
+        result.appendElements( response.toBSON() );
         return true;
     }
 

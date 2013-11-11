@@ -129,8 +129,10 @@ env.CppUnitTest('metadata_loader_test',
 # Write Operations
 #
 
+# Types for write operations
+# TODO: Push upward into shared types library between mongos/mongod
 env.StaticLibrary(
-    target='batched_write_ops',
+    target='batch_write_types',
     source=[
         'write_ops/batched_command_request.cpp',
         'write_ops/batched_command_response.cpp',
@@ -154,7 +156,7 @@ env.CppUnitTest(
         'write_ops/batched_command_response_test.cpp',
     ],
     LIBDEPS=[
-        'batched_write_ops',
+        'batch_write_types',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -165,7 +167,7 @@ env.CppUnitTest(
         'write_ops/batched_delete_request_test.cpp',
     ],
     LIBDEPS=[
-        'batched_write_ops',
+        'batch_write_types',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -176,7 +178,7 @@ env.CppUnitTest(
         'write_ops/batched_insert_request_test.cpp',
     ],
     LIBDEPS=[
-        'batched_write_ops',
+        'batch_write_types',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -187,21 +189,23 @@ env.CppUnitTest(
         'write_ops/batched_update_request_test.cpp',
     ],
     LIBDEPS=[
-        'batched_write_ops',
+        'batch_write_types',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
 
+# Cluster write op state and execution
 env.StaticLibrary(
-    target='write_ops',
+    target='cluster_write_ops',
     source=[
         'write_ops/write_op.cpp',
         'write_ops/batch_write_op.cpp',
         'write_ops/batch_write_exec.cpp',
+        'write_ops/config_coordinator.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        'batched_write_ops',
+        'batch_write_types',
     ],
 )
 
@@ -212,7 +216,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'write_ops',
+        'cluster_write_ops',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -224,7 +228,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'write_ops',
+        'cluster_write_ops',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -236,21 +240,35 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'write_ops',
+        'cluster_write_ops',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/clientdriver',
     ],
 )
 
+env.CppUnitTest(
+    target='config_coordinator_test',
+    source=[
+        'write_ops/config_coordinator_test.cpp',
+    ],
+    LIBDEPS=[
+        'base',
+        'cluster_write_ops',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/clientdriver',
+    ],
+)
+
+# Upconvert/Downconvert write functionality for mongos
 env.StaticLibrary(
-    target='write_op_conversion',
+    target='cluster_write_op_conversion',
     source=[
         'write_ops/batch_upconvert.cpp',
         'write_ops/batch_downconvert.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        'write_ops',
+        'cluster_write_ops',
         '$BUILD_DIR/mongo/db/common', # for Message
     ],
 )
@@ -261,8 +279,8 @@ env.CppUnitTest(
         'write_ops/batch_upconvert_test.cpp',
     ],
     LIBDEPS=[
-        'write_ops',
-        'write_op_conversion',
+        'cluster_write_ops',
+        'cluster_write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
     ]
@@ -274,15 +292,16 @@ env.CppUnitTest(
         'write_ops/batch_downconvert_test.cpp',
     ],
     LIBDEPS=[
-        'write_ops',
-        'write_op_conversion',
+        'cluster_write_ops',
+        'cluster_write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
     ]
 )
 
+# Implementations of components to perform cluster operations in mongos
 env.StaticLibrary(
-    target='write_op_impl',
+    target='cluster_op_impl',
     source=[
         'chunk_manager_targeter.cpp',
         'cluster_write.cpp',
@@ -292,8 +311,9 @@ env.StaticLibrary(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        'batched_write_ops',
-        'write_op_conversion',
+        'batch_write_types',
+        'cluster_write_ops',
+        'cluster_write_op_conversion',
     ],
 )
 

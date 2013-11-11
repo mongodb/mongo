@@ -26,7 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/cluster_write.h"
+
+#include <string>
+#include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -36,8 +41,13 @@
 #include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/config_coordinator.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+    using std::vector;
+    using std::string;
 
     /**
      * Splits the chunks touched based from the targeter stats if needed.
@@ -83,9 +93,31 @@ namespace mongo {
         }
     }
 
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit ) {
+    /**
+     * Returns the currently-set config hosts for a cluster
+     */
+    static vector<ConnectionString> getConfigHosts() {
+
+        vector<ConnectionString> configHosts;
+        ConnectionString configHostOrHosts = configServer.getConnectionString();
+        if ( configHostOrHosts.type() == ConnectionString::MASTER ) {
+            configHosts.push_back( configHostOrHosts );
+        }
+        else {
+            dassert( configHostOrHosts.type() == ConnectionString::SYNC );
+            vector<HostAndPort> configHPs = configHostOrHosts.getServers();
+            for ( vector<HostAndPort>::iterator it = configHPs.begin(); it != configHPs.end();
+                ++it ) {
+                configHosts.push_back( ConnectionString( *it ) );
+            }
+        }
+
+        return configHosts;
+    }
+
+    static void shardWrite( const BatchedCommandRequest& request,
+                            BatchedCommandResponse* response,
+                            bool autoSplit ) {
 
         ChunkManagerTargeter targeter;
         Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
@@ -101,12 +133,64 @@ namespace mongo {
 
         DBClientShardResolver resolver;
         DBClientMultiCommand dispatcher;
-
         BatchWriteExec exec( &targeter, &resolver, &dispatcher );
-
         exec.executeBatch( request, response );
 
         if ( autoSplit ) splitIfNeeded( request.getNS(), *targeter.getStats() );
+    }
+
+    static void configWrite( const BatchedCommandRequest& request,
+                             BatchedCommandResponse* response,
+                             bool fsyncCheck ) {
+
+        DBClientMultiCommand dispatcher;
+        ConfigCoordinator exec( &dispatcher, getConfigHosts() );
+        exec.executeBatch( request, response, fsyncCheck );
+    }
+
+    void clusterWrite( const BatchedCommandRequest& request,
+                       BatchedCommandResponse* response,
+                       bool autoSplit ) {
+
+        // App-level validation of a create index insert
+        if ( request.isInsertIndexRequest() ) {
+            if ( request.sizeWriteOps() != 1 || request.isWriteConcernSet() ) {
+
+                // Invalid request to create index
+                response->setOk( false );
+                response->setErrCode( ErrorCodes::InvalidOptions );
+                response->setErrMessage( "invalid batch request for index creation" );
+
+                dassert( response->isValid( NULL ) );
+                return;
+            }
+        }
+
+        // Config writes and shard writes are done differently
+        string dbName = NamespaceString( request.getNS() ).db().toString();
+        if ( dbName == "config" || dbName == "admin" ) {
+
+            bool verboseWC = request.isVerboseWC();
+
+            // We only support batch sizes of one and {w:0} write concern for config writes
+            if ( request.sizeWriteOps() != 1 || ( verboseWC && request.isWriteConcernSet() ) ) {
+                // Invalid config server write
+                response->setOk( false );
+                response->setErrCode( ErrorCodes::InvalidOptions );
+                response->setErrMessage( "invalid batch request for config write" );
+
+                dassert( response->isValid( NULL ) );
+                return;
+            }
+
+            // We need to support "best-effort" writes for pings to the config server.
+            // {w:0} (!verbose) writes are interpreted as best-effort in this case - they may still
+            // error, but do not do the initial fsync check.
+            configWrite( request, response, verboseWC );
+        }
+        else {
+            shardWrite( request, response, autoSplit );
+        }
     }
 
 } // namespace mongo

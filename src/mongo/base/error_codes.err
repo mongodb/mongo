@@ -71,5 +71,6 @@ error_code("IndexAlreadyExists", 68 )
 error_code("AuthSchemaIncompatible", 69)
 error_code("ShardNotFound", 70 )
 error_code("ReplicaSetNotFound", 71 )
+error_code("InvalidOptions", 72)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
