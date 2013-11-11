@@ -194,7 +194,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
-		    (uintmax_t)((v * 100) / el->bytes)));
+		    (uintmax_t)((v * 100) / (off_t)el->bytes)));
 	}
 #ifdef __VERBOSE_OUTPUT_PERCENTILE
 #endif
@@ -204,7 +204,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i * 10, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
-		    (uintmax_t)((v * 100) / el->bytes)));
+		    (uintmax_t)((v * 100) / (off_t)el->bytes)));
 	}
 
 	return (0);
