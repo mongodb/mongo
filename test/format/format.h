@@ -142,6 +142,7 @@ typedef struct {
 	char *c_data_source;
 	u_int c_delete_pct;
 	u_int c_dictionary;
+	u_int c_firstfit;
 	u_int c_hot_backups;
 	char *c_file_type;
 	u_int c_huffman_key;

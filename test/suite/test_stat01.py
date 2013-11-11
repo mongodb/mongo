@@ -37,7 +37,8 @@ class test_stat01(wttest.WiredTigerTestCase):
 
     tablename = 'test_stat01.wt'
     uri = 'file:' + tablename
-    config = 'key_format=S,allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
+    config = 'key_format=S,' +\
+        'allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
     nentries = 25
 
     # Override WiredTigerTestCase, we have extensions.

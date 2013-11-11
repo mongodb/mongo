@@ -69,9 +69,10 @@ connection_stats = [
 	Stat('cache_eviction_fail',
 	    'cache: pages selected for eviction unable to be evicted'),
 	Stat('cache_eviction_force',
-		'cache: pages evicted because they exceeded the in memory maximum'),
+	    'cache: pages evicted because they exceeded the in memory maximum'),
 	Stat('cache_eviction_force_fail',
-		'cache: failed eviction of pages that exceeded the in memory maximum'),
+	    'cache: failed eviction of pages that exceeded the ' +
+	    'in memory maximum'),
 	Stat('cache_eviction_hazard',
 	    'cache: hazard pointer blocked page eviction'),
 	Stat('cache_eviction_internal', 'cache: internal pages evicted'),
@@ -250,7 +251,7 @@ dsrc_stats = [
 	# Block manager statistics
 	##########################################
 	Stat('block_alloc', 'blocks allocated'),
-	Stat('block_allocsize',
+	Stat('allocation_size',
 	    'block manager file allocation unit size', 'no_aggregate,no_scale'),
 	Stat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
 	Stat('block_extension', 'block allocations requiring file extension'),

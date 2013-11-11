@@ -370,34 +370,12 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __session_compact_worker --
- *	Worker function to do the actual compaction call.
- */
-static int
-__session_compact_worker(
-    WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL(session, compact, config, cfg);
-
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_compact, NULL, cfg, 0));
-
-err:	API_END_NOTFOUND_MAP(session, ret);
-}
-
-/*
  * __session_compact --
- *	WT_SESSION.compact method.
+ *	WT_SESSION->compact method.
  */
 static int
 __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 {
-	WT_DECL_ITEM(t);
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
 
@@ -424,53 +402,7 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 		WT_RET_MSG(session, EINVAL,
 		    "Compaction not permitted in a transaction");
 
-	/*
-	 * Compaction requires 2, and possibly 3 checkpoints, how many is block
-	 * manager specific: all block managers will need the first checkpoint,
-	 * but may or may not need the last two.
-	 *
-	 * The first checkpoint frees emptied pages to the underlying block
-	 * manager (when rows are deleted, underlying blocks aren't freed until
-	 * the page is reconciled, and checkpoint makes that happen).  Because
-	 * compaction is based on having available blocks in the block manager,
-	 * compaction could do no work without the first checkpoint.
-	 *
-	 * After the first checkpoint, we compact the tree.
-	 *
-	 * The second and third checkpoints are done because the default block
-	 * manager does checkpoints in two steps: blocks made available for
-	 * re-use during a checkpoint are put on a special checkpoint-available
-	 * list and only moved onto the real available list once the metadata
-	 * has been updated with the newly written checkpoint information.  This
-	 * means blocks allocated by the checkpoint itself cannot be taken from
-	 * the blocks made available by the checkpoint.
-	 *
-	 * In other words, the second checkpoint puts the blocks from the end of
-	 * the file that were freed by compaction onto the checkpoint-available
-	 * list, but then potentially writes checkpoint blocks at the end of the
-	 * file, which would prevent any file truncation.  When the second
-	 * checkpoint resolves, those blocks become available for the third
-	 * checkpoint, so it's able to write its blocks toward the beginning of
-	 * the file, and then the file can be truncated.
-	 *
-	 * We do the work here so applications don't get confused why compaction
-	 * isn't helping until after multiple, subsequent checkpoint calls.
-	 *
-	 * Force the checkpoint: we don't want to skip it because the work we
-	 * need to have done is done in the underlying block manager.
-	 */
-	WT_RET(__wt_scr_alloc(session, 0, &t));
-	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\")", uri));
-	WT_ERR(__session_checkpoint(wt_session, t->data));
-
-	WT_ERR(__session_compact_worker(wt_session, uri, config));
-
-	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
-	WT_ERR(__session_checkpoint(wt_session, t->data));
-	WT_ERR(__session_checkpoint(wt_session, t->data));
-
-err:	__wt_scr_free(&t);
-	return (ret);
+	return (__wt_session_compact(wt_session, uri, config));
 }
 
 /*

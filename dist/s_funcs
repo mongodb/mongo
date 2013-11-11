@@ -13,7 +13,7 @@ l="$l `echo ../src/*/*.i ../src/utilities/*.c`"
 sed -e '/^$/d' -e '/^#/d' < s_funcs.list
 
 # Get the list of functions
-search=`egrep -h '^[a-zA-Z0-9_]*\(' $l | sed 's/(.*//' | sort -u`
+search=`egrep -h '^[a-zA-Z0-9_][a-zA-Z0-9_]*\(' $l | sed -e 's/(.*//' | sort -u`
 
 # Print the list of functions, followed by the occurrences: we're looking for
 # functions that only appear once

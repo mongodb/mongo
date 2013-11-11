@@ -951,6 +951,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	} *ft, verbtypes[] = {
 		{ "block",		WT_VERB_block },
 		{ "ckpt",		WT_VERB_ckpt },
+		{ "compact",		WT_VERB_compact },
 		{ "evict",		WT_VERB_evict },
 		{ "evictserver",	WT_VERB_evictserver },
 		{ "fileops",		WT_VERB_fileops },

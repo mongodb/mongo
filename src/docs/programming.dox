@@ -24,6 +24,7 @@ WiredTiger applications:
 
 - @subpage cache_configuration
 - @subpage checkpoints
+- @subpage compaction
 - @subpage hot_backup
 - @subpage statistics
 - @subpage threads

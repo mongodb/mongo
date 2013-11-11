@@ -164,6 +164,16 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
+ * __bm_compact_start --
+ *	Start a block manager compaction.
+ */
+static int
+__bm_compact_start(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+	return (__wt_block_compact_start(session, bm->block));
+}
+
+/*
  * __bm_compact_page_skip --
  *	Return if a page is useful for compaction.
  */
@@ -180,10 +190,19 @@ __bm_compact_page_skip(WT_BM *bm, WT_SESSION_IMPL *session,
  *	Return if a file can be compacted.
  */
 static int
-__bm_compact_skip(
-    WT_BM *bm, WT_SESSION_IMPL *session, int trigger, int *skipp)
+__bm_compact_skip(WT_BM *bm, WT_SESSION_IMPL *session, int *skipp)
 {
-	return (__wt_block_compact_skip(session, bm->block, trigger, skipp));
+	return (__wt_block_compact_skip(session, bm->block, skipp));
+}
+
+/*
+ * __bm_compact_end --
+ *	End a block manager compaction.
+ */
+static int
+__bm_compact_end(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+	return (__wt_block_compact_end(session, bm->block));
 }
 
 /*
@@ -275,7 +294,7 @@ __bm_salvage_end(WT_BM *bm, WT_SESSION_IMPL *session)
 
 /*
  * __bm_verify_start --
- *	Start a block manager salvage.
+ *	Start a block manager verify.
  */
 static int
 __bm_verify_start(WT_BM *bm, WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
@@ -296,7 +315,7 @@ __bm_verify_addr(WT_BM *bm,
 
 /*
  * __bm_verify_end --
- *	End a block manager salvage.
+ *	End a block manager verify.
  */
 static int
 __bm_verify_end(WT_BM *bm, WT_SESSION_IMPL *session)
@@ -322,10 +341,14 @@ __bm_method_set(WT_BM *bm, int readonly)
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->checkpoint_unload = __bm_checkpoint_unload;
 		bm->close = __bm_close;
+		bm->compact_end =
+		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->compact_page_skip = (int (*)(WT_BM *, WT_SESSION_IMPL *,
 		    const uint8_t *, uint32_t, int *))__bm_readonly;
 		bm->compact_skip = (int (*)
-		    (WT_BM *, WT_SESSION_IMPL *, int, int *))__bm_readonly;
+		    (WT_BM *, WT_SESSION_IMPL *, int *))__bm_readonly;
+		bm->compact_start =
+		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, const uint8_t *, uint32_t))__bm_readonly;
 		bm->preload = __wt_bm_preload;
@@ -356,8 +379,10 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->checkpoint_resolve = __bm_checkpoint_resolve;
 		bm->checkpoint_unload = __bm_checkpoint_unload;
 		bm->close = __bm_close;
+		bm->compact_end = __bm_compact_end;
 		bm->compact_page_skip = __bm_compact_page_skip;
 		bm->compact_skip = __bm_compact_skip;
+		bm->compact_start = __bm_compact_start;
 		bm->free = __bm_free;
 		bm->preload = __wt_bm_preload;
 		bm->read = __wt_bm_read;

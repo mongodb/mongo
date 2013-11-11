@@ -49,9 +49,10 @@ extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
     int data_cksum);
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
-extern int __wt_block_compact_skip( WT_SESSION_IMPL *session,
+extern int __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_compact_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    int trigger,
     int *skipp);
 extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -1271,6 +1272,9 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
     WT_SESSION_IMPL **sessionp);
+extern int __wt_session_compact( WT_SESSION *wt_session,
+    const char *uri,
+    const char *config);
 extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
     WT_DATA_HANDLE_CACHE **dhandle_cachep);
 extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);

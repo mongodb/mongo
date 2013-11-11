@@ -56,6 +56,7 @@ flags = {
 	'verbose' : [
 		'VERB_block',
 		'VERB_ckpt',
+		'VERB_compact',
 		'VERB_evict',
 		'VERB_evictserver',
 		'VERB_fileops',
