@@ -45,7 +45,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/batch_upconvert.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/chunk.h"
@@ -54,6 +53,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/version_manager.h"
+#include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/util/mongoutils/str.h"
 
 // error codes 8010-8040

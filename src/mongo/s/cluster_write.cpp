@@ -30,12 +30,12 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
-#include "mongo/s/batch_write_exec.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/config.h"
 #include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 
 namespace mongo {
 

@@ -132,15 +132,15 @@ env.CppUnitTest('metadata_loader_test',
 env.StaticLibrary(
     target='batched_write_ops',
     source=[
-        'batched_command_request.cpp',
-        'batched_command_response.cpp',
-        'batched_delete_request.cpp',
-        'batched_delete_document.cpp',
-        'batched_error_detail.cpp',
-        'batched_insert_request.cpp',
-        'batched_update_request.cpp',
-        'batched_update_document.cpp',
-        'batched_upsert_detail.cpp',
+        'write_ops/batched_command_request.cpp',
+        'write_ops/batched_command_response.cpp',
+        'write_ops/batched_delete_request.cpp',
+        'write_ops/batched_delete_document.cpp',
+        'write_ops/batched_error_detail.cpp',
+        'write_ops/batched_insert_request.cpp',
+        'write_ops/batched_update_request.cpp',
+        'write_ops/batched_update_document.cpp',
+        'write_ops/batched_upsert_detail.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
@@ -151,7 +151,7 @@ env.StaticLibrary(
 env.CppUnitTest(
     target='batched_command_response_test',
     source=[
-        'batched_command_response_test.cpp',
+        'write_ops/batched_command_response_test.cpp',
     ],
     LIBDEPS=[
         'batched_write_ops',
@@ -162,7 +162,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='batched_delete_request_test',
     source=[
-        'batched_delete_request_test.cpp',
+        'write_ops/batched_delete_request_test.cpp',
     ],
     LIBDEPS=[
         'batched_write_ops',
@@ -173,7 +173,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='batched_insert_request_test',
     source=[
-        'batched_insert_request_test.cpp',
+        'write_ops/batched_insert_request_test.cpp',
     ],
     LIBDEPS=[
         'batched_write_ops',
@@ -184,7 +184,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='batched_update_request_test',
     source=[
-        'batched_update_request_test.cpp',
+        'write_ops/batched_update_request_test.cpp',
     ],
     LIBDEPS=[
         'batched_write_ops',
@@ -195,9 +195,9 @@ env.CppUnitTest(
 env.StaticLibrary(
     target='write_ops',
     source=[
-        'write_op.cpp',
-        'batch_write_op.cpp',
-        'batch_write_exec.cpp',
+        'write_ops/write_op.cpp',
+        'write_ops/batch_write_op.cpp',
+        'write_ops/batch_write_exec.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
@@ -208,7 +208,7 @@ env.StaticLibrary(
 env.CppUnitTest(
     target='write_op_test',
     source=[
-        'write_op_test.cpp',
+        'write_ops/write_op_test.cpp',
     ],
     LIBDEPS=[
         'base',
@@ -220,7 +220,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='batch_write_op_test',
     source=[
-        'batch_write_op_test.cpp',
+        'write_ops/batch_write_op_test.cpp',
     ],
     LIBDEPS=[
         'base',
@@ -232,7 +232,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='batch_write_exec_test',
     source=[
-        'batch_write_exec_test.cpp',
+        'write_ops/batch_write_exec_test.cpp',
     ],
     LIBDEPS=[
         'base',
@@ -245,8 +245,8 @@ env.CppUnitTest(
 env.StaticLibrary(
     target='write_op_conversion',
     source=[
-        'batch_upconvert.cpp',
-        'batch_downconvert.cpp',
+        'write_ops/batch_upconvert.cpp',
+        'write_ops/batch_downconvert.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
@@ -258,7 +258,7 @@ env.StaticLibrary(
 env.CppUnitTest(
     target='batch_upconvert_test',
     source=[
-        'batch_upconvert_test.cpp',
+        'write_ops/batch_upconvert_test.cpp',
     ],
     LIBDEPS=[
         'write_ops',
@@ -271,7 +271,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='batch_downconvert_test',
     source=[
-        'batch_downconvert_test.cpp',
+        'write_ops/batch_downconvert_test.cpp',
     ],
     LIBDEPS=[
         'write_ops',
@@ -287,8 +287,8 @@ env.StaticLibrary(
         'chunk_manager_targeter.cpp',
         'cluster_write.cpp',
         'dbclient_multi_command.cpp',
-        'dbclient_safe_writer.cpp',
         'dbclient_shard_resolver.cpp',
+        'write_ops/dbclient_safe_writer.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',

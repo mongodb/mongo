@@ -31,7 +31,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/s/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 /**
  * Contains common functionality shared between the batch write commands in mongos and mongod.

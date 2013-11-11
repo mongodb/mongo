@@ -26,15 +26,45 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/s/write_ops/batch_upconvert.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclientinterface.h" // for write constants
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/net/message.h"
 
-namespace mongo {
+namespace {
 
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit );
+    using namespace mongo;
 
-} // namespace mongo
+    TEST(WriteBatchUpconvert, BasicInsert) {
+
+        // Tests that an insert message is correctly upconverted to a batch insert
+
+        const string ns = "foo.bar";
+        const BSONObj doc = BSON( "hello" << "world" );
+
+        Message insertMsg;
+        BufBuilder insertMsgB;
+
+        int reservedFlags = InsertOption_ContinueOnError;
+        insertMsgB.appendNum( reservedFlags );
+        insertMsgB.appendStr( ns );
+        doc.appendSelfToBufBuilder( insertMsgB );
+        insertMsg.setData( dbInsert, insertMsgB.buf(), insertMsgB.len() );
+
+        auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( insertMsg ) );
+        ASSERT_EQUALS( request->getBatchType(), BatchedCommandRequest::BatchType_Insert );
+        string errMsg;
+        ASSERT( request->isValid( &errMsg ) );
+        ASSERT_EQUALS( request->getNS(), ns );
+        ASSERT( !request->getOrdered() );
+        ASSERT_EQUALS( request->sizeWriteOps(), 1u );
+        bool isSameDoc = doc.woCompare( request->getInsertRequest()->getDocumentsAt( 0 ) ) == 0;
+        ASSERT( isSameDoc );
+    }
+
+}

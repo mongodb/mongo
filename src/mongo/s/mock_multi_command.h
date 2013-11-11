@@ -31,8 +31,8 @@
 #include <deque>
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/s/batched_command_response.h"
 #include "mongo/s/multi_command_dispatch.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

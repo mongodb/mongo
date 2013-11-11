@@ -28,13 +28,27 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit );
+    /**
+     * Executes a batch write operation using safe writes and DBClientConnections.
+     * TODO: Remove post-2.6
+     */
+    class DBClientSafeWriter : public SafeWriter {
+    public:
 
-} // namespace mongo
+        virtual ~DBClientSafeWriter() {
+        }
+
+        void safeWrite( DBClientBase* conn, const BatchItemRef& batchItem, LastError* error );
+
+    };
+
+}

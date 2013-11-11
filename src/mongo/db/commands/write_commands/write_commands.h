@@ -32,7 +32,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/client_basic.h"
-#include "mongo/s/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 

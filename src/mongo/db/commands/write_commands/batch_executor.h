@@ -31,10 +31,10 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/s/batched_command_request.h"
-#include "mongo/s/batched_command_response.h"
-#include "mongo/s/batched_delete_document.h"
-#include "mongo/s/batched_update_document.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_delete_document.h"
+#include "mongo/s/write_ops/batched_update_document.h"
 
 namespace mongo {
 

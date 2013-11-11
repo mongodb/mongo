@@ -40,11 +40,11 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/batched_error_detail.h"
-#include "mongo/s/batched_upsert_detail.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

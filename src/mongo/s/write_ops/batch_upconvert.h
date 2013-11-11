@@ -28,13 +28,33 @@
 
 #pragma once
 
+#include "mongo/db/lasterror.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit );
+    //
+    // Utility functions for up-converting incoming write messages into batch write requests.
+    // NOTE: These functions throw on invalid message format.
+    //
 
-} // namespace mongo
+    BatchedCommandRequest* msgToBatchRequest( const Message& msg );
+
+    BatchedCommandRequest* msgToBatchInsert( const Message& insertMsg );
+
+    BatchedCommandRequest* msgToBatchUpdate( const Message& updateMsg );
+
+    BatchedCommandRequest* msgToBatchDelete( const Message& deleteMsg );
+
+    //
+    // Utility function for recording completed batch writes into the LastError object.
+    // (Interpreting the response requires the request object as well.)
+    //
+
+    void batchErrorToLastError( const BatchedCommandRequest& request,
+                                const BatchedCommandResponse& response,
+                                LastError* error );
+
+}

@@ -26,15 +26,17 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/s/write_ops/batch_downconvert.h"
 
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace {
 
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit );
+    using namespace mongo;
 
-} // namespace mongo
+    TEST(WriteBatchDownconvert, Basic) {
+        BatchSafeWriter( NULL );
+        ASSERT( true );
+    }
+
+}

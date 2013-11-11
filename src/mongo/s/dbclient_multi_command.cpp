@@ -31,8 +31,8 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/batch_downconvert.h"
-#include "mongo/s/dbclient_safe_writer.h"
+#include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/s/write_ops/dbclient_safe_writer.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
