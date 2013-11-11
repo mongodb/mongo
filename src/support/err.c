@@ -144,6 +144,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+	struct timespec ts;
 	size_t len, remain, wlen;
 	int prefix_cnt;
 	const char *err, *prefix;
@@ -165,11 +166,21 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	dhandle = session->dhandle;
 
 	/*
-	 * We have several prefixes for the error message: the database error
+	 * We have several prefixes for the error message:
+	 * a timestamp and the process and thread ids, the database error
 	 * prefix, the data-source's name, and the session's name.  Write them
 	 * as a comma-separate list, followed by a colon.
 	 */
 	prefix_cnt = 0;
+	if (__wt_epoch(session, &ts) == 0) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain,
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%p] ",
+		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
+		    (uint64_t)getpid(), pthread_self());
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
 	if ((prefix = S2C(session)->error_prefix) != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain, "%s", prefix);
