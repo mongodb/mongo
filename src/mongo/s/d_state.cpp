@@ -431,15 +431,28 @@ namespace mongo {
         //
 
         CollectionMetadataPtr beforeMetadata;
+        string shardName;
         {
             scoped_lock lk( _mutex );
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
             if ( it != _collMetadata.end() ) beforeMetadata = it->second;
+            shardName = _shardName;
         }
 
         ChunkVersion beforeShardVersion;
         if ( beforeMetadata ) beforeShardVersion = beforeMetadata->getShardVersion();
         *latestShardVersion = beforeShardVersion;
+
+        // We can't reload without a shard name.  Must check here before loading, since shard name
+        // may have changed if we checked it earlier and released the _mutex.
+        if ( shardName.empty() ) {
+
+            string errMsg = str::stream() << "cannot refresh metadata for " << ns
+                                          << " before shard name has been set";
+
+            LOG( 0 ) << errMsg << endl;
+            return Status( ErrorCodes::IllegalOperation, errMsg );
+        }
 
         //
         // Determine whether we need to diff or fully reload
@@ -475,7 +488,7 @@ namespace mongo {
         Timer refreshTimer;
         Status status =
                 mdLoader.makeCollectionMetadata( ns,
-                                                 _shardName,
+                                                 shardName,
                                                  ( fullReload ? NULL : beforeMetadata.get() ),
                                                  remoteMetadataRaw );
         long long refreshMillis = refreshTimer.millis();

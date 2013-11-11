@@ -1020,6 +1020,8 @@ namespace mongo {
                     ok = connTo->runCommand( "admin" ,
                                              BSON( "_recvChunkStart" << ns <<
                                                    "from" << fromShard.getConnString() <<
+                                                   "fromShardName" << fromShard.getName() <<
+                                                   "toShardName" << toShard.getName() <<
                                                    "min" << min <<
                                                    "max" << max <<
                                                    "shardKeyPattern" << shardKeyPattern <<
@@ -2127,6 +2129,11 @@ namespace mongo {
 
             if ( ! configServer.ok() )
                 ShardingState::initialize(cmdObj["configServer"].String());
+
+            if ( !cmdObj["toShardName"].eoo() ) {
+                dassert( cmdObj["toShardName"].type() == String );
+                shardingState.gotShardName( cmdObj["toShardName"].String() );
+            }
 
             string ns = cmdObj.firstElement().String();
             BSONObj min = cmdObj["min"].Obj().getOwned();
