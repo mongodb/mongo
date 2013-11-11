@@ -39,6 +39,34 @@ __wt_raw_to_hex(
 }
 
 /*
+ * __wt_raw_to_hex_mem --
+ *	Convert a chunk of data to a nul-terminated printable hex string.
+ */
+void
+__wt_raw_to_hex_mem(WT_SESSION_IMPL *session,
+    const uint8_t *from, uint32_t size, u_char *dest, uint32_t dest_size)
+{
+	size_t len;
+	uint32_t i;
+	const uint8_t *p;
+	u_char *t;
+
+	/*
+	 * In the worst case, every character takes up 2 spaces, plus a
+	 * trailing nul byte.
+	 */
+	len = (size_t)size * 2 + 1;
+	WT_ASSERT(session, len <= dest_size);
+
+	for (p = from, t = dest, i = size; i > 0; --i, ++p) {
+		*t++ = hex[(*p & 0xf0) >> 4];
+		*t++ = hex[*p & 0x0f];
+	}
+	*t++ = '\0';
+	return;
+}
+
+/*
  * __wt_raw_to_esc_hex --
  *	Convert a chunk of data to a nul-terminated printable string using
  * escaped hex, as necessary.

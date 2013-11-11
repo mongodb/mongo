@@ -149,7 +149,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	size_t len, remain, wlen;
 	int prefix_cnt;
 	const char *err, *prefix;
-	char *end, *p;
+	char *end, *p, tid[64];
 
 	/*
 	 * We're using a stack buffer because we want error messages no matter
@@ -176,10 +176,13 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	if (__wt_epoch(session, &ts) == 0) {
 		remain = WT_PTRDIFF(end, p);
 		self = pthread_self();
+		__wt_raw_to_hex_mem(session,
+		    (const uint8_t *)&self, sizeof(self),
+		    (u_char *)tid, sizeof(tid));
 		wlen = (size_t)snprintf(p, remain,
-		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%" PRIu64 "] ",
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s] ",
 		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
-		    (uint64_t)getpid(), *(uint64_t *)&self);
+		    (uint64_t)getpid(), tid);
 		p = wlen >= remain ? end : p + wlen;
 		++prefix_cnt;
 	}
