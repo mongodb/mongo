@@ -177,7 +177,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		wlen = (size_t)snprintf(p, remain,
 		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%p] ",
 		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
-		    (uint64_t)getpid(), pthread_self());
+		    (uint64_t)getpid(), (void *)pthread_self());
 		p = wlen >= remain ? end : p + wlen;
 		++prefix_cnt;
 	}
