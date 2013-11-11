@@ -50,9 +50,10 @@ struct __wt_session_impl {
 
 	u_int active;			/* Non-zero if the session is in-use */
 
-	WT_CONDVAR *cond;		/* Condition variable */
-
 	const char *name;		/* Name */
+	uint32_t id;			/* UID, offset in session array */
+
+	WT_CONDVAR *cond;		/* Condition variable */
 
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
@@ -62,7 +63,8 @@ struct __wt_session_impl {
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
-	WT_CURSOR_BACKUP *bkp_cursor;	/* Cursor for current backup */
+
+	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
 
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
@@ -101,7 +103,7 @@ struct __wt_session_impl {
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
 
-	uint32_t id;			/* Offset in conn->session_array */
+	int compaction;			/* Compaction did some work */
 
 	uint32_t flags;
 

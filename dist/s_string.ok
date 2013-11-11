@@ -237,6 +237,7 @@ TXNC
 TXNID
 Timestamp
 TxnID
+UID
 UIDs
 UINT
 ULINE
@@ -388,6 +389,8 @@ datalen
 datasets
 datasource
 dbc
+decile
+deciles
 decl
 decr
 decrement
@@ -460,6 +463,7 @@ filenames
 fileops
 filesize
 filesystem
+firstfit
 fixup
 flcs
 fmt
@@ -687,6 +691,7 @@ qdown
 qrrSS
 qs
 qsort
+quartile
 qup
 rS
 rdlock

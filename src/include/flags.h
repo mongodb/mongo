@@ -40,8 +40,9 @@
 #define	WT_TREE_SKIP_INTL				0x00000004
 #define	WT_TREE_SKIP_LEAF				0x00000002
 #define	WT_TREE_WAIT					0x00000001
-#define	WT_VERB_block					0x00010000
-#define	WT_VERB_ckpt					0x00008000
+#define	WT_VERB_block					0x00020000
+#define	WT_VERB_ckpt					0x00010000
+#define	WT_VERB_compact					0x00008000
 #define	WT_VERB_evict					0x00004000
 #define	WT_VERB_evictserver				0x00002000
 #define	WT_VERB_fileops					0x00001000

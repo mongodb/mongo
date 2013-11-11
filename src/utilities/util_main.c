@@ -167,10 +167,14 @@ main(int argc, char *argv[])
 
 	/* Open the database and a session. */
 	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
+	    verbose ? verbose_handler : NULL, config, &conn)) != 0) {
+		ret = util_err(ret, NULL);
 		goto err;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+	}
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		ret = util_err(ret, NULL);
 		goto err;
+	}
 
 	/* Call the function. */
 	ret = func(session, argc, argv);

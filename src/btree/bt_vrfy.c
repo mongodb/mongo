@@ -53,10 +53,12 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_VSTUFF *vs, _vstuff;
 	uint32_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
+	int bm_start;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	ckptbase = NULL;
+	bm_start = 0;
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
@@ -74,6 +76,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(bm->verify_start(bm, session, ckptbase));
+	bm_start = 1;
 
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
@@ -84,15 +87,14 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		if (F_ISSET(ckpt, WT_CKPT_FAKE))
 			continue;
 
+		/* House-keeping between checkpoints. */
+		__verify_checkpoint_reset(vs);
+
 #ifdef HAVE_DIAGNOSTIC
 		if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
 			WT_ERR(__wt_msg(session, "%s: checkpoint %s",
 			    btree->dhandle->name, ckpt->name));
 #endif
-
-		/* House-keeping between checkpoints. */
-		__verify_checkpoint_reset(vs);
-
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt->raw.data, ckpt->raw.size,
@@ -125,11 +127,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(ret);
 	}
 
-	/* Discard the list of checkpoints. */
-err:	__wt_meta_ckptlist_free(session, ckptbase);
+err:	/* Inform the underlying block manager we're done. */
+	if (bm_start)
+		WT_TRET(bm->verify_end(bm, session));
 
-	/* Inform the underlying block manager we're done. */
-	WT_TRET(bm->verify_end(bm, session));
+	/* Discard the list of checkpoints. */
+	if (ckptbase != NULL)
+		__wt_meta_ckptlist_free(session, ckptbase);
 
 	if (vs != NULL) {
 		/* Wrap up reporting. */

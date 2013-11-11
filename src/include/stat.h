@@ -116,8 +116,8 @@ struct __wt_stats {
  * Statistics entries for data sources.
  */
 struct __wt_dsrc_stats {
+	WT_STATS allocation_size;
 	WT_STATS block_alloc;
-	WT_STATS block_allocsize;
 	WT_STATS block_checkpoint_size;
 	WT_STATS block_extension;
 	WT_STATS block_free;

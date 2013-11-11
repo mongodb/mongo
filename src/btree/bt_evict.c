@@ -493,7 +493,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		/*
 		 * The first pass walks all cache leaf pages, waiting for
 		 * concurrent activity in a page to be resolved, acquiring
-		 * hazard references to prevent eviction.
+		 * hazard pointers to prevent eviction.
 		 */
 		flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL;
 		if (syncop == WT_SYNC_CHECKPOINT)
@@ -966,7 +966,7 @@ __evict_get_page(
 	/*
 	 * A pathological case: if we're the oldest transaction in the system
 	 * and the eviction server is stuck trying to find space, abort the
-	 * transaction to give up all hazard references before trying again.
+	 * transaction to give up all hazard pointers before trying again.
 	 */
 	if (is_app && F_ISSET(cache, WT_EVICT_STUCK) &&
 	    __wt_txn_am_oldest(session)) {

@@ -116,7 +116,6 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		if (!checkpoint)
 			WT_ERR(__wt_block_extlist_read_avail(
 			    session, block, &ci->avail, ci->file_size));
-
 	}
 
 	/*
