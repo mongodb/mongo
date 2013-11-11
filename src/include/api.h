@@ -49,10 +49,8 @@
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
-/*
- * End a transactional API call.
- */
-#define	TXN_API_END(s, ret)						\
+/* End a transactional API call, optional retry on deadlock. */
+#define	TXN_API_END_RETRY(s, ret, retry)				\
 	API_END(s);							\
 	if (__autotxn) {						\
 		if (F_ISSET(&(s)->txn, TXN_AUTOCOMMIT))			\
@@ -61,7 +59,8 @@
 			ret = __wt_txn_commit((s), NULL);		\
 		else {							\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
-			if (ret == 0 || ret == WT_DEADLOCK) {		\
+			if ((ret == 0 || ret == WT_DEADLOCK) &&		\
+			    (retry)) {					\
 				ret = 0;				\
 				continue;				\
 			}						\
@@ -73,6 +72,9 @@
 	break;								\
 } while (ret == 0)
 
+/* End a transactional API call, retry on deadlock. */
+#define	TXN_API_END(s, ret)	TXN_API_END_RETRY(s, ret, 1)
+
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
  * underlying object was not found), map it to ENOENT, only cursor methods
@@ -80,10 +82,6 @@
  */
 #define	API_END_NOTFOUND_MAP(s, ret)					\
 	API_END(s);							\
-	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
-
-#define	TXN_API_END_NOTFOUND_MAP(s, ret)				\
-	TXN_API_END(s, ret);						\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
 #define	CONNECTION_API_CALL(conn, s, n, config, cfg)			\
