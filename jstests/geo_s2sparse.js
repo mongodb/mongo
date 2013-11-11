@@ -1,57 +1,96 @@
-// Test the sparseness of 2dsphere indices.
-t = db.geo_s2sparse;
-t.drop();
+// the collection we will be using
+var coll = db.geo_s2sparse;
 
-//
-// Sparse on
-//
+// 2d geo object used in inserted documents
+var point = { type: "Point", coordinates: [5, 5] }
 
-// Insert a doc. that is indexed
-pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
-t.insert( {geo : pointA , nonGeo: "pointA"})
-// Make a sparse index.
-t.ensureIndex({geo: "2dsphere", otherNonGeo: 1}, {sparse: 1});
+// the index we'll use
+var index = { geo: "2dsphere", nonGeo: 1 };
+var indexName = "geo_2dsphere_nonGeo_1";
 
-// Save the size of the index with one obj.
-var sizeWithOneIndexedObj = t.stats().indexSizes.geo_2dsphere;
+/// First run: make sure a sparse 2dsphere index behaves correctly
 
-// Insert a bunch of data that won't be indexed.
-var N = 1000;
-for (var i = 0; i < N; ++i) {
-    // Missing both.
-    t.insert( {nonGeo: "pointA"})
-    // Missing geo.
-    t.insert( {geo: pointA})
-    // Missing nonGeo.
-    t.insert( {otherNonGeo: "pointA"})
+// clean up
+coll.drop();
+
+// ensure a sparse index
+coll.ensureIndex(index, { sparse: 1 });
+
+// note the initial size of the index
+var initialIndexSize = coll.stats().indexSizes[indexName];
+assert.gt(initialIndexSize, 0);
+
+// insert matching docs
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ geo: point, nonGeo: "point_"+i });
 }
 
-// The size should be the same as we don't index no-geo data.
-var sizeAfter = t.stats().indexSizes.geo_2dsphere;
-assert.eq(sizeAfter, sizeWithOneIndexedObj);
+// the new size of the index
+var indexSizeAfterFirstInsert = coll.stats().indexSizes[indexName];
+assert.gt(indexSizeAfterFirstInsert, initialIndexSize);
 
-//
-// Sparse off
-//
-
-t.drop();
-
-// Insert a doc. that is indexed
-pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
-t.insert( {geo : pointA , nonGeo: "pointA"})
-// Make a non-sparse index.
-t.ensureIndex({geo: "2dsphere"});
-
-// Save the size of the index with one obj.
-var sizeWithOneIndexedObj = t.stats().indexSizes.geo_2dsphere;
-
-// Insert a bunch of data that will be indexed with the "no geo field" key
-var N = 1000;
-for (var i = 0; i < N; ++i) {
-    t.insert( {nonGeo: "pointA"})
+// insert docs missing the nonGeo field
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ geo: point, wrongNonGeo: "point_"+i });
 }
 
-// Since the index isn't sparse we have entries in the index for each insertion even though it's
-// missing the geo key.
-var sizeAfter = t.stats().indexSizes.geo_2dsphere;
-assert.gt(sizeAfter, sizeWithOneIndexedObj);
+// the new size, should be unchanged
+var indexSizeAfterSecondInsert = coll.stats().indexSizes[indexName];
+assert.eq(indexSizeAfterFirstInsert, indexSizeAfterSecondInsert);
+
+// insert docs missing the geo field, to make sure they're filtered out
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ wrongGeo: point, nonGeo: "point_"+i });
+}
+
+// the new size, should be unchanged
+var indexSizeAfterThirdInsert = coll.stats().indexSizes[indexName];
+assert.eq(indexSizeAfterSecondInsert, indexSizeAfterThirdInsert);
+
+/// Second run: make sure a non-sparse 2dsphere index behaves correctly
+
+// clean up
+coll.drop();
+
+// ensure a normal (non-sparse) index
+coll.ensureIndex(index);
+
+// note the initial size of the index
+initialIndexSize = coll.stats().indexSizes[indexName];
+assert.gt(initialIndexSize, 0);
+
+// insert matching docs
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ geo: point, nonGeo: "point_"+i });
+}
+
+// the new size of the index
+indexSizeAfterFirstInsert = coll.stats().indexSizes[indexName];
+assert.gt(indexSizeAfterFirstInsert, initialIndexSize);
+
+// insert docs missing the nonGeo field, which should still be indexed
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ geo: point, wrongNonGeo: "point_"+i });
+}
+
+// the new size, which should be larger with the new index entries
+indexSizeAfterSecondInsert = coll.stats().indexSizes[indexName];
+assert.gt(indexSizeAfterSecondInsert, indexSizeAfterFirstInsert);
+
+// insert docs missing the geo field, which should still be indexed
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ wrongGeo: point, nonGeo: "point_"+i });
+}
+
+// the new size
+indexSizeAfterThirdInsert = coll.stats().indexSizes[indexName];
+assert.gt(indexSizeAfterThirdInsert, indexSizeAfterSecondInsert);
+
+// insert docs missing both fields, which should still be indexed
+for (var i = 0; i < 1000; i++) {
+    coll.insert({ wrongGeo: point, wrongNonGeo: "point_"+i });
+}
+
+// the new size
+var indexSizeAfterFourthInsert = coll.stats().indexSizes[indexName];
+assert.gt(indexSizeAfterFourthInsert, indexSizeAfterThirdInsert);
