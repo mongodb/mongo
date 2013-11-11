@@ -21,7 +21,7 @@
 
 static int __cache_pool_adjust(uint64_t, uint64_t);
 static int __cache_pool_assess(uint64_t *);
-static int  __cache_pool_balance(void);
+static int __cache_pool_balance(void);
 
 /*
  * __wt_conn_cache_pool_config --
@@ -319,7 +319,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
  *	Do a pass over the cache pool members and ensure the pool is being
  *	effectively used.
  */
-int
+static int
 __cache_pool_balance(void)
 {
 	WT_CACHE_POOL *cp;
