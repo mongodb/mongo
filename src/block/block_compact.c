@@ -183,9 +183,9 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	memset(decile, 0, sizeof(decile));
 	memset(percentile, 0, sizeof(percentile));
 	WT_EXT_FOREACH(ext, el->off)
-		for (v = ext->off; v < ext->off + ext->size; v += 512) {
-			++decile[(v * 10) / size];
-			++percentile[(v * 100) / size];
+		for (i = 0; i < ext->size / 512; ++i) {
+			++decile[((ext->off + i * 512) * 10) / size];
+			++percentile[((ext->off + i * 512) * 100) / size];
 		}
 
 	for (i = 0; i < WT_ELEMENTS(percentile); ++i) {
@@ -200,7 +200,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
 		v = decile[i] * 512;
 		WT_RET(__wt_verbose(
-		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
+		    session, "%2u%%: %12" PRIiMAX "MB, (%" PRIiMAX "B, %"
 		    PRIuMAX "%%)",
 		    i * 10, v / WT_MEGABYTE, v, (v * 100) / (off_t)el->bytes));
 	}
