@@ -193,16 +193,18 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		WT_RET(__wt_verbose(
 		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
-		    i, v / WT_MEGABYTE, v, (v * 100) / (off_t)el->bytes));
+		    i, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
+		    (uintmax_t)((v * 100) / el->bytes)));
 	}
 #ifdef __VERBOSE_OUTPUT_PERCENTILE
 #endif
 	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
 		v = decile[i] * 512;
 		WT_RET(__wt_verbose(
-		    session, "%2u%%: %12" PRIiMAX "MB, (%" PRIiMAX "B, %"
+		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
-		    i * 10, v / WT_MEGABYTE, v, (v * 100) / (off_t)el->bytes));
+		    i * 10, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
+		    (uintmax_t)((v * 100) / el->bytes)));
 	}
 
 	return (0);
