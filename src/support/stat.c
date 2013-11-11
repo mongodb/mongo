@@ -8,9 +8,9 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	/* Clear, so can also be called for reinitialization. */
 	memset(stats, 0, sizeof(*stats));
 
-	stats->block_alloc.desc = "blocks allocated";
-	stats->block_allocation_size.desc =
+	stats->allocation_size.desc =
 	    "block manager file allocation unit size";
+	stats->block_alloc.desc = "blocks allocated";
 	stats->block_checkpoint_size.desc = "checkpoint size";
 	stats->block_extension.desc =
 	    "block allocations requiring file extension";
@@ -126,8 +126,8 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	WT_DSRC_STATS *stats;
 
 	stats = (WT_DSRC_STATS *)stats_arg;
+	stats->allocation_size.v = 0;
 	stats->block_alloc.v = 0;
-	stats->block_allocation_size.v = 0;
 	stats->block_checkpoint_size.v = 0;
 	stats->block_extension.v = 0;
 	stats->block_free.v = 0;

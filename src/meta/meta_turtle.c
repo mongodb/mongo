@@ -137,7 +137,7 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 		 * retrieve the allocation size and re-create the file.
 		 */
 		WT_ERR(__wt_direct_io_size_check(
-		    session, filecfg, "block_allocation_size", &allocsize));
+		    session, filecfg, "allocation_size", &allocsize));
 		WT_ERR(__wt_block_manager_create(session, key, allocsize));
 	}
 	WT_ERR_NOTFOUND_OK(ret);

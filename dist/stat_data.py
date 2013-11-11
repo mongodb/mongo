@@ -244,7 +244,7 @@ dsrc_stats = [
 	# Block manager statistics
 	##########################################
 	Stat('block_alloc', 'blocks allocated'),
-	Stat('block_allocation_size',
+	Stat('allocation_size',
 	    'block manager file allocation unit size', 'no_aggregate,no_scale'),
 	Stat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
 	Stat('block_extension', 'block allocations requiring file extension'),

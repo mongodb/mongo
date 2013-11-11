@@ -38,7 +38,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
     # Use a small page size and lots of keys because we want to create lots
     # of individual pages in the file.
     nentries = 10000
-    config = 'block_allocation_size=512,' +\
+    config = 'allocation_size=512,' +\
         'leaf_page_max=512,value_format=S,key_format=S'
 
     # address_deleted routine:

@@ -76,11 +76,11 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         uri = self.type + 'random'
         if self.type == 'file:':
             simple_populate(self, uri,
-                'block_allocation_size=512,leaf_page_max=512,key_format=' +\
+                'allocation_size=512,leaf_page_max=512,key_format=' +\
                 self.fmt, 10000)
         else:
             complex_populate(self, uri,
-                'block_allocation_size=512,leaf_page_max=512,key_format=' +\
+                'allocation_size=512,leaf_page_max=512,key_format=' +\
                 self.fmt, 10000)
 
         # Close the connection so everything is forced to disk (otherwise the

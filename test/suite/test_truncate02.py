@@ -45,7 +45,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     # of individual pages in the file.
     types = [
         ('file', dict(type='file:', config=\
-            'block_allocation_size=512,leaf_page_max=512,' +\
+            'allocation_size=512,leaf_page_max=512,' +\
             'value_format=S,key_format=')),
     ]
 

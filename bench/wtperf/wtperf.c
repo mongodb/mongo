@@ -150,7 +150,7 @@ uint64_t wtperf_value_range(CONFIG *);
 
 #define	DEFAULT_LSM_CONFIG						\
 	"key_format=S,value_format=S,type=lsm,exclusive=true,"		\
-	"leaf_page_max=4kb,internal_page_max=64kb,block_allocation_size=4kb,"
+	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
 
 /* Default values. */
 CONFIG default_cfg = {

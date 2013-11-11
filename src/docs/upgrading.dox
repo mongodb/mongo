@@ -8,7 +8,7 @@
 In previous releases, the \c allocation_size configuration string to the
 WT_SESSION::create method specified the file unit allocation size; in the
 1.6.6 release, this configuration string has been renamed to
-\c block_allocation_size for consistency with other configuration options.
+\c allocation_size for consistency with other configuration options.
 Applications may require modifications to resolve run-time errors.
 </dd>
 

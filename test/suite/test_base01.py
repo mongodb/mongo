@@ -37,7 +37,7 @@ class test_base01(wttest.WiredTigerTestCase):
     table_name2 = 'test_base01b.wt'
 
     def create_table(self, tablename):
-        extra_params = ',block_allocation_size=512,' +\
+        extra_params = ',allocation_size=512,' +\
             'internal_page_max=16384,leaf_page_max=131072'
         self.pr('create_table')
         self.session.create('table:' + tablename,

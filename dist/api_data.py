@@ -133,7 +133,7 @@ file_config = format_meta + [
 		algorithm during block allocation, the \c "best" configuration
 		uses a best-fit algorithm''',
 		choices=['first', 'best',]),
-	Config('block_allocation_size', '4KB', r'''
+	Config('allocation_size', '4KB', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
 		items, and the default value of 4KB is a good choice absent

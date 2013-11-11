@@ -185,7 +185,7 @@ wts_create(void)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
-	    "block_allocation=%s,block_allocation_size=512,"
+	    "block_allocation=%s,allocation_size=512,"
 	    "internal_page_max=%d,internal_item_max=%d,"
 	    "leaf_page_max=%d,leaf_item_max=%d",
 	    (g.type == ROW) ? "u" : "r",
