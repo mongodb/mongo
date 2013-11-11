@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+    class AuthorizationManager;
+
     /**
      * Mock of the AuthzManagerExternalState class used only for testing.
      */
@@ -53,22 +55,10 @@ namespace mongo {
         AuthzManagerExternalStateMock();
         virtual ~AuthzManagerExternalStateMock();
 
+        void setAuthorizationManager(AuthorizationManager* authzManager);
         void setAuthzVersion(int version);
 
         virtual Status getStoredAuthorizationVersion(int* outVersion);
-
-        virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj,
-                                               const BSONObj& writeConcern);
-
-        virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj,
-                                               const BSONObj& writeConcern);
-
-        // no-op for the mock
-        virtual Status removePrivilegeDocuments(const BSONObj& query,
-                                                const BSONObj& writeConcern,
-                                                int* numRemoved);
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
@@ -133,6 +123,7 @@ namespace mongo {
                             std::vector<BSONObjCollection::iterator>* result);
 
 
+        AuthorizationManager* _authzManager;  // For reporting logOps.
         NamespaceDocumentMap _documents; // Mock database.
     };
 

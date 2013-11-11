@@ -79,8 +79,13 @@ namespace {
     }
 }  // namespace
 
-    AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() {}
+    AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() : _authzManager(NULL) {}
     AuthzManagerExternalStateMock::~AuthzManagerExternalStateMock() {}
+
+    void AuthzManagerExternalStateMock::setAuthorizationManager(
+            AuthorizationManager* authzManager) {
+        _authzManager = authzManager;
+    }
 
     void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
         uassertStatusOK(
@@ -130,25 +135,6 @@ namespace {
                             "Could not find user " << userName.getFullName());
         }
         return status;
-    }
-
-    Status AuthzManagerExternalStateMock::updatePrivilegeDocument(const UserName& user,
-                                                                  const BSONObj& updateObj,
-                                                                  const BSONObj&) {
-        return Status(ErrorCodes::InternalError, "Not implemented in mock.");
-    }
-
-    Status AuthzManagerExternalStateMock::removePrivilegeDocuments(const BSONObj& query,
-                                                                   const BSONObj&,
-                                                                   int* numRemoved) {
-        return Status(ErrorCodes::InternalError, "Not implemented in mock.");
-    }
-
-    Status AuthzManagerExternalStateMock::insertPrivilegeDocument(const std::string& dbname,
-                                                                  const BSONObj& userObj,
-                                                                  const BSONObj& writeConcern) {
-        NamespaceString usersCollection("admin.system.users");
-        return insert(usersCollection, userObj, writeConcern);
     }
 
     Status AuthzManagerExternalStateMock::getAllDatabaseNames(
@@ -211,7 +197,25 @@ namespace {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj&) {
-        _documents[collectionName].push_back(document.copy());
+        BSONObj toInsert;
+        if (document["_id"].eoo()) {
+            BSONObjBuilder docWithIdBuilder;
+            docWithIdBuilder.append("_id", OID::gen());
+            docWithIdBuilder.appendElements(document);
+            toInsert = docWithIdBuilder.obj();
+        }
+        else {
+            toInsert = document.copy();
+        }
+        _documents[collectionName].push_back(toInsert);
+        if (_authzManager) {
+            _authzManager->logOp(
+                    "i",
+                    collectionName.ns().c_str(),
+                    toInsert,
+                    NULL,
+                    NULL);
+        }
         return Status::OK();
     }
 
@@ -235,10 +239,21 @@ namespace {
         mmb::Document document;
         if (status.isOK()) {
             document.reset(*iter, mmb::Document::kInPlaceDisabled);
-            status = driver.update(StringData(), &document, NULL);
+            BSONObj logObj;
+            status = driver.update(StringData(), &document, &logObj);
             if (!status.isOK())
                 return status;
-            *iter = document.getObject().copy();
+            BSONObj newObj = document.getObject().copy();
+            *iter = newObj;
+            BSONObj idQuery = driver.makeOplogEntryQuery(newObj, false);
+            if (_authzManager) {
+                _authzManager->logOp(
+                        "u",
+                        collectionName.ns().c_str(),
+                        logObj,
+                        &idQuery,
+                        NULL);
+            }
             return Status::OK();
         }
         else if (status == ErrorCodes::NoMatchingDocument && upsert) {
@@ -279,8 +294,17 @@ namespace {
         int n = 0;
         BSONObjCollection::iterator iter;
         while (_findOneIter(collectionName, query, &iter).isOK()) {
+            BSONObj idQuery = (*iter)["_id"].wrap();
             _documents[collectionName].erase(iter);
             ++n;
+            if (_authzManager) {
+                _authzManager->logOp(
+                        "d",
+                        collectionName.ns().c_str(),
+                        idQuery,
+                        NULL,
+                        NULL);
+            }
         }
         *numRemoved = n;
         return Status::OK();

@@ -110,24 +110,24 @@ namespace mongo {
          *
          * TODO(spencer): remove dbname argument once users are only written into the admin db
          */
-        virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj,
-                                               const BSONObj& writeConcern);
+        Status insertPrivilegeDocument(const std::string& dbname,
+                                       const BSONObj& userObj,
+                                       const BSONObj& writeConcern);
 
         /**
          * Updates the given user object with the given update modifier.
          */
-        virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj,
-                                               const BSONObj& writeConcern);
+        Status updatePrivilegeDocument(const UserName& user,
+                                       const BSONObj& updateObj,
+                                       const BSONObj& writeConcern);
 
         /**
          * Removes users for the given database matching the given query.
          * Writes into *numRemoved the number of user documents that were modified.
          */
-        virtual Status removePrivilegeDocuments(const BSONObj& query,
-                                                const BSONObj& writeConcern,
-                                                int* numRemoved);
+        Status removePrivilegeDocuments(const BSONObj& query,
+                                        const BSONObj& writeConcern,
+                                        int* numRemoved);
 
         /**
          * Puts into the *dbnames vector the name of every database in the cluster.
