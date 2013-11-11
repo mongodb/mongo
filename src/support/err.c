@@ -144,6 +144,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+	pthread_t self;
 	struct timespec ts;
 	size_t len, remain, wlen;
 	int prefix_cnt;
@@ -174,10 +175,11 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	prefix_cnt = 0;
 	if (__wt_epoch(session, &ts) == 0) {
 		remain = WT_PTRDIFF(end, p);
+		self = pthread_self();
 		wlen = (size_t)snprintf(p, remain,
-		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%p] ",
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%" PRIu64 "] ",
 		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
-		    (uint64_t)getpid(), (void *)pthread_self());
+		    (uint64_t)getpid(), *(uint64_t *)&self);
 		p = wlen >= remain ? end : p + wlen;
 		++prefix_cnt;
 	}
