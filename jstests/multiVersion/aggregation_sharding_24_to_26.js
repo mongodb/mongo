@@ -11,32 +11,26 @@ function testVersions(versions) {
 
 
         // basic aggregation using just 2.4 features works
-        var res = coll.runCommand('aggregate', {pipeline: [{$group: {_id: null,
-                                                                     count: {$sum: 1},
-                                                                     avg: {$avg: '$_id'},
-                                                                     }}]});
-        assert.eq(res.result, [{_id: null, count: 1000, avg: 499.5}]);
+        var res = coll.aggregate([{$group: {_id: null, count: {$sum: 1}, avg: {$avg: '$_id'}}}]);
+        assert.eq(res.toArray(), [{_id: null, count: 1000, avg: 499.5}]);
 
         // sorting with 2.4 shards uses a different codepath
-        var res = coll.runCommand('aggregate', {pipeline: [{$project: {_id:1}},
-                                                           {$sort: {_id: 1}},
-                                                           {$limit: 5}]});
-        assert.eq(res.result, [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
+        var res = coll.aggregate([{$project: {_id:1}}, {$sort: {_id: 1}}, {$limit: 5}]);
+        assert.eq(res.toArray(), [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
 
         // Targeted aggregation works
-        var res = coll.runCommand('aggregate', {pipeline: [{$match: {_id: 0}},
-                                                           {$project: {_id: 1}},
-                                                          ]});
-        assert.eq(res.result, [{_id: 0}]);
+        var res = coll.aggregate([{$match: {_id: 0}}, {$project: {_id: 1}}]);
+        assert.eq(res.toArray(), [{_id: 0}]);
 
         if (testFailures) {
             // 2.6 features aren't guaranteed to work until upgrade is complete. They may work
             // anyway if all data is on upgraded shards and the primary is updated, which is why
             // these only run in the "normal" sharded case
-            assert.throws(function() {coll.aggregate({$limit: 100000})});
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$out: "ts1_out"}]}));
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$limit: 10}],
-                                                            allowDiskUsage:true}));
+                                                               allowDiskUsage:true}));
+            assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$limit: 10}],
+                                                               cursor: {}}));
         }
     }
 

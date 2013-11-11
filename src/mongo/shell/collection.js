@@ -985,25 +985,42 @@ DBCollection.prototype.distinct = function( keyString , query ){
 
 
 DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
-    var cmd = {pipeline: pipeline};
-
     if (!(pipeline instanceof Array)) {
-        // support varargs form
-        cmd.pipeline = [];
-        for (var i=0; i<arguments.length; i++) {
-            cmd.pipeline.push(arguments[i]);
-        }
+        // support legacy varargs form. (Also handles db.foo.aggregate())
+        pipeline = argumentsToArray(arguments)
+        extraOpts = {}
     }
-    else {
-        Object.extend(cmd, extraOpts);
+    else if (extraOpts === undefined) {
+        extraOpts = {};
     }
 
-    if (cmd.cursor === undefined) {
+    var cmd = {pipeline: pipeline};
+    Object.extend(cmd, extraOpts);
+
+    if (!('cursor' in cmd)) {
+        // implicitly use cursors
         cmd.cursor = {};
     }
 
     var res = this.runCommand("aggregate", cmd);
-    assert.commandWorked(res, "aggregate with cursor failed");
+
+    if (!res.ok
+            && (res.code == 17020 || res.errmsg == "unrecognized field \"cursor")
+            && !("cursor" in extraOpts)) {
+        // If the command failed because cursors aren't supported and the user didn't explicitly
+        // request a cursor, try again without requesting a cursor.
+        delete cmd.cursor;
+        res = this.runCommand("aggregate", cmd);
+
+        if ('result' in res && !("cursor" in res)) {
+            // convert old-style output to cursor-style output
+            res.cursor = {ns: '', id: NumberLong(0)};
+            res.cursor.firstBatch = res.result;
+            delete res.result;
+        }
+    }
+
+    assert.commandWorked(res, "aggregate failed");
 
     if ("cursor" in res)
         return new DBCommandCursor(this._mongo, res);
