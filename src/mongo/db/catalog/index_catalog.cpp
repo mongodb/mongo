@@ -36,6 +36,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -392,6 +393,44 @@ namespace mongo {
         if( !validKeyPattern(key) ) {
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "bad index key pattern " << key );
+        }
+
+        // Ensures that the fields on which we are building the index are valid: a field must not
+        // begin with a '$' unless it is part of a DBRef, and a field path cannot contain an empty
+        // field. If a field cannot be created or updated, it should not be indexable.
+        BSONObjIterator it( key );
+        while ( it.more() ) {
+            BSONElement keyElement = it.next();
+            FieldRef keyField;
+            keyField.parse( keyElement.fieldName() );
+
+            const size_t numParts = keyField.numParts();
+            for ( size_t i = 0; i != numParts; ++i ) {
+                const StringData part = keyField.getPart(i);
+
+                // Check if the index key path contains an empty field.
+                if ( part.empty() ) {
+                    return Status( ErrorCodes::CannotCreateIndex,
+                                   str::stream() << "Index key cannot contain an empty field." );
+                }
+
+                if ( part[0] != '$' )
+                    continue;
+
+                // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
+                // necessary context to validate whether this is a proper DBRef, we allow index
+                // creation on '$'-prefixed names that match those used in a DBRef.
+                const bool mightBePartOfDbRef = (i != 0) &&
+                                                (part == "$db" ||
+                                                 part == "$id" ||
+                                                 part == "$ref");
+
+                if ( !mightBePartOfDbRef ) {
+                    return Status( ErrorCodes::CannotCreateIndex,
+                                   str::stream() << "Index key contains an illegal field name: "
+                                                 << "field name starts with '$'." );
+                }
+            }
         }
 
         if ( !IndexDetails::isIdIndexPattern( key ) ) {
