@@ -31,21 +31,6 @@ typedef struct {
 	int	 upd_skipped;		/* Skipped a page's update */
 
 	/*
-	 * Track if reconciliation has seen any overflow items.  Leaf pages with
-	 * no overflow items are special because we can delete them without
-	 * reading them.  If a leaf page is reconciled and no overflow items are
-	 * included, we set the parent page's address cell to a special type,
-	 * leaf-no-overflow.  The code works on a per-page reconciliation basis,
-	 * that is, once we see an overflow item, all subsequent leaf pages will
-	 * not get the special cell type.  It would be possible to do better by
-	 * tracking overflow items on split boundaries, but this is simply a
-	 * a performance optimization for range deletes, I don't see an argument
-	 * for optimizing for pages that split and contain chunks both with and
-	 * without overflow items.
-	 */
-	int	ovfl_items;
-
-	/*
 	 * Raw compression (don't get me started, as if normal reconciliation
 	 * wasn't bad enough).  If an application wants absolute control over
 	 * what gets written to disk, we give it a list of byte strings and it
@@ -59,6 +44,26 @@ typedef struct {
 	uint32_t *raw_entries;		/* Raw compression slot entries */
 	uint32_t *raw_offsets;		/* Raw compression slot offsets */
 	uint64_t *raw_recnos;		/* Raw compression recno count */
+
+	/*
+	 * Track if reconciliation has seen any overflow items.  If a leaf page
+	 * with no overflow items is written, the parent page's address cell is
+	 * set to the leaf-no-overflow type.  This means we can delete the leaf
+	 * page without reading it because we don't have to discard any overflow
+	 * items it might reference.
+	 *	The test test is per-page reconciliation, that is, once we see
+	 * an overflow item on the page, all subsequent leaf pages written for
+	 * the page will not be leaf-no-overflow type, regardless of whether or
+	 * not they contain overflow items.  In other words, leaf-no-overflow
+	 * is not guaranteed to be set on every page that doesn't contain an
+	 * overflow item, only that if it is set, the page contains no overflow
+	 * items.
+	 *	The reason is because of raw compression: there's no easy/fast
+	 * way to figure out if the rows selected by raw compression included
+	 * overflow items, and the optimization isn't worth another pass over
+	 * the data.
+	 */
+	int	ovfl_items;
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, which happens
