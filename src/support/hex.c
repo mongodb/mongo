@@ -9,6 +9,17 @@
 
 static const u_char hex[] = "0123456789abcdef";
 
+#define	FILL_HEX(src, src_max, dest, dest_max) do {			\
+	uint32_t __s, __d;						\
+	for (p = (src), t = (dest), __s = src_max, __d = dest_max - 1;	\
+	    __s > 0 && __d > 0;						\
+	    __s-=1, __d-=2, ++p) {					\
+		*t++ = hex[(*p & 0xf0) >> 4];				\
+		*t++ = hex[*p & 0x0f];					\
+	}								\
+	*t++ = '\0';							\
+} while (0)
+
 /*
  * __wt_raw_to_hex --
  *	Convert a chunk of data to a nul-terminated printable hex string.
@@ -18,7 +29,6 @@ __wt_raw_to_hex(
     WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
 {
 	size_t len;
-	uint32_t i;
 	const uint8_t *p;
 	u_char *t;
 
@@ -29,11 +39,7 @@ __wt_raw_to_hex(
 	len = (size_t)size * 2 + 1;
 	WT_RET(__wt_buf_init(session, to, len));
 
-	for (p = from, t = to->mem, i = size; i > 0; --i, ++p) {
-		*t++ = hex[(*p & 0xf0) >> 4];
-		*t++ = hex[*p & 0x0f];
-	}
-	*t++ = '\0';
+	FILL_HEX(from, size, to->mem, len);
 	to->size = WT_PTRDIFF32(t, to->mem);
 	return (0);
 }
@@ -43,24 +49,18 @@ __wt_raw_to_hex(
  *	Convert a chunk of data to a nul-terminated printable hex string.
  */
 void
-__wt_raw_to_hex_mem(WT_SESSION_IMPL *session,
+__wt_raw_to_hex_mem(
     const uint8_t *from, uint32_t size, u_char *dest, uint32_t dest_size)
 {
-	uint32_t i;
 	const uint8_t *p;
 	u_char *t;
 
 	/*
 	 * In the worst case, every character takes up 2 spaces, plus a
-	 * trailing nul byte.
+	 * trailing nul byte.  if the user didn't give us enough space,
+	 * fill in what we can.
 	 */
-	WT_ASSERT(session, (size_t)size * 2 + 1 <= dest_size);
-
-	for (p = from, t = dest, i = size; i > 0; --i, ++p) {
-		*t++ = hex[(*p & 0xf0) >> 4];
-		*t++ = hex[*p & 0x0f];
-	}
-	*t++ = '\0';
+	FILL_HEX(from, size, dest, dest_size);
 	return;
 }
 
