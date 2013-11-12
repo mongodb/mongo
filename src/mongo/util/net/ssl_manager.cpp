@@ -776,7 +776,7 @@ namespace mongo {
         // match wildcard DNS names
         if (certHostName[0] == '*' && certHostName[1] == '.') {
             // allow name.example.com if the cert is *.example.com, '*' does not match '.'
-            char* subName = strchr(nameToMatch, '.');
+            const char* subName = strchr(nameToMatch, '.');
             return subName && !strcasecmp(certHostName+1, subName);
         }
         else {
