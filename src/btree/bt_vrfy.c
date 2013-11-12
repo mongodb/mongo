@@ -358,20 +358,23 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	 * Check overflow pages.  We check overflow cells separately from other
 	 * tests that walk the page as it's simpler, and I don't care much how
 	 * fast table verify runs.
-	 *
-	 * Object if a leaf-no-overflow address cell references a page that has
-	 * overflow keys, but don't object if a standard address cell references
-	 * a page without overflow keys.  The leaf-no-overflow address cell is
-	 * an optimization for trees with few, if any, overflow items, and may
-	 * not be set by reconciliation in all possible cases.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__verify_overflow_cell(session, page, &found, vs));
-		if (!WT_PAGE_IS_ROOT(page) && found &&
-		    unpack->raw == WT_CELL_ADDR_LEAF_NO)
+		if (WT_PAGE_IS_ROOT(page) || page->type == WT_PAGE_ROW_INT)
+			break;
+
+		/*
+		 * Object if a leaf-no-overflow address cell references a page
+		 * with overflow keys, but don't object if a leaf address cell
+		 * references a page without overflow keys.  Reconciliation
+		 * doesn't guarantee every leaf page without overflow items will
+		 * be a leaf-no-overflow type.
+		 */
+		if (found && unpack->raw == WT_CELL_ADDR_LEAF_NO)
 			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s, of type %s and referenced in its "
 			    "parent by a cell of type %s, contains overflow "
