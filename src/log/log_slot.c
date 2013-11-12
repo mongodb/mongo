@@ -57,6 +57,8 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
 		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
+		WT_ERR(__wt_cond_alloc(session,
+		    "slot pool done", 0, &log->slot_pool[i].slot_done_cond));
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, WT_LOG_SLOT_BUF_INIT_SIZE * SLOT_POOL);
@@ -75,14 +77,18 @@ int
 __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 	int i;
 
 	conn = S2C(session);
 	log = conn->log;
 
-	for (i = 0; i < SLOT_POOL; i++)
+	for (i = 0; i < SLOT_POOL; i++) {
 		__wt_buf_free(session, &log->slot_pool[i].slot_buf);
+		WT_TRET(__wt_cond_destroy(
+		    session, &log->slot_pool[i].slot_done_cond));
+	}
 	return (0);
 }
 
@@ -226,10 +232,11 @@ retry:
  *	Notify all threads waiting for the state to be < WT_LOG_SLOT_DONE.
  */
 int
-__wt_log_slot_notify(WT_LOGSLOT *slot)
+__wt_log_slot_notify(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	slot->slot_state =
 	    (int64_t)WT_LOG_SLOT_DONE - (int64_t)slot->slot_group_size;
+	__wt_cond_signal(session, slot->slot_done_cond);
 	return (0);
 }
 
@@ -238,10 +245,10 @@ __wt_log_slot_notify(WT_LOGSLOT *slot)
  *	Wait for slot leader to allocate log area and tell us our log offset.
  */
 int
-__wt_log_slot_wait(WT_LOGSLOT *slot)
+__wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	while (slot->slot_state > WT_LOG_SLOT_DONE)
-		__wt_yield();
+		__wt_cond_wait(session, slot->slot_done_cond, 10000);
 	return (0);
 }
 
