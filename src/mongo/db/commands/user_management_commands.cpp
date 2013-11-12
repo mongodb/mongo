@@ -2532,12 +2532,21 @@ namespace mongo {
             }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("auth schema upgrade")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
             bool done;
             status = authzManager->upgradeSchemaStep(writeConcern, &done);
             if (!status.isOK()) {
                 appendCommandStatus(result, status);
                 return false;
             }
+
             result.append("done", done);
             return true;
         }

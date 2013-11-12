@@ -1210,11 +1210,6 @@ namespace {
 }  // namespace
 
     Status AuthorizationManager::upgradeSchemaStep(const BSONObj& writeConcern, bool* isDone) {
-        AuthzDocumentsUpdateGuard lkUpgrade(this);
-        if (!lkUpgrade.tryLock("Upgrade authorization data")) {
-            return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
-        }
-
         int authzVersion = getAuthorizationVersion();
         switch (authzVersion) {
         case schemaVersion24:
