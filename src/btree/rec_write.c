@@ -2228,13 +2228,10 @@ __rec_vtype(WT_SESSION_IMPL *session, WT_ADDR *addr)
 	switch (addr->type) {
 	case WT_ADDR_INT:
 		return (WT_CELL_ADDR_INT);
-		break;
 	case WT_ADDR_LEAF:
 		return (WT_CELL_ADDR_LEAF);
-		break;
 	case WT_ADDR_LEAF_NO:
 		return (WT_CELL_ADDR_LEAF_NO);
-		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 	/* NOTREACHED */
