@@ -908,7 +908,7 @@ namespace {
             else {
                 // Handles 2.4-style user documents, with roles arrays and (optionally, in admin db)
                 // otherDBRoles objects.
-                uassert(0,
+                uassert(17252,
                         "roles field in v2.4 user documents must be an array",
                         rolesElement.type() == Array);
                 for (BSONObjIterator oldRoles(rolesElement.Obj());
@@ -921,7 +921,7 @@ namespace {
 
                 BSONElement otherDBRolesElement = oldUserDoc["otherDBRoles"];
                 if (sourceDB == "admin" && !otherDBRolesElement.eoo()) {
-                    uassert(0,
+                    uassert(17253,
                             "otherDBRoles field in v2.4 user documents must be an object.",
                             otherDBRolesElement.type() == Object);
 
@@ -932,7 +932,7 @@ namespace {
                         BSONElement otherDBRoles = *otherDBs;
                         if (otherDBRoles.fieldNameStringData() == "local")
                             continue;
-                        uassert(0,
+                        uassert(17254,
                                 "Member fields of otherDBRoles objects must be arrays.",
                                 otherDBRoles.type() == Array);
                         for (BSONObjIterator oldRoles(otherDBRoles.Obj());
