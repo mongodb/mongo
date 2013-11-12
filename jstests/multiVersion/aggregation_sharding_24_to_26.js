@@ -63,6 +63,18 @@ function testVersions(versions) {
     for (var i = 0; i < shards.length; i++) {
         var shardConn = new Mongo(shards[i].host);
         assert.commandWorked(shardConn.adminCommand({setParameter: 1, traceExceptions: true}));
+
+        // Because v2.4 doesn't send the shard name during migrations, migrations will fail to
+        // empty v2.6 shards until the shard name has been set otherwise.  The below manually sets
+        // the shard name via SSV.
+        var shardAdmin = shardConn.getDB("admin");
+        assert.commandWorked(shardAdmin.runCommand({ setShardVersion : "dummy.dummy",
+                                                     configdb : st._configDB,
+                                                     shard : shards[i]._id,
+                                                     shardHost : shards[i].host,
+                                                     serverID : new ObjectId(),
+                                                     init : true }));
+        // END hack
     }
 
     jsTest.log("About to test unsharded db. Versions: " +  tojson(versions));
