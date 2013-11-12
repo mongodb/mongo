@@ -315,13 +315,6 @@ namespace {
 
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(multiDB);
-
-
-        // initializeAllV1UserData() pins the users by adding 1 to their refCount, so need to
-        // release each user an extra time to bring their refCounts to 0.
-        authzManager->releaseUser(readOnly);
-        authzManager->releaseUser(clusterAdmin);
-        authzManager->releaseUser(multiDB);
     }
 
 
