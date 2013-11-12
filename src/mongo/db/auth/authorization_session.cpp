@@ -454,7 +454,7 @@ namespace {
                     getAuthorizationManager().releaseUser(user);
                     user = updatedUser;
                 }
-                else {
+                else if (status != ErrorCodes::UserNotFound) {
                     warning() << "Could not fetch updated user privilege information for V1-style "
                         "user " << name << "; continuing to use old information.  Reason is "
                               << status;

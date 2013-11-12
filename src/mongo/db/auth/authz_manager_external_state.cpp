@@ -53,12 +53,14 @@ namespace mongo {
                           mongoutils::str::stream() << "Bad database name \"" << dbname << "\"");
         }
 
+        const bool isUserFromTargetDB = (dbname == userName.getDB());
+
         // Build the query needed to get the privilege document
 
         BSONObjBuilder queryBuilder;
         const NamespaceString usersNamespace(dbname, "system.users");
         queryBuilder.append(AuthorizationManager::V1_USER_NAME_FIELD_NAME, userName.getUser());
-        if (dbname == userName.getDB()) {
+        if (isUserFromTargetDB) {
             queryBuilder.appendNull(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME);
         }
         else {
@@ -77,6 +79,17 @@ namespace mongo {
                               0);
             } else {
                 return found;
+            }
+        }
+
+        if (isUserFromTargetDB) {
+            if (userBSONObj[AuthorizationManager::PASSWORD_FIELD_NAME].eoo()) {
+                return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
+                              "User documents with schema version " <<
+                              AuthorizationManager::schemaVersion24 <<
+                              " must have a \"" <<
+                              AuthorizationManager::PASSWORD_FIELD_NAME <<
+                              "\" field.");
             }
         }
 

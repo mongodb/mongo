@@ -562,30 +562,43 @@ namespace mongo {
 
         int authzVersion = _version;
         guard.beginFetchPhase();
-        if (authzVersion == schemaVersionInvalid) {
-            Status status = _externalState->getStoredAuthorizationVersion(&authzVersion);
-            if (!status.isOK())
-                return status;
-        }
 
-        switch (authzVersion) {
-        default:
-            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                          "Illegal value for authorization data schema version, " << authzVersion);
-        case schemaVersion26Final:
-        case schemaVersion26Upgrade: {
-            Status status = _fetchUserV2(userName, &user);
-            if (!status.isOK())
+        // Number of times to retry a user document that fetches due to transient
+        // AuthSchemaIncompatible errors.  These errors should only ever occur during and shortly
+        // after schema upgrades.
+        static const int maxAcquireRetries = 2;
+        Status status = Status::OK();
+        for (int i = 0; i < maxAcquireRetries; ++i) {
+            if (authzVersion == schemaVersionInvalid) {
+                Status status = _externalState->getStoredAuthorizationVersion(&authzVersion);
+                if (!status.isOK())
+                    return status;
+            }
+
+            switch (authzVersion) {
+            default:
+                status = Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                "Illegal value for authorization data schema version, " <<
+                                authzVersion);
+                break;
+            case schemaVersion26Final:
+            case schemaVersion26Upgrade:
+                status = _fetchUserV2(userName, &user);
+                break;
+            case schemaVersion24:
+                status = _fetchUserV1(userName, &user);
+                break;
+            }
+            if (status.isOK())
+                break;
+            if (status != ErrorCodes::AuthSchemaIncompatible)
                 return status;
-            break;
+
+            authzVersion = schemaVersionInvalid;
         }
-        case schemaVersion24: {
-            Status status = _fetchUserV1(userName, &user);
-            if (!status.isOK())
-                return status;
-            break;
-        }
-        }
+        if (!status.isOK())
+            return status;
+
         guard.endFetchPhase();
 
         user->incrementRefCount();
@@ -670,6 +683,9 @@ namespace mongo {
                 if (!status.isOK())
                     return status;
             }
+            else if (status != ErrorCodes::UserNotFound) {
+                return status;
+            }
             user->markProbedV1("admin");
         }
 
@@ -721,22 +737,44 @@ namespace mongo {
 
         if (!user.get()) {
             Status status = _fetchUserV1(userName, &user);
+            if (status == ErrorCodes::AuthSchemaIncompatible) {
+                // Must early-return from this if block, because we end the fetch phase.  Since the
+                // auth schema is incompatible with schemaVersion24, make a best effort to do the
+                // schemaVersion26(Upgrade|Final) user acquisition, and return.
+                status = _fetchUserV2(userName, &user);
+                guard.endFetchPhase();
+                if (status.isOK()) {
+                    // Not safe to throw from here until the function returns.
+                    if (guard.isSameCacheGeneration()) {
+                        _invalidateUserCache_inlock();
+                        _userCache.insert(make_pair(userName, user.get()));
+                    }
+                    else {
+                        user->invalidate();
+                    }
+                    user->incrementRefCount();
+                    *acquiredUser = user.release();
+                }
+                return status;
+            }
             if (!status.isOK())
                 return status;
         }
 
-        BSONObj privDoc;
-        Status status = _externalState->getPrivilegeDocumentV1(dbname, userName, &privDoc);
-        if (status.isOK()) {
-            V1UserDocumentParser parser;
-            status = parser.initializeUserRolesFromUserDocument(user.get(), privDoc, dbname);
-            if (!status.isOK())
+        if (!user->hasProbedV1(dbname)) {
+            BSONObj privDoc;
+            Status status = _externalState->getPrivilegeDocumentV1(dbname, userName, &privDoc);
+            if (status.isOK()) {
+                V1UserDocumentParser parser;
+                status = parser.initializeUserRolesFromUserDocument(user.get(), privDoc, dbname);
+                if (!status.isOK())
+                    return status;
+                _initializeUserPrivilegesFromRolesV1(user.get());
+                user->markProbedV1(dbname);
+            }
+            else if (status != ErrorCodes::UserNotFound) {
                 return status;
-            _initializeUserPrivilegesFromRolesV1(user.get());
-            user->markProbedV1(dbname);
-        }
-        else if (status != ErrorCodes::UserNotFound) {
-            return status;
+            }
         }
 
         guard.endFetchPhase();
