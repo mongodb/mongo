@@ -1368,6 +1368,10 @@ extern int __wt_raw_to_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
     uint32_t size,
     WT_ITEM *to);
+extern void __wt_raw_to_hex_mem( const uint8_t *from,
+    uint32_t size,
+    u_char *dest,
+    uint32_t dest_size);
 extern int __wt_raw_to_esc_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
     size_t size,

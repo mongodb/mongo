@@ -188,6 +188,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			++percentile[((ext->off + i * 512) * 100) / size];
 		}
 
+#ifdef __VERBOSE_OUTPUT_PERCENTILE
 	for (i = 0; i < WT_ELEMENTS(percentile); ++i) {
 		v = percentile[i] * 512;
 		WT_RET(__wt_verbose(
@@ -196,7 +197,6 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    i, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
 		    (uintmax_t)((v * 100) / (off_t)el->bytes)));
 	}
-#ifdef __VERBOSE_OUTPUT_PERCENTILE
 #endif
 	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
 		v = decile[i] * 512;

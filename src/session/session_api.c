@@ -546,7 +546,8 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_ERR(__wt_schema_range_truncate(session, start, stop));
 
 done:
-err:	TXN_API_END_NOTFOUND_MAP(session, ret);
+err:	TXN_API_END_RETRY(session, ret, 0);
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret));
 }
 
 /*

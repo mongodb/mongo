@@ -276,7 +276,6 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_strdup(
 	    session, WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
 	dhandle->cfg[1] = metaconf;
-	metaconf = NULL;
 	return (0);
 
 err:	__wt_free(session, metaconf);
