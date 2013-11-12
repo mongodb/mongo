@@ -67,6 +67,7 @@ __wt_log_get_active_files(
 	for (i = 0; i < count; ) {
 		WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
 		if (id < log->ckpt_lsn.file) {
+			__wt_free(session, files[i]);
 			files[i] = files[count - 1];
 			files[--count] = NULL;
 		} else

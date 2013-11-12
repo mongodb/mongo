@@ -82,10 +82,12 @@ struct __wt_txn_op {
 		/* TXN_OP_TRUNCATE_ROW */
 		struct {
 			WT_ITEM start, stop;
-			uint32_t mode;  /* 0 = no start / stop,
-					   1 = stop but no start,
-					   2 = start but no stop,
-					   3 = start and stop */
+			enum {
+				TXN_TRUNC_ALL,
+				TXN_TRUNC_BOTH,
+				TXN_TRUNC_START,
+				TXN_TRUNC_STOP
+			} mode;
 		} truncate_row;
 	} u;
 };

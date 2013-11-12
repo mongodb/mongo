@@ -28,24 +28,47 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 }
 
 /*
+ * __wt_txn_unmodify --
+ *	If threads race making updates, they may discard the last referenced
+ *	WT_UPDATE item while the transaction is still active.  This function
+ *	removes the last update item from the "log".
+ */
+static inline void
+__wt_txn_unmodify(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_RUNNING)) {
+		WT_ASSERT(session, txn->mod_count > 0);
+		txn->mod_count--;
+	}
+}
+
+/*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
+	WT_DECL_RET;
 	WT_TXN_OP *op;
 
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    TXN_OP_INMEM : TXN_OP_BASIC;
-	if (cbt->btree->type == BTREE_ROW)
-		WT_RET(__wt_row_key_get(cbt, &op->u.op.key));
+	/* If we are logging, logging, we need a reference to the key. */
+	if (cbt->btree->type == BTREE_ROW && S2C(session)->logging)
+		WT_ERR(__wt_row_key_get(cbt, &op->u.op.key));
 	op->u.op.ins = cbt->ins;
 	op->u.op.upd = upd;
 	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
-	return (0);
+	if (0) {
+err:            __wt_txn_unmodify(session);
+	}
+	return (ret);
 }
 
 /*
@@ -62,24 +85,6 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	op->u.ref = ref;
 	ref->txnid = session->txn.id;
 	return (0);
-}
-
-/*
- * __wt_txn_unmodify --
- *	If threads race making updates, they may discard the last referenced
- *	WT_UPDATE item while the transaction is still active.  This function
- *	removes the last update item from the "log".
- */
-static inline void
-__wt_txn_unmodify(WT_SESSION_IMPL *session)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn->mod_count > 0);
-		txn->mod_count--;
-	}
 }
 
 /*

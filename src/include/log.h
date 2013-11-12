@@ -167,18 +167,16 @@ struct __wt_log_op_desc {
  * DO NOT EDIT: automatically built by dist/log.py.
  * Log record declarations: BEGIN
  */
-#define	WT_LOGREC_INVALID	0
-#define	WT_LOGREC_FILE_SYNC	1
-#define	WT_LOGREC_CHECKPOINT	2
-#define	WT_LOGREC_COMMIT	3
-#define	WT_LOGREC_DEBUG	4
-#define	WT_LOGOP_INVALID	0
-#define	WT_LOGOP_COL_PUT	1
-#define	WT_LOGOP_COL_REMOVE	2
-#define	WT_LOGOP_COL_TRUNCATE	3
-#define	WT_LOGOP_ROW_PUT	4
-#define	WT_LOGOP_ROW_REMOVE	5
-#define	WT_LOGOP_ROW_TRUNCATE	6
+#define	WT_LOGREC_CHECKPOINT	0
+#define	WT_LOGREC_COMMIT	1
+#define	WT_LOGREC_DEBUG	2
+#define	WT_LOGREC_FILE_SYNC	3
+#define	WT_LOGOP_COL_PUT	0
+#define	WT_LOGOP_COL_REMOVE	1
+#define	WT_LOGOP_COL_TRUNCATE	2
+#define	WT_LOGOP_ROW_PUT	3
+#define	WT_LOGOP_ROW_REMOVE	4
+#define	WT_LOGOP_ROW_TRUNCATE	5
 /*
  * Log record declarations: END
  * DO NOT EDIT: automatically built by dist/log.py.

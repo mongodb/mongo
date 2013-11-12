@@ -225,7 +225,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Tell logging that we are about to start a database checkpoint. */
 	if (S2C(session)->logging && full)
 		WT_ERR(__wt_txn_checkpoint_log(
-		    session, 1, WT_TXN_LOG_CKPT_PREPARE, NULL));
+		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	/* Start a snapshot transaction for the checkpoint. */
 	wt_session = &session->iface;
@@ -234,7 +234,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full)
 		WT_ERR(__wt_txn_checkpoint_log(
-		    session, 1, WT_TXN_LOG_CKPT_START, NULL));
+		    session, full, WT_TXN_LOG_CKPT_START, NULL));
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
@@ -297,7 +297,7 @@ err:	/*
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_TRET(__wt_txn_checkpoint_log(session, 1,
+		WT_TRET(__wt_txn_checkpoint_log(session, full,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
 

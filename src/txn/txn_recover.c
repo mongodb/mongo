@@ -7,23 +7,27 @@
 
 #include "wt_internal.h"
 
-/* Recovery state. */
+/* State maintained during recovery. */
 typedef struct {
 	WT_SESSION_IMPL *session;
 
+	/* Files from the metadata, indexed by file ID. */
 	struct {
-		const char *uri;
-		WT_CURSOR *c;
-		WT_LSN ckpt_lsn;
+		const char *uri;	/* File URI. */
+		WT_CURSOR *c;		/* Cursor used for recovery. */
+		WT_LSN ckpt_lsn;	/* File's checkpoint LSN. */
 	} *files;
+	size_t file_alloc;		/* Allocated size of files array. */
+	u_int max_fileid;		/* Maximum file ID seen. */
+	u_int nfiles;			/* Number of files in the metadata. */
 
-	WT_LSN ckpt_lsn;
+	WT_LSN ckpt_lsn;		/* Start LSN for main recovery loop. */
 
-	size_t file_alloc;
-	u_int max_fileid, nfiles;
-	int modified;
-
-	int metadata_only;
+	int modified;			/* Did recovery make any changes? */
+	int metadata_only;		/*
+					 * Set during the first recovery pass,
+					 * when only the metadata is recovered.
+					 */
 } WT_RECOVERY;
 
 /*
@@ -68,6 +72,14 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 }
 
 /*
+ * Helper to a cursor if this operation is to be applied during recovery.
+ */
+#define	GET_RECOVERY_CURSOR(s, r, lsnp, fileid, cp)			\
+	WT_ERR(__recovery_cursor((s), (r), (lsnp), (fileid), 0, (cp)));	\
+	if (cursor == NULL)						\
+		break
+
+/*
  * __txn_op_apply --
  *	Apply a transactional operation during recovery.
  */
@@ -92,9 +104,7 @@ __txn_op_apply(
 	case WT_LOGOP_COL_PUT:
 		WT_ERR(__wt_logop_col_put_unpack(session, pp, end,
 		    &fileid, &recno, &value));
-		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
-		if (cursor == NULL)
-			break;
+		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 		cursor->set_key(cursor, recno);
 		__wt_cursor_set_raw_value(cursor, &value);
 		WT_ERR(cursor->insert(cursor));
@@ -103,9 +113,7 @@ __txn_op_apply(
 	case WT_LOGOP_COL_REMOVE:
 		WT_ERR(__wt_logop_col_remove_unpack(session, pp, end,
 		    &fileid, &recno));
-		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
-		if (cursor == NULL)
-			break;
+		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 		cursor->set_key(cursor, recno);
 		WT_ERR(cursor->remove(cursor));
 		break;
@@ -113,9 +121,7 @@ __txn_op_apply(
 	case WT_LOGOP_COL_TRUNCATE:
 		WT_ERR(__wt_logop_col_truncate_unpack(session, pp, end,
 		    &fileid, &start_recno, &stop_recno));
-		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
-		if (cursor == NULL)
-			break;
+		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 
 		/* Set up the cursors. */
 		if (start_recno == 0) {
@@ -147,9 +153,7 @@ __txn_op_apply(
 	case WT_LOGOP_ROW_PUT:
 		WT_ERR(__wt_logop_row_put_unpack(session, pp, end,
 		    &fileid, &key, &value));
-		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
-		if (cursor == NULL)
-			break;
+		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 		__wt_cursor_set_raw_key(cursor, &key);
 		__wt_cursor_set_raw_value(cursor, &value);
 		WT_ERR(cursor->insert(cursor));
@@ -158,9 +162,7 @@ __txn_op_apply(
 	case WT_LOGOP_ROW_REMOVE:
 		WT_ERR(__wt_logop_row_remove_unpack(session, pp, end,
 		    &fileid, &key));
-		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
-		if (cursor == NULL)
-			break;
+		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 		__wt_cursor_set_raw_key(cursor, &key);
 		WT_ERR(cursor->remove(cursor));
 		break;
@@ -168,22 +170,23 @@ __txn_op_apply(
 	case WT_LOGOP_ROW_TRUNCATE:
 		WT_ERR(__wt_logop_row_truncate_unpack(session, pp, end,
 		    &fileid, &start_key, &stop_key, &mode));
-		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
-		if (cursor == NULL)
-			break;
+		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 		/* Set up the cursors. */
 		start = stop = NULL;
 		switch (mode) {
-		case 1:
-			stop = cursor;
+		case TXN_TRUNC_ALL:
+			/* Both cursors stay NULL. */
 			break;
-		case 2:
-			start = cursor;
-			break;
-		case 3:
+		case TXN_TRUNC_BOTH:
 			start = cursor;
 			WT_ERR(__recovery_cursor(
 			    session, r, lsnp, fileid, 1, &stop));
+			break;
+		case TXN_TRUNC_START:
+			start = cursor;
+			break;
+		case TXN_TRUNC_STOP:
+			stop = cursor;
 			break;
 
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -398,8 +401,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	/*
 	 * First, do a full pass through the log to recover the metadata,
-	 * and establish the last checkpoint LSN.  Pass WT_LOGSCAN_RECOVER so
-	 * that old logs get truncated.
+	 * and establish the last checkpoint LSN.
 	 */
 	r.metadata_only = 1;
 	ret = __wt_log_scan(
@@ -411,7 +413,10 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	ret = __recovery_file_scan(&r);
 	WT_ASSERT(session, ret == 0);
 
-	/* Now, recover all the files apart from the metadata. */
+	/*
+	 * Now, recover all the files apart from the metadata.
+	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
+	 */
 	r.metadata_only = 0;
 	ret = __wt_log_scan(
 	    session, &r.ckpt_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);

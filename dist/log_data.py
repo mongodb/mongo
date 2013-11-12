@@ -18,12 +18,21 @@ class LogRecordType:
         return '__logrec_print_' + self.name
 
 rectypes = [
-    LogRecordType('invalid', []),
-    LogRecordType('file_sync', [('uint32', 'fileid'), ('int', 'start')]),
+    # A database-wide checkpoint.
     LogRecordType('checkpoint', [
         ('WT_LSN', 'ckpt_lsn'), ('uint32', 'nsnapshot'), ('item', 'snapshot')]),
+
+    # Common case: a transaction commit
     LogRecordType('commit', [('uint64', 'txnid')]),
+
+    # Debugging message in the log
     LogRecordType('debug', [('string', 'message')]),
+
+    # Mark the start / end of a file sync operation (usually when a file is
+    # closed).  These log records aren't required during recovery, but we use
+    # the allocated LSN to reduce the amount of work recovery has to do, and
+    # they are useful for debugging recovery.
+    LogRecordType('file_sync', [('uint32', 'fileid'), ('int', 'start')]),
 ]
 
 class LogOperationType:
@@ -35,7 +44,6 @@ class LogOperationType:
         return 'WT_LOGOP_%s' % self.name.upper()
 
 optypes = [
-    LogOperationType('invalid', []),
     LogOperationType('col_put',
         [('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
     LogOperationType('col_remove',

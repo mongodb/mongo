@@ -21,14 +21,11 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 	value.size = op->u.op.upd->size;
 
 	/*
-	 * Cases:
+	 * Log the operation.  It must be one of the following:
 	 * 1) column store remove;
 	 * 2) column store insert/update;
-	 * 3) row store remove;
-	 * 4) row store insert/update;
-	 *
-	 * We first calculate the size being packed (assuming the size itself
-	 * is zero), then fix the calculation once we know the size.
+	 * 3) row store remove; or
+	 * 4) row store insert/update.
 	 */
 	if (op->u.op.key.data == NULL) {
 		WT_ASSERT(session, op->u.op.ins != NULL);
@@ -125,7 +122,7 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR(__wt_logop_row_truncate_pack(session, logrec,
 			    op->fileid,
 			    &op->u.truncate_row.start, &op->u.truncate_row.stop,
-			    op->u.truncate_row.mode));
+			    (uint32_t)op->u.truncate_row.mode));
 			break;
 		}
 
@@ -252,10 +249,7 @@ __wt_txn_checkpoint_log(
 			*ckpt_lsn = S2C(session)->log->alloc_lsn;
 		}
 
-		/*
-		 * Write the checkpoint log record and tell the logging
-		 * subsystem the checkpoint LSN.
-		 */
+		/* Write the checkpoint log record. */
 		WT_ERR(__wt_struct_size(session, &recsize, fmt,
 		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
 		    txn->ckpt_nsnapshot, &txn->ckpt_snapshot));
@@ -269,9 +263,9 @@ __wt_txn_checkpoint_log(
 		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
 
 		/*
-		 * If this a full checkpoint completed successfully and there
-		 * is no hot backup in progress, we can archive up to the
-		 * checkpoint LSN.
+		 * If this full checkpoint completed successfully and there is
+		 * no hot backup in progress, tell the logging subsystem the
+		 * checkpoint LSN so that it can archive.
 		 */
 		if (!S2C(session)->hot_backup)
 			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
@@ -309,18 +303,20 @@ __wt_txn_truncate_log(
 
 	if (btree->type == BTREE_ROW) {
 		op->type = TXN_OP_TRUNCATE_ROW;
-		op->u.truncate_row.mode = 0;
+		op->u.truncate_row.mode = TXN_TRUNC_ALL;
 		WT_CLEAR(op->u.truncate_row.start);
 		WT_CLEAR(op->u.truncate_row.stop);
 		if (start != NULL) {
-			op->u.truncate_row.mode |= 0x2;
+			op->u.truncate_row.mode = TXN_TRUNC_START;
 			item = &op->u.truncate_row.start;
 			WT_RET(__wt_cursor_get_raw_key(&start->iface, item));
 			WT_RET(__wt_buf_set(
 			    session, item, item->data, item->size));
 		}
 		if (stop != NULL) {
-			op->u.truncate_row.mode |= 0x1;
+			op->u.truncate_row.mode =
+			    (op->u.truncate_row.mode == TXN_TRUNC_ALL) ?
+			    TXN_TRUNC_STOP : TXN_TRUNC_BOTH;
 			item = &op->u.truncate_row.stop;
 			WT_RET(__wt_cursor_get_raw_key(&stop->iface, item));
 			WT_RET(__wt_buf_set(

@@ -340,15 +340,24 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
-	/* Rollback notification. */
+	/* Commit notification. */
 	if (txn->notify != NULL)
-		WT_RET(txn->notify->notify(txn->notify, (WT_SESSION *)session,
-		    txn->id, 1));
+		WT_TRET(txn->notify->notify(txn->notify,
+		    (WT_SESSION *)session, txn->id, 1));
 
-	if (ret != 0 ||
-	    (txn->mod_count > 0 && S2C(session)->logging &&
-	    !F_ISSET(session, WT_SESSION_LOGGING_DISABLED) &&
-	    (ret = __wt_txn_log_commit(session, cfg)) != 0)) {
+	/* If we are logging, write a commit log record. */
+	if (ret == 0 &&
+	    txn->mod_count > 0 && S2C(session)->logging &&
+	    !F_ISSET(session, WT_SESSION_LOGGING_DISABLED))
+		ret = __wt_txn_log_commit(session, cfg);
+
+	/*
+	 * If anything went wrong, roll back.
+	 *
+	 * !!!
+	 * Nothing can fail after this point.
+	 */
+	if (ret != 0) {
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}
