@@ -48,6 +48,9 @@ function testVersions(versions) {
         },
     });
 
+    // All tests of sharded collections place chunks where they need to be.
+    st.stopBalancer();
+
     var mongos = st.s0;
     var coll = mongos.getCollection("test.collection");
     var admin = mongos.getDB("admin");
@@ -80,21 +83,23 @@ function testVersions(versions) {
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
     runTest(coll, false);
 
-    jsTest.log("About to test normal sharded collection with balancer on. " +
+    jsTest.log("About to test sharded collection with data on both shards. " +
                "Versions: " +  tojson(versions));
     coll.getDB().dropDatabase();
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
+    // movePrimary fails if the "to" shard is already primary. That is successful for our purposes.
+    printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: shards[0]._id}));
     assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 500}}));
+    assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
+                                           find: {_id: 1},
+                                           to: shards[1]._id}));
     runTest(coll, true);
-
-    // Later tests don't want the balancer on
-    st.stopBalancer();
 
     jsTest.log("About to test sharded collection with all data on primary shard. " +
                "Versions: " +  tojson(versions));
     coll.getDB().dropDatabase();
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
-    // movePrimary fails if the "to" shard is already primary. That is successful for our purposes.
     printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: shards[0]._id}));
     assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
     runTest(coll, false);
