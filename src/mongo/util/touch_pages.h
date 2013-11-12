@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <fcntl.h>
 
 namespace mongo {
