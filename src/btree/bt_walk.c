@@ -88,7 +88,7 @@ __tree_walk_delete(
 	 * locked down, instantiating the page in memory and modifying it could
 	 * theoretically point the address somewhere away from the on-page cell.
 	 */
-	if (__wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LNO)
+	if (__wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
 		goto err;
 
 	/*

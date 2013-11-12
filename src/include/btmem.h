@@ -78,7 +78,11 @@ struct __wt_page_header {
 struct __wt_addr {
 	uint8_t *addr;			/* Block-manager's cookie */
 	uint32_t size;			/* Block-manager's cookie length */
-	uint8_t  leaf_no_overflow;	/* 1/0: a leaf page w/o overflow */
+
+#define	WT_ADDR_INT	1		/* Internal page */
+#define	WT_ADDR_LEAF	2		/* Leaf page */
+#define	WT_ADDR_LEAF_NO	3		/* Leaf page, no overflow */
+	uint8_t  type;
 };
 
 /*

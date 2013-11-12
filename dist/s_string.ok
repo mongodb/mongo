@@ -895,6 +895,7 @@ vpack
 vrfy
 vsize
 vslot
+vtype
 vunpack
 vupdate
 walk's

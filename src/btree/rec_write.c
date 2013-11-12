@@ -458,7 +458,7 @@ __rec_write_init(
 
 			WT_ASSERT(session, bnd->addr.addr == NULL);
 			bnd->addr.size = 0;
-			bnd->addr.leaf_no_overflow = 0;
+			bnd->addr.type = 0;
 
 			/* Leave the key alone, it's space we re-use. */
 
@@ -1192,6 +1192,7 @@ __rec_is_checkpoint(WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	if (bnd == &r->bnd[0] && WT_PAGE_IS_ROOT(r->page)) {
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
+		bnd->addr.type = 0;
 		return (1);
 	}
 	return (0);
@@ -1533,7 +1534,10 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY_SHORT:
 			break;
-		case WT_CELL_ADDR:
+		case WT_CELL_ADDR_DEL:
+		case WT_CELL_ADDR_INT:
+		case WT_CELL_ADDR_LEAF:
+		case WT_CELL_ADDR_LEAF_NO:
 		case WT_CELL_DEL:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
@@ -1916,8 +1920,8 @@ err:	__wt_scr_free(&tmp);
  *	Write a disk block out for the split helper functions.
  */
 static int
-__rec_split_write(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf)
+__rec_split_write(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
 	uint32_t addr_size;
@@ -1927,14 +1931,22 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	WT_RET(__wt_bt_write(
 	    session, buf, addr, &addr_size, 0, bnd->already_compressed));
 	WT_RET(__wt_strndup(session, (char *)addr, addr_size, &bnd->addr.addr));
+	bnd->addr.size = addr_size;
 
 	dsk = buf->mem;
-	bnd->addr.size = addr_size;
-	bnd->addr.leaf_no_overflow =
-	    (dsk->type == WT_PAGE_COL_FIX ||
-	    dsk->type == WT_PAGE_COL_VAR ||
-	    dsk->type == WT_PAGE_ROW_LEAF) &&
-	    r->ovfl_items == 0 ? 1 : 0;
+	switch (dsk->type) {
+	case WT_PAGE_COL_FIX:
+		bnd->addr.type = WT_ADDR_LEAF_NO;
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
+		bnd->addr.type = r->ovfl_items ? WT_ADDR_LEAF : WT_ADDR_LEAF_NO;
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		bnd->addr.type = WT_ADDR_INT;
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
 	return (0);
 }
 
@@ -2201,6 +2213,29 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 }
 
 /*
+ * __rec_vtype --
+ *	Return a value cell's address type.
+ */
+static inline u_int
+__rec_vtype(WT_SESSION_IMPL *session, WT_ADDR *addr)
+{
+
+	switch (addr->type) {
+	case WT_ADDR_INT:
+		return (WT_CELL_ADDR_INT);
+		break;
+	case WT_ADDR_LEAF:
+		return (WT_CELL_ADDR_LEAF);
+		break;
+	case WT_ADDR_LEAF_NO:
+		return (WT_CELL_ADDR_LEAF_NO);
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+	/* NOTREACHED */
+}
+
+/*
  * __rec_col_int --
  *	Reconcile a column-store internal page.
  */
@@ -2304,11 +2339,8 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			val->cell_len = 0;
 			val->len = val->buf.size;
 		} else
-			__rec_cell_build_addr(r,
-			    addr->addr, addr->size,
-			    addr->leaf_no_overflow ?
-			    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
-			    ref->key.recno);
+			__rec_cell_build_addr(r, addr->addr, addr->size,
+			    __rec_vtype(session, addr), ref->key.recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -3061,8 +3093,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			p = addr->addr;
 			size = addr->size;
 			if (vtype == 0)
-				vtype = addr->leaf_no_overflow ?
-				    WT_CELL_ADDR_LNO : WT_CELL_ADDR;
+				vtype = __rec_vtype(session, addr);
 		} else {
 			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;
@@ -3208,8 +3239,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			p = addr->addr;
 			size = addr->size;
 			if (vtype == 0)
-				vtype = addr->leaf_no_overflow ?
-				    WT_CELL_ADDR_LNO : WT_CELL_ADDR;
+				vtype = __rec_vtype(session, addr);
 		} else {
 			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;

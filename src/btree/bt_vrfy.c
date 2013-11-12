@@ -226,7 +226,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t entry, i;
-	int found, lno;
+	int found;
 
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
@@ -324,6 +324,36 @@ recno_chk:	if (recno != vs->record_total + 1)
 		break;
 	}
 
+	/* If it's not the root page, unpack the parent cell. */
+	if (!WT_PAGE_IS_ROOT(page))
+		__wt_cell_unpack(page->ref->addr, unpack);
+
+	/* Compare the parent cell against the page type. */
+	if (!WT_PAGE_IS_ROOT(page))
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+			if (unpack->raw != WT_CELL_ADDR_LEAF_NO)
+				goto celltype_err;
+			break;
+		case WT_PAGE_COL_VAR:
+		case WT_PAGE_ROW_LEAF:
+			if (unpack->raw != WT_CELL_ADDR_LEAF &&
+			    unpack->raw != WT_CELL_ADDR_LEAF_NO)
+				goto celltype_err;
+			break;
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_ROW_INT:
+			if (unpack->raw != WT_CELL_ADDR_INT)
+celltype_err:			WT_RET_MSG(session, WT_ERROR,
+				    "page at %s, of type %s, is referenced in "
+				    "its parent by a cell of type %s",
+				    __wt_page_addr_string(
+					session, vs->tmp1, page),
+				    __wt_page_type_string(page->type),
+				    __wt_cell_type_string(unpack->raw));
+			break;
+		}
+
 	/*
 	 * Check overflow pages.  We check overflow cells separately from other
 	 * tests that walk the page as it's simpler, and I don't care much how
@@ -332,37 +362,23 @@ recno_chk:	if (recno != vs->record_total + 1)
 	 * Object if a leaf-no-overflow address cell references a page that has
 	 * overflow keys, but don't object if a standard address cell references
 	 * a page without overflow keys.  The leaf-no-overflow address cell is
-	 * an optimization for trees without few, if any, overflow items, and
-	 * may not be set by reconciliation in all possible cases.
+	 * an optimization for trees with few, if any, overflow items, and may
+	 * not be set by reconciliation in all possible cases.
 	 */
-	if (WT_PAGE_IS_ROOT(page))
-		lno = 0;
-	else {
-		__wt_cell_unpack(page->ref->addr, unpack);
-		lno = unpack->raw == WT_CELL_ADDR_LNO ? 1 : 0;
-	}
 	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__verify_overflow_cell(session, page, &found, vs));
-		if (found && lno)
+		if (!WT_PAGE_IS_ROOT(page) && found &&
+		    unpack->raw == WT_CELL_ADDR_LEAF_NO)
 			WT_RET_MSG(session, WT_ERROR,
-			    "page at %s referenced in its parent by a cell of "
-			    "type %s illegally contains overflow items",
-			    __wt_page_addr_string(session, vs->tmp1, page),
-			    __wt_cell_type_string(WT_CELL_ADDR_LNO));
-		break;
-	default:
-		if (lno)
-			WT_RET_MSG(session, WT_ERROR,
-			    "page at %s is of type %s and is illegally "
-			    "referenced in its parent by a cell of type %s",
+			    "page at %s, of type %s and referenced in its "
+			    "parent by a cell of type %s, contains overflow "
+			    "items",
 			    __wt_page_addr_string(session, vs->tmp1, page),
 			    __wt_page_type_string(page->type),
-			    __wt_cell_type_string(WT_CELL_ADDR_LNO));
+			    __wt_cell_type_string(WT_CELL_ADDR_LEAF_NO));
 		break;
 	}
 
