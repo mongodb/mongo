@@ -396,8 +396,9 @@ namespace mongo {
         }
 
         // Ensures that the fields on which we are building the index are valid: a field must not
-        // begin with a '$' unless it is part of a DBRef, and a field path cannot contain an empty
-        // field. If a field cannot be created or updated, it should not be indexable.
+        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
+        // contain an empty field. If a field cannot be created or updated, it should not be
+        // indexable.
         BSONObjIterator it( key );
         while ( it.more() ) {
             BSONElement keyElement = it.next();
@@ -415,6 +416,10 @@ namespace mongo {
                 }
 
                 if ( part[0] != '$' )
+                    continue;
+
+                // This is used for text indexing.
+                if ( part == "$**" )
                     continue;
 
                 // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
