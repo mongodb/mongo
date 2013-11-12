@@ -112,13 +112,12 @@ namespace mongo {
          */
         uint32_t getRefCount() const;
 
+        /**
+         * Clones this user into a new, valid User object with refcount of 0.
+         */
+        User* clone() const;
 
         // Mutators below.  Mutation functions should *only* be called by the AuthorizationManager
-
-        /**
-         * Copies the contents of other into this User.
-         */
-        void copyFrom(const User& other);
 
         /**
          * Sets this user's authentication credentials.

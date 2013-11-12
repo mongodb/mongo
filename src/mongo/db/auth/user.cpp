@@ -71,13 +71,14 @@ namespace mongo {
         return it->second.getActions();
     }
 
-    void User::copyFrom(const User& other) {
-        _name = other._name;
-        _privileges = other._privileges;
-        _roles = other._roles;
-        _credentials = other._credentials;
-        _refCount = other._refCount;
-        _isValid= other._isValid;
+    User* User::clone() const {
+        std::auto_ptr<User> result(new User(_name));
+        result->_privileges = _privileges;
+        result->_roles = _roles;
+        result->_probedDatabases = _probedDatabases;
+        result->_credentials = _credentials;
+        result->_schemaVersion = _schemaVersion;
+        return result.release();
     }
 
     void User::setCredentials(const CredentialData& credentials) {

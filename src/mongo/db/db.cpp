@@ -905,7 +905,6 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
         (InitializerContext* context) {
     AuthorizationManager* authzManager =
             new AuthorizationManager(new AuthzManagerExternalStateMongod());
-    authzManager->addInternalUser(internalSecurity.user);
     setGlobalAuthorizationManager(authzManager);
     return Status::OK();
 }

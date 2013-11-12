@@ -339,12 +339,6 @@ namespace mongo {
         void invalidateUsersFromDB(const std::string& dbname);
 
         /**
-         * Inserts the given user directly into the _userCache.  Used to add the internalSecurity
-         * user into the cache at process startup.
-         */
-        void addInternalUser(User* user);
-
-        /**
          * Initializes the authorization manager.  Depending on what version the authorization
          * system is at, this may involve building up the user cache and/or the roles graph.
          * Call this function at startup and after resynchronizing a slave/secondary.

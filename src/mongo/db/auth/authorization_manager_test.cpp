@@ -148,9 +148,6 @@ namespace {
             authzManager.reset(new AuthorizationManager(externalState));
             externalState->setAuthorizationManager(authzManager.get());
             authzManager->setAuthEnabled(true);
-            // This duplicates the behavior from the server that adds the internal user at process
-            // startup via a MONGO_INITIALIZER
-            authzManager->addInternalUser(internalSecurity.user);
         }
 
         scoped_ptr<AuthorizationManager> authzManager;

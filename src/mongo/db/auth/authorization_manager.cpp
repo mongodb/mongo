@@ -251,10 +251,8 @@ namespace mongo {
     AuthorizationManager::~AuthorizationManager() {
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
-            if (it->second != internalSecurity.user) {
-                // The internal user should never be deleted.
-                delete it->second ;
-            }
+            fassert(0, it->second != internalSecurity.user);
+            delete it->second ;
         }
     }
 
@@ -537,6 +535,11 @@ namespace mongo {
     }
 
     Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {
+        if (userName == internalSecurity.user->getName()) {
+            *acquiredUser = internalSecurity.user;
+            return Status::OK();
+        }
+
         unordered_map<UserName, User*>::iterator it;
 
         CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
@@ -678,47 +681,58 @@ namespace mongo {
     Status AuthorizationManager::acquireV1UserProbedForDb(
             const UserName& userName, const StringData& dbname, User** acquiredUser) {
 
-        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
-        unordered_map<UserName, User*>::iterator it;
-        while ((_userCache.end() == (it = _userCache.find(userName))) &&
-               guard.otherUpdateInFetchPhase()) {
-
-            guard.wait();
+        if (userName == internalSecurity.user->getName()) {
+            *acquiredUser = internalSecurity.user;
+            return Status::OK();
         }
 
-        User* user = NULL;
-        if (_userCache.end() != it) {
-            user = it->second;
-            fassert(17224, user->getSchemaVersion() == schemaVersion24);
-            fassert(17225, user->isValid());
-            if (user->hasProbedV1(dbname)) {
-                user->incrementRefCount();
-                *acquiredUser = user;
-                return Status::OK();
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
+        std::auto_ptr<User> user;
+        {
+            unordered_map<UserName, User*>::iterator it;
+            while ((_userCache.end() == (it = _userCache.find(userName))) &&
+                   guard.otherUpdateInFetchPhase()) {
+
+                guard.wait();
+            }
+
+            if (_userCache.end() != it) {
+                User* cachedUser = it->second;
+                fassert(17225, cachedUser->isValid());
+                if ((cachedUser->getSchemaVersion() != schemaVersion24) ||
+                    cachedUser->hasProbedV1(dbname)) {
+
+                    cachedUser->incrementRefCount();
+                    *acquiredUser = cachedUser;
+                    return Status::OK();
+                }
+                // We clone cachedUser for two reasons.  First, because it is not OK to mutate a
+                // User object that may have been returned from acquireUser() or
+                // acquireV1UserProbedForDb().  Second, because outside of this scope (or more
+                // precisely, after calling guard.wait() or guard.beginFetchPhase(), after the
+                // scope), references to data in the _userCache for which we do not know the
+                // refcount is greater than zero are invalid.
+                user.reset(cachedUser->clone());
             }
         }
-
         while (guard.otherUpdateInFetchPhase())
             guard.wait();
-
         guard.beginFetchPhase();
 
-        std::auto_ptr<User> auser;
-        if (!user) {
-            Status status = _fetchUserV1(userName, &auser);
+        if (!user.get()) {
+            Status status = _fetchUserV1(userName, &user);
             if (!status.isOK())
                 return status;
-            user = auser.get();
         }
 
         BSONObj privDoc;
         Status status = _externalState->getPrivilegeDocumentV1(dbname, userName, &privDoc);
         if (status.isOK()) {
             V1UserDocumentParser parser;
-            status = parser.initializeUserRolesFromUserDocument(user, privDoc, dbname);
+            status = parser.initializeUserRolesFromUserDocument(user.get(), privDoc, dbname);
             if (!status.isOK())
                 return status;
-            _initializeUserPrivilegesFromRolesV1(user);
+            _initializeUserPrivilegesFromRolesV1(user.get());
             user->markProbedV1(dbname);
         }
         else if (status != ErrorCodes::UserNotFound) {
@@ -728,16 +742,22 @@ namespace mongo {
         guard.endFetchPhase();
         user->incrementRefCount();
         // NOTE: It is not safe to throw an exception from here to the end of the method.
-        *acquiredUser = user;
-        auser.release();
+        *acquiredUser = user.release();
         if (guard.isSameCacheGeneration()) {
-            _userCache.insert(make_pair(userName, user));
+            unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
+            if (it != _userCache.end()) {
+                it->second->invalidate();
+                it->second = *acquiredUser;
+            }
+            else {
+                _userCache.insert(make_pair(userName, *acquiredUser));
+            }
         }
         else {
             // If the cache generation changed while this thread was in fetch mode, the data
             // associated with the user may now be invalid, so we must mark it as such.  The caller
             // may still opt to use the information for a short while, but not indefinitely.
-            user->invalidate();
+            (*acquiredUser)->invalidate();
         }
         return Status::OK();
     }
@@ -787,11 +807,6 @@ namespace mongo {
         }
     }
 
-    void AuthorizationManager::addInternalUser(User* user) {
-        CacheGuard guard(this);
-        _userCache.insert(make_pair(user->getName(), user));
-    }
-
     void AuthorizationManager::invalidateUserCache() {
         CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         _invalidateUserCache_inlock();
@@ -801,15 +816,10 @@ namespace mongo {
         ++_cacheGeneration;
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
-            if (it->second->getName() == internalSecurity.user->getName()) {
-                // Don't invalidate the internal user
-                continue;
-            }
+            fassert(0, it->second != internalSecurity.user);
             it->second->invalidate();
         }
         _userCache.clear();
-        // Make sure the internal user stays in the cache.
-        _userCache.insert(make_pair(internalSecurity.user->getName(), internalSecurity.user));
 
         // Reread the schema version before acquiring the next user.
         _version = schemaVersionInvalid;
