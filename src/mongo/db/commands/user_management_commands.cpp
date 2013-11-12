@@ -2077,6 +2077,9 @@ namespace mongo {
                                                          dbname,
                                                          &roleName,
                                                          &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
 
             if (!authzSession->isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(roleName.getDB()), ActionType::dropRole)) {
