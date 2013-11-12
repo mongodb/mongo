@@ -3,6 +3,7 @@
 //
 
 var coll = db.getCollection( "batch_write_update" );
+coll.drop();
 
 jsTest.log("Starting update tests...");
 

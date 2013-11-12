@@ -3,6 +3,7 @@
 //
 
 var coll = db.getCollection( "batch_write_delete" );
+coll.drop();
 
 jsTest.log("Starting delete tests...");
 

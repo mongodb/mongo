@@ -3,6 +3,7 @@
 //
 
 var coll = db.getCollection( "batch_write_insert" );
+coll.drop();
 
 jsTest.log("Starting insert tests...");
 
