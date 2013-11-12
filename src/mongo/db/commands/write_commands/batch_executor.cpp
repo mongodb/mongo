@@ -152,7 +152,7 @@ namespace mongo {
                 // TODO
                 // Define the final error code here.
                 // Might be used as a final error, depending on write concern success.
-                response->setErrCode( 99999 );
+                response->setErrCode( ErrorCodes::MultipleErrorsOccurred );
                 response->setErrMessage( "batch op errors occurred" );
             }
             else {

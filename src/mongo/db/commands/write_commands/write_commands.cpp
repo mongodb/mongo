@@ -97,7 +97,7 @@ namespace mongo {
             // Batch parse failure
             response.setOk( false );
             response.setN( 0 );
-            response.setErrCode( 99999 );
+            response.setErrCode( ErrorCodes::FailedToParse );
             response.setErrMessage( errMsg );
 
             dassert( response.isValid( &errMsg ) );
