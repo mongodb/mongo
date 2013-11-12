@@ -10,7 +10,8 @@
 static const u_char hex[] = "0123456789abcdef";
 
 #define	FILL_HEX(src, src_max, dest, dest_max) do {			\
-	uint32_t __s, __d;						\
+	const uint8_t *p;						\
+	size_t __s, __d;						\
 	for (p = (src), t = (dest), __s = src_max, __d = dest_max - 1;	\
 	    __s > 0 && __d > 0;						\
 	    __s-=1, __d-=2, ++p) {					\
@@ -29,7 +30,6 @@ __wt_raw_to_hex(
     WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
 {
 	size_t len;
-	const uint8_t *p;
 	u_char *t;
 
 	/*
@@ -52,7 +52,6 @@ void
 __wt_raw_to_hex_mem(
     const uint8_t *from, uint32_t size, u_char *dest, uint32_t dest_size)
 {
-	const uint8_t *p;
 	u_char *t;
 
 	/*
