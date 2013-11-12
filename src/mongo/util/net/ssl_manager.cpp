@@ -32,6 +32,7 @@
 
 #ifdef MONGO_SSL
 #include <openssl/evp.h>
+#include <openssl/x509v3.h>
 #endif
 
 namespace mongo {
@@ -134,6 +135,7 @@ namespace mongo {
                    const std::string& cafile = "",
                    const std::string& crlfile = "",
                    bool weakCertificateValidation = false,
+                   bool allowInvalidCertificates = false,
                    bool fipsMode = false) :
                 pemfile(pemfile),
                 pempwd(pempwd),
@@ -142,6 +144,7 @@ namespace mongo {
                 cafile(cafile),
                 crlfile(crlfile),
                 weakCertificateValidation(weakCertificateValidation),
+                allowInvalidCertificates(allowInvalidCertificates),
                 fipsMode(fipsMode) {};
 
             std::string pemfile;
@@ -151,6 +154,7 @@ namespace mongo {
             std::string cafile;
             std::string crlfile;
             bool weakCertificateValidation;
+            bool allowInvalidCertificates;
             bool fipsMode;
         };
 
@@ -164,7 +168,8 @@ namespace mongo {
 
             virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len);
 
-            virtual std::string validatePeerCertificate(const SSLConnection* conn);
+            virtual std::string parseAndValidatePeerCertificate(const SSLConnection* conn,
+                                                                const std::string& remoteHost);
 
             virtual void cleanupThreadLocals();
 
@@ -198,6 +203,7 @@ namespace mongo {
             std::string _password;
             bool _validateCertificates;
             bool _weakValidation;
+            bool _allowInvalidCertificates;
             std::string _serverSubjectName;
             std::string _clientSubjectName;
 
@@ -255,6 +261,11 @@ namespace mongo {
              */
             void _flushNetworkBIO(SSLConnection* conn);
 
+            /*
+             * match a remote host name to an x.509 host name
+             */
+            bool _hostNameMatch(const char* nameToMatch, const char* certHostName);
+            
             /**
              * Callbacks for SSL functions
              */
@@ -279,6 +290,7 @@ namespace mongo {
                 sslGlobalParams.sslCAFile,
                 sslGlobalParams.sslCRLFile,
                 sslGlobalParams.sslWeakCertificateValidation,
+                sslGlobalParams.sslAllowInvalidCertificates,
                 sslGlobalParams.sslFIPSMode);
             theSSLManager = new SSLManager(params, isSSLServer);
         }
@@ -354,7 +366,8 @@ namespace mongo {
 
     SSLManager::SSLManager(const Params& params, bool isServer) :
         _validateCertificates(false),
-        _weakValidation(params.weakCertificateValidation) {
+        _weakValidation(params.weakCertificateValidation),
+        _allowInvalidCertificates(params.allowInvalidCertificates) {
 
         SSL_library_init();
         SSL_load_error_strings();
@@ -753,7 +766,27 @@ namespace mongo {
         return sslConn;
     }
 
-    std::string SSLManager::validatePeerCertificate(const SSLConnection* conn) {
+    // TODO SERVER-11601 Use NFC Unicode canonicalization
+    bool SSLManager::_hostNameMatch(const char* nameToMatch, 
+                                    const char* certHostName) {
+        if (strlen(certHostName) < 2) {
+            return false;
+        }
+        
+        // match wildcard DNS names
+        if (certHostName[0] == '*' && certHostName[1] == '.') {
+            // allow name.example.com if the cert is *.example.com, '*' does not match '.'
+            char* subName = strchr(nameToMatch, '.');
+            return subName && !strcasecmp(certHostName+1, subName);
+        }
+        else {
+            return !strcasecmp(nameToMatch, certHostName);
+        }
+    }
+
+    std::string SSLManager::parseAndValidatePeerCertificate(const SSLConnection* conn, 
+                                                    const std::string& remoteHost) {
+        // only set if a CA cert has been provided
         if (!_validateCertificates) return "";
 
         X509* peerCert = SSL_get_peer_certificate(conn->ssl);
@@ -773,13 +806,69 @@ namespace mongo {
         long result = SSL_get_verify_result(conn->ssl);
 
         if (result != X509_V_OK) {
-            error() << "SSL peer certificate validation failed:" << 
-                X509_verify_cert_error_string(result) << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
+            if (_allowInvalidCertificates) {
+                warning() << "SSL peer certificate validation failed:" << 
+                    X509_verify_cert_error_string(result);
+            }
+            else {
+                error() <<  "SSL peer certificate validation failed:" << 
+                    X509_verify_cert_error_string(result);
+                throw SocketException(SocketException::CONNECT_ERROR, "");
+            }
         }
  
         // TODO: check optional cipher restriction, using cert.
-        return getCertificateSubjectName(peerCert);
+        std::string peerSubjectName = getCertificateSubjectName(peerCert);
+
+        // If this is an SSL client context (on a MongoDB server or client) 
+        // perform hostname validation of the remote server 
+        if (remoteHost.empty()) {
+            return peerSubjectName;
+        }
+       
+        int cnBegin = peerSubjectName.find("CN=") + 3;
+        int cnEnd = peerSubjectName.find(",", cnBegin);
+        std::string commonName = peerSubjectName.substr(cnBegin, cnEnd-cnBegin);
+        
+        if (_hostNameMatch(remoteHost.c_str(), commonName.c_str())) {
+            return peerSubjectName;
+        }
+
+        // If Common Name (CN) didn't match, check Subject Alternate Name (SAN)
+        stack_st_GENERAL_NAME *sanNames = static_cast<stack_st_GENERAL_NAME*>
+            (X509_get_ext_d2i(peerCert, NID_subject_alt_name, NULL, NULL));
+        
+        bool sanMatch = false;
+        if (sanNames != NULL) {
+            int sanNamesList = sk_GENERAL_NAME_num(sanNames);
+            
+            for (int i = 0; i < sanNamesList; i++) {
+                const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
+                if (currentName && currentName->type == GEN_DNS) {
+                    char *dnsName = 
+                        reinterpret_cast<char *>(ASN1_STRING_data(currentName->d.dNSName));
+                    if (_hostNameMatch(remoteHost.c_str(), dnsName)) {
+                        sanMatch = true;
+                        break;
+                    }
+                }
+            }
+        }
+        sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
+
+        if (!sanMatch) {
+            if (_allowInvalidCertificates) {
+                warning() << "The server certificate does not match the host name " << 
+                    remoteHost;
+            }
+            else {
+                error() << "The server certificate does not match the host name " <<
+                    remoteHost;
+                throw SocketException(SocketException::CONNECT_ERROR, "");
+            }
+        }
+
+        return peerSubjectName;
     }
 
     void SSLManager::cleanupThreadLocals() {

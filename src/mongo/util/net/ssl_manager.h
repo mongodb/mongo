@@ -71,7 +71,8 @@ namespace mongo {
          * Throws SocketException on failure
          * @return a std::string containing the certificate's subject name.
          */
-        virtual std::string validatePeerCertificate(const SSLConnection* conn) = 0;
+        virtual std::string parseAndValidatePeerCertificate(const SSLConnection* conn, 
+                                                    const std::string& remoteHost) = 0;
 
         /**
          * Cleans up SSL thread local memory; use at thread exit

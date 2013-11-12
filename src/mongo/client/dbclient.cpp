@@ -911,7 +911,7 @@ namespace mongo {
         int sslModeVal = sslGlobalParams.sslMode.load();
         if (sslModeVal == SSLGlobalParams::SSLMode_sendAcceptSSL ||
             sslModeVal == SSLGlobalParams::SSLMode_sslOnly) {
-            return p->secure( sslManager() );
+            return p->secure( sslManager(), _server.host() );
         }
 #endif
 

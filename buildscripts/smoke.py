@@ -461,7 +461,8 @@ def runTest(test, result):
         if use_ssl:
             argv += ["--ssl",
                      "--sslPEMKeyFile", "jstests/libs/client.pem",
-                     "--sslCAFile", "jstests/libs/ca.pem"]
+                     "--sslCAFile", "jstests/libs/ca.pem",
+                     "--sslAllowInvalidCertificates"]
         argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.

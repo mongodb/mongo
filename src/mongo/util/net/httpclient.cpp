@@ -108,7 +108,7 @@ namespace mongo {
             // pointer to global singleton instance
             SSLManagerInterface* mgr = getSSLManager();
 
-            sock.secure(mgr);
+            sock.secure(mgr, "");
 #else
             uasserted( 15862 , "no ssl support" );
 #endif

@@ -458,14 +458,14 @@ namespace mongo {
     }
 
 #ifdef MONGO_SSL
-    bool Socket::secure(SSLManagerInterface* mgr) {
+    bool Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
         fassert(16503, mgr);
         if ( _fd < 0 ) { 
             return false;
         }
         _sslManager = mgr;
         _sslConnection.reset(_sslManager->connect(this));
-        mgr->validatePeerCertificate(_sslConnection.get());
+        mgr->parseAndValidatePeerCertificate(_sslConnection.get(), remoteHost);
         return true;
     }
 
@@ -482,7 +482,7 @@ namespace mongo {
                                   remoteString());
         }
         _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
-        return _sslManager->validatePeerCertificate(_sslConnection.get());
+        return _sslManager->parseAndValidatePeerCertificate(_sslConnection.get(), "");
     }
 #endif
 

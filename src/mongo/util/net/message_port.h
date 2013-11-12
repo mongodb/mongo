@@ -125,9 +125,11 @@ namespace mongo {
          * Initiates the TLS/SSL handshake on this MessagingPort.
          * When this function returns, further communication on this
          * MessagingPort will be encrypted.
+         * ssl - Pointer to the global SSLManager.
+         * remoteHost - The hostname of the remote server.
          */
-        bool secure( SSLManagerInterface* ssl ) {
-            return psock->secure( ssl );
+        bool secure( SSLManagerInterface* ssl, const std::string& remoteHost ) {
+            return psock->secure( ssl, remoteHost );
         }
 #endif
 

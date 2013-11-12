@@ -422,6 +422,7 @@ MongoRunner.mongoOptions = function( opts ){
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
         opts.sslWeakCertificateValidation = "";
+        opts.sslAllowInvalidCertificates = "";
     }
 
     if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
@@ -486,6 +487,7 @@ MongoRunner.mongodOptions = function( opts ){
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
         opts.sslWeakCertificateValidation = "";
+        opts.sslAllowInvalidCertificates = "";
     }
 
     if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
@@ -720,6 +722,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
         if (!options["sslPEMKeyFile"]) options["sslPEMKeyFile"] = "jstests/libs/server.pem";
         if (!options["sslCAFile"]) options["sslCAFile"] = "jstests/libs/ca.pem";
         options["sslWeakCertificateValidation"] = "";
+        options["sslAllowInvalidCertificates"] = "";
     }
 
     if ( jsTestOptions().useX509 && !options["clusterAuthMode"] ) {

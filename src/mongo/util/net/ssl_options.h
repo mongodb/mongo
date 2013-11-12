@@ -38,6 +38,7 @@ namespace mongo {
         std::string sslCRLFile;     // --sslCRLFile
         bool sslWeakCertificateValidation; // --sslWeakCertificateValidation
         bool sslFIPSMode; // --sslFIPSMode
+        bool sslAllowInvalidCertificates; // --sslIgnoreCertificateValidation
 
         SSLGlobalParams() {
             sslMode.store(SSLMode_noSSL);

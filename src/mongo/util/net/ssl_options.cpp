@@ -53,9 +53,11 @@ namespace mongo {
         options->addOptionChaining("ssl.weakCertificateValidation", "sslWeakCertificateValidation",
                 moe::Switch, "allow client to connect without presenting a certificate");
 
+        options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
+                    moe::Switch, "allow connections to servers with invalid certificates");
+
         options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
                 "activate FIPS 140-2 mode at startup");
-
 
         return Status::OK();
     }
@@ -75,9 +77,11 @@ namespace mongo {
         options->addOptionChaining("ssl.CRLFile", "sslCRLFile", moe::String,
                 "Certificate Revocation List file for SSL");
 
+        options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
+                    moe::Switch, "allow connections to servers with invalid certificates");
+ 
         options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
                 "activate FIPS 140-2 mode at startup");
-
 
         return Status::OK();
     }
@@ -135,6 +139,9 @@ namespace mongo {
         if (params.count("ssl.weakCertificateValidation")) {
             sslGlobalParams.sslWeakCertificateValidation = true;
         }
+        if (params.count("ssl.allowInvalidCertificates")) {
+            sslGlobalParams.sslAllowInvalidCertificates = true;
+        }
         if (params.count("ssl.sslOnNormalPorts")) {
             if (params.count("ssl.mode")) {
                     return Status(ErrorCodes::BadValue, 
@@ -161,6 +168,10 @@ namespace mongo {
             }
             if (params.count("ssl.FIPSMode")) {
                 sslGlobalParams.sslFIPSMode = true;
+            }
+            if (sslGlobalParams.sslCAFile.empty()) {
+                warning() << "No SSL certificate validation can be performed since no CA file "
+                             "has been provided; please specify an sslCAFile parameter";
             }
         }
         else if (sslGlobalParams.sslPEMKeyFile.size() ||
@@ -207,6 +218,9 @@ namespace mongo {
         }
         if (params.count("ssl.CRLFile")) {
             sslGlobalParams.sslCRLFile = params["ssl.CRLFile"].as<std::string>();
+        }
+        if (params.count("ssl.allowInvalidCertificates")) {
+            sslGlobalParams.sslAllowInvalidCertificates = true;
         }
         if (params.count("ssl.FIPSMode")) {
             sslGlobalParams.sslFIPSMode = true;
