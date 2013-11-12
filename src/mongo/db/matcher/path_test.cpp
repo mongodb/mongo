@@ -216,10 +216,12 @@ namespace mongo {
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 4, e.element().numberInt() );
+        ASSERT( !e.outerArray() );
 
         ASSERT( cursor.more() );
         e = cursor.next();
         ASSERT_EQUALS( BSON( "1" << 4 ), e.element().Obj() );
+        ASSERT( e.outerArray() );
 
         ASSERT( !cursor.more() );
     }

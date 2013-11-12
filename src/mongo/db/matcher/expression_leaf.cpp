@@ -331,11 +331,26 @@ namespace mongo {
         MatchableDocument::IteratorHolder cursor( doc, &_elementPath );
         while ( cursor->more() ) {
             ElementIterator::Context e = cursor->next();
-            if ( e.outerArray() )
-                continue;
 
-            if ( !matchesSingleElement( e.element() ) )
+            // In the case where _elementPath is referring to an array,
+            // $type should match elements of that array only.
+            // outerArray() helps to identify elements of the array
+            // and the containing array itself.
+            // This matters when we are looking for {$type: Array}.
+            // Example (_elementPath refers to field 'a' and _type is Array):
+            // a : [        // outer array. should not match
+            //     123,     // inner array
+            //     [ 456 ], // inner array. should match
+            //     ...
+            // ]
+            if ( _type == mongo::Array && e.outerArray() ) {
                 continue;
+            }
+
+            if ( !matchesSingleElement( e.element() ) ) {
+                continue;
+            }
+
             if ( details && details->needRecord() && !e.arrayOffset().eoo() ) {
                 details->setElemMatchKey( e.arrayOffset().fieldName() );
             }

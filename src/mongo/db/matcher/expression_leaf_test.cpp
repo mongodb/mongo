@@ -32,6 +32,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
@@ -1218,6 +1219,41 @@ namespace mongo {
         ASSERT( !type.matchesBSON( BSON( "a" << BSON_ARRAY( 4 << "a" ) ), NULL ) );
         ASSERT( type.matchesBSON( BSON( "a" << BSON_ARRAY( BSONArray() << 2 ) ), NULL ) );
         ASSERT( !type.matchesBSON( BSON( "a" << "bar" ), NULL ) );
+    }
+
+    TEST( TypeMatchExpression, MatchesObject ) {
+        TypeMatchExpression type;
+        ASSERT( type.init( "a", Object ).isOK() );
+        ASSERT( type.matchesBSON( BSON( "a" << BSON( "b" << 1 ) ), NULL ) );
+        ASSERT( !type.matchesBSON( BSON( "a" << 1 ), NULL ) );
+    }
+
+    TEST( TypeMatchExpression, MatchesDotNotationFieldObject ) {
+        TypeMatchExpression type;
+        ASSERT( type.init( "a.b", Object ).isOK() );
+        ASSERT( type.matchesBSON( BSON( "a" << BSON( "b" << BSON( "c" << 1 ) ) ), NULL ) );
+        ASSERT( !type.matchesBSON( BSON( "a" << BSON( "b" << 1 ) ), NULL ) );
+    }
+
+    TEST( TypeMatchExpression, MatchesDotNotationArrayElementArray ) {
+        TypeMatchExpression type;
+        ASSERT( type.init( "a.0", Array ).isOK() );
+        ASSERT( type.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 1 ) ) ), NULL ) );
+        ASSERT( !type.matchesBSON( BSON( "a" << BSON_ARRAY( "b" ) ), NULL ) );
+    }
+
+    TEST( TypeMatchExpression, MatchesDotNotationArrayElementScalar ) {
+        TypeMatchExpression type;
+        ASSERT( type.init( "a.0", String ).isOK() );
+        ASSERT( type.matchesBSON( BSON( "a" << BSON_ARRAY( "b" ) ), NULL ) );
+        ASSERT( !type.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) ), NULL ) );
+    }
+
+    TEST( TypeMatchExpression, MatchesDotNotationArrayElementObject ) {
+        TypeMatchExpression type;
+        ASSERT( type.init( "a.0", Object ).isOK() );
+        ASSERT( type.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 1 ) ) ), NULL ) );
+        ASSERT( !type.matchesBSON( BSON( "a" << BSON_ARRAY( 1 ) ), NULL ) );
     }
 
     TEST( TypeMatchExpression, MatchesNull ) {
