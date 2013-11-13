@@ -196,9 +196,10 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * the page is being reconciled, lock the page down.
 		 */
 		WT_PAGE_LOCK(session, page);
-		WT_RET(bm->compact_page_skip(bm,
+		ret = bm->compact_page_skip(bm,
 		    session, mod->u.replace.addr, mod->u.replace.size, &skip));
 		WT_PAGE_UNLOCK(session, page);
+		WT_RET(ret):
 		if (skip)
 			return (0);
 	}
