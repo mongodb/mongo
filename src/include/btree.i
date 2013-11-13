@@ -466,9 +466,6 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * If on-page, the pointer references a cell.
 	 *
 	 * The type is of a limited set: internal, leaf or no-overflow leaf.
-	 *
-	 * In short, there's no error checking and you can get into real trouble
-	 * if you don't know what you're expecting to get back.
 	 */
 	if (addr == NULL) {
 		*addrp = NULL;
