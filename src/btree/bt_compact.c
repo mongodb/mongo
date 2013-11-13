@@ -117,8 +117,8 @@ __wt_compact_page_skip(
 	bm = S2BT(session)->bm;
 
 	/*
-	 * We aren't holding a hazard reference, so we can't look at the page
-	 * itself, all we can look at the WT_REF information.  If there's no
+	 * We aren't holding a hazard pointer, so we can't look at the page
+	 * itself, all we can look at is the WT_REF information.  If there's no
 	 * address, the page isn't on disk, but we have to read internal pages
 	 * to walk the tree regardless; throw up our hands and read it.
 	 */
