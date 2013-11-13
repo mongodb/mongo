@@ -23,6 +23,8 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -49,20 +51,22 @@ namespace QueryStageSortTests {
             _client.insert(ns(), obj);
         }
 
-        void getLocs(set<DiskLoc>* locs) {
-            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns());
-                 c->ok(); c->advance()) {
-
-                locs->insert(c->currLoc());
+        void getLocs(set<DiskLoc>* out, Collection* coll) {
+            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+                                                       CollectionScanParams::FORWARD);
+            while (!it->isEOF()) {
+                DiskLoc nextLoc = it->getNext();
+                out->insert(nextLoc);
             }
+            delete it;
         }
 
         /**
          * We feed a mix of (key, unowned, owned) data to the sort stage.
          */
-        void insertVarietyOfObjects(MockStage* ms) {
+        void insertVarietyOfObjects(MockStage* ms, Collection* coll) {
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
 
             set<DiskLoc>::iterator it = locs.begin();
 
@@ -90,12 +94,12 @@ namespace QueryStageSortTests {
          * If extAllowed is true, sorting will use use external sorting if available.
          * If limit is not zero, we limit the output of the sort stage to 'limit' results.
          */
-        void sortAndCheck(int direction) {
+        void sortAndCheck(int direction, Collection* coll) {
             WorkingSet* ws = new WorkingSet();
             MockStage* ms = new MockStage(ws);
 
             // Insert a mix of the various types of data.
-            insertVarietyOfObjects(ms);
+            insertVarietyOfObjects(ms, coll);
 
             SortStageParams params;
             params.pattern = BSON("foo" << direction);
@@ -141,8 +145,14 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
             fillData();
-            sortAndCheck(1);
+            sortAndCheck(1, coll);
         }
     };
 
@@ -153,8 +163,14 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
             fillData();
-            sortAndCheck(-1);
+            sortAndCheck(-1, coll);
         }
     };
 
@@ -165,8 +181,14 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
             fillData();
-            sortAndCheck(-1);
+            sortAndCheck(-1, coll);
         }
     };
 
@@ -177,16 +199,21 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             fillData();
 
             // The data we're going to later invalidate.
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
 
             // Build the mock stage which feeds the data.
             WorkingSet ws;
             auto_ptr<MockStage> ms(new MockStage(&ws));
-            insertVarietyOfObjects(ms.get());
+            insertVarietyOfObjects(ms.get(), coll);
 
             SortStageParams params;
             params.pattern = BSON("foo" << 1);
