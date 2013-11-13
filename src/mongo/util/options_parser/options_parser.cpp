@@ -46,7 +46,7 @@ namespace optionenvironment {
         //
         // These conversions are different depending on the data source because our current
         // implementation uses boost::program_options for the command line and INI files and the
-        // mongo JSON parser for JSON config files.  Our destination storage in both cases is an
+        // yaml-cpp YAML parser for YAML config files.  Our destination storage in both cases is an
         // Environment which stores Value objects.
         //
         // 1. YAML Config Files
@@ -121,7 +121,7 @@ namespace optionenvironment {
             // Get expected type
             for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
                 iterator != options_vector.end(); iterator++) {
-                if (key == iterator->_dottedName && (iterator->_sources & SourceJSONConfig)) {
+                if (key == iterator->_dottedName && (iterator->_sources & SourceYAMLConfig)) {
                     isRegistered = true;
                     type = iterator->_type;
                 }
@@ -280,77 +280,6 @@ namespace optionenvironment {
             return Status::OK();
         }
 
-        // Check if the given key is registered in our OptionDescription.  This is needed for JSON
-        // Config File handling since the JSON parser just reads in whatever fields and values it
-        // sees without taking a description of what to look for.
-        Status isRegistered(const std::vector<OptionDescription>& options_vector, const Key& key) {
-
-            for(std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
-                iterator != options_vector.end(); iterator++) {
-                if (key == iterator->_dottedName && (iterator->_sources & SourceJSONConfig)) {
-                    return Status::OK();
-                }
-            }
-            StringBuilder sb;
-            sb << "Unrecognized option: " << key;
-            return Status(ErrorCodes::BadValue, sb.str());
-        }
-
-        // Convert a BSONElement to a Value.  See comments at the beginning of this section.
-        Status BSONElementToValue(const BSONElement& element, Value* value) {
-
-            std::vector<BSONElement> elements;
-            std::vector<std::string> valueStrings;
-            try {
-                switch (element.type()) {
-                    case ::mongo::NumberInt:
-                        *value = Value(element.Int());
-                        return Status::OK();
-                    case ::mongo::NumberDouble:
-                        *value = Value(element.Double());
-                        return Status::OK();
-                    case ::mongo::NumberLong:
-                        // FIXME: Figure out how to stop this, or detect overflow
-                        *value = Value(static_cast<unsigned long long>(element.Long()));
-                        return Status::OK();
-                    case ::mongo::String:
-                        *value = Value(element.String());
-                        return Status::OK();
-                    case ::mongo::Array:
-                        elements = element.Array();
-                        for(std::vector<BSONElement>::const_iterator iterator = elements.begin();
-                            iterator != elements.end(); iterator++) {
-                            if (iterator->type() == ::mongo::String) {
-                                valueStrings.push_back(iterator->String());
-                            }
-                            else {
-                                StringBuilder sb;
-                                sb << "Arrays can only contain strings in JSON Config File";
-                                return Status(ErrorCodes::BadValue, sb.str());
-                            }
-                        }
-                        *value = Value(valueStrings);
-                        return Status::OK();
-                    case ::mongo::Bool:
-                        *value = Value(element.Bool());
-                        return Status::OK();
-                    case ::mongo::EOO:
-                        return Status(ErrorCodes::InternalError,
-                                    "Error converting BSONElement to value; BSONElement empty");
-                    default:
-                        StringBuilder sb;
-                        sb << "Conversion from BSONElement type: " <<
-                            element.type() << " not supported.";
-                        return Status(ErrorCodes::TypeMismatch, sb.str());
-                }
-            }
-            catch ( std::exception &e ) {
-                StringBuilder sb;
-                sb << "Exception thrown by BSON conversion: " << e.what();
-                return Status(ErrorCodes::InternalError, sb.str());
-            }
-        }
-
         // Add all the values in the given YAML Node to our environment.  See comments at the
         // beginning of this section.
         Status addYAMLNodesToEnvironment(const YAML::Node& root,
@@ -427,140 +356,6 @@ namespace optionenvironment {
             return Status::OK();
         }
 
-        // Add all the values in the given BSONObj to our environment.  See comments at the
-        // beginning of this section.
-        Status addBSONElementsToEnvironment(const BSONObj& obj,
-                                             const OptionSection& options,
-                                             const std::string parentPath,
-                                             Environment* environment) {
-
-            std::vector<OptionDescription> options_vector;
-            Status ret = options.getAllOptions(&options_vector);
-            if (!ret.isOK()) {
-                return ret;
-            }
-
-            BSONObjIterator iterator(obj);
-            while (iterator.more()) {
-                BSONElement elem = iterator.next();
-                string fieldName= elem.fieldName();
-
-                // The following code should allow the following comment styles:
-                // { "option" : { "value" : <value>, "comment" : "comment string" } }
-                // { "option" : <value>, "comment" : "comment string" }
-
-                // Ignore fields with a name of "comment"
-                if (fieldName == "comment") {
-                    continue;
-                }
-
-                std::string dottedName;
-                if (parentPath.empty()) {
-                    // We are at the top level, so the full specifier is just the current field name
-                    dottedName = fieldName;
-                }
-                else {
-                    // If our field name is "value", assume this contains the value for the parent
-                    if (fieldName == "value") {
-                        dottedName = parentPath;
-                    }
-                    // If this is not a special field name, and we are in a sub object, append our
-                    // current fieldName to the selector for the sub object we are traversing
-                    else {
-                        dottedName = parentPath + '.' + fieldName;
-                    }
-                }
-
-                if (elem.type() == ::mongo::Object) {
-                    addBSONElementsToEnvironment( elem.Obj(), options, dottedName, environment );
-                }
-                else {
-                    Value optionValue;
-                    Status ret = BSONElementToValue(elem, &optionValue);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-
-                    ret = isRegistered(options_vector, dottedName);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-
-                    Value dummyVal;
-                    if (environment->get(dottedName, &dummyVal).isOK()) {
-                        StringBuilder sb;
-                        sb << "Error parsing JSON config: duplcate key: " << dottedName;
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-
-                    ret = environment->set(dottedName, optionValue);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-                }
-            }
-
-            return Status::OK();
-        }
-
-        // Iterate through our options and add type constraints to our environment based on what
-        // types the options were registered with.  This is needed for the JSON config file
-        // handling, since the JSON parser just reads the types without checking them.  Currently,
-        // the boost parsers check the types for us.
-        Status addTypeConstraints(const OptionSection& options, Environment* environment) {
-
-            std::vector<OptionDescription> options_vector;
-            Status ret = options.getAllOptions(&options_vector);
-            if (!ret.isOK()) {
-                return ret;
-            }
-
-            for(std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
-                iterator != options_vector.end(); iterator++) {
-                switch (iterator->_type) {
-                case StringVector:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<std::vector<std::string> >(iterator->_dottedName));
-                    break;
-                case Bool:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<bool>(iterator->_dottedName));
-                    break;
-                case Double:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<double>(iterator->_dottedName));
-                    break;
-                case Int:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<int>(iterator->_dottedName));
-                    break;
-                case Long:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<long>(iterator->_dottedName));
-                    break;
-                case String:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<std::string>(iterator->_dottedName));
-                    break;
-                case UnsignedLongLong:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<unsigned long long>(iterator->_dottedName));
-                    break;
-                case Unsigned:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<unsigned>(iterator->_dottedName));
-                    break;
-                case Switch:
-                    environment->addKeyConstraint(
-                           new TypeKeyConstraint<bool>(iterator->_dottedName));
-                    break;
-                default: /* XXX: should not get here */
-                    return Status(ErrorCodes::InternalError, "Unrecognized option type");
-                }
-            }
-            return Status::OK();
-        }
-
         /**
         * For all options that we registered as composable, combine the values from source and dest
         * and set the result in dest.  Note that this only works for options that are registered as
@@ -620,6 +415,7 @@ namespace optionenvironment {
         */
         Status addConstraints(const OptionSection& options, Environment* dest) {
             std::vector<boost::shared_ptr<Constraint> > constraints_vector;
+
             Status ret = options.getConstraints(&constraints_vector);
             if (!ret.isOK()) {
                 return ret;
@@ -801,37 +597,6 @@ namespace {
 } // namespace
 
     /**
-     * This function delegates the JSON config parsing to the MongoDB JSON parser.
-     *
-     * 1. Parse JSON
-     * 2. Add all elements from the resulting BSONObj to the Environment
-     *
-     * This function checks for duplicates and unregistered options, but the caller is responsible
-     * for checking that the options are the correct types
-     *
-     * Also note that the size of our JSON config file is limited in size.  The equivalent BSON
-     * object can only be 16MB.  We catch the exception that is thrown in this case and return an
-     * error Status from this function
-     */
-    Status OptionsParser::parseJSONConfigFile(const OptionSection& options,
-                                              const std::string& config,
-                                              Environment* environment) {
-        BSONObj BSONConfig;
-        try {
-            BSONConfig = fromjson(config);
-            Status ret = addBSONElementsToEnvironment(BSONConfig, options, "", environment);
-            if (!ret.isOK()) {
-                return ret;
-            }
-        } catch ( MsgAssertionException& e ) {
-            StringBuilder sb;
-            sb << "Error parsing JSON config file: " << e.what();
-            return Status(ErrorCodes::BadValue, sb.str());
-        }
-        return Status::OK();
-    }
-
-    /**
      * Add default values from the given OptionSection to the given Environment
      */
     Status OptionsParser::addDefaultValues(const OptionSection& options,
@@ -856,8 +621,10 @@ namespace {
     }
 
     /**
-     * Reads the entire config file into the output string.  This is done this way because the JSON
-     * parser only takes complete strings
+     * Reads the entire config file into the output string.  This was done this way because the JSON
+     * parser only takes complete strings, and we were using that to parse the config file before.
+     * We could redesign the parser to use some kind of streaming interface, but for now this is
+     * simple and works for the current use case of config files which should be limited in size.
      */
     Status OptionsParser::readConfigFile(const std::string& filename, std::string* contents) {
 
@@ -919,25 +686,6 @@ namespace {
         return Status::OK();
     }
 
-    bool OptionsParser::isJSONConfig(const std::string& config) {
-        for (std::string::const_iterator curChar = config.begin();
-             curChar < config.end(); curChar++) {
-            if (isspace(*curChar)) {
-                // Skip whitespace
-            }
-            else if (*curChar == '{') {
-                // If first non whitespace character is '{', then this is a JSON config file
-                return true;
-            }
-            else {
-                // Otherwise, this is a legacy INI config file
-                return false;
-            }
-        }
-        // Treat the empty config file as INI
-        return false;
-    }
-
     /**
      * Run the OptionsParser
      *
@@ -946,7 +694,7 @@ namespace {
      * 1. Parse argc and argv using the given OptionSection as a description of expected options
      * 2. Check for a "config" argument
      * 3. If "config" found, read config file
-     * 4. Detect config file type (JSON or INI)
+     * 4. Detect config file type (YAML or INI)
      * 5. Parse config file using the given OptionSection as a description of expected options
      * 6. Add the results to the output Environment in the proper order to ensure correct precedence
      */

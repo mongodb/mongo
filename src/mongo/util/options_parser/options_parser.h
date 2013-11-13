@@ -28,7 +28,7 @@ namespace optionenvironment {
     class OptionSection;
     class Value;
 
-    /** Handles parsing of the command line as well as JSON and INI config files.  Takes an
+    /** Handles parsing of the command line as well as YAML and INI config files.  Takes an
      *  OptionSection instance that describes the allowed options, parses argv (env not yet
      *  supported), and populates an Environment with the results.
      *
@@ -75,7 +75,7 @@ namespace optionenvironment {
         OptionsParser() { }
         virtual ~OptionsParser() { }
 
-        /** Handles parsing of the command line as well as JSON and INI config files.  The
+        /** Handles parsing of the command line as well as YAML and INI config files.  The
          *  OptionSection be a description of the allowed options.  This function populates the
          *  given Environment with the results of parsing the command line and or config files but
          *  does not call validate on the Environment.
@@ -98,14 +98,8 @@ namespace optionenvironment {
         /** Handles parsing of an INI config string and adds the results to the given Environment */
         Status parseINIConfigFile(const OptionSection&, const std::string& config, Environment*);
 
-        /** Handles parsing of a JSON config string and adds the results to the given Environment */
-        Status parseJSONConfigFile(const OptionSection&, const std::string& config, Environment*);
-
         /** Gets defaults from the OptionSection and adds them to the given Environment */
         Status addDefaultValues(const OptionSection&, Environment*);
-
-        /** Detects whether the given string represents a JSON config file or an INI config file */
-        bool isJSONConfig(const std::string& config);
 
         /** Reads the given config file into the output string.  This function is virtual for
          *  testing purposes only. */

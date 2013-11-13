@@ -46,10 +46,10 @@ namespace optionenvironment {
     enum OptionSources {
         SourceCommandLine = 1,
         SourceINIConfig = 2,
-        SourceJSONConfig = 4,
-        SourceAllConfig = SourceINIConfig | SourceJSONConfig,
+        SourceYAMLConfig = 4,
+        SourceAllConfig = SourceINIConfig | SourceYAMLConfig,
         SourceAllLegacy = SourceINIConfig | SourceCommandLine,
-        SourceAll = SourceCommandLine | SourceINIConfig | SourceJSONConfig
+        SourceAll = SourceCommandLine | SourceINIConfig | SourceYAMLConfig
     };
 
     /**

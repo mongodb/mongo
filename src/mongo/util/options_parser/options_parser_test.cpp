@@ -2128,7 +2128,7 @@ namespace {
 
     }
 
-    TEST(OptionSources, SourceJSONConfig) {
+    TEST(OptionSources, SourceYAMLConfig) {
         OptionsParserTester parser;
         moe::Environment environment;
         moe::Value value;
@@ -2139,7 +2139,7 @@ namespace {
         moe::OptionSection testOpts;
         testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
         testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
-                                  .setSources(moe::SourceJSONConfig);
+                                  .setSources(moe::SourceYAMLConfig);
 
         argv.clear();
         argv.push_back("binaryname");
