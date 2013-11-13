@@ -51,6 +51,8 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
+        virtual void redactForLogging(mutablebson::Document* cmdObj);
+
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const string& dbname,
                  BSONObj& cmdObj,

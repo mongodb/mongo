@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/audit.h"
@@ -118,6 +119,20 @@ namespace mongo {
         SimpleMutex _randMutex;  // Synchronizes accesses to _random.
         boost::scoped_ptr<SecureRandom> _random;
     } cmdGetNonce;
+
+    void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {
+        namespace mmb = mutablebson;
+        static const int numRedactedFields = 2;
+        static const char* redactedFields[numRedactedFields] = { "key", "nonce" };
+        for (int i = 0; i < numRedactedFields; ++i) {
+            for (mmb::Element element = mmb::findFirstChildNamed(cmdObj->root(), redactedFields[i]);
+                 element.ok();
+                 element = mmb::findElementNamed(element.rightSibling(), redactedFields[i])) {
+
+                element.setValueString("xxx");
+            }
+        }
+    }
 
     bool CmdAuthenticate::run(const string& dbname,
                               BSONObj& cmdObj,
