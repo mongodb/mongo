@@ -251,7 +251,7 @@ namespace mongo {
     AuthorizationManager::~AuthorizationManager() {
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
-            fassert(0, it->second != internalSecurity.user);
+            fassert(17265, it->second != internalSecurity.user);
             delete it->second ;
         }
     }
@@ -816,7 +816,7 @@ namespace mongo {
         ++_cacheGeneration;
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
-            fassert(0, it->second != internalSecurity.user);
+            fassert(17266, it->second != internalSecurity.user);
             it->second->invalidate();
         }
         _userCache.clear();
