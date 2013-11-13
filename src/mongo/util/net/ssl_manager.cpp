@@ -835,7 +835,7 @@ namespace mongo {
         }
 
         // If Common Name (CN) didn't match, check Subject Alternate Name (SAN)
-        stack_st_GENERAL_NAME *sanNames = static_cast<stack_st_GENERAL_NAME*>
+        STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>
             (X509_get_ext_d2i(peerCert, NID_subject_alt_name, NULL, NULL));
         
         bool sanMatch = false;

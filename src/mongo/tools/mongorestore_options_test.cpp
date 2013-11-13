@@ -546,6 +546,18 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
+            else if (iterator->_dottedName == "ssl.allowInvalidCertificates") {
+                ASSERT_EQUALS(iterator->_singleName, "sslAllowInvalidCertificates");
+                ASSERT_EQUALS(iterator->_type, moe::Switch);
+                ASSERT_EQUALS(iterator->_description, "allow connections to servers with invalid certificates");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
             else if (iterator->_dottedName == "ssl.FIPSMode") {
                 ASSERT_EQUALS(iterator->_singleName, "sslFIPSMode");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
