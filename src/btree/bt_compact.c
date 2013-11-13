@@ -154,6 +154,7 @@ int
 __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BM *bm;
+	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	uint32_t addr_size;
 	int skip;
@@ -197,9 +198,9 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		WT_PAGE_LOCK(session, page);
 		ret = bm->compact_page_skip(bm,
-		    session, mod->u.replace.addr, mod->u.replace.size, &skip));
+		    session, mod->u.replace.addr, mod->u.replace.size, &skip);
 		WT_PAGE_UNLOCK(session, page);
-		WT_RET(ret):
+		WT_RET(ret);
 		if (skip)
 			return (0);
 	}
