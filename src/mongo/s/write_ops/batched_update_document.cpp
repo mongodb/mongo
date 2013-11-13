@@ -180,8 +180,12 @@ namespace mongo {
     }
 
     bool BatchedUpdateDocument::getMulti() const {
-        dassert(_isMultiSet);
-        return _multi;
+        if (_isMultiSet) {
+            return _multi;
+        }
+        else {
+            return multi.getDefault();
+        }
     }
 
     void BatchedUpdateDocument::setUpsert(bool upsert) {
@@ -198,8 +202,12 @@ namespace mongo {
     }
 
     bool BatchedUpdateDocument::getUpsert() const {
-        dassert(_isUpsertSet);
-        return _upsert;
+        if (_isUpsertSet) {
+            return _upsert;
+        }
+        else {
+            return upsert.getDefault();
+        }
     }
 
 } // namespace mongo

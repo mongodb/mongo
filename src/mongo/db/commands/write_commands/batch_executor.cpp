@@ -470,8 +470,8 @@ namespace mongo {
 
         BSONObj queryObj = updateOp.getQuery();
         BSONObj updateObj = updateOp.getUpdateExpr();
-        bool multi = updateOp.isMultiSet() ? updateOp.getMulti() : false;
-        bool upsert = updateOp.isUpsertSet() ? updateOp.getUpsert() : false;
+        bool multi = updateOp.getMulti();
+        bool upsert = updateOp.getUpsert();
 
         currentOp->setQuery( queryObj );
         opDebug.op = dbUpdate;
