@@ -97,15 +97,6 @@ namespace {
                           BSONObj()));
     }
 
-    Status AuthzManagerExternalStateMock::getStoredAuthorizationVersion(int* outVersion) {
-        Status status = AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(outVersion);
-        if (status.isOK() && outVersion < 0) {
-            status = Status(ErrorCodes::UnknownError,
-                            "Mock configured to fail getStoredAuthorizationVersion()");
-        }
-        return status;
-    }
-
     Status AuthzManagerExternalStateMock::_getUserDocument(const UserName& userName,
                                                            BSONObj* userDoc) {
         int authzVersion;
