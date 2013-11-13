@@ -259,10 +259,9 @@ namespace mongo {
         Status recomputePrivilegeData();
 
     private:
-        // Helper method for recursively doing a topological DFS to compute the indirect privilege
+        // Helper method doing a topological DFS to compute the indirect privilege
         // data and look for cycles
         Status _recomputePrivilegeDataHelper(const RoleName& currentRole,
-                                             std::vector<RoleName>& inProgressRoles,
                                              unordered_set<RoleName>& visitedRoles);
 
         /**

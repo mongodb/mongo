@@ -431,104 +431,120 @@ namespace {
          * number of nodes and "m" is the number of prerequisite edges.  Space complexity is O(n),
          * in both stack space and size of the "visitedRoles" set.
          *
-         * "inProgressRoles" is used to detect and report cycles.
+         * "inProgressRoles" is used to detect and report cycles, as well as to keep track of roles
+         * we started visiting before realizing they had children that needed visiting first, so
+         * we can get back to them after visiting their children.
          */
 
-        std::vector<RoleName> inProgressRoles;
         unordered_set<RoleName> visitedRoles;
-
         for (EdgeSet::const_iterator it = _roleToSubordinates.begin();
                 it != _roleToSubordinates.end(); ++it) {
-            Status status = _recomputePrivilegeDataHelper(it->first, inProgressRoles, visitedRoles);
-            if (status != Status::OK()) {
+            Status status = _recomputePrivilegeDataHelper(it->first, visitedRoles);
+            if (!status.isOK()) {
                 return status;
             }
         }
-
         return Status::OK();
     }
 
-    /*
-     * Recursive helper method for performing the depth-first traversal of the roles graph.  Called
-     * once for every node in the graph by recomputePrivilegeData(), above.
-     */
-    Status RoleGraph::_recomputePrivilegeDataHelper(const RoleName& currentRole,
-                                                    std::vector<RoleName>& inProgressRoles,
+    Status RoleGraph::_recomputePrivilegeDataHelper(const RoleName& startingRole,
                                                     unordered_set<RoleName>& visitedRoles) {
-
-        if (visitedRoles.count(currentRole)) {
+        if (visitedRoles.count(startingRole)) {
             return Status::OK();
         }
 
-        if (!roleExists(currentRole)) {
-            return Status(ErrorCodes::RoleNotFound,
-                          mongoutils::str::stream() << "Role: " << currentRole.getFullName() <<
-                                " does not exist",
-                          0);
-        }
+        std::vector<RoleName> inProgressRoles;
+        inProgressRoles.push_back(startingRole);
+        while (inProgressRoles.size()) {
+            const RoleName currentRole = inProgressRoles.back();
+            fassert(17277, !visitedRoles.count(currentRole));
 
-        // Check for cycles
-        std::vector<RoleName>::iterator firstOccurence = std::find(
-                inProgressRoles.begin(), inProgressRoles.end(), currentRole);
-        if (firstOccurence != inProgressRoles.end()) {
-            std::ostringstream os;
-            os << "Cycle in dependency graph: ";
-            for (std::vector<RoleName>::iterator it = firstOccurence;
-                    it != inProgressRoles.end(); ++it) {
-                os << it->getFullName() << " -> ";
-            }
-            os << currentRole.getFullName();
-            return Status(ErrorCodes::GraphContainsCycle, os.str());
-        }
-
-        inProgressRoles.push_back(currentRole);
-
-        // Need to clear out the "all privileges" vector for the current role, and re-fill it with
-        // just the direct privileges for this role.
-        PrivilegeVector& currentRoleAllPrivileges = _allPrivilegesForRole[currentRole];
-        currentRoleAllPrivileges = _directPrivilegesForRole[currentRole];
-
-        // Need to do the same thing for the indirect roles
-        unordered_set<RoleName>& currentRoleIndirectRoles =
-                _roleToIndirectSubordinates[currentRole];
-        currentRoleIndirectRoles.clear();
-        const std::vector<RoleName>& currentRoleDirectRoles = _roleToSubordinates[currentRole];
-        for (std::vector<RoleName>::const_iterator it = currentRoleDirectRoles.begin();
-                it != currentRoleDirectRoles.end(); ++it) {
-            currentRoleIndirectRoles.insert(*it);
-        }
-
-        // Recursively add children's privileges to current role's "all privileges" vector, and
-        // children's roles to current roles's "indirect roles" vector.
-        for (std::vector<RoleName>::const_iterator roleIt = currentRoleDirectRoles.begin();
-                roleIt != currentRoleDirectRoles.end(); ++roleIt) {
-            const RoleName& childRole = *roleIt;
-            Status status = _recomputePrivilegeDataHelper(childRole, inProgressRoles, visitedRoles);
-            if (status != Status::OK()) {
-                return status;
+            if (!roleExists(currentRole)) {
+                return Status(ErrorCodes::RoleNotFound,
+                              mongoutils::str::stream() << "Role: " << currentRole.getFullName() <<
+                                    " does not exist",
+                              0);
             }
 
-            // At this point, we know that the "all privilege" set for the child is correct, so
-            // add those privileges to our "all privilege" set.
-            const PrivilegeVector& childsPrivileges = _allPrivilegesForRole[childRole];
-            for (PrivilegeVector::const_iterator privIt = childsPrivileges.begin();
-                    privIt != childsPrivileges.end(); ++privIt) {
-                Privilege::addPrivilegeToPrivilegeVector(&currentRoleAllPrivileges, *privIt);
+            // Check for cycles
+            {
+                const std::vector<RoleName>::const_iterator begin = inProgressRoles.begin();
+                // The currentRole will always be last so don't look there.
+                const std::vector<RoleName>::const_iterator end = --inProgressRoles.end();
+                const std::vector<RoleName>::const_iterator firstOccurence =
+                        std::find(begin, end, currentRole);
+                if (firstOccurence != end) {
+                    std::ostringstream os;
+                    os << "Cycle in dependency graph: ";
+                    for (std::vector<RoleName>::const_iterator it = firstOccurence;
+                            it != end; ++it) {
+                        os << it->getFullName() << " -> ";
+                    }
+                    os << currentRole.getFullName();
+                    return Status(ErrorCodes::GraphContainsCycle, os.str());
+                }
             }
 
-            // We also know that the "indirect roles" for the child is also correct, so we can add
-            // those roles to our "indirect roles" set.
-            const unordered_set<RoleName>& childsRoles = _roleToIndirectSubordinates[childRole];
-            for (unordered_set<RoleName>::const_iterator childsRoleIt = childsRoles.begin();
-                    childsRoleIt != childsRoles.end(); ++childsRoleIt) {
-                currentRoleIndirectRoles.insert(*childsRoleIt);
+            // Make sure we've already visited all subordinate roles before worrying about this one.
+            const std::vector<RoleName>& currentRoleDirectRoles = _roleToSubordinates[currentRole];
+            std::vector<RoleName>::const_iterator roleIt;
+            for (roleIt = currentRoleDirectRoles.begin();
+                    roleIt != currentRoleDirectRoles.end(); ++roleIt) {
+                const RoleName& childRole = *roleIt;
+                if (!visitedRoles.count(childRole)) {
+                    inProgressRoles.push_back(childRole);
+                    break;
+                }
             }
+            // If roleIt didn't reach the end of currentRoleDirectRoles that means we found a child
+            // of currentRole that we haven't visited yet.
+            if (roleIt != currentRoleDirectRoles.end()) {
+                continue;
+            }
+            // At this point, we know that we've already visited all child roles of currentRole
+            // and thus their "all privileges" sets are correct and can be added to currentRole's
+            // "all privileges" set
+
+            // Need to clear out the "all privileges" vector for the current role, and re-fill it
+            // with just the direct privileges for this role.
+            PrivilegeVector& currentRoleAllPrivileges = _allPrivilegesForRole[currentRole];
+            currentRoleAllPrivileges = _directPrivilegesForRole[currentRole];
+
+            // Need to do the same thing for the indirect roles
+            unordered_set<RoleName>& currentRoleIndirectRoles =
+                    _roleToIndirectSubordinates[currentRole];
+            currentRoleIndirectRoles.clear();
+            for (std::vector<RoleName>::const_iterator it = currentRoleDirectRoles.begin();
+                    it != currentRoleDirectRoles.end(); ++it) {
+                currentRoleIndirectRoles.insert(*it);
+            }
+
+            // Recursively add children's privileges to current role's "all privileges" vector, and
+            // children's roles to current roles's "indirect roles" vector.
+            for (std::vector<RoleName>::const_iterator roleIt = currentRoleDirectRoles.begin();
+                    roleIt != currentRoleDirectRoles.end(); ++roleIt) {
+                // At this point, we already know that the "all privilege" set for the child is
+                // correct, so add those privileges to our "all privilege" set.
+                const RoleName& childRole = *roleIt;
+
+                const PrivilegeVector& childsPrivileges = _allPrivilegesForRole[childRole];
+                for (PrivilegeVector::const_iterator privIt = childsPrivileges.begin();
+                        privIt != childsPrivileges.end(); ++privIt) {
+                    Privilege::addPrivilegeToPrivilegeVector(&currentRoleAllPrivileges, *privIt);
+                }
+
+                // We also know that the "indirect roles" for the child is also correct, so we can
+                // add those roles to our "indirect roles" set.
+                const unordered_set<RoleName>& childsRoles = _roleToIndirectSubordinates[childRole];
+                for (unordered_set<RoleName>::const_iterator childsRoleIt = childsRoles.begin();
+                        childsRoleIt != childsRoles.end(); ++childsRoleIt) {
+                    currentRoleIndirectRoles.insert(*childsRoleIt);
+                }
+            }
+
+            visitedRoles.insert(currentRole);
+            inProgressRoles.pop_back();
         }
-
-        if (inProgressRoles.back() != currentRole)
-            return Status(ErrorCodes::InternalError, "inProgressRoles stack corrupt");
-        inProgressRoles.pop_back();
-        visitedRoles.insert(currentRole);
         return Status::OK();
     }
 

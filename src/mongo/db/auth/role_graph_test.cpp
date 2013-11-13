@@ -272,7 +272,13 @@ namespace {
         ASSERT_OK(graph.createRole(roleC));
         ASSERT_OK(graph.createRole(roleD));
 
+        // Add a role to itself
         ASSERT_OK(graph.recomputePrivilegeData());
+        ASSERT_OK(graph.addRoleToRole(roleA, roleA));
+        ASSERT_NOT_OK(graph.recomputePrivilegeData());
+        ASSERT_OK(graph.removeRoleFromRole(roleA, roleA));
+        ASSERT_OK(graph.recomputePrivilegeData());
+
         ASSERT_OK(graph.addRoleToRole(roleA, roleB));
         ASSERT_OK(graph.recomputePrivilegeData());
         ASSERT_OK(graph.addRoleToRole(roleA, roleC));
