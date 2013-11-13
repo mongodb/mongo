@@ -53,6 +53,11 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	int locked;
 
 	locked = 0;
+	WT_ASSERT(session, usecs >= 0);
+
+	/* Fast path if already signalled. */
+	if (WT_ATOMIC_CAS(cond->signalled, 1, 0))
+		return (0);
 
 	/*
 	 * !!!
@@ -125,15 +130,9 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WT_RET(__wt_verbose(
 		    session, "signal %s cond (%p)", cond->name, cond));
 
-	/* Fast path if already signalled. */
-	if (cond->signalled)
-		return (0);
-
-	WT_ERR(pthread_mutex_lock(&cond->mtx));
-	locked = 1;
-
-	if (!cond->signalled) {
-		cond->signalled = 1;
+	if (WT_ATOMIC_CAS(cond->signalled, 0, 1)) {
+		WT_ERR(pthread_mutex_lock(&cond->mtx));
+		locked = 1;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));
 	}
 
