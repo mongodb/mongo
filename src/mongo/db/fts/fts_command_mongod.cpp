@@ -98,7 +98,7 @@ namespace mongo {
                 return false;
             }
             if ( idxMatches.size() > 1 ) {
-                errmsg = str::stream() << "too many text index for: " << ns;
+                errmsg = str::stream() << "too many text indexes for: " << ns;
                 return false;
             }
 
