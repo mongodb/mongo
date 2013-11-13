@@ -29,7 +29,7 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 
 /*
  * __wt_bt_cache_op --
- *	Cache operations: compaction, discard, sync/checkpoint.
+ *	Cache operations: close/discard, sync/checkpoint.
  */
 int
 __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
@@ -40,13 +40,13 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	btree = S2BT(session);
 
 	/*
-	 * Compaction and sync/checkpoint reconcile dirty pages from the cache
-	 * to the backing block manager.  Reconciliation is just another reader
-	 * of the page, so with some care, it can be done in the current thread,
-	 * leaving the eviction thread to keep freeing spaces if the cache is
-	 * full.  Sync and eviction cannot operate on the same page at the same
-	 * time, and there are different modes inside __wt_tree_walk to make
-	 * sure they don't trip over each other.
+	 * Sync/checkpoint reconcile dirty pages from the cache to the backing
+	 * block manager.  Reconciliation is just another reader of the page,
+	 * so with some care, it can be done in the current thread, leaving the
+	 * eviction thread to keep freeing spaces if the cache is full.  Sync
+	 * and eviction cannot operate on the same page at the same time, and
+	 * there are different modes inside __wt_tree_walk to make sure they
+	 * don't trip over each other.
 	 *
 	 * XXX
 	 * Set the checkpoint reference for reconciliation -- this is ugly, but
@@ -59,7 +59,6 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
-	case WT_SYNC_COMPACT:
 	case WT_SYNC_WRITE_LEAVES:
 		WT_ERR(__wt_sync_file(session, op));
 		break;
