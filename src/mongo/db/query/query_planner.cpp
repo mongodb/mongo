@@ -1589,7 +1589,8 @@ namespace mongo {
         //
         // XXX XXX: Can we do this even if the index is sparse?  Might we miss things?
         if (!query.getParsed().getSort().isEmpty()
-            && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+            && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
+            && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
 
             // See if we have a sort provided from an index already.
             bool usingIndexToSort = false;
