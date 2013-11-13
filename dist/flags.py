@@ -81,6 +81,7 @@ flags = {
 		'CONN_SERVER_RUN',
 	],
 	'session' : [
+		'SESSION_CACHE_BUSY',
 		'SESSION_INTERNAL',
 		'SESSION_NO_CACHE',
 		'SESSION_NO_CACHE_CHECK',

@@ -345,14 +345,13 @@ retry:				if (ref->state != WT_REF_MEM ||
 			} else if (cache) {
 				/*
 				 * Only look at unlocked pages in memory.
-				 * There is a race here, but worse case is
-				 * that the page will be read back in to cache.
+				 * There is a race here, but worse case is that
+				 * the page will be read back in to cache.
 				 */
-				while (LF_ISSET(WT_TREE_WAIT) &&
-				    ref->state == WT_REF_LOCKED)
-					__wt_yield();
 				if (ref->state == WT_REF_DELETED ||
-				    ref->state == WT_REF_DISK)
+				    ref->state == WT_REF_DISK ||
+				    (ref->state == WT_REF_LOCKED &&
+				    !LF_ISSET(WT_TREE_WAIT)))
 					break;
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
