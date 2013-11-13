@@ -32,7 +32,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 		goto err;
 
 	cond->name = name;
-	cond->signalled = is_signalled;
+	cond->waiters = is_signalled ? -1 : 0;
 
 	*condp = cond;
 	return (0);
@@ -56,7 +56,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	WT_ASSERT(session, usecs >= 0);
 
 	/* Fast path if already signalled. */
-	if (WT_ATOMIC_CAS(cond->signalled, 1, 0))
+	if (WT_ATOMIC_ADD(cond->waiters, 1) == 0)
 		return (0);
 
 	/*
@@ -72,36 +72,27 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = 1;
 
-	while (!cond->signalled) {
-		if (usecs > 0) {
-			WT_ERR(__wt_epoch(session, &ts));
-			ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
-			ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
-			ret = pthread_cond_timedwait(
-			    &cond->cond, &cond->mtx, &ts);
-			if (ret == ETIMEDOUT)
-				ret = 0;
-		} else
-			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
+	if (usecs > 0) {
+		WT_ERR(__wt_epoch(session, &ts));
+		ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
+		ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
+		ret = pthread_cond_timedwait(
+		    &cond->cond, &cond->mtx, &ts);
+	} else
+		ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 
-		/* If woken up normally, we're done. */
-		if (ret == 0)
-			break;
-
-		/*
-		 * Check pthread_cond_wait() return for EINTR, ETIME and
-		 * ETIMEDOUT, some systems return these errors.
-		 */
-		if (ret == EINTR ||
+	/*
+	 * Check pthread_cond_wait() return for EINTR, ETIME and
+	 * ETIMEDOUT, some systems return these errors.
+	 */
+	if (ret == EINTR ||
 #ifdef ETIME
-		    ret == ETIME ||
+	    ret == ETIME ||
 #endif
-		    ret == ETIMEDOUT)
-			ret = 0;
-		WT_ERR(ret);
-	}
+	    ret == ETIMEDOUT)
+		ret = 0;
 
-	cond->signalled = 0;
+	(void)WT_ATOMIC_SUB(cond->waiters, 1);
 
 err:	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
@@ -130,7 +121,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WT_RET(__wt_verbose(
 		    session, "signal %s cond (%p)", cond->name, cond));
 
-	if (WT_ATOMIC_CAS(cond->signalled, 0, 1)) {
+	if (cond->waiters != -1 && !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
 		WT_ERR(pthread_mutex_lock(&cond->mtx));
 		locked = 1;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));
