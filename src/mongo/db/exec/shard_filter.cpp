@@ -55,8 +55,6 @@ namespace mongo {
             // If we're sharded make sure that we don't return any data that hasn't been migrated
             // off of our shared yet.
             if (_metadata) {
-                // This information can change if we yield and as such we must make sure to re-fetch
-                // it if we yield.
                 KeyPattern kp(_metadata->getKeyPattern());
 
                 WorkingSetMember* member = _ws->get(*out);

@@ -48,6 +48,10 @@ namespace mongo {
 
             // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
             // shouldn't be on this shard" stage before projection.
+            //
+            // In order to set this, you must check
+            // shardingState.needCollectionMetadata(current_namespace) in the same lock that you use
+            // to build the query runner.
             INCLUDE_SHARD_FILTER = 4,
         };
 
