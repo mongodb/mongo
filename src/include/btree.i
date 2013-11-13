@@ -447,32 +447,53 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
- * __wt_get_addr --
- *	Return the addr/size pair for a reference.
+ * __wt_ref_info --
+ *	Return the addr/size and type triplet for a reference.
  */
 static inline void
-__wt_get_addr(
-    WT_PAGE *page, WT_REF *ref, const uint8_t **addrp, uint32_t *sizep)
+__wt_ref_info(WT_PAGE *page,
+    WT_REF *ref, const uint8_t **addrp, uint32_t *sizep, u_int *typep)
 {
+	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
 
+	addr = ref->addr;
 	unpack = &_unpack;
 
 	/*
 	 * If NULL, there is no location.
 	 * If off-page, the pointer references a WT_ADDR structure.
 	 * If on-page, the pointer references a cell.
+	 *
+	 * The type is of a limited set: internal, leaf or no-overflow leaf.
+	 *
+	 * In short, there's no error checking and you can get into real trouble
+	 * if you don't know what you're expecting to get back.
 	 */
-	if (ref->addr == NULL) {
+	if (addr == NULL) {
 		*addrp = NULL;
 		*sizep = 0;
-	} else if (__wt_off_page(page, ref->addr)) {
-		*addrp = ((WT_ADDR *)(ref->addr))->addr;
-		*sizep = ((WT_ADDR *)(ref->addr))->size;
+	} else if (__wt_off_page(page, addr)) {
+		*addrp = addr->addr;
+		*sizep = addr->size;
+		if (typep != NULL)
+			switch (addr->type) {
+			case WT_ADDR_INT:
+				*typep = WT_CELL_ADDR_INT;
+				break;
+			case WT_ADDR_LEAF:
+				*typep = WT_CELL_ADDR_LEAF;
+				break;
+			case WT_ADDR_LEAF_NO:
+				*typep = WT_CELL_ADDR_LEAF_NO;
+				break;
+			}
 	} else {
-		__wt_cell_unpack(ref->addr, unpack);
+		__wt_cell_unpack((WT_CELL *)addr, unpack);
 		*addrp = unpack->data;
 		*sizep = unpack->size;
+		if (typep != NULL)
+			*typep = unpack->type;
 	}
 }
 

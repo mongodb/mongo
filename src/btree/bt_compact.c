@@ -18,10 +18,14 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_PAGE *page;
 	int skip;
+	uint32_t addr_size;
+	const uint8_t *addr;
 
 	WT_UNUSED(cfg);
 
 	bm = S2BT(session)->bm;
+	page = NULL;
+
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
 	/*
@@ -61,25 +65,42 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 			break;
 
 		/*
-		 * The only pages returned by the tree walk function are pages
-		 * we want to re-write; mark the page and tree dirty.
+		 * We may be visiting a page that doesn't need to be re-written.
+		 * (We have to visit all of the internal pages in order to walk
+		 * the tree, both those needing to be rewritten for compaction
+		 * and those that don't.  Leave open the possibility a page of
+		 * a different type had no address but yet wasn't in-memory, it
+		 * keeps the code simpler and there's no guarantee it couldn't
+		 * happen.)  If we can't find an address for the page ignore it,
+		 * it can't be a factor in compaction.
 		 */
-		if ((ret = __wt_page_modify_init(session, page)) != 0) {
-			WT_TRET(__wt_page_release(session, page));
-			WT_ERR(ret);
-		}
+		if (WT_PAGE_IS_ROOT(page))
+			continue;
+
+		__wt_ref_info(page->parent, page->ref, &addr, &addr_size, NULL);
+		if (addr == NULL)
+			continue;
+		WT_ERR(
+		    bm->compact_page_skip(bm, session, addr, addr_size, &skip));
+		if (skip)
+			continue;
+
+		WT_ERR(__wt_page_modify_init(session, page));
 		__wt_page_modify_set(session, page);
 
 		WT_STAT_FAST_DATA_INCR(session, btree_compact_rewrite);
 	}
 
-err:	WT_TRET(bm->compact_end(bm, session));
+err:	if (page != NULL)
+		WT_TRET(__wt_page_release(session, page));
+
+	WT_TRET(bm->compact_end(bm, session));
 	return (0);
 }
 
 /*
  * __wt_compact_page_skip --
- *	Return if the block-manager wants us to re-write this page.
+ *	Return if compaction requires we read this page.
  */
 int
 __wt_compact_page_skip(
@@ -87,32 +108,30 @@ __wt_compact_page_skip(
 {
 	WT_BM *bm;
 	uint32_t addr_size;
+	u_int type;
 	const uint8_t *addr;
+
+	*skipp = 0;				/* Default to reading. */
 
 	bm = S2BT(session)->bm;
 
 	/*
-	 * There's one compaction test we do before we read the page, to see
-	 * if the block-manager thinks it useful to rewrite the page.  If a
-	 * rewrite won't help, we don't want to do I/O for nothing.  For that
-	 * reason, this check is done in a call from inside the tree-walking
-	 * routine.
-	 *
-	 * Ignore everything but on-disk pages, we've already done a pass over
-	 * the in-memory pages.
+	 * We aren't holding a hazard reference, so we can't look at the page
+	 * itself, all we can look at the WT_REF information.  If there's no
+	 * address, the page isn't on disk, but we have to read internal pages
+	 * to walk the tree regardless; throw up our hands and read it.
 	 */
-	if (ref->state != WT_REF_DISK) {
-		*skipp = 1;
+	__wt_ref_info(parent, ref, &addr, &addr_size, &type);
+	if (addr == NULL)
 		return (0);
-	}
 
-	__wt_get_addr(parent, ref, &addr, &addr_size);
-	if (addr == NULL) {
-		*skipp = 1;
-		return (0);
-	}
-
-	return (bm->compact_page_skip(bm, session, addr, addr_size, skipp));
+	/*
+	 * Internal pages must be read to walk the tree; ask the block-manager
+	 * if it's useful to rewrite leaf pages, don't do the I/O if a rewrite
+	 * won't help.
+	 */
+	return (type == WT_CELL_ADDR_INT ? 0 :
+	    bm->compact_page_skip(bm, session, addr, addr_size, skipp));
 }
 
 /*
@@ -163,9 +182,8 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case 0:
-disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
-		if (addr == NULL)
-			return (0);
+disk:		__wt_ref_info(page->parent, page->ref, &addr, &addr_size, NULL);
+		WT_ASSERT(session, addr != NULL);
 		WT_RET(
 		    bm->compact_page_skip(bm, session, addr, addr_size, &skip));
 		if (skip)

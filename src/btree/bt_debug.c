@@ -820,7 +820,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	if (ref->addr == NULL)
 		__dmsg(ds, " %s\n", "[NoAddr]");
 	else {
-		__wt_get_addr(page, ref, &addr, &size);
+		__wt_ref_info(page, ref, &addr, &size, NULL);
 		__dmsg(ds,
 		    " %s\n", __wt_addr_string(session, ds->tmp, addr, size));
 	}

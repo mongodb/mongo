@@ -367,19 +367,24 @@ retry:				if (ref->state != WT_REF_MEM ||
 					break;
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
-			} else {
+			} else if (compact) {
 				/*
-				 * If iterating a cursor (or doing compaction),
-				 * skip deleted pages that are visible to us.
+				 * Skip deleted pages, rewriting them doesn't
+				 * seem useful.
 				 */
-				WT_RET(__tree_walk_read(session, ref, &skip));
-				if (skip)
+				if (ref->state == WT_REF_DELETED)
 					break;
 
 				/*
 				 * Test if the page is useful for compaction:
 				 * we don't want to read it if it won't help.
-				 *
+				 */
+				WT_RET(__wt_compact_page_skip(
+				    session, page, ref, &skip));
+				if (skip)
+					break;
+
+				/*
 				 * Pages read for compaction aren't "useful";
 				 * reset the page generation to a low value so
 				 * the page is quickly chosen for eviction.
@@ -387,19 +392,23 @@ retry:				if (ref->state != WT_REF_MEM ||
 				 * and will only result in an incorrectly low
 				 * page read generation and possible eviction.)
 				 */
-				set_read_gen = 0;
-				if (compact) {
-					WT_RET(__wt_compact_page_skip(
-					    session, page, ref, &skip));
-					if (skip)
-						break;
-					set_read_gen =
-					    ref->state == WT_REF_DISK ? 1 : 0;
-				}
+				set_read_gen =
+				    ref->state == WT_REF_DISK ? 1 : 0;
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
 				if (set_read_gen)
 					page->read_gen = WT_READ_GEN_OLDEST;
+			} else {
+				/*
+				 * If iterating a cursor, skip deleted pages
+				 * that are visible to us.
+				 */
+				WT_RET(__tree_walk_read(session, ref, &skip));
+				if (skip)
+					break;
+
+				WT_RET(
+				    __wt_page_swap(session, couple, page, ref));
 			}
 
 			couple = page = ref->page;
