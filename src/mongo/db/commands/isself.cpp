@@ -207,11 +207,6 @@ namespace mongo {
         int _p = port();
         int p = _p == -1 ? ServerGlobalParams::DefaultDBPort : _p;
 
-        if (p != serverGlobalParams.port) {
-            // shortcut - ports have to match at the very least
-            return false;
-        }
-
         string host = str::stream() << this->host() << ":" << p;
 
         {
@@ -234,8 +229,10 @@ namespace mongo {
                 string a = *i;
                 string b = *j;
 
-                if ( a == b ||
-                        ( str::startsWith( a , "127." ) && str::startsWith( b , "127." ) )  // 127. is all loopback
+                // check if the ports match as well
+                if ( (p == serverGlobalParams.port) &&
+                        (a == b || ( str::startsWith( a , "127." ) &&
+                                     str::startsWith( b , "127." ) ))  // 127. is all loopback
                    ) {
 
                     // add to cache
