@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- header for use with make_vcxproj.py
+    
+     Note that once you generate the vcxproj file, if you change it in visual studio, when it 
+     writes it back out you will use the comments and semi-neat formatting below.
+-->
+
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win2008PlusDebug|Win32">
+      <Configuration>Win2008PlusDebug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win2008PlusDebug|x64">
+      <Configuration>Win2008PlusDebug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win2008PlusRelease|Win32">
+      <Configuration>Win2008PlusRelease</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win2008PlusRelease|x64">
+      <Configuration>Win2008PlusRelease</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <ProjectName>mongod</ProjectName>
+    <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>mongod</RootNamespace>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+<!-- given we do final official build with scons, it is reasonable to consider leaving this off for better
+     compile speed during development:
+-->
+<!--
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'" Label="Configuration">
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'" Label="Configuration">
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+-->
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">false</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">false</LinkIncremental>
+    <CodeAnalysisRuleSet >AllRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <!-- GLOBAL SETTINGS ALL BUILD STYLES -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ObjectFileName>%(RelativeDir)/</ObjectFileName>
+      <AdditionalIncludeDirectories>src\mongo;src;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      <DisableSpecificWarnings>4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>No</MinimalRebuild>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <AdditionalDependencies>winmm.lib;ws2_32.lib;psapi.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- DEBUG -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug' Or '(Configuration)'=='Win2008PlusDebug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>_DEBUG;DEBUG;OBJECT_PRINT;ENABLE_DISASSEMBLER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!--<DebugInformationFormat>EditAndContinue</DebugInformationFormat>-->
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!-- RELEASE -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Win2008PlusRelease'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!-- X64 -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>V8_TARGET_ARCH_X64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!-- 32 bit -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>V8_TARGET_ARCH_IA32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <LargeAddressAware>true</LargeAddressAware>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- SPECIFICS -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Link>
+      <IgnoreSpecificDefaultLibraries>msvcrtd;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">
+  </ItemDefinitionGroup>
+
+<!--
+  <ItemDefinitionGroup>
+    <PreBuildEvent>
+      <Command>cscript //Nologo "src\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\v8" /input:"tools\js2c.py,src\proxy.js,src\collection.js,src\macros.py" /output:"src\experimental-libraries.cc" /command:"python tools\js2c.py src/experimental-libraries.cc EXPERIMENTAL off src/proxy.js src/collection.js src/macros.py"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\v8" /input:"tools\js2c.py,src/runtime.js,src/v8natives.js,src/array.js,src/string.js,src/uri.js,src/math.js,src/messages.js,src/apinatives.js,src/date.js,src/regexp.js,src/json.js,src/liveedit-debugger.js,src/mirror-debugger.js,src/debug-debugger.js,src\macros.py" /output:"src\libraries.cc" /command:"python tools\js2c.py src/libraries.cc CORE off src/runtime.js src/v8natives.js src/array.js src/string.js src/uri.js src/math.js src/messages.js src/apinatives.js src/date.js src/regexp.js src/json.js src/liveedit-debugger.js src/mirror-debugger.js src/debug-debugger.js src\macros.py"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
+        </Command>
+      <Message>Run pre-build commands</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+-->
+
+
