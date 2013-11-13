@@ -22,6 +22,7 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/cursor.h"
+#include "mongo/db/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/mock_stage.h"
@@ -29,6 +30,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_registry.h"
@@ -44,10 +47,14 @@ namespace QueryStageFetch {
             _client.dropCollection(ns());
         }
 
-        void getLocs(set<DiskLoc>* out) {
-            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
-                out->insert(c->currLoc());
+        void getLocs(set<DiskLoc>* out, Collection* coll) {
+            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+                                                       CollectionScanParams::FORWARD);
+            while (!it->isEOF()) {
+                DiskLoc nextLoc = it->getNext();
+                out->insert(nextLoc);
             }
+            delete it;
         }
 
         void insert(const BSONObj& obj) {
@@ -73,12 +80,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -139,12 +151,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -199,12 +216,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -269,12 +291,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -328,12 +355,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.

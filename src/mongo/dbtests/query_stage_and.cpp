@@ -31,6 +31,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageAnd {
@@ -47,17 +48,20 @@ namespace QueryStageAnd {
             _client.ensureIndex(ns(), obj);
         }
 
-        IndexDescriptor* getIndex(const BSONObj& obj) {
-            Collection* collection = cc().database()->getCollection( ns() );
-            NamespaceDetails* nsd = collection->details();
+        IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
+            NamespaceDetails* nsd = coll->details();
             int idxNo = nsd->findIndexByKeyPattern(obj);
-            return collection->getIndexCatalog()->getDescriptor( idxNo );
+            return coll->getIndexCatalog()->getDescriptor( idxNo );
         }
 
-        void getLocs(set<DiskLoc>* out) {
-            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
-                out->insert(c->currLoc());
+        void getLocs(set<DiskLoc>* out, Collection* coll) {
+            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+                                                       CollectionScanParams::FORWARD);
+            while (!it->isEOF()) {
+                DiskLoc nextLoc = it->getNext();
+                out->insert(nextLoc);
             }
+            delete it;
         }
 
         void insert(const BSONObj& obj) {
@@ -99,6 +103,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 50; ++i) {
                 insert(BSON("foo" << i << "bar" << i));
@@ -112,7 +121,7 @@ namespace QueryStageAnd {
 
             // Foo <= 20
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 20);
             params.bounds.endKey = BSONObj();
@@ -121,7 +130,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 10
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 10);
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
@@ -141,7 +150,7 @@ namespace QueryStageAnd {
             ah->prepareToYield();
             // ...invalidate one of the read objects
             set<DiskLoc> data;
-            getLocs(&data);
+            getLocs(&data, coll);
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
                 if (it->obj()["foo"].numberInt() == 15) {
                     ah->invalidate(*it);
@@ -191,6 +200,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 50; ++i) {
                 insert(BSON("foo" << i << "bar" << i << "baz" << i));
@@ -205,7 +219,7 @@ namespace QueryStageAnd {
 
             // Foo <= 20
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 20);
             params.bounds.endKey = BSONObj();
@@ -214,7 +228,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 10
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 10);
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
@@ -222,7 +236,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // 5 <= baz <= 15
-            params.descriptor = getIndex(BSON("baz" << 1));
+            params.descriptor = getIndex(BSON("baz" << 1), coll);
             params.bounds.startKey = BSON("" << 5);
             params.bounds.endKey = BSON("" << 15);
             params.bounds.endKeyInclusive = true;
@@ -240,6 +254,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 50; ++i) {
                 insert(BSON("foo" << i << "bar" << 20));
@@ -253,7 +272,7 @@ namespace QueryStageAnd {
 
             // Foo <= 20
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 20);
             params.bounds.endKey = BSONObj();
@@ -262,7 +281,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar == 5.  Index scan should be eof.
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 5);
             params.bounds.endKey = BSON("" << 5);
             params.bounds.endKeyInclusive = true;
@@ -278,6 +297,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 10; ++i) {
                 insert(BSON("foo" << (100 + i)));
@@ -292,7 +316,7 @@ namespace QueryStageAnd {
 
             // Foo >= 100
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 100);
             params.bounds.endKey = BSONObj();
@@ -301,7 +325,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar <= 100
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 100);
             // This is subtle and confusing.  We couldn't extract any keys from the elements with
             // 'foo' in them so we would normally index them with the "nothing found" key.  We don't
@@ -320,6 +344,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 50; ++i) {
                 insert(BSON("foo" << i << "bar" << (100 - i)));
@@ -337,7 +366,7 @@ namespace QueryStageAnd {
 
             // Foo <= 20
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 20);
             params.bounds.endKey = BSONObj();
@@ -346,7 +375,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 95
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 10);
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
@@ -370,6 +399,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             // Insert a bunch of data
             for (int i = 0; i < 50; ++i) {
@@ -383,7 +417,7 @@ namespace QueryStageAnd {
 
             // Scan over foo == 1
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 1);
             params.bounds.endKey = BSON("" << 1);
@@ -392,12 +426,12 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Scan over bar == 1
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Get the set of disklocs in our collection to use later.
             set<DiskLoc> data;
-            getLocs(&data);
+            getLocs(&data, coll);
 
             // We're making an assumption here that happens to be true because we clear out the
             // collection before running this: increasing inserts have increasing DiskLocs.
@@ -481,6 +515,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             // Insert a bunch of data
             for (int i = 0; i < 50; ++i) {
@@ -503,7 +542,7 @@ namespace QueryStageAnd {
 
             // Scan over foo == 1
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 1);
             params.bounds.endKey = BSON("" << 1);
@@ -512,11 +551,11 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // bar == 1
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // baz == 1
-            params.descriptor = getIndex(BSON("baz" << 1));
+            params.descriptor = getIndex(BSON("baz" << 1), coll);
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             ASSERT_EQUALS(50, countResults(ah.get()));
@@ -528,6 +567,12 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
 
             for (int i = 0; i < 50; ++i) {
                 insert(BSON("foo" << 8 << "bar" << 20));
@@ -541,7 +586,7 @@ namespace QueryStageAnd {
 
             // Foo == 7.  Should be EOF.
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 7);
             params.bounds.endKey = BSON("" << 7);
@@ -550,7 +595,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar == 20, not EOF.
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 20);
             params.bounds.endKey = BSON("" << 20);
             params.bounds.endKeyInclusive = true;
@@ -566,6 +611,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 50; ++i) {
                 // Insert data with foo=7, bar==20, but nothing with both.
@@ -583,7 +633,7 @@ namespace QueryStageAnd {
 
             // foo == 7.
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 7);
             params.bounds.endKey = BSON("" << 7);
@@ -592,7 +642,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // bar == 20.
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             params.bounds.startKey = BSON("" << 20);
             params.bounds.endKey = BSON("" << 20);
             params.bounds.endKeyInclusive = true;
@@ -608,6 +658,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             for (int i = 0; i < 50; ++i) {
                 insert(BSON("foo" << 1 << "bar" << 1));
@@ -625,7 +680,7 @@ namespace QueryStageAnd {
 
             // Scan over foo == 1
             IndexScanParams params;
-            params.descriptor = getIndex(BSON("foo" << 1));
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 1);
             params.bounds.endKey = BSON("" << 1);
@@ -634,7 +689,7 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // bar == 1
-            params.descriptor = getIndex(BSON("bar" << 1));
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Filter drops everything.

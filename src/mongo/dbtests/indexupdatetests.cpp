@@ -22,9 +22,9 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -296,18 +296,22 @@ namespace IndexUpdateTests {
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << ( i / 4 ) ) );
             }
+
             // Find the documents that are dups.
             set<DiskLoc> dups;
             int32_t last = -1;
-            for( boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
-                 cursor->ok();
-                 cursor->advance() ) {
-                int32_t currA = cursor->current()[ "a" ].Int();
+            CollectionIterator* it = collection()->getIterator( DiskLoc(), false,
+                                                                CollectionScanParams::FORWARD );
+            while ( !it->isEOF() ) {
+                DiskLoc currLoc = it->getNext();
+                int32_t currA = currLoc.obj()[ "a" ].Int();
                 if ( currA == last ) {
-                    dups.insert( cursor->currLoc() );
+                    dups.insert( currLoc );
                 }
                 last = currA;
             }
+            delete it;
+
             // Check the expected number of dups.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
             // Drop the dups.
@@ -329,18 +333,22 @@ namespace IndexUpdateTests {
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << ( i / 4 ) ) );
             }
+
             // Find the documents that are dups.
             set<DiskLoc> dups;
             int32_t last = -1;
-            for( boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
-                 cursor->ok();
-                 cursor->advance() ) {
-                int32_t currA = cursor->current()[ "a" ].Int();
+            CollectionIterator* it = collection()->getIterator( DiskLoc(), false,
+                                                                CollectionScanParams::FORWARD );
+            while ( !it->isEOF() ) {
+                DiskLoc currLoc = it->getNext();
+                int32_t currA = currLoc.obj()[ "a" ].Int();
                 if ( currA == last ) {
-                    dups.insert( cursor->currLoc() );
+                    dups.insert( currLoc );
                 }
                 last = currA;
             }
+            delete it;
+
             // Check the expected number of dups.  There must be enough to trigger a RARELY
             // condition when deleting them.
             ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
@@ -364,14 +372,20 @@ namespace IndexUpdateTests {
         bool _mayInterrupt;
     };
 
-    /** DataFileMgr::insertWithObjMod is killed if mayInterrupt is true. */
+    /** Index creation is killed if mayInterrupt is true. */
     class InsertBuildIndexInterrupt : public IndexBuildBase {
     public:
         void run() {
-            // Insert some documents.
+            // Create a new collection.
+            Database* db = _ctx.ctx().db();
+            db->dropCollection( _ns );
+            Collection* coll = db->createCollection( _ns );
+            // Drop all indexes including id index.
+            coll->getIndexCatalog()->dropAllIndexes( true );
+            // Insert some documents with enforceQuota=true.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "a" << i ) );
+                coll->insertDocument( BSON( "a" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -379,25 +393,26 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
             // The call is interrupted because mayInterrupt == true.
-            ASSERT_THROWS( theDataFileMgr.insertWithObjMod( "unittests.system.indexes",
-                                                            indexInfo,
-                                                            true ),
-                           UserException );
-            // The new index is not listed in system.indexes because the index build failed.
-            ASSERT_EQUALS( 0U,
-                           _client.count( "unittests.system.indexes",
-                                          BSON( "ns" << _ns << "name" << "a_1" ) ) );
+            Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
+            ASSERT_NOT_OK( status.code() );
+            // The new index is not listed in the index catalog because the index build failed.
+            ASSERT( !coll->getIndexCatalog()->findIndexByName( "a_1" ) );
         }
     };
 
-    /** DataFileMgr::insertWithObjMod is not killed if mayInterrupt is false. */
+    /** Index creation is not killed if mayInterrupt is false. */
     class InsertBuildIndexInterruptDisallowed : public IndexBuildBase {
     public:
         void run() {
+            // Create a new collection.
+            Database* db = _ctx.ctx().db();
+            db->dropCollection( _ns );
+            Collection* coll = db->createCollection( _ns );
+            coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "a" << i ) );
+                coll->insertDocument( BSON( "a" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -405,31 +420,27 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
             // The call is not interrupted because mayInterrupt == false.
-            theDataFileMgr.insertWithObjMod( "unittests.system.indexes", indexInfo, false );
-            // The new index is listed in system.indexes because the index build completed.
-            ASSERT_EQUALS( 1U,
-                           _client.count( "unittests.system.indexes",
-                                          BSON( "ns" << _ns << "name" << "a_1" ) ) );
+            Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
+            ASSERT_OK( status.code() );
+            // The new index is listed in the index catalog because the index build completed.
+            ASSERT( coll->getIndexCatalog()->findIndexByName( "a_1" ) );
         }
     };
 
-    /** DataFileMgr::insertWithObjMod is killed when building the _id index. */
+    /** Index creation is killed when building the _id index. */
     class InsertBuildIdIndexInterrupt : public IndexBuildBase {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            _client.dropCollection( _ns );
-            BSONObj info;
-            ASSERT( _client.runCommand( "unittests",
-                                        BSON( "create" << "indexupdate" <<
-                                              "capped" << true <<
-                                              "size" << ( 10 * 1024 ) <<
-                                              "autoIndexId" << false ),
-                                        info ) );
+            Database* db = _ctx.ctx().db();
+            db->dropCollection( _ns );
+            const BSONObj collOptions = BSON( "size" << (10 * 1024) );
+            Collection* coll = db->createCollection( _ns, true, &collOptions );
+            coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "_id" << i ) );
+                coll->insertDocument( BSON( "_id" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -437,37 +448,29 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
                                       "ns" << _ns <<
-                                      "name" << "_id" );
+                                      "name" << "_id_" );
             // The call is interrupted because mayInterrupt == true.
-            ASSERT_THROWS( theDataFileMgr.insertWithObjMod( "unittests.system.indexes",
-                                                            indexInfo,
-                                                            true ),
-                           UserException );
-            // The new index is not listed in system.indexes because the index build failed.
-            ASSERT_EQUALS( 0U, _client.count( "unittests.system.indexes", BSON( "ns" << _ns ) ) );
+            Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
+            ASSERT_NOT_OK( status.code() );
+            // The new index is not listed in the index catalog because the index build failed.
+            ASSERT( !coll->getIndexCatalog()->findIndexByName( "_id_" ) );
         }
     };
 
-    /**
-     * DataFileMgr::insertWithObjMod is not killed when building the _id index if mayInterrupt is
-     * false.
-     */
+    /** Index creation is not killed when building the _id index if mayInterrupt is false. */
     class InsertBuildIdIndexInterruptDisallowed : public IndexBuildBase {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            _client.dropCollection( _ns );
-            BSONObj info;
-            ASSERT( _client.runCommand( "unittests",
-                                        BSON( "create" << "indexupdate" <<
-                                              "capped" << true <<
-                                              "size" << ( 10 * 1024 ) <<
-                                              "autoIndexId" << false ),
-                                        info ) );
+            Database* db = _ctx.ctx().db();
+            db->dropCollection( _ns );
+            const BSONObj collOptions = BSON( "size" << (10 * 1024) );
+            Collection* coll = db->createCollection( _ns, true, &collOptions );
+            coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "_id" << i ) );
+                coll->insertDocument( BSON( "_id" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -475,11 +478,12 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
                                       "ns" << _ns <<
-                                      "name" << "_id" );
+                                      "name" << "_id_" );
             // The call is not interrupted because mayInterrupt == false.
-            theDataFileMgr.insertWithObjMod( "unittests.system.indexes", indexInfo, false );
-            // The new index is listed in system.indexes because the index build succeeded.
-            ASSERT_EQUALS( 1U, _client.count( "unittests.system.indexes", BSON( "ns" << _ns ) ) );
+            Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
+            ASSERT_OK( status.code() );
+            // The new index is listed in the index catalog because the index build succeeded.
+            ASSERT( coll->getIndexCatalog()->findIndexByName( "_id_" ) );
         }
     };
 

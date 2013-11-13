@@ -135,8 +135,24 @@ namespace ReplSetTests {
 
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::DBWrite lk(ns());
-            Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
+            Client::Context ctx(ns());
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            if (o.hasField("_id")) {
+                coll->insertDocument(o, true);
+                return;
+            }
+
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID("_id", &id);
+            b.appendElements(o);
+            coll->insertDocument(b.obj(), true);
         }
 
         BSONObj findOne( const BSONObj &query = BSONObj() ) const {
@@ -152,7 +168,7 @@ namespace ReplSetTests {
                 return;
             }
 
-            c.ctx().db()->dropCollection( ns() );
+            c.ctx().db()->dropCollection(ns());
         }
         static void setup() {
             replSettings.replSet = "foo";
@@ -954,13 +970,15 @@ namespace ReplSetTests {
         }
 
         void insert() {
-            Client::Context ctx( cappedNs() );
+            Client::Context ctx(cappedNs());
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(cappedNs());
+            if (!coll) {
+                coll = db->createCollection(cappedNs());
+            }
+
             BSONObj o = BSON(GENOID << "x" << 456);
-            DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(),
-                                                 o.objdata(),
-                                                 o.objsize(),
-                                                 false,
-                                                 false );
+            DiskLoc loc = coll->insertDocument(o, true).getValue();
             verify(!loc.isNull());
         }
     public:

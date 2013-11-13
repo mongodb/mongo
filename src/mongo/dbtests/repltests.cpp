@@ -33,6 +33,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -101,21 +102,39 @@ namespace ReplTests {
             return client()->findOne( cllNS(), BSONObj() );
         }
         int count() const {
-            int count = 0;
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
-            for(; c->ok(); c->advance(), ++count ) {
-//                cout << "obj: " << c->current().toString() << endl;
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns() );
+            if ( !coll ) {
+                coll = db->createCollection( ns() );
             }
+
+            int count = 0;
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            for ( ; !it->isEOF(); it->getNext() ) {
+                ++count;
+            }
+            delete it;
             return count;
         }
         static int opCount() {
             Lock::GlobalWrite lk;
             Client::Context ctx( cllNS() );
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( cllNS() );
+            if ( !coll ) {
+                coll = db->createCollection( cllNS() );
+            }
+
             int count = 0;
-            for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
+            }
+            delete it;
             return count;
         }
         static void applyAllOperations() {
@@ -123,8 +142,16 @@ namespace ReplTests {
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
-                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
-                    ops.push_back( c->current() );
+                Database* db = ctx.db();
+                Collection* coll = db->getCollection( cllNS() );
+
+                CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                            CollectionScanParams::FORWARD );
+                while ( !it->isEOF() ) {
+                    DiskLoc currLoc = it->getNext();
+                    ops.push_back( currLoc.obj() );
+                }
+                delete it;
             }
             {
                 Client::Context ctx( ns() );
@@ -143,32 +170,62 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
-            boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
-            vector< DiskLoc > toDelete;
-            out() << "all for " << ns << endl;
-            for(; c->ok(); c->advance() ) {
-                out() << c->current().toString() << endl;
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns );
+            if ( !coll ) {
+                coll = db->createCollection( ns );
             }
+
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            out() << "all for " << ns << endl;
+            while ( !it->isEOF() ) {
+                DiskLoc currLoc = it->getNext();
+                out() << currLoc.obj().toString() << endl;
+            }
+            delete it;
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
-            Collection* collection = ctx.db()->getCollection( ns );
-
-            boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
-            vector< DiskLoc > toDelete;
-            for(; c->ok(); c->advance() ) {
-                toDelete.push_back( c->currLoc() );
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns );
+            if ( !coll ) {
+                coll = db->createCollection( ns );
             }
+
+            vector< DiskLoc > toDelete;
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            while ( !it->isEOF() ) {
+                toDelete.push_back( it->getNext() );
+            }
+            delete it;
             for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-                collection->deleteDocument( *i, true );
+                coll->deleteDocument( *i, true );
             }
         }
-        static void insert( const BSONObj &o, bool god = false ) {
+        static void insert( const BSONObj &o ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns() );
+            if ( !coll ) {
+                coll = db->createCollection( ns() );
+            }
+
+            if ( o.hasField( "_id" ) ) {
+                coll->insertDocument( o, true );
+                return;
+            }
+
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID( "_id", &id );
+            b.appendElements( o );
+            coll->insertDocument( b.obj(), true );
         }
         static BSONObj wid( const char *json ) {
             class BSONObjBuilder b;
@@ -663,8 +720,8 @@ namespace ReplTests {
             }
             void reset() const {
                 deleteAll( ns() );
-                insert( ot_, true );
-                insert( o_, true );
+                insert( ot_ );
+                insert( o_ );
             }
         protected:
             BSONObj o_, u_, ot_;
