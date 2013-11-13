@@ -4,6 +4,7 @@ t = db.jstests_update_dbref;
 t.drop();
 
 t.save({_id:1, a: new DBRef("a", "b")});
+assert.gleSuccess(db, "failed to save dbref");
 assert.docEq({_id:1, a: new DBRef("a", "b")}, t.findOne());
 
 t.update({}, {$set: {"a.$id": 2}});

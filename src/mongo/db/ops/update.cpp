@@ -78,6 +78,128 @@ namespace mongo {
             }
         }
 
+        Status storageValid(const mb::Document&, const bool);
+        Status storageValid(const mb::ConstElement&, const bool);
+        Status storageValidChildren(const mb::ConstElement&, const bool);
+
+        /**
+         * mutable::document storageValid check -- like BSONObj::_okForStorage
+         */
+        Status storageValid(const mb::Document& doc, const bool deep = true) {
+            mb::ConstElement currElem = doc.root().leftChild();
+            while (currElem.ok()) {
+                if (currElem.getFieldName() == idFieldName) {
+                    switch (currElem.getType()) {
+                        case RegEx:
+                        case Array:
+                        case Undefined:
+                            return Status(ErrorCodes::InvalidIdField,
+                                          str::stream() << "The '_id' value cannot be of type "
+                                                        << typeName(currElem.getType()));
+                        default:
+                            break;
+                    }
+                }
+                Status s = storageValid(currElem, deep);
+                if (!s.isOK())
+                    return s;
+                currElem = currElem.rightSibling();
+            }
+
+            return Status::OK();
+        }
+
+        Status storageValid(const mb::ConstElement& elem, const bool deep = true) {
+            if (!elem.ok())
+                return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
+
+            StringData fieldName = elem.getFieldName();
+            // Cannot start with "$", unless dbref which must start with ($ref, $id)
+            if (fieldName[0] == '$') {
+                // Check if it is a DBRef has this field {$ref, $id, [$db]}
+                mb::ConstElement curr = elem;
+                StringData currName = fieldName;
+
+                // Found a $db field
+                if (currName == "$db") {
+                    if (curr.getType() != String) {
+                        return Status(ErrorCodes::InvalidDBRef,
+                                str::stream() << "The DBRef $db field must be a String, not a "
+                                              << typeName(curr.getType()));
+                    }
+                    curr = curr.leftSibling();
+
+                    if (!curr.ok() || (curr.getFieldName() != "$id"))
+                        return Status(ErrorCodes::InvalidDBRef,
+                                      "Found $db field without a $id before it, which is invalid.");
+
+                    currName = curr.getFieldName();
+                }
+
+                // Found a $id field
+                if (currName == "$id") {
+                    Status s = storageValidChildren(curr, deep);
+                    if (!s.isOK())
+                        return s;
+
+                    curr = curr.leftSibling();
+                    if (!curr.ok() || (curr.getFieldName() != "$ref")) {
+                        return Status(ErrorCodes::InvalidDBRef,
+                                     "Found $id field without a $ref before it, which is invalid.");
+                    }
+
+                    currName = curr.getFieldName();
+                }
+
+                if (currName == "$ref") {
+                    if (curr.getType() != String) {
+                        return Status(ErrorCodes::InvalidDBRef,
+                                str::stream() << "The DBRef $ref field must be a String, not a "
+                                              << typeName(curr.getType()));
+                    }
+
+                    if (!curr.rightSibling().ok() || curr.rightSibling().getFieldName() != "$id")
+                        return Status(ErrorCodes::InvalidDBRef,
+                                str::stream() << "The DBRef $ref field must be "
+                                                 "following by a $id field");
+                }
+                else {
+                    // not an okay, $ prefixed field name.
+                    return Status(ErrorCodes::DollarPrefixedFieldName,
+                                  str::stream() << elem.getFieldName()
+                                                << " is not valid for storage.");
+                }
+            }
+
+            // Field name cannot have a "." in it.
+            if (fieldName.find(".") != string::npos) {
+                return Status(ErrorCodes::DottedFieldName,
+                              str::stream() << elem.getFieldName() << " is not valid for storage.");
+            }
+
+            // Check children if there are any.
+            Status s = storageValidChildren(elem, deep);
+            if (!s.isOK())
+                return s;
+
+            return Status::OK();
+        }
+
+        Status storageValidChildren(const mb::ConstElement& elem, const bool deep) {
+            if (!elem.hasChildren())
+                return Status::OK();
+
+            mb::ConstElement curr = elem.leftChild();
+            while (curr.ok()) {
+                Status s = storageValid(curr, deep);
+                if (!s.isOK())
+                    return s;
+                curr = curr.rightSibling();
+            }
+
+            return Status::OK();
+        }
+
         /**
          * This will verify that all updated fields are
          *   1.) Valid for storage (checking parent to make sure things like DBRefs are valid)
@@ -101,13 +223,7 @@ namespace mongo {
                    << " validate:" << opts.enforceOkForStorage;
 
             // 1.) Loop through each updated field and validate for storage
-            // and detect immutable updates
-
-            // Once we check the root once, there is no need to do it again
-            bool checkedRoot = false;
-
-            // TODO: Replace with mutablebson implementation -- this is wasteful to make a copy.
-            BSONObj doc = updated.getObject();
+            // and detect immutable field updates
 
             // The set of possibly changed immutable fields -- we will need to check their vals
             FieldRefSet changedImmutableFields;
@@ -117,7 +233,7 @@ namespace mongo {
             if (updatedFields.empty() || !opts.enforceOkForStorage) {
                 if (opts.enforceOkForStorage) {
                     // No specific fields were updated so the whole doc must be checked
-                    Status s = doc.storageValid(true);
+                    Status s = storageValid(updated, true);
                     if (!s.isOK())
                         return s;
                 }
@@ -134,54 +250,25 @@ namespace mongo {
                 if (immutableAndSingleValueFields)
                     immutableFieldRef.fillFrom(*immutableAndSingleValueFields);
 
-
                 FieldRefSet::const_iterator where = updatedFields.begin();
                 const FieldRefSet::const_iterator end = updatedFields.end();
                 for( ; where != end; ++where) {
                     const FieldRef& current = **where;
 
-                    //TODO: don't check paths more than once
+                    // Find the updated field in the updated document.
+                    mutablebson::ConstElement newElem = updated.root();
+                    size_t currentPart = 0;
+                    while (newElem.ok() && currentPart < current.numParts())
+                        newElem = newElem[current.getPart(currentPart++)];
 
-                    const bool isTopLevelField = (current.numParts() == 1);
-                    if (isTopLevelField) {
-                        // We check the top level since the current implementation checks BSONObj,
-                        // not BSONElements. NOTE: in the mutablebson version we can just check elem
-                        if (!checkedRoot) {
-                            // Check the root level (top level fields) only once, and don't go deep
-                            Status s = doc.storageValid(false);
-                            if (!s.isOK()) {
-                               return s;
-                            }
-                            checkedRoot = true;
-                        }
-
-                        // Check if the updated field conflicts with immutable fields
-                        immutableFieldRef.getConflicts(&current, &changedImmutableFields);
-
-                        // Traverse (deep)
-                        BSONElement elem = doc.getFieldDotted(current.dottedField());
-                        if (elem.isABSONObj()) {
-                            Status s = elem.embeddedObject().storageValid(true);
-                            if (!s.isOK()) {
-                               return s;
-                            }
-                        }
+                    // newElem might be missing if $unset/$renamed-away
+                    if (newElem.ok()) {
+                        Status s = storageValid(newElem, true);
+                        if (!s.isOK())
+                            return s;
                     }
-                    else {
-                        // Remove the right-most part, to get the parent.
-                        // "a.b.c" -> "a.b"
-                        StringData path = current.dottedField().substr(
-                                            0,
-                                            current.dottedField().size() -
-                                                current.getPart(current.numParts() - 1).size() - 1);
-
-                        BSONElement elem = doc.getFieldDotted(path);
-                        Status s = elem.embeddedObject().storageValid(true);
-                        if (!s.isOK()) {
-                           return s;
-                        }
-
-                    }
+                    // Check if the updated field conflicts with immutable fields
+                    immutableFieldRef.getConflicts(&current, &changedImmutableFields);
                 }
             }
 
