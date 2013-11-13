@@ -86,6 +86,7 @@ for f in \
 
 	# Early exits from critical loops
 	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
+	       -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
 	       -e '/va_start/,/va_end/{=;p;}' $f | \
 		sed 'N;s/\n/:/' | \
 		egrep -w 'return|WT_RET' | \

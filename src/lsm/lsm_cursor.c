@@ -20,15 +20,24 @@
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
-	WT_ERR(__clsm_enter(clsm, 0))
+	WT_ERR(__clsm_enter(clsm, 0));					\
+	__wt_cache_full_check(session);					\
+	F_SET(session, WT_SESSION_CACHE_BUSY)
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
-	WT_ERR(__clsm_enter(clsm, 1))
+	WT_ERR(__clsm_enter(clsm, 1));					\
+	__wt_cache_full_check(session);					\
+	F_SET(session, WT_SESSION_CACHE_BUSY)
+
+#define	WT_LSM_LEAVE(session)						\
+	API_END(session);						\
+	F_CLR(session, WT_SESSION_CACHE_BUSY);				\
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
 	CURSOR_UPDATE_API_END(session, ret);				\
+	F_CLR(session, WT_SESSION_CACHE_BUSY)
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_lookup(WT_CURSOR_LSM *);
@@ -619,7 +628,7 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	return (ret);
 }
 
@@ -700,7 +709,7 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	return (ret);
 }
 
@@ -850,7 +859,7 @@ __clsm_search(WT_CURSOR *cursor)
 
 	ret = __clsm_lookup(clsm);
 
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	return (ret);
 }
 
@@ -991,7 +1000,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		ret = WT_NOTFOUND;
 
 done:
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	if (ret == 0) {
 		c = clsm->current;
 		WT_TRET(c->get_key(c, &cursor->key));
