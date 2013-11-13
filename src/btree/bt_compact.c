@@ -185,7 +185,8 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case 0:
 disk:		WT_RET(__wt_ref_info(session,
 		    page->parent, page->ref, &addr, &addr_size, NULL));
-		WT_ASSERT(session, addr != NULL);
+		if (addr == NULL)
+			return (0);
 		WT_RET(
 		    bm->compact_page_skip(bm, session, addr, addr_size, &skip));
 		if (skip)

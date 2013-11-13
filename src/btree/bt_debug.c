@@ -816,14 +816,11 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
+	
+	WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
+	__dmsg(ds, " %s\n", addr == NULL ? "[NoAddr]" :
+	    __wt_addr_string(session, ds->tmp, addr, size));
 
-	if (ref->addr == NULL)
-		__dmsg(ds, " %s\n", "[NoAddr]");
-	else {
-		WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
-		__dmsg(ds,
-		    " %s\n", __wt_addr_string(session, ds->tmp, addr, size));
-	}
 	return (0);
 }
 
