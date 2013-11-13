@@ -450,8 +450,8 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
  * __wt_ref_info --
  *	Return the addr/size and type triplet for a reference.
  */
-static inline void
-__wt_ref_info(WT_PAGE *page,
+static inline int
+__wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
     WT_REF *ref, const uint8_t **addrp, uint32_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
@@ -487,6 +487,7 @@ __wt_ref_info(WT_PAGE *page,
 			case WT_ADDR_LEAF_NO:
 				*typep = WT_CELL_ADDR_LEAF_NO;
 				break;
+			WT_ILLEGAL_VALUE(session);
 			}
 	} else {
 		__wt_cell_unpack((WT_CELL *)addr, unpack);
@@ -495,6 +496,7 @@ __wt_ref_info(WT_PAGE *page,
 		if (typep != NULL)
 			*typep = unpack->type;
 	}
+	return (0);
 }
 
 /*

@@ -94,7 +94,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	 * Otherwise, there's an address, read the backing disk page and build
 	 * an in-memory version of the page.
 	 */
-	__wt_ref_info(parent, ref, &addr, &size, NULL);
+	WT_ERR(__wt_ref_info(session, parent, ref, &addr, &size, NULL));
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 

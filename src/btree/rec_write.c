@@ -859,7 +859,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	if (ref->addr != NULL &&
 	    (ref->txnid == WT_TXN_NONE ||
 	    __wt_txn_visible_all(session, ref->txnid))) {
-		__wt_ref_info(page, ref, &addr, &size, NULL);
+		WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
 		WT_RET(bm->free(bm, session, addr, size));
 
 		if (__wt_off_page(page, ref->addr)) {
@@ -3795,7 +3795,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * Free the page and clear the address (so we don't free
 			 * it twice).
 			 */
-			__wt_ref_info(page->parent, ref, &addr, &size, NULL);
+			WT_RET(__wt_ref_info(session,
+			    page->parent, ref, &addr, &size, NULL));
 			WT_RET(bm->free(bm, session, addr, size));
 			if (__wt_off_page(page->parent, ref->addr)) {
 				__wt_free(

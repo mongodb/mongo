@@ -77,7 +77,8 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		if (WT_PAGE_IS_ROOT(page))
 			continue;
 
-		__wt_ref_info(page->parent, page->ref, &addr, &addr_size, NULL);
+		WT_ERR(__wt_ref_info(session,
+		    page->parent, page->ref, &addr, &addr_size, NULL));
 		if (addr == NULL)
 			continue;
 		WT_ERR(
@@ -121,7 +122,7 @@ __wt_compact_page_skip(
 	 * address, the page isn't on disk, but we have to read internal pages
 	 * to walk the tree regardless; throw up our hands and read it.
 	 */
-	__wt_ref_info(parent, ref, &addr, &addr_size, &type);
+	WT_RET(__wt_ref_info(session, parent, ref, &addr, &addr_size, &type));
 	if (addr == NULL)
 		return (0);
 
@@ -182,7 +183,8 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case 0:
-disk:		__wt_ref_info(page->parent, page->ref, &addr, &addr_size, NULL);
+disk:		WT_RET(__wt_ref_info(session,
+		    page->parent, page->ref, &addr, &addr_size, NULL));
 		WT_ASSERT(session, addr != NULL);
 		WT_RET(
 		    bm->compact_page_skip(bm, session, addr, addr_size, &skip));
