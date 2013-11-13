@@ -144,10 +144,13 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+	pthread_t self;
+	struct timespec ts;
 	size_t len, remain, wlen;
 	int prefix_cnt;
 	const char *err, *prefix;
 	char *end, *p;
+	u_char tid[64];
 
 	/*
 	 * We're using a stack buffer because we want error messages no matter
@@ -165,11 +168,24 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	dhandle = session->dhandle;
 
 	/*
-	 * We have several prefixes for the error message: the database error
+	 * We have several prefixes for the error message:
+	 * a timestamp and the process and thread ids, the database error
 	 * prefix, the data-source's name, and the session's name.  Write them
 	 * as a comma-separate list, followed by a colon.
 	 */
 	prefix_cnt = 0;
+	if (__wt_epoch(session, &ts) == 0) {
+		remain = WT_PTRDIFF(end, p);
+		self = pthread_self();
+		__wt_raw_to_hex_mem((const uint8_t *)&self, sizeof(self),
+		    tid, sizeof(tid));
+		wlen = (size_t)snprintf(p, remain,
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s] ",
+		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
+		    (uint64_t)getpid(), tid);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
 	if ((prefix = S2C(session)->error_prefix) != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain, "%s", prefix);

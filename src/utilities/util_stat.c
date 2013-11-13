@@ -15,14 +15,17 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	size_t urilen;
-	int ch, objname_free;
+	int all, ch, objname_free;
 	const char *pval, *desc;
 	char *objname, *uri;
 
-	objname_free = 0;
+	all = objname_free = 0;
 	objname = uri = NULL;
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	while ((ch = util_getopt(argc, argv, "a")) != EOF)
 		switch (ch) {
+		case 'a':
+			all = 1;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -55,8 +58,8 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	}
 	snprintf(uri, urilen, "statistics:%s", objname);
 
-	if ((ret = session->open_cursor(
-	    session, uri, NULL, NULL, &cursor)) != 0) {
+	if ((ret = session->open_cursor(session, uri, NULL,
+	    all ? "statistics=(all)" : NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, uri, wiredtiger_strerror(ret));
 		goto err;
@@ -91,7 +94,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "stat [uri]\n",
+	    "stat -a [uri]\n",
 	    progname, usage_prefix);
 	return (1);
 }
