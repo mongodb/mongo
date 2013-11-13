@@ -1,6 +1,6 @@
 // Test $text with $textScore projection.
 
-var t = db.getSiblingDB("test").getCollection("fts_querylang");
+var t = db.getSiblingDB("test").getCollection("fts_projection");
 t.drop();
 
 db.adminCommand({setParameter:1, textSearchEnabled:true});
