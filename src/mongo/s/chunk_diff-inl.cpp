@@ -218,79 +218,15 @@ namespace mongo {
         verifyAttached();
 
         //
-        // Basic idea behind the query is to find all the chunks $gt the current max version, and
-        // then also update chunks that we need minor versions - splits and (2.0) max chunks on
-        // shards
+        // Basic idea behind the query is to find all the chunks $gte the current max version.
+        // Currently, any splits and merges will increment the current max version.
         //
 
-        static const int maxMinorVersionClauses = 50;
         BSONObjBuilder queryB;
-
-        int numStaleMinorClauses = extraMinorVersions.size() + _maxShardVersions->size();
-
-#ifdef _DEBUG
-        // In debug builds, randomly trigger full reloads to exercise both codepaths
-        if( rand() % 2 ) numStaleMinorClauses = maxMinorVersionClauses;
-#endif
-
         queryB.append(ChunkType::ns(), _ns);
-
-        //
-        // If we have only a few minor versions to refresh, we can be more selective in our query
-        //
-        if( numStaleMinorClauses < maxMinorVersionClauses ){
-
-            //
-            // Get any version changes higher than we know currently
-            //
-            BSONArrayBuilder queryOrB( queryB.subarrayStart( "$or" ) );
-            {
-                BSONObjBuilder queryNewB( queryOrB.subobjStart() );
-                {
-                    BSONObjBuilder ts(queryNewB.subobjStart(ChunkType::DEPRECATED_lastmod()));
-                    // We should *always* pull at least a single chunk back, this lets us quickly
-                    // detect if our collection was unsharded (and most of the time if it was
-                    // resharded) in the meantime
-                    ts.appendTimestamp( "$gte", _maxVersion->toLong() );
-                    ts.done();
-                }
-
-                queryNewB.done();
-            }
-
-            // Get any shard version changes higher than we know currently
-            // Needed since there could have been a split of the max version chunk of any shard
-            // TODO: Ideally, we shouldn't care about these
-            for( typename map<ShardType, ChunkVersion>::const_iterator it = _maxShardVersions->begin(); it != _maxShardVersions->end(); it++ ){
-
-                BSONObjBuilder queryShardB( queryOrB.subobjStart() );
-                queryShardB.append(ChunkType::shard(), nameFrom( it->first ) );
-                {
-                    BSONObjBuilder ts(queryShardB.subobjStart(ChunkType::DEPRECATED_lastmod()));
-                    ts.appendTimestamp( "$gt", it->second.toLong() );
-                    ts.done();
-                }
-                queryShardB.done();
-            }
-
-            // Get any minor version changes we've marked as interesting
-            // TODO: Ideally we shouldn't care about these
-            for( set<ChunkVersion>::const_iterator it = extraMinorVersions.begin(); it != extraMinorVersions.end(); it++ ){
-
-                BSONObjBuilder queryShardB( queryOrB.subobjStart() );
-                {
-                    BSONObjBuilder ts(queryShardB.subobjStart(ChunkType::DEPRECATED_lastmod()));
-                    ts.appendTimestamp( "$gt", it->toLong() );
-                    ts.appendTimestamp( "$lt",
-                                        ChunkVersion( it->majorVersion() + 1, 0, OID() ).toLong() );
-                    ts.done();
-                }
-                queryShardB.done();
-            }
-
-            queryOrB.done();
-        }
-
+        BSONObjBuilder tsBuilder(queryB.subobjStart(ChunkType::DEPRECATED_lastmod()));
+        tsBuilder.appendTimestamp( "$gte", _maxVersion->toLong() );
+        tsBuilder.done();
         BSONObj query = queryB.obj();
 
         //

@@ -173,6 +173,5 @@ namespace mongo {
 } // namespace mongo
 
 // Include template definition
-// TODO: Convert to normal .cpp file when normalized
-#include "chunk_diff.hpp"
+#include "chunk_diff-inl.cpp"
 
