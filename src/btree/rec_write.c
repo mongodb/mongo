@@ -2241,19 +2241,13 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
  *	Return a value cell's address type.
  */
 static inline u_int
-__rec_vtype(WT_SESSION_IMPL *session, WT_ADDR *addr)
+__rec_vtype(WT_ADDR *addr)
 {
-
-	switch (addr->type) {
-	case WT_ADDR_INT:
+	if (addr->type == WT_ADDR_INT)
 		return (WT_CELL_ADDR_INT);
-	case WT_ADDR_LEAF:
+	if (addr->type == WT_ADDR_LEAF)
 		return (WT_CELL_ADDR_LEAF);
-	case WT_ADDR_LEAF_NO:
-		return (WT_CELL_ADDR_LEAF_NO);
-	WT_ILLEGAL_VALUE(session);
-	}
-	/* NOTREACHED */
+	return (WT_CELL_ADDR_LEAF_NO);
 }
 
 /*
@@ -2361,7 +2355,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			val->len = val->buf.size;
 		} else
 			__rec_cell_build_addr(r, addr->addr, addr->size,
-			    __rec_vtype(session, addr), ref->key.recno);
+			    __rec_vtype(addr), ref->key.recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -3114,7 +3108,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			p = addr->addr;
 			size = addr->size;
 			if (vtype == 0)
-				vtype = __rec_vtype(session, addr);
+				vtype = __rec_vtype(addr);
 		} else {
 			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;
@@ -3260,7 +3254,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			p = addr->addr;
 			size = addr->size;
 			if (vtype == 0)
-				vtype = __rec_vtype(session, addr);
+				vtype = __rec_vtype(addr);
 		} else {
 			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;
