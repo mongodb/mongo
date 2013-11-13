@@ -15,15 +15,17 @@ int
 __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BM *bm;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int skip;
 	uint32_t addr_size;
+	int skip;
 	const uint8_t *addr;
 
 	WT_UNUSED(cfg);
 
 	bm = S2BT(session)->bm;
+	conn = S2C(session);
 	page = NULL;
 
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
@@ -43,16 +45,24 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Walk the cache reviewing in-memory pages to see if they need to be
-	 * re-written.  This requires looking at page reconciliation results,
-	 * which means the page cannot be reconciled at the same time as it's
-	 * being reviewed for compaction.  The underlying functions ensure we
-	 * don't collide with page eviction, but we need to make sure we don't
-	 * collide with checkpoints either, they are the other operation that
-	 * can reconcile a page.
+	 * re-written, which requires looking at page reconciliation results.
+	 * The underlying functions ensure we don't collide with page eviction,
+	 * but we need to make sure we don't collide with checkpoints either,
+	 * they are the other operation that can reconcile a page.
+	 *	Lock out checkpoints and set a flag so reconciliation knows
+	 * compaction is running.  This means checkpoints block compaction, but
+	 * compaction won't block checkpoints for more than a few instructions.
+	 *	Reconciliation looks for the flag: if set, reconciliation locks
+	 * the page it's writing.  That's bad, because a page lock blocks work
+	 * on the page, but compaction is an uncommon, heavy-weight operation,
+	 * we're probably doing a ton of I/O, spinlocks aren't our big concern.
 	 */
-	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
+	__wt_spin_lock(session, &conn->checkpoint_lock);
+	conn->compact_in_memory_pass = 1;
+	__wt_spin_unlock(session, &conn->checkpoint_lock);
 	ret = __wt_bt_cache_op(session, NULL, WT_SYNC_COMPACT);
-	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+	conn->compact_in_memory_pass = 0;
+	WT_FULL_BARRIER();
 	WT_ERR(ret);
 
 	/*
@@ -145,21 +155,14 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
-	int skip;
 	uint32_t addr_size;
+	int skip;
 	const uint8_t *addr;
 
 	bm = S2BT(session)->bm;
 	mod = page->modify;
 
 	/*
-	 * We have to review page reconciliation information as an in-memory
-	 * page's original disk addresses might have been fine for compaction
-	 * but its replacement addresses might be a problem.  To review page
-	 * reconciliation information, we have to lock out both eviction and
-	 * checkpoints, as those are the other two operations that can write
-	 * a page.
-	 *
 	 * Ignore the root: it may not have a replacement address, and besides,
 	 * if anything else gets written, so will it.
 	 */
@@ -176,14 +179,10 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/*
 	 * If the page is clean, test the original addresses.
 	 * If the page is a 1-to-1 replacement, test the replacement addresses.
-	 * If the page is a split, ignore it, it will be merged into the parent.
+	 * Ignore split and empty pages, they get merged into the parent.
 	 */
-	if (mod == NULL)
-		goto disk;
-
-	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
-	case 0:
-disk:		WT_RET(__wt_ref_info(session,
+	if (mod == NULL || F_ISSET(mod, WT_PM_REC_MASK) == 0) {
+		WT_RET(__wt_ref_info(session,
 		    page->parent, page->ref, &addr, &addr_size, NULL));
 		if (addr == NULL)
 			return (0);
@@ -191,18 +190,17 @@ disk:		WT_RET(__wt_ref_info(session,
 		    bm->compact_page_skip(bm, session, addr, addr_size, &skip));
 		if (skip)
 			return (0);
-		break;
-	case WT_PM_REC_EMPTY:
-		return (0);
-	case WT_PM_REC_REPLACE:
+	} else if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_REPLACE) {
+		/*
+		 * The page's modification information can change underfoot if
+		 * the page is being reconciled, lock the page down.
+		 */
+		WT_PAGE_LOCK(session, page);
 		WT_RET(bm->compact_page_skip(bm,
 		    session, mod->u.replace.addr, mod->u.replace.size, &skip));
+		WT_PAGE_UNLOCK(session, page);
 		if (skip)
 			return (0);
-		break;
-	case WT_PM_REC_SPLIT:
-	case WT_PM_REC_SPLIT_MERGE:
-		return (0);
 	}
 
 	/* Mark the page and tree dirty, we want to write this page. */

@@ -284,6 +284,10 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 {
 	WT_RECONCILE *r;
 	WT_DECL_RET;
+	WT_CONNECTION_IMPL *conn;
+	int locked;
+
+	conn = S2C(session);
 
 	/* We're shouldn't get called with a clean page, that's an error. */
 	if (!__wt_page_is_modified(page))
@@ -313,6 +317,16 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
 	r = session->reconcile;
 
+	/*
+	 * The compaction process looks at the page's modification information;
+	 * if compaction is running, lock the page down.
+	 */
+	locked = 0;
+	if (conn->compact_in_memory_pass) {
+		locked = 1;
+		WT_PAGE_LOCK(session, page);
+	}
+
 	/* Reconcile the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -333,15 +347,19 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_LEAF:
 		ret = __rec_row_leaf(session, r, page, salvage);
 		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-	if (ret != 0) {
-		WT_TRET(__rec_write_wrapup_err(session, r, page));
-		return (ret);
+	WT_ILLEGAL_VALUE_SET(session);
 	}
 
-	/* Wrap up the page's reconciliation. */
-	WT_RET(__rec_write_wrapup(session, r, page));
+	/* Wrap up the page reconciliation. */
+	if (ret == 0)
+		ret = __rec_write_wrapup(session, r, page);
+	else
+		WT_TRET(__rec_write_wrapup_err(session, r, page));
+
+	/* Release the page lock if we're holding one. */
+	if (locked)
+		WT_PAGE_UNLOCK(session, page);
+	WT_RET(ret);
 
 	/*
 	 * If this page has a parent, mark the parent dirty.  Split-merge pages
