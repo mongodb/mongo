@@ -231,6 +231,14 @@ struct __wt_page_modify {
 
 	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
+#define	WT_PAGE_LOCK(session, page)					\
+	__wt_spin_lock((session), (page)->modify->page_lock)
+#define	WT_PAGE_TRYLOCK(session, page)					\
+	__wt_spin_trylock((session), (page)->modify->page_lock)
+#define	WT_PAGE_UNLOCK(session, page)					\
+	__wt_spin_unlock(session, (page)->modify->page_lock)
+	WT_SPINLOCK *page_lock;		/* Page's spinlock */
+
 	/*
 	 * The write generation is incremented when a page is modified, a page
 	 * is clean if the write generation is 0.
@@ -240,17 +248,6 @@ struct __wt_page_modify {
 	 * 4B types will always be backed by atomic writes to memory.
 	 */
 	uint32_t write_gen;
-
-#define	WT_PAGE_LOCK(session, page)					\
-	__wt_spin_lock(							\
-	    session, S2C(session)->page_lock[(page)->modify->page_lock])
-#define	WT_PAGE_TRYLOCK(session, page)					\
-	__wt_spin_trylock(						\
-	    session, S2C(session)->page_lock[(page)->modify->page_lock])
-#define	WT_PAGE_UNLOCK(session, page)					\
-	__wt_spin_unlock(						\
-	    session, S2C(session)->page_lock[(page)->modify->page_lock])
-	uint8_t page_lock;		/* Page's spinlock */
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
