@@ -348,43 +348,46 @@ namespace mongo {
         // so this should be 30000 in that case
         long long _expectedLatencyMs; 
 
-        /** Nested class that implements a time limit ($maxTimeMS) for a CurOp object. */
+        // Time limit for this operation.  0 if the operation has no time limit.
+        uint64_t _maxTimeMicros;
+
+        /** Nested class that implements tracking of a time limit for a CurOp object. */
         class MaxTimeTracker {
             MONGO_DISALLOW_COPYING(MaxTimeTracker);
         public:
             /** Newly-constructed MaxTimeTracker objects have the time limit disabled. */
             MaxTimeTracker();
 
-            /** Disables the time limit. */
+            /** Disables the time tracker. */
             void reset();
 
-            /** Returns whether or not the time limit is enabled. */
-            bool isEnabled() { return _enabled; }
+            /** Returns whether or not time tracking is enabled. */
+            bool isEnabled() const { return _enabled; }
 
             /**
-             * Enables the time limit to be "durationMicros" microseconds from "startEpochMicros"
-             * (units of microseconds since the epoch).
+             * Enables time tracking.  The time limit is set to be "durationMicros" microseconds
+             * from "startEpochMicros" (units of microseconds since the epoch).
              *
              * "durationMicros" must be nonzero.
              */
             void setTimeLimit(uint64_t startEpochMicros, uint64_t durationMicros);
 
             /**
-             * Checks whether the time limit has been hit.  Returns false if not, or if the time
-             * limit is disabled.
+             * Checks whether the time limit has been hit.  Returns false if not, or if time
+             * tracking is disabled.
              */
             bool checkTimeLimit();
 
             /**
              * Returns the number of microseconds remaining for the time limit, or the special
-             * value 0 if the time limit is disabled.
+             * value 0 if time tracking is disabled.
              *
              * Calling this method is more expensive than calling its sibling "checkInterval()",
              * since an accurate measure of remaining time needs to be calculated.
              */
             uint64_t getRemainingMicros() const;
         private:
-            // Whether or not this operation is subject to a time limit.
+            // Whether or not time tracking is enabled for this operation.
             bool _enabled;
 
             // Point in time at which the time limit is hit.  Units of microseconds since the
