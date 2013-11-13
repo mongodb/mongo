@@ -66,7 +66,15 @@ assert.throws(function() { t.find({$or: [{$text: {$search: "content -irrelevant"
 
 // TODO Test invalid inputs for $text, $search, $language.
 
-// TODO Test $language.
+// Test $language.
+cursor = t.find({$text: {$search: "contents", $language: "none"}});
+assert.eq(false, cursor.hasNext());
+
+cursor = t.find({$text: {$search: "contents", $language: "EN"}});
+assert.eq(true, cursor.hasNext());
+
+cursor = t.find({$text: {$search: "contents", $language: "spanglish"}});
+assert.throws(function() { cursor.next() });
 
 // TODO Test $and of basic text query with geo expression.
 

@@ -34,6 +34,7 @@
 #include <vector>
 #include <string>
 
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
@@ -54,14 +55,14 @@ namespace mongo {
         class FTSSpec {
 
             struct Tools {
-                Tools( string _language,
+                Tools( const FTSLanguage _language,
                        const Stemmer* _stemmer,
                        const StopWords* _stopwords )
                     : language( _language )
                     , stemmer( _stemmer )
                     , stopwords( _stopwords ) {}
 
-                const std::string& language;
+                const FTSLanguage language;
                 const Stemmer* stemmer;
                 const StopWords* stopwords;
             };
@@ -70,7 +71,7 @@ namespace mongo {
             FTSSpec( const BSONObj& indexInfo );
 
             bool wildcard() const { return _wildcard; }
-            const string& defaultLanguage() const { return _defaultLanguage; }
+            const FTSLanguage defaultLanguage() const { return _defaultLanguage; }
             const string& languageOverrideField() const { return _languageOverrideField; }
 
             size_t numExtraBefore() const { return _extraBefore.size(); }
@@ -78,13 +79,6 @@ namespace mongo {
 
             size_t numExtraAfter() const { return _extraAfter.size(); }
             const std::string& extraAfter( unsigned i ) const { return _extraAfter[i]; }
-
-            /**
-             * Find a "language" field, if any, in a given BSON doc.  If the language is not on the
-             * list of valid languages, return current.
-             */
-            string getLanguageToUse( const BSONObj& userDoc,
-                                     const std::string& currentLanguage ) const;
 
             /**
              * Calculates term/score pairs for a BSONObj as applied to this spec.
@@ -95,7 +89,7 @@ namespace mongo {
              * - "term_freqs": out-parameter to store results
              */
             void scoreDocument( const BSONObj& obj,
-                                const string& parentLanguage,
+                                const FTSLanguage parentLanguage,
                                 const string& parentPath,
                                 bool isArray,
                                 TermFrequencyMap* term_freqs ) const;
@@ -109,12 +103,19 @@ namespace mongo {
 
             static BSONObj fixSpec( const BSONObj& spec );
         private:
+            /**
+             * Get the language override for the given BSON doc.  If no language override is
+             * specified, returns currentLanguage.
+             */
+            const FTSLanguage getLanguageToUse( const BSONObj& userDoc,
+                                                const FTSLanguage currentLanguage ) const;
+
             void _scoreString( const Tools& tools,
                                const StringData& raw,
                                TermFrequencyMap* term_freqs,
                                double weight ) const;
 
-            string _defaultLanguage;
+            FTSLanguage _defaultLanguage;
             string _languageOverrideField;
             bool _wildcard;
 

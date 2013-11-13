@@ -107,7 +107,7 @@ namespace mongo {
             IndexDescriptor* descriptor = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
             auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(descriptor));
             if ( language == "" ) {
-                language = fam->getSpec().defaultLanguage();
+                language = fam->getSpec().defaultLanguage().str();
             }
             Status s = fam->getSpec().getIndexPrefix( filter, &indexPrefix );
             if ( !s.isOK() ) {

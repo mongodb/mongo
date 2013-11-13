@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_language.h"
 #include "third_party/libstemmer_c/include/libstemmer.h"
 
 namespace mongo {
@@ -47,7 +48,7 @@ namespace mongo {
          */
         class Stemmer {
         public:
-            Stemmer( const std::string& language );
+            Stemmer( const FTSLanguage language );
             ~Stemmer();
 
             std::string stem( const StringData& word ) const;

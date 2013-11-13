@@ -29,6 +29,7 @@ env.StaticLibrary('base', [
         'fts_matcher.cpp',
         'fts_query.cpp',
         'fts_spec.cpp',
+        'fts_language.cpp',
         'fts_util.cpp',
         'stemmer.cpp',
         'stop_words.cpp',
@@ -72,6 +73,9 @@ env.CppUnitTest( "fts_query_test", "fts_query_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",

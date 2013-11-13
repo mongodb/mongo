@@ -43,10 +43,13 @@ namespace mongo {
 
         Status FTSQuery::parse(const string& query, const string& language) {
             _search = query;
-            _language = language;
+            Status status = _language.init( language );
+            if ( !status.isOK() ) {
+                return status;
+            }
 
-            const StopWords* stopWords = StopWords::getStopWords( language );
-            Stemmer stemmer( language );
+            const StopWords* stopWords = StopWords::getStopWords( _language );
+            Stemmer stemmer( _language );
 
             bool inNegation = false;
             bool inPhrase = false;

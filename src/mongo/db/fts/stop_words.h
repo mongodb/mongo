@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -51,7 +52,7 @@ namespace mongo {
 
             size_t numStopWords() const { return _words.size(); }
 
-            static const StopWords* getStopWords( const std::string& langauge );
+            static const StopWords* getStopWords( const FTSLanguage langauge );
         private:
             ~StopWords(){}
             unordered_set<std::string> _words;

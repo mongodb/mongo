@@ -45,15 +45,19 @@ namespace mongo {
         const double MAX_WEIGHT = 1000000000;
         const double MAX_WORD_WEIGHT = MAX_WEIGHT / 10000;
 
+        namespace {
+            // Default language.  Used for new indexes.
+            const std::string moduleDefaultLanguage( "english" );
+        }
+
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
             massert( 16739, "found invalid spec for text index",
                      indexInfo["weights"].isABSONObj() );
 
-            _defaultLanguage = indexInfo["default_language"].valuestrsafe();
-            _languageOverrideField = indexInfo["language_override"].valuestrsafe();
+            Status status = _defaultLanguage.init( indexInfo["default_language"].String() );
+            verify( status.isOK() );
 
-            if ( _defaultLanguage.size() == 0 )
-                _defaultLanguage = "english";
+            _languageOverrideField = indexInfo["language_override"].valuestrsafe();
             if ( _languageOverrideField.size() == 0 )
                 _languageOverrideField = "language";
 
@@ -103,15 +107,20 @@ namespace mongo {
             }
         }
 
-        string FTSSpec::getLanguageToUse( const BSONObj& userDoc,
-                                          const string& currentLanguage ) const {
+        const FTSLanguage FTSSpec::getLanguageToUse( const BSONObj& userDoc,
+                                                     const FTSLanguage currentLanguage ) const {
             BSONElement e = userDoc[_languageOverrideField];
-            if ( e.type() == String ) {
-                const char * x = e.valuestrsafe();
-                if ( strlen( x ) > 0 )
-                    return x;
+            if ( e.eoo() ) {
+                return currentLanguage;
             }
-            return currentLanguage;
+            uassert( 17261,
+                     "found language override field in document with non-string type",
+                     e.type() == mongo::String );
+            StatusWithFTSLanguage swl = FTSLanguage::makeFTSLanguage( e.String() );
+            uassert( 17262,
+                     "language override unsupported: " + e.String(),
+                     swl.getStatus().isOK() );
+            return swl.getValue();
         }
 
 
@@ -129,11 +138,11 @@ namespace mongo {
         }
 
         void FTSSpec::scoreDocument( const BSONObj& obj,
-                                     const string& parentLanguage,
+                                     const FTSLanguage parentLanguage,
                                      const string& parentPath,
                                      bool isArray,
                                      TermFrequencyMap* term_freqs ) const {
-            string language = getLanguageToUse( obj, parentLanguage );
+            const FTSLanguage language = getLanguageToUse( obj, parentLanguage );
             Stemmer stemmer( language );
             Tools tools( language, &stemmer, StopWords::getStopWords( language ) );
 
@@ -374,9 +383,19 @@ namespace mongo {
                 weights = b.obj();
             }
 
-            string default_language(spec.getStringField("default_language"));
-            if ( default_language.empty() )
-                default_language = "english";
+            BSONElement default_language_elt = spec["default_language"];
+            string default_language( default_language_elt.str() );
+            if ( default_language_elt.eoo() ) {
+                default_language = moduleDefaultLanguage;
+            }
+            else {
+                uassert( 17263,
+                         "default_language needs a string type",
+                         default_language_elt.type() == String );
+            }
+            uassert( 17264,
+                     "default_language is not valid",
+                     FTSLanguage::makeFTSLanguage( default_language ).getStatus().isOK() );
 
             string language_override(spec.getStringField("language_override"));
             if ( language_override.empty() )

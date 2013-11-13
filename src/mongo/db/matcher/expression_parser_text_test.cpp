@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionParserText, Text ) {
+    TEST( MatchExpressionParserText, Parse1 ) {
         BSONObj query = fromjson( "{$text:{$search:\"awesome\", $language:\"english\"}}" );
 
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
@@ -51,5 +51,12 @@ namespace mongo {
         TextMatchExpression* textExp = static_cast<TextMatchExpression*>( exp );
         ASSERT_EQUALS( textExp->getQuery(), "awesome" );
         ASSERT_EQUALS( textExp->getLanguage(), "english" );
+    }
+
+    TEST( MatchExpressionParserText, Parse2 ) {
+        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $language:\"spanglish\"}}" );
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
     }
 }

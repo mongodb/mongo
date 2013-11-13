@@ -215,7 +215,7 @@ namespace mongo {
             if (!s.isOK()) { return NULL; }
 
             string language = ("" == node->_language
-                               ? fam->getSpec().defaultLanguage()
+                               ? fam->getSpec().defaultLanguage().str()
                                : node->_language);
 
             FTSQuery ftsq;

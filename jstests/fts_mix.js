@@ -67,6 +67,13 @@ res = tc.runCommand( "text", { search: "magazine's" } );
 res2 = tc.runCommand( "text", { search: "magazine" } );
 assert.eq( getIDS( res ), getIDS( res2 ) );
 
+// -------------------------------------------- LANGUAGE -------------------------------------------
+
+res = tc.runCommand( "text", { search: "member", language: "spanglish" } );
+assert.commandFailed( res );
+res = tc.runCommand( "text", { search: "member", language: "english" } );
+assert.commandWorked( res );
+
 // -------------------------------------------- LIMIT RESULTS --------------------------------------
 
 // ensure limit limits results

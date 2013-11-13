@@ -30,6 +30,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -46,11 +47,19 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$search needs a String" );
         }
 
+        string language = "";
         BSONElement languageElt = queryObj["$language"];
-        if ( !languageElt.eoo() && mongo::String != languageElt.type() ) {
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "$language needs a String" );
+        if ( !languageElt.eoo() ) {
+            if ( mongo::String != languageElt.type() ) {
+                return StatusWithMatchExpression( ErrorCodes::BadValue,
+                                                  "$language needs a String" );
+            }
+            language = languageElt.String();
+            if ( !fts::FTSLanguage::makeFTSLanguage( language ).getStatus().isOK() ) {
+                return StatusWithMatchExpression( ErrorCodes::BadValue,
+                                                  "$language specifies unsupported language" );
+            }
         }
-        string language = ( !languageElt.eoo() ? languageElt.String() : "" );
         string query = queryObj["$search"].String();
 
         if ( queryObj.nFields() != ( languageElt.eoo() ? 1 : 2 ) ) {

@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 
@@ -60,7 +61,7 @@ namespace mongo {
         class Tokenizer {
         public:
 
-            Tokenizer( const std::string& language, const StringData& str );
+            Tokenizer( const FTSLanguage language, const StringData& str );
 
             bool more() const;
             Token next();

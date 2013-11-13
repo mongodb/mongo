@@ -47,6 +47,29 @@ namespace mongo {
             ASSERT_EQUALS( fixed, fixed2 );
         }
 
+        TEST( FTSSpec, DefaultLanguage1 ) {
+            BSONObj user = BSON( "key" << BSON( "text" << "fts" ) <<
+                                 "default_language" << "spanish" );
+
+            try {
+                BSONObj fixed = FTSSpec::fixSpec( user );
+            }
+            catch ( UserException& e ) {
+                ASSERT(false);
+            }
+        }
+
+        TEST( FTSSpec, DefaultLanguage2 ) {
+            BSONObj user = BSON( "key" << BSON( "text" << "fts" ) <<
+                                 "default_language" << "spanglish" );
+
+            try {
+                BSONObj fixed = FTSSpec::fixSpec( user );
+                ASSERT(false);
+            }
+            catch ( UserException& e ) {}
+        }
+
         TEST( FTSSpec, ScoreSingleField1 ) {
             BSONObj user = BSON( "key" << BSON( "title" << "fts" <<
                                                 "text" << "fts" ) <<
@@ -56,7 +79,10 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "title" << "cat sat run" ),
-                                "english", "", false, &m );
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
             ASSERT_EQUALS( 3U, m.size() );
             ASSERT_EQUALS( m["cat"], m["sat"] );
             ASSERT_EQUALS( m["cat"], m["run"] );
@@ -72,7 +98,10 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "title" << "cat sat run" << "text" << "cat book" ),
-                                "english", "", false, &m );
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
 
             ASSERT_EQUALS( 4U, m.size() );
             ASSERT_EQUALS( m["sat"], m["run"] );
@@ -94,7 +123,10 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "title" << "cat sat sat run run run" ),
-                                "english", "", false, &m );
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
             ASSERT_EQUALS( 3U, m.size() );
             ASSERT( m["cat"] > 0 );
             ASSERT( m["sat"] > m["cat"] );
@@ -163,7 +195,11 @@ namespace mongo {
             // The following document matches {"a.b": {$type: 2}}, so "term" should be indexed.
             BSONObj obj = fromjson("{a: [{b: ['term']}]}"); // indirectly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj, "english", "", false, &m );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -174,7 +210,11 @@ namespace mongo {
             // The wildcard spec implies a full recursive traversal, so "term" should be indexed.
             BSONObj obj = fromjson("{a: {b: [['term']]}}"); // directly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj, "english", "", false, &m );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -186,7 +226,11 @@ namespace mongo {
             // indexed.
             BSONObj obj = fromjson("{a: {b: [['term']]}}"); // directly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj, "english", "", false, &m );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
             ASSERT_EQUALS( 0U, m.size() );
         }
 
@@ -205,7 +249,11 @@ namespace mongo {
                 "   }"
                 " }" );
 
-            spec.scoreDocument( obj, "english", "", false, &tfm );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &tfm );
 
             set<string> hits;
             hits.insert("walk");
@@ -236,7 +284,11 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, "english", "", false, &tfm );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -267,7 +319,11 @@ namespace mongo {
                 "  } ]"
                 "}" );
 
-            spec.scoreDocument( obj, "english", "", false, &tfm );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -300,7 +356,11 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, "english", "", false, &tfm );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -333,7 +393,11 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, "english", "", false, &tfm );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -368,7 +432,11 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, "english", "", false, &tfm );
+            spec.scoreDocument( obj,
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &tfm );
 
             set<string> hits;
             hits.insert("foredrag");

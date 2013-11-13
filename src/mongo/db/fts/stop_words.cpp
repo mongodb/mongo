@@ -59,8 +59,8 @@ namespace mongo {
                 _words.insert( *i );
         }
 
-        const StopWords* StopWords::getStopWords( const std::string& langauge ) {
-            unordered_map<string,StopWords*>::const_iterator i = STOP_WORDS.find( langauge );
+        const StopWords* StopWords::getStopWords( const FTSLanguage language ) {
+            unordered_map<string,StopWords*>::const_iterator i = STOP_WORDS.find( language.str() );
             if ( i == STOP_WORDS.end() )
                 return empty;
             return i->second;

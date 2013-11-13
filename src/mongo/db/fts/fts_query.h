@@ -69,7 +69,7 @@ namespace mongo {
             }
 
             string getSearch() const { return _search; }
-            string getLanguage() const { return _language; }
+            const FTSLanguage getLanguage() const { return _language; }
 
             string toString() const;
 
@@ -77,7 +77,7 @@ namespace mongo {
 
         protected:
             string _search;
-            string _language;
+            FTSLanguage _language;
             vector<string> _terms;
             unordered_set<string> _negatedTerms;
             vector<string> _phrases;
