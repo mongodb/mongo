@@ -275,12 +275,6 @@ namespace audit {
     void logShutdown(ClientBasic* client);
 
     /**
-     * Logs the result of an AuditLogRotate command.
-     */
-    void logAuditLogRotate(ClientBasic* client,
-                           const StringData& file);
-
-    /**
      * Logs the result of a createIndex command.
      */
     void logCreateIndex(ClientBasic* client,

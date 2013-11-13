@@ -167,9 +167,6 @@ namespace audit {
 
     void logShutdown(ClientBasic* client) MONGO_AUDIT_STUB
 
-    void logAuditLogRotate(ClientBasic* client,
-                           const StringData& file) MONGO_AUDIT_STUB
-
     void logCreateIndex(ClientBasic* client,
                         const BSONObj* indexSpec,
                         const StringData& indexname,
