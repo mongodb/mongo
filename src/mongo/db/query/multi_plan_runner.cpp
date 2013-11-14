@@ -486,7 +486,7 @@ namespace mongo {
              it != _candidateStats.end();
              ++it) {
 
-            TypeExplain* candidateExplain;
+            TypeExplain* candidateExplain = NULL;
             status = explainPlan(**it, &candidateExplain, false /* no full details */);
             if (status != Status::OK()) {
                 continue;
