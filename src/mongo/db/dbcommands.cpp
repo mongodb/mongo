@@ -845,6 +845,13 @@ namespace mongo {
             }
 
             auto_ptr<Runner> runner(rawRunner);
+
+            // The runner must be registered to be informed of DiskLoc deletions and NS dropping
+            // when we yield the lock below.
+            ClientCursor::registerRunner(runner.get());
+            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+
             const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
             BSONObj obj;
