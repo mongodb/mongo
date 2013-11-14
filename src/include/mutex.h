@@ -17,7 +17,8 @@ struct __wt_condvar {
 	pthread_mutex_t mtx;		/* Mutex */
 	pthread_cond_t  cond;		/* Condition variable */
 
-	int signalled;			/* Condition signalled */
+	int waiters;			/* Numbers of waiters, or
+					   -1 if signalled with no waiters. */
 };
 
 /*
