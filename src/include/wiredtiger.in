@@ -2511,50 +2511,56 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SLOT_JOINS			56
 /*! log: consolidated slot join races */
 #define	WT_STAT_CONN_LOG_SLOT_RACES			57
+/*! log: log slot ready wait timeouts */
+#define	WT_STAT_CONN_LOG_SLOT_READY_WAIT_TIMEOUT	58
+/*! log: log slot release wait timeouts */
+#define	WT_STAT_CONN_LOG_SLOT_RELEASE_WAIT_TIMEOUT	59
+/*! log: number of slots selected for switching that were not available */
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		60
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			58
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			61
 /*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			59
+#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			62
 /*! log: consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		60
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		63
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				61
+#define	WT_STAT_CONN_LOG_SYNC				64
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				62
+#define	WT_STAT_CONN_LOG_WRITES				65
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			63
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			66
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			64
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			67
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			65
+#define	WT_STAT_CONN_MEMORY_FREE			68
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			66
+#define	WT_STAT_CONN_MEMORY_GROW			69
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				67
+#define	WT_STAT_CONN_READ_IO				70
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				68
+#define	WT_STAT_CONN_REC_PAGES				71
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			69
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			72
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			70
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			73
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			71
+#define	WT_STAT_CONN_RWLOCK_READ			74
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			72
+#define	WT_STAT_CONN_RWLOCK_WRITE			75
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		73
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		76
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				74
+#define	WT_STAT_CONN_TXN_BEGIN				77
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			75
+#define	WT_STAT_CONN_TXN_CHECKPOINT			78
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				76
+#define	WT_STAT_CONN_TXN_COMMIT				79
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			77
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			80
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			78
+#define	WT_STAT_CONN_TXN_ROLLBACK			81
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				79
+#define	WT_STAT_CONN_WRITE_IO				82
 
 /*!
  * @}

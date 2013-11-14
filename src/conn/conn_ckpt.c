@@ -73,7 +73,7 @@ __ckpt_server(void *arg)
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 
 		/* Wait... */
-		WT_ERR(
+		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
 	}
 

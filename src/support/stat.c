@@ -381,6 +381,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
 	stats->log_slot_joins.desc = "log: consolidated slot joins";
 	stats->log_slot_races.desc = "log: consolidated slot join races";
+	stats->log_slot_ready_wait_timeout.desc =
+	    "log: log slot ready wait timeouts";
+	stats->log_slot_release_wait_timeout.desc =
+	    "log: log slot release wait timeouts";
+	stats->log_slot_switch_fails.desc =
+	    "log: number of slots selected for switching that were not available";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_slot_toosmall.desc =
 	    "log: failed to find a slot large enough for record";
@@ -469,6 +475,9 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_slot_consolidated.v = 0;
 	stats->log_slot_joins.v = 0;
 	stats->log_slot_races.v = 0;
+	stats->log_slot_ready_wait_timeout.v = 0;
+	stats->log_slot_release_wait_timeout.v = 0;
+	stats->log_slot_switch_fails.v = 0;
 	stats->log_slot_toobig.v = 0;
 	stats->log_slot_toosmall.v = 0;
 	stats->log_slot_transitions.v = 0;
