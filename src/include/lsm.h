@@ -64,7 +64,7 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_CHUNK_ONDISK	0x10
 #define	WT_LSM_CHUNK_STABLE	0x20
 	uint32_t flags;
-};
+} WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 /*
  * WT_LSM_TREE --
