@@ -38,7 +38,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/max_time.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/index_details.h"
@@ -1319,16 +1318,9 @@ namespace mongo {
                 BSONObjBuilder builder;
                 BSONObj requestBSON = request->toBSON();
                 Command::runAgainstRegistered( cmdNS.c_str(), requestBSON, builder, 0 );
+                // We purposely don't do anything with the response, lastError is populated in
+                // the command itself.
 
-                BatchedCommandResponse response;
-                bool parsed = response.parseBSON( builder.obj(), NULL );
-                (void)parsed;
-                dassert( parsed && response.isValid( NULL ) );
-
-                LastError* lastErrorForRequest = lastError.get( false /* don't create */ );
-                dassert( lastErrorForRequest );
-
-                batchErrorToLastError( *request, response, lastErrorForRequest );
                 return;
             }
 

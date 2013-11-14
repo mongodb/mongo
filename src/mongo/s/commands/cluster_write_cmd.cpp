@@ -32,8 +32,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batch_upconvert.h"
 
 namespace mongo {
 
@@ -164,6 +166,13 @@ namespace mongo {
             request.setNS( nss.ns() );
             clusterWrite( request, &response, true /* autosplit */ );
         }
+
+        // Populate the lastError object based on the write
+        dassert( response.isValid( NULL ) );
+        LastError* lastErrorForRequest = lastError.get( true /* create */ );
+        dassert( lastErrorForRequest );
+        lastErrorForRequest->reset();
+        batchErrorToLastError( request, response, lastErrorForRequest );
 
         // TODO
         // There's a pending issue about how to report response here. If we use
