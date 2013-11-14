@@ -104,12 +104,6 @@ namespace mongo {
 
         /**
          * @return
-         * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.
-         */
-        bool isPrefixOf( const KeyPattern& otherPattern ) const;
-
-        /**
-         * @return
          * true if this shard key is compatible with a unique index on 'uniqueIndexPattern'.
          *      Primarily this just checks whether 'this' is a prefix of 'uniqueIndexPattern',
          *      However it does not need to be an exact syntactic prefix due to "hashed"

@@ -1,7 +1,7 @@
 // Basic test of sharding with a hashed shard key
 //  - Test basic migrations with moveChunk, using different chunk specification methods
 
-var s = new ShardingTest( { name : jsTestName() , shards : 3 , mongos : 1, verbose : 1 } );
+var s = new ShardingTest( { name : jsTestName() , shards : 1 , mongos : 1, verbose : 1 } );
 var dbname = "test";
 var coll = "foo";
 var ns = dbname + "." + coll;

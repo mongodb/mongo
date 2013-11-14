@@ -84,14 +84,6 @@ namespace mongo {
          */
         BSONElement getField( const char* fieldname ) const { return _pattern[ fieldname ]; }
 
-        /*
-         * Returns true if the key described by this KeyPattern is a prefix of
-         * the (potentially) compound key described by 'other'
-         */
-        bool isPrefixOf( const KeyPattern& other ) const {
-            return _pattern.isPrefixOf( other.toBSON() );
-        }
-
         /**
          * Is the provided key pattern the index over the ID field?
          * The always required ID index is always {_id: 1} or {_id: -1}.

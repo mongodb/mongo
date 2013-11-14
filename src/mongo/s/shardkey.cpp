@@ -73,10 +73,6 @@ namespace mongo {
         return true;
     }
 
-    bool ShardKeyPattern::isPrefixOf( const KeyPattern& otherPattern ) const {
-        return pattern.isPrefixOf( otherPattern );
-    }
-
     bool ShardKeyPattern::isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const {
         return mongo::isUniqueIndexCompatible( pattern.toBSON(), uniqueIndexPattern.toBSON() );
     }

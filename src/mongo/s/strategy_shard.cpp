@@ -1413,7 +1413,7 @@ namespace mongo {
                                  " key: " + o["key"].embeddedObjectUserCheck().toString() ,
                                  IndexDetails::isIdIndexPattern( newIndexKey ) ||
                                  ! o["unique"].trueValue() ||
-                                 r.getConfig()->getChunkManager( ns )->getShardKey().isPrefixOf( newIndexKey ) );
+                                 r.getConfig()->getChunkManager( ns )->getShardKey().isUniqueIndexCompatible( newIndexKey ) );
 
                         ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
                         verify( cm );
