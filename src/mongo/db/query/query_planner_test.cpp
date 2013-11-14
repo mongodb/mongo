@@ -94,17 +94,31 @@ namespace {
         void runQuery(BSONObj query) {
             solns.clear();
             queryObj = query.getOwned();
-            ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, &cq));
+            Status s = CanonicalQuery::canonicalize(ns, queryObj, &cq);
+            if (!s.isOK()) { cq = NULL; }
+            ASSERT_OK(s);
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
             QueryPlanner::plan(*cq, params, &solns);
         }
 
         void runDetailedQuery(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
             solns.clear();
-            ASSERT_OK(CanonicalQuery::canonicalize(ns, query, sort, proj, &cq));
+            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, &cq);
+            if (!s.isOK()) { cq = NULL; }
+            ASSERT_OK(s);
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
             QueryPlanner::plan(*cq, params, &solns);
-            ASSERT_GREATER_THAN(solns.size(), 0U);;
+            ASSERT_GREATER_THAN(solns.size(), 0U);
+        }
+
+        void runQuerySkipLimit(const BSONObj& query, long long skip, long long limit) {
+            solns.clear();
+            Status s = CanonicalQuery::canonicalize(ns, query, skip, limit, &cq);
+            if (!s.isOK()) { cq = NULL; }
+            ASSERT_OK(s);
+            params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+            QueryPlanner::plan(*cq, params, &solns);
+            ASSERT_GREATER_THAN(solns.size(), 0U);
         }
 
         //
@@ -123,30 +137,191 @@ namespace {
             }
         }
 
+        /**
+         * Looks in the children stored in the 'nodes' field of 'testSoln'
+         * to see if they match the 'children' field of 'trueSoln'.
+         *
+         * This does an unordered comparison, i.e. childrenMatch returns true
+         * as long as the set of subtrees in testSoln's 'nodes' matches the set of
+         * subtrees in trueSoln's 'children' vector.
+         */
+        bool childrenMatch(const BSONObj& testSoln, const QuerySolutionNode* trueSoln) const {
+            BSONElement children = testSoln["nodes"];
+            if (children.eoo() || !children.isABSONObj()) { return false; }
+
+            // The order of the children array in testSoln might not match
+            // the order in trueSoln, so we have to check all combos with
+            // these nested loops.
+            BSONObjIterator i(children.Obj());
+            while (i.more()) {
+                BSONElement child = i.next();
+                if (child.eoo() || !child.isABSONObj()) { return false; }
+
+                // try to match against one of the QuerySolutionNode's children
+                bool found = false;
+                for (size_t j = 0; j < trueSoln->children.size(); ++j) {
+                    if (solutionMatches(child.Obj(), trueSoln->children[j])) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                // we couldn't match child
+                if (!found) { return false; }
+            }
+
+            return true;
+        }
+
+        bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln) const {
+
+            //
+            // leaf nodes
+            //
+            if (STAGE_COLLSCAN == trueSoln->getType()) {
+                return testSoln.hasField("cscan") && (testSoln.nFields() == 1);
+            }
+            else if (STAGE_IXSCAN == trueSoln->getType()) {
+                const IndexScanNode* ixn = static_cast<const IndexScanNode*>(trueSoln);
+                BSONElement el = testSoln["ixscan"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj argObj = el.Obj();
+                return argObj == ixn->indexKeyPattern;
+            }
+            else if (STAGE_GEO_2D == trueSoln->getType()) {
+                const Geo2DNode* node = static_cast<const Geo2DNode*>(trueSoln);
+                BSONElement el = testSoln["geo2d"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj geoObj = el.Obj();
+                return geoObj == node->indexKeyPattern;
+            }
+            else if (STAGE_GEO_NEAR_2D == trueSoln->getType()) {
+                const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(trueSoln);
+                BSONElement el = testSoln["geoNear2d"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj geoObj = el.Obj();
+                return geoObj == node->indexKeyPattern;
+            }
+            else if (STAGE_GEO_NEAR_2DSPHERE == trueSoln->getType()) {
+                const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(trueSoln);
+                BSONElement el = testSoln["geoNear2dsphere"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj geoObj = el.Obj();
+                return geoObj == node->indexKeyPattern;
+            }
+
+            //
+            // internal nodes
+            //
+
+            else if (STAGE_FETCH == trueSoln->getType()) {
+                const FetchNode* fn = static_cast<const FetchNode*>(trueSoln);
+                BSONElement el = testSoln["fetch"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                return solutionMatches(el.Obj(), fn->children[0]);
+            }
+            else if (STAGE_OR == trueSoln->getType()) {
+                const OrNode * orn = static_cast<const OrNode*>(trueSoln);
+                BSONElement el = testSoln["or"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj orObj = el.Obj();
+                return childrenMatch(orObj, orn);
+            }
+            else if (STAGE_PROJECTION == trueSoln->getType()) {
+                const ProjectionNode* pn = static_cast<const ProjectionNode*>(trueSoln);
+
+                BSONElement el = testSoln["proj"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj projObj = el.Obj();
+
+                BSONElement spec = projObj["spec"];
+                if (spec.eoo() || !spec.isABSONObj()) { return false; }
+                BSONElement child = projObj["node"];
+                if (child.eoo() || !child.isABSONObj()) { return false; }
+
+                return (spec.Obj() == pn->liteProjection->getProjectionSpec())
+                       && solutionMatches(child.Obj(), pn->children[0]);
+            }
+            else if (STAGE_SORT == trueSoln->getType()) {
+                const SortNode* sn = static_cast<const SortNode*>(trueSoln);
+                BSONElement el = testSoln["sort"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj sortObj = el.Obj();
+
+                BSONElement patternEl = sortObj["pattern"];
+                if (patternEl.eoo() || !patternEl.isABSONObj()) { return false; }
+                BSONElement child = sortObj["node"];
+                if (child.eoo() || !child.isABSONObj()) { return false; }
+
+                return (patternEl.Obj() == sn->pattern)
+                       && solutionMatches(child.Obj(), sn->children[0]);
+            }
+            else if (STAGE_SORT_MERGE == trueSoln->getType()) {
+                const MergeSortNode* msn = static_cast<const MergeSortNode*>(trueSoln);
+                BSONElement el = testSoln["mergeSort"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj mergeSortObj = el.Obj();
+                return childrenMatch(mergeSortObj, msn);
+            }
+            else if (STAGE_SKIP == trueSoln->getType()) {
+                const SkipNode* sn = static_cast<const SkipNode*>(trueSoln);
+                BSONElement el = testSoln["skip"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj sortObj = el.Obj();
+
+                BSONElement skipEl = sortObj["n"];
+                if (!skipEl.isNumber()) { return false; }
+                BSONElement child = sortObj["node"];
+                if (child.eoo() || !child.isABSONObj()) { return false; }
+
+                return (skipEl.numberInt() == sn->skip)
+                       && solutionMatches(child.Obj(), sn->children[0]);
+            }
+            else if (STAGE_LIMIT == trueSoln->getType()) {
+                const LimitNode* ln = static_cast<const LimitNode*>(trueSoln);
+                BSONElement el = testSoln["limit"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj sortObj = el.Obj();
+
+                BSONElement limitEl = sortObj["n"];
+                if (!limitEl.isNumber()) { return false; }
+                BSONElement child = sortObj["node"];
+                if (child.eoo() || !child.isABSONObj()) { return false; }
+
+                return (limitEl.numberInt() == ln->limit)
+                       && solutionMatches(child.Obj(), ln->children[0]);
+            }
+
+            return false;
+        }
+
+        /**
+         * Verifies that the solution tree represented in json by 'solnJson' is
+         * one of the solutions generated by QueryPlanner.
+         *
+         * By default, 'expectMatches' is 1. In rare cases expectMatches may be
+         * have to be specified as some other positive integer. For example, in
+         * the BasicAllElemMatch test case, there are two possible query plans
+         * using each of the available indices which differ only by their filter.
+         * Since assertSolutionExists, at least for now, does not look at the filter,
+         * we cannot distinguish between the two plans and expect two matches.
+         */
+        void assertSolutionExists(const string& solnJson, size_t expectMatches = 1) const {
+            BSONObj testSoln = fromjson(solnJson);
+            size_t matches = 0;
+            for (vector<QuerySolution*>::const_iterator it = solns.begin();
+                    it != solns.end();
+                    ++it) {
+                QuerySolutionNode* root = (*it)->root.get();
+                if (solutionMatches(testSoln, root)) {
+                    ++matches;
+                }
+            }
+            ASSERT_EQUALS(matches, expectMatches);
+        }
+
         // TODO:
         // bool hasIndexedPlan(BSONObj indexKeyPattern);
-
-        void getPlanByType(StageType stageType, QuerySolution** soln) const {
-            size_t found = 0;
-            for (vector<QuerySolution*>::const_iterator it = solns.begin();
-                 it != solns.end();
-                 ++it) {
-                if ((*it)->root->getType() == stageType) {
-                    *soln = *it;
-                    found++;
-                }
-            }
-            if (1 != found) {
-                cout << "Can't find requested stage type " << stageType
-                     << ", dump of all solutions:\n";
-                for (vector<QuerySolution*>::const_iterator it = solns.begin();
-                        it != solns.end();
-                        ++it) {
-                    cout << (*it)->toString() << endl;
-                }
-            }
-            ASSERT_EQUALS(found, 1U);
-        }
 
         void getAllPlans(StageType stageType, vector<QuerySolution*>* out) const {
             for (vector<QuerySolution*>::const_iterator it = solns.begin();
@@ -155,39 +330,6 @@ namespace {
                 if ((*it)->root->getType() == stageType) {
                     out->push_back(*it);
                 }
-            }
-        }
-
-        // { 'field': [ [min, max, startInclusive, endInclusive], ... ], 'field': ... }
-        void boundsEqual(BSONObj boundsObj, IndexBounds bounds) const {
-            ASSERT_EQUALS(static_cast<int>(bounds.size()), boundsObj.nFields());
-
-            size_t i = 0;
-            BSONObjIterator iti(boundsObj);
-            while (iti.more()) {
-
-                BSONElement field = iti.next();
-                ASSERT_EQUALS(field.type(), Array);
-                ASSERT_EQUALS(static_cast<int>(bounds.getNumIntervals(i)),
-                              field.embeddedObject().nFields());
-
-                size_t j = 0;
-                BSONObjIterator itj(field.embeddedObject());
-                while (itj.more()) {
-
-                    BSONElement intervalElem = itj.next();
-                    ASSERT_EQUALS(intervalElem.type(), Array);
-                    BSONObj intervalObj = intervalElem.embeddedObject();
-                    ASSERT_EQUALS(intervalObj.nFields(), 4);
-
-                    Interval interval(intervalObj, intervalObj[2].Bool(), intervalObj[3].Bool());
-                    ASSERT_EQUALS(interval.compare(bounds.getInterval(i,j)),
-                                  Interval::INTERVAL_EQUALS);
-
-                    j++;
-                }
-
-                i++;
             }
         }
 
@@ -207,15 +349,8 @@ namespace {
         runQuery(BSON("x" << 5));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->children[0]);
-        boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, EqualityIndexScanWithTrailingFields) {
@@ -224,12 +359,8 @@ namespace {
         runQuery(BSON("x" << 5));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1, y: 1}}}");
     }
 
     //
@@ -242,12 +373,8 @@ namespace {
         runQuery(BSON("x" << BSON("$lt" << 5)));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     //
@@ -260,12 +387,8 @@ namespace {
         runQuery(BSON("x" << BSON("$lte" << 5)));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     //
@@ -278,12 +401,8 @@ namespace {
         runQuery(BSON("x" << BSON("$gt" << 5)));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     //
@@ -296,12 +415,60 @@ namespace {
         runQuery(BSON("x" << BSON("$gte" << 5)));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
+    }
 
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+    //
+    // skip and limit
+    //
 
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+    TEST_F(IndexAssignmentTest, BasicSkipNoIndex) {
+        addIndex(BSON("a" << 1));
+
+        runQuerySkipLimit(BSON("x" << 5), 3, 0);
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{skip: {n: 3, node: {cscan: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, BasicSkipWithIndex) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuerySkipLimit(BSON("a" << 5), 8, 0);
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{skip: {n: 8, node: {cscan: 1}}}");
+        assertSolutionExists("{skip: {n: 8, node: {fetch: {ixscan: {a: 1, b: 1}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, BasicLimitNoIndex) {
+        addIndex(BSON("a" << 1));
+
+        runQuerySkipLimit(BSON("x" << 5), 0, -3);
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{limit: {n: 3, node: {cscan: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, BasicLimitWithIndex) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuerySkipLimit(BSON("a" << 5), 0, -5);
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{limit: {n: 5, node: {cscan: 1}}}");
+        assertSolutionExists("{limit: {n: 5, node: {fetch: {ixscan: {a: 1, b: 1}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SkipAndLimit) {
+        addIndex(BSON("x" << 1));
+
+        runQuerySkipLimit(BSON("x" << BSON("$lte" << 4)), 7, -2);
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{limit: {n: 2, node: {skip: {n: 7, node: {cscan: 1}}}}}");
+        assertSolutionExists("{limit: {n: 2, node: {skip: {n: 7, node: {fetch: {ixscan: {x: 1}}}}}}}");
     }
 
     //
@@ -314,56 +481,45 @@ namespace {
         runQuery(fromjson("{$and: [ {x: {$gt: 1}}, {x: {$lt: 3}} ] }"));
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
+        assertSolutionExists("{cscan: 1}");
         // This is a fetch not an ixscan because our index tagging isn't good so far and we don't
         // know that the index is used for the second predicate.
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-        // TODO: use this when we tag both indices.
-        // boundsEqual(fromjson("{x: [ [1, 3, false, false] ] }"), ixNode->bounds);
-        // TODO check filter
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, SimpleOr) {
         addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {a: 21}]}"));
+
+        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        QuerySolution* indexedSolution = NULL;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-        cout << indexedSolution->toString() << endl;
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a:1}}}");
     }
 
     TEST_F(IndexAssignmentTest, OrWithoutEnoughIndices) {
         addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {b: 21}]}"));
         ASSERT_EQUALS(getNumSolutions(), 1U);
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        cout << collScanSolution->toString() << endl;
+        assertSolutionExists("{cscan: 1}");
     }
 
     TEST_F(IndexAssignmentTest, OrWithAndChild) {
         addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {$and: [{a:1}, {b:7}]}]}"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        QuerySolution* indexedSolution = NULL;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-        cout << indexedSolution->toString() << endl;
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {or: {nodes: [{fetch: {ixscan: {a: 1}}}, {ixscan: {a: 1}}]}}}");
     }
 
     TEST_F(IndexAssignmentTest, AndWithUnindexedOrChild) {
         addIndex(BSON("a" << 1));
         runQuery(fromjson("{a:20, $or: [{b:1}, {c:7}]}"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        QuerySolution* indexedSolution = NULL;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-        cout << indexedSolution->toString() << endl;
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
     }
 
 
@@ -371,10 +527,10 @@ namespace {
         addIndex(BSON("b" << 1));
         addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [{b:1}, {c:7}], a:20}"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        QuerySolution* indexedSolution = NULL;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-        cout << indexedSolution->toString() << endl;
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
     }
 
     //
@@ -384,24 +540,12 @@ namespace {
     TEST_F(IndexAssignmentTest, AndOfAnd) {
         addIndex(BSON("x" << 1));
         runQuery(fromjson("{$and: [ {$and: [ {x: 2.5}]}, {x: {$gt: 1}}, {x: {$lt: 3}} ] }"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
-
-        QuerySolution* indexedSolution;
+        assertSolutionExists("{cscan: 1}");
         // This is a fetch not an ixscan because our index tagging isn't good so far and we don't
         // know that the index is used for the second predicate.
-        getPlanByType(STAGE_FETCH, &indexedSolution);
-        cout << indexedSolution->toString() << endl;
-
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-        //boundsEqual(BSON("x" << BSON_ARRAY(BSON_ARRAY(1 << MAXKEY << false << true))), ixNode->bounds);
-        // TODO: use this when we tag both indices.
-        // boundsEqual(fromjson("{x: [ [1, 3, false, false] ] }"), ixNode->bounds);
-        // TODO check filter
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     //
@@ -414,15 +558,9 @@ namespace {
         runDetailedQuery(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
-        vector<QuerySolution*> solns;
-        getAllPlans(STAGE_PROJECTION, &solns);
         ASSERT_EQUALS(solns.size(), 2U);
-
-        for (size_t i = 0; i < solns.size(); ++i) {
-            cout << solns[i]->toString();
-            ProjectionNode* pn = static_cast<ProjectionNode*>(solns[i]->root.get());
-            ASSERT(STAGE_COLLSCAN == pn->children[0]->getType() || STAGE_IXSCAN == pn->children[0]->getType());
-        }
+        assertSolutionExists("{proj: {spec: {_id: 0, x: 1}, node: {ixscan: {x: 1}}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, x: 1}, node: {cscan: 1}}}");
     }
 
     //
@@ -433,13 +571,10 @@ namespace {
         addIndex(BSON("x" << 1));
         // query, sort, proj
         runDetailedQuery(fromjson("{ x : {$gt: 1}}"), fromjson("{x: 1}"), BSONObj());
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_SORT, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{sort: {pattern: {x: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
     }
 
     //
@@ -449,46 +584,36 @@ namespace {
     TEST_F(IndexAssignmentTest, BasicCompound) {
         addIndex(BSON("x" << 1 << "y" << 1));
         runQuery(fromjson("{ x : 5, y: 10}"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1, y: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, CompoundMissingField) {
         addIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
         runQuery(fromjson("{ x : 5, z: 10}"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1, y: 1, z: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, CompoundFieldsOrder) {
         addIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
         runQuery(fromjson("{ x : 5, z: 10, y:1}"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
-
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_FETCH, &indexedSolution);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1, y: 1, z: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, CantUseCompound) {
         addIndex(BSON("x" << 1 << "y" << 1));
         runQuery(fromjson("{ y: 10}"));
-        ASSERT_EQUALS(getNumSolutions(), 1U);
 
-        QuerySolution* collScanSolution;
-        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{cscan: 1}");
     }
 
     //
@@ -498,39 +623,52 @@ namespace {
     TEST_F(IndexAssignmentTest, ElemMatchOneField) {
         addIndex(BSON("a.b" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1}}}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {'a.b': 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, ElemMatchTwoFields) {
         addIndex(BSON("a.b" << 1));
         addIndex(BSON("a.c" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {'a.b': 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {'a.c': 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, BasicAllElemMatch) {
         addIndex(BSON("foo.a" << 1));
         addIndex(BSON("foo.b" << 1));
         runQuery(fromjson("{foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 5U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {'foo.a': 1}}}", 2);
+        assertSolutionExists("{fetch: {ixscan: {'foo.b': 1}}}", 2);
     }
 
     TEST_F(IndexAssignmentTest, ElemMatchValueMatch) {
         addIndex(BSON("foo" << 1));
         addIndex(BSON("foo" << 1 << "bar" << 1));
         runQuery(fromjson("{foo: {$elemMatch: {$gt: 5, $lt: 10}}}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {foo: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {foo: 1, bar: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, ElemMatchNested) {
         addIndex(BSON("a.b.c" << 1));
         runQuery(fromjson("{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1, $lte:1 } } } } }}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {'a.b.c': 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, TwoElemMatchNested) {
@@ -539,14 +677,20 @@ namespace {
         runQuery(fromjson("  { a:{ $elemMatch:{ d:{ $elemMatch:{ e:{ $lte:1 } } },"
                                                "b:{ $elemMatch:{ c:{ $gte:1 } } } } } }"));
         dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {'a.d.e': 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {'a.b.c': 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, ElemMatchCompoundTwoFields) {
         addIndex(BSON("a.b" << 1 << "a.c" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {'a.b': 1, 'a.c': 1}}}");
     }
 
     //
@@ -561,23 +705,27 @@ namespace {
 
         // Polygon
         runQuery(fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {geo2d: {a: '2d'}}}");
 
         // Center
         runQuery(fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {geo2d: {a: '2d'}}}");
 
         // Centersphere
         runQuery(fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {geo2d: {a: '2d'}}}");
 
         // Within box.
         runQuery(fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {geo2d: {a: '2d'}}}");
 
         // TODO: test that we *don't* annotate for things we shouldn't.
     }
@@ -588,12 +736,14 @@ namespace {
 
         runQuery(fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
                                                            "coordinates: [10.0, 10.0]}}}}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: '2dsphere'}}}");
 
         runQuery(fromjson("{a : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: '2dsphere'}}}");
 
         // TODO: test that we *don't* annotate for things we shouldn't.
     }
@@ -602,8 +752,8 @@ namespace {
         // Can only do near + old point.
         addIndex(BSON("a" << "2d"));
         runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{geoNear2d: {a: '2d'}}");
     }
 
     TEST_F(IndexAssignmentTest, Basic2DSphereGeoNear) {
@@ -611,36 +761,62 @@ namespace {
         addIndex(BSON("a" << "2dsphere"));
 
         runQuery(fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
 
         runQuery(fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
                                           "$maxDistance:100}}}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
     }
 
     TEST_F(IndexAssignmentTest, Basic2DSphereGeoNearReverseCompound) {
         addIndex(BSON("x" << 1));
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
     }
 
     TEST_F(IndexAssignmentTest, NearNoIndex) {
         addIndex(BSON("x" << 1));
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 0U);
     }
 
     TEST_F(IndexAssignmentTest, TwoDSphereNoGeoPred) {
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1}"));
-        dumpSolutions();
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1, a: '2dsphere'}}}");
     }
+
+    // SERVER-3984, $or 2d index
+    TEST_F(IndexAssignmentTest, Or2DNonNear) {
+        addIndex(BSON("a" << "2d"));
+        addIndex(BSON("b" << "2d"));
+        runQuery(fromjson("{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
+                                 " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}");
+    }
+
+    // SERVER-3984, $or 2dsphere index
+    TEST_F(IndexAssignmentTest, Or2DSphereNonNear) {
+        addIndex(BSON("a" << "2dsphere"));
+        addIndex(BSON("b" << "2dsphere"));
+        runQuery(fromjson("{$or: [ {a: {$geoIntersects: {$geometry: {type: 'Point', coordinates: [10.0, 10.0]}}}},"
+                                 " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}"));
+
+        assertSolutionExists("{cscan: 1}");
+        // TODO investigate why no indexed solution exists
+    }
+
 
     //
     // Multiple solutions
@@ -652,10 +828,11 @@ namespace {
 
         runQuery(fromjson("{a:1, b:{$gt:2,$lt:2}}"));
 
-        dumpSolutions();
-
         // 2 indexed solns and one non-indexed
         ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
     }
 
     TEST_F(IndexAssignmentTest, TwoPlansElemMatch) {
@@ -665,10 +842,11 @@ namespace {
         runQuery(fromjson("{arr: { $elemMatch : { x : 5 , y : 5 } },"
                           " a : 55 , b : { $in : [ 1 , 5 , 8 ] } }"));
 
-        dumpSolutions();
-
         // 2 indexed solns and one non-indexed
         ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
+        assertSolutionExists("{fetch: {fetch: {ixscan: {'arr.x': 1, a: 1}}}}");
     }
 
     //
@@ -680,7 +858,10 @@ namespace {
         addIndex(BSON("a" << 1 << "c" << 1));
         addIndex(BSON("b" << 1 << "c" << 1));
         runDetailedQuery(fromjson("{$or: [{a:1}, {b:1}]}"), fromjson("{c:1}"), BSONObj());
-        dumpSolutions();
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{fetch: {mergeSort: {nodes: [{ixscan: {a: 1, c: 1}}, {ixscan: {b: 1, c: 1}}]}}}");
+        assertSolutionExists("{sort: {pattern: {c: 1}, node: {cscan: 1}}}");
     }
 
     // SERVER-1205 as well.
@@ -688,7 +869,10 @@ namespace {
         addIndex(BSON("a" << 1 << "c" << 1));
         addIndex(BSON("b" << 1 << "c" << 1));
         runDetailedQuery(fromjson("{$or: [{a:1}, {b:1}]}"), BSONObj(), BSONObj());
-        dumpSolutions();
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {or: {nodes: [{ixscan: {a: 1, c: 1}}, {ixscan: {b: 1, c: 1}}]}}}");
     }
 
     // SERVER-10801
@@ -697,7 +881,10 @@ namespace {
         BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
         BSONObj sort = fromjson("{timestamp: -1}");
         runDetailedQuery(query, sort, BSONObj());
-        dumpSolutions();
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {timestamp: -1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {timestamp: -1, position: '2dsphere'}}}");
     }
 
     // SERVER-9257
@@ -705,20 +892,29 @@ namespace {
         addIndex(BSON("creationDate" << 1 << "foo.bar" << "2dsphere"));
         runDetailedQuery(fromjson("{creationDate: { $gt: 7}}"),
                          fromjson("{creationDate: 1}"), BSONObj());
-        dumpSolutions();
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {creationDate: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {creationDate: 1, 'foo.bar': '2dsphere'}}}");
     }
 
     // Basic "keep sort in mind with an OR"
     TEST_F(IndexAssignmentTest, MergeSortEvenIfSameIndex) {
         addIndex(BSON("a" << 1 << "b" << 1));
         runDetailedQuery(fromjson("{$or: [{a:1}, {a:7}]}"), fromjson("{b:1}"), BSONObj());
-        dumpSolutions();
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: 1}}}");
+        // TODO the second solution should be mergeSort rather than just sort
     }
 
     TEST_F(IndexAssignmentTest, ReverseScanForSort) {
         addIndex(BSON("_id" << 1));
         runDetailedQuery(BSONObj(), fromjson("{_id: -1}"), BSONObj());
-        dumpSolutions();
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {_id: -1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {_id: 1}}}");
     }
 
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
