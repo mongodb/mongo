@@ -166,7 +166,7 @@ namespace {
             << ActionType::getShardMap
             << ActionType::hostInfo
             << ActionType::listDatabases
-            << ActionType::listShards
+            << ActionType::listShards // clusterManager gets this also
             << ActionType::netstat
             << ActionType::replSetGetStatus // clusterManager gets this also
             << ActionType::serverStatus
@@ -194,7 +194,7 @@ namespace {
             << ActionType::touch
             << ActionType::unlock
             << ActionType::diagLogging
-            << ActionType::flushRouterConfig
+            << ActionType::flushRouterConfig // clusterManager gets this also
             << ActionType::fsync
             << ActionType::invalidateUserCache // userAdmin gets this also
             << ActionType::killop
@@ -215,6 +215,8 @@ namespace {
             << ActionType::resync // hostManager gets this also
             << ActionType::addShard
             << ActionType::removeShard
+            << ActionType::listShards // clusterMonitor gets this also
+            << ActionType::flushRouterConfig // hostManager gets this also
             << ActionType::cleanupOrphaned;
 
         clusterManagerRoleDatabaseActions
