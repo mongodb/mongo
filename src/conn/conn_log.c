@@ -90,7 +90,8 @@ __log_archive_server(void *arg)
 		 * it gets turned back on and check again.
 		 */
 		if (conn->archive == 0) {
-			WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
+			WT_ERR_TIMEDOUT_OK(
+			    __wt_cond_wait(session, conn->arch_cond, 0));
 			continue;
 		}
 
@@ -132,7 +133,8 @@ __log_archive_server(void *arg)
 		log->first_lsn.offset = 0;
 
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
+		WT_ERR_TIMEDOUT_OK(
+		    __wt_cond_wait(session, conn->arch_cond, 0));
 	}
 
 	if (0) {

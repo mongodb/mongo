@@ -196,8 +196,10 @@ retry:
 	newslot = &log->slot_pool[pool_i];
 	if (++log->pool_index >= SLOT_POOL)
 		log->pool_index = 0;
-	if (newslot->slot_state != WT_LOG_SLOT_FREE)
+	if (newslot->slot_state != WT_LOG_SLOT_FREE) {
+		WT_STAT_FAST_CONN_INCR(session, log_slot_switch_fails);
 		goto retry;
+	}
 
 	/*
 	 * Sleep for a small amount of time to allow other threads a
@@ -247,8 +249,19 @@ __wt_log_slot_notify(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 int
 __wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
-	while (slot->slot_state > WT_LOG_SLOT_DONE)
-		__wt_cond_wait(session, slot->slot_done_cond, 10000);
+	while (slot->slot_state > WT_LOG_SLOT_DONE) {
+		/*
+		 * Workloads with fast commits (no-sync is a reasonable
+		 * approximation) benefit from yielding rather than using the
+		 * more heavy weight condition wait.
+		 */
+		if (S2C(session)->txn_logsync == 0)
+			__wt_yield();
+		else if (__wt_cond_wait(session,
+		    slot->slot_done_cond, 10000) == ETIMEDOUT)
+			WT_STAT_FAST_CONN_INCR(session,
+			    log_slot_ready_wait_timeout);
+	}
 	return (0);
 }
 

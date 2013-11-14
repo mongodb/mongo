@@ -266,6 +266,9 @@ struct __wt_connection_stats {
 	WT_STATS log_slot_consolidated;
 	WT_STATS log_slot_joins;
 	WT_STATS log_slot_races;
+	WT_STATS log_slot_ready_wait_timeout;
+	WT_STATS log_slot_release_wait_timeout;
+	WT_STATS log_slot_switch_fails;
 	WT_STATS log_slot_toobig;
 	WT_STATS log_slot_toosmall;
 	WT_STATS log_slot_transitions;

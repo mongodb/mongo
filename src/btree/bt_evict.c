@@ -165,7 +165,8 @@ __wt_cache_evict_server(void *arg)
 		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_VERBOSE_ERR(session, evictserver, "sleeping");
 		/* Don't rely on signals: check periodically. */
-		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
+		WT_ERR_TIMEDOUT_OK(
+		    __wt_cond_wait(session, cache->evict_cond, 100000));
 		WT_VERBOSE_ERR(session, evictserver, "waking");
 	}
 

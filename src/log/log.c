@@ -500,8 +500,19 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * Wait for earlier groups to finish, otherwise there could be holes
 	 * in the log file.
 	 */
-	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
-		__wt_cond_wait(session, log->log_release_cond, 10000);
+	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+		/*
+		 * Workloads with fast commits (no-sync is a reasonable
+		 * approximation) benefit from yielding rather than using the
+		 * more heavy weight condition wait.
+		 */
+		if (S2C(session)->txn_logsync == 0)
+			__wt_yield();
+		else if (__wt_cond_wait(session,
+		    log->log_release_cond, 10000) == ETIMEDOUT)
+			WT_STAT_FAST_CONN_INCR(session,
+			    log_slot_release_wait_timeout);
+	}
 	if (F_ISSET(slot, SLOT_SYNC)) {
 		WT_STAT_FAST_CONN_INCR(session, log_sync);
 		WT_ERR(__wt_fsync(session, log->log_fh));
