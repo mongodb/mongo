@@ -4,7 +4,9 @@
 // *only* mongos-specific tests.
 //
 
-var options = { separateConfig : true, sync : true };
+// Only reason for using localhost name is to make the test consistent with naming host so it
+// will be easier to check for the host name inside error objects.
+var options = { separateConfig : true, sync : true, configOptions: { useHostName: false }};
 var st = new ShardingTest({shards: 2, mongos: 1, other: options});
 st.stopBalancer();
 
@@ -80,6 +82,109 @@ assert.eq(0, st.config0.getCollection(configColl + "").count());
 assert.eq(0, st.config1.getCollection(configColl + "").count());
 assert.eq(0, st.config2.getCollection(configColl + "").count());
 
+MongoRunner.stopMongod(st.config1.port, 15);
+
+// Config server insert with 2nd config down.
+configColl.remove({});
+printjson( request = {insert : configColl.getName(),
+                      documents: [{a:1}]} );
+printjson( result = configColl.runCommand(request) );
+assert(resultNOK(result));
+assert(result.errmsg != null);
+assert(result.errInfo != null);
+assert(result.errInfo[st.config1.name] != null);
+assert(!result.errInfo[st.config1.name].ok);
+assert(result.errInfo[st.config1.name].errmsg != null);
+
+//
+// Config server update with 2nd config down.
+configColl.remove({});
+configColl.insert({a:1});
+printjson( request = {update : configColl.getName(),
+                      updates: [{q: {a:1}, u: {$set: {b:2}}}]} );
+printjson( result = configColl.runCommand(request) );
+assert(resultNOK(result));
+assert(result.errInfo[st.config1.name] != null);
+assert(!result.errInfo[st.config1.name].ok);
+assert(result.errInfo[st.config1.name].errmsg != null);
+
+//
+// Config server delete with 2nd config down.
+configColl.remove({});
+configColl.insert({a:1});
+printjson( request = {delete : configColl.getName(),
+                      deletes: [{q: {a:1}, limit: 0}]} );
+printjson( result = configColl.runCommand(request) );
+assert(!resultOK(result));
+assert(result.errmsg != null);
+assert(result.errInfo != null);
+assert(result.errInfo[st.config1.name] != null);
+assert(!result.errInfo[st.config1.name].ok);
+assert(result.errInfo[st.config1.name].errmsg != null);
+
+//
+// Config server insert with 2nd config down while bypassing fsync check.
+configColl.remove({});
+printjson( request = { insert: configColl.getName(),
+                       documents: [{ a: 1 }],
+                       // { w: 0 } has special meaning for config servers
+                       writeConcern: { w: 0 }} );
+printjson( result = configColl.runCommand(request) );
+assert(resultNOK(result));
+
+assert(result.errInfo[st.config0.name] != null);
+assert(result.errInfo[st.config0.name].ok);
+
+assert(result.errInfo[st.config1.name] != null);
+assert(!result.errInfo[st.config1.name].ok);
+assert(result.errInfo[st.config1.name].errmsg != null);
+
+assert(result.errInfo[st.config2.name] != null);
+assert(result.errInfo[st.config2.name].ok);
+
+//
+// Config server update with 2nd config down while bypassing fsync check.
+configColl.remove({});
+configColl.insert({a:1});
+printjson( request = { update: configColl.getName(),
+                       updates: [{ q: { a: 1 }, u: { $set: { b:2 }}}],
+                       // { w: 0 } has special meaning for config servers
+                       writeConcern: { w: 0 }} );
+printjson( result = configColl.runCommand(request) );
+assert(resultNOK(result));
+
+assert(result.errInfo[st.config0.name] != null);
+assert(result.errInfo[st.config0.name].ok);
+
+assert(result.errInfo[st.config1.name] != null);
+assert(!result.errInfo[st.config1.name].ok);
+assert(result.errInfo[st.config1.name].errmsg != null);
+
+assert(result.errInfo[st.config2.name] != null);
+assert(result.errInfo[st.config2.name].ok);
+
+//
+// Config server update with 2nd config down while bypassing fsync check.
+configColl.remove({});
+configColl.insert({a:1});
+printjson( request = { delete: configColl.getName(),
+                       deletes: [{ q: { a: 1 }, limit: 0 }],
+                       // { w: 0 } has special meaning for config servers
+                       writeConcern: { w: 0 }} );
+printjson( result = configColl.runCommand(request) );
+assert(resultNOK(result));
+assert(result.errmsg != null);
+assert(result.errInfo != null);
+
+assert(result.errInfo[st.config0.name] != null);
+assert(result.errInfo[st.config0.name].ok);
+
+assert(result.errInfo[st.config1.name] != null);
+assert(!result.errInfo[st.config1.name].ok);
+assert(result.errInfo[st.config1.name].errmsg != null);
+
+assert(result.errInfo[st.config2.name] != null);
+assert(result.errInfo[st.config2.name].ok);
 
 //
 // TODO: More tests to come

@@ -106,9 +106,13 @@ namespace mongo {
             }
 
             BSONObj toBSON() const {
-                // Not implemented
-                dassert( false );
-                return BSONObj();
+                BSONObjBuilder builder;
+
+                if ( _isOkSet ) builder << ok( _ok );
+                if ( _isErrCodeSet ) builder << errCode( _errCode );
+                if ( _isErrMessageSet ) builder << errMessage( _errMessage );
+
+                return builder.obj();
             }
 
             bool parseBSON( const BSONObj& source, std::string* errMsg ) {
@@ -204,20 +208,12 @@ namespace mongo {
         //
 
         struct ConfigResponse {
-            ConfigResponse( const ConnectionString& configHost ) :
-                configHost( configHost ) {
-            }
-
-            const ConnectionString configHost;
+            ConnectionString configHost;
             BatchedCommandResponse response;
         };
 
         struct ConfigFsyncResponse {
-            ConfigFsyncResponse( const ConnectionString& configHost ) :
-                configHost( configHost ) {
-            }
-
-            const ConnectionString configHost;
+            ConnectionString configHost;
             FsyncResponse response;
         };
     }
@@ -387,10 +383,9 @@ namespace mongo {
             bool fsyncError = false;
             while ( _dispatcher->numPending() > 0 ) {
 
-                ConnectionString configHost;
-                fsyncResponses.push_back( new ConfigFsyncResponse( configHost ) );
+                fsyncResponses.push_back( new ConfigFsyncResponse() );
                 ConfigFsyncResponse& fsyncResponse = *fsyncResponses.back();
-                Status dispatchStatus = _dispatcher->recvAny( &configHost,
+                Status dispatchStatus = _dispatcher->recvAny( &fsyncResponse.configHost,
                                                               &fsyncResponse.response );
 
                 // We've got to recv everything, no matter what
@@ -444,10 +439,10 @@ namespace mongo {
         while ( _dispatcher->numPending() > 0 ) {
 
             // Get the response
-            ConnectionString configHost;
-            responses.push_back( new ConfigResponse( configHost ) );
+            responses.push_back( new ConfigResponse() );
             ConfigResponse& configResponse = *responses.back();
-            Status dispatchStatus = _dispatcher->recvAny( &configHost, &configResponse.response );
+            Status dispatchStatus = _dispatcher->recvAny( &configResponse.configHost,
+                                                          &configResponse.response );
 
             if ( !dispatchStatus.isOK() ) {
                 buildErrorFrom( dispatchStatus, &configResponse.response );
