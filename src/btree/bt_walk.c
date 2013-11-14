@@ -88,7 +88,7 @@ __tree_walk_delete(
 	 * locked down, instantiating the page in memory and modifying it could
 	 * theoretically point the address somewhere away from the on-page cell.
 	 */
-	if (__wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LNO)
+	if (__wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
 		goto err;
 
 	/*
@@ -366,18 +366,22 @@ retry:				if (ref->state != WT_REF_MEM ||
 					break;
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
-			} else {
+			} else if (compact) {
 				/*
-				 * If iterating a cursor (or doing compaction),
-				 * skip deleted pages that are visible to us.
+				 * Skip deleted pages, rewriting them doesn't
+				 * seem useful.
 				 */
-				WT_RET(__tree_walk_read(session, ref, &skip));
-				if (skip)
+				if (ref->state == WT_REF_DELETED)
 					break;
 
 				/*
-				 * Test if the page is useful for compaction:
-				 * we don't want to read it if it won't help.
+				 * If the page is in-memory, we want to look at
+				 * it (it may have been modified and written,
+				 * and the current location is the interesting
+				 * one in terms of compaction, not the original
+				 * location).  If the page isn't in-memory, test
+				 * if the page will help with compaction, don't
+				 * read it if we don't have to.
 				 *
 				 * Pages read for compaction aren't "useful";
 				 * reset the page generation to a low value so
@@ -387,18 +391,28 @@ retry:				if (ref->state != WT_REF_MEM ||
 				 * page read generation and possible eviction.)
 				 */
 				set_read_gen = 0;
-				if (compact) {
+				if (ref->state == WT_REF_DISK) {
+					set_read_gen = 1;
 					WT_RET(__wt_compact_page_skip(
 					    session, page, ref, &skip));
 					if (skip)
 						break;
-					set_read_gen =
-					    ref->state == WT_REF_DISK ? 1 : 0;
 				}
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
 				if (set_read_gen)
 					page->read_gen = WT_READ_GEN_OLDEST;
+			} else {
+				/*
+				 * If iterating a cursor, skip deleted pages
+				 * that are visible to us.
+				 */
+				WT_RET(__tree_walk_read(session, ref, &skip));
+				if (skip)
+					break;
+
+				WT_RET(
+				    __wt_page_swap(session, couple, page, ref));
 			}
 
 			couple = page = ref->page;

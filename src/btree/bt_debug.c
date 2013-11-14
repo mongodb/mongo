@@ -817,13 +817,10 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	if (ref->addr == NULL)
-		__dmsg(ds, " %s\n", "[NoAddr]");
-	else {
-		__wt_get_addr(page, ref, &addr, &size);
-		__dmsg(ds,
-		    " %s\n", __wt_addr_string(session, ds->tmp, addr, size));
-	}
+	WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
+	__dmsg(ds, " %s\n", addr == NULL ? "[NoAddr]" :
+	    __wt_addr_string(session, ds->tmp, addr, size));
+
 	return (0);
 }
 
@@ -875,14 +872,17 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 
 	/* Dump addresses. */
 	switch (unpack->raw) {
-	case WT_CELL_ADDR:
-		type = "addr";
-		goto addr;
 	case WT_CELL_ADDR_DEL:
 		type = "addr/del";
 		goto addr;
-	case WT_CELL_ADDR_LNO:
-		type = "addr/lno";
+	case WT_CELL_ADDR_INT:
+		type = "addr/int";
+		goto addr;
+	case WT_CELL_ADDR_LEAF:
+		type = "addr/leaf";
+		goto addr;
+	case WT_CELL_ADDR_LEAF_NO:
+		type = "addr/leaf-no";
 		goto addr;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
@@ -922,14 +922,17 @@ __debug_cell_data(WT_DBG *ds,
 		goto deleted;
 
 	switch (unpack->raw) {
-	case WT_CELL_ADDR:
-		__debug_item(ds, tag, "addr", strlen("addr"));
-		break;
 	case WT_CELL_ADDR_DEL:
 		__debug_item(ds, tag, "addr/del", strlen("addr/del"));
 		break;
-	case WT_CELL_ADDR_LNO:
-		__debug_item(ds, tag, "addr/lno", strlen("addr/lno"));
+	case WT_CELL_ADDR_INT:
+		__debug_item(ds, tag, "addr", strlen("addr/int"));
+		break;
+	case WT_CELL_ADDR_LEAF:
+		__debug_item(ds, tag, "addr/lno", strlen("addr/leaf"));
+		break;
+	case WT_CELL_ADDR_LEAF_NO:
+		__debug_item(ds, tag, "addr/lno", strlen("addr/leaf-no"));
 		break;
 	case WT_CELL_DEL:
 deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
