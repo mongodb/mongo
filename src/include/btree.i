@@ -518,6 +518,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * read generation and we have some chance of succeeding.
 	 */
 	if (!WT_TXN_ACTIVE(&session->txn) &&
+	    (page->modify == NULL ||
+	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) &&
 	    page->read_gen == WT_READ_GEN_OLDEST &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {

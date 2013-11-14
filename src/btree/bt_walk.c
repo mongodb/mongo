@@ -401,7 +401,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
 				if (set_read_gen)
-					page->read_gen = WT_READ_GEN_OLDEST;
+					ref->page->read_gen =
+					    WT_READ_GEN_OLDEST;
 			} else {
 				/*
 				 * If iterating a cursor, skip deleted pages
