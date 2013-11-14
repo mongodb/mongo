@@ -198,42 +198,40 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
         }
     }
 
-    this._lastID = obj._id;
+    var result = undefined;
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this._mongo.useWriteCommands) {
+    if ( this._mongo.useWriteCommands() ) {
         var documents = obj;
         if (!Array.isArray(obj)) {
             documents = [obj];
         }
 
+        var cmdColl = this._db.getCollection('$cmd');
         var cmdObj = { insert: this.getName(),
                        documents: documents,
                        // bit 0 flag is continueOnError
-                       ordered: ((options & 1) == 1)};
+                       ordered: ((options & 1) == 0)};
+
+        if ( this._mongo.getWriteConcern() ) {
+            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
+        }
 
         // Bypass runCommand to ignore slaveOk and read pref settings
-        var cmdColl = this._db.getCollection('$cmd');
-        var cursor = new DBQuery(this._mongo,
-                                 this._db,
-                                 cmdColl,
-                                 cmdColl.getFullName(),
-                                 cmdObj,
-                                 {}, /* projection */
-                                 -1, /* limit */
-                                 0, /* skip */
-                                 0, /* batchSize */
-                                 0 /* option flags */);
-
-        return (cursor.hasNext()? cursor.next(): null);
+        result = new WriteResult( 'insert',
+            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
+                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
+                        0 /* flags */).next() );
     }
     else {
-        var startTime = (typeof(_verboseShell) === 'undefined' ||
-                         !_verboseShell) ? 0 : new Date().getTime();
-
         this._mongo.insert( this._fullName , obj, options );
-        this._printExtraInfo("Inserted", startTime);
     }
-}
+
+    this._lastID = obj._id;
+    this._printExtraInfo("Inserted", startTime);
+    return result;
+};
 
 DBCollection.prototype.remove = function( t , justOne ){
     for ( var k in t ){
@@ -242,38 +240,40 @@ DBCollection.prototype.remove = function( t , justOne ){
         }
     }
 
-    if (this._mongo.useWriteCommands) {
-        var limit = NumberInt(0);
-        if (typeof(justOne) != 'undefined' && justOne != null && justOne) {
-            limit = NumberInt(1);
-        }
-
+    var result = undefined;
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
+    
+    if ( this._mongo.useWriteCommands() ) {
+        
         var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
-        var cmdObj = { delete: this.getName(),
+        
+        var limit = 0;
+        if (typeof(justOne) != 'undefined' && justOne != null && justOne) {
+            limit = 1;
+        }
+        
+        var cmdColl = this._db.getCollection('$cmd');
+        var cmdObj = { 'delete': this.getName(),
                        deletes: [{ q: query,
                                    limit: limit }]};
+        
+        if ( this._mongo.getWriteConcern() ) {
+            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
+        }
 
         // Bypass runCommand to ignore slaveOk and read pref settings
-        var cmdColl = this._db.getCollection('$cmd');
-        var cursor = new DBQuery(this._mongo,
-                                 this._db,
-                                 cmdColl,
-                                 cmdColl.getFullName(),
-                                 cmdObj,
-                                 {}, /* projection */
-                                 -1, /* limit */
-                                 0, /* skip */
-                                 0, /* batchSize */
-                                 0 /* option flags */);
-
-        return (cursor.hasNext()? cursor.next(): null);
+        result = new WriteResult( 'remove',
+            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
+                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
+                        0 /* flags */).next() );
     }
     else {
-        var startTime = (typeof(_verboseShell) === 'undefined' ||
-                         !_verboseShell) ? 0 : new Date().getTime();
         this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
-        this._printExtraInfo("Removed", startTime);
     }
+    
+    this._printExtraInfo("Removed", startTime);
+    return result;
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
@@ -291,7 +291,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         this._validateForStorage( obj );
     }
 
-    // can pass options via object for improved readability    
+    // can pass options via object for improved readability
     if ( typeof(upsert) === 'object' ) {
         assert( multi === undefined, "Fourth argument must be empty when specifying upsert and multi with an object." );
 
@@ -300,36 +300,37 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         upsert = opts.upsert;
     }
 
-    if (this._mongo.useWriteCommands) {
+    var result = undefined;
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
+
+    if ( this._mongo.useWriteCommands() ) {
+
+        var cmdColl = this._db.getCollection('$cmd');
         var cmdObj = { update: this.getName(),
                        updates: [{ q: query,
                                    u: obj,
                                    upsert: (upsert? true : false),
                                    multi: (multi? true : false) }]};
 
-        // Bypass runCommand to ignore slaveOk and read pref settings
-        var cmdColl = this._db.getCollection('$cmd');
-        var cursor = new DBQuery(this._mongo,
-                                 this._db,
-                                 cmdColl,
-                                 cmdColl.getFullName(),
-                                 cmdObj,
-                                 {}, /* projection */
-                                 -1, /* limit */
-                                 0, /* skip */
-                                 0, /* batchSize */
-                                 0 /* option flags */);
+        if ( this._mongo.getWriteConcern() ) {
+            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
+        }
 
-        return (cursor.hasNext()? cursor.next(): null);
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        result = new WriteResult( 'update',
+            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
+                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
+                        0 /* flags */).next() );
     }
     else {
-        var startTime = (typeof(_verboseShell) === 'undefined' ||
-                         !_verboseShell) ? 0 : new Date().getTime();
         this._mongo.update(this._fullName, query, obj,
                            upsert ? true : false, multi ? true : false );
-        this._printExtraInfo("Updated", startTime);
     }
-}
+
+    this._printExtraInfo("Updated", startTime);
+    return result;
+};
 
 DBCollection.prototype.save = function( obj ){
     if ( obj == null )

@@ -155,6 +155,46 @@ connect = function(url, user, pass) {
     return db;
 }
 
-// {Boolean} If true, uses the write commands instead of the legacy write ops.
-Mongo.prototype.useWriteCommands = _useWriteCommandsDefault();
+/**
+ * {Boolean} If true, uses the write commands instead of the legacy write ops.
+ * 
+ * Sends isMaster to determine if the connection is capable of using bulk write operations, and
+ * caches the result.
+ */
+Mongo.prototype.useWriteCommands = function() {
 
+    if ( '_useWriteCommands' in this ) {
+        return this._useWriteCommands;
+    }
+
+    // always use legacy write commands against old servers
+    var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
+    if ( isMaster.ok && 'minWireVersion' in isMaster &&
+         isMaster.minWireVersion <= 2 && 2 <= isMaster.maxWireVersion ) {
+        this._useWriteCommands = _useWriteCommandsDefault();
+    }
+    else {
+        print("WARNING: connected to a server which does not support write commands.");
+        this._useWriteCommands = false;
+    }
+    
+    return this._useWriteCommands;
+};
+
+//
+// Write Concern can be set at the connection level, and is used for all write operations
+// TODO: (unless overridden)
+//
+
+Mongo.prototype.setWriteConcern = function( wc ) {
+    if ( typeof wc != 'WriteConcern' ) wc = new WriteConcern( wc );
+    this._writeConcern = wc;
+};
+
+Mongo.prototype.getWriteConcern = function() {
+    return this._writeConcern;
+};
+
+Mongo.prototype.unsetWriteConcern = function() {
+    delete this._writeConcern;
+};
