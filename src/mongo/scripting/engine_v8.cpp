@@ -844,8 +844,13 @@ namespace mongo {
 
     std::string V8Scope::v8ExceptionToSTLString(const v8::TryCatch* try_catch) {
         stringstream ss;
-        v8::String::Utf8Value exceptionText(try_catch->Exception());
-        ss << *exceptionText;
+        v8::Local<v8::Value> stackTrace = try_catch->StackTrace();
+        if (!stackTrace.IsEmpty()) {
+            ss << StringData(V8String(stackTrace));
+        }
+        else {
+            ss << StringData(V8String((try_catch->Exception())));
+        }
 
         // get the exception message
         v8::Handle<v8::Message> message = try_catch->Message();
