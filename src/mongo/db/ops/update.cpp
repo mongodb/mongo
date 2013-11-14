@@ -676,15 +676,8 @@ namespace mongo {
             uasserted(16836, status.reason());
         }
 
-        if (!collection) {
-            collection = cc().database()->getCollection(request.getNamespaceString().ns());
-            if (!collection) {
-                collection = cc().database()->createCollection(request.getNamespaceString().ns());
-            }
-        }
-
-        dassert(collection->details());
-        const bool idRequired = collection->details()->haveIdIndex();
+        // If the collection doesn't exist or has an _id index, then an _id is required
+        const bool idRequired = collection ? collection->details()->haveIdIndex() : true;
 
         mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
 
@@ -722,6 +715,14 @@ namespace mongo {
                                      doc,
                                      immutableFields,
                                      driver->modOptions()) );
+        }
+
+        // Only create the collection if the doc will be inserted.
+        if (!collection) {
+            collection = cc().database()->getCollection(request.getNamespaceString().ns());
+            if (!collection) {
+                collection = cc().database()->createCollection(request.getNamespaceString().ns());
+            }
         }
 
         // Insert the doc
