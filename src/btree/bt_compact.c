@@ -163,6 +163,7 @@ __wt_compact_page_skip(
 	const uint8_t *addr;
 
 	*skipp = 0;				/* Default to reading. */
+	type = 0;				/* Keep compiler quiet. */
 
 	bm = S2BT(session)->bm;
 
