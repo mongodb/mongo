@@ -16,6 +16,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name, int is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
+	pthread_mutexattr_t *attrp;
 
 	/*
 	 * !!!
@@ -24,7 +25,18 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_CONDVAR), &cond));
 
 	/* Initialize the mutex. */
-	if (pthread_mutex_init(&cond->mtx, NULL) != 0)
+#ifdef HAVE_MUTEX_ADAPTIVE
+	{
+	pthread_mutexattr_t attr;
+
+	WT_RET(pthread_mutexattr_init(&attr));
+	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
+	attrp = &attr;
+	}
+#else
+	attrp = NULL;
+#endif
+	if (pthread_mutex_init(&cond->mtx, attrp) != 0)
 		goto err;
 
 	/* Initialize the condition variable to permit self-blocking. */
