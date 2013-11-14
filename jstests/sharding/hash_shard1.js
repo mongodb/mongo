@@ -1,7 +1,7 @@
 // Basic test of sharding with a hashed shard key
 //  - Test basic migrations with moveChunk, using different chunk specification methods
 
-var s = new ShardingTest( { name : jsTestName() , shards : 1 , mongos : 1, verbose : 1 } );
+var s = new ShardingTest( { name : jsTestName() , shards : 3 , mongos : 1, verbose : 1 } );
 var dbname = "test";
 var coll = "foo";
 var ns = dbname + "." + coll;
@@ -15,6 +15,7 @@ s.stopBalancer();
 // shard a fresh collection using a hashed shard key
 t.drop();
 var res = db.adminCommand( { shardcollection : ns , key : { a : "hashed" } } );
+assert.gt( s.config.chunks.count({ns:ns}), 3);
 assert.eq( res.ok , 1 , "shardcollection didn't work" );
 db.printShardingStatus();
 
@@ -29,6 +30,7 @@ printjson( t.find().explain() );
 
 // find a chunk that's not on shard0000
 var chunk = s.config.chunks.findOne( {shard : {$ne  : "shard0000"} } );
+assert.neq(chunk, null, "all chunks on shard0000!");    
 printjson(chunk);
 
 // try to move the chunk using an invalid specification method. should fail.

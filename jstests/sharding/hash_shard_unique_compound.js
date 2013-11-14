@@ -3,7 +3,7 @@
 //  1.) shard collection on hashed "a", ensure unique index {a:1, b:1}
 //  2.) reverse order
 
-var s = new ShardingTest( { name : jsTestName() , shards : 3 , mongos : 1, verbose : 1 } );
+var s = new ShardingTest( { name : jsTestName() , shards : 1 , mongos : 1, verbose : 1 } );
 var dbName = "test";
 var collName = "foo";
 var ns = dbName + "." + collName;
