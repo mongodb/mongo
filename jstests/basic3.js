@@ -1,50 +1,45 @@
-
+// Tests that "." cannot be in field names
 t = db.getCollection( "foo_basic3" );
+t.drop()
 
-t.find( { "a.b" : 1 } ).toArray();
+//more diagnostics on bad save, if exception fails
+doBadSave = function(param) {
+    print("doing save with " + tojson(param))
+    t.save(param);
+    // Should not get here.
+    printjson(db.getLastErrorObj());
+}
 
-ok = true;
+//more diagnostics on bad save, if exception fails
+doBadUpdate = function(query, update) {
+    print("doing update with " + tojson(query) + " " + tojson(update))
+    t.update(query, update);
+    // Should not get here.
+    printjson(db.getLastErrorObj());
+}
 
-try{
-    t.save( { "a.b" : 5 } );
-    ok = false;
-}
-catch ( e ){
-}
-assert( ok , ". in names aren't allowed doesn't work" );
+assert.throws(doBadSave, [{"a.b":5}], ". in names aren't allowed doesn't work");
 
-try{
-    t.save( { "x" : { "a.b" : 5 } } );
-    ok = false;
-}
-catch ( e ){
-}
-assert( ok , ". in embedded names aren't allowed doesn't work" );
+assert.throws(doBadSave, 
+              [{ "x" : { "a.b" : 5 } }], 
+              ". in embedded names aren't allowed doesn't work");
 
 // following tests make sure update keys are checked
 t.save({"a": 0,"b": 1})
-try {
-    t.update({"a": 0}, {"b.b": 1});
-    ok = false;
-} catch (e) {}
-assert( ok , "must deny '.' in key of update" );
+
+assert.throws(doBadUpdate, [{a:0}, { "b.b" : 1 }], 
+              "must deny '.' in key of update");
 
 // upsert with embedded doc
-try {
-    t.update({"a": 10}, {"b": { "c.c" : 1 }}, true);
-    ok = false;
-} catch (e) {}
-assert( ok , "must deny '.' in key of update" );
+assert.throws(doBadUpdate, [{a:10}, { c: {"b.b" : 1 }}], 
+              "must deny embedded '.' in key of update");
 
 // if it is a modifier, it should still go through
 t.update({"a": 0}, {$set: { "c.c": 1}})
 t.update({"a": 0}, {$inc: { "c.c": 1}})
 
 // edge cases
-try {
-    t.update({"a": 0}, {"": { "c.c": 1}})
-    ok = false;
-} catch (e) {}
-assert( ok , "must deny '.' in key of update" );
+assert.throws(doBadUpdate, [{a:0}, { "":{"b.b" : 1} }], 
+              "must deny '' embedded '.' in key of update");
 t.update({"a": 0}, {})
 

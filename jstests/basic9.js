@@ -1,25 +1,19 @@
-
+// Tests that $<prefix> field names are not allowed, but you can use a $ anywhere else.
 t = db.getCollection( "foo_basic9" );
+t.drop()
 
-t.save( { "foo$bar" : 5 } );
-
-ok = false;
-
-try{
-    t.save( { "$foo" : 5 } );
-    ok = false;
+// more diagnostics on bad save, if exception fails
+doBadSave = function(param) {
+    print("doing save with " + tojson(param))
+    t.save(param);
+    // Should not get here.
+    printjson(db.getLastErrorObj());
 }
-catch ( e ){
-    ok = true;
-}
-assert( ok , "key names aren't allowed to start with $ doesn't work" );
 
-try{
-    t.save( { "x" : { "$foo" : 5 } } );
-    ok = false;
-}
-catch ( e ){
-    ok = true;
-}
-assert( ok , "embedded key names aren't allowed to start with $ doesn't work" );
+t.save({foo$foo:5});
+t.save({foo$:5});
 
+assert.throws(doBadSave, [{$foo:5}], "key names aren't allowed to start with $ doesn't work");
+assert.throws(doBadSave, 
+              [{x:{$foo:5}}], 
+              "embedded key names aren't allowed to start with $ doesn't work");
