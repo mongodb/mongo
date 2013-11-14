@@ -320,7 +320,9 @@ namespace mongo {
             }
         }
 
-        if (!serverGlobalParams.keyFile.empty() && serverGlobalParams.clusterAuthMode != "x509") {
+        int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
+        if (!serverGlobalParams.keyFile.empty() && 
+            clusterAuthMode != ServerGlobalParams::ClusterAuthMode_x509) {
             if (!setUpSecurityKey(serverGlobalParams.keyFile)) {
                 // error message printed in setUpPrivateKey
                 return false;
@@ -329,13 +331,14 @@ namespace mongo {
 
         // Auto-enable auth except if clusterAuthMode is not set.
         // clusterAuthMode is automatically set if a --keyFile parameter is provided.
-        if (!serverGlobalParams.clusterAuthMode.empty()) {
+        if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined) {
             getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
 
 #ifdef MONGO_SSL
-        if (serverGlobalParams.clusterAuthMode == "x509" ||
-            serverGlobalParams.clusterAuthMode == "sendX509") {
+
+        if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
+            clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
             setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-X509" <<
                                            saslCommandUserDBFieldName << "$external" <<
                                            saslCommandUserFieldName << 

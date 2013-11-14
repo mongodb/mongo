@@ -391,9 +391,31 @@ namespace {
         }
 
         if (params.count("clusterAuthMode")) {
-            serverGlobalParams.clusterAuthMode = params["clusterAuthMode"].as<std::string>();
-        }
+            std::string clusterAuthMode = params["clusterAuthMode"].as<std::string>();
 
+            if (clusterAuthMode == "keyFile") {
+                serverGlobalParams.clusterAuthMode.store
+                    (ServerGlobalParams::ClusterAuthMode_keyFile);
+            }
+            else if (clusterAuthMode == "sendKeyFile") {
+                serverGlobalParams.clusterAuthMode.store
+                    (ServerGlobalParams::ClusterAuthMode_sendKeyFile);
+            }
+            else if (clusterAuthMode == "sendX509") {
+                serverGlobalParams.clusterAuthMode.store
+                    (ServerGlobalParams::ClusterAuthMode_sendX509);
+            }
+            else if (clusterAuthMode == "x509") {
+                serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_x509);
+            }
+            else {
+                return Status(ErrorCodes::BadValue, 
+                              "unsupported value for clusterAuthMode " + clusterAuthMode );
+            }
+        }
+        else {
+            serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_undefined);
+        }
         if (params.count("quiet")) {
             serverGlobalParams.quiet = true;
         }
@@ -547,20 +569,14 @@ namespace {
             }
         }
         if (!params.count("clusterAuthMode") && params.count("keyFile")){
-            serverGlobalParams.clusterAuthMode = "keyFile";
+            serverGlobalParams.clusterAuthMode.store
+                (ServerGlobalParams::ClusterAuthMode_keyFile);
         }
 
 #ifdef MONGO_SSL
         ret = storeSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;
-        }
-#else // ifdef MONGO_SSL
-        // keyFile is currently the only supported value if not using SSL
-        if (params.count("clusterAuthMode") && serverGlobalParams.clusterAuthMode != "keyFile") {
-            StringBuilder sb;
-            sb << "unsupported value for clusterAuthMode " << serverGlobalParams.clusterAuthMode;
-            return Status(ErrorCodes::BadValue, sb.str());
         }
 #endif
 

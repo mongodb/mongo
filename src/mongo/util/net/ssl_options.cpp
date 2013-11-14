@@ -186,18 +186,13 @@ namespace mongo {
                           "need to enable SSL via the sslMode flag when "
                           "using SSL configuration parameters");
         }
-        if (serverGlobalParams.clusterAuthMode == "sendKeyFile" ||
-            serverGlobalParams.clusterAuthMode == "sendX509" ||
-            serverGlobalParams.clusterAuthMode == "x509") {
+        int clusterAuthMode = serverGlobalParams.clusterAuthMode.load(); 
+        if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile ||
+            clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
+            clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
             if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_noSSL){
                 return Status(ErrorCodes::BadValue, "need to enable SSL via the sslMode flag");
             }
-        }
-        else if (params.count("clusterAuthMode") &&
-                 serverGlobalParams.clusterAuthMode != "keyFile") {
-            StringBuilder sb;
-            sb << "unsupported value for clusterAuthMode " << serverGlobalParams.clusterAuthMode;
-            return Status(ErrorCodes::BadValue, sb.str());
         }
 
         return Status::OK();

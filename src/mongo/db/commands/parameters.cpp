@@ -294,6 +294,69 @@ namespace mongo {
             }
         } sslModeSetting;
         
+        class ClusterAuthModeSetting : public ServerParameter {
+        public:
+            ClusterAuthModeSetting() : 
+                ServerParameter(ServerParameterSet::getGlobal(), "clusterAuthMode") {}
+
+            std::string clusterAuthModeStr() {
+                switch (serverGlobalParams.clusterAuthMode.load()) {
+                    case ServerGlobalParams::ClusterAuthMode_keyFile:
+                        return "keyFile";
+                    case ServerGlobalParams::ClusterAuthMode_sendKeyFile:
+                        return "sendKeyFile";
+                    case ServerGlobalParams::ClusterAuthMode_sendX509:
+                        return "sendX509";
+                    case ServerGlobalParams::ClusterAuthMode_x509:
+                        return "x509";
+                    default:
+                        return "undefined";
+                }
+            }
+
+            virtual void append(BSONObjBuilder& b, const std::string& name) {
+                b << name << clusterAuthModeStr();
+            }
+
+            virtual Status set(const BSONElement& newValueElement) {
+                try {
+                    return setFromString(newValueElement.String());
+                }
+                catch (MsgAssertionException msg) {
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Invalid value for clusterAuthMode via setParameter command: " 
+                                    << newValueElement);
+                }
+
+            }
+
+            virtual Status setFromString(const std::string& str) {
+                if (str != "sendX509" && str != "x509") { 
+                        return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Invalid value for clusterAuthMode via setParameter command: "
+                                    << str);
+                }
+
+                int oldMode = serverGlobalParams.clusterAuthMode.load();
+                if (str == "sendX509" && 
+                    oldMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
+                    serverGlobalParams.clusterAuthMode.store
+                        (ServerGlobalParams::ClusterAuthMode_sendX509);
+                }
+                else if (str == "x509" && 
+                    oldMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
+                    serverGlobalParams.clusterAuthMode.store
+                        (ServerGlobalParams::ClusterAuthMode_x509);
+                }
+                else {
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                  "Illegal state transition for clusterAuthMode, change from "
+                                  << clusterAuthModeStr() << " to " << str);
+                }
+                return Status::OK();
+            }
+        } clusterAuthModeSetting;
+
         ExportedServerParameter<bool> QuietSetting( ServerParameterSet::getGlobal(),
                                                     "quiet",
                                                     &serverGlobalParams.quiet,
