@@ -375,15 +375,14 @@ retry:				if (ref->state != WT_REF_MEM ||
 					break;
 
 				/*
-				 * Test if the page is useful for compaction:
-				 * we don't want to read it if it won't help.
-				 */
-				WT_RET(__wt_compact_page_skip(
-				    session, page, ref, &skip));
-				if (skip)
-					break;
-
-				/*
+				 * If the page is in-memory, we want to look at
+				 * it (it may have been modified and written,
+				 * and the current location is the interesting
+				 * one in terms of compaction, not the original
+				 * location).  If the page isn't in-memory, test
+				 * if the page will help with compaction, don't
+				 * read it if we don't have to.
+				 *
 				 * Pages read for compaction aren't "useful";
 				 * reset the page generation to a low value so
 				 * the page is quickly chosen for eviction.
@@ -391,8 +390,14 @@ retry:				if (ref->state != WT_REF_MEM ||
 				 * and will only result in an incorrectly low
 				 * page read generation and possible eviction.)
 				 */
-				set_read_gen =
-				    ref->state == WT_REF_DISK ? 1 : 0;
+				set_read_gen = 0;
+				if (ref->state == WT_REF_DISK) {
+					set_read_gen = 1;
+					WT_RET(__wt_compact_page_skip(
+					    session, page, ref, &skip));
+					if (skip)
+						break;
+				}
 				WT_RET(
 				    __wt_page_swap(session, couple, page, ref));
 				if (set_read_gen)
