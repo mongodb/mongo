@@ -118,6 +118,13 @@ namespace optionenvironment {
             // failure if we have a logic error.
             OptionType type = Bool;
 
+            // The config file had a ":" as the first non whitespace character on a line
+            if (key.empty()) {
+                StringBuilder sb;
+                sb << "Found empty key in YAML config file";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+
             // Get expected type
             for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
                 iterator != options_vector.end(); iterator++) {
@@ -164,12 +171,29 @@ namespace optionenvironment {
                 unsigned long long unsignedLongLongVal;
                 unsigned unsignedVal;
                 case Switch:
+                    if (stringVal == "true") {
+                        *value = Value(true);
+                        return Status::OK();
+                    }
+                    else if (stringVal == "false") {
+                        // XXX: Don't set switches that are false, to maintain backwards
+                        // compatibility with the old behavior since some code depends on this
+                        // behavior
+                        *value = Value();
+                        return Status::OK();
+                    }
+                    else {
+                        StringBuilder sb;
+                        sb << "Expected boolean switch but found string: " << stringVal
+                           << " for option: " << key;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
                 case Bool:
                     if (stringVal == "true") {
                         *value = Value(true);
                         return Status::OK();
                     }
-                    else if (stringVal == "true") {
+                    else if (stringVal == "false") {
                         *value = Value(false);
                         return Status::OK();
                     }
@@ -346,9 +370,13 @@ namespace optionenvironment {
                         return Status(ErrorCodes::BadValue, sb.str());
                     }
 
-                    ret = environment->set(dottedName, optionValue);
-                    if (!ret.isOK()) {
-                        return ret;
+                    // Only add the value if it is not empty.  YAMLNodeToValue will set the
+                    // optionValue to an empty Value if we should not set it in the Environment.
+                    if (!optionValue.isEmpty()) {
+                        ret = environment->set(dottedName, optionValue);
+                        if (!ret.isOK()) {
+                            return ret;
+                        }
                     }
                 }
             }

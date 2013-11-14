@@ -1042,13 +1042,24 @@ namespace {
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
-    TEST(JSONConfigFile, BadType) {
+    TEST(JSONConfigFile, TypeChecking) {
         OptionsParserTester parser;
         moe::Environment environment;
+        moe::Value value;
 
         moe::OptionSection testOpts;
         testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+        testOpts.addOptionChaining("stringVectorVal", "stringVectorVal", moe::StringVector,
+                                   "StringVectorVal");
+        testOpts.addOptionChaining("boolVal", "boolVal", moe::Bool, "BoolVal");
+        testOpts.addOptionChaining("doubleVal", "doubleVal", moe::Double, "DoubleVal");
+        testOpts.addOptionChaining("intVal", "intVal", moe::Int, "IntVal");
+        testOpts.addOptionChaining("longVal", "longVal", moe::Long, "LongVal");
+        testOpts.addOptionChaining("stringVal", "stringVal", moe::String, "StringVal");
+        testOpts.addOptionChaining("unsignedLongLongVal", "unsignedLongLongVal",
+                                   moe::UnsignedLongLong, "UnsignedLongLongVal");
+        testOpts.addOptionChaining("unsignedVal", "unsignedVal", moe::Unsigned, "UnsignedVal");
+        testOpts.addOptionChaining("switchVal", "switchVal", moe::Switch, "SwitchVal");
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -1056,9 +1067,285 @@ namespace {
         argv.push_back("config.json");
         std::map<std::string, std::string> env_map;
 
-        parser.setConfig("config.json", "{ port : \"string\" }");
+        // Test StringVector type
+        std::vector<std::string> stringVectorVal;
 
+        parser.setConfig("config.json", "{ stringVectorVal : \"scalar\" }");
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVectorVal : \"true\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVectorVal : \"5\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVectorVal : [ [ \"string\" ], true, 1, 1.0 ] }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a string vector type and treat it as an array of strings, even if the
+        // elements are not surrounded by quotes
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVectorVal : [ \"string\", bare, true, 1, 1.0 ] }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVectorVal"), &value));
+        std::vector<std::string>::iterator stringVectorValIt;
+        ASSERT_OK(value.get(&stringVectorVal));
+        stringVectorValIt = stringVectorVal.begin();
+        ASSERT_EQUALS(*stringVectorValIt, "string");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "bare");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "true");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "1");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "1.0");
+
+        // Test Bool type
+        bool boolVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ boolVal : \"lies\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ boolVal : truth }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ boolVal : 1 }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a bool type and try to convert it to a bool, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ boolVal : \"true\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
+        ASSERT_OK(value.get(&boolVal));
+        ASSERT_EQUALS(boolVal, true);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ boolVal : false }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
+        ASSERT_OK(value.get(&boolVal));
+        ASSERT_EQUALS(boolVal, false);
+
+        // Test Double type
+        double doubleVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ doubleVal : \"double the monkeys\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ doubleVal : true }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a double type and try to convert it to a double, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ doubleVal : 1.5 }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 1.5);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ doubleVal : -1.5 }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, -1.5);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ doubleVal : \"3.14\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 3.14);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ doubleVal : \"-3.14\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, -3.14);
+
+        // Test Int type
+        int intVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ intVal : \"hungry hippos\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ intVal : 1.5 }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ intVal : 18446744073709551617 }"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ intVal : true }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as an int type and try to convert it to a int, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ intVal : \"5\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 5);
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ intVal : \"-5\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, -5);
+
+        // Test Long type
+        long longVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ longVal : \"in an eating race\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ longVal : 1.5 }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ longVal : 18446744073709551617 }"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ longVal : true }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a long type and try to convert it to a long, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ longVal : \"5\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 5);
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ longVal : \"-5\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, -5);
+
+        // Test String type
+        std::string stringVal;
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a string type and treat it as a string, even if the element is not
+        // surrounded by quotes
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVal : }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "");
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVal : \"1000\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "1000");
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVal : wat man }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "wat man");
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ stringVal : true 1 string 1.0 }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "true 1 string 1.0");
+
+        // Test UnsignedLongLong type
+        unsigned long long unsignedLongLongVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedLongLongVal : \"unsigned hungry hippos\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedLongLongVal : 1.5 }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json",
+                         "{ unsignedLongLongVal : 18446744073709551617 }"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedLongLongVal : true }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedLongLongVal : \"-5\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as an unsigned long long type and try to convert it to an unsigned long long,
+        // even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedLongLongVal : \"5\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 5ULL);
+
+        // Test Unsigned type
+        unsigned unsignedVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedVal : \"unsigned hungry hippos\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedVal : 1.5 }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedVal : 18446744073709551617 }"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedVal : true }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedVal : \"-5\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as an unsigned type and try to convert it to an unsigned, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ unsignedVal : \"5\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 5U);
+
+        // Test Switch type
+        bool switchVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ switchVal : \"lies\" }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ switchVal : truth }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ switchVal : 1 }");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a switch type and try to convert it to a bool, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ switchVal : \"true\" }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("switchVal"), &value));
+        ASSERT_OK(value.get(&switchVal));
+        ASSERT_EQUALS(switchVal, true);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "{ switchVal : false }");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // A switch not being present results in it not getting added to the map for legacy reasons.
+        // The downside of this is that switches can't override a default value of "true" in a
+        // config file.  We should change this once we elminate the places in the code that depend
+        // on this behavior.
+        ASSERT_NOT_OK(environment.get(moe::Key("switchVal"), &value));
     }
 
     TEST(JSONConfigFile, Nested) {
@@ -2470,23 +2757,310 @@ namespace {
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
-    TEST(YAMLConfigFile, BadType) {
+    TEST(YAMLConfigFile, TypeChecking) {
         OptionsParserTester parser;
         moe::Environment environment;
+        moe::Value value;
 
         moe::OptionSection testOpts;
         testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+        testOpts.addOptionChaining("stringVectorVal", "stringVectorVal", moe::StringVector,
+                                   "StringVectorVal");
+        testOpts.addOptionChaining("boolVal", "boolVal", moe::Bool, "BoolVal");
+        testOpts.addOptionChaining("doubleVal", "doubleVal", moe::Double, "DoubleVal");
+        testOpts.addOptionChaining("intVal", "intVal", moe::Int, "IntVal");
+        testOpts.addOptionChaining("longVal", "longVal", moe::Long, "LongVal");
+        testOpts.addOptionChaining("stringVal", "stringVal", moe::String, "StringVal");
+        testOpts.addOptionChaining("unsignedLongLongVal", "unsignedLongLongVal",
+                                   moe::UnsignedLongLong, "UnsignedLongLongVal");
+        testOpts.addOptionChaining("unsignedVal", "unsignedVal", moe::Unsigned, "UnsignedVal");
+        testOpts.addOptionChaining("switchVal", "switchVal", moe::Switch, "SwitchVal");
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
         argv.push_back("--config");
-        argv.push_back("config.yaml");
+        argv.push_back("config.json");
         std::map<std::string, std::string> env_map;
 
-        parser.setConfig("config.yaml", "port: \"string\"");
+        // Test StringVector type
+        std::vector<std::string> stringVectorVal;
 
+        parser.setConfig("config.json", "stringVectorVal : \"scalar\"");
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVectorVal : \"true\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVectorVal : \"5\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVectorVal : [ [ \"string\" ], true, 1, 1.0 ]");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a string vector type and treat it as an array of strings, even if the
+        // elements are not surrounded by quotes
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVectorVal : [ \"string\", bare, true, 1, 1.0 ]");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVectorVal"), &value));
+        std::vector<std::string>::iterator stringVectorValIt;
+        ASSERT_OK(value.get(&stringVectorVal));
+        stringVectorValIt = stringVectorVal.begin();
+        ASSERT_EQUALS(*stringVectorValIt, "string");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "bare");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "true");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "1");
+        stringVectorValIt++;
+        ASSERT_EQUALS(*stringVectorValIt, "1.0");
+
+        // Test Bool type
+        bool boolVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "boolVal : \"lies\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "boolVal : truth");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "boolVal : 1");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a bool type and try to convert it to a bool, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "boolVal : \"true\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
+        ASSERT_OK(value.get(&boolVal));
+        ASSERT_EQUALS(boolVal, true);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "boolVal : false");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("boolVal"), &value));
+        ASSERT_OK(value.get(&boolVal));
+        ASSERT_EQUALS(boolVal, false);
+
+        // Test Double type
+        double doubleVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "doubleVal : \"double the monkeys\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "doubleVal : true");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a double type and try to convert it to a double, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "doubleVal : 1.5");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 1.5);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "doubleVal : -1.5");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, -1.5);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "doubleVal : \"3.14\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 3.14);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "doubleVal : \"-3.14\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, -3.14);
+
+        // Test Int type
+        int intVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "intVal : \"hungry hippos\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "intVal : 1.5");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "intVal : 18446744073709551617"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "intVal : true");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as an int type and try to convert it to a int, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "intVal : \"5\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 5);
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "intVal : \"-5\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, -5);
+
+        // Test Long type
+        long longVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "longVal : \"in an eating race\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "longVal : 1.5");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "longVal : 18446744073709551617"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "longVal : true");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a long type and try to convert it to a long, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "longVal : \"5\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 5);
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "longVal : \"-5\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, -5);
+
+        // Test String type
+        std::string stringVal;
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a string type and treat it as a string, even if the element is not
+        // surrounded by quotes
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVal :");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "");
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVal : \"1000\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "1000");
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVal : wat man");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "wat man");
+
+        environment = moe::Environment();
+        parser.setConfig("config.json", "stringVal : true 1 string 1.0");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("stringVal"), &value));
+        ASSERT_OK(value.get(&stringVal));
+        ASSERT_EQUALS(stringVal, "true 1 string 1.0");
+
+        // Test UnsignedLongLong type
+        unsigned long long unsignedLongLongVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedLongLongVal : \"unsigned hungry hippos\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedLongLongVal : 1.5");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json",
+                         "unsignedLongLongVal : 18446744073709551617"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedLongLongVal : true");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedLongLongVal : \"-5\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as an unsigned long long type and try to convert it to an unsigned long long,
+        // even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedLongLongVal : \"5\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 5ULL);
+
+        // Test Unsigned type
+        unsigned unsignedVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedVal : \"unsigned hungry hippos\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedVal : 1.5");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedVal : 18446744073709551617"); // 2^64 + 1
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedVal : true");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedVal : \"-5\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as an unsigned type and try to convert it to an unsigned, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "unsignedVal : \"5\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 5U);
+
+        // Test Switch type
+        bool switchVal;
+        environment = moe::Environment();
+        parser.setConfig("config.json", "switchVal : \"lies\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "switchVal : truth");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+        environment = moe::Environment();
+        parser.setConfig("config.json", "switchVal : 1");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // The YAML parser treats everything as a string, so we just take anything that was
+        // specified as a switch type and try to convert it to a bool, even if it was quoted
+        environment = moe::Environment();
+        parser.setConfig("config.json", "switchVal : \"true\"");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("switchVal"), &value));
+        ASSERT_OK(value.get(&switchVal));
+        ASSERT_EQUALS(switchVal, true);
+        environment = moe::Environment();
+        parser.setConfig("config.json", "switchVal : false");
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // A switch not being present results in it not getting added to the map for legacy reasons.
+        // The downside of this is that switches can't override a default value of "true" in a
+        // config file.  We should change this once we elminate the places in the code that depend
+        // on this behavior.
+        ASSERT_NOT_OK(environment.get(moe::Key("switchVal"), &value));
     }
 
     TEST(YAMLConfigFile, Nested) {
@@ -2677,4 +3251,24 @@ namespace {
         ASSERT_OK(value.get(&host));
         ASSERT_EQUALS(host, "localhost");
     }
+
+    TEST(YAMLConfigFile, EmptyKey) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", ":");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
 } // unnamed namespace
