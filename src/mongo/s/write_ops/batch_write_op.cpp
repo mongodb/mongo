@@ -106,7 +106,11 @@ namespace mongo {
                 writeIt != writes.end(); ++writeIt ) {
 
                 TargetedWrite* write = *writeIt;
-                targetedWriteOps.insert( &writeOps[write->writeOpRef.first] );
+
+                // NOTE: We may repeatedly cancel a write op here, but that's fast and we want to
+                // cancel before erasing the TargetedWrite* (which owns the cancelled targeting
+                // info) for reporting reasons.
+                writeOps[write->writeOpRef.first].cancelWrites( &why );
             }
 
             // Note that we need to *erase* first, *then* delete, since the map keys are ptrs from
@@ -115,13 +119,6 @@ namespace mongo {
             delete batch;
         }
         batchMap->clear();
-
-        // Cancel all the write ops we found above
-        for ( set<WriteOp*>::iterator it = targetedWriteOps.begin(); it != targetedWriteOps.end();
-            ++it ) {
-            WriteOp* writeOp = *it;
-            writeOp->cancelWrites( &why );
-        }
     }
 
     Status BatchWriteOp::targetBatch( const NSTargeter& targeter,
@@ -129,12 +126,14 @@ namespace mongo {
                                       vector<TargetedWriteBatch*>* targetedBatches ) {
 
         TargetedBatchMap batchMap;
+        int numTargetErrors = 0;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
 
-            // Only do one-at-a-time ops if COE is false
-            if ( _clientRequest->getOrdered() && !batchMap.empty() ) break;
+            // Only do one-at-a-time ops if COE is false (and break at first target error)
+            if ( _clientRequest->getOrdered() && ( !batchMap.empty() || numTargetErrors != 0 ) )
+                break;
 
             WriteOp& writeOp = _writeOps[i];
 
@@ -163,6 +162,7 @@ namespace mongo {
 
                 if ( recordTargetErrors ) {
                     writeOp.setOpError( targetError );
+                    ++numTargetErrors;
                     continue;
                 }
                 else {

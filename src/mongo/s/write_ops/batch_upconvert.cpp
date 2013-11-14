@@ -161,15 +161,10 @@ namespace mongo {
                 buildErrorFromResponse( response, topLevelError.get() );
                 lastBatchError = topLevelError.get();
             }
-            else if ( request.getOrdered() && response.isErrDetailsSet() ) {
-                // The last error in the batch
+            else if ( response.isErrDetailsSet() ) {
+                // The last error in the batch is always reported - this matches expected COE
+                // semantics for insert batches and works for single writes
                 lastBatchError = response.getErrDetails().back();
-            }
-            else if ( !request.getOrdered() ) {
-                // If everything failed, populate the error, otherwise don't
-                if ( request.sizeWriteOps() == response.sizeErrDetails() ) {
-                    lastBatchError = response.getErrDetails().back();
-                }
             }
         }
 

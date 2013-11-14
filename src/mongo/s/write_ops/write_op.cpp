@@ -207,7 +207,7 @@ namespace mongo {
 
     void WriteOp::cancelWrites( const BatchedErrorDetail* why ) {
 
-        dassert( _state == WriteOpState_Pending );
+        dassert( _state == WriteOpState_Pending || _state == WriteOpState_Ready );
         for ( vector<ChildWriteOp*>::iterator it = _childOps.begin(); it != _childOps.end();
             ++it ) {
 
