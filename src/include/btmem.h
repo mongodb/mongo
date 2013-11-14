@@ -241,16 +241,13 @@ struct __wt_page_modify {
 	 */
 	uint32_t write_gen;
 
-#define	WT_PAGE_LOCK(session, page)					\
-	__wt_spin_lock(							\
-	    session, S2C(session)->page_lock[(page)->modify->page_lock])
-#define	WT_PAGE_TRYLOCK(session, page)					\
-	__wt_spin_trylock(						\
-	    session, S2C(session)->page_lock[(page)->modify->page_lock])
-#define	WT_PAGE_UNLOCK(session, page)					\
-	__wt_spin_unlock(						\
-	    session, S2C(session)->page_lock[(page)->modify->page_lock])
-	uint8_t page_lock;		/* Page's spinlock */
+#define	WT_PAGE_LOCK(s, p)						\
+	__wt_spin_lock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
+#define	WT_PAGE_TRYLOCK(s, p)						\
+	__wt_spin_trylock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
+#define	WT_PAGE_UNLOCK(s, p)						\
+	__wt_spin_unlock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
+	uint8_t page_lock;    /* Page's spinlock */
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */

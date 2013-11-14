@@ -24,7 +24,7 @@
 struct __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t snap_min;
-};
+} WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 struct __wt_txn_global {
 	volatile uint64_t current;	/* Current transaction ID. */

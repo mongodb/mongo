@@ -87,8 +87,8 @@ struct __wt_connection_impl {
 	 * very short operations, each one is 64 bytes, so 256 will fill the L1
 	 * cache on most CPUs.
 	 */
-#define	WT_PAGE_LOCKS(conn)	WT_ELEMENTS((conn)->page_lock)
-	WT_SPINLOCK *page_lock[17];	/* Btree page spinlocks */
+#define	WT_PAGE_LOCKS(conn)	16
+	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
 	u_int	     page_lock_cnt;	/* Next spinlock to use */
 
 					/* Connection queue */

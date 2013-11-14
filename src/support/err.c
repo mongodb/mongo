@@ -180,17 +180,18 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		__wt_raw_to_hex_mem((const uint8_t *)&self, sizeof(self),
 		    tid, sizeof(tid));
 		wlen = (size_t)snprintf(p, remain,
-		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s] ",
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s]",
 		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
 		    (uint64_t)getpid(), tid);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if ((prefix = S2C(session)->error_prefix) != NULL) {
 		remain = WT_PTRDIFF(end, p);
-		wlen = (size_t)snprintf(p, remain, "%s", prefix);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	prefix = dhandle == NULL ? NULL : dhandle->name;
 	if (prefix != NULL) {
@@ -198,14 +199,14 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		wlen = (size_t)snprintf(p, remain,
 		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if ((prefix = session->name) != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if (prefix_cnt != 0) {
 		remain = WT_PTRDIFF(end, p);
