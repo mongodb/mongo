@@ -469,6 +469,8 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 	if (addr == NULL) {
 		*addrp = NULL;
 		*sizep = 0;
+		if (typep != NULL)
+			*typep = 0;
 	} else if (__wt_off_page(page, addr)) {
 		*addrp = addr->addr;
 		*sizep = addr->size;
