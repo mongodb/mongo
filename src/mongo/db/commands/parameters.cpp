@@ -36,6 +36,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/ssl_options.h"
 
 namespace mongo {
 
@@ -231,6 +232,68 @@ namespace mongo {
             }
         } logLevelSetting;
 
+        class SSLModeSetting : public ServerParameter {
+        public:
+            SSLModeSetting() : ServerParameter(ServerParameterSet::getGlobal(), "sslMode") {}
+
+            std::string sslModeStr() {
+                switch (sslGlobalParams.sslMode.load()) {
+                    case SSLGlobalParams::SSLMode_noSSL:
+                        return "noSSL";
+                    case SSLGlobalParams::SSLMode_acceptSSL:
+                        return "acceptSSL";
+                    case SSLGlobalParams::SSLMode_sendAcceptSSL:
+                        return "sendAcceptSSL";
+                    case SSLGlobalParams::SSLMode_sslOnly:
+                        return "sslOnly";
+                    default:
+                        return "undefined";
+                }
+            }
+
+            virtual void append(BSONObjBuilder& b, const std::string& name) {
+                b << name << sslModeStr();
+            }
+
+            virtual Status set(const BSONElement& newValueElement) {
+                try {
+                    return setFromString(newValueElement.String());
+                }
+                catch (MsgAssertionException msg) {
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Invalid value for sslMode via setParameter command: " 
+                                    << newValueElement);
+                }
+
+            }
+
+            virtual Status setFromString(const std::string& str) {
+#ifndef MONGO_SSL
+                return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
+                                "Unable to set sslMode, SSL support is not compiled into server");
+#endif
+                if (str != "sendAcceptSSL" && str != "sslOnly") { 
+                        return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Invalid value for sslMode via setParameter command: " 
+                                    << str);
+                }
+
+                int oldMode = sslGlobalParams.sslMode.load();
+                if (str == "sendAcceptSSL" && oldMode == SSLGlobalParams::SSLMode_acceptSSL) {
+                    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sendAcceptSSL);
+                }
+                else if (str == "sslOnly" && oldMode == SSLGlobalParams::SSLMode_sendAcceptSSL) {
+                    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+                }
+                else {
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Illegal state transition for sslMode, attempt to change from "
+                                    << sslModeStr() << " to " << str);
+                }
+                return Status::OK();
+            }
+        } sslModeSetting;
+        
         ExportedServerParameter<bool> QuietSetting( ServerParameterSet::getGlobal(),
                                                     "quiet",
                                                     &serverGlobalParams.quiet,
