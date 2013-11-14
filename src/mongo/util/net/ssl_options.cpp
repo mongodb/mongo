@@ -28,7 +28,7 @@ namespace mongo {
                 "use ssl on configured ports");
 
         options->addOptionChaining("ssl.mode", "sslMode", moe::String,
-                "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
+                "set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)");
 
         options->addOptionChaining("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
                 "PEM file for ssl");
@@ -90,17 +90,17 @@ namespace mongo {
 
         if (params.count("ssl.mode")) {
             std::string sslModeParam = params["ssl.mode"].as<string>();
-            if (sslModeParam == "noSSL") {
-                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_noSSL);
+            if (sslModeParam == "disabled") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_disabled);
             }
-            else if (sslModeParam == "acceptSSL") {
-                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_acceptSSL);
+            else if (sslModeParam == "allowSSL") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_allowSSL);
             }
-            else if (sslModeParam == "sendAcceptSSL") {
-                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sendAcceptSSL);
+            else if (sslModeParam == "preferSSL") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_preferSSL);
             }
-            else if (sslModeParam == "sslOnly") {
-                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+            else if (sslModeParam == "requireSSL") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
             }
             else {
                 return Status(ErrorCodes::BadValue, 
@@ -148,11 +148,11 @@ namespace mongo {
                                   "can't have both sslMode and sslOnNormalPorts");
             }
             else {
-                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
             }
         }
 
-        if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_noSSL) {
+        if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled) {
             if (sslGlobalParams.sslPEMKeyFile.size() == 0) {
                 return Status(ErrorCodes::BadValue,
                               "need sslPEMKeyFile when SSL is enabled");
@@ -190,7 +190,7 @@ namespace mongo {
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
-            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_noSSL){
+            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_disabled){
                 return Status(ErrorCodes::BadValue, "need to enable SSL via the sslMode flag");
             }
         }
@@ -200,7 +200,7 @@ namespace mongo {
 
     Status storeSSLClientOptions(const moe::Environment& params) {
         if (params.count("ssl")) {
-            sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+            sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
         }
         if (params.count("ssl.PEMKeyFile")) {
             sslGlobalParams.sslPEMKeyFile = params["ssl.PEMKeyFile"].as<std::string>();

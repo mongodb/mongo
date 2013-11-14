@@ -41,29 +41,29 @@ namespace mongo {
         bool sslAllowInvalidCertificates; // --sslIgnoreCertificateValidation
 
         SSLGlobalParams() {
-            sslMode.store(SSLMode_noSSL);
+            sslMode.store(SSLMode_disabled);
         }
  
         enum SSLModes {
             /** 
             * Make unencrypted outgoing connections and do not accept incoming SSL-connections 
             */
-            SSLMode_noSSL,
+            SSLMode_disabled,
 
             /**
             * Make unencrypted outgoing connections and accept both unencrypted and SSL-connections 
             */
-            SSLMode_acceptSSL,
+            SSLMode_allowSSL,
 
             /**
             * Make outgoing SSL-connections and accept both unecrypted and SSL-connections
             */
-            SSLMode_sendAcceptSSL,
+            SSLMode_preferSSL,
  
             /**
             * Make outgoing SSL-connections and only accept incoming SSL-connections
             */
-            SSLMode_sslOnly
+            SSLMode_requireSSL
         };
     };
 

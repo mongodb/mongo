@@ -618,7 +618,7 @@ namespace {
             else if (iterator->_dottedName == "ssl.mode") {
                 ASSERT_EQUALS(iterator->_singleName, "sslMode");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
+                ASSERT_EQUALS(iterator->_description, "set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());

@@ -2,30 +2,30 @@
 // since it is not necessary for this test.
 TestData.useX509 = false;
 
-ssl_options1 = {sslMode : "sslOnly",
+ssl_options1 = {sslMode : "requireSSL",
                sslPEMKeyFile : "jstests/libs/server.pem",
                sslCAFile: "jstests/libs/ca.pem",
                sslAllowInvalidCertificates: ""};
 ssl_options2 = ssl_options1;
 load("jstests/replsets/replset1.js");
 
-// Test mixed sslMode acceptSSL/sendAcceptSSL
-ssl_options1 = {sslMode : "acceptSSL",
+// Test mixed sslMode allowSSL/preferSSL
+ssl_options1 = {sslMode : "allowSSL",
                sslPEMKeyFile : "jstests/libs/server.pem",
                sslCAFile: "jstests/libs/ca.pem",
                sslAllowInvalidCertificates: ""};
-ssl_options2 = {sslMode : "sendAcceptSSL",
+ssl_options2 = {sslMode : "preferSSL",
                sslPEMKeyFile : "jstests/libs/server.pem",
                sslCAFile: "jstests/libs/ca.pem",
                sslAllowInvalidCertificates: ""};
 load("jstests/replsets/replset1.js");
 
-// Test mixed sslMode sendAcceptSSL/sslOnly
-ssl_options1 = {sslMode : "sendAcceptSSL",
+// Test mixed sslMode preferSSL/requireSSL
+ssl_options1 = {sslMode : "preferSSL",
                sslPEMKeyFile : "jstests/libs/server.pem",
                sslCAFile: "jstests/libs/ca.pem",
                sslAllowInvalidCertificates: ""};
-ssl_options2 = {sslMode : "sslOnly",
+ssl_options2 = {sslMode : "requireSSL",
                sslPEMKeyFile : "jstests/libs/server.pem",
                sslCAFile: "jstests/libs/ca.pem",
                sslAllowInvalidCertificates: ""};

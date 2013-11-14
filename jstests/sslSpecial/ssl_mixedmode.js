@@ -10,7 +10,7 @@ var baseName = "jstests_mixed_mode_ssl"
 port = allocatePorts(1)[0];
 
 function testCombination(sslMode, sslShell, shouldSucceed) {
-    if (sslMode == "noSSL") {
+    if (sslMode == "disabled") {
         MongoRunner.runMongod({port: port});
     }
     else {
@@ -44,12 +44,12 @@ function testCombination(sslMode, sslShell, shouldSucceed) {
     stopMongod(port);
 }
 
-testCombination("noSSL", false, true);
-testCombination("acceptSSL", false, true);
-testCombination("sendAcceptSSL", false, true);
-testCombination("sslOnly", false, false);
-testCombination("noSSL", true, false);
-testCombination("acceptSSL", true, true);
-testCombination("sendAcceptSSL", true, true);
-testCombination("sslOnly", true, true);
+testCombination("disabled", false, true);
+testCombination("allowSSL", false, true);
+testCombination("preferSSL", false, true);
+testCombination("requireSSL", false, false);
+testCombination("disabled", true, false);
+testCombination("allowSSL", true, true);
+testCombination("preferSSL", true, true);
+testCombination("requireSSL", true, true);
 

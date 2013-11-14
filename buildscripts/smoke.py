@@ -224,7 +224,7 @@ class mongod(object):
                 argv += ['--setParameter', 'authenticationMechanisms=' + authMechanism]
             self.auth = True
         if self.kwargs.get('use_ssl') or self.kwargs.get('use_x509'):
-            argv += ['--sslMode', "sslOnly",
+            argv += ['--sslMode', "requireSSL",
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
                      '--sslWeakCertificateValidation']

@@ -12,7 +12,7 @@ var baseName = "jstests_ssl_ssl_crl";
 
 var md = startMongod("--port", port1, "--dbpath", 
                      MongoRunner.dataPath + baseName + "1",
-                     "--sslMode", "sslOnly",
+                     "--sslMode", "requireSSL",
                      "--sslPEMKeyFile", "jstests/libs/server.pem",
                      "--sslCAFile", "jstests/libs/ca.pem",
                      "--sslCRLFile", "jstests/libs/crl.pem");
@@ -28,7 +28,7 @@ assert(mongo==0);
 port2 = ports[1];
 // This test ensures clients cannot connect if the CRL is expired.
 md = startMongod("--port", port2, "--dbpath", MongoRunner.dataPath + baseName + "2",
-                 "--sslMode", "sslOnly",
+                 "--sslMode", "requireSSL",
                  "--sslPEMKeyFile", "jstests/libs/server.pem",
                  "--sslCAFile", "jstests/libs/ca.pem",
                  "--sslCRLFile", "jstests/libs/crl_expired.pem");

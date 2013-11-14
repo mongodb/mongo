@@ -418,7 +418,7 @@ MongoRunner.mongoOptions = function( opts ){
     if (waitForConnect == undefined || waitForConnect == null) opts.waitForConnect = true;
     
     if( jsTestOptions().useSSL ) {
-        if (!opts.sslMode) opts.sslMode = "sslOnly";
+        if (!opts.sslMode) opts.sslMode = "requireSSL";
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
         opts.sslWeakCertificateValidation = "";
@@ -483,7 +483,7 @@ MongoRunner.mongodOptions = function( opts ){
     }
 
     if( jsTestOptions().useSSL ) {
-        if (!opts.sslMode) opts.sslMode = "sslOnly";
+        if (!opts.sslMode) opts.sslMode = "requireSSL";
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
         opts.sslWeakCertificateValidation = "";
@@ -718,7 +718,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     if( jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']) ) options['keyFile'] = jsTestOptions().keyFile
 
     if( jsTestOptions().useSSL ) {
-        if (!options["sslMode"]) options["sslMode"] = "sslOnly";
+        if (!options["sslMode"]) options["sslMode"] = "requireSSL";
         if (!options["sslPEMKeyFile"]) options["sslPEMKeyFile"] = "jstests/libs/server.pem";
         if (!options["sslCAFile"]) options["sslCAFile"] = "jstests/libs/ca.pem";
         options["sslWeakCertificateValidation"] = "";

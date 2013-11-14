@@ -7,7 +7,7 @@ var baseName = "jstests_ssl_ssl_crl_revoked";
 
 
 var md = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName,
-                    "--sslMode","sslOnly",
+                    "--sslMode","requireSSL",
                     "--sslPEMKeyFile", "jstests/libs/server.pem",
                     "--sslCAFile", "jstests/libs/ca.pem",
                     "--sslCRLFile", "jstests/libs/crl_client_revoked.pem");

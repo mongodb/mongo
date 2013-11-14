@@ -238,14 +238,14 @@ namespace mongo {
 
             std::string sslModeStr() {
                 switch (sslGlobalParams.sslMode.load()) {
-                    case SSLGlobalParams::SSLMode_noSSL:
-                        return "noSSL";
-                    case SSLGlobalParams::SSLMode_acceptSSL:
-                        return "acceptSSL";
-                    case SSLGlobalParams::SSLMode_sendAcceptSSL:
-                        return "sendAcceptSSL";
-                    case SSLGlobalParams::SSLMode_sslOnly:
-                        return "sslOnly";
+                    case SSLGlobalParams::SSLMode_disabled:
+                        return "disabled";
+                    case SSLGlobalParams::SSLMode_allowSSL:
+                        return "allowSSL";
+                    case SSLGlobalParams::SSLMode_preferSSL:
+                        return "preferSSL";
+                    case SSLGlobalParams::SSLMode_requireSSL:
+                        return "requireSSL";
                     default:
                         return "undefined";
                 }
@@ -272,18 +272,18 @@ namespace mongo {
                 return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
                                 "Unable to set sslMode, SSL support is not compiled into server");
 #endif
-                if (str != "sendAcceptSSL" && str != "sslOnly") { 
+                if (str != "preferSSL" && str != "requireSSL") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                                     "Invalid value for sslMode via setParameter command: " 
                                     << str);
                 }
 
                 int oldMode = sslGlobalParams.sslMode.load();
-                if (str == "sendAcceptSSL" && oldMode == SSLGlobalParams::SSLMode_acceptSSL) {
-                    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sendAcceptSSL);
+                if (str == "preferSSL" && oldMode == SSLGlobalParams::SSLMode_allowSSL) {
+                    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_preferSSL);
                 }
-                else if (str == "sslOnly" && oldMode == SSLGlobalParams::SSLMode_sendAcceptSSL) {
-                    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+                else if (str == "requireSSL" && oldMode == SSLGlobalParams::SSLMode_preferSSL) {
+                    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
                 }
                 else {
                     return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<

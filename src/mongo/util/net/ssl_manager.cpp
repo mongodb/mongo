@@ -281,7 +281,7 @@ namespace mongo {
     
     MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
-        if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_noSSL) {
+        if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled) {
             const Params params(
                 sslGlobalParams.sslPEMKeyFile,
                 sslGlobalParams.sslPEMKeyPassword,

@@ -47,7 +47,7 @@ void play( string url ) {
 int main( int argc, const char **argv, char **envp) {
 
 #ifdef MONGO_SSL
-    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+    sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
     runGlobalInitializersOrDie(argc, argv, envp);
 #endif
 

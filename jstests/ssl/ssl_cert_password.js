@@ -13,7 +13,7 @@ mkdir(external_scratch_dir);
 md = startMongod("--nopreallocj",
                  "--port", port, 
                  "--dbpath", dbpath, 
-                 "--sslMode","sslOnly",
+                 "--sslMode","requireSSL",
                  "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                  "--sslPEMKeyPassword", "qwerty");
 // startMongod connects a Mongo shell, so if we get here, the test is successful.

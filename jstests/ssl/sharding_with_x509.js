@@ -1,7 +1,7 @@
 // Tests basic sharding with x509 cluster auth 
 // The purpose is to verify the connectivity between mongos and the shards
 
-var x509_options = {sslMode : "sslOnly",
+var x509_options = {sslMode : "requireSSL",
                     sslPEMKeyFile : "jstests/libs/server.pem",
                     sslCAFile: "jstests/libs/ca.pem",
                     sslClusterFile: "jstests/libs/cluster-cert.pem",

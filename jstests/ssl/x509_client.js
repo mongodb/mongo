@@ -47,7 +47,7 @@ function authAndTest(mongo) {
 
 print("1. Testing x.509 auth to mongod");
 var mongo = MongoRunner.runMongod({port : port,
-                                sslMode : "sslOnly", 
+                                sslMode : "requireSSL", 
                                 sslPEMKeyFile : SERVER_CERT, 
                                 sslCAFile : CA_CERT,
                                 auth:""});
@@ -56,7 +56,7 @@ authAndTest(mongo);
 stopMongod(port);
 
 print("2. Testing x.509 auth to mongos");
-var x509_options = {sslMode : "sslOnly",
+var x509_options = {sslMode : "requireSSL",
                     sslPEMKeyFile : SERVER_CERT,
                     sslCAFile : CA_CERT};
 

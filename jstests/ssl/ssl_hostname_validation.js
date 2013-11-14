@@ -16,7 +16,7 @@ port = allocatePorts(1)[0];
 
 function testCombination(certPath, allowInvalidCert, shouldSucceed) {
     MongoRunner.runMongod({port: port,
-                           sslMode: "sslOnly", 
+                           sslMode: "requireSSL", 
                            sslPEMKeyFile: certPath,
                            sslCAFile: CA_CERT});
 
@@ -56,7 +56,7 @@ testCombination(SERVER_CERT, false, false);
 testCombination(SERVER_CERT, true, true);
 
 // 2. Initiate ReplSetTest with invalid certs
-ssl_options = {sslMode : "sslOnly",
+ssl_options = {sslMode : "requireSSL",
                sslPEMKeyFile : SERVER_CERT,
                sslCAFile: CA_CERT};
 
@@ -66,7 +66,7 @@ assert.throws( function() { replTest.initiate() } );
 replTest.stopSet();
 
 // 3. Initiate ReplSetTest with invalid certs but set allowInvalidCertificates
-ssl_options = {sslMode : "sslOnly",
+ssl_options = {sslMode : "requireSSL",
                sslPEMKeyFile : SERVER_CERT,
                sslCAFile: CA_CERT,
                sslAllowInvalidCertificates: ""};
