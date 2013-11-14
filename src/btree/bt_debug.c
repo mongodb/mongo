@@ -24,8 +24,8 @@ typedef struct {
 	WT_ITEM		*tmp;			/* Temporary space */
 } WT_DBG;
 
-/* Diagnostic output separator. */
-static const char *sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
+static const					/* Output separator */
+    char * const sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
 static int  __debug_cell(WT_DBG *, WT_PAGE_HEADER *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(
