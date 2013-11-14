@@ -93,6 +93,5 @@ assert.gleError(shard0Coll.getDB(), function(gle) {
             " doc: " + tojson(shard0Coll.findOne()) 
 });
 
-db.adminCommand("unsetSharding");
 jsTest.log("DONE!"); // distinguishes shutdown failures
 st.stop();
