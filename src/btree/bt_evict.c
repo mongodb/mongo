@@ -1090,8 +1090,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 */
 	page->read_gen = __wt_cache_read_gen_set(session);
 
-	WT_WITH_BTREE(session, btree,
-	    ret = __wt_evict_page(session, page));
+	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, page));
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
