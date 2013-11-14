@@ -1082,6 +1082,12 @@ namespace mongo {
                                << solnRoot->toString() << endl;
                     }
                     else {
+                        // If we're not allowed to put a blocking sort in, bail out.
+                        if (params.options & QueryPlannerParams::NO_BLOCKING_SORT) {
+                            delete solnRoot;
+                            return NULL;
+                        }
+
                         // XXX TODO: Can we pull values out of the key and if so in what
                         // cases?  (covered_index_sort_3.js)
 
@@ -1240,10 +1246,7 @@ namespace mongo {
             fetch->children.push_back(isn);
             solnRoot = fetch;
         }
-
-        QuerySolution* soln = analyzeDataAccess(query, params, solnRoot);
-        verify(NULL != soln);
-        return soln;
+        return analyzeDataAccess(query, params, solnRoot);
     }
 
     // Copied verbatim from queryutil.cpp.
@@ -1292,6 +1295,9 @@ namespace mongo {
         if (options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             ss << "INCLUDE_SHARD_FILTER ";
         }
+        if (options & QueryPlannerParams::NO_BLOCKING_SORT) {
+            ss << "NO_BLOCKING_SORT";
+        }
         return ss.str();
     }
 
@@ -1331,11 +1337,15 @@ namespace mongo {
                     isn->bounds.startKey = isn->bounds.endKey = key;
                     isn->bounds.endKeyInclusive = true;
                     isn->computeProperties();
-                    out->push_back(analyzeDataAccess(query, params, isn));
 
-                    QLOG() << "IDHACK solution is:\n" << (*out)[0]->toString() << endl;
-                    // And that's it.
-                    return;
+                    QuerySolution* soln = analyzeDataAccess(query, params, isn);
+
+                    if (NULL != soln) {
+                        out->push_back(soln);
+                        QLOG() << "IDHACK solution is:\n" << (*out)[0]->toString() << endl;
+                        // And that's it.
+                        return;
+                    }
                 }
             }
         }
@@ -1353,8 +1363,10 @@ namespace mongo {
         if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
             if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
                 && canTableScan) {
-
-                out->push_back(makeCollectionScan(query, true, params));
+                QuerySolution* soln = makeCollectionScan(query, true, params);
+                if (NULL != soln) {
+                    out->push_back(soln);
+                }
             }
             return;
         }
@@ -1366,7 +1378,10 @@ namespace mongo {
             if (!natural.eoo()) {
                 QLOG() << "forcing a table scan due to hinted $natural\n";
                 if (canTableScan) {
-                    out->push_back(makeCollectionScan(query, false, params));
+                    QuerySolution* soln = makeCollectionScan(query, false, params);
+                    if (NULL != soln) {
+                        out->push_back(soln);
+                    }
                 }
                 return;
             }
@@ -1385,7 +1400,10 @@ namespace mongo {
             }
             QLOG() << "NOT/NOR in plan, just outtping a collscan\n";
             if (canTableScan) {
-                out->push_back(makeCollectionScan(query, false, params));
+                QuerySolution* soln = makeCollectionScan(query, false, params);
+                if (NULL != soln) {
+                    out->push_back(soln);
+                }
             }
             return;
         }
@@ -1526,7 +1544,11 @@ namespace mongo {
                 // only be first for gnNode.
                 tag->first.erase(tag->first.begin() + i);
 
-                out->push_back(analyzeDataAccess(query, params, solnRoot));
+                QuerySolution* soln = analyzeDataAccess(query, params, solnRoot);
+
+                if (NULL != soln) {
+                    out->push_back(soln);
+                }
             }
 
             // Continue planning w/non-2d indices tagged for this pred.
@@ -1564,12 +1586,11 @@ namespace mongo {
                                                                      relevantIndices);
                 if (NULL == solnRoot) { continue; }
 
-                // This shouldn't ever fail.
                 QuerySolution* soln = analyzeDataAccess(query, params, solnRoot);
-                verify(NULL != soln);
-
-                QLOG() << "Planner: adding solution:\n" << soln->toString() << endl;
-                out->push_back(soln);
+                if (NULL != soln) {
+                    QLOG() << "Planner: adding solution:\n" << soln->toString() << endl;
+                    out->push_back(soln);
+                }
             }
         }
 
@@ -1579,8 +1600,11 @@ namespace mongo {
         // scan the entire index to provide results and output that as our plan.  This is the
         // desired behavior when an index is hinted that is not relevant to the query.
         if (!hintIndex.isEmpty() && (0 == out->size())) {
-            QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
-            out->push_back(scanWholeIndex(params.indices[hintIndexNumber], query, params));
+            QuerySolution* soln = scanWholeIndex(params.indices[hintIndexNumber], query, params);
+            if (NULL != soln) {
+                QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
+                out->push_back(soln);
+            }
             return;
         }
 
@@ -1608,14 +1632,20 @@ namespace mongo {
                     if (providesSort(query, kp)) {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."
                                << endl;
-                        out->push_back(scanWholeIndex(params.indices[i], query, params));
-                        break;
+                        QuerySolution* soln = scanWholeIndex(params.indices[i], query, params);
+                        if (NULL != soln) {
+                            out->push_back(soln);
+                            break;
+                        }
                     }
                     if (providesSort(query, reverseSortObj(kp))) {
                         QLOG() << "Planner: outputting soln that uses (reverse) index "
                                << "to provide sort." << endl;
-                        out->push_back(scanWholeIndex(params.indices[i], query, params, -1));
-                        break;
+                        QuerySolution* soln = scanWholeIndex(params.indices[i], query, params, -1);
+                        if (NULL != soln) {
+                            out->push_back(soln);
+                            break;
+                        }
                     }
                 }
             }
@@ -1628,9 +1658,11 @@ namespace mongo {
              && ((params.options & QueryPlannerParams::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan)))
         {
             QuerySolution* collscan = makeCollectionScan(query, false, params);
-            out->push_back(collscan);
-            QLOG() << "Planner: outputting a collscan:\n";
-            QLOG() << collscan->toString() << endl;
+            if (NULL != collscan) {
+                out->push_back(collscan);
+                QLOG() << "Planner: outputting a collscan:\n";
+                QLOG() << collscan->toString() << endl;
+            }
         }
     }
 

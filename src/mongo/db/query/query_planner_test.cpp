@@ -45,6 +45,23 @@ namespace {
 
     static const char* ns = "somebogusns";
 
+    TEST(QueryPlannerOptions, NoBlockingSortsAllowedTest) {
+        QueryPlannerParams params;
+        params.options = QueryPlannerParams::NO_BLOCKING_SORT;
+        vector<QuerySolution*> solns;
+        CanonicalQuery* rawCQ;
+        ASSERT_OK(CanonicalQuery::canonicalize(ns, BSONObj(), fromjson("{x:1}"), BSONObj(), &rawCQ));
+
+        // No indices available to provide the sort.
+        QueryPlanner::plan(*rawCQ, params, &solns);
+        ASSERT_EQUALS(solns.size(), 0U);
+
+        // Add an index that provides the desired sort.
+        params.indices.push_back(IndexEntry(fromjson("{x:1}"), false, false, "foo"));
+        QueryPlanner::plan(*rawCQ, params, &solns);
+        ASSERT_EQUALS(solns.size(), 1U);
+    }
+
     class IndexAssignmentTest : public mongo::unittest::Test {
     protected:
         void tearDown() {

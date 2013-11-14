@@ -53,6 +53,10 @@ namespace mongo {
             // shardingState.needCollectionMetadata(current_namespace) in the same lock that you use
             // to build the query runner.
             INCLUDE_SHARD_FILTER = 4,
+
+            // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
+            // provided by the index.
+            NO_BLOCKING_SORT = 8,
         };
 
         // See Options enum above.
@@ -250,6 +254,8 @@ namespace mongo {
          * 'taggedRoot' is a copy of the parse tree.  Nodes in 'solnRoot' may point into it.
          *
          * Takes ownership of 'solnRoot' and 'taggedRoot'.
+         *
+         * Returns NULL if a solution cannot be constructed given the requirements in 'params'.
          *
          * Caller owns the returned QuerySolution.
          */
