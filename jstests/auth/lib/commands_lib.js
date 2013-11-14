@@ -994,7 +994,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: adminDbName,
-                    rolesAllowed: roles_hostManager,
+                    rolesAllowed: Object.extend({clusterManager: 1}, roles_hostManager),
                     requiredPrivileges: [
                         { resource: {cluster: true}, actions: ["flushRouterConfig"] }
                     ]
@@ -1317,7 +1317,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: adminDbName,
-                    rolesAllowed: roles_monitoring,
+                    rolesAllowed: Object.extend({clusterManager: 1}, roles_monitoring),
                     requiredPrivileges: [
                         { resource: {cluster: true}, actions: ["listShards"] }
                     ]
