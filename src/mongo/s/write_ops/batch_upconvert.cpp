@@ -136,20 +136,74 @@ namespace mongo {
         return request;
     }
 
+    void buildErrorFromResponse( const BatchedCommandResponse& response, BatchedErrorDetail* error ) {
+        error->setErrCode( response.getErrCode() );
+        if ( error->isErrInfoSet() ) error->setErrInfo( response.getErrInfo() );
+        error->setErrMessage( response.getErrMessage() );
+    }
+
     void batchErrorToLastError( const BatchedCommandRequest& request,
                                 const BatchedCommandResponse& response,
                                 LastError* error ) {
 
-        // Record an error
+        scoped_ptr<BatchedErrorDetail> topLevelError;
+        BatchedErrorDetail* lastBatchError = NULL;
+
         if ( !response.getOk() ) {
-            error->raiseError( response.getErrCode(), response.getErrMessage().c_str() );
+
+            int code = response.getErrCode();
+
+            // Check for batch error
+            // We don't care about write concern errors, these happen in legacy mode in GLE
+            if ( code != ErrorCodes::WriteConcernFailed && !response.isErrDetailsSet() ) {
+                // Top-level error, all writes failed
+                topLevelError.reset( new BatchedErrorDetail );
+                buildErrorFromResponse( response, topLevelError.get() );
+                lastBatchError = topLevelError.get();
+            }
+            else if ( request.getOrdered() && response.isErrDetailsSet() ) {
+                // The last error in the batch
+                lastBatchError = response.getErrDetails().back();
+            }
+            else if ( !request.getOrdered() ) {
+                // If everything failed, populate the error, otherwise don't
+                if ( request.sizeWriteOps() == response.sizeErrDetails() ) {
+                    lastBatchError = response.getErrDetails().back();
+                }
+            }
+        }
+
+        // Record an error if one exists
+        if ( lastBatchError ) {
+            error->raiseError( lastBatchError->getErrCode(),
+                               lastBatchError->getErrMessage().c_str() );
             return;
         }
 
-        // Record write stats
+        // Record write stats otherwise
+        // NOTE: For multi-write batches, our semantics change a little because we don't have
+        // un-aggregated "n" stats.
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
-            // TODO: Deal with upserted
-            error->recordUpdate( response.getN() != 0, response.getN(), BSONObj() );
+
+            BSONObj upsertedId;
+            if ( response.isSingleUpsertedSet() ) upsertedId = response.getSingleUpserted();
+            else if( response.isUpsertDetailsSet() ) {
+                // Only report the very last item's upserted id if applicable
+                if ( response.getUpsertDetails().back()->getIndex() + 1
+                     == static_cast<int>( request.sizeWriteOps() ) ) {
+                    upsertedId = response.getUpsertDetails().back()->getUpsertedID();
+                }
+            }
+
+            int numUpserted = 0;
+            if ( response.isSingleUpsertedSet() )
+                ++numUpserted;
+            else if ( response.isUpsertDetailsSet() )
+                numUpserted += response.sizeUpsertDetails();
+
+            int numUpdated = response.getN() - numUpserted;
+            dassert( numUpdated >= 0 );
+            error->recordUpdate( numUpdated > 0, response.getN(), upsertedId );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Delete ) {
             error->recordDelete( response.getN() );

@@ -59,7 +59,12 @@
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(useClusterWriteCommands, bool, false);
+    bool Strategy::useClusterWriteCommands = false;
+    ExportedServerParameter<bool> _useClusterWriteCommands( ServerParameterSet::getGlobal(),
+                                                            "useClusterWriteCommands",
+                                                            &Strategy::useClusterWriteCommands,
+                                                            true /* startup param */,
+                                                            true /* runtime param */);
 
     class ShardStrategy : public Strategy {
 
@@ -1299,7 +1304,7 @@ namespace mongo {
         virtual void writeOp( int op , Request& r ) {
 
             // Valve for turning on upconversion for all batch write commands
-            if ( useClusterWriteCommands ) {
+            if ( Strategy::useClusterWriteCommands ) {
 
                 // Ignore all messages from the WBL if we're using cluster write commands
                 // TODO: We'll have to turn it off at some point, but this is an easy way to ensure

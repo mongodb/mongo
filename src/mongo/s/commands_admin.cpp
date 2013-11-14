@@ -1497,7 +1497,8 @@ namespace mongo {
                 LastError *le = lastError.disableForCommand();
                 verify( le );
                 {
-                    if ( le->msg.size() && le->nPrev == 1 ) {
+                    if ( Strategy::useClusterWriteCommands ||
+                         ( le->msg.size() && le->nPrev == 1 ) ) {
                         le->appendSelf( result );
                         return true;
                     }

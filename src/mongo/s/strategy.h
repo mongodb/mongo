@@ -68,6 +68,8 @@ namespace mongo {
         friend class ShardStrategy;
         friend class SingleStrategy;
 
+        static bool useClusterWriteCommands;
+
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doIndexQuery( Request& r , const Shard& shard );
