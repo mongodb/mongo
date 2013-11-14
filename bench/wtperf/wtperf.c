@@ -574,7 +574,7 @@ stat_worker(void *arg)
 
 	uri_len = strlen("statistics:") + strlen(cfg->uri) + 1;
 	if ((stat_uri = malloc(uri_len)) == NULL) {
-		ret = enomem(cfg);
+		(void)enomem(cfg);
 		goto err;
 	}
 	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
@@ -631,11 +631,14 @@ stat_worker(void *arg)
 			    "open_cursor failed for data source statistics");
 			goto err;
 		}
-		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+		while ((ret = cursor->next(cursor)) == 0) {
+			assert(cursor->get_value(
+			    cursor, &desc, &pvalue, &value) == 0);
 			if (value != 0)
 				lprintf(cfg, 0, cfg->verbose,
 				    "stat:table: %s=%s", desc, pvalue);
+		}
+		assert(ret == WT_NOTFOUND);
 		assert(cursor->close(cursor) == 0);
 		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
@@ -646,11 +649,14 @@ stat_worker(void *arg)
 			    "open_cursor failed in statistics");
 			goto err;
 		}
-		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+		while ((ret = cursor->next(cursor)) == 0) {
+			assert(cursor->get_value(
+			    cursor, &desc, &pvalue, &value) == 0);
 			if (value != 0)
 				lprintf(cfg, 0, cfg->verbose,
 				    "stat:conn: %s=%s", desc, pvalue);
+		}
+		assert(ret == WT_NOTFOUND);
 		assert(cursor->close(cursor) == 0);
 	}
 err:	if (session != NULL)
