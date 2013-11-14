@@ -101,6 +101,27 @@ namespace optionenvironment {
 
                         return Status::OK();
                     }
+                case StringMap:
+                    {
+                        // Boost doesn't support maps, so we just register a vector parameter and
+                        // parse it as "key=value" strings
+                        *boostType = std::auto_ptr<po::value_semantic>(
+                                                    po::value< std::vector<std::string> >());
+
+                        if (!implicitValue.isEmpty()) {
+                            StringBuilder sb;
+                            sb << "Implicit value not supported for string map";
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            StringBuilder sb;
+                            sb << "Default value not supported for string map";
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+
+                        return Status::OK();
+                    }
                 case Bool:
                     {
                         std::auto_ptr<po::typed_value<bool> > boostTypeBuilder(po::value<bool>());

@@ -138,10 +138,10 @@ namespace optionenvironment {
 
     OptionDescription& OptionDescription::composing() {
 
-        if (_type != StringVector) {
+        if (_type != StringVector && _type != StringMap) {
             StringBuilder sb;
             sb << "Could not register option \"" << _dottedName << "\": "
-                << "only options registered as StringVector can be composing";
+                << "only options registered as StringVector or StringMap can be composing";
             throw DBException(sb.str(), ErrorCodes::InternalError);
         }
 

@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <map>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -51,6 +52,8 @@ namespace optionenvironment {
 
         explicit Value() : _type(None) { }
         explicit Value(std::vector<std::string> val) : _stringVectorVal(val), _type(StringVector) {}
+        explicit Value(std::map<std::string, std::string> val) : _stringMapVal(val),
+                                                                 _type(StringMap) {}
         explicit Value(bool val) : _boolVal(val), _type(Bool) { }
         explicit Value(double val) : _doubleVal(val), _type(Double) { }
         explicit Value(int val) : _intVal(val), _type(Int) { }
@@ -63,6 +66,7 @@ namespace optionenvironment {
         // Access interface
 
         Status get(std::vector<std::string>* val) const;
+        Status get(std::map<std::string, std::string>* val) const;
         Status get(bool* val) const;
         Status get(double* val) const;
         Status get(int* val) const;
@@ -91,7 +95,8 @@ namespace optionenvironment {
         bool equal(Value&) const;
 
         /**
-         *  Return the string representation of this Value
+         *  Return the string representation of this Value.  This function is used only for
+         *  debugging purposes and does not output data in an easily parseable format.
          */
         std::string toString() const;
 
@@ -114,6 +119,7 @@ namespace optionenvironment {
 
     private:
         std::vector<std::string> _stringVectorVal;
+        std::map<std::string, std::string> _stringMapVal;
         std::string _stringVal;
         union {
             bool _boolVal;
@@ -127,6 +133,7 @@ namespace optionenvironment {
         // Types currently supported by Value
         enum Type {
             StringVector,     // std::vector<std::string>
+            StringMap,        // std::map<std::string, std::string>
             Bool,             // bool
             Double,           // double
             Int,              // int

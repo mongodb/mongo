@@ -150,7 +150,7 @@ namespace {
         }
     }
 
-    TEST(Registration, ComposableNotVector) {
+    TEST(Registration, ComposableNotVectorOrMap) {
         moe::OptionSection testOpts;
         try {
             testOpts.addOptionChaining("setParameter", "setParameter", moe::String,
@@ -301,6 +301,59 @@ namespace {
         ASSERT_EQUALS(*multivalit, "val1");
         multivalit++;
         ASSERT_EQUALS(*multivalit, "val2");
+    }
+
+    TEST(Parsing, StringMap) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--multival");
+        argv.push_back("key1=value1");
+        argv.push_back("--multival");
+        argv.push_back("key2=value2");
+        argv.push_back("--multival");
+        argv.push_back("key3=");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::map<std::string, std::string> multival;
+        std::map<std::string, std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(multivalit->first, "key1");
+        ASSERT_EQUALS(multivalit->second, "value1");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key2");
+        ASSERT_EQUALS(multivalit->second, "value2");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key3");
+        ASSERT_EQUALS(multivalit->second, "");
+    }
+
+    TEST(Parsing, StringMapDuplicateKey) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--multival");
+        argv.push_back("key1=value1");
+        argv.push_back("--multival");
+        argv.push_back("key1=value2");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
     TEST(Parsing, Positional) {
@@ -918,6 +971,91 @@ namespace {
         ASSERT_EQUALS(port, 6);
     }
 
+    TEST(INIConfigFile, StringVector) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringVector, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.ini", "multival = val1\nmultival = val2");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::vector<std::string> multival;
+        std::vector<std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(*multivalit, "val1");
+        multivalit++;
+        ASSERT_EQUALS(*multivalit, "val2");
+    }
+
+    TEST(INIConfigFile, StringMap) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.ini",
+                         "multival = key1=value1\n"
+                         "multival = key2=value2\n"
+                         "multival = key3=");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::map<std::string, std::string> multival;
+        std::map<std::string, std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(multivalit->first, "key1");
+        ASSERT_EQUALS(multivalit->second, "value1");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key2");
+        ASSERT_EQUALS(multivalit->second, "value2");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key3");
+        ASSERT_EQUALS(multivalit->second, "");
+    }
+
+    TEST(INIConfigFile, StringMapDuplicateKey) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.ini",
+                         "multival = key1=value1\n"
+                         "multival = key1=value2");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
     TEST(JSONConfigFile, Basic) {
         OptionsParserTester parser;
         moe::Environment environment;
@@ -1454,6 +1592,60 @@ namespace {
         ASSERT_EQUALS(*multivalit, "val2");
     }
 
+    TEST(JSONConfigFile, StringMap) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ multival : { key1 : \"value1\", key2 : \"value2\", key3 : \"\" } }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::map<std::string, std::string> multival;
+        std::map<std::string, std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(multivalit->first, "key1");
+        ASSERT_EQUALS(multivalit->second, "value1");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key2");
+        ASSERT_EQUALS(multivalit->second, "value2");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key3");
+        ASSERT_EQUALS(multivalit->second, "");
+    }
+
+    TEST(JSONConfigFile, StringMapDuplicateKey) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ multival : { key1 : \"value1\", key1 : \"value2\" } }");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
     TEST(JSONConfigFile, StringVectorNonString) {
         OptionsParserTester parser;
         moe::Environment environment;
@@ -1645,7 +1837,7 @@ namespace {
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
-    TEST(JSONConfigFile, Composing) {
+    TEST(JSONConfigFile, ComposingStringVector) {
         OptionsParserTester parser;
         moe::Environment environment;
 
@@ -1674,16 +1866,56 @@ namespace {
         ASSERT_OK(value.get(&setParameter));
         ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(4));
         setParameterit = setParameter.begin();
-        ASSERT_EQUALS(*setParameterit, "val1");
-        setParameterit++;
-        ASSERT_EQUALS(*setParameterit, "val2");
-        setParameterit++;
         ASSERT_EQUALS(*setParameterit, "val3");
         setParameterit++;
         ASSERT_EQUALS(*setParameterit, "val4");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val1");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val2");
     }
 
-    TEST(INIConfigFile, Composing) {
+    TEST(JSONConfigFile, ComposingStringMap) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("setParameter", "setParameter", moe::StringMap,
+                                                  "Multiple Values").composing();
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        argv.push_back("--setParameter");
+        argv.push_back("key1=value1");
+        argv.push_back("--setParameter");
+        argv.push_back("key2=value2");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ setParameter : { key2 : \"overridden_value2\", key3 : \"value3\" } }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
+        std::map<std::string, std::string> setParameter;
+        std::map<std::string, std::string>::iterator setParameterIt;
+        ASSERT_OK(value.get(&setParameter));
+        ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(3));
+        setParameterIt = setParameter.begin();
+        ASSERT_EQUALS(setParameterIt->first, "key1");
+        ASSERT_EQUALS(setParameterIt->second, "value1");
+        setParameterIt++;
+        ASSERT_EQUALS(setParameterIt->first, "key2");
+        ASSERT_EQUALS(setParameterIt->second, "value2");
+        setParameterIt++;
+        ASSERT_EQUALS(setParameterIt->first, "key3");
+        ASSERT_EQUALS(setParameterIt->second, "value3");
+    }
+
+    TEST(INIConfigFile, ComposingStringVector) {
         OptionsParserTester parser;
         moe::Environment environment;
 
@@ -1712,13 +1944,134 @@ namespace {
         ASSERT_OK(value.get(&setParameter));
         ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(4));
         setParameterit = setParameter.begin();
-        ASSERT_EQUALS(*setParameterit, "val1");
-        setParameterit++;
-        ASSERT_EQUALS(*setParameterit, "val2");
-        setParameterit++;
         ASSERT_EQUALS(*setParameterit, "val3");
         setParameterit++;
         ASSERT_EQUALS(*setParameterit, "val4");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val1");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val2");
+    }
+
+    TEST(INIConfigFile, ComposingStringMap) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("setParameter", "setParameter", moe::StringMap,
+                                                  "Multiple Values").composing();
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+        argv.push_back("--setParameter");
+        argv.push_back("key1=value1");
+        argv.push_back("--setParameter");
+        argv.push_back("key2=value2");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.ini",
+                         "setParameter=key2=overridden_value2\nsetParameter=key3=value3");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
+        std::map<std::string, std::string> setParameter;
+        std::map<std::string, std::string>::iterator setParameterIt;
+        ASSERT_OK(value.get(&setParameter));
+        ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(3));
+        setParameterIt = setParameter.begin();
+        ASSERT_EQUALS(setParameterIt->first, "key1");
+        ASSERT_EQUALS(setParameterIt->second, "value1");
+        setParameterIt++;
+        ASSERT_EQUALS(setParameterIt->first, "key2");
+        ASSERT_EQUALS(setParameterIt->second, "value2");
+        setParameterIt++;
+        ASSERT_EQUALS(setParameterIt->first, "key3");
+        ASSERT_EQUALS(setParameterIt->second, "value3");
+    }
+
+    TEST(YAMLConfigFile, ComposingStringVector) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("setParameter", "setParameter", moe::StringVector,
+                                                  "Multiple Values").composing();
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        argv.push_back("--setParameter");
+        argv.push_back("val1");
+        argv.push_back("--setParameter");
+        argv.push_back("val2");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml", "setParameter : \n - \"val3\"\n - \"val4\"");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
+        std::vector<std::string> setParameter;
+        std::vector<std::string>::iterator setParameterit;
+        ASSERT_OK(value.get(&setParameter));
+        ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(4));
+        setParameterit = setParameter.begin();
+        ASSERT_EQUALS(*setParameterit, "val3");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val4");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val1");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val2");
+    }
+
+    TEST(YAMLConfigFile, ComposingStringMap) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("setParameter", "setParameter", moe::StringMap,
+                                                  "Multiple Values").composing();
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        argv.push_back("--setParameter");
+        argv.push_back("key1=value1");
+        argv.push_back("--setParameter");
+        argv.push_back("key2=value2");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml",
+                         // NOTE: Indentation is used to determine whether an option is in a sub
+                         // category, so the spaces after the newlines before key2 and key3 is
+                         // significant
+                         "setParameter:\n key2: \"overridden_value2\"\n key3: \"value3\"");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
+        std::map<std::string, std::string> setParameter;
+        std::map<std::string, std::string>::iterator setParameterIt;
+        ASSERT_OK(value.get(&setParameter));
+        ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(3));
+        setParameterIt = setParameter.begin();
+        ASSERT_EQUALS(setParameterIt->first, "key1");
+        ASSERT_EQUALS(setParameterIt->second, "value1");
+        setParameterIt++;
+        ASSERT_EQUALS(setParameterIt->first, "key2");
+        ASSERT_EQUALS(setParameterIt->second, "value2");
+        setParameterIt++;
+        ASSERT_EQUALS(setParameterIt->first, "key3");
+        ASSERT_EQUALS(setParameterIt->second, "value3");
     }
 
     TEST(LegacyInterface, Good) {
@@ -3268,6 +3621,95 @@ namespace {
 
         parser.setConfig("config.yaml", ":");
 
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(YAMLConfigFile, StringVector) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringVector, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json", "multival : [ \"val1\", \"val2\" ]");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::vector<std::string> multival;
+        std::vector<std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(*multivalit, "val1");
+        multivalit++;
+        ASSERT_EQUALS(*multivalit, "val2");
+    }
+
+    TEST(YAMLConfigFile, StringMap) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         // NOTE: Indentation is used to determine whether an option is in a sub
+                         // category, so the spaces after the newlines before key2 and key3 is
+                         // significant
+                         "multival : \n key1 : \"value1\"\n key2 : \"value2\"\n key3 : \"\"");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("multival"), &value));
+        std::map<std::string, std::string> multival;
+        std::map<std::string, std::string>::iterator multivalit;
+        ASSERT_OK(value.get(&multival));
+        multivalit = multival.begin();
+        ASSERT_EQUALS(multivalit->first, "key1");
+        ASSERT_EQUALS(multivalit->second, "value1");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key2");
+        ASSERT_EQUALS(multivalit->second, "value2");
+        multivalit++;
+        ASSERT_EQUALS(multivalit->first, "key3");
+        ASSERT_EQUALS(multivalit->second, "");
+    }
+
+    TEST(YAMLConfigFile, StringMapDuplicateKey) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("multival", "multival", moe::StringMap, "Multiple Values");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         // NOTE: Indentation is used to determine whether an option is in a sub
+                         // category, so the spaces after the newlines before key2 and key3 is
+                         // significant
+                         "multival : \n key1 : \"value1\"\n key1 : \"value2\"");
+
+        moe::Value value;
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 

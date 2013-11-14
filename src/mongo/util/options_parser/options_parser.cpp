@@ -25,8 +25,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/options_parser/constraints.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/scopeguard.h"
@@ -105,6 +106,22 @@ namespace optionenvironment {
             return Status::OK();
         }
 
+        // Returns true if the option for the given key is a StringMap option, and false otherwise
+        bool OptionIsStringMap(const std::vector<OptionDescription>& options_vector,
+                               const Key& key) {
+
+            for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
+                iterator != options_vector.end(); iterator++) {
+                if (key == iterator->_dottedName && (iterator->_sources & SourceYAMLConfig)) {
+                    if (iterator->_type == StringMap) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         // Convert a YAML::Node to a Value.  See comments at the beginning of this section.
         Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                                const std::vector<OptionDescription>& options_vector,
@@ -159,6 +176,34 @@ namespace optionenvironment {
                     stringVector.push_back(it->Scalar());
                 }
                 *value = Value(stringVector);
+                return Status::OK();
+            }
+
+            // Handle a sub map as a value
+            if (type == StringMap) {
+                if (!YAMLNode.IsMap()) {
+                    StringBuilder sb;
+                    sb << "Option: " << key
+                       << " is of type StringMap, but value in YAML config is not a map type";
+                    return Status(ErrorCodes::BadValue, sb.str());
+                }
+                std::map<std::string, std::string> stringMap;
+                for (YAML::const_iterator it = YAMLNode.begin(); it != YAMLNode.end(); ++it) {
+                    if (it->second.IsSequence() || it->second.IsMap()) {
+                        StringBuilder sb;
+                        sb << "Option: " << key
+                           << " has a map with non scalar values, which is not allowed";
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    if (stringMap.count(it->first.Scalar()) > 0) {
+                        StringBuilder sb;
+                        sb << "String Map Option: " << key
+                           << " has duplicate keys in YAML Config: " << it->first.Scalar();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    stringMap[it->first.Scalar()] = it->second.Scalar();
+                }
+                *value = Value(stringMap);
                 return Status::OK();
             }
 
@@ -298,6 +343,33 @@ namespace optionenvironment {
                         }
                     }
 
+                    // If this is really a StringMap, try to split on "key=value" for each element
+                    // in our StringVector
+                    if (iterator->_type == StringMap) {
+                        std::vector<std::string> keyValueVector;
+                        ret = optionValue.get(&keyValueVector);
+                        std::vector<std::string>::iterator keyValueVectorIt;
+                        std::map<std::string, std::string> mapValue;
+                        for (keyValueVectorIt = keyValueVector.begin();
+                             keyValueVectorIt != keyValueVector.end(); ++keyValueVectorIt) {
+                            std::string key;
+                            std::string value;
+                            if (!mongoutils::str::splitOn(*keyValueVectorIt, '=', key, value)) {
+                                StringBuilder sb;
+                                sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
+                                return Status(ErrorCodes::BadValue, sb.str());
+                            }
+                            if (mapValue.count(key) > 0) {
+                                StringBuilder sb;
+                                sb << "Key Value Option: " << iterator->_dottedName
+                                   << " has a duplicate key from the same source: " << key;
+                                return Status(ErrorCodes::BadValue, sb.str());
+                            }
+                            mapValue[key] = value;
+                        }
+                        optionValue = Value(mapValue);
+                    }
+
                     environment->set(iterator->_dottedName, optionValue);
                 }
             }
@@ -352,7 +424,7 @@ namespace optionenvironment {
                     }
                 }
 
-                if (YAMLNode.IsMap()) {
+                if (YAMLNode.IsMap() && !OptionIsStringMap(options_vector, dottedName)) {
                     addYAMLNodesToEnvironment(YAMLNode, options, dottedName, environment);
                 }
                 else {
@@ -398,11 +470,16 @@ namespace optionenvironment {
                 return ret;
             }
 
-            for(std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
-                iterator != options_vector.end(); iterator++) {
-                if (iterator->_isComposing) {
-                    std::vector<std::string> source_value;
-                    ret = source.get(iterator->_dottedName, &source_value);
+            for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
+                 iterator != options_vector.end(); iterator++) {
+
+                if (!iterator->_isComposing) {
+                    continue;
+                }
+
+                if (iterator->_type == StringVector) {
+                    std::vector<std::string> sourceValue;
+                    ret = source.get(iterator->_dottedName, &sourceValue);
                     if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
                         StringBuilder sb;
                         sb << "Error getting composable vector value from source: "
@@ -411,8 +488,8 @@ namespace optionenvironment {
                     }
                     // Only do something if our source environment has something to add
                     else if (ret.isOK()) {
-                        std::vector<std::string> dest_value;
-                        ret = dest->get(iterator->_dottedName, &dest_value);
+                        std::vector<std::string> destValue;
+                        ret = dest->get(iterator->_dottedName, &destValue);
                         if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
                             StringBuilder sb;
                             sb << "Error getting composable vector value from dest: "
@@ -420,17 +497,56 @@ namespace optionenvironment {
                             return Status(ErrorCodes::InternalError, sb.str());
                         }
 
-                        // Append source_value on the end of dest_value
-                        dest_value.insert(dest_value.end(),
-                                          source_value.begin(),
-                                          source_value.end());
+                        // Append sourceValue on the end of destValue
+                        destValue.insert(destValue.end(),
+                                sourceValue.begin(),
+                                sourceValue.end());
 
                         // Set the resulting value in our output environment
-                        ret = dest->set(Key(iterator->_dottedName), Value(dest_value));
+                        ret = dest->set(Key(iterator->_dottedName), Value(destValue));
                         if (!ret.isOK()) {
                             return ret;
                         }
                     }
+                }
+                else if (iterator->_type == StringMap) {
+                    std::map<std::string, std::string> sourceValue;
+                    ret = source.get(iterator->_dottedName, &sourceValue);
+                    if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
+                        StringBuilder sb;
+                        sb << "Error getting composable map value from source: "
+                            << ret.toString();
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
+                    // Only do something if our source environment has something to add
+                    else if (ret.isOK()) {
+                        std::map<std::string, std::string> destValue;
+                        ret = dest->get(iterator->_dottedName, &destValue);
+                        if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
+                            StringBuilder sb;
+                            sb << "Error getting composable map value from dest: "
+                                << ret.toString();
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+
+                        // Iterate sourceValue and add elements to destValue
+                        std::map<std::string, std::string>::iterator sourceValueIt;
+                        for (sourceValueIt = sourceValue.begin();
+                                sourceValueIt != sourceValue.end(); sourceValueIt++) {
+                            destValue[sourceValueIt->first] = sourceValueIt->second;
+                        }
+
+                        // Set the resulting value in our output environment
+                        ret = dest->set(Key(iterator->_dottedName), Value(destValue));
+                        if (!ret.isOK()) {
+                            return ret;
+                        }
+                    }
+                } else {
+                    StringBuilder sb;
+                    sb << "Found composable option that is not of StringVector or "
+                        << "StringMap Type: " << iterator->_dottedName;
+                    return Status(ErrorCodes::InternalError, sb.str());
                 }
             }
 
@@ -785,12 +901,14 @@ namespace {
         // Adds the values for all our options that were registered as composable to the composed
         // environment.  addCompositions doesn't override the values like "setAll" on our
         // environment.  Instead it aggregates the values in the result environment.
-        ret = addCompositions(options, commandLineEnvironment, &composedEnvironment);
+        // NOTE: We must add our configEnvironment compositions first since we have a StringMap type
+        // in which some options can be overridden by the command line.
+        ret = addCompositions(options, configEnvironment, &composedEnvironment);
         if (!ret.isOK()) {
             return ret;
         }
 
-        ret = addCompositions(options, configEnvironment, &composedEnvironment);
+        ret = addCompositions(options, commandLineEnvironment, &composedEnvironment);
         if (!ret.isOK()) {
             return ret;
         }
@@ -812,7 +930,11 @@ namespace {
             return ret;
         }
 
-        // Add this last because it represents the aggregated results of composing all environments
+        // Add this last because it has all the composable options aggregated over different
+        // sources.  For example, if we have a StringMap type with some values set on the command
+        // line and some values set in config files, we want to make sure to get them all.  This
+        // should not override any non composable options, since composedEnvironment should not have
+        // them set.  See the addCompositions function for more details.
         ret = environment->setAll(composedEnvironment);
         if (!ret.isOK()) {
             return ret;

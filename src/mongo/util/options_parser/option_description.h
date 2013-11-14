@@ -30,6 +30,7 @@ namespace optionenvironment {
      */
     enum OptionType {
         StringVector,     // po::value< std::vector<std::string> >
+        StringMap,        // po::value< std::vector<std::string> > (but in "key=value" format)
         Bool,             // po::value<bool>
         Double,           // po::value<double>
         Int,              // po::value<int>
