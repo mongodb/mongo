@@ -68,10 +68,8 @@ if ( ( typeof WriteResult ) == 'undefined' ){
 
         this._result = result;
 
-        if ( opType ) this._opType = opType;
-        else this._opType = undefined;
-        assert( opType == 'insert' || opType == 'update' ||
-                opType == 'remove' || opType == undefined );
+        this._opType = opType;
+        assert( opType == 'insert' || opType == 'update' || opType == 'remove' );
 
         this._ok = result.ok ? true : false;
 
@@ -129,8 +127,7 @@ if ( ( typeof WriteResult ) == 'undefined' ){
     };
 
     WriteResult.prototype.getOpTypeString = function() {
-        if ( this._opType ) return this._opType;
-        return 'unknown';
+        return this._opType;
     };
 
     WriteResult.prototype.shellPrint = function() {
