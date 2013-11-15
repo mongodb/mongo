@@ -134,6 +134,17 @@ namespace {
         ASSERT_NOT_EQUALS(f.compare(a), Interval::INTERVAL_PRECEDES);
     }
 
+    TEST(Comparison, PrecedesCouldUnion) {
+        Interval a(BSON("" << 10 << "" << 20), false, true);
+        ASSERT_NOT_EQUALS(a.compare(a), Interval::INTERVAL_PRECEDES);
+
+        Interval b(BSON("" << 0 << "" << 10), true, false);
+        ASSERT_EQUALS(b.compare(a), Interval::INTERVAL_PRECEDES);
+
+        Interval c(BSON("" << 0 << "" << 10), true, true);
+        ASSERT_EQUALS(c.compare(a), Interval::INTERVAL_PRECEDES_COULD_UNION);
+    }
+
     TEST(Comparison, Succeds) {
         Interval a(BSON("" << 10 << "" << 20), true, true);
         ASSERT_NOT_EQUALS(a.compare(a), Interval::INTERVAL_SUCCEEDS);

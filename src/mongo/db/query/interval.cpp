@@ -150,7 +150,9 @@ namespace mongo {
         //
 
         if (precedes(*this, other)) {
-            if (0 == end.woCompare(other.start, false)) {
+            // It's not possible for both endInclusive and other.startInclusive to be true because
+            // the bounds would intersect. Refer to section on "Intersect cases" above.
+            if ((endInclusive || other.startInclusive) && 0 == end.woCompare(other.start, false)) {
                 return INTERVAL_PRECEDES_COULD_UNION;
             }
             return INTERVAL_PRECEDES;
