@@ -91,16 +91,17 @@ wts_ops(void)
 
 		/* Wait for the threads. */
 		for (;;) {
-			total.search =
-			    total.insert = total.remove = total.update = 0;
+			total.commit = total.deadlock = total.insert =
+			    total.remove = total.rollback = total.search =
+			    total.update = 0;
 			for (i = 0, running = 0; i < g.c_threads; ++i) {
-				total.search += tinfo[i].search;
+				total.commit += tinfo[i].commit;
+				total.deadlock += tinfo[i].deadlock;
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;
-				total.update += tinfo[i].update;
-				total.commit += tinfo[i].commit;
 				total.rollback += tinfo[i].rollback;
-				total.deadlock += tinfo[i].deadlock;
+				total.search += tinfo[i].search;
+				total.update += tinfo[i].update;
 				switch (tinfo[i].state) {
 				case TINFO_RUNNING:
 					running = 1;
