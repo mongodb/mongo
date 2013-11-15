@@ -16,7 +16,19 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name, int is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
+	WT_DECL_RET;
 	pthread_mutexattr_t *attrp;
+
+	/* Initialize the mutex. */
+#ifdef HAVE_MUTEX_ADAPTIVE
+	pthread_mutexattr_t attr;
+
+	WT_RET(pthread_mutexattr_init(&attr));
+	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
+	attrp = &attr;
+#else
+	attrp = NULL;
+#endif
 
 	/*
 	 * !!!
@@ -24,24 +36,10 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_CONDVAR), &cond));
 
-	/* Initialize the mutex. */
-#ifdef HAVE_MUTEX_ADAPTIVE
-	{
-	pthread_mutexattr_t attr;
-
-	WT_RET(pthread_mutexattr_init(&attr));
-	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
-	attrp = &attr;
-	}
-#else
-	attrp = NULL;
-#endif
-	if (pthread_mutex_init(&cond->mtx, attrp) != 0)
-		goto err;
+	WT_ERR(pthread_mutex_init(&cond->mtx, attrp));
 
 	/* Initialize the condition variable to permit self-blocking. */
-	if (pthread_cond_init(&cond->cond, NULL) != 0)
-		goto err;
+	WT_ERR(pthread_cond_init(&cond->cond, NULL));
 
 	cond->name = name;
 	cond->waiters = is_signalled ? -1 : 0;
@@ -50,7 +48,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	return (0);
 
 err:	__wt_free(session, cond);
-	return (WT_ERROR);
+	return (ret);
 }
 
 /*
@@ -164,8 +162,7 @@ __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 	WT_TRET(pthread_mutex_destroy(&cond->mtx));
 	__wt_free(session, *condp);
 
-	return ((ret == 0) ? 0 : WT_ERROR);
-
+	return (ret);
 }
 
 /*
@@ -180,7 +177,7 @@ __wt_rwlock_alloc(
 	WT_RWLOCK *rwlock;
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
-	WT_ERR_TEST(pthread_rwlock_init(&rwlock->rwlock, NULL), WT_ERROR);
+	WT_ERR(pthread_rwlock_init(&rwlock->rwlock, NULL));
 
 	rwlock->name = name;
 	*rwlockp = rwlock;
