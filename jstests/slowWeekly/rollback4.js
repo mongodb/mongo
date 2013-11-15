@@ -9,7 +9,7 @@ var r = replTest.initiate({ "_id": "unicomplex",
                                       { "_id": 0, "host": nodes[0] },
                                       { "_id": 1, "host": nodes[1] },
                                       { "_id": 2, "host": nodes[2], arbiterOnly: true}]
-                          }, 'replSetInitiate', 60000);
+                          }, 'replSetInitiate', 600000);
 
 // Make sure we have a master
 var master = replTest.getMaster();
