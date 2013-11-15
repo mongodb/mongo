@@ -120,13 +120,10 @@ namespace mongo {
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
                     ++count;
                 }
-                if (Runner::RUNNER_EOF == state) {
-                    return count;
-                }
-                else {
-                    // Query ended due to an error.
-                    return -2;
-                }
+
+                // Emulate old behavior and return the count even if the runner was killed.  This
+                // happens when the underlying collection is dropped.
+                return count;
             }
             catch ( const DBException &e ) {
                 err = e.toString();
@@ -136,10 +133,12 @@ namespace mongo {
                 err = e.what();
                 errCode = 0;
             } 
+
             // Historically we have returned zero in many count assertion cases - see SERVER-2291.
             log() << "Count with ns: " << ns << " and query: " << query
                   << " failed with exception: " << err << " code: " << errCode
                   << endl;
+
             return -2;
         }
         else {
