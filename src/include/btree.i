@@ -724,15 +724,14 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
 	btree = S2BT(session);
 	root = btree->root_page;
 
-	if (btree == NULL || root == NULL ||
-	    (child = root->u.intl.t->page) == NULL)
+	if (root == NULL || root->u.intl.t->page == NULL)
 		return (0);
 
 	/* Make sure this is a simple tree, or LSM should switch. */
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    root->entries != 1 ||
 	    root->u.intl.t->state != WT_REF_MEM ||
-	    child->type != WT_PAGE_ROW_LEAF)
+	    root->u.intl.t->page->type != WT_PAGE_ROW_LEAF)
 		return (1);
 
 	return (child->memory_footprint > maxsize);
