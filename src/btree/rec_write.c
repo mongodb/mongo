@@ -223,6 +223,8 @@ typedef struct {
 	int key_sfx_compress;		/* If can suffix-compress next key */
 	int key_sfx_compress_conf;	/* If suffix compression configured */
 
+	int bulk_load;			/* If it's a bulk load */
+
 	int tested_ref_state;		/* Debugging information */
 } WT_RECONCILE;
 
@@ -1993,6 +1995,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 
 	WT_RET(__rec_write_init(session, page, 0, &cbulk->reconcile));
 	r = cbulk->reconcile;
+	r->bulk_load = 1;
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -4480,9 +4483,13 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 		size = (uint32_t)alloc_size;
 		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
-		/* Track the overflow record. */
-		WT_ERR(__wt_ovfl_reuse_add(session, page,
-		    addr, size, kv->buf.data, kv->buf.size));
+		/*
+		 * Track the overflow record (unless it's a bulk load, which
+		 * by definition won't ever reuse a record.
+		 */
+		if (!r->bulk_load)
+			WT_ERR(__wt_ovfl_reuse_add(session, page,
+			    addr, size, kv->buf.data, kv->buf.size));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */
