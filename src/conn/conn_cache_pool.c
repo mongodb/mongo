@@ -176,41 +176,34 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	int create_server, locked;
+	int create_server;
 
 	conn = S2C(session);
-	locked = 0;
 	cp = __wt_process.cache_pool;
-
-	__wt_spin_lock(session, &cp->cache_pool_lock);
-	locked = 1;
 
 	/*
 	 * Add this connection into the cache pool connection queue. Figure
 	 * out if a manager thread is needed while holding the lock. Don't
 	 * start the thread until we have released the lock.
 	 */
+	__wt_spin_lock(session, &cp->cache_pool_lock);
 	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
-
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
-	locked = 0;
-	WT_VERBOSE_ERR(session, shared_cache,
+
+	WT_VERBOSE_RET(session, shared_cache,
 	    "Added %s to cache pool %s.", conn->home, cp->name);
 
 	/* Start the cache pool server if required. */
 	if (create_server) {
 		F_SET(cp, WT_CACHE_POOL_RUN);
-		WT_ERR(__wt_thread_create(session,
+		WT_RET(__wt_thread_create(session,
 		    &cp->cache_pool_tid, __wt_cache_pool_server, NULL));
 	}
 	/* Wake up the cache pool server to get our initial chunk. */
-	WT_ERR(__wt_cond_signal(session, cp->cache_pool_cond));
+	WT_RET(__wt_cond_signal(session, cp->cache_pool_cond));
 
-err:	if (locked)
-		__wt_spin_unlock(session, &cp->cache_pool_lock);
-	return (ret);
+	return (0);
 }
 
 /*
