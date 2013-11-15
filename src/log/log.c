@@ -878,7 +878,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	} while (!done);
 
 	/* Truncate if we're in recovery. */
-	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+	if (LF_ISSET(WT_LOGSCAN_RECOVER) &&
+	    LOG_CMP(&rd_lsn, &log->trunc_lsn) < 0)
 		WT_ERR(__log_truncate(session, &rd_lsn, 0));
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
