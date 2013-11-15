@@ -186,6 +186,9 @@ namespace mongo {
 
         // Analysis below should be done after squashing the tree to make it clearer.
 
+        // TODO: We want $text in root level or within rooted AND for consistent text score
+        // availability.
+
         // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root
         // must be an AND and its child must be a NEAR.
         size_t numGeoNear = countNodes(root, MatchExpression::GEO_NEAR);
@@ -228,13 +231,14 @@ namespace mongo {
 
         _root.reset(root);
 
+        // Validate the projection if there is one.
         if (!_pq->getProj().isEmpty()) {
-            LiteProjection* liteProj = NULL;
-            Status liteProjStatus = LiteProjection::make(_pq->getFilter(), _pq->getProj(), &liteProj);
-            if (!liteProjStatus.isOK()) {
-                return liteProjStatus;
+            ParsedProjection* pp;
+            Status projStatus = ParsedProjection::make(_pq->getProj(), _pq->getFilter(), &pp);
+            if (!projStatus.isOK()) {
+                return projStatus;
             }
-            _liteProj.reset(liteProj);
+            _proj.reset(pp);
         }
 
         return Status::OK();

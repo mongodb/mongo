@@ -26,46 +26,63 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/diskloc.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/projection_exec.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    /**
-     * This stage computes a projection.
-     */
-    class ProjectionStage : public PlanStage {
+    class ParsedProjection {
     public:
-        ProjectionStage(BSONObj projObj,
-                        const MatchExpression* fullExpression,
-                        WorkingSet* ws,
-                        PlanStage* child);
+        // TODO: this is duplicated in here and in the proj exec code.  When we have
+        // ProjectionExpression we can remove dups.
+        enum ArrayOpType {
+            ARRAY_OP_NORMAL = 0,
+            ARRAY_OP_ELEM_MATCH,
+            ARRAY_OP_POSITIONAL
+        };
 
-        virtual ~ProjectionStage();
+        /**
+         * Parses the projection 'spec' and checks its validity with respect to the query 'query'.
+         * Puts covering information into 'out'.
+         *
+         * Returns Status::OK() if it's a valid spec.
+         * Returns a Status indicating how it's invalid otherwise.
+         */
+        static Status make(const BSONObj& spec, const BSONObj& query, ParsedProjection** out);
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+        /**
+         * Is the full document required to compute this projection?
+         */
+        bool requiresDocument() const { return _requiresDocument; }
 
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl);
+        /**
+         * If requiresDocument() == false, what fields are required to compute
+         * the projection?
+         */
+        const vector<string>& getRequiredFields() const {
+            return _requiredFields;
+        }
 
-        PlanStageStats* getStats();
+        /**
+         * Get the raw BSONObj proj spec obj
+         */
+        const BSONObj& getProjObj() const {
+            return _source;
+        }
 
     private:
-        scoped_ptr<ProjectionExec> _exec;
+        /**
+         * Must go through ::make
+         */
+        ParsedProjection() : _requiresDocument(true) { }
 
-        // _ws is not owned by us.
-        WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+        // XXX stringdata?
+        vector<string> _requiredFields;
 
-        // Stats
-        CommonStats _commonStats;
+        bool _requiresDocument;
+
+        BSONObj _source;
     };
 
 }  // namespace mongo

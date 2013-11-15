@@ -118,10 +118,10 @@ namespace mongo {
         }
 
         // Project the results.
-        if (NULL != query.getLiteProj()) {
+        if (NULL != query.getProj()) {
             QLOG() << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
             QLOG() << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
-            if (query.getLiteProj()->requiresDocument()) {
+            if (query.getProj()->requiresDocument()) {
                 QLOG() << "PROJECTION: claims to require doc adding fetch.\n";
                 // If the projection requires the entire document, somebody must fetch.
                 if (!solnRoot->fetched()) {
@@ -132,8 +132,7 @@ namespace mongo {
             }
             else {
                 QLOG() << "PROJECTION: requires fields\n";
-                vector<string> fields;
-                query.getLiteProj()->getRequiredFields(&fields);
+                const vector<string>& fields = query.getProj()->getRequiredFields();
                 bool covered = true;
                 for (size_t i = 0; i < fields.size(); ++i) {
                     if (!solnRoot->hasField(fields[i])) {
@@ -155,9 +154,9 @@ namespace mongo {
 
             // We now know we have whatever data is required for the projection.
             ProjectionNode* projNode = new ProjectionNode();
-            projNode->liteProjection = query.getLiteProj();
             projNode->children.push_back(solnRoot);
             projNode->fullExpression = query.root();
+            projNode->projection = query.getParsed().getProj();
             solnRoot = projNode;
         }
         else {

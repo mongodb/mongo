@@ -48,6 +48,7 @@ env.Library(
         "oplogstart.cpp",
         "or.cpp",
         "projection.cpp",
+        "projection_exec.cpp",
         "s2near.cpp",
         "shard_filter.cpp",
         "skip.cpp",

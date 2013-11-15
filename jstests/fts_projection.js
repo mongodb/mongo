@@ -12,13 +12,32 @@ t.insert({_id:2, _idCopy: 2, a:"irrelevant content"});
 t.ensureIndex({a:"text"});
 
 // Project the text score.
-var results = t.find({$text: {$search: "textual content -irrelevant"}}, {score:{$textScore: 1}}).toArray();
-printjson(results);
+// TODO(hk): Allow sorting with metadata.
+var results = t.find({$text: {$search: "textual content -irrelevant"}}, {_idCopy:0, score:{$meta: "text"}}).toArray();
+// printjson(results);
 assert.eq(results.length, 2);
 assert.eq(results[0]._id, 0);
 assert.eq(results[1]._id, 1);
 assert(results[0].score > results[1].score);
 
+//
+// Edge/error cases:
+//
+
+// Project text score into 2 fields.
+results = t.find({$text: {$search: "textual content -irrelevant"}}, {otherScore: {$meta: "text"}, score:{$meta: "text"}}).toArray();
+// printjson(results);
+
+// Project text score into "x.$" shouldn't crash
+assert.throws(function() { t.find({$text: {$search: "textual content -irrelevant"}}, {'x.$': {$meta: "text"}}).toArray(); });
+
+// TODO: We can't project 'x.y':1 and 'x':1 (yet).
+
+// TODO: Clobber an existing field and behave nicely.
+
 // Don't crash if we have no text score.
-var results = t.find({a: /text/}, {score:{$textScore: 1}}).toArray();
-printjson(results);
+var results = t.find({a: /text/}, {score:{$meta: "text"}}).toArray();
+// printjson(results);
+
+// No textScore proj. with nested fields
+assert.throws(function() { t.find({$text: {$search: "blah"}}, {'x.y':{$meta: "text"}}).toArray(); });

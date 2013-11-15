@@ -33,7 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/query/lite_projection.h"
+#include "mongo/db/query/parsed_projection.h"
 
 namespace mongo {
 
@@ -65,8 +65,11 @@ namespace mongo {
         MatchExpression* root() const { return _root.get(); }
         BSONObj getQueryObj() const { return _pq->getFilter(); }
         const LiteParsedQuery& getParsed() const { return *_pq; }
-        LiteProjection* getLiteProj() const { return _liteProj.get(); }
+        const ParsedProjection* getProj() const { return _proj.get(); }
 
+        //
+        // Debugging
+        //
         string toString() const;
 
     private:
@@ -81,7 +84,7 @@ namespace mongo {
         // _root points into _pq->getFilter()
         scoped_ptr<MatchExpression> _root;
 
-        scoped_ptr<LiteProjection> _liteProj;
+        scoped_ptr<ParsedProjection> _proj;
     };
 
 }  // namespace mongo

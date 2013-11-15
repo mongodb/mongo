@@ -26,31 +26,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/lite_projection.h"
+#include "mongo/db/exec/projection_exec.h"
 
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    // static
-    Status LiteProjection::make(const BSONObj& query,
-                                const BSONObj& projObj,
-                                LiteProjection** out) {
-
-        auto_ptr<LiteProjection> proj(new LiteProjection());
-
-        Status initStatus = proj->init(projObj, query);
-        if (!initStatus.isOK()) {
-            return initStatus;
-        }
-
-        *out = proj.release();
-        return Status::OK();
-    }
-
-    LiteProjection::LiteProjection()
+    ProjectionExec::ProjectionExec()
         : _include(true),
           _special(false),
           _includeID(true),
@@ -58,23 +43,20 @@ namespace mongo {
           _limit(-1),
           _arrayOpType(ARRAY_OP_NORMAL),
           _hasNonSimple(false),
-          _hasDottedField(false) { }
+          _hasDottedField(false),
+          _queryExpression(NULL) { }
 
-    LiteProjection::~LiteProjection() {
-        for (FieldMap::const_iterator it = _fields.begin(); it != _fields.end(); ++it) {
-            delete it->second;
-        }
-
-        for (Matchers::const_iterator it = _matchers.begin(); it != _matchers.end(); ++it) {
-            delete it->second;
-        }
-    }
-
-    Status LiteProjection::init(const BSONObj& spec, const BSONObj& query) {
-        verify(_source.isEmpty());
-        // Save the raw obj.
-        _source = spec;
-        verify(_source.isOwned());
+    ProjectionExec::ProjectionExec(const BSONObj& spec, const MatchExpression* queryExpression)
+        : _include(true),
+          _special(false),
+          _source(spec),
+          _includeID(true),
+          _skip(0),
+          _limit(-1),
+          _arrayOpType(ARRAY_OP_NORMAL),
+          _hasNonSimple(false),
+          _hasDottedField(false),
+          _queryExpression(queryExpression) {
 
         // Are we including or excluding fields?
         // -1 when we haven't initialized it.
@@ -92,6 +74,8 @@ namespace mongo {
 
             if (Object == e.type()) {
                 BSONObj obj = e.embeddedObject();
+                verify(1 == obj.nFields());
+
                 BSONElement e2 = obj.firstElement();
                 if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
                     if (e2.isNumber()) {
@@ -103,43 +87,21 @@ namespace mongo {
                             add(e.fieldName(), 0, i);
                         }
                     }
-                    else if (e2.type() == Array) {
+                    else {
+                        verify(e2.type() == Array);
                         BSONObj arr = e2.embeddedObject();
-                        if (2 != arr.nFields()) {
-                            return Status(ErrorCodes::BadValue, "$slice array wrong size");
-                        }
+                        verify(2 == arr.nFields());
 
                         BSONObjIterator it(arr);
                         int skip = it.next().numberInt();
                         int limit = it.next().numberInt();
-                        if (limit <= 0) {
-                            return Status(ErrorCodes::BadValue, "$slice limit must be positive");
-                        }
+
+                        verify(limit > 0);
 
                         add(e.fieldName(), skip, limit);
                     }
-                    else {
-                        return Status(ErrorCodes::BadValue,
-                                      "$slice only supports numbers and [skip, limit] arrays");
-                    }
                 }
                 else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
-                    // Validate $elemMatch arguments and dependencies.
-                    if (Object != e2.type()) {
-                        return Status(ErrorCodes::BadValue,
-                                      "elemMatch: Invalid argument, object required.");
-                    }
-
-                    if (ARRAY_OP_POSITIONAL == _arrayOpType) {
-                        return Status(ErrorCodes::BadValue,
-                                      "Cannot specify positional operator and $elemMatch.");
-                    }
-
-                    if (mongoutils::str::contains(e.fieldName(), '.')) {
-                        return Status(ErrorCodes::BadValue,
-                                      "Cannot use $elemMatch projection on a nested field.");
-                    }
-
                     _arrayOpType = ARRAY_OP_ELEM_MATCH;
 
                     // Create a MatchExpression for the elemMatch.
@@ -147,23 +109,25 @@ namespace mongo {
                     verify(elemMatchObj.isOwned());
                     _elemMatchObjs.push_back(elemMatchObj);
                     StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj);
-                    if (!swme.isOK()) {
-                        return swme.getStatus();
-                    }
+                    verify(swme.isOK());
                     // And store it in _matchers.
                     _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()]
                         = swme.getValue();
 
                     add(e.fieldName(), true);
                 }
-                else if (mongoutils::str::equals(e2.fieldName(), "$textScore")) {
-                    // TODO: Do we want to check this for :0 or :1 or just assume presence implies
-                    // projection?
-                    _textScoreFieldName = e.fieldName();
+                else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
+                    verify(String == e2.type());
+                    if (mongoutils::str::equals(e2.valuestr(), "text")) {
+                        _meta[e.fieldName()] = META_TEXT;
+                    }
+                    else {
+                        // This shouldn't happen, should be caught by parsing.
+                        verify(0);
+                    }
                 }
                 else {
-                    return Status(ErrorCodes::BadValue,
-                                  string("Unsupported projection option: ") + e.toString());
+                    verify(0);
                 }
             }
             else if (mongoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
@@ -184,86 +148,25 @@ namespace mongo {
                     include_exclude = e.trueValue();
                     _include = !e.trueValue();
                 }
-                else if (static_cast<bool>(include_exclude) != e.trueValue()) {
-                    // Make sure that the incl./excl. matches the previous.
-                    return Status(ErrorCodes::BadValue,
-                                  "Projection cannot have a mix of inclusion and exclusion.");
-                }
             }
 
             if (mongoutils::str::contains(e.fieldName(), ".$")) {
-                // Validate the positional op.
-                if (!e.trueValue()) {
-                    return Status(ErrorCodes::BadValue,
-                                  "Cannot exclude array elements with the positional operator.");
-                }
-
-                if (ARRAY_OP_POSITIONAL == _arrayOpType) {
-                    return Status(ErrorCodes::BadValue,
-                                  "Cannot specify more than one positional proj. per query.");
-                }
-
-                if (ARRAY_OP_ELEM_MATCH == _arrayOpType) {
-                    return Status(ErrorCodes::BadValue,
-                                  "Cannot specify positional operator and $elemMatch.");
-                }
-
                 _arrayOpType = ARRAY_OP_POSITIONAL;
             }
         }
-
-        if (ARRAY_OP_POSITIONAL != _arrayOpType) {
-            return Status::OK();
-        }
-
-        // Validates positional operator ($) projections.
-
-        // XXX: This is copied from how it was validated before.  It should probably walk the
-        // expression tree...but we maintain this for now.  TODO: Remove this and/or make better.
-
-        BSONObjIterator querySpecIter(query);
-        while (querySpecIter.more()) {
-            BSONElement queryElement = querySpecIter.next();
-            if (mongoutils::str::equals(queryElement.fieldName(), "$and")) {
-                // don't check $and to avoid deep comparison of the arguments.
-                // TODO: can be replaced with Matcher::FieldSink when complete (SERVER-4644)
-                return Status::OK();
-            }
-
-            BSONObjIterator projectionSpecIter(_source);
-            while ( projectionSpecIter.more() ) {
-                // for each projection element
-                BSONElement projectionElement = projectionSpecIter.next();
-                if ( mongoutils::str::contains( projectionElement.fieldName(), ".$" ) &&
-                        mongoutils::str::before( queryElement.fieldName(), '.' ) ==
-                        mongoutils::str::before( projectionElement.fieldName(), "." ) ) {
-                    return Status::OK();
-                }
-            }
-        }
-
-        return Status(ErrorCodes::BadValue,
-                      "Positional operator does not match the query specifier.");
     }
 
-    // TODO: stringdata
-    void LiteProjection::getRequiredFields(vector<string>* fields) const {
-        if (_includeID) {
-            fields->push_back("_id");
+    ProjectionExec::~ProjectionExec() {
+        for (FieldMap::const_iterator it = _fields.begin(); it != _fields.end(); ++it) {
+            delete it->second;
         }
 
-        // The only way we could be here is if _source is only simple non-dotted-field projections.
-        // Therefore we can iterate over _source to get the fields required.
-        BSONObjIterator srcIt(_source);
-        while (srcIt.more()) {
-            BSONElement elt = srcIt.next();
-            if (elt.trueValue()) {
-                fields->push_back(elt.fieldName());
-            }
+        for (Matchers::const_iterator it = _matchers.begin(); it != _matchers.end(); ++it) {
+            delete it->second;
         }
     }
 
-    void LiteProjection::add(const string& field, bool include) {
+    void ProjectionExec::add(const string& field, bool include) {
         if (field.empty()) { // this is the field the user referred to
             _include = include;
         }
@@ -275,17 +178,17 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot + 1, string::npos));
 
-            LiteProjection*& fm = _fields[subfield.c_str()];
+            ProjectionExec*& fm = _fields[subfield.c_str()];
 
             if (NULL == fm) {
-                fm = new LiteProjection();
+                fm = new ProjectionExec();
             }
 
             fm->add(rest, include);
         }
     }
 
-    void LiteProjection::add(const string& field, int skip, int limit) {
+    void ProjectionExec::add(const string& field, int skip, int limit) {
         _special = true; // can't include or exclude whole object
 
         if (field.empty()) { // this is the field the user referred to
@@ -297,10 +200,10 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot + 1, string::npos));
 
-            LiteProjection*& fm = _fields[subfield.c_str()];
+            ProjectionExec*& fm = _fields[subfield.c_str()];
 
             if (NULL == fm) {
-                fm = new LiteProjection();
+                fm = new ProjectionExec();
             }
 
             fm->add(rest, skip, limit);
@@ -311,7 +214,75 @@ namespace mongo {
     // Execution
     //
 
-    Status LiteProjection::transform(const BSONObj& in,
+    Status ProjectionExec::transform(WorkingSetMember* member) const {
+        BSONObjBuilder bob;
+
+        if (!requiresDocument()) {
+            // Go field by field.
+            if (_includeID) {
+                BSONElement elt;
+                member->getFieldDotted("_id", &elt);
+                verify(!elt.eoo());
+                bob.appendAs(elt, "_id");
+            }
+
+            BSONObjIterator it(_source);
+            while (it.more()) {
+                BSONElement specElt = it.next();
+                if (mongoutils::str::equals("_id", specElt.fieldName())) {
+                    continue;
+                }
+
+                BSONElement keyElt;
+                // We can project a field that doesn't exist.  We just ignore it.
+                if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
+                    bob.appendAs(keyElt, specElt.fieldName());
+                }
+            }
+        }
+        else {
+            // Planner should have done this.
+            verify(member->hasObj());
+
+            MatchDetails matchDetails;
+
+            // If it's a positional projection we need a MatchDetails.
+            if (transformRequiresDetails()) {
+                matchDetails.requestElemMatchKey();
+                verify(NULL != _queryExpression);
+                verify(_queryExpression->matchesBSON(member->obj, &matchDetails));
+            }
+
+            Status projStatus = transform(member->obj, &bob, &matchDetails);
+            if (!projStatus.isOK()) {
+                return projStatus;
+            }
+        }
+
+        for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
+            if (META_TEXT == it->second) {
+                if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
+                    const TextScoreComputedData* score
+                        = static_cast<const TextScoreComputedData*>(
+                                member->getComputed(WSM_COMPUTED_TEXT_SCORE));
+                    bob.append(it->first, score->getScore());
+                }
+                else {
+                    bob.append(it->first, 0.0);
+                }
+            }
+        }
+
+        BSONObj newObj = bob.obj();
+        member->state = WorkingSetMember::OWNED_OBJ;
+        member->obj = newObj;
+        member->keyData.clear();
+        member->loc = DiskLoc();
+
+        return Status::OK();
+    }
+
+    Status ProjectionExec::transform(const BSONObj& in,
                                      BSONObjBuilder* bob,
                                      const MatchDetails* details) const {
 
@@ -378,7 +349,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void LiteProjection::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested) const {
+    void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested) const {
         int skip  = nested ?  0 : _skip;
         int limit = nested ? -1 : _limit;
 
@@ -424,7 +395,7 @@ namespace mongo {
         }
     }
 
-    Status LiteProjection::append(BSONObjBuilder* bob,
+    Status ProjectionExec::append(BSONObjBuilder* bob,
                                   const BSONElement& elt,
                                   const MatchDetails* details,
                                   const ArrayOpType arrayOpType) const {
@@ -437,7 +408,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        LiteProjection& subfm = *field->second;
+        ProjectionExec& subfm = *field->second;
         if ((subfm._fields.empty() && !subfm._special)
             || !(elt.type() == Object || elt.type() == Array)) {
             // field map empty, or element is not an array/object

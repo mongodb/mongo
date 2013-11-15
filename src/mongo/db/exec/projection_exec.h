@@ -28,17 +28,19 @@
 
 #pragma once
 
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 
-    class LiteProjection {
+    class ProjectionExec {
     public:
-        typedef StringMap<LiteProjection*> FieldMap;
-        typedef StringMap<MatchExpression*> Matchers;
-
+        /**
+         * A .find() projection can have an array operation, either an elemMatch or positional (or
+         * neither).
+         */
         enum ArrayOpType {
             ARRAY_OP_NORMAL = 0,
             ARRAY_OP_ELEM_MATCH,
@@ -46,41 +48,51 @@ namespace mongo {
         };
 
         /**
-         * Use this to create a LiteProjection.
-         *
-         * 'query' is the user's query, used to ensure that the query is consistent with any
-         * positional operators in the projection.
-         *
-         * 'projObj' is the projection.
-         *
-         * If 'projObj' is valid (with respect to 'query'), returns Status::OK() and populates *out.
-         * Caller owns the pointer.
-         *
-         * Otherwise, returns an error.
+         * Projections based on data computed while answering a query, or other metadata about a
+         * document / query.
          */
-        static Status make(const BSONObj& query, const BSONObj& projObj, LiteProjection** out);
-
-        ~LiteProjection();
+        enum MetaProjection {
+            META_TEXT,
+            META_GEO,
+            META_DISKLOC,
+            META_IX_KEY,
+        };
 
         /**
-         * Is the full document required to compute this projection?
+         * TODO: document why we like StringMap so much here
          */
-        bool requiresDocument() const {
-            return _include || _hasNonSimple || _hasDottedField;
-        }
+        typedef StringMap<ProjectionExec*> FieldMap;
+        typedef StringMap<MatchExpression*> Matchers;
+        typedef StringMap<MetaProjection> MetaMap;
+
+        ProjectionExec(const BSONObj& spec, const MatchExpression* queryExpression);
+        ~ProjectionExec();
 
         /**
-         * Return the fields required to compute the projection in 'fields'.
-         *
-         * Assumes that requiresDocument() is false and may produce bogus results if
-         * requiresDocument() is true.
+         * Apply this projection to the 'member'.  Changes the type to OWNED_OBJ.
          */
-        void getRequiredFields(vector<string>* fields) const;
+        Status transform(WorkingSetMember* member) const;
+
+    private:
+        //
+        // Initialization
+        //
+
+        ProjectionExec();
 
         /**
-         * Return a StringData for which field we're projecting the text score into.
+         * Add 'field' as a field name that is included or excluded as part of the projection.
          */
-        StringData getTextScoreName() const { return _textScoreFieldName; }
+        void add(const string& field, bool include);
+
+        /**
+         * Add 'field' as a field name that is sliced as part of the projection.
+         */
+        void add(const string& field, int skip, int limit);
+
+        //
+        // Execution
+        //
 
         /**
          * Apply the projection that 'this' represents to the object 'in'.  'details' is the result
@@ -102,44 +114,12 @@ namespace mongo {
             return ARRAY_OP_POSITIONAL == _arrayOpType;
         }
 
-        /** 
-         * Used for debugging.
-         */
-        const BSONObj& getProjectionSpec() const { return _source; }
-
-        StringData getTextScoreFieldName() const { return _textScoreFieldName; }
-
-    private:
-        friend class ProjectionStage;
-
-        //
-        // Initialization
-        //
-
         /**
-         * We keep this private so that one must call ::make to create a new instance.
+         * Is the full document required to compute this projection?
          */
-        LiteProjection();
-
-        /**
-         * Initialize the projection from the provided BSONObj.
-         * Returns Status::OK() if the provided projection spec is valid.
-         * Otherwise, returns an error.
-         */
-        Status init(const BSONObj& spec, const BSONObj& query);
-
-        /**
-         * Add 'field' to the set of things to be projected.
-         * 'include' specifies whether or not 'field' is to be included or dropped.
-         * 'skip' and 'limit' are for $slice.
-         */
-        void add(const string& field, bool include);
-        void add(const string& field, int skip, int limit);
-
-        //
-        // Execution
-        // TODO: Move into exec/projection.cpp or elsewhere.
-        //
+        bool requiresDocument() const {
+            return _include || _hasNonSimple || _hasDottedField;
+        }
 
         /**
          * Appends the element 'e' to the builder 'bob', possibly descending into sub-fields of 'e'
@@ -159,6 +139,7 @@ namespace mongo {
         // True if this level can't be skipped or included without recursing.
         bool _special; 
 
+        // We must group projections with common prefixes together.
         // TODO: benchmark vector<pair> vs map
         // XXX: document
         FieldMap _fields;
@@ -187,8 +168,11 @@ namespace mongo {
         // Is there a projection over a dotted field?
         bool _hasDottedField;
 
-        // The field name for a $textScore projection
-        StringData _textScoreFieldName;
+        // The full query expression.  Used when we need MatchDetails.
+        const MatchExpression* _queryExpression;
+
+        // Projections that aren't sourced from the document or index keys.
+        MetaMap _meta;
     };
 
 }  // namespace mongo

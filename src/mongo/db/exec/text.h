@@ -83,6 +83,7 @@ namespace mongo {
     class TextStage : public PlanStage {
     public:
         TextStage(const TextStageParams& params, WorkingSet* ws, const MatchExpression* filter);
+
         virtual ~TextStage();
 
         virtual StageState work(WorkingSetID* out);

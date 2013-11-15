@@ -42,6 +42,7 @@ namespace mongo {
 
         // Do the fetch, invalidate the DL.
         member->obj = member->loc.obj().getOwned();
+
         member->state = WorkingSetMember::OWNED_OBJ;
         member->loc = DiskLoc();
         return true;

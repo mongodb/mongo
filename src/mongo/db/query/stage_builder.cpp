@@ -108,8 +108,7 @@ namespace mongo {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
             PlanStage* childStage = buildStages(ns, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            bool covered = !pn->children[0]->fetched();
-            return new ProjectionStage(pn->liteProjection, covered, pn->fullExpression, ws, childStage, NULL);
+            return new ProjectionStage(pn->projection, pn->fullExpression, ws, childStage);
         }
         else if (STAGE_LIMIT == root->getType()) {
             const LimitNode* ln = static_cast<const LimitNode*>(root);

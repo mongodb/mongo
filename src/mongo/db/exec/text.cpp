@@ -35,13 +35,17 @@
 
 namespace mongo {
 
-    TextStage::TextStage(const TextStageParams& params, WorkingSet* ws,
+    TextStage::TextStage(const TextStageParams& params,
+                         WorkingSet* ws,
                          const MatchExpression* filter)
-        : _params(params), _ftsMatcher(params.query, params.spec), _ws(ws), _filter(filter),
-          _filledOutResults(false), _curResult(0) { }
+        : _params(params),
+          _ftsMatcher(params.query, params.spec),
+          _ws(ws),
+          _filter(filter),
+          _filledOutResults(false),
+          _curResult(0) { }
 
-    TextStage::~TextStage() {
-    }
+    TextStage::~TextStage() { }
 
     bool TextStage::isEOF() {
         // If we haven't filled out our results yet we can't be EOF.
@@ -72,8 +76,6 @@ namespace mongo {
         member->loc = _results[_curResult].loc;
         member->obj = member->loc.obj();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-        // TODO: Planner can tell us whether or not to do this depending on whether or not we have a
-        // $textScore projection.
         member->addComputed(new TextScoreComputedData(_results[_curResult].score));
 
         // Advance to next result.

@@ -33,7 +33,6 @@
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/lite_projection.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
@@ -128,6 +127,8 @@ namespace mongo {
         // These are owned here.
         vector<QuerySolutionNode*> children;
 
+        // If a stage has a non-NULL filter all values outputted from that stage must pass that
+        // filter.
         scoped_ptr<MatchExpression> filter;
 
     protected:
@@ -191,8 +192,9 @@ namespace mongo {
 
         virtual void appendToString(stringstream* ss, int indent) const;
 
-        bool fetched() const { return false; }
-        bool hasField(const string& field) const { return false; }
+        // text's return is LOC_AND_UNOWNED_OBJ so it's fetched and has all fields.
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sort; }
 
@@ -359,7 +361,7 @@ namespace mongo {
     };
 
     struct ProjectionNode : public QuerySolutionNode {
-        ProjectionNode() : liteProjection(NULL) { }
+        ProjectionNode() { }
         virtual ~ProjectionNode() { }
 
         virtual StageType getType() const { return STAGE_PROJECTION; }
@@ -394,12 +396,13 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        // Points into the CanonicalQuery, not owned here.
-        LiteProjection* liteProjection;
-
         // The full query tree.  Needed when we have positional operators.
         // Owned in the CanonicalQuery, not here.
         MatchExpression* fullExpression;
+
+        // Given that we don't yet have a MatchExpression analogue for the expression language, we
+        // use a BSONObj.
+        BSONObj projection;
     };
 
     struct SortNode : public QuerySolutionNode {
