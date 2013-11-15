@@ -228,6 +228,11 @@ namespace {
         const NamespaceString& rolesCollectionNamespace =
             AuthorizationManager::rolesCollectionNamespace;
         const StringData cmdName(cmdObj.firstElement().fieldNameStringData());
+        if (cmdName == "applyOps") {
+            // Operations applied by applyOps will be passed into RoleGraph::handleOplog() by the
+            // implementation of applyOps itself.
+            return Status::OK();
+        }
         if (cmdName == "drop") {
             if (cmdObj.firstElement().str() == rolesCollectionNamespace.coll()) {
                 *roleGraph = RoleGraph();
