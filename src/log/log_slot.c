@@ -184,10 +184,12 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	WT_LOGSLOT *newslot;
 	int64_t old_state;
-	uint32_t pool_i;
+	int32_t yields;
+	uint32_t pool_i, switch_fails;
 
 	conn = S2C(session);
 	log = conn->log;
+	switch_fails = 0;
 retry:
 	/*
 	 * Find an unused slot in the pool.
@@ -198,14 +200,25 @@ retry:
 		log->pool_index = 0;
 	if (newslot->slot_state != WT_LOG_SLOT_FREE) {
 		WT_STAT_FAST_CONN_INCR(session, log_slot_switch_fails);
+		/*
+		 * If it takes a number of attempts to find an available slot
+		 * it's likely all slots are waiting to be released. This
+		 * churn is used to change how long we pause before closing
+		 * the slot - which leads to more consolidation and less churn.
+		 */
+		if (++switch_fails % SLOT_POOL == 0 &&
+		    switch_fails != 0 && slot->slot_churn < 5)
+			++slot->slot_churn;
+		__wt_yield();
 		goto retry;
+	} else if (slot->slot_churn > 0) {
+		--slot->slot_churn;
+		WT_ASSERT(session, slot->slot_churn >= 0);
 	}
 
-	/*
-	 * Sleep for a small amount of time to allow other threads a
-	 * chance to consolidate.
-	 */
-	__wt_yield();
+	/* Pause to allow other threads a chance to consolidate. */
+	for (yields = slot->slot_churn; yields >= 0; yields--)
+		__wt_yield();
 
 	/*
 	 * Swap out the slot we're going to use and put a free one in the

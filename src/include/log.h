@@ -69,6 +69,7 @@ typedef struct {
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
 	WT_CONDVAR *slot_done_cond;	/* Signalled when write done */
+	int32_t	slot_churn;		/* Active slots are scarce. */
 #define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
 #define	SLOT_BUFFERED	0x02			/* Buffer writes */
 #define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
