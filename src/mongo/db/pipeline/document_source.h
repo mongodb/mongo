@@ -356,12 +356,6 @@ namespace mongo {
         virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual bool isValidInitialSource() const { return true; }
-
-        /**
-         * Release the Cursor and the read lock it requires, but without changing the other data.
-         * Releasing the lock is required for proper concurrency, see SERVER-6123.  This
-         * functionality is also used by the explain version of pipeline execution.
-         */
         virtual void dispose();
 
         /**
@@ -382,12 +376,6 @@ namespace mongo {
             const string& ns,
             CursorId cursorId,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /*
-          Record the namespace.  Required for explain.
-
-          @param namespace the namespace
-        */
 
         /*
           Record the query that was specified for the cursor this wraps, if
@@ -433,26 +421,13 @@ namespace mongo {
         // BSONObj members must outlive _projection and cursor.
         BSONObj _query;
         BSONObj _sort;
-        shared_ptr<Projection> _projection; // shared with pClientCursor
+        BSONObj _projection;
         ParsedDeps _dependencies;
         intrusive_ptr<DocumentSourceLimit> _limit;
         long long _docsAddedToBatches; // for _limit enforcement
 
-        string ns; // namespace
+        string _ns; // namespace
         CursorId _cursorId;
-        CollectionMetadataPtr _collMetadata;
-
-        bool canUseCoveredIndex(ClientCursor* cursor) const;
-
-        /*
-          Yield the cursor sometimes.
-
-          If the state of the world changed during the yield such that we
-          are unable to continue execution of the query, this will release the
-          client cursor, and throw an error.  NOTE This differs from the
-          behavior of most other operations, see SERVER-2454.
-         */
-        void yieldSometimes(ClientCursor* cursor);
     };
 
 

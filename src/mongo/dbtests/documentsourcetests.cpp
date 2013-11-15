@@ -23,6 +23,7 @@
 #include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/new_find.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -110,11 +111,15 @@ namespace DocumentSourceTests {
         protected:
             void createSource() {
                 Client::ReadContext ctx (ns);
-                boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
-                ClientCursorHolder cc(
-                        new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
+                CanonicalQuery* cq;
+                uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
+                Runner* runner;
+                uassertStatusOK(getRunner(cq, &runner));
+                auto_ptr<ClientCursor> cc(new ClientCursor(runner, QueryOption_NoCursorTimeout));
+                verify(cc->getRunner());
+                cc->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
                 CursorId cursorId = cc->cursorid();
-                cc->c()->prepareToYield();
+                runner->saveState();
                 cc.release(); // it is now owned by the client cursor manager
                 _source = DocumentSourceCursor::create(ns, cursorId, _ctx);
             }
@@ -278,7 +283,7 @@ namespace DocumentSourceTests {
                 // Iterate through all results.
                 while( source()->getNext() );
                 // The lock was yielded during iteration.
-                ASSERT( 0 < cc().curop()->numYields() );
+                ASSERT_GREATER_THAN(cc().curop()->numYields(), 0);
             }
         private:
             // An active writer is required to trigger yielding.
