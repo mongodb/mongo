@@ -167,7 +167,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 *
 	 * Without a session, we don't have event handlers or prefixes for the
 	 * error message.  Write the error to stderr and call it a day.  (It's
-	 * almost impossible for thta to happen given how early we allocate the
+	 * almost impossible for that to happen given how early we allocate the
 	 * first session, but if the allocation of the first session fails, for
 	 * example, we can end up here without a session.)
 	 */
