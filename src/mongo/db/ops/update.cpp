@@ -668,6 +668,9 @@ namespace mongo {
             // We need all the fields from the query to compare against for validation below.
             original = doc.getObject();
         }
+        else {
+            original = request.getQuery();
+        }
 
         // Apply the update modifications and then log the update as an insert manually.
         FieldRefSet updatedFields;

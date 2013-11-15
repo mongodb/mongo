@@ -57,11 +57,6 @@ value = coll.findOne({ i : 1 })
 coll.update( value, Object.merge( value, { i : [ 3, 4 ] } ), false, true)
 checkError( true )
 
-// Single update the value with valid other fields
-value = coll.findOne({ i : 1 })
-coll.update( Object.merge( value, { i : [ 3, 4 ] } ), value )
-checkError( true )
-
 // Multi-update the value with other fields (won't work, but no error)
 value = coll.findOne({ i : 1 })
 coll.update( Object.merge( value, { i : [ 1, 1 ] } ), { $set : { k : 4 } }, false, true)
