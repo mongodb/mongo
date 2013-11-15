@@ -21,14 +21,12 @@
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
 	WT_ERR(__clsm_enter(clsm, 0));					\
-	WT_ERR(__wt_cache_full_check(session));				\
 	F_SET(session, WT_SESSION_CACHE_BUSY)
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 1));					\
-	WT_ERR(__wt_cache_full_check(session));				\
 	F_SET(session, WT_SESSION_CACHE_BUSY)
 
 #define	WT_LSM_LEAVE(session)						\
@@ -42,6 +40,10 @@
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_lookup(WT_CURSOR_LSM *);
 
+/*
+ * __clsm_enter --
+ *	Start an operation on an LSM cursor, update if the tree has changed.
+ */
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
@@ -87,6 +89,14 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 				if (TXNID_LT(*txnid_maxp, snap_min))
 					break;
 		}
+
+		/*
+		 * If the cursor looks up-to-date, check if the cache is full.
+		 * In case this call blocks, re-check that we are up-to-date
+		 * before proceeding.
+		 */
+		if (clsm->dsk_gen == clsm->lsm_tree->dsk_gen)
+			WT_ERR(__wt_cache_full_check(session));
 
 		/*
 		 * Stop when we are up-to-date, as long as this is:
@@ -438,7 +448,8 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 	return (ret);
 }
 
-/* __wt_clsm_init_merge --
+/*
+ * __wt_clsm_init_merge --
  *	Initialize an LSM cursor for a merge.
  */
 int
