@@ -227,32 +227,28 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	}
 
 	/* Move to the previous entry and return the item. */
-	for (;;) {
-		if (cbt->recno == cbt->page->u.col_fix.recno)
-			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, cbt->recno - 1);
+	if (cbt->recno == cbt->page->u.col_fix.recno)
+		return (WT_NOTFOUND);
+	__cursor_set_recno(cbt, cbt->recno - 1);
 
-new_page:	/* Check any insert list for a matching record. */
-		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
-		cbt->ins = __col_insert_search(
-		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
-		if (cbt->ins != NULL &&
-		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
-			cbt->ins = NULL;
-		upd = cbt->ins == NULL ?
-		    NULL : __wt_txn_read(session, cbt->ins->upd);
-		if (upd != NULL) {
-			val->data = WT_UPDATE_DATA(upd);
-			val->size = 1;
-			return (0);
-		}
-
-		cbt->v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
-		val->data = &cbt->v;
+new_page:
+	/* Check any insert list for a matching record. */
+	cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
+	cbt->ins = __col_insert_search(
+	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
+	if (cbt->ins != NULL && cbt->recno != WT_INSERT_RECNO(cbt->ins))
+		cbt->ins = NULL;
+	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
+	if (upd != NULL) {
+		val->data = WT_UPDATE_DATA(upd);
 		val->size = 1;
 		return (0);
 	}
-	/* NOTREACHED */
+
+	cbt->v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
+	val->data = &cbt->v;
+	val->size = 1;
+	return (0);
 }
 
 /*
