@@ -448,10 +448,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	*retp = trk;
 	return (0);
 
-err:	if (trk->addr.addr != NULL)
-		__wt_free(session, trk->addr.addr);
-	if (trk != NULL)
-		__wt_free(session, trk);
+err:	__wt_free(session, trk->addr.addr);
+	__wt_free(session, trk);
 	return (ret);
 }
 
