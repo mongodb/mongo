@@ -239,14 +239,11 @@ new_page:
 	if (cbt->ins != NULL && cbt->recno != WT_INSERT_RECNO(cbt->ins))
 		cbt->ins = NULL;
 	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
-	if (upd != NULL) {
+	if (upd == NULL) {
+		cbt->v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
+		val->data = &cbt->v;
+	} else
 		val->data = WT_UPDATE_DATA(upd);
-		val->size = 1;
-		return (0);
-	}
-
-	cbt->v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
-	val->data = &cbt->v;
 	val->size = 1;
 	return (0);
 }
