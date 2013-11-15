@@ -214,7 +214,7 @@ config_read(char ***listp, int *hexp)
 	}
 
 	/* Headers are required, and they're supposed to be in pairs. */
-	if (list == NULL || entry / 2 == 0)
+	if (list == NULL || entry % 2 != 0)
 		return (format());
 
 	list[entry] = NULL;
