@@ -54,15 +54,12 @@ assert.commandFailed(mydb.runCommand({ createUser: "bob",
 // Tests of the update path
 //
 
-/* Disabled per SERVER-10249.
 // Update a document in a legal way, expect success.
-mydb.system.users.update({user: "spencer", userSource: null}, { $set: {readOnly: false} });
-assertGLEOK(mydb.getLastErrorObj());
-
+assert.commandWorked(mydb.runCommand({updateUser: 'spencer', roles: ['read']}));
 
 // Update a document in a way that is illegal, expect failure.
-mydb.system.users.update({user: "spencer", userSource: null}, { $unset: {pwd: 1} });
-assertGLENotOK(mydb.getLastErrorObj());
-*/
+assert.commandFailed(mydb.runCommand({updateUser: 'spencer', readOnly: true}));
+assert.commandFailed(mydb.runCommand({updateUser: 'spencer', pwd: ""}));
+assert.commandFailed(mydb.runCommand({updateUser: 'spencer', roles: ['fakeRole123']}));
 
 mydb.dropDatabase();
