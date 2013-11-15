@@ -1,4 +1,5 @@
 // Test mongod start with FIPS mode enabled
+if (0) { // SERVER-11005
 ports = allocatePorts(1);
 port1 = ports[0];
 var baseName = "jstests_ssl_ssl_fips";
@@ -23,4 +24,5 @@ if (mongo != 0) {
 else {
     // kill mongod
     stopMongod(port1);
+}
 }
