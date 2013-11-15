@@ -235,7 +235,6 @@ extern int __wt_compact_page_skip( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,
     int *skipp);
-extern int __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
@@ -279,6 +278,8 @@ extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
+extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
 extern int __wt_sync_file(WT_SESSION_IMPL *session, int syncop);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);

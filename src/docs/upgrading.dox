@@ -3,6 +3,12 @@
 @section version_166 Upgrading to Version 1.6.6
 <dl>
 
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.6.6 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
 <dt>WT_SESSION::create allocation_size configuration</dt>
 <dd>
 In previous releases, the \c allocation_size configuration string to the

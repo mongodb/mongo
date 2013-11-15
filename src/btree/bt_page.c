@@ -463,7 +463,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	/*
 	 * Walk the page, instantiating keys: the page contains sorted key and
 	 * location cookie pairs.  Keys are on-page/overflow items and location
-	 * cookies are WT_CELL_ADDR items.
+	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -483,7 +483,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 			*sizep += sizeof(WT_IKEY) + current->size;
 			break;
-		case WT_CELL_ADDR:
+		case WT_CELL_ADDR_DEL:
+		case WT_CELL_ADDR_INT:
+		case WT_CELL_ADDR_LEAF:
+		case WT_CELL_ADDR_LEAF_NO:
 			ref->addr = cell;
 
 			/*

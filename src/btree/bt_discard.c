@@ -83,7 +83,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 		__wt_overwrite_and_free_len(
 		    session, page->dsk, page->dsk->mem_size);
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
-		__wt_mmap_discard(session, page->dsk, page->dsk->mem_size);
+		(void)__wt_mmap_discard(
+		    session, page->dsk, page->dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
 }

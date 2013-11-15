@@ -412,7 +412,7 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 #ifdef HAVE_DIAGNOSTIC
 	/* Check that all cursors are open as expected. */
 	if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
-		for (i = 0, cp = clsm->cursors; i != nchunks; cp++, i++) {
+		for (i = 0, cp = clsm->cursors; i != clsm->nchunks; cp++, i++) {
 			chunk = lsm_tree->chunk[i + start_chunk];
 
 			/* Make sure the cursor is open. */

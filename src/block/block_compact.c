@@ -138,14 +138,12 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 		el = &block->live.avail;
 		WT_EXT_FOREACH(ext, el->off)
 			if (ext->off < ninety && ext->size >= size) {
-				WT_VERBOSE_ERR(session, compact,
-				    "compaction %" PRIuMAX, (uintmax_t)offset);
 				*skipp = 0;
 				break;
 			}
 	}
 
-err:	__wt_spin_unlock(session, &block->live_lock);
+	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
 }

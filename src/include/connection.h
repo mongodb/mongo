@@ -167,14 +167,16 @@ struct __wt_connection_impl {
 	const char	*ckpt_config;	/* Checkpoint configuration */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
+	int compact_in_memory_pass;	/* Compaction serialization */
+
 	/*
 	 * There are only three statistics states so far: "none", "fast" and
 	 * "all".  Keep it simple, "all" sets both variables, "fast" sets one
 	 * of them.
 	 */
-	int		 stat_all;	/* "all" statistics configured */
-	int		 stat_fast;	/* "fast" statistics configured */
-	int		 stat_clear;	/* "clear" statistics configured */
+	int stat_all;			/* "all" statistics configured */
+	int stat_fast;			/* "fast" statistics configured */
+	int stat_clear;			/* "clear" statistics configured */
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING

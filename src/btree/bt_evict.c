@@ -347,27 +347,24 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_evict_file --
- *	Flush pages for a specific file as part of a close or compact operation.
+ * __wt_evict_file_exclusive_on
+ *	Get exclusive eviction access to a file and discard any of the file's
+ * blocks queued for eviction.
  */
-int
-__wt_evict_file(WT_SESSION_IMPL *session, int syncop)
+void
+__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
-	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
-	WT_PAGE *next_page, *page;
 	u_int i, elem;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
 	/*
-	 * We need exclusive access to the file -- disable ordinary eviction.
-	 *
-	 * Hold the walk lock to set the "no eviction" flag: no new pages will
-	 * be queued for eviction after this point.
+	 * Hold the walk lock to set the "no eviction" flag: no new pages from
+	 * the file will be queued for eviction after this point.
 	 */
 	__wt_spin_lock(session, &cache->evict_walk_lock);
 	F_SET(btree, WT_BTREE_NO_EVICTION);
@@ -376,12 +373,12 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* Hold the evict lock to remove any queued pages from this file. */
 	__wt_spin_lock(session, &cache->evict_lock);
 
-	/* Clear any existing LRU eviction walk, we're discarding the tree. */
+	/* Clear any existing LRU eviction walk for the file. */
 	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
-	 * The eviction candidate list might reference pages we are about to
-	 * discard; clear it.
+	 * The eviction candidate list might reference pages from the file,
+	 * clear it.
 	 */
 	elem = cache->evict_max;
 	for (i = 0, evict = cache->evict; i < elem; i++, evict++)
@@ -395,6 +392,42 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 */
 	while (btree->lru_count > 0)
 		__wt_yield();
+}
+
+/*
+ * __wt_evict_file_exclusive_off
+ *	Release exclusive eviction access to a file.
+ */
+void
+__wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	WT_ASSERT(session, btree->evict_page == NULL);
+
+	F_CLR(btree, WT_BTREE_NO_EVICTION);
+}
+
+/*
+ * __wt_evict_file --
+ *	Flush pages for a specific file as part of a close operation.
+ */
+int
+__wt_evict_file(WT_SESSION_IMPL *session, int syncop)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_PAGE *next_page, *page;
+
+	btree = S2BT(session);
+
+	/*
+	 * We need exclusive access to the file -- disable ordinary eviction
+	 * and drain any blocks already queued.
+	 */
+	__wt_evict_file_exclusive_on(session);
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -463,8 +496,9 @@ err:		/* On error, clear any left-over tree walk. */
 		if (next_page != NULL)
 			__wt_evict_clear_tree_walk(session, next_page);
 	}
-	WT_ASSERT(session, btree->evict_page == NULL);
-	F_CLR(btree, WT_BTREE_NO_EVICTION);
+
+	__wt_evict_file_exclusive_off(session);
+
 	return (ret);
 }
 
@@ -551,21 +585,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(session, page, NULL, 0));
-			WT_ERR(__wt_tree_walk(session, &page, flags));
-		}
-		break;
-	case WT_SYNC_COMPACT:
-		/*
-		 * Compaction requires only a single pass (we don't have to turn
-		 * eviction off when visiting internal nodes, so we don't bother
-		 * breaking the work into two separate passes).   Wait for
-		 * concurrent activity in a page to be resolved, acquire hazard
-		 * references to prevent eviction.
-		 */
-		flags = WT_TREE_CACHE | WT_TREE_WAIT;
-		WT_ERR(__wt_tree_walk(session, &page, flags));
-		while (page != NULL) {
-			WT_ERR(__wt_compact_evict(session, page));
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 		break;
@@ -1072,8 +1091,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 */
 	page->read_gen = __wt_cache_read_gen_set(session);
 
-	WT_WITH_BTREE(session, btree,
-	    ret = __wt_evict_page(session, page));
+	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, page));
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
