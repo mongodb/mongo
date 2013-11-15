@@ -882,6 +882,8 @@ namespace mongo {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
+                ShardConnection::sync();
+
                 string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
@@ -1037,6 +1039,8 @@ namespace mongo {
             bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
+
+                ShardConnection::sync();
 
                 Timer t;
                 string ns = parseNs(dbname, cmdObj);
