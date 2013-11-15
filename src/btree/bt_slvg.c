@@ -435,6 +435,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TRACK *trk;
 
+	trk = NULL;
+
 	WT_RET(__wt_calloc_def(session, 1, &trk));
 	trk->ss = ss;
 
