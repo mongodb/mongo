@@ -1,5 +1,7 @@
 // test preservePadding
 collName = "compactPreservePadding";
+db.getSisterDB("compactPreservePaddingDB");
+db.dropDatabase();
 db.createCollection(collName);
 // ensure there is some padding by using power of 2 sizes
 db.runCommand({collMod: collName, usePowerOf2Sizes: true});
