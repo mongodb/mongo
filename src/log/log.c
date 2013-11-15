@@ -132,11 +132,9 @@ __wt_log_extract_lognum(
 
 	if (id == NULL || name == NULL)
 		return (0);
-	if ((p = strrchr(name, '.')) == NULL)
-		return (WT_ERROR);
-	++p;
-	if ((sscanf(++p, "%" PRIu32, id)) != 1)
-		return (WT_ERROR);
+	if ((p = strrchr(name, '.')) == NULL ||
+	    sscanf(++p, "%" PRIu32, id) != 1)
+		WT_RET_MSG(session, WT_ERROR, "Bad log file name '%s'", name);
 	return (0);
 }
 
@@ -680,8 +678,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, logrec->len);
 	if (logrec->checksum != cksum) {
-		WT_VERBOSE_ERR(session, log, "log_read: Bad checksum");
-		ret = WT_ERROR;
+		WT_ERR_MSG(session, WT_ERROR, "log_read: Bad checksum");
 		goto err;
 	}
 	record->size = logrec->len;
@@ -721,7 +718,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	 * Check for correct usage.
 	 */
 	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
-		return (WT_ERROR);
+		WT_RET_MSG(session, WT_ERROR,
+		    "choose either a start LSN or a start flag");
 	/*
 	 * If the caller did not give us a callback function there is nothing
 	 * to do.
@@ -857,8 +855,15 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		logrec->checksum = 0;
 		logrec->checksum = __wt_cksum(logrec, logrec->len);
 		if (logrec->checksum != cksum) {
-			ret = WT_ERROR;
-			goto err;
+			/*
+			 * A checksum mismatch means we have reached the end of
+			 * the useful part of the log.  This should be found on
+			 * the first pass through recovery.  In the second pass
+			 * where we truncate the log, this is where it should
+			 * end.
+			 */
+			log->trunc_lsn = rd_lsn;
+			break;
 		}
 
 		/*
