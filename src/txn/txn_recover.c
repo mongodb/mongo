@@ -76,6 +76,10 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
  */
 #define	GET_RECOVERY_CURSOR(s, r, lsnp, fileid, cp)			\
 	WT_ERR(__recovery_cursor((s), (r), (lsnp), (fileid), 0, (cp)));	\
+	WT_VERBOSE_ERR(session, recovery,				\
+	    "%s op %d to file %d at LSN %u/%" PRIuMAX,		\
+	    (cursor == NULL) ? "Skipping" : "Applying",			\
+	    optype, fileid, lsnp->file, (uintmax_t)lsnp->offset);	\
 	if (cursor == NULL)						\
 		break
 
@@ -404,23 +408,29 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	 * and establish the last checkpoint LSN.
 	 */
 	r.metadata_only = 1;
-	ret = __wt_log_scan(
-	    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
-	WT_ASSERT(session, ret == 0);
+	WT_ERR(__wt_log_scan(
+	    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
 
 	WT_ASSERT(session, LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
 
-	ret = __recovery_file_scan(&r);
-	WT_ASSERT(session, ret == 0);
+	WT_ERR(__recovery_file_scan(&r));
 
 	/*
 	 * Now, recover all the files apart from the metadata.
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
 	r.metadata_only = 0;
-	ret = __wt_log_scan(
-	    session, &r.ckpt_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
-	WT_ASSERT(session, ret == 0);
+	WT_VERBOSE_ERR(session, recovery,
+	    "Main recovery loop: starting at %u/%" PRIuMAX,
+	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset);
+	if (IS_INIT_LSN(&r.ckpt_lsn))
+		WT_ERR(__wt_log_scan(session, NULL,
+		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+		    __txn_log_recover, &r));
+	else
+		WT_ERR(__wt_log_scan(session, &r.ckpt_lsn,
+		    WT_LOGSCAN_RECOVER,
+		    __txn_log_recover, &r));
 
 	conn->next_file_id = r.max_fileid;
 

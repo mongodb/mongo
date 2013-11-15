@@ -720,6 +720,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "choose either a start LSN or a start flag");
+
+	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+		WT_VERBOSE_RET(session, log,
+		    "__wt_log_scan truncating to %u/%" PRIuMAX,
+		    log->trunc_lsn.file, (uintmax_t)log->trunc_lsn.offset);
 	/*
 	 * If the caller did not give us a callback function there is nothing
 	 * to do.
@@ -796,7 +801,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			 * Truncate this log file before we move to the next.
 			 */
 			if (LF_ISSET(WT_LOGSCAN_RECOVER))
-				WT_ERR(__log_truncate(session, &rd_lsn, 0));
+				WT_ERR(__log_truncate(session, &rd_lsn, 1));
 			rd_lsn.file++;
 			rd_lsn.offset = 0;
 			/*
@@ -831,12 +836,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * that may exist.
 		 */
 		if (reclen == 0) {
-			/*
-			 * This LSN is the end.  Truncate if we're in recovery
-			 * otherwise, just stop.
-			 */
-			if (LF_ISSET(WT_LOGSCAN_RECOVER))
-				WT_ERR(__log_truncate(session, &rd_lsn, 0));
+			/* This LSN is the end. */
 			break;
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
@@ -876,6 +876,10 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
 		rd_lsn.offset += (off_t)rdup_len;
 	} while (!done);
+
+	/* Truncate if we're in recovery. */
+	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+		WT_ERR(__log_truncate(session, &rd_lsn, 0));
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	if (logfiles != NULL)
