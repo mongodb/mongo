@@ -198,7 +198,7 @@ ops(void *arg)
 		}
 
 		/* Open up a new session and cursors. */
-		if (cnt == session_op) {
+		if (cnt == session_op || session == NULL || cursor == NULL) {
 			if (session != NULL &&
 			    (ret = session->close(session, NULL)) != 0)
 				die(ret, "session.close");
