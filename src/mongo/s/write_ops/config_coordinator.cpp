@@ -356,7 +356,6 @@ namespace mongo {
         NamespaceString nss( clientRequest.getNS() );
         dassert( nss.db() == "config" || nss.db() == "admin" );
         dassert( clientRequest.sizeWriteOps() == 1u );
-        dassert( !clientRequest.isWriteConcernSet() );
 
         if ( fsyncCheck ) {
 
