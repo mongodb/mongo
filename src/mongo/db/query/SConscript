@@ -107,6 +107,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="lite_projection_test",
+    source=[
+        "lite_projection_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
     target="query_planner_test",
     source=[
         "query_planner_test.cpp"
