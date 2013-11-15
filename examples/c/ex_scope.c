@@ -55,9 +55,9 @@ cursor_scope_ops(WT_CURSOR *cursor)
 
 	for (op = ops; op->key != NULL; op++) {
 		/*! [cursor scope operation] */
-		strcpy(keybuf, op->key);
+		(void)snprintf(keybuf, sizeof(keybuf), "%s", op->key);
 		cursor->set_key(cursor, keybuf);
-		strcpy(valuebuf, op->value);
+		(void)snprintf(valuebuf, sizeof(valuebuf), "%s", op->value);
 		cursor->set_value(cursor, valuebuf);
 
 		/*
