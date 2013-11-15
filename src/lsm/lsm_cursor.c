@@ -21,14 +21,12 @@
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
 	WT_ERR(__clsm_enter(clsm, 0));					\
-	WT_ERR(__wt_cache_full_check(session));				\
 	F_SET(session, WT_SESSION_CACHE_BUSY)
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 1));					\
-	WT_ERR(__wt_cache_full_check(session));				\
 	F_SET(session, WT_SESSION_CACHE_BUSY)
 
 #define	WT_LSM_LEAVE(session)						\
@@ -62,6 +60,19 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 		return (0);
 
 	for (;;) {
+		/*
+		 * If the cursor looks up-to-date, check if the cache is full.
+		 * In case this call blocks, the check will be repeated before
+		 * proceeding.
+		 */
+		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+			goto open;
+
+		WT_RET(__wt_cache_full_check(session));
+
+		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+			goto open;
+
 		/* Update the maximum transaction ID in the primary chunk. */
 		if (update && (chunk = clsm->primary_chunk) != NULL) {
 			WT_RET(__wt_txn_autocommit_check(session));
@@ -69,7 +80,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 			    !TXNID_LE(myid, id);
 			    id = chunk->txnid_max) {
 				WT_ASSERT(session, myid != WT_TXN_NONE);
-				(void)WT_ATOMIC_CAS(chunk->txnid_max, id, myid);
+				(void)WT_ATOMIC_CAS(
+				    chunk->txnid_max, id, myid);
 			}
 		}
 
@@ -99,14 +111,14 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 		 *   - an update operation with a primary chunk, or
 		 *   - a read operation and the cursor is open for reading.
 		 */
-		if (clsm->dsk_gen == clsm->lsm_tree->dsk_gen &&
-		    (!update || session->txn.isolation != TXN_ISO_SNAPSHOT ||
+		if ((!update ||
+		    session->txn.isolation != TXN_ISO_SNAPSHOT ||
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
 		    ((update && clsm->primary_chunk != NULL) ||
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
-		WT_WITH_SCHEMA_LOCK(session,
+open:		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __clsm_open_cursors(clsm, update, 0, 0));
 		WT_RET(ret);
 	}

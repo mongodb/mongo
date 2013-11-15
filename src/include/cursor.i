@@ -76,12 +76,6 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	WT_RET(__wt_page_release(session, cbt->page));
 	cbt->page = NULL;
 
-	/*
-	 * Check whether the cache is full.  We may have other cursors open,
-	 * but the one we just closed might help eviction make progress.
-	 */
-	WT_RET(__wt_cache_full_check(session));
-
 	return (0);
 }
 
@@ -89,16 +83,24 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
  * __cursor_enter --
  *	Setup the cursor's state for a new call.
  */
-static inline void
+static inline int
 __cursor_enter(WT_CURSOR_BTREE *cbt)
 {
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	if (session->ncursors++ == 0)
+	/*
+	 * If there are no other cursors positioned in the session, check
+	 * whether the cache is full and then get a snapshot if necessary.
+	 */
+	if (session->ncursors == 0) {
+		WT_RET(__wt_cache_full_check(session));
 		__wt_txn_read_first(session);
+	}
+	++session->ncursors;
 	F_SET(cbt, WT_CBT_ACTIVE);
+	return (0);
 }
 
 /*
@@ -115,7 +117,7 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 	if (reenter)
 		WT_RET(__cursor_leave(cbt));
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
-		__cursor_enter(cbt);
+		WT_RET(__cursor_enter(cbt));
 	__wt_txn_cursor_op(session);
 	return (0);
 }
