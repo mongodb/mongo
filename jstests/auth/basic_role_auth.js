@@ -422,24 +422,19 @@ var TESTS = [
     }
 },
 
-// Changing role test disabled per SERVER-10151. Once we have commands for changing user's roles,
-// this should be changed to use those and re-enabled
-/*{
+{
     name: 'Test change role',
     test: function(conn) {
         var testDB = conn.getDB('test');
         assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
 
         var newConn = new Mongo(conn.host);
-        var testDB2 = newConn.getDB('test');
-        assert.eq(1, testDB2.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
-        var origSpec = testDB2.system.users.findOne({ user: 'rw' });
-        testDB2.system.users.update({ user: 'rw' }, { $set: { roles: [ 'read' ] }});
-        var gle = testDB2.runCommand({ getLastError: 1 });
-        assert(gle.err == null, 'role change failed: ' + tojson(gle));
+        assert.eq(1, newConn.getDB('admin').auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
+        newConn.getDB('test').updateUser('rw', {roles: ['read']});
+        var origSpec = newConn.getDB("test").getUser("rw");
 
-        // role change should not affect users already authenticated.
-        testOps(testDB, READ_WRITE_PERM);
+        // role change should affect users already authenticated.
+        testOps(testDB, READ_PERM);
 
         // role change should affect active connections.
         testDB.runCommand({ logout: 1 });
@@ -452,9 +447,9 @@ var TESTS = [
         assert.eq(1, testDB3.auth('rw', AUTH_INFO.test.rw.pwd));
         testOps(testDB3, READ_PERM);
 
-        testDB2.system.users.update({ user: 'rw' }, origSpec);
+        newConn.getDB('test').updateUser('rw', {roles: origSpec.roles});
     }
-},*/
+},
 
 {
     name: 'Test override user',
