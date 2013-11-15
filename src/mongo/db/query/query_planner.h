@@ -55,7 +55,7 @@ namespace mongo {
             INCLUDE_SHARD_FILTER = 4,
 
             // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
-            // provided by the index.
+            // provided by an index.
             NO_BLOCKING_SORT = 8,
         };
 

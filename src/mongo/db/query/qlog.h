@@ -32,7 +32,10 @@
 
 namespace mongo {
 
-    std::ostream& QLOG();
+    extern bool verboseQueryLogging;
+
+// With a #define like this, we don't evaluate the costly toString()s that are QLOG'd
+#define QLOG() if (verboseQueryLogging) log()
 
     bool qlogOff();
     bool qlogOn();
