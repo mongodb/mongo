@@ -141,7 +141,6 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	pthread_t self;
@@ -162,10 +161,26 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 */
 	char s[2048];
 
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 *
+	 * Without a session, we don't have event handlers or prefixes for the
+	 * error message.  Write the error to stderr and call it a day.  (It's
+	 * almost impossible for thta to happen given how early we allocate the
+	 * first session, but if the allocation of the first session fails, for
+	 * example, we can end up here without a session.)
+	 */
+	if (session == NULL) {
+		WT_RET_TEST((fprintf(stderr, "WiredTiger Error%s%s\n",
+		    error == 0 ? "" : ": ",
+		    error == 0 ? "" : wiredtiger_strerror(error)) < 0),
+		    __wt_errno());
+		return (0);
+	}
+
 	p = s;
 	end = s + sizeof(s);
-
-	dhandle = session->dhandle;
 
 	/*
 	 * We have several prefixes for the error message:
@@ -193,7 +208,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		p = wlen >= remain ? end : p + wlen;
 		prefix_cnt = 1;
 	}
-	prefix = dhandle == NULL ? NULL : dhandle->name;
+	prefix = session->dhandle == NULL ? NULL : session->dhandle->name;
 	if (prefix != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
