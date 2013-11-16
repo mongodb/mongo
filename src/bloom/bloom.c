@@ -42,14 +42,10 @@ __bloom_init(WT_SESSION_IMPL *session,
 	*bloomp = bloom;
 	return (0);
 
-err:	if (bloom->uri != NULL)
-		__wt_free(session, bloom->uri);
-	if (bloom->config != NULL)
-		__wt_free(session, bloom->config);
-	if (bloom->bitstring != NULL)
-		__wt_free(session, bloom->bitstring);
-	if (bloom != NULL)
-		__wt_free(session, bloom);
+err:	__wt_free(session, bloom->uri);
+	__wt_free(session, bloom->config);
+	__wt_free(session, bloom->bitstring);
+	__wt_free(session, bloom);
 	return (ret);
 }
 
