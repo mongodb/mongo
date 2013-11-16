@@ -595,7 +595,14 @@ err:	/* On error, clear any left-over tree walk. */
 		__wt_evict_clear_tree_walk(session, page);
 
 	if (btree->checkpointing) {
+		/*
+		 * Lock/unlock around clearing the checkpointing flag; it's not
+		 * required, but publishing the change ensures stalled eviction
+		 * gets moving as soon as possible.
+		 */
+		__wt_spin_lock(session, &cache->evict_lock);
 		btree->checkpointing = 0;
+		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
 		 * Wake the eviction server, in case application threads have
