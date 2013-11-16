@@ -355,8 +355,10 @@ config_rename(char **urip, const char *name)
 	 * Find the separating colon characters, but not the trailing one may
 	 * not be there.
 	 */
-	if ((p = strchr(*urip, ':')) == NULL)
+	if ((p = strchr(*urip, ':')) == NULL) {
+		free(buf);
 		return (format());
+	}
 	*p = '\0';
 	p = strchr(p + 1, ':');
 	snprintf(buf, len, "%s:%s%s", *urip, name, p == NULL ? "" : p);
