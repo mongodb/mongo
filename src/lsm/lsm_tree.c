@@ -315,7 +315,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 
-	WT_RET(__lsm_tree_set_name(session, lsm_tree, uri));
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 
 	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
