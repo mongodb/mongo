@@ -405,17 +405,16 @@ static int
 __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_CONFIG_ITEM cval;
-	uint64_t required;
-	uint32_t maxleafpage;
+	uint64_t maxleafpage, required;
 	const char *cfg[] = { WT_CONFIG_BASE(
 	    session, session_create), lsm_tree->file_config, NULL };
 
 	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
-	maxleafpage = (uint32_t)cval.val;
+	maxleafpage = (uint64_t)cval.val;
 
 	/* Three chunks, plus one page for each participant in a merge. */
 	required = 3 * lsm_tree->chunk_size +
-	    lsm_tree->merge_threads * (lsm_tree->merge_max *  maxleafpage);
+	    lsm_tree->merge_threads * (lsm_tree->merge_max * maxleafpage);
 	if (S2C(session)->cache_size < required)
 		WT_RET_MSG(session, EINVAL,
 		    "The LSM configuration requires a cache size of at least %"
