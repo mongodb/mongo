@@ -302,15 +302,15 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		tp->frequency = (uint32_t)frequency;
 	}
 
-err:	if (fp != NULL)
+	*entriesp = lineno - 1;
+	*tablep = table;
+
+	if (0) {
+err:		__wt_free(session, table);
+	}
+	if (fp != NULL)
 		(void)fclose(fp);
 	__wt_free(session, file);
-
-	if (ret == 0) {
-		*entriesp = lineno - 1;
-		*tablep = table;
-	} else
-		__wt_free(session, table);
 	return (ret);
 }
 
