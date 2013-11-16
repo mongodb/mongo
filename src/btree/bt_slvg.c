@@ -1657,6 +1657,8 @@ __slvg_row_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
+	addr = NULL;
+
 	/* Allocate a row-store root (internal) page and fill it in. */
 	WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, &page));
 	page->parent = NULL;
@@ -1678,6 +1680,7 @@ __slvg_row_build_internal(
 
 		ref->page = NULL;
 		ref->addr = addr;
+		addr = NULL;
 		__wt_ref_key_clear(ref);
 		ref->state = WT_REF_DISK;
 
@@ -1704,7 +1707,9 @@ __slvg_row_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page);
+err:		if (addr != NULL)
+			__wt_free(session, addr);
+		__wt_page_out(session, &page);
 	}
 	return (ret);
 }
