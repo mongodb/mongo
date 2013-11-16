@@ -23,8 +23,6 @@ __block_ext_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXT **extp)
 {
 	u_int skipdepth;
 
-	*extp = NULL;
-
 	/*
 	 * Select (and set) the WT_EXT structure's depth because we have to
 	 * know how deep the skiplist goes at the entry to allocate it.
