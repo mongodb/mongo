@@ -600,13 +600,12 @@ err:	/* On error, clear any left-over tree walk. */
 
 	if (btree->checkpointing) {
 		/*
-		 * Lock/unlock around clearing the checkpointing flag; it's not
-		 * required, but publishing the change ensures stalled eviction
-		 * gets moving as soon as possible.
+		 * Clear the checkpoint flag and push the change; not required,
+		 * but publishing the change means stalled eviction gets moving
+		 * as soon as possible.
 		 */
-		__wt_spin_lock(session, &cache->evict_lock);
 		btree->checkpointing = 0;
-		__wt_spin_unlock(session, &cache->evict_lock);
+		WT_FULL_BARRIER();
 
 		/*
 		 * Wake the eviction server, in case application threads have
