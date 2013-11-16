@@ -961,7 +961,7 @@ main(int argc, char *argv[])
 
 	conn = NULL;
 	parse_session = NULL;
-	checkpoint_created = stat_created = 0;
+	checkpoint_created = ret = stat_created = 0;
 	user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
