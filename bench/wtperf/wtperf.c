@@ -959,16 +959,16 @@ main(int argc, char *argv[])
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
-	/* Setup the default configuration values. */
-	memset(&cfg, 0, sizeof(cfg));
-	if (config_assign(&cfg, &default_cfg))
-		goto err;
-
 	conn = NULL;
 	parse_session = NULL;
 	checkpoint_created = stat_created = 0;
 	user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
+
+	/* Setup the default configuration values. */
+	memset(&cfg, 0, sizeof(cfg));
+	if (config_assign(&cfg, &default_cfg))
+		goto err;
 
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = getopt(argc, argv, opts)) != EOF)
