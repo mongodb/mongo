@@ -282,7 +282,7 @@ namespace mongo {
 
         try {
             // we don't want to kill a half formed IndexDetails, so be carefule
-            log() << "creating index with info @ " << loc;
+            LOG(1) << "creating index with info @ " << loc;
             getDur().writingDiskLoc( _indexDetails->info ) = loc;
         }
         catch ( DBException& e ) {

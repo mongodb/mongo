@@ -543,7 +543,7 @@ namespace mongo {
         }
         _extentManager.init( details );
         verify( _extentManager.hasFreeList() );
-        log() << "have free list for " << _extentFreelistName << endl;
+        LOG(1) << "have free list for " << _extentFreelistName << endl;
     }
 
     Collection* Database::createCollection( const StringData& ns, bool capped,
