@@ -548,30 +548,32 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	conn = S2C(session);
 	log = conn->log;
 	WT_CLEAR(buf);
-	/*
-	 * Check for correct usage.
-	 */
-	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
-		return (WT_ERROR);
+
 	/*
 	 * If the caller did not give us a callback function there is nothing
 	 * to do.
 	 */
 	if (func == NULL)
 		return (0);
-	/*
-	 * If the offset isn't on an allocation boundary it must be wrong.
-	 */
-	if (lsnp != NULL &&
-	    (lsnp->offset % log->allocsize != 0 || lsnp->file > log->fileid))
-		return (WT_NOTFOUND);
 
-	if (LF_ISSET(WT_LOGSCAN_FIRST))
-		start_lsn = log->first_lsn;
-	else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
-		start_lsn = log->ckpt_lsn;
-	else
+	if (lsnp == NULL) {
+		if (LF_ISSET(WT_LOGSCAN_FIRST))
+			start_lsn = log->first_lsn;
+		else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
+			start_lsn = log->ckpt_lsn;
+		else
+			return (WT_ERROR);	/* Illegal usage */
+	} else {
+		if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP))
+			return (WT_ERROR);	/* Illegal usage */
+
+		/* Offsets must be on allocation boundaries. */
+		if (lsnp->offset % log->allocsize != 0 ||
+		    lsnp->file > log->fileid)
+			return (WT_NOTFOUND);
+
 		start_lsn = *lsnp;
+	}
 	end_lsn = log->alloc_lsn;
 	log_fh = NULL;
 	WT_RET(__log_openfile(session, 0, &log_fh, start_lsn.file));
