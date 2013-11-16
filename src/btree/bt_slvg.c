@@ -1076,6 +1076,8 @@ __slvg_col_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
+	addr = NULL;
+
 	/* Allocate a column-store root (internal) page and fill it in. */
 	WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, &page));
 	page->parent = NULL;				/* Root page */
