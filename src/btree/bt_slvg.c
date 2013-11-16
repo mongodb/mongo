@@ -1628,10 +1628,9 @@ __slvg_row_trk_update_start(
 		qsort(ss->pages + slot, (size_t)i,
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
-	if (page != NULL)
+err:	if (page != NULL)
 		__wt_page_out(session, &page);
-
-err:	__wt_scr_free(&dsk);
+	__wt_scr_free(&dsk);
 	__wt_scr_free(&key);
 
 	return (ret);
