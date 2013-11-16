@@ -299,6 +299,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 		/* Now free the pool. */
 		__wt_free(session, cp->name);
+
+		__wt_spin_unlock(session, &cp->cache_pool_lock);
 		__wt_spin_destroy(session, &cp->cache_pool_lock);
 		WT_TRET(__wt_cond_destroy(session, &cp->cache_pool_cond));
 		__wt_free(session, cp);
