@@ -520,8 +520,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	Calculate whether LSM updates need to be throttled.
  */
 void
-__wt_lsm_tree_throttle(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
 	uint64_t cache_sz, cache_used, record_count;
@@ -577,7 +576,7 @@ __wt_lsm_tree_throttle(
 		 * There is nothing particularly special about the chosen
 		 * multipliers.
 		 */
-		cache_used = in_memory * lsm_tree->chunk_size * 2;
+		cache_used = (uint64_t)in_memory * lsm_tree->chunk_size * 2;
 		if (cache_used > cache_sz * 0.8)
 			lsm_tree->throttle_sleep *= 5;
 	}
