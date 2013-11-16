@@ -84,7 +84,7 @@ err:
 	if (ret == 0)
 		return (0);
 
-	if (dirlist != NULL && *dirlist != NULL) {
+	if (*dirlist != NULL) {
 		for (count = dirsz; count > 0; count--)
 			__wt_free(session, entries[count]);
 		__wt_free(session, entries);
