@@ -4107,6 +4107,8 @@ __rec_split_row(
 	uint32_t i, ksize;
 	void *p;
 
+	addr = NULL;
+
 	/* Allocate a split-merge page. */
 	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_ROW_INT));
 
@@ -4167,6 +4169,7 @@ __rec_split_row(
 		    bnd->key.data, bnd->key.size, &ref->key.ikey));
 		size += sizeof(WT_IKEY) + bnd->key.size;
 		ref->addr = addr;
+		addr = NULL;
 		ref->state = WT_REF_DISK;
 	}
 	__wt_cache_page_inmem_incr(
@@ -4175,7 +4178,9 @@ __rec_split_row(
 	*splitp = page;
 	return (0);
 
-err:	if (page != NULL)
+err:	if (addr != NULL)
+		__wt_free(session, addr);
+	if (page != NULL)
 		__wt_page_out(session, &page);
 	return (ret);
 }
