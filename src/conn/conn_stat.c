@@ -230,7 +230,7 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 	}
 
 err:	if (locked)
-		__wt_spin_lock(session, &S2C(session)->schema_lock);
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);
 	return (ret);
 }
 
