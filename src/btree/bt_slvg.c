@@ -1098,6 +1098,7 @@ __slvg_col_build_internal(
 
 		ref->page = NULL;
 		ref->addr = addr;
+		addr = NULL;
 		ref->key.recno = trk->col_start;
 		ref->state = WT_REF_DISK;
 
@@ -1120,7 +1121,9 @@ __slvg_col_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page);
+err:		if (addr != NULL)
+			__wt_free(session, addr);
+		__wt_page_out(session, &page);
 	}
 	return (ret);
 }
