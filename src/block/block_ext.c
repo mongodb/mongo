@@ -32,6 +32,7 @@ __block_ext_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXT **extp)
 		WT_RET(__wt_calloc(session, 1,
 		    sizeof(WT_EXT) + skipdepth * 2 * sizeof(WT_EXT *), extp));
 		(*extp)->depth = (uint8_t)skipdepth;
+		WT_STAT_FAST_CONN_INCR(session, block_locked_allocation);
 	} else {
 		--block->free_ext_cnt;
 
