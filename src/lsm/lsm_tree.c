@@ -790,6 +790,7 @@ __wt_lsm_tree_truncate(
 	int locked;
 
 	WT_UNUSED(cfg);
+	chunk = NULL;
 	locked = 0;
 
 	/* Get the LSM tree. */
@@ -820,12 +821,19 @@ __wt_lsm_tree_truncate(
 
 err:	if (locked) 
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
-	/*
-	 * Don't discard the LSM tree structure unless there has been an
-	 * error. The handle remains valid for future operations.
-	 */
-	if (ret != 0)
+	if (ret != 0) {
+		if (chunk != NULL) {
+			(void)__wt_schema_drop(session, chunk->uri, NULL);
+			__wt_free(session, chunk);
+		}
+		/*
+		 * Discard the LSM tree structure on error. This will force the
+		 * LSM tree to be re-opened the next time it is accessed and
+		 * the last good version of the metadata will be used.
+		 * Resulting in a valid (un-truncated) tree.
+		 */
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+	}
 	return (ret);
 }
 
