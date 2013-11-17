@@ -177,6 +177,7 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 			szp->next[i] = *sstack[i];
 			*sstack[i] = szp;
 		}
+		WT_STAT_FAST_CONN_INCR(session, block_locked_allocation);
 	}
 
 	/* Insert the new WT_EXT structure into the offset skiplist. */
