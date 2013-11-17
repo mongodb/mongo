@@ -55,15 +55,7 @@ namespace mongo {
     const bool UpdateLifecycleImpl::canContinue() const {
         // Collection needs to exist to continue
         Collection* coll = cc().database()->getCollection(_nsString.ns());
-        if (!coll)
-            return false;
-
-        // Shard version must be compatible to continue
-        const CollectionMetadataPtr metadata = getMetadata(_nsString);
-        const ChunkVersion shardVersion = metadata ?
-            metadata->getShardVersion() : ChunkVersion::IGNORED();
-        return (ChunkVersion::isIgnoredVersion(shardVersion) ||
-                _shardVersion.isWriteCompatibleWith(shardVersion));
+        return coll;
     }
 
     const void UpdateLifecycleImpl::getIndexKeys(IndexPathSet* returnedIndexPathSet) const {
