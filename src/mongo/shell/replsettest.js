@@ -484,7 +484,7 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
         return result['ok'] == 1;
     }, "Initiate replica set", timeout);
 
-    this.awaitSecondaryNodes();
+    this.awaitSecondaryNodes(timeout);
 
     // Setup authentication if running test with authentication
     if ((jsTestOptions().keyFile || jsTestOptions().useX509) && 
