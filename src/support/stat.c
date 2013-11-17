@@ -9,17 +9,18 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	memset(stats, 0, sizeof(*stats));
 
 	stats->allocation_size.desc =
-	    "block manager file allocation unit size";
-	stats->block_alloc.desc = "blocks allocated";
-	stats->block_checkpoint_size.desc = "checkpoint size";
+	    "block manager: file allocation unit size";
+	stats->block_alloc.desc = "block manager: blocks allocated";
+	stats->block_checkpoint_size.desc = "block manager: checkpoint size";
 	stats->block_extension.desc =
-	    "block allocations requiring file extension";
-	stats->block_free.desc = "blocks freed";
-	stats->block_magic.desc = "file magic number";
-	stats->block_major.desc = "file major version number";
-	stats->block_minor.desc = "minor version number";
-	stats->block_reuse_bytes.desc = "file bytes available for reuse";
-	stats->block_size.desc = "block manager file size in bytes";
+	    "block manager: allocations requiring file extension";
+	stats->block_free.desc = "block manager: blocks freed";
+	stats->block_magic.desc = "block manager: file magic number";
+	stats->block_major.desc = "block manager: file major version number";
+	stats->block_minor.desc = "block manager: minor version number";
+	stats->block_reuse_bytes.desc =
+	    "block manager: file bytes available for reuse";
+	stats->block_size.desc = "block manager: file size in bytes";
 	stats->bloom_count.desc = "bloom filters in the LSM tree";
 	stats->bloom_false_positive.desc = "bloom filter false positives";
 	stats->bloom_hit.desc = "bloom filter hits";
@@ -307,14 +308,15 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	/* Clear, so can also be called for reinitialization. */
 	memset(stats, 0, sizeof(*stats));
 
-	stats->block_byte_map_read.desc =
-	    "mapped bytes read by the block manager";
-	stats->block_byte_read.desc = "bytes read by the block manager";
-	stats->block_byte_write.desc = "bytes written by the block manager";
-	stats->block_map_read.desc = "mapped blocks read by the block manager";
-	stats->block_preload.desc = "blocks pre-loaded by the block manager";
-	stats->block_read.desc = "blocks read by the block manager";
-	stats->block_write.desc = "blocks written by the block manager";
+	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
+	stats->block_byte_read.desc = "block manager: bytes read";
+	stats->block_byte_write.desc = "block manager: bytes written";
+	stats->block_locked_allocation.desc =
+	    "block manager: memory allocations while locked";
+	stats->block_map_read.desc = "block manager: mapped blocks read";
+	stats->block_preload.desc = "block manager: blocks pre-loaded";
+	stats->block_read.desc = "block manager: blocks read";
+	stats->block_write.desc = "block manager: blocks written";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_bytes_inuse.desc = "cache: bytes currently in the cache";
@@ -415,6 +417,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
+	stats->block_locked_allocation.v = 0;
 	stats->block_map_read.v = 0;
 	stats->block_preload.v = 0;
 	stats->block_read.v = 0;

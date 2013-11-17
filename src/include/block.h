@@ -217,13 +217,6 @@ struct __wt_block {
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
 	int		ckpt_inprogress;/* Live checkpoint in progress */
 
-	/*
-	 * Array of free WT_EXTLIST structures, if we're doing lots of I/O,
-	 * a cache avoids an allocation/free while holding the spin lock.
-	 */
-	WT_EXT *free_ext;		/* List of free entries */
-	u_int	free_ext_cnt;		/* Limit the number we cache */
-
 				/* Salvage support */
 	off_t	slvg_off;		/* Salvage file offset */
 

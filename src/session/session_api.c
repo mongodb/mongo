@@ -96,8 +96,11 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
 
-	/* Free the reconciliation information. */
-	__wt_rec_destroy(session, &session->reconcile);
+	/* Cleanup */
+	if (session->block_manager_cleanup != NULL)
+		WT_TRET(session->block_manager_cleanup(session));
+	if (session->reconcile_cleanup != NULL)
+		WT_TRET(session->reconcile_cleanup(session));
 
 	/* Free the eviction exclusive-lock information. */
 	__wt_free(session, session->excl);
