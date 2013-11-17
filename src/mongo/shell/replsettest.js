@@ -1067,6 +1067,11 @@ ReplSetTest.prototype.bridge = function( opts ) {
         print("ReplSetTest bridge for node " + i + ":");
         printjson(updateMod);
         this.nodes[i].getDB("local").system.replset.update({},updateMod);
+	var err = this.nodes[i].getDB("local").getLastErrorObj();
+        if (err.err) {
+           print("Error updating replset config: " + tojson(err));
+           throw err;
+        }
     }
 
     this.stopSet( null, true, opts );
