@@ -829,8 +829,8 @@ err:	if (locked)
 		/*
 		 * Discard the LSM tree structure on error. This will force the
 		 * LSM tree to be re-opened the next time it is accessed and
-		 * the last good version of the metadata will be used.
-		 * Resulting in a valid (un-truncated) tree.
+		 * the last good version of the metadata will be used, resulting
+		 * in a valid (not truncated) tree.
 		 */
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
