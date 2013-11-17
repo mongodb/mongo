@@ -84,7 +84,7 @@ __wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp, u_int max)
 
 		/*
 		 * The count is advisory to minimize our exposure to bugs, but
-		 * don't let it go negative, that would lead to never cacheing
+		 * don't let it go negative, that would lead to never caching
 		 * a WT_EXT structure  again, we'd always believe there are too
 		 * many cached.
 		 */
