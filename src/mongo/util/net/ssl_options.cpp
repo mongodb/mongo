@@ -66,22 +66,28 @@ namespace mongo {
         options->addOptionChaining("ssl", "ssl", moe::Switch, "use SSL for all connections");
 
         options->addOptionChaining("ssl.CAFile", "sslCAFile", moe::String,
-                "Certificate Authority file for SSL");
+                "Certificate Authority file for SSL")
+                                  .requires("ssl");
 
         options->addOptionChaining("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
-                "PEM certificate/key file for SSL");
+                "PEM certificate/key file for SSL")
+                                  .requires("ssl");
 
         options->addOptionChaining("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
-                "password for key in PEM file for SSL");
+                "password for key in PEM file for SSL")
+                                  .requires("ssl");
 
         options->addOptionChaining("ssl.CRLFile", "sslCRLFile", moe::String,
-                "Certificate Revocation List file for SSL");
+                "Certificate Revocation List file for SSL")
+                                  .requires("ssl");
 
         options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
-                    moe::Switch, "allow connections to servers with invalid certificates");
- 
+                    moe::Switch, "allow connections to servers with invalid certificates")
+                                  .requires("ssl");
+
         options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
-                "activate FIPS 140-2 mode at startup");
+                "activate FIPS 140-2 mode at startup")
+                                  .requires("ssl");
 
         return Status::OK();
     }
