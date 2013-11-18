@@ -655,12 +655,13 @@ def run_tests(tests):
             tests_run = 0
             for tests_run, test in enumerate(tests):
                 test_result = { "start": time.time() }
+                (test_path, use_db) = test
 
-                if test[0].startswith(mongo_repo + os.path.sep):
-                    test_result["test_file"] = test[0][len(mongo_repo)+1:]
+                if test_path.startswith(mongo_repo + os.path.sep):
+                    test_result["test_file"] = test_path[len(mongo_repo)+1:]
                 else:
                     # user could specify a file not in repo. leave it alone.
-                    test_result["test_file"] = test[0]
+                    test_result["test_file"] = test_path
 
                 try:
                     fails.append(test)
@@ -673,9 +674,12 @@ def run_tests(tests):
                     test_result["status"] = "pass"
                     test_report["results"].append( test_result )
 
+                    if skipTest(test_path):
+                        test_result["status"] = "skip"
+
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
-                    elif test[1]: # reach inside test and see if "usedb" is true
+                    elif use_db: # reach inside test and see if "usedb" is true
                         if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
