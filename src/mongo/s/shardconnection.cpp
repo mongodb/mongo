@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    MONGO_EXPORT_SERVER_PARAMETER(ignoreInitialVersionFailure, bool, false);
+
     DBConnectionPool shardConnectionPool;
 
     class ClientConnections;
@@ -254,7 +256,14 @@ namespace mongo {
 
                     warning() << "problem while initially checking shard versions on"
                               << " " << shard.getName() << causedBy(e) << endl;
-                    throw;
+                    
+                    if ( !ignoreInitialVersionFailure ) {
+                        throw;
+                    }
+                    else {
+                        // We swallow the error here, checking shard version here is a heuristic to
+                        // prevent later stale config exceptions, not required for correctness.
+                    }
                 }
             }
         }
