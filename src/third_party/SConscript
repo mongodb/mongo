@@ -9,81 +9,81 @@ env.SConscript( [
 env.Append(CPPPATH='$BUILD_DIR/third_party/s2')
 
 if use_system_version_of_library("pcre"):
-    env.StaticLibrary( "shim_pcrecpp", ['shim_pcrecpp.cc'],
-                       SYSLIBDEPS=[
-                           env['LIBDEPS_PCRE_SYSLIBDEP'],
-                           env['LIBDEPS_PCRECPP_SYSLIBDEP']
-                       ] )
+    env.Library( "shim_pcrecpp", ['shim_pcrecpp.cc'],
+                 SYSLIBDEPS=[
+                     env['LIBDEPS_PCRE_SYSLIBDEP'],
+                     env['LIBDEPS_PCRECPP_SYSLIBDEP']
+                 ] )
 else:
     env.SConscript('pcre-${PCRE_VERSION}/SConscript')
-    env.StaticLibrary( "shim_pcrecpp", ['shim_pcrecpp.cc'],
-                       LIBDEPS=[ 'pcre-${PCRE_VERSION}/pcrecpp' ] )
+    env.Library( "shim_pcrecpp", ['shim_pcrecpp.cc'],
+                 LIBDEPS=[ 'pcre-${PCRE_VERSION}/pcrecpp' ] )
 
 if use_system_version_of_library("boost"):
-    env.StaticLibrary("shim_boost", ['shim_boost.cpp'],
-                      SYSLIBDEPS=[
-                          env['LIBDEPS_BOOST_PROGRAM_OPTIONS_SYSLIBDEP'],
-                          env['LIBDEPS_BOOST_FILESYSTEM_SYSLIBDEP'],
-                          env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
-                          env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP']
-                      ] )
+    env.Library("shim_boost", ['shim_boost.cpp'],
+                SYSLIBDEPS=[
+                    env['LIBDEPS_BOOST_PROGRAM_OPTIONS_SYSLIBDEP'],
+                    env['LIBDEPS_BOOST_FILESYSTEM_SYSLIBDEP'],
+                    env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
+                    env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP']
+                ] )
 else:
     env.SConscript('boost/SConscript')
-    env.StaticLibrary( "shim_boost", ['shim_boost.cpp'],
-                       LIBDEPS=[ 'boost/boost_program_options',
-                                 'boost/boost_filesystem',
-                                 'boost/boost_thread',
-                                 'boost/boost_system',
-                                 ] )
+    env.Library( "shim_boost", ['shim_boost.cpp'],
+                 LIBDEPS=[ 'boost/boost_program_options',
+                           'boost/boost_filesystem',
+                           'boost/boost_thread',
+                           'boost/boost_system',
+                           ] )
 
 if use_system_version_of_library("snappy"):
-    env.StaticLibrary("shim_snappy", ['shim_snappy.cpp'],
-                      SYSLIBDEPS=[
-                          env['LIBDEPS_SNAPPY_SYSLIBDEP']
-                      ] )
+    env.Library("shim_snappy", ['shim_snappy.cpp'],
+                SYSLIBDEPS=[
+                    env['LIBDEPS_SNAPPY_SYSLIBDEP']
+                ] )
 else:
     env.Append(CPPPATH='$BUILD_DIR/third_party/snappy')
     env.SConscript('snappy/SConscript')
-    env.StaticLibrary('shim_snappy', ['shim_snappy.cpp'], LIBDEPS=['snappy/snappy'])
+    env.Library('shim_snappy', ['shim_snappy.cpp'], LIBDEPS=['snappy/snappy'])
 
 if usev8:
     if use_system_version_of_library("v8"):
-        env.StaticLibrary("shim_v8", ['shim_v8.cpp'], SYSLIBDEPS=[
+        env.Library("shim_v8", ['shim_v8.cpp'], SYSLIBDEPS=[
             env['LIBDEPS_V8_SYSLIBDEP'] ])
     else:
         env.Append(CPPPATH='$BUILD_DIR/third_party/v8/include')
         env.SConscript('v8/SConscript')
-        env.StaticLibrary('shim_v8', ['shim_v8.cpp'], LIBDEPS=['v8/v8'])
+        env.Library('shim_v8', ['shim_v8.cpp'], LIBDEPS=['v8/v8'])
 
 if (GetOption("allocator") != "tcmalloc"):
-    env.StaticLibrary("shim_allocator", "shim_allocator.cpp")
+    env.Library("shim_allocator", "shim_allocator.cpp")
 elif use_system_version_of_library("tcmalloc"):
-    env.StaticLibrary("shim_allocator", "shim_allocator.cpp",
-                      SYSLIBDEPS=[
-                          env['LIBDEPS_TCMALLOC_SYSLIBDEP']
-                      ] )
+    env.Library("shim_allocator", "shim_allocator.cpp",
+                SYSLIBDEPS=[
+                    env['LIBDEPS_TCMALLOC_SYSLIBDEP']
+                ] )
 else:
     env.SConscript('gperftools-2.0/SConscript')
-    env.StaticLibrary('shim_allocator', 'shim_allocator.cpp',
+    env.Library('shim_allocator', 'shim_allocator.cpp',
                       LIBDEPS=['gperftools-2.0/tcmalloc_minimal'])
 
 if use_system_version_of_library("stemmer"):
-    env.StaticLibrary("shim_stemmer", ['shim_stemmer.cpp'],
-                      SYSLIBDEPS=[
-                        env['LIBDEPS_STEMMER_SYSLIBDEP']
-                      ] )
+    env.Library("shim_stemmer", ['shim_stemmer.cpp'],
+                SYSLIBDEPS=[
+                  env['LIBDEPS_STEMMER_SYSLIBDEP']
+                ] )
 else:
     env.SConscript('libstemmer_c/SConscript')
-    env.StaticLibrary("shim_stemmer", ['shim_stemmer.cpp'],
-                      LIBDEPS=['libstemmer_c/stemmer'])
+    env.Library("shim_stemmer", ['shim_stemmer.cpp'],
+                LIBDEPS=['libstemmer_c/stemmer'])
 
 if use_system_version_of_library("yaml"):
-    env.StaticLibrary("shim_yaml", ['shim_yaml.cpp'],
-                      SYSLIBDEPS=[
-                        env['LIBDEPS_YAML_SYSLIBDEP']
-                      ] )
+    env.Library("shim_yaml", ['shim_yaml.cpp'],
+                SYSLIBDEPS=[
+                  env['LIBDEPS_YAML_SYSLIBDEP']
+                ] )
 else:
     env.Append(CPPPATH='$BUILD_DIR/third_party/yaml-cpp-0.5.1/include')
     env.SConscript('yaml-cpp-0.5.1/SConscript')
-    env.StaticLibrary("shim_yaml", ['shim_yaml.cpp'],
-                      LIBDEPS=['yaml-cpp-0.5.1/yaml'])
+    env.Library("shim_yaml", ['shim_yaml.cpp'],
+                LIBDEPS=['yaml-cpp-0.5.1/yaml'])

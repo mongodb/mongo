@@ -6,7 +6,7 @@ env = env.Clone()
 
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 
-env.StaticLibrary(
+env.Library(
     "base",
     [ 
 	"int128.cc",

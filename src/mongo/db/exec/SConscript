@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.StaticLibrary(
+env.Library(
     target = "working_set",
     source = [
         "working_set.cpp",
@@ -22,7 +22,7 @@ env.CppUnitTest(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target = "mock_stage",
     source = [
         "mock_stage.cpp",
@@ -32,7 +32,7 @@ env.StaticLibrary(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target = 'exec',
     source = [
         "2d.cpp",

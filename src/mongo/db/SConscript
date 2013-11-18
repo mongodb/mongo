@@ -8,7 +8,7 @@ Import("env")
 # get resolved.
 #
 
-env.StaticLibrary(
+env.Library(
     target= 'common',
     source= [
         'field_ref.cpp',

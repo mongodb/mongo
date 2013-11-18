@@ -6,22 +6,22 @@ Import("env")
 # Schema and backward compatibility code for "config" collections.
 #
 
-env.StaticLibrary('base', ['mongo_version_range.cpp',
-                           'range_arithmetic.cpp',
-                           'shard_key_pattern.cpp',
-                           'type_changelog.cpp',
-                           'type_chunk.cpp',
-                           'type_collection.cpp',
-                           'type_database.cpp',
-                           'type_locks.cpp',
-                           'type_lockpings.cpp',
-                           'type_settings.cpp',
-                           'type_shard.cpp',
-                           'type_config_version.cpp',
-                           'type_mongos.cpp',
-                           'type_tags.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/base/base',
-                           '$BUILD_DIR/mongo/bson'])
+env.Library('base', ['mongo_version_range.cpp',
+                     'range_arithmetic.cpp',
+                     'shard_key_pattern.cpp',
+                     'type_changelog.cpp',
+                     'type_chunk.cpp',
+                     'type_collection.cpp',
+                     'type_database.cpp',
+                     'type_locks.cpp',
+                     'type_lockpings.cpp',
+                     'type_settings.cpp',
+                     'type_shard.cpp',
+                     'type_config_version.cpp',
+                     'type_mongos.cpp',
+                     'type_tags.cpp'],
+            LIBDEPS=['$BUILD_DIR/mongo/base/base',
+                     '$BUILD_DIR/mongo/bson'])
 
 env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp',
                 LIBDEPS=['base',
@@ -100,13 +100,13 @@ env.Library('upgrade', ['cluster_client_internal.cpp',
 # Support for maintaining persistent sharding state and data.
 #
 
-env.StaticLibrary('metadata', ['collection_metadata.cpp',
-                               'metadata_loader.cpp'],
-                  LIBDEPS=['base',
-                           '$BUILD_DIR/mongo/bson',
-                           '$BUILD_DIR/mongo/base/base',
-                           '$BUILD_DIR/mongo/clientdriver',
-                          ])
+env.Library('metadata', ['collection_metadata.cpp',
+                         'metadata_loader.cpp'],
+            LIBDEPS=['base',
+                     '$BUILD_DIR/mongo/bson',
+                     '$BUILD_DIR/mongo/base/base',
+                     '$BUILD_DIR/mongo/clientdriver',
+                    ])
 
 env.CppUnitTest('chunk_diff_test',
                 'chunk_diff_test.cpp',
@@ -131,7 +131,7 @@ env.CppUnitTest('metadata_loader_test',
 
 # Types for write operations
 # TODO: Push upward into shared types library between mongos/mongod
-env.StaticLibrary(
+env.Library(
     target='batch_write_types',
     source=[
         'write_ops/batched_command_request.cpp',
@@ -195,7 +195,7 @@ env.CppUnitTest(
 )
 
 # Cluster write op state and execution
-env.StaticLibrary(
+env.Library(
     target='cluster_write_ops',
     source=[
         'write_ops/write_op.cpp',
@@ -260,7 +260,7 @@ env.CppUnitTest(
 )
 
 # Upconvert/Downconvert write functionality for mongos
-env.StaticLibrary(
+env.Library(
     target='cluster_write_op_conversion',
     source=[
         'write_ops/batch_upconvert.cpp',
@@ -300,7 +300,7 @@ env.CppUnitTest(
 )
 
 # Implementations of components to perform cluster operations in mongos
-env.StaticLibrary(
+env.Library(
     target='cluster_op_impl',
     source=[
         'chunk_manager_targeter.cpp',

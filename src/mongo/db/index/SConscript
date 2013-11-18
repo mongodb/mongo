@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.StaticLibrary(
+env.Library(
         target='key_generator',
         source=[
             'btree_key_generator.cpp',

@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.StaticLibrary('boost_system', ['libs/system/src/error_code.cpp'])
+env.Library('boost_system', ['libs/system/src/error_code.cpp'])
 
 boost_thread_source = dict(
     posix=['libs/thread/src/pthread/once.cpp',
@@ -14,9 +14,9 @@ boost_thread_source = dict(
 
 threadlib_env = env.Clone()
 threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'])
-threadlib_env.StaticLibrary('boost_thread', boost_thread_source)
+threadlib_env.Library('boost_thread', boost_thread_source)
 
-env.StaticLibrary('boost_filesystem', [
+env.Library('boost_filesystem', [
         'libs/filesystem/v2/src/v2_operations.cpp',
         'libs/filesystem/v2/src/v2_path.cpp',
         'libs/filesystem/v2/src/v2_portability.cpp',
@@ -30,7 +30,7 @@ env.StaticLibrary('boost_filesystem', [
         'libs/filesystem/v3/src/windows_file_codecvt.cpp',
         ])
 
-env.StaticLibrary('boost_program_options', [
+env.Library('boost_program_options', [
         'libs/program_options/src/cmdline.cpp',
         'libs/program_options/src/config_file.cpp',
         'libs/program_options/src/convert.cpp',

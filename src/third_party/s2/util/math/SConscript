@@ -11,7 +11,7 @@ if solaris:
     # Enables declaration of isinf() on Solaris
     env.Append(CPPDEFINES=['__C99FEATURES__'])
 
-env.StaticLibrary("math",
-                [ "mathutil.cc",
-                 # "mathlimits.cc",
-                ])
+env.Library("math",
+          [ "mathutil.cc",
+           # "mathlimits.cc",
+          ])

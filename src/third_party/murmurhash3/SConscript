@@ -1,2 +1,2 @@
 Import("env")
-env.StaticLibrary("murmurhash3", ["MurmurHash3.cpp"])
+env.Library("murmurhash3", ["MurmurHash3.cpp"])

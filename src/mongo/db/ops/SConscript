@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.StaticLibrary(
+env.Library(
     target='update_common',
     source=[
         'field_checker.cpp',
@@ -48,7 +48,7 @@ env.CppUnitTest(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target='update',
     source=[
         'modifier_add_to_set.cpp',
@@ -196,7 +196,7 @@ env.CppUnitTest(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target='update_driver',
     source=[
         'modifier_table.cpp',

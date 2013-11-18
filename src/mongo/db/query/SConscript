@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.StaticLibrary(
+env.Library(
     target='query_planner',
     source=[
         "canonical_query.cpp",
@@ -25,7 +25,7 @@ env.StaticLibrary(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target='query',
     source=[
         "cached_plan_runner.cpp",
@@ -46,7 +46,7 @@ env.StaticLibrary(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target="index_bounds",
     source=[
         "index_bounds.cpp",
@@ -57,7 +57,7 @@ env.StaticLibrary(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target="lite_parsed_query",
     source=[
         "lite_parsed_query.cpp"
