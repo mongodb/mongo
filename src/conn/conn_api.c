@@ -1027,6 +1027,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	*wt_connp = NULL;
 
+	conn = NULL;
 	session = NULL;
 
 	WT_RET(__wt_library_init());

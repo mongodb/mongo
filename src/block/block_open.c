@@ -83,8 +83,6 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	__wt_spin_destroy(session, &block->live_lock);
 
-	__wt_block_ext_cleanup(session, block);
-
 	__wt_overwrite_and_free(session, block);
 
 	return (ret);

@@ -97,11 +97,14 @@ struct __wt_session_impl {
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
 
-	void	*reconcile;		/* Reconciliation information */
-
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
+
+	void	*block_manager;		/* Block-manager support */
+	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
+	void	*reconcile;		/* Reconciliation support */
+	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
 	int compaction;			/* Compaction did some work */
 

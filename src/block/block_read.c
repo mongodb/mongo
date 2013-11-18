@@ -80,15 +80,17 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		__wt_buf_free(session, buf);
 
 	/*
-	 * If we're going to be able to return mapped memory and the buffer
-	 * has allocated memory, discard it.
+	 * Map the block if it's possible.
 	 */
 	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
-	if (buf->mem != NULL && mapped)
-		__wt_buf_free(session, buf);
-
-	/* Map the block if it's possible. */
 	if (mapped) {
+		/*
+		 * If we're going to be able to return mapped memory and the
+		 * buffer has allocated memory, discard it.
+		 */
+		if (buf->mem != NULL)
+			__wt_buf_free(session, buf);
+
 		buf->mem = (uint8_t *)bm->map + offset;
 		buf->memsize = size;
 		buf->data = buf->mem;

@@ -315,7 +315,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 
-	WT_RET(__lsm_tree_set_name(session, lsm_tree, uri));
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 
 	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
@@ -405,17 +405,16 @@ static int
 __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_CONFIG_ITEM cval;
-	uint64_t required;
-	uint32_t maxleafpage;
+	uint64_t maxleafpage, required;
 	const char *cfg[] = { WT_CONFIG_BASE(
 	    session, session_create), lsm_tree->file_config, NULL };
 
 	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
-	maxleafpage = (uint32_t)cval.val;
+	maxleafpage = (uint64_t)cval.val;
 
 	/* Three chunks, plus one page for each participant in a merge. */
 	required = 3 * lsm_tree->chunk_size +
-	    lsm_tree->merge_threads * (lsm_tree->merge_max *  maxleafpage);
+	    lsm_tree->merge_threads * (lsm_tree->merge_max * maxleafpage);
 	if (S2C(session)->cache_size < required)
 		WT_RET_MSG(session, EINVAL,
 		    "The LSM configuration requires a cache size of at least %"
@@ -521,8 +520,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	Calculate whether LSM updates need to be throttled.
  */
 void
-__wt_lsm_tree_throttle(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
 	uint64_t cache_sz, cache_used, record_count;
@@ -578,7 +576,7 @@ __wt_lsm_tree_throttle(
 		 * There is nothing particularly special about the chosen
 		 * multipliers.
 		 */
-		cache_used = in_memory * lsm_tree->chunk_size * 2;
+		cache_used = (uint64_t)in_memory * lsm_tree->chunk_size * 2;
 		if (cache_used > cache_sz * 0.8)
 			lsm_tree->throttle_sleep *= 5;
 	}
@@ -792,6 +790,7 @@ __wt_lsm_tree_truncate(
 	int locked;
 
 	WT_UNUSED(cfg);
+	chunk = NULL;
 	locked = 0;
 
 	/* Get the LSM tree. */
@@ -822,12 +821,19 @@ __wt_lsm_tree_truncate(
 
 err:	if (locked) 
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
-	/*
-	 * Don't discard the LSM tree structure unless there has been an
-	 * error. The handle remains valid for future operations.
-	 */
-	if (ret != 0)
+	if (ret != 0) {
+		if (chunk != NULL) {
+			(void)__wt_schema_drop(session, chunk->uri, NULL);
+			__wt_free(session, chunk);
+		}
+		/*
+		 * Discard the LSM tree structure on error. This will force the
+		 * LSM tree to be re-opened the next time it is accessed and
+		 * the last good version of the metadata will be used, resulting
+		 * in a valid (not truncated) tree.
+		 */
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+	}
 	return (ret);
 }
 

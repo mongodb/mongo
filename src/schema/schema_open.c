@@ -46,10 +46,12 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	if (table->cg_complete)
 		return (0);
 
-	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	colgroup = NULL;
+	cgconfig = NULL;
 
-	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+
+	WT_ERR(__wt_config_subinit(session, &cparser, &table->cgconf));
 
 	/* Open each column group. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -81,6 +83,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_ERR(__wt_calloc_def(session, 1, &colgroup));
 		colgroup->name = __wt_buf_steal(session, buf, NULL);
 		colgroup->config = cgconfig;
+		cgconfig = NULL;
 		WT_ERR(__wt_config_getones(session,
 		    colgroup->config, "columns", &colgroup->colconf));
 		WT_ERR(__wt_config_getones(
@@ -105,6 +108,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 err:	__wt_scr_free(&buf);
 	if (colgroup != NULL)
 		__wt_schema_destroy_colgroup(session, colgroup);
+	if (cgconfig != NULL)
+		__wt_free(session, cgconfig);
 	return (ret);
 }
 

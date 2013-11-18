@@ -78,7 +78,7 @@ __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session)
 
 /*
  * __bm_checkpoint_load --
- *	Load a checkpoint point.
+ *	Load a checkpoint.
  */
 static int
 __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,

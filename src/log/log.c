@@ -714,17 +714,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	log = conn->log;
 	logfiles = NULL;
 	WT_CLEAR(buf);
-	/*
-	 * Check for correct usage.
-	 */
-	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
-		WT_RET_MSG(session, WT_ERROR,
-		    "choose either a start LSN or a start flag");
 
-	if (LF_ISSET(WT_LOGSCAN_RECOVER))
-		WT_VERBOSE_RET(session, log,
-		    "__wt_log_scan truncating to %u/%" PRIuMAX,
-		    log->trunc_lsn.file, (uintmax_t)log->trunc_lsn.offset);
 	/*
 	 * If the caller did not give us a callback function there is nothing
 	 * to do.
@@ -732,7 +722,34 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	if (func == NULL)
 		return (0);
 
-	if (log == NULL) {
+	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+		WT_VERBOSE_RET(session, log,
+		    "__wt_log_scan truncating to %u/%" PRIuMAX,
+		    log->trunc_lsn.file, (uintmax_t)log->trunc_lsn.offset);
+
+	if (log != NULL) {
+		allocsize = log->allocsize;
+
+		if (lsnp == NULL) {
+			if (LF_ISSET(WT_LOGSCAN_FIRST))
+				start_lsn = log->first_lsn;
+			else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
+				start_lsn = log->ckpt_lsn;
+			else
+				return (WT_ERROR);	/* Illegal usage */
+		} else {
+			if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP))
+				WT_RET_MSG(session, WT_ERROR,
+			    "choose either a start LSN or a start flag");
+
+			/* Offsets must be on allocation boundaries. */
+			if (lsnp->offset % allocsize != 0 ||
+			    lsnp->file > log->fileid)
+				return (WT_NOTFOUND);
+
+			start_lsn = *lsnp;
+		}
+	} else {
 		/*
 		 * If logging is not configured, we can still print out the log
 		 * if log files exist.  We just need to set the LSNs from what
@@ -763,24 +780,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		start_lsn.offset = end_lsn.offset = 0;
 		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
-	} else {
-		/*
-		 * If the offset isn't on an allocation boundary
-		 * it must be wrong.
-		 */
-		allocsize = log->allocsize;
-		if (lsnp != NULL &&
-		    (lsnp->offset % allocsize != 0 || lsnp->file > log->fileid))
-			return (WT_NOTFOUND);
-
-		if (LF_ISSET(WT_LOGSCAN_FIRST))
-			start_lsn = log->first_lsn;
-		else if (LF_ISSET(WT_LOGSCAN_FROM_CKP))
-			start_lsn = log->ckpt_lsn;
-		else
-			start_lsn = *lsnp;
-		end_lsn = log->alloc_lsn;
 	}
+	end_lsn = log->alloc_lsn;
 	log_fh = NULL;
 	WT_ERR(__log_openfile(session, 0, &log_fh, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));

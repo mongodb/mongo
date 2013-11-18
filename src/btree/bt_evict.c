@@ -122,19 +122,23 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	uint64_t bytes_inuse, bytes_max;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = conn->cache_size;
 
-	WT_VERBOSE_RET(session, evictserver,
-	    "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB)",
-	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    bytes_inuse / WT_MEGABYTE,
-	    bytes_inuse <= bytes_max ? "<=" : ">",
-	    bytes_max / WT_MEGABYTE);
+	if (WT_VERBOSE_ISSET(session, evictserver)) {
+		uint64_t bytes_inuse, bytes_max;
+
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		bytes_max = conn->cache_size;
+		WT_RET(__wt_verbose(session,
+		    "waking, bytes inuse %s max (%" PRIu64
+		    "MB %s %" PRIu64 "MB)",
+		    bytes_inuse <= bytes_max ? "<=" : ">",
+		    bytes_inuse / WT_MEGABYTE,
+		    bytes_inuse <= bytes_max ? "<=" : ">",
+		    bytes_max / WT_MEGABYTE));
+	}
 
 	return (__wt_cond_signal(session, cache->evict_cond));
 }
@@ -596,7 +600,13 @@ err:	/* On error, clear any left-over tree walk. */
 		__wt_evict_clear_tree_walk(session, page);
 
 	if (btree->checkpointing) {
+		/*
+		 * Clear the checkpoint flag and push the change; not required,
+		 * but publishing the change means stalled eviction gets moving
+		 * as soon as possible.
+		 */
 		btree->checkpointing = 0;
+		WT_FULL_BARRIER();
 
 		/*
 		 * Wake the eviction server, in case application threads have

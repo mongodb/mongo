@@ -211,6 +211,7 @@ struct __wt_connection_stats {
 	WT_STATS block_byte_map_read;
 	WT_STATS block_byte_read;
 	WT_STATS block_byte_write;
+	WT_STATS block_locked_allocation;
 	WT_STATS block_map_read;
 	WT_STATS block_preload;
 	WT_STATS block_read;

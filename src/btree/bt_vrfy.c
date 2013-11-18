@@ -135,16 +135,14 @@ err:	/* Inform the underlying block manager we're done. */
 	if (ckptbase != NULL)
 		__wt_meta_ckptlist_free(session, ckptbase);
 
-	if (vs != NULL) {
-		/* Wrap up reporting. */
-		WT_TRET(__wt_progress(session, NULL, vs->fcnt));
+	/* Wrap up reporting. */
+	WT_TRET(__wt_progress(session, NULL, vs->fcnt));
 
-		/* Free allocated memory. */
-		__wt_scr_free(&vs->max_key);
-		__wt_scr_free(&vs->max_addr);
-		__wt_scr_free(&vs->tmp1);
-		__wt_scr_free(&vs->tmp2);
-	}
+	/* Free allocated memory. */
+	__wt_scr_free(&vs->max_key);
+	__wt_scr_free(&vs->max_addr);
+	__wt_scr_free(&vs->tmp1);
+	__wt_scr_free(&vs->tmp2);
 
 	return (ret);
 }

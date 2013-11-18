@@ -230,7 +230,6 @@ int
 __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_DECL_RET;
-	WT_LOG *log;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
@@ -244,8 +243,8 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 		conn->arch_tid_set = 0;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->arch_cond));
-	if ((log = conn->log) != NULL)
-		WT_TRET(__wt_log_close(session));
+
+	WT_TRET(__wt_log_close(session));
 
 	__wt_free(session, conn->log_path);
 
@@ -255,10 +254,11 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		conn->arch_session = NULL;
 	}
+
 	WT_TRET(__wt_log_slot_destroy(session));
-	WT_TRET(__wt_cond_destroy(session, &log->log_release_cond));
-	__wt_spin_destroy(session, &log->log_lock);
-	__wt_spin_destroy(session, &log->log_slot_lock);
+	WT_TRET(__wt_cond_destroy(session, &conn->log->log_release_cond));
+	__wt_spin_destroy(session, &conn->log->log_lock);
+	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_free(session, conn->log);
 
 	return (ret);

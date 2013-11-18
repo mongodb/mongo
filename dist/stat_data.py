@@ -43,13 +43,15 @@ connection_stats = [
 	##########################################
 	# Block manager statistics
 	##########################################
-	Stat('block_byte_map_read', 'mapped bytes read by the block manager'),
-	Stat('block_byte_read', 'bytes read by the block manager'),
-	Stat('block_byte_write', 'bytes written by the block manager'),
-	Stat('block_map_read', 'mapped blocks read by the block manager'),
-	Stat('block_preload', 'blocks pre-loaded by the block manager'),
-	Stat('block_read', 'blocks read by the block manager'),
-	Stat('block_write', 'blocks written by the block manager'),
+	Stat('block_byte_map_read', 'block manager: mapped bytes read'),
+	Stat('block_byte_read', 'block manager: bytes read'),
+	Stat('block_byte_write', 'block manager: bytes written'),
+	Stat('block_locked_allocation',
+	    'block manager: memory allocations while locked'),
+	Stat('block_map_read', 'block manager: mapped blocks read'),
+	Stat('block_preload', 'block manager: blocks pre-loaded'),
+	Stat('block_read', 'block manager: blocks read'),
+	Stat('block_write', 'block manager: blocks written'),
 
 	##########################################
 	# Cache and eviction statistics
@@ -256,18 +258,23 @@ dsrc_stats = [
 	##########################################
 	# Block manager statistics
 	##########################################
-	Stat('block_alloc', 'blocks allocated'),
+	Stat('block_alloc', 'block manager: blocks allocated'),
 	Stat('allocation_size',
-	    'block manager file allocation unit size', 'no_aggregate,no_scale'),
-	Stat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
-	Stat('block_extension', 'block allocations requiring file extension'),
-	Stat('block_free', 'blocks freed'),
-	Stat('block_magic', 'file magic number', 'no_aggregate,no_scale'),
-	Stat('block_major',
-	    'file major version number', 'no_aggregate,no_scale'),
-	Stat('block_minor', 'minor version number', 'no_aggregate,no_scale'),
-	Stat('block_reuse_bytes', 'file bytes available for reuse'),
-	Stat('block_size', 'block manager file size in bytes', 'no_scale'),
+	    'block manager: file allocation unit size', 'no_aggregate,no_scale'),
+	Stat('block_checkpoint_size',
+	    'block manager: checkpoint size', 'no_scale'),
+	Stat('block_extension',
+	    'block manager: allocations requiring file extension'),
+	Stat('block_free', 'block manager: blocks freed'),
+	Stat('block_magic',
+	    'block manager: file magic number', 'no_aggregate,no_scale'),
+	Stat('block_major', 'block manager: file major version number',
+	    'no_aggregate,no_scale'),
+	Stat('block_minor',
+	    'block manager: minor version number', 'no_aggregate,no_scale'),
+	Stat('block_reuse_bytes',
+	    'block manager: file bytes available for reuse'),
+	Stat('block_size', 'block manager: file size in bytes', 'no_scale'),
 
 	##########################################
 	# Cache and eviction statistics

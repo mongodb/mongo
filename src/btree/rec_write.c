@@ -249,6 +249,7 @@ static int  __rec_col_var(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *, WT_RECONCILE *,
 		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
+static int  __rec_destroy_session(WT_SESSION_IMPL *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
@@ -448,7 +449,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
  */
 static int
 __rec_write_init(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, void *retp)
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, void *reconcilep)
 {
 	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
@@ -457,10 +458,11 @@ __rec_write_init(
 
 	btree = S2BT(session);
 
-	/* Allocate a reconciliation structure if we don't already have one. */
-	if ((r = *(WT_RECONCILE **)retp) == NULL) {
+	if ((r = *(WT_RECONCILE **)reconcilep) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
-		*(WT_RECONCILE **)retp = r;
+
+		*(WT_RECONCILE **)reconcilep = r;
+		session->reconcile_cleanup = __rec_destroy_session;
 
 		/* Connect prefix compression pointers/buffers. */
 		r->cur = &r->_cur;
@@ -569,15 +571,16 @@ __rec_write_init(
  * __wt_rec_destroy --
  *	Clean up the reconciliation structure.
  */
-void
-__wt_rec_destroy(WT_SESSION_IMPL *session, void *retp)
+static void
+__rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 {
 	WT_BOUNDARY *bnd;
 	WT_RECONCILE *r;
 	uint32_t i;
 
-	if ((r = *(WT_RECONCILE **)retp) == NULL)
+	if ((r = *(WT_RECONCILE **)reconcilep) == NULL)
 		return;
+	*(WT_RECONCILE **)reconcilep = NULL;
 
 	__wt_buf_free(session, &r->dsk);
 
@@ -601,7 +604,17 @@ __wt_rec_destroy(WT_SESSION_IMPL *session, void *retp)
 	__rec_dictionary_free(session, r);
 
 	__wt_free(session, r);
-	*(WT_RECONCILE **)retp = NULL;
+}
+
+/*
+ * __rec_destroy_session --
+ *	Clean up the reconciliation structure, session version.
+ */
+static int
+__rec_destroy_session(WT_SESSION_IMPL *session)
+{
+	__rec_destroy(session, &session->reconcile);
+	return (0);
 }
 
 /*
@@ -2053,7 +2066,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_RET(__wt_page_modify_init(session, page->parent));
 	__wt_page_modify_set(session, page->parent);
 
-	__wt_rec_destroy(session, &cbulk->reconcile);
+	__rec_destroy(session, &cbulk->reconcile);
 
 	return (0);
 }
@@ -4111,6 +4124,8 @@ __rec_split_row(
 	uint32_t i, ksize;
 	void *p;
 
+	addr = NULL;
+
 	/* Allocate a split-merge page. */
 	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_ROW_INT));
 
@@ -4171,6 +4186,7 @@ __rec_split_row(
 		    bnd->key.data, bnd->key.size, &ref->key.ikey));
 		size += sizeof(WT_IKEY) + bnd->key.size;
 		ref->addr = addr;
+		addr = NULL;
 		ref->state = WT_REF_DISK;
 	}
 	__wt_cache_page_inmem_incr(
@@ -4179,7 +4195,9 @@ __rec_split_row(
 	*splitp = page;
 	return (0);
 
-err:	if (page != NULL)
+err:	if (addr != NULL)
+		__wt_free(session, addr);
+	if (page != NULL)
 		__wt_page_out(session, &page);
 	return (ret);
 }
