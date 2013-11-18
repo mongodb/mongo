@@ -34,41 +34,251 @@ import com.wiredtiger.db.wiredtiger;
 
 import static org.junit.Assert.assertEquals;
 
+import org.junit.After;
 import org.junit.Test;
 import org.junit.Assert;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 public class AutoCloseTest {
-    Connection conn;
 
-    @Test
-    public void autoClose01()
-    throws WiredTigerPackingException {
+    /*
+     * Connvalid tells us that we really closed the connection.
+     * That allows teardown to reliably clean up so that
+     * a single failure in one test does not cascade.
+     */
+    Connection conn;
+    boolean connvalid = false;
+
+    private Session sessionSetup() {
         String keyFormat = "S";
         String valueFormat = "u";
 
         conn = wiredtiger.open("WT_HOME", "create");
+        connvalid = true;
         Session s = conn.open_session(null);
         s.create("table:t",
                  "key_format=" + keyFormat + ",value_format=" + valueFormat);
+        return s;
+    }
+
+    private Cursor populate(Session s)
+    throws WiredTigerPackingException {
         Cursor c = s.open_cursor("table:t", null, null);
         c.putKeyString("bar");
         c.putValueByteArray("foo".getBytes());
         c.insert();
-	/* Close the session. */
-        s.close("");
-
-	/* Now do something with the handle that was closed. */
-	c.close();
-
-	/* Clean up after ourselves */
-        s.drop("table:t", "");
-        s.close("");
-        conn.close("");
+        return c;
     }
 
-    private void teardown() {
+    @Test
+    public void autoCloseCursor01()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        c.close();
+
+        boolean caught = false;
+        try {
+            // Error: cursor used after close
+            c.next();
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("cursor is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+
+        s.close("");
+        conn.close("");
+        connvalid = false;
+    }
+
+    @Test
+    public void autoCloseCursor02()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        s.close("");
+
+        boolean caught = false;
+        try {
+            // Error: cursor used after session closed
+            c.next();
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("cursor is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+
+        conn.close("");
+        connvalid = false;
+    }
+
+    @Test
+    public void autoCloseCursor03()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        conn.close("");
+        connvalid = false;
+
+        boolean caught = false;
+        try {
+            // Error: cursor used after connection close
+            c.close();
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("cursor is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+    }
+
+    @Test
+    public void autoCloseCursor04()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+
+        // The truncate call allows both of its cursor args
+        // to be null, so we don't expect null checking.
+
+        Cursor cbegin = s.open_cursor("table:t", null, null);
+        cbegin.putKeyString("bar");
+        cbegin.search();
+        Cursor cend = s.open_cursor(null, cbegin, null);
+        s.truncate(null, cbegin, cend, "");
+        cbegin.close();
+        cend.close();
+
+        s.truncate("table:t", null, null, null);
+
+        conn.close("");
+        connvalid = false;
+    }
+
+    @Test
+    public void autoCloseCursor05()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        // Allowable compare call
+        c.putKeyString("bar");
+        c.search();
+        Cursor c2 = s.open_cursor(null, c, null);
+        c.compare(c2);
+
+        boolean caught = false;
+        try {
+            // Error: cursor arg should not be null
+            c.compare(null);
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("other is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+        conn.close("");
+        connvalid = false;
+    }
+
+    @Test
+    public void autoCloseSession01()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        s.close("");
+
+        boolean caught = false;
+        try {
+            // Error: session used after close
+            s.drop("table:t", "");
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("session is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+
+        conn.close("");
+        connvalid = false;
+    }
+
+    @Test
+    public void autoCloseSession02()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        conn.close("");
+        connvalid = false;
+
+        boolean caught = false;
+        try {
+            // Error: session used after connection close
+            s.close("");
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("session is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+    }
+
+    public void autoCloseSession03()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        s.close("");
+
+        boolean caught = false;
+        try {
+            // Error: session used after close, using open call
+            s.open_cursor("table:t", null, null);
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("session is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+
+        conn.close("");
+        connvalid = false;
+    }
+
+    @Test
+    public void autoCloseConnection01()
+    throws WiredTigerPackingException {
+        Session s = sessionSetup();
+        Cursor c = populate(s);
+
+        conn.close("");
+        connvalid = false;
+
+        boolean caught = false;
+        try {
+            // Error: connection used after close
+            conn.close("");
+        }
+        catch (NullPointerException iae) {
+            assertEquals(iae.toString().contains("connection is null"), true);
+            caught = true;
+        }
+        assertEquals(caught, true);
+    }
+
+    @After
+    public void teardown() {
+        if (connvalid) {
+            conn.close("");
+        }
     }
 
 }

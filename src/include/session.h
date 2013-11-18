@@ -97,6 +97,8 @@ struct __wt_session_impl {
 
 	void	*reconcile;		/* Reconciliation information */
 
+	void	*lang_private;		/* Language specific private storage */
+
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
