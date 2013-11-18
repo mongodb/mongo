@@ -72,6 +72,7 @@ error_code("AuthSchemaIncompatible", 69)
 error_code("ShardNotFound", 70)
 error_code("ReplicaSetNotFound", 71)
 error_code("InvalidOptions", 72)
+error_code("InvalidNamespace", 73)
 
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)

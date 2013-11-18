@@ -83,7 +83,12 @@ namespace mongo {
     Status ChunkManagerTargeter::targetInsert( const BSONObj& doc,
                                                ShardEndpoint** endpoint ) const {
 
-        if ( !_primary && !_manager ) return Status( ErrorCodes::NamespaceNotFound, "" );
+        if ( !_primary && !_manager )  {
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "could not target insert in collection "
+                                         << getNS().ns()
+                                         << "; no metadata found" );
+        }
 
         if ( _primary ) {
             *endpoint = new ShardEndpoint( _primary->getName(),
@@ -277,7 +282,12 @@ namespace mongo {
     Status ChunkManagerTargeter::targetQuery( const BSONObj& query,
                                               vector<ShardEndpoint*>* endpoints ) const {
 
-        if ( !_primary && !_manager ) return Status( ErrorCodes::NamespaceNotFound, "" );
+        if ( !_primary && !_manager ) {
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "could not target query in "
+                                         << getNS().ns()
+                                         << "; no metadata found" );
+        }
 
         set<Shard> shards;
         if ( _manager ) {
@@ -299,7 +309,12 @@ namespace mongo {
 
     Status ChunkManagerTargeter::targetAll( vector<ShardEndpoint*>* endpoints ) const {
 
-        if ( !_primary && !_manager ) return Status( ErrorCodes::NamespaceNotFound, "" );
+        if ( !_primary && !_manager ) {
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "could not target full range of "
+                                         << getNS().ns()
+                                         << "; metadata not found" );
+        }
 
         set<Shard> shards;
         if ( _manager ) {

@@ -164,10 +164,30 @@ namespace mongo {
                 dassert( response->isValid( NULL ) );
                 return;
             }
+
+            NamespaceString ns( request.getTargetingNS() );
+            if ( !ns.isValid() ) {
+                response->setOk( false );
+                response->setN( 0 );
+                response->setErrCode( ErrorCodes::InvalidNamespace );
+                string errMsg( str::stream() << ns.ns() << " is not a valid namespace to index" );
+                response->setErrMessage( errMsg );
+                return;
+            }
+        }
+
+        NamespaceString ns( request.getNS() );
+        if ( !ns.isValid() ) {
+            response->setOk( false );
+            response->setN( 0 );
+            response->setErrCode( ErrorCodes::InvalidNamespace );
+            string errMsg( str::stream() << ns.ns() << " is not a valid namespace" );
+            response->setErrMessage( errMsg );
+            return;
         }
 
         // Config writes and shard writes are done differently
-        string dbName = NamespaceString( request.getNS() ).db().toString();
+        string dbName = ns.db().toString();
         if ( dbName == "config" || dbName == "admin" ) {
 
             bool verboseWC = request.isVerboseWC();
