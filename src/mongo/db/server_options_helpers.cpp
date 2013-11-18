@@ -177,7 +177,8 @@ namespace {
                 "full path to pidfile (if not set, no pidfile is created)");
 
         options->addOptionChaining("keyFile", "keyFile", moe::String,
-                "private key for cluster authentication");
+                "private key for cluster authentication")
+                                  .incompatibleWith("noauth");
 
         options->addOptionChaining("setParameter", "setParameter", moe::StringVector,
                 "Set a configurable parameter")

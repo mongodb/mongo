@@ -119,7 +119,8 @@ namespace mongo {
         general_options.addOptionChaining("jsonp", "jsonp", moe::Switch,
                 "allow JSONP access via http (has security implications)");
 
-        general_options.addOptionChaining("noauth", "noauth", moe::Switch, "run without security");
+        general_options.addOptionChaining("noauth", "noauth", moe::Switch, "run without security")
+                                         .incompatibleWith("keyFile");
 
         general_options.addOptionChaining("noIndexBuildRetry", "noIndexBuildRetry", moe::Switch,
                 "don't retry any index builds that were interrupted by shutdown");
