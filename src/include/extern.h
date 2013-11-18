@@ -166,6 +166,10 @@ extern int __wt_block_ext_alloc(WT_SESSION_IMPL *session,
     WT_EXT **extp,
     u_int max);
 extern void __wt_block_ext_free(WT_SESSION_IMPL *session, WT_EXT *ext);
+extern int __wt_block_size_alloc(WT_SESSION_IMPL *session,
+    WT_SIZE **szp,
+    u_int max);
+extern void __wt_block_size_free(WT_SESSION_IMPL *session, WT_SIZE *sz);
 extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,

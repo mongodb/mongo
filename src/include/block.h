@@ -86,8 +86,12 @@ struct __wt_size {
 
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Per-size offset skiplist */
 
-	/* Variable-length array, sized by the number of skiplist elements. */
-	WT_SIZE *next[0];			/* Size skiplist */
+	/*
+	 * We don't use a variable-length array for the size skiplist, we want
+	 * to be able to use any cached WT_SIZE structure as the head of a list,
+	 * and we don't know the related WT_EXT structure's depth.
+	 */
+	WT_SIZE *next[WT_SKIP_MAXDEPTH];	/* Size skiplist */
 };
 
 /*

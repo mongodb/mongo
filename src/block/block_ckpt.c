@@ -222,9 +222,10 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 
 	/*
 	 * Checkpoints are potentially reading/writing/merging lots of blocks,
-	 * pre-allocate a bunch of WT_EXT structures for this thread's use.
+	 * pre-allocate structures for this thread's use.
 	 */
 	WT_RET(__wt_block_ext_alloc(session, NULL, 100));
+	WT_RET(__wt_block_size_alloc(session, NULL, 10));
 
 	/* Process the checkpoint list, deleting and updating as required. */
 	return (__ckpt_process(session, block, ckptbase));
