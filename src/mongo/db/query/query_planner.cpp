@@ -610,6 +610,28 @@ namespace mongo {
                                                   + curChild);
                     delete child;
                 }
+                // In the AND case, the filter can be brought above the AND node.
+                // But in the OR case, the filter only applies to one branch, so
+                // we must affix curChild's filter now. In order to apply the filter
+                // to the proper OR branch, create a FETCH node with the filter whose
+                // child is the IXSCAN.
+                else if (root->matchType() == MatchExpression::OR) {
+                    verify(NULL != currentScan.get());
+
+                    finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
+                    root->getChildVector()->erase(root->getChildVector()->begin()
+                                                  + curChild);
+
+                    FetchNode* fetch = new FetchNode();
+                    // takes ownership
+                    fetch->filter.reset(child);
+                    // takes ownership
+                    fetch->children.push_back(currentScan.release());
+                    // takes ownership
+                    out->push_back(fetch);
+
+                    currentIndexNumber = IndexTag::kNoIndex;
+                }
                 else {
                     // We keep curChild in the AND for affixing later.
                     ++curChild;
@@ -639,8 +661,30 @@ namespace mongo {
                     delete child;
                     // Don't increment curChild.
                 }
+                // In the AND case, the filter can be brought above the AND node.
+                // But in the OR case, the filter only applies to one branch, so
+                // we must affix curChild's filter now. In order to apply the filter
+                // to the proper OR branch, create a FETCH node with the filter whose
+                // child is the IXSCAN.
+                else if (root->matchType() == MatchExpression::OR) {
+                    verify(NULL != currentScan.get());
+
+                    finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
+                    root->getChildVector()->erase(root->getChildVector()->begin()
+                                                  + curChild);
+
+                    FetchNode* fetch = new FetchNode();
+                    // takes ownership
+                    fetch->filter.reset(child);
+                    // takes ownership
+                    fetch->children.push_back(currentScan.release());
+                    // takes ownership
+                    out->push_back(fetch);
+
+                    currentIndexNumber = IndexTag::kNoIndex;
+                }
                 else {
-                    // We keep curChild in the node for affixing later as a filter.
+                    // We keep curChild in the AND for affixing later as a filter.
                     ++curChild;
                 }
             }

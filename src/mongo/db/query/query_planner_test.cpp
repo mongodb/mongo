@@ -813,8 +813,10 @@ namespace {
         runQuery(fromjson("{$or: [ {a: {$geoIntersects: {$geometry: {type: 'Point', coordinates: [10.0, 10.0]}}}},"
                                  " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}"));
 
+        ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: 1}");
-        // TODO investigate why no indexed solution exists
+        assertSolutionExists("{or: {nodes: [{fetch: {ixscan: {a: '2dsphere'}}},"
+                                           "{fetch: {ixscan: {b: '2dsphere'}}}]}}");
     }
 
 
