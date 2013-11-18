@@ -79,7 +79,8 @@ namespace mongo {
 
         options->addOptionChaining("ssl.CRLFile", "sslCRLFile", moe::String,
                 "Certificate Revocation List file for SSL")
-                                  .requires("ssl");
+                                  .requires("ssl")
+                                  .requires("ssl.CAFile");
 
         options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
                     moe::Switch, "allow connections to servers with invalid certificates")
