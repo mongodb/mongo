@@ -1677,61 +1677,6 @@ namespace {
         ASSERT_EQUALS(*multivalit, "true");
     }
 
-    TEST(JSONConfigFile, Over16Megabytes) {
-        // Test to make sure that we can parse a JSON config file that results in a BSON object
-        // larger than the current limit of 16MB, now that we no longer store the result in BSON
-        OptionsParserTester parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
-        testOpts.addOptionChaining("largeArray", "largeArray", moe::StringVector, "Large array");
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        // 1024 characters = 64 * 16
-        const std::string largeString =
-            "\""
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            "\"";
-
-        std::string largeConfigString;
-
-        largeConfigString.append("{ \"largeArray\" : [ ");
-
-        // 16mb = 16 * 1024kb = 16384
-        for (int i = 0; i < 16383; i++) {
-            largeConfigString.append(largeString);
-            largeConfigString.append(",");
-        }
-        largeConfigString.append(largeString);
-        largeConfigString.append(" ] }");
-
-        parser.setConfig("config.json", largeConfigString);
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    }
-
     TEST(JSONConfigFile, DefaultValueOverride) {
         OptionsParserTester parser;
         moe::Environment environment;
