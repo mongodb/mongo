@@ -2036,20 +2036,30 @@ namespace mongo {
         }
 
         bool startCommit() {
+
             if ( state != STEADY )
                 return false;
             state = COMMIT_START;
             
-            Timer t;
-            // we wait for the commit to succeed before giving up
-            while ( t.seconds() <= 30 ) {
-                log() << "Waiting for commit to finish" << endl;
-                sleepmillis(1);
-                if ( state == DONE )
-                    return true;
+            boost::xtime xt;
+            boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
+            xt.sec += 30;
+
+            scoped_lock lock(m_active);
+            while ( active ) {
+                if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
+                    // TIMEOUT
+                    state = FAIL;
+                    log() << "startCommit never finished!" << migrateLog;
+                    return false;
+                }
             }
-            state = FAIL;
-            log() << "startCommit never finished!" << migrateLog;
+
+            if ( state == DONE ) {
+                return true;
+            }
+
+            log() << "startCommit failed, final data failed to transfer" << migrateLog;
             return false;
         }
 
@@ -2059,10 +2069,15 @@ namespace mongo {
         }
 
         bool getActive() const { scoped_lock l(m_active); return active; }
-        void setActive( bool b ) { scoped_lock l(m_active); active = b; }
+        void setActive( bool b ) { 
+            scoped_lock l(m_active);
+            active = b;
+            isActiveCV.notify_all(); 
+        }
 
         mutable mongo::mutex m_active;
         bool active;
+        boost::condition isActiveCV;
 
         string ns;
         string from;
