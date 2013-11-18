@@ -1371,8 +1371,10 @@ namespace mongo {
         case mongo::jstOID:
             return newId(elem.__oid());
         case mongo::NumberDouble:
-        case mongo::NumberInt:
             return v8::Number::New(elem.number());
+        case mongo::NumberInt:
+            argv[0] = v8::Number::New(elem.numberInt());
+            return NumberIntFT()->GetFunction()->NewInstance(1, argv);
         case mongo::Array: {
             // NB: This comment may no longer be accurate.
             // for arrays it's better to use non lazy object because:
