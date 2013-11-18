@@ -30,6 +30,7 @@ JAVA_SRC = \
 		$(JAVAEXAMPLES)/ex_access.java
 
 JAVA_JUNIT = \
+		$(JAVATEST)/AutoCloseTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
 		$(JAVATEST)/PackTest.java \

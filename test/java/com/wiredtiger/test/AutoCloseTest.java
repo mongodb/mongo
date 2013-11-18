@@ -26,18 +26,49 @@
  */
 package com.wiredtiger.test;
 
+import com.wiredtiger.db.Connection;
+import com.wiredtiger.db.Cursor;
+import com.wiredtiger.db.Session;
+import com.wiredtiger.db.WiredTigerPackingException;
+import com.wiredtiger.db.wiredtiger;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.junit.Assert;
 import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.runners.JUnit4;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses( {
-    AutoCloseTest.class,
-    CursorTest.class,
-    CursorTest02.class,
-    PackTest.class
-})
+public class AutoCloseTest {
+    Connection conn;
 
-public class WiredTigerSuite {
-    // the class remains empty,
-    // used only as a holder for the above annotations
+    @Test
+    public void autoClose01()
+    throws WiredTigerPackingException {
+        String keyFormat = "S";
+        String valueFormat = "u";
+
+        conn = wiredtiger.open("WT_HOME", "create");
+        Session s = conn.open_session(null);
+        s.create("table:t",
+                 "key_format=" + keyFormat + ",value_format=" + valueFormat);
+        Cursor c = s.open_cursor("table:t", null, null);
+        c.putKeyString("bar");
+        c.putValueByteArray("foo".getBytes());
+        c.insert();
+	/* Close the session. */
+        s.close("");
+
+	/* Now do something with the handle that was closed. */
+	c.close();
+
+	/* Clean up after ourselves */
+        s.drop("table:t", "");
+        s.close("");
+        conn.close("");
+    }
+
+    private void teardown() {
+    }
+
 }
