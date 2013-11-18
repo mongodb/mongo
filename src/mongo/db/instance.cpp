@@ -640,42 +640,33 @@ namespace mongo {
             uasserted( 17009, status.reason() );
         }
 
-        PageFaultRetryableSection s;
-        while ( 1 ) {
-            try {
-                Lock::DBWrite lk(ns.ns());
+        Lock::DBWrite lk(ns.ns());
 
-                // void ReplSetImpl::relinquish() uses big write lock so this is thus
-                // synchronized given our lock above.
-                uassert( 17010 ,  "not master", isMasterNs( ns.ns().c_str() ) );
+        // void ReplSetImpl::relinquish() uses big write lock so this is thus
+        // synchronized given our lock above.
+        uassert( 17010 ,  "not master", isMasterNs( ns.ns().c_str() ) );
 
-                // if this ever moves to outside of lock, need to adjust check
-                // Client::Context::_finishInit
-                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-                    return;
+        // if this ever moves to outside of lock, need to adjust check
+        // Client::Context::_finishInit
+        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+            return;
 
-                Client::Context ctx( ns );
+        Client::Context ctx( ns );
 
-                const NamespaceString requestNs(ns);
-                UpdateRequest request(requestNs);
+        const NamespaceString requestNs(ns);
+        UpdateRequest request(requestNs);
 
-                request.setUpsert(upsert);
-                request.setMulti(multi);
-                request.setQuery(query);
-                request.setUpdates(toupdate);
-                request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
-                UpdateLifecycleImpl updateLifecycle(broadcast, requestNs);
-                request.setLifecycle(&updateLifecycle);
-                UpdateResult res = update(request, &op.debug(), &driver);
+        request.setUpsert(upsert);
+        request.setMulti(multi);
+        request.setQuery(query);
+        request.setUpdates(toupdate);
+        request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
+        UpdateLifecycleImpl updateLifecycle(broadcast, requestNs);
+        request.setLifecycle(&updateLifecycle);
+        UpdateResult res = update(request, &op.debug(), &driver);
 
-                // for getlasterror
-                lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
-                break;
-            }
-            catch ( PageFaultException& e ) {
-                e.touch();
-            }
-        }
+        // for getlasterror
+        lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
     }
 
     void receivedDelete(Message& m, CurOp& op) {
