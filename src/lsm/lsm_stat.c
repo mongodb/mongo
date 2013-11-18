@@ -60,7 +60,6 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	 * For each chunk, aggregate its statistics, as well as any associated
 	 * bloom filter statistics, into the total statistics.
 	 */
-	WT_STAT_SET(&lsm_tree->stats, lsm_chunk_count, lsm_tree->nchunks);
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 
@@ -128,6 +127,9 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
+
+	/* Set statistics that aren't aggregated directly into the cursor */
+	WT_STAT_SET(stats, lsm_chunk_count, lsm_tree->nchunks);
 
 	/* Aggregate, and optionally clear, LSM-level specific information. */
 	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
