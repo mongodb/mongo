@@ -349,12 +349,16 @@ namespace {
 
         if (params.count("verbose")) {
             std::string verbosity = params["verbose"].as<std::string>();
-            for (std::string::iterator iterator = verbosity.begin();
-                 iterator != verbosity.end(); iterator++) {
-                if (*iterator != 'v') {
-                    return Status(ErrorCodes::BadValue,
-                                  "The \"verbose\" option string cannot contain any characters "
-                                  "other than \"v\"");
+
+            // Skip this for backwards compatibility.  See SERVER-11471.
+            if (verbosity != "true") {
+                for (std::string::iterator iterator = verbosity.begin();
+                    iterator != verbosity.end(); iterator++) {
+                    if (*iterator != 'v') {
+                        return Status(ErrorCodes::BadValue,
+                                      "The \"verbose\" option string cannot contain any characters "
+                                      "other than \"v\"");
+                    }
                 }
             }
         }
@@ -369,7 +373,9 @@ namespace {
 
             if (params.count("verbose")) {
                 std::string verbosity = params["verbose"].as<std::string>();
-                if (s == verbosity) {
+                if (s == verbosity ||
+                    // Treat a verbosity of "true" the same as a single "v".  See SERVER-11471.
+                    (s == "v" && verbosity == "true")) {
                     logger::globalLogDomain()->setMinimumLoggedSeverity(
                             logger::LogSeverity::Debug(s.length()));
                 }
