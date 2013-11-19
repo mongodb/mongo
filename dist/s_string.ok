@@ -672,6 +672,7 @@ poptable
 posint
 posix
 pre
+prealloc
 preload
 prepended
 presize

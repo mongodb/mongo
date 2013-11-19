@@ -127,8 +127,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 
 	if (!locked) {
-		WT_RET(__wt_block_ext_alloc(session, NULL, 5));
-		WT_RET(__wt_block_size_alloc(session, NULL, 2));
+		WT_RET(__wt_block_ext_prealloc(session, 5));
 		__wt_spin_lock(session, &block->live_lock);
 	}
 	ret = __wt_block_alloc(session, block, &offset, (off_t)align_size);

@@ -311,8 +311,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
 	stats->block_byte_read.desc = "block manager: bytes read";
 	stats->block_byte_write.desc = "block manager: bytes written";
-	stats->block_locked_allocation.desc =
-	    "block manager: memory allocations while locked";
 	stats->block_map_read.desc = "block manager: mapped blocks read";
 	stats->block_preload.desc = "block manager: blocks pre-loaded";
 	stats->block_read.desc = "block manager: blocks read";
@@ -417,7 +415,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
-	stats->block_locked_allocation.v = 0;
 	stats->block_map_read.v = 0;
 	stats->block_preload.v = 0;
 	stats->block_read.v = 0;

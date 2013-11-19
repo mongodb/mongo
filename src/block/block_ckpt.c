@@ -199,6 +199,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, int data_cksum)
 {
 	WT_BLOCK_CKPT *ci;
+	WT_DECL_RET;
 
 	ci = &block->live;
 	ci->version = WT_BM_CHECKPOINT_VERSION;
@@ -224,11 +225,15 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	 * Checkpoints are potentially reading/writing/merging lots of blocks,
 	 * pre-allocate structures for this thread's use.
 	 */
-	WT_RET(__wt_block_ext_alloc(session, NULL, 100));
-	WT_RET(__wt_block_size_alloc(session, NULL, 10));
+	WT_RET(__wt_block_ext_prealloc(session, 250));
 
 	/* Process the checkpoint list, deleting and updating as required. */
-	return (__ckpt_process(session, block, ckptbase));
+	ret = __ckpt_process(session, block, ckptbase);
+
+	/* Discard any excessive memory we've allocated. */
+	WT_TRET(__wt_block_ext_discard(session, 250));
+
+	return (ret);
 }
 
 /*
