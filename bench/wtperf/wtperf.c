@@ -82,7 +82,6 @@ typedef struct {
 
 	struct timeval phase_start_time;
 
-#define	PERF_SLEEP_LOAD		0x01
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
@@ -91,7 +90,8 @@ typedef struct {
 } CONFIG;
 
 typedef enum {
-	UINT32_TYPE, CONFIG_STRING_TYPE, STRING_TYPE, BOOL_TYPE, FLAG_TYPE
+	BOOL_TYPE, CONFIG_STRING_TYPE, FLAG_TYPE, INT_TYPE, STRING_TYPE,
+	UINT32_TYPE
 } CONFIG_OPT_TYPE;
 
 typedef struct {
@@ -719,7 +719,8 @@ execute_populate(CONFIG *cfg)
 	struct timeval e;
 	double secs;
 	uint64_t last_ops;
-	uint32_t interval, sleepsec;
+	uint32_t interval;
+	u_int sleepsec;
 	int elapsed, ret;
 
 	conn = cfg->conn;
@@ -792,16 +793,16 @@ execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f", secs, cfg->icount / secs);
 
 	/*
-	 * If configured, sleep for some seconds to allow LSM merging
-	 * to complete in the background.  If user gives -1, UINT_MAX,
-	 * then sleep the load time amount.
+	 * If configured, sleep for awhile to allow LSM merging to complete in
+	 * the background.  If user specifies -1, then sleep for as long as it
+	 * took to load.
 	 */
 	if (cfg->merge_sleep) {
-		if (cfg->merge_sleep == PERF_SLEEP_LOAD)
-			sleepsec = (uint32_t)
-			    (e.tv_sec - cfg->phase_start_time.tv_sec);
+		if (cfg->merge_sleep < 0)
+			sleepsec =
+			    (u_int)(e.tv_sec - cfg->phase_start_time.tv_sec);
 		else
-			sleepsec = cfg->merge_sleep;
+			sleepsec = (u_int)cfg->merge_sleep;
 		lprintf(cfg, 0, 1, "Sleep %d seconds for merging", sleepsec);
 		(void)sleep(sleepsec);
 	}
@@ -1292,6 +1293,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	char *newstr, **strp;
 	size_t i, nopt;
 	uint64_t newlen;
+	uint32_t *pconfigval;
 	void *valueloc;
 
 	popt = NULL;
@@ -1311,20 +1313,38 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		return (EINVAL);
 	}
 	valueloc = ((unsigned char *)cfg + popt->offset);
-	if (popt->type == UINT32_TYPE) {
+	switch (popt->type) {
+	case INT_TYPE:
 		if (v->type != WT_CONFIG_ITEM_NUM) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad int value for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
 			return (EINVAL);
-		} else if (v->val < 0 || v->val > UINT_MAX) {
+		}
+		if (v->val > INT_MAX) {
+			fprintf(stderr, "wtperf: Error: "
+			    "int value out of range for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
+		}
+		*(int *)valueloc = (int)v->val;
+		break;
+	case UINT32_TYPE:
+		if (v->type != WT_CONFIG_ITEM_NUM) {
+			fprintf(stderr, "wtperf: Error: "
+			    "bad uint32 value for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
+		}
+		if (v->val < 0 || v->val > UINT_MAX) {
 			fprintf(stderr, "wtperf: Error: "
 			    "uint32 value out of range for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
 			return (EINVAL);
 		}
 		*(uint32_t *)valueloc = (uint32_t)v->val;
-	} else if (popt->type == CONFIG_STRING_TYPE) {
+		break;
+	case CONFIG_STRING_TYPE:
 		if (v->type != WT_CONFIG_ITEM_STRING) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
@@ -1347,7 +1367,8 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			free(*strp);
 		}
 		*strp = newstr;
-	} else if (popt->type == STRING_TYPE) {
+		break;
+	case STRING_TYPE:
 		if (v->type != WT_CONFIG_ITEM_STRING) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
@@ -1361,9 +1382,9 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		strncpy(newstr, v->str, v->len);
 		newstr[v->len] = '\0';
 		*strp = newstr;
-	} else if (popt->type == BOOL_TYPE || popt->type == FLAG_TYPE) {
-		uint32_t *pconfigval;
-
+		break;
+	case BOOL_TYPE:
+	case FLAG_TYPE:
 		if (v->type != WT_CONFIG_ITEM_BOOL) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad bool value for \'%.*s=%.*s\'\n",
@@ -1377,6 +1398,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			*pconfigval |= popt->flagmask;
 		else
 			*pconfigval &= ~popt->flagmask;
+		break;
 	}
 	return (0);
 }
@@ -1537,20 +1559,26 @@ config_opt_usage(void)
 
 	printf("Following are options settable using -o or -O, "
 	    "showing [default value].\n");
-	printf("String values must be enclosed by \" quotes,\n");
-	printf("bool values must be true or false.\n\n");
+	printf("String values must be enclosed by \" quotes, ");
+	printf("boolean values must be either true or false.\n\n");
 
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
 	for (i = 0; i < nopt; i++) {
 		typestr = "?";
 		defaultval = config_opts[i].defaultval;
-		if (config_opts[i].type == UINT32_TYPE)
+		switch (config_opts[i].type) {
+		case INT_TYPE:
 			typestr = "int";
-		else if (config_opts[i].type == STRING_TYPE ||
-		    config_opts[i].type == CONFIG_STRING_TYPE)
+			break;
+		case UINT32_TYPE:
+			typestr = "unsigned int";
+			break;
+		case STRING_TYPE:
+		case CONFIG_STRING_TYPE:
 			typestr = "string";
-		else if (config_opts[i].type == BOOL_TYPE ||
-		    config_opts[i].type == FLAG_TYPE) {
+			break;
+		case BOOL_TYPE:
+		case FLAG_TYPE:
 			typestr = "bool";
 			if (strcmp(defaultval, "0") == 0)
 				defaultval = "true";
@@ -1775,17 +1803,18 @@ print_config(CONFIG *cfg)
 void
 usage(void)
 {
-	printf("wtperf [-CLMOSThov]\n");
-	printf("\t-S Use a small default configuration\n");
-	printf("\t-M Use a medium default configuration\n");
+	printf("wtperf [-LMSv] [-C config] "
+	    "[-h home] [-O file] [-o option] [-T config]\n");
 	printf("\t-L Use a large default configuration\n");
-	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST\n");
+	printf("\t-M Use a medium default configuration\n");
+	printf("\t-S Use a small default configuration\n");
 	printf("\t-C <string> additional connection configuration\n");
 	printf("\t            (added to option conn_config)\n");
+	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST\n");
+	printf("\t-O <file> file contains options as listed below\n");
+	printf("\t-o option=val[,option=val,...] set options listed below\n");
 	printf("\t-T <string> additional table configuration\n");
 	printf("\t            (added to option table_config)\n");
-	printf("\t-O <filename> file contains options as listed below\n");
-	printf("\t-o option=val[,option=val,...] set options listed below\n");
 	printf("\n");
 	config_opt_usage();
 }

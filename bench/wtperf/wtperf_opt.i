@@ -29,33 +29,37 @@
  */
 
 #ifdef OPT_DECLARE_STRUCT
-#define	DEF_OPT_AS_STRING(name, initval, desc)	const char *name;
+#define	DEF_OPT_AS_BOOL(name, initval, desc)		uint32_t name;
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
-#define	DEF_OPT_AS_BOOL(name, initval, desc)	uint32_t name;
-#define	DEF_OPT_AS_UINT32(name, initval, desc)	uint32_t name;
 #define	DEF_OPT_AS_FLAGVAL(name, bits, desc)
+#define	DEF_OPT_AS_INT(name, initval, desc)		int name;
+#define	DEF_OPT_AS_STRING(name, initval, desc)		const char *name;
+#define	DEF_OPT_AS_UINT32(name, initval, desc)		uint32_t name;
 #endif
 
 #ifdef OPT_DEFINE_DESC
-#define	DEF_OPT_AS_STRING(name, initval, desc)			\
-	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name), 0 },
+#define	DEF_OPT_AS_BOOL(name, initval, desc)				\
+	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name), 0 },
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
 	{ #name, desc, #initval, CONFIG_STRING_TYPE,                    \
 	offsetof(CONFIG, name), 0 },
-#define	DEF_OPT_AS_BOOL(name, initval, desc)			\
-	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name), 0 },
-#define	DEF_OPT_AS_UINT32(name, initval, desc)			\
-	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name), 0 },
-#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)			\
+#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)				\
 	{ #name, desc, "0", FLAG_TYPE, offsetof(CONFIG, flags), bits },
+#define	DEF_OPT_AS_INT(name, initval, desc)				\
+	{ #name, desc, #initval, INT_TYPE, offsetof(CONFIG, name), 0 },
+#define	DEF_OPT_AS_STRING(name, initval, desc)				\
+	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name), 0 },
+#define	DEF_OPT_AS_UINT32(name, initval, desc)				\
+	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name), 0 },
 #endif
 
 #ifdef OPT_DEFINE_DEFAULT
-#define	DEF_OPT_AS_STRING(name, initval, desc)	initval,
+#define	DEF_OPT_AS_BOOL(name, initval, desc)		initval,
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
-#define	DEF_OPT_AS_BOOL(name, initval, desc)	initval,
-#define	DEF_OPT_AS_UINT32(name, initval, desc)	initval,
 #define	DEF_OPT_AS_FLAGVAL(name, bits, desc)
+#define	DEF_OPT_AS_INT(name, initval, desc)		initval,
+#define	DEF_OPT_AS_STRING(name, initval, desc)		initval,
+#define	DEF_OPT_AS_UINT32(name, initval, desc)		initval,
 #endif
 
 /*
@@ -97,8 +101,8 @@ DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
-DEF_OPT_AS_UINT32(merge_sleep, 0,
-    "post-populate sleep seconds for LSM merging activity")
+DEF_OPT_AS_INT(merge_sleep, 0,
+    "post-populate sleep seconds for LSM merging activity (-1 for load time)")
 DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
     "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
@@ -123,8 +127,9 @@ DEF_OPT_AS_UINT32(update_threads, 0, "number of update threads")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 
-#undef DEF_OPT_AS_STRING
-#undef DEF_OPT_AS_CONFIG_STRING
 #undef DEF_OPT_AS_BOOL
-#undef DEF_OPT_AS_UINT32
+#undef DEF_OPT_AS_CONFIG_STRING
 #undef DEF_OPT_AS_FLAGVAL
+#undef DEF_OPT_AS_INT
+#undef DEF_OPT_AS_STRING
+#undef DEF_OPT_AS_UINT32
