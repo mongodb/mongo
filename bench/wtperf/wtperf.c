@@ -1543,6 +1543,7 @@ config_opt_usage(void)
 				defaultval = "true";
 			else
 				defaultval = "false";
+			break;
 		case CONFIG_STRING_TYPE:
 		case STRING_TYPE:
 			typestr = "string";
