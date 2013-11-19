@@ -245,7 +245,7 @@ namespace mongo {
         }
 
         // All the mandatory fields must be present.
-        if (!_isActionsSet) {
+        if (!_isActionsSet || !_actions.size()) {
             *errMsg = stream() << "missing " << actions.name() << " field";
             return false;
         }
