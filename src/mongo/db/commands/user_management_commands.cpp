@@ -1246,6 +1246,12 @@ namespace mongo {
                 return false;
             }
 
+            if (args.roleName.getRole().empty()) {
+                addStatus(Status(ErrorCodes::BadValue, "Role name must be non-empty"),
+                          result);
+                return false;
+            }
+
             if (args.roleName.getDB() == "local") {
                 addStatus(Status(ErrorCodes::BadValue, "Cannot create roles in the local database"),
                           result);
