@@ -60,16 +60,14 @@ __wt_lsm_merge(
 	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count;
-	u_int dest_id, end_chunk, i, nchunks, start_chunk;
-	u_int max_chunks, min_chunks;
+	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
 	int create_bloom;
 	const char *cfg[3];
 
 	bloom = NULL;
 	create_bloom = 0;
 	dest = src = NULL;
-	max_chunks = lsm_tree->merge_max;
-	min_chunks = (id == 0) ? lsm_tree->merge_min : 2;
+	merge_min = aggressive ? 2 : lsm_tree->merge_min;
 	start_id = 0;
 
 	/*
@@ -86,7 +84,7 @@ __wt_lsm_merge(
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a
@@ -123,19 +121,18 @@ __wt_lsm_merge(
 			break;
 
 		/*
-		 * Stay in the youngest generation in the first thread if there
-		 * are multiple threads.  If there is a single thread, wait
-		 * looking for small merges before trying a big one.
+		 * Look for small merges before trying a big one: stay in the
+		 * youngest generation in the first thread until we get
+		 * aggressive.
 		 */
-		if (id == 0 && chunk->generation > 0 &&
-		    (!aggressive || lsm_tree->merge_threads > 1))
+		if (id == 0 && chunk->generation > 0 && !aggressive)
 			break;
 
 		/*
 		 * If we have enough chunks for a merge and the next chunk is
 		 * in a different generation, stop.
 		 */
-		if (nchunks >= min_chunks &&
+		if (nchunks >= merge_min &&
 		    chunk->generation > youngest->generation)
 			break;
 
@@ -143,7 +140,7 @@ __wt_lsm_merge(
 		record_count += chunk->count;
 		--start_chunk;
 
-		if (nchunks == max_chunks) {
+		if (nchunks == lsm_tree->merge_max) {
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
 			record_count -= youngest->count;
 			--end_chunk;
@@ -151,7 +148,7 @@ __wt_lsm_merge(
 	}
 
 	nchunks = (end_chunk + 1) - start_chunk;
-	WT_ASSERT(session, nchunks <= max_chunks);
+	WT_ASSERT(session, nchunks <= lsm_tree->merge_max);
 
 	if (nchunks > 0) {
 		chunk = lsm_tree->chunk[start_chunk];
@@ -160,10 +157,11 @@ __wt_lsm_merge(
 
 		/*
 		 * Don't do small merges or merge across more than 2
-		 * generations.
+		 * generations, unless we are aggressive.
 		 */
-		if (nchunks < min_chunks ||
-		    chunk->generation > youngest->generation + 1) {
+		if (nchunks < merge_min ||
+		    chunk->generation > youngest->generation +
+		    (aggressive ? 2 : 1)) {
 			for (i = 0; i < nchunks; i++)
 				F_CLR(lsm_tree->chunk[start_chunk + i],
 				    WT_LSM_CHUNK_MERGING);
@@ -176,7 +174,7 @@ __wt_lsm_merge(
 		generation = WT_MAX(generation,
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
+	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 	if (nchunks == 0)
 		return (WT_NOTFOUND);
@@ -185,8 +183,8 @@ __wt_lsm_merge(
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Merging chunks %d-%d into %d (%" PRIu64 " records)"
-	    ", generation %d\n",
+	    "Merging chunks %u-%u into %u (%" PRIu64 " records)"
+	    ", generation %" PRIu32 "\n",
 	    start_chunk, end_chunk, dest_id, record_count, generation);
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
@@ -245,7 +243,7 @@ __wt_lsm_merge(
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_CSTAT_INCRV(session, lsm_rows_merged, insert_count);
+	WT_STAT_FAST_CONN_INCRV(session, lsm_rows_merged, insert_count);
 	WT_VERBOSE_ERR(session, lsm,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
@@ -292,7 +290,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -317,7 +315,7 @@ __wt_lsm_merge(
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	lsm_tree->dsk_gen++;
-	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 err:	if (src != NULL)
 		WT_TRET(src->close(src));

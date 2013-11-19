@@ -10,7 +10,7 @@
 static int __verify_ckptfrag_add(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_ckptfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_filefrag_add(
-	WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t, int);
+	WT_SESSION_IMPL *, WT_BLOCK *, const char *, off_t, off_t, int);
 static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
@@ -122,8 +122,8 @@ __verify_last_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 		WT_ERR(__wt_block_extlist_read_avail(
 		    session, block, el, ci->file_size));
 		WT_EXT_FOREACH(ext, el->off)
-			if ((ret = __verify_filefrag_add(
-			    session, block, ext->off, ext->size, 1)) != 0)
+			if ((ret = __verify_filefrag_add(session, block,
+			    "avail-list chunk", ext->off, ext->size, 1)) != 0)
 				break;
 	}
 
@@ -193,17 +193,18 @@ __wt_verify_ckpt_load(
 	 * the list of blocks we've "seen" from the file.
 	 */
 	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session,
-		    block, ci->root_offset, (off_t)ci->root_size, 1));
+		WT_RET(__verify_filefrag_add(session, block,
+		    "checkpoint", ci->root_offset, (off_t)ci->root_size, 1));
 	if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session,
-		    block, ci->alloc.offset, (off_t)ci->alloc.size, 1));
+		WT_RET(__verify_filefrag_add(session, block,
+		    "alloc list", ci->alloc.offset, (off_t)ci->alloc.size, 1));
 	if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session,
-		    block, ci->avail.offset, (off_t)ci->avail.size, 1));
+		WT_RET(__verify_filefrag_add(session, block,
+		    "avail list", ci->avail.offset, (off_t)ci->avail.size, 1));
 	if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session,
-		    block, ci->discard.offset, (off_t)ci->discard.size, 1));
+		WT_RET(__verify_filefrag_add(session, block,
+		    "discard list",
+		    ci->discard.offset, (off_t)ci->discard.size, 1));
 
 	/*
 	 * Checkpoint verification is similar to deleting checkpoints.  As we
@@ -217,7 +218,7 @@ __wt_verify_ckpt_load(
 		WT_RET(__wt_block_extlist_read(
 		    session, block, el, ci->file_size));
 		WT_RET(__wt_block_extlist_merge(
-		    session, block, el, &block->verify_alloc));
+		    session, el, &block->verify_alloc));
 		__wt_block_extlist_free(session, el);
 	}
 	el = &ci->discard;
@@ -226,7 +227,7 @@ __wt_verify_ckpt_load(
 		    session, block, el, ci->file_size));
 		WT_EXT_FOREACH(ext, el->off)
 			WT_RET(__wt_block_off_remove_overlap(session,
-			    block, &block->verify_alloc, ext->off, ext->size));
+			    &block->verify_alloc, ext->off, ext->size));
 		__wt_block_extlist_free(session, el);
 	}
 
@@ -238,7 +239,7 @@ __wt_verify_ckpt_load(
 	 * checkpoints.
 	 */
 	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_remove_overlap(session, block,
+		WT_RET(__wt_block_off_remove_overlap(session,
 		    &block->verify_alloc, ci->root_offset, ci->root_size));
 
 	/*
@@ -294,7 +295,7 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* Add to the per-file list. */ 
-	WT_RET(__verify_filefrag_add(session, block, offset, size, 0));
+	WT_RET(__verify_filefrag_add(session, block, NULL, offset, size, 0));
 
 	/*
 	 * It's tempting to try and flag a page as "verified" when we read it.
@@ -322,13 +323,16 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
  * we've already verified this chunk of the file.
  */
 static int
-__verify_filefrag_add(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, off_t offset, off_t size, int nodup)
+__verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    const char *type, off_t offset, off_t size, int nodup)
 {
 	uint64_t f, frag, frags, i;
 
 	WT_VERBOSE_RET(session, verify,
-	    "adding file block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
+	    "add file block%s%s%s at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
+	    type == NULL ? "" : " (",
+	    type == NULL ? "" : type,
+	    type == NULL ? "" : ")",
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/* Check each chunk against the total file size. */

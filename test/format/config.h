@@ -71,6 +71,10 @@ typedef struct {
 #define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
 
 static CONFIG c[] = {
+	{ "firstfit",
+	  "if allocation is firstfit",			/* 20% */
+	  0x0, C_BOOL, 20, 0, 0, &g.c_firstfit, NULL },
+
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
 	  C_FIX, 0x0, 1, 8, 8, &g.c_bitcnt, NULL },

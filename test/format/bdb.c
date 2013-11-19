@@ -37,7 +37,7 @@ bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
 	int cmp;
 	size_t len;
 
-	UNUSED(dbp);
+	WT_UNUSED(dbp);
 
 	len = (k1->size < k2->size) ? k1->size : k2->size;
 	if ((cmp = memcmp(k2->data, k1->data, len)) == 0)

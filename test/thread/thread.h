@@ -38,11 +38,10 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
+#include <gcc.h>				/* WiredTiger internal */
 
 #define	FNAME		"file:__wt"		/* File name */
 #define	FNAME_STAT	"__stats"		/* File name for statistics */
-
-#define	UNUSED(v)	(void)(v)		/* Quiet unused var warnings */
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
@@ -54,11 +53,7 @@ extern u_int nkeys;				/* Keys to load */
 extern u_int nops;				/* Operations per thread */
 extern int   session_per_op;			/* New session per operation */
 
-#if defined (__GNUC__)
-void die(const char *, int) __attribute__((noreturn));
-#else
-void die(const char *, int);
-#endif
+void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
 void load(void);
 int  rw_start(u_int, u_int);
 void stats(void);

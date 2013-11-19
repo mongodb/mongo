@@ -42,14 +42,10 @@ __bloom_init(WT_SESSION_IMPL *session,
 	*bloomp = bloom;
 	return (0);
 
-err:	if (bloom->uri != NULL)
-		__wt_free(session, bloom->uri);
-	if (bloom->config != NULL)
-		__wt_free(session, bloom->config);
-	if (bloom->bitstring != NULL)
-		__wt_free(session, bloom->bitstring);
-	if (bloom != NULL)
-		__wt_free(session, bloom);
+err:	__wt_free(session, bloom->uri);
+	__wt_free(session, bloom->config);
+	__wt_free(session, bloom->bitstring);
+	__wt_free(session, bloom);
 	return (ret);
 }
 
@@ -96,13 +92,18 @@ __wt_bloom_create(
     uint64_t count, uint32_t factor, uint32_t k, WT_BLOOM **bloomp)
 {
 	WT_BLOOM *bloom;
-	WT_RET(__bloom_init(session, uri, config, &bloom));
-	WT_RET(__bloom_setup(bloom, count, 0, factor, k));
+	WT_DECL_RET;
 
-	WT_RET(__bit_alloc(session, bloom->m, &bloom->bitstring));
+	WT_RET(__bloom_init(session, uri, config, &bloom));
+	WT_ERR(__bloom_setup(bloom, count, 0, factor, k));
+
+	WT_ERR(__bit_alloc(session, bloom->m, &bloom->bitstring));
 
 	*bloomp = bloom;
 	return (0);
+
+err:	(void)__wt_bloom_close(bloom);
+	return (ret);
 }
 
 /*

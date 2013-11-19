@@ -16,6 +16,19 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name, int is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
+	WT_DECL_RET;
+	pthread_mutexattr_t *attrp;
+
+	/* Initialize the mutex. */
+#ifdef HAVE_MUTEX_ADAPTIVE
+	pthread_mutexattr_t attr;
+
+	WT_RET(pthread_mutexattr_init(&attr));
+	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
+	attrp = &attr;
+#else
+	attrp = NULL;
+#endif
 
 	/*
 	 * !!!
@@ -23,22 +36,19 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_CONDVAR), &cond));
 
-	/* Initialize the mutex. */
-	if (pthread_mutex_init(&cond->mtx, NULL) != 0)
-		goto err;
+	WT_ERR(pthread_mutex_init(&cond->mtx, attrp));
 
 	/* Initialize the condition variable to permit self-blocking. */
-	if (pthread_cond_init(&cond->cond, NULL) != 0)
-		goto err;
+	WT_ERR(pthread_cond_init(&cond->cond, NULL));
 
 	cond->name = name;
-	cond->signalled = is_signalled;
+	cond->waiters = is_signalled ? -1 : 0;
 
 	*condp = cond;
 	return (0);
 
 err:	__wt_free(session, cond);
-	return (WT_ERROR);
+	return (ret);
 }
 
 /*
@@ -53,6 +63,11 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	int locked;
 
 	locked = 0;
+	WT_ASSERT(session, usecs >= 0);
+
+	/* Fast path if already signalled. */
+	if (WT_ATOMIC_ADD(cond->waiters, 1) == 0)
+		return (0);
 
 	/*
 	 * !!!
@@ -61,40 +76,33 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	if (session != NULL) {
 		WT_VERBOSE_RET(
 		    session, mutex, "wait %s cond (%p)", cond->name, cond);
-		WT_CSTAT_INCR(session, cond_wait);
+		WT_STAT_FAST_CONN_INCR(session, cond_wait);
 	}
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = 1;
 
-	while (!cond->signalled) {
-		if (usecs > 0) {
-			WT_ERR(__wt_epoch(session, &ts));
-			ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
-			ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
-			ret = pthread_cond_timedwait(
-			    &cond->cond, &cond->mtx, &ts);
-			if (ret == ETIMEDOUT) {
-				ret = 0;
-				break;
-			}
-		} else
-			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
+	if (usecs > 0) {
+		WT_ERR(__wt_epoch(session, &ts));
+		ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
+		ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
+		ret = pthread_cond_timedwait(
+		    &cond->cond, &cond->mtx, &ts);
+	} else
+		ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 
-		/*
-		 * Check pthread_cond_wait() return for EINTR, ETIME and
-		 * ETIMEDOUT, some systems return these errors.
-		 */
-		if (ret == EINTR ||
+	/*
+	 * Check pthread_cond_wait() return for EINTR, ETIME and
+	 * ETIMEDOUT, some systems return these errors.
+	 */
+	if (ret == EINTR ||
 #ifdef ETIME
-		    ret == ETIME ||
+	    ret == ETIME ||
 #endif
-		    ret == ETIMEDOUT)
-			ret = 0;
-		WT_ERR(ret);
-	}
+	    ret == ETIMEDOUT)
+		ret = 0;
 
-	cond->signalled = 0;
+	(void)WT_ATOMIC_SUB(cond->waiters, 1);
 
 err:	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
@@ -123,11 +131,9 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WT_RET(__wt_verbose(
 		    session, "signal %s cond (%p)", cond->name, cond));
 
-	WT_ERR(pthread_mutex_lock(&cond->mtx));
-	locked = 1;
-
-	if (!cond->signalled) {
-		cond->signalled = 1;
+	if (cond->waiters != -1 && !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
+		WT_ERR(pthread_mutex_lock(&cond->mtx));
+		locked = 1;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));
 	}
 
@@ -156,8 +162,7 @@ __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 	WT_TRET(pthread_mutex_destroy(&cond->mtx));
 	__wt_free(session, *condp);
 
-	return ((ret == 0) ? 0 : WT_ERROR);
-
+	return (ret);
 }
 
 /*
@@ -172,7 +177,7 @@ __wt_rwlock_alloc(
 	WT_RWLOCK *rwlock;
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
-	WT_ERR_TEST(pthread_rwlock_init(&rwlock->rwlock, NULL), WT_ERROR);
+	WT_ERR(pthread_rwlock_init(&rwlock->rwlock, NULL));
 
 	rwlock->name = name;
 	*rwlockp = rwlock;
@@ -197,7 +202,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock);
-	WT_CSTAT_INCR(session, rwlock_read);
+	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	if ((ret = pthread_rwlock_rdlock(&rwlock->rwlock)) == 0)
 		return (0);
@@ -215,7 +220,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock);
-	WT_CSTAT_INCR(session, rwlock_write);
+	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	if ((ret =
 	    pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0 || ret == EBUSY)
@@ -234,7 +239,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: writelock %s (%p)", rwlock->name, rwlock);
-	WT_CSTAT_INCR(session, rwlock_write);
+	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	if ((ret = pthread_rwlock_wrlock(&rwlock->rwlock)) == 0)
 		return (0);

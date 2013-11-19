@@ -12,9 +12,11 @@
  *	Default WT_EVENT_HANDLER->handle_error implementation: send to stderr.
  */
 static int
-__handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
+__handle_error_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 	WT_UNUSED(error);
 
 	return (fprintf(stderr, "%s\n", errmsg) >= 0 ? 0 : EIO);
@@ -25,9 +27,11 @@ __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
  *	Default WT_EVENT_HANDLER->handle_message implementation: send to stdout.
  */
 static int
-__handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
+__handle_message_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	return (printf("%s\n", message) >= 0 ? 0 : EIO);
 }
@@ -37,12 +41,28 @@ __handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-__handle_progress_default(
-    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
+__handle_progress_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 	WT_UNUSED(operation);
 	WT_UNUSED(progress);
+
+	return (0);
+}
+
+/*
+ * __handle_close_default --
+ *	Default WT_EVENT_HANDLER->handle_close implementation: ignore.
+ */
+static int
+__handle_close_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, WT_CURSOR *cursor)
+{
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
+	WT_UNUSED(cursor);
 
 	return (0);
 }
@@ -50,7 +70,8 @@ __handle_progress_default(
 static WT_EVENT_HANDLER __event_handler_default = {
 	__handle_error_default,
 	__handle_message_default,
-	__handle_progress_default
+	__handle_progress_default,
+	__handle_close_default
 };
 
 /*
@@ -62,6 +83,7 @@ __handler_failure(WT_SESSION_IMPL *session,
     int error, const char *which, int error_handler_failed)
 {
 	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 
 	/*
 	 * !!!
@@ -79,13 +101,14 @@ __handler_failure(WT_SESSION_IMPL *session,
 	 * handler that failed.  If it was the error handler that failed, or a
 	 * call to the error handler fails, use the default error handler.
 	 */
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (!error_handler_failed &&
 	    handler->handle_error != __handle_error_default &&
-	    handler->handle_error(handler, error, s) == 0)
+	    handler->handle_error(handler, wt_session, error, s) == 0)
 		return;
 
-	(void)__handle_error_default(NULL, error, s);
+	(void)__handle_error_default(NULL, wt_session, error, s);
 }
 
 /*
@@ -118,12 +141,15 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	pthread_t self;
+	struct timespec ts;
 	size_t len, remain, wlen;
 	int prefix_cnt;
 	const char *err, *prefix;
 	char *end, *p;
+	u_char tid[64];
 
 	/*
 	 * We're using a stack buffer because we want error messages no matter
@@ -135,37 +161,67 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 */
 	char s[2048];
 
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 *
+	 * Without a session, we don't have event handlers or prefixes for the
+	 * error message.  Write the error to stderr and call it a day.  (It's
+	 * almost impossible for that to happen given how early we allocate the
+	 * first session, but if the allocation of the first session fails, for
+	 * example, we can end up here without a session.)
+	 */
+	if (session == NULL) {
+		WT_RET_TEST((fprintf(stderr, "WiredTiger Error%s%s\n",
+		    error == 0 ? "" : ": ",
+		    error == 0 ? "" : wiredtiger_strerror(error)) < 0),
+		    __wt_errno());
+		return (0);
+	}
+
 	p = s;
 	end = s + sizeof(s);
 
-	dhandle = session->dhandle;
-
 	/*
-	 * We have several prefixes for the error message: the database error
+	 * We have several prefixes for the error message:
+	 * a timestamp and the process and thread ids, the database error
 	 * prefix, the data-source's name, and the session's name.  Write them
 	 * as a comma-separate list, followed by a colon.
 	 */
 	prefix_cnt = 0;
+	if (__wt_epoch(session, &ts) == 0) {
+		remain = WT_PTRDIFF(end, p);
+		self = pthread_self();
+		__wt_raw_to_hex_mem((const uint8_t *)&self, sizeof(self),
+		    tid, sizeof(tid));
+		wlen = (size_t)snprintf(p, remain,
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s]",
+		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
+		    (uint64_t)getpid(), tid);
+		p = wlen >= remain ? end : p + wlen;
+		prefix_cnt = 1;
+	}
 	if ((prefix = S2C(session)->error_prefix) != NULL) {
 		remain = WT_PTRDIFF(end, p);
-		wlen = (size_t)snprintf(p, remain, "%s", prefix);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
-	prefix = dhandle == NULL ? NULL : dhandle->name;
+	prefix = session->dhandle == NULL ? NULL : session->dhandle->name;
 	if (prefix != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if ((prefix = session->name) != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if (prefix_cnt != 0) {
 		remain = WT_PTRDIFF(end, p);
@@ -217,13 +273,14 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 * using the default error handler.  If the default error handler fails,
 	 * there's nothing to do.
 	 */
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (msg_event) {
-		ret = handler->handle_message(handler, s);
+		ret = handler->handle_message(handler, wt_session, s);
 		if (ret != 0)
 			__handler_failure(session, ret, "message", 0);
 	} else {
-		ret = handler->handle_error(handler, error, s);
+		ret = handler->handle_error(handler, wt_session, error, s);
 		if (ret != 0 && handler->handle_error != __handle_error_default)
 			__handler_failure(session, ret, "error", 1);
 	}
@@ -299,6 +356,7 @@ static int
 info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 
 	/*
 	 * !!!
@@ -309,8 +367,9 @@ info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	(void)vsnprintf(s, sizeof(s), fmt, ap);
 
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
-	return (handler->handle_message(handler, s));
+	return (handler->handle_message(handler, wt_session, s));
 }
 
 /*
@@ -362,11 +421,14 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 {
 	WT_DECL_RET;
 	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (handler != NULL && handler->handle_progress != NULL)
 		if ((ret = handler->handle_progress(
-		    handler, s == NULL ? session->name : s, v)) != 0)
+		    handler, wt_session,
+		    s == NULL ? session->name : s, v)) != 0)
 			__handler_failure(session, ret, "progress", 0);
 	return (0);
 }

@@ -50,9 +50,10 @@ struct __wt_session_impl {
 
 	u_int active;			/* Non-zero if the session is in-use */
 
-	WT_CONDVAR *cond;		/* Condition variable */
-
 	const char *name;		/* Name */
+	uint32_t id;			/* UID, offset in session array */
+
+	WT_CONDVAR *cond;		/* Condition variable */
 
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
@@ -62,7 +63,8 @@ struct __wt_session_impl {
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
-	WT_CURSOR_BACKUP *bkp_cursor;	/* Cursor for current backup */
+
+	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
 
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
@@ -95,13 +97,16 @@ struct __wt_session_impl {
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
 
-	void	*reconcile;		/* Reconciliation information */
-
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
 
-	uint32_t id;			/* Offset in conn->session_array */
+	void	*block_manager;		/* Block-manager support */
+	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
+	void	*reconcile;		/* Reconciliation support */
+	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
+
+	int compaction;			/* Compaction did some work */
 
 	uint32_t flags;
 
@@ -111,10 +116,13 @@ struct __wt_session_impl {
 	 * Putting the hazard pointer at the end of the structure allows us to
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard pointer.
+	 *
+	 * The number of hazard pointers that can be in use grows dynamically.
 	 */
+#define	WT_HAZARD_INCR		10
 	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
 	uint32_t   nhazard;		/* Count of active hazard pointers */
 
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard pointer array */
-};
+} WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));

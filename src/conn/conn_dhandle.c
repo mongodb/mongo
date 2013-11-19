@@ -204,7 +204,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		ret = __wt_checkpoint_close(session, NULL);
+		ret = __wt_checkpoint_close(session);
 
 	WT_TRET(__wt_btree_close(session));
 	F_CLR(dhandle, WT_DHANDLE_OPEN);
@@ -276,7 +276,6 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_strdup(
 	    session, WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
 	dhandle->cfg[1] = metaconf;
-	metaconf = NULL;
 	return (0);
 
 err:	__wt_free(session, metaconf);
@@ -365,7 +364,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	 * is not free, we're done.  Cleaning up the list is a best effort only.
 	 */
 	if (__wt_spin_trylock(session, &conn->dhandle_lock) != 0) {
-		WT_CSTAT_INCR(session, dh_sweep_evict);
+		WT_STAT_FAST_CONN_INCR(session, dh_sweep_evict);
 		return (0);
 	}
 	/*
@@ -378,7 +377,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    dhandle->refcnt == 0) {
-			WT_CSTAT_INCR(session, dh_conn_handles);
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 			SLIST_INSERT_HEAD(&sweeplh, dhandle, l);
 		}
@@ -441,6 +440,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
+    int apply_checkpoints,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
@@ -454,6 +454,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    WT_PREFIX_MATCH(dhandle->name, "file:") &&
+		    (apply_checkpoints || dhandle->checkpoint == NULL) &&
 		    !WT_IS_METADATA(dhandle)) {
 			/*
 			 * We need to pull the handle into the session handle

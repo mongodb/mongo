@@ -35,8 +35,8 @@ const char *config;				/* Object config */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
-static int  handle_error(WT_EVENT_HANDLER *, int, const char *);
-static int  handle_message(WT_EVENT_HANDLER *, const char *);
+static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
+static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int);
 static void shutdown(void);
 static int  usage(void);
@@ -141,7 +141,8 @@ wt_startup(char *config_open)
 	static WT_EVENT_HANDLER event_handler = {
 		handle_error,
 		handle_message,
-		NULL
+		NULL,
+		NULL	/* Close handler. */
 	};
 	int ret;
 	char config_buf[128];
@@ -177,14 +178,16 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)system("rm -f WiredTiger* __wt*");
+	WT_UNUSED_RET(system("rm -f WiredTiger* __wt*"));
 }
 
 static int
-handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
+handle_error(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *errmsg)
 {
-	UNUSED(handler);
-	UNUSED(error);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
+	WT_UNUSED(error);
 
 	/* Ignore complaints about missing files. */
 	if (error == ENOENT)
@@ -199,9 +202,11 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 }
 
 static int
-handle_message(WT_EVENT_HANDLER *handler, const char *message)
+handle_message(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
-	UNUSED(handler);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	if (logfp != NULL)
 		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);
@@ -216,7 +221,7 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
 static void
 onint(int signo)
 {
-	UNUSED(signo);
+	WT_UNUSED(signo);
 
 	shutdown();
 

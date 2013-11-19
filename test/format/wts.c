@@ -28,9 +28,11 @@
 #include "format.h"
 
 static int
-handle_message(WT_EVENT_HANDLER *handler, const char *message)
+handle_message(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
-	UNUSED(handler);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	if (g.logfp != NULL)
 		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
@@ -43,10 +45,11 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-handle_progress(
-    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
+handle_progress(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *operation, uint64_t progress)
 {
-	UNUSED(handler);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	track(operation, progress, NULL);
 	return (0);
@@ -55,7 +58,8 @@ handle_progress(
 static WT_EVENT_HANDLER event_handler = {
 	NULL,
 	handle_message,
-	handle_progress
+	handle_progress,
+	NULL	/* Close handler. */
 };
 
 /*
@@ -86,7 +90,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
-	    g.c_statistics ? "statistics=true," : "",
+	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
@@ -181,9 +185,11 @@ wts_create(void)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
+	    "allocation_size=512,%s"
 	    "internal_page_max=%d,internal_item_max=%d,"
-	    "allocation_size=512,leaf_page_max=%d,leaf_item_max=%d",
+	    "leaf_page_max=%d,leaf_item_max=%d",
 	    (g.type == ROW) ? "u" : "r",
+	    g.c_firstfit ? "block_allocation=first," : "",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
 	switch (g.type) {
@@ -265,9 +271,6 @@ wts_create(void)
 
 	if (DATASOURCE("lsm")) {
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
-		if (MMRAND(1, 10) <= 2)			/* 20% */
-			p += snprintf(
-			    p, (size_t)(end - p), ",lsm_bloom_newest=true");
 		if (MMRAND(1, 10) <= 2)			/* 20% */
 			p += snprintf(
 			    p, (size_t)(end - p), ",lsm_bloom_oldest=true");

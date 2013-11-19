@@ -155,8 +155,6 @@ fop(void *arg)
 			++s->verify;
 			obj_verify();
 			break;
-		default:
-			break;
 		}
 
 	return (NULL);

@@ -47,10 +47,8 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
  */
-enum __wt_page_state;
-    typedef enum __wt_page_state WT_PAGE_STATE;
-enum __wt_txn_isolation;
-    typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
+typedef enum __wt_page_state WT_PAGE_STATE;
+typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_block;
@@ -97,6 +95,8 @@ struct __wt_connection_impl;
     typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
 struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
+struct __wt_connection_stats_spinlock;
+    typedef struct __wt_connection_stats_spinlock WT_CONNECTION_STATS_SPINLOCK;
 struct __wt_cursor_backup;
     typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
 struct __wt_cursor_backup_entry;
@@ -215,6 +215,8 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "gcc.h"
+#include "hardware.h"
 #include "misc.h"
 #include "mutex.h"
 #include "posix.h"
@@ -251,16 +253,16 @@ struct __wt_update;
 #include "cell.i"
 
 #include "mutex.i"			/* required by btree.i */
+#include "txn.i"			/* required by btree.i */
 
 #include "btree.i"			/* required by cursor.i */
 #include "cache.i"			/* required by cursor.i */
-#include "txn.i"			/* required by cursor.i */
 #include "cursor.i"
 
 #include "bitstring.i"
 #include "column.i"
 #include "log.i"
-#include "serial_funcs.i"
+#include "serial.i"
 
 #if defined(__cplusplus)
 }

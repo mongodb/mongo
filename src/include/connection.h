@@ -80,6 +80,17 @@ struct __wt_connection_impl {
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 
+	/*
+	 * We distribute the btree page locks across a set of spin locks; it
+	 * can't be an array, we impose cache-line alignment and gcc doesn't
+	 * support that for arrays.  Don't use too many: they are only held for
+	 * very short operations, each one is 64 bytes, so 256 will fill the L1
+	 * cache on most CPUs.
+	 */
+#define	WT_PAGE_LOCKS(conn)	16
+	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
+	u_int	     page_lock_cnt;	/* Next spinlock to use */
+
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 					/* Cache pool queue */
@@ -156,14 +167,37 @@ struct __wt_connection_impl {
 	const char	*ckpt_config;	/* Checkpoint configuration */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
+	int compact_in_memory_pass;	/* Compaction serialization */
+
+	/*
+	 * There are only three statistics states so far: "none", "fast" and
+	 * "all".  Keep it simple, "all" sets both variables, "fast" sets one
+	 * of them.
+	 */
+	int stat_all;			/* "all" statistics configured */
+	int stat_fast;			/* "fast" statistics configured */
+	int stat_clear;			/* "clear" statistics configured */
+
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
-	int		 statistics;	/* Global statistics configuration */
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
+#define	WT_SPINLOCK_MAX	25
+	/* Spinlock blocking matrix: sized 2x the number of spinlocks. */
+	struct __wt_connection_stats_spinlock {
+		const char *name;		/* Mutex name */
+		const char *file;		/* Caller's file/line */
+		int line;
+						/* Count of blocked calls */
+		u_int blocked[WT_SPINLOCK_MAX * 2];
+	} spinlock_stats[WT_SPINLOCK_MAX * 2];
+
+	/* Spinlock list: sized 1x the number of spinlocks. */
+	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
+#endif
+
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
-
-	int		 stat_clear;	/* Statistics log clear */
 	const char	*stat_format;	/* Statistics log timestamp format */
 	FILE		*stat_fp;	/* Statistics log file handle */
 	const char	*stat_path;	/* Statistics log path format */

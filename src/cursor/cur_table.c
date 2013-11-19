@@ -337,6 +337,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 		(*cp)->key.data = primary->key.data;
 		(*cp)->key.size = primary->key.size;
 		(*cp)->recno = primary->recno;
+		F_SET(*cp, WT_CURSTD_KEY_EXT);
 		WT_ERR((*cp)->search(*cp));
 	}
 

@@ -30,21 +30,17 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_TXN *txn;
-	int busy, oldgen;
+	int busy, force_attempts, oldgen;
 
-	txn = &session->txn;
-
-	for (oldgen = 0;;) {
+	for (force_attempts = oldgen = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
 			/*
 			 * The page isn't in memory, attempt to read it.
-			 *
-			 * First make sure there is space in the cache.
+			 * Make sure there is space in the cache.
 			 */
-			WT_RET(__wt_cache_full_check(session, 0));
+			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
 			continue;
@@ -77,17 +73,16 @@ __wt_page_in_func(
 			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
-			 * Make sure the page isn't too big.  Only do this
-			 * check if the transaction hasn't made any updates
-			 * and limit the number of attempts to avoid getting
-			 * stuck if the page doesn't become available.
+			 * Force evict pages that are too big.  Only do this
+			 * check if there is a chance of eviction succeeding.
+			 * That is, if the updates on the page are visible to
+			 * the running transaction.
 			 */
-			if (!WT_TXN_ACTIVE(txn) &&
-			    txn->force_evict_attempts < 4 &&
-			    __wt_eviction_page_force(session, page)) {
-				++txn->force_evict_attempts;
-				page->read_gen = WT_READ_GEN_OLDEST;
-				WT_RET(__wt_page_release(session, page));
+			if (force_attempts < 10 &&
+			    __wt_eviction_force_check(session, page) &&
+			    __wt_eviction_force_txn_check(session, page)) {
+				++force_attempts;
+				WT_RET(__wt_eviction_force(session, page));
 				break;
 			}
 
@@ -468,7 +463,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	/*
 	 * Walk the page, instantiating keys: the page contains sorted key and
 	 * location cookie pairs.  Keys are on-page/overflow items and location
-	 * cookies are WT_CELL_ADDR items.
+	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -479,8 +474,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			break;
 		case WT_CELL_KEY_OVFL:
 			/* Instantiate any overflow records. */
-			WT_ERR(__wt_cell_unpack_ref(
-			    session, WT_PAGE_ROW_INT, unpack, current));
+			WT_ERR(__wt_dsk_cell_data_ref(
+			    session, page->type, unpack, current));
 
 			WT_ERR(__wt_row_ikey(session,
 			    WT_PAGE_DISK_OFFSET(page, cell),
@@ -488,7 +483,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 			*sizep += sizeof(WT_IKEY) + current->size;
 			break;
-		case WT_CELL_ADDR:
+		case WT_CELL_ADDR_DEL:
+		case WT_CELL_ADDR_INT:
+		case WT_CELL_ADDR_LEAF:
+		case WT_CELL_ADDR_LEAF_NO:
 			ref->addr = cell;
 
 			/*

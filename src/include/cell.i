@@ -25,7 +25,7 @@
  *
  * WT_PAGE_ROW_INT (row-store internal page):
  *	Keys and offpage-reference pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- * cell followed by a WT_CELL_{ADDR,ADDR_DEL,ADDR_LNO} cell).
+ * cell followed by a WT_CELL_ADDR_XXX cell).
  *
  * WT_PAGE_ROW_LEAF (row-store leaf page):
  *	Keys with optional data cells (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
@@ -35,7 +35,7 @@
  *	byte count immediately following the cell.
  *
  * WT_PAGE_COL_INT (Column-store internal page):
- *	Off-page references (a WT_CELL_{ADDR,ADDR_LNO} cell).
+ *	Off-page references (a WT_CELL_ADDR_XXX cell).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
  *	Data cells (a WT_CELL_{VALUE,VALUE_COPY,VALUE_OVFL} cell), or deleted
@@ -77,28 +77,32 @@
 #define	WT_CELL_UNUSED_BIT4	0x08		/* Unused */
 
 /*
- * WT_CELL_ADDR is a block location, WT_CELL_ADDR_LNO is a block location with
- * the additional information that the address is for a leaf page without any
- * overflow items.  The goal is to speed up data truncation since we don't have
- * to read leaf pages without overflow items in order to delete them.
+ * WT_CELL_ADDR_INT is an internal block location, WT_CELL_ADDR_LEAF is a leaf
+ * block location, and WT_CELL_ADDR_LEAF_NO is a leaf block location where the
+ * page has no overflow items.  (The goal is to speed up truncation as we don't
+ * have to read pages without overflow items in order to delete them.  Note,
+ * WT_CELL_ADDR_LEAF_NO is not guaranteed to be set on every page without
+ * overflow items, the only guarantee is that if set, the page has no overflow
+ * items.)
  *
  * WT_CELL_VALUE_COPY is a reference to a previous cell on the page, supporting
  * value dictionaries: if the two values are the same, we only store them once
  * and have the second and subsequent use reference the original.
  */
-#define	WT_CELL_ADDR		 (0 << 4)	/* Block location */
-#define	WT_CELL_ADDR_DEL	 (1 << 4)	/* Block location (deleted) */
-#define	WT_CELL_ADDR_LNO	 (2 << 4)	/* Block location (lno) */
-#define	WT_CELL_DEL		 (3 << 4)	/* Deleted value */
-#define	WT_CELL_KEY		 (4 << 4)	/* Key */
-#define	WT_CELL_KEY_OVFL	 (5 << 4)	/* Overflow key */
-#define	WT_CELL_KEY_PFX		 (6 << 4)	/* Key with prefix byte */
-#define	WT_CELL_VALUE		 (7 << 4)	/* Value */
-#define	WT_CELL_VALUE_COPY	 (8 << 4)	/* Value copy */
-#define	WT_CELL_VALUE_OVFL	 (9 << 4)	/* Overflow value */
-#define	WT_CELL_VALUE_OVFL_RM	(10 << 4)	/* Removed overflow value */
+#define	WT_CELL_ADDR_DEL	 (0)		/* Address: deleted */
+#define	WT_CELL_ADDR_INT	 (1 << 4)	/* Address: internal  */
+#define	WT_CELL_ADDR_LEAF	 (2 << 4)	/* Address: leaf */
+#define	WT_CELL_ADDR_LEAF_NO	 (3 << 4)	/* Address: leaf no overflow */
+#define	WT_CELL_DEL		 (4 << 4)	/* Deleted value */
+#define	WT_CELL_KEY		 (5 << 4)	/* Key */
+#define	WT_CELL_KEY_OVFL	 (6 << 4)	/* Overflow key */
+#define	WT_CELL_KEY_PFX		 (7 << 4)	/* Key with prefix byte */
+#define	WT_CELL_VALUE		 (8 << 4)	/* Value */
+#define	WT_CELL_VALUE_COPY	 (9 << 4)	/* Value copy */
+#define	WT_CELL_VALUE_OVFL	(10 << 4)	/* Overflow value */
+#define	WT_CELL_VALUE_OVFL_RM	(11 << 4)	/* Removed overflow value */
 
-#define	WT_CELL_TYPE_MASK	(0x0fU << 4)
+#define	WT_CELL_TYPE_MASK	(0x0fU << 4)	/* Maximum 16 cell types */
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
 
 /*
@@ -459,15 +463,10 @@ __wt_cell_type(WT_CELL *cell)
 	}
 
 	switch (type = WT_CELL_TYPE(cell->__chunk[0])) {
-	case WT_CELL_ADDR_DEL:
-	case WT_CELL_ADDR_LNO:
-		return (WT_CELL_ADDR);
 	case WT_CELL_KEY_PFX:
 		return (WT_CELL_KEY);
 	case WT_CELL_VALUE_OVFL_RM:
 		return (WT_CELL_VALUE_OVFL);
-	default:
-		break;
 	}
 	return (type);
 }
@@ -593,9 +592,10 @@ restart:
 		unpack->ovfl = 1;
 		/* FALLTHROUGH */
 
-	case WT_CELL_ADDR:
 	case WT_CELL_ADDR_DEL:
-	case WT_CELL_ADDR_LNO:
+	case WT_CELL_ADDR_INT:
+	case WT_CELL_ADDR_LEAF:
+	case WT_CELL_ADDR_LEAF_NO:
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_PFX:
 	case WT_CELL_VALUE:
@@ -648,12 +648,12 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 }
 
 /*
- * __wt_cell_unpack_ref --
+ * __cell_data_ref --
  *	Set a buffer to reference the data from an unpacked cell.
  */
 static inline int
-__wt_cell_unpack_ref(
-    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+__cell_data_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page, int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 	void *huffman;
@@ -665,7 +665,7 @@ __wt_cell_unpack_ref(
 	case WT_CELL_KEY:
 		store->data = unpack->data;
 		store->size = unpack->size;
-		if (type == WT_PAGE_ROW_INT)
+		if (page_type == WT_PAGE_ROW_INT)
 			return (0);
 
 		huffman = btree->huffman_key;
@@ -676,14 +676,14 @@ __wt_cell_unpack_ref(
 		huffman = btree->huffman_value;
 		break;
 	case WT_CELL_KEY_OVFL:
-		WT_RET(__wt_ovfl_read(session, unpack, store));
-		if (type == WT_PAGE_ROW_INT)
+		WT_RET(__wt_ovfl_read(session, page, unpack, store));
+		if (page_type == WT_PAGE_ROW_INT)
 			return (0);
 
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE_OVFL:
-		WT_RET(__wt_ovfl_read(session, unpack, store));
+		WT_RET(__wt_ovfl_read(session, page, unpack, store));
 		huffman = btree->huffman_value;
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -695,12 +695,39 @@ __wt_cell_unpack_ref(
 }
 
 /*
- * __wt_cell_unpack_copy --
+ * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
+ *	Set a buffer to reference the data from an unpacked cell, two flavors.
+ * There are two version because of WT_CELL_VALUE_OVFL_RM type cells.  When an
+ * overflow item is deleted, its backing blocks are removed; if there are still
+ * running transactions that might need to see the overflow item, we cache a
+ * copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM.  If we
+ * find a WT_CELL_VALUE_OVFL_RM cell when reading an overflow item, we use the
+ * page reference to look aside into the cache.  So, calling the "dsk" version
+ * of the function declares the cell cannot be of type WT_CELL_VALUE_OVFL_RM,
+ * and calling the "page" version means it might be.
+ */
+static inline int
+__wt_dsk_cell_data_ref(WT_SESSION_IMPL *session,
+    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	WT_ASSERT(session,
+	    __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
+	return (__cell_data_ref(session, NULL, page_type, unpack, store));
+}
+static inline int
+__wt_page_cell_data_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	return (__cell_data_ref(session, page, page->type, unpack, store));
+}
+
+/*
+ * __wt_cell_data_copy --
  *	Copy the data from an unpacked cell into a buffer.
  */
 static inline int
-__wt_cell_unpack_copy(
-    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+__wt_cell_data_copy(WT_SESSION_IMPL *session,
+    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	/*
 	 * We have routines to both copy and reference a cell's information.  In
@@ -710,8 +737,11 @@ __wt_cell_unpack_copy(
 	 * a copy will be made (for example, when reading an overflow item from
 	 * the underlying object.  If that happens, we're done, otherwise make
 	 * a copy.
+	 *
+	 * We don't require two versions of this function, no callers need to
+	 * handle WT_CELL_VALUE_OVFL_RM cells.
 	 */
-	WT_RET(__wt_cell_unpack_ref(session, type, unpack, store));
+	WT_RET(__wt_dsk_cell_data_ref(session, page_type, unpack, store));
 	if (!WT_DATA_IN_ITEM(store))
 		WT_RET(__wt_buf_set(session, store, store->data, store->size));
 	return (0);

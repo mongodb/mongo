@@ -23,8 +23,10 @@ main(int argc, char *argv[])
 	WT_CONNECTION *conn;
 	WT_DECL_RET;
 	WT_SESSION *session;
-	int ch, major_v, minor_v, tret;
-	const char *config;
+	size_t len;
+	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
+	char *p;
+	const char *cmd_config, *config;
 
 	conn = NULL;
 
@@ -49,11 +51,11 @@ main(int argc, char *argv[])
 	}
 
 	/* Check for standard options. */
-	config = NULL;
+	cmd_config = config = NULL;
 	while ((ch = util_getopt(argc, argv, "C:h:Vv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
-			config = util_optarg;
+			cmd_config = util_optarg;
 			break;
 		case 'h':			/* home directory */
 			home = util_optarg;
@@ -80,106 +82,104 @@ main(int argc, char *argv[])
 	util_optreset = 1;
 	util_optind = 1;
 
-	/* The copyright option doesn't require a database. */
-	switch (command[0]) {
-	case 'c':
-		if (strcmp(command, "copyright") == 0) {
-			util_copyright();
-			return (EXIT_SUCCESS);
-		}
-		break;
-	}
-
-	/* The "create" and "load" commands can create the database. */
-	if (config == NULL &&
-	    (strcmp(command, "create") == 0 ||
-	    strcmp(command, "load") == 0 ||
-	    strcmp(command, "loadtext") == 0))
-		config = "create";
-
-	if ((ret = wiredtiger_open(home,
-	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
-		goto err;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		goto err;
-
+	func = NULL;
 	switch (command[0]) {
 	case 'b':
 		if (strcmp(command, "backup") == 0)
-			ret = util_backup(session, argc, argv);
-		else
-			ret = usage();
+			func = util_backup;
 		break;
 	case 'c':
 		if (strcmp(command, "compact") == 0)
-			ret = util_compact(session, argc, argv);
-		else if (strcmp(command, "create") == 0)
-			ret = util_create(session, argc, argv);
-		else
-			ret = usage();
+			func = util_compact;
+		else if (strcmp(command, "copyright") == 0) {
+			util_copyright();
+			return (EXIT_SUCCESS);
+		} else if (strcmp(command, "create") == 0) {
+			func = util_create;
+			config = "create";
+		}
 		break;
 	case 'd':
 		if (strcmp(command, "drop") == 0)
-			ret = util_drop(session, argc, argv);
+			func = util_drop;
 		else if (strcmp(command, "dump") == 0)
-			ret = util_dump(session, argc, argv);
-		else
-			ret = usage();
+			func = util_dump;
 		break;
 	case 'l':
 		if (strcmp(command, "list") == 0)
-			ret = util_list(session, argc, argv);
-		else if (strcmp(command, "load") == 0)
-			ret = util_load(session, argc, argv);
-		else if (strcmp(command, "loadtext") == 0)
-			ret = util_loadtext(session, argc, argv);
-		else
-			ret = usage();
+			func = util_list;
+		else if (strcmp(command, "load") == 0) {
+			func = util_load;
+			config = "create";
+		} else if (strcmp(command, "loadtext") == 0) {
+			func = util_loadtext;
+			config = "create";
+		}
 		break;
 	case 'p':
 		if (strcmp(command, "printlog") == 0)
-			ret = util_printlog(session, argc, argv);
-		else
-			ret = usage();
+			func = util_printlog;
 		break;
 	case 'r':
 		if (strcmp(command, "read") == 0)
-			ret = util_read(session, argc, argv);
+			func = util_read;
 		else if (strcmp(command, "rename") == 0)
-			ret = util_rename(session, argc, argv);
-		else
-			ret = usage();
+			func = util_rename;
 		break;
 	case 's':
 		if (strcmp(command, "salvage") == 0)
-			ret = util_salvage(session, argc, argv);
-		else if (strcmp(command, "stat") == 0)
-			ret = util_stat(session, argc, argv);
-		else
-			ret = usage();
+			func = util_salvage;
+		else if (strcmp(command, "stat") == 0) {
+			func = util_stat;
+			config = "statistics=(all)";
+		}
 		break;
 	case 'u':
 		if (strcmp(command, "upgrade") == 0)
-			ret = util_upgrade(session, argc, argv);
-		else
-			ret = usage();
+			func = util_upgrade;
 		break;
 	case 'v':
 		if (strcmp(command, "verify") == 0)
-			ret = util_verify(session, argc, argv);
-		else
-			ret = usage();
+			func = util_verify;
 		break;
 	case 'w':
 		if (strcmp(command, "write") == 0)
-			ret = util_write(session, argc, argv);
-		else
-			ret = usage();
+			func = util_write;
 		break;
 	default:
-		ret = usage();
 		break;
 	}
+	if (func == NULL)
+		return (usage());
+
+	/* Build the configuration string, as necessary. */
+	if (config == NULL)
+		config = cmd_config;
+	else if (cmd_config != NULL) {
+		len = strlen(cmd_config) + strlen(config) + 10;
+		if ((p = malloc(len)) == NULL) {
+			ret = util_err(errno, NULL);
+			goto err;
+		}
+		(void)snprintf(p, len, "%s,%s", config, cmd_config);
+		config = p;
+	}
+
+	/* Open the database and a session. */
+	if ((ret = wiredtiger_open(home,
+	    verbose ? verbose_handler : NULL, config, &conn)) != 0) {
+		ret = util_err(ret, NULL);
+		goto err;
+	}
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		ret = util_err(ret, NULL);
+		goto err;
+	}
+
+	/* Call the function. */
+	ret = func(session, argc, argv);
+
+	/* Close the database. */
 
 err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
@@ -268,7 +268,7 @@ type_err:		fprintf(stderr,
 
 	len = strlen(type) + strlen(s) + 2;
 	if ((name = calloc(len, 1)) == NULL) {
-		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
+		(void)util_err(errno, NULL);
 		return (NULL);
 	}
 

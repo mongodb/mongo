@@ -126,8 +126,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk->cksum = __wt_cksum(
 	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 
-	if (!locked)
+	if (!locked) {
+		WT_RET(__wt_block_ext_alloc(session, NULL, 5));
+		WT_RET(__wt_block_size_alloc(session, NULL, 2));
 		__wt_spin_lock(session, &block->live_lock);
+	}
 	ret = __wt_block_alloc(session, block, &offset, (off_t)align_size);
 	if (!locked)
 		__wt_spin_unlock(session, &block->live_lock);
@@ -188,8 +191,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    session, ret, "%s: posix_fadvise", block->name);
 	}
 #endif
-	WT_CSTAT_INCR(session, block_write);
-	WT_CSTAT_INCRV(session, block_byte_write, align_size);
+	WT_STAT_FAST_CONN_INCR(session, block_write);
+	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
 
 	WT_VERBOSE_RET(session, write,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,

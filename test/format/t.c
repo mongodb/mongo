@@ -249,7 +249,7 @@ startup(void)
 		die(errno, "mkdir: %s", RUNDIR);
 
 	/* Remove the run's files except for rand. */
-	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
+	WT_UNUSED_RET(system("cd RUNDIR && rm -rf `ls | sed /rand/d`"));
 
 	/* Create the data-source directory. */
 	if (mkdir(RUNDIR_KVS, 0777) != 0)
@@ -270,10 +270,10 @@ startup(void)
 static void
 onint(int signo)
 {
-	UNUSED(signo);
+	WT_UNUSED(signo);
 
 	/* Remove the run's files except for rand. */
-	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
+	WT_UNUSED_RET(system("cd RUNDIR && rm -rf `ls | sed /rand/d`"));
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);

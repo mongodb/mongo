@@ -156,7 +156,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 
 	/* Destroy locks. */
-	__wt_spin_destroy(session, &btree->serial_lock);
 	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
 
 	/* Free allocated memory. */
@@ -187,8 +186,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	btree = S2BT(session);
 	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
-
-	WT_RET(__wt_spin_init(session, &btree->serial_lock));
 
 	/* Dump out format information. */
 	if (WT_VERBOSE_ISSET(session, version)) {
@@ -546,8 +543,10 @@ __btree_preload(WT_SESSION_IMPL *session)
 
 	/* Pre-load the second-level internal pages. */
 	WT_REF_FOREACH(btree->root_page, ref, i) {
-		__wt_get_addr(btree->root_page, ref, &addr, &addr_size);
-		WT_RET(bm->preload(bm, session, addr, addr_size));
+		WT_RET(__wt_ref_info(session,
+		    btree->root_page, ref, &addr, &addr_size, NULL));
+		if (addr != NULL)
+			WT_RET(bm->preload(bm, session, addr, addr_size));
 	}
 	return (0);
 }

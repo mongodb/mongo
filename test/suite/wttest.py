@@ -54,14 +54,6 @@ def shortenWithEllipsis(s, maxlen):
         s = s[0:maxlen-3] + '...'
     return s
 
-class FdWriter(object):
-    def __init__(self, fd):
-        self.fd = fd
-
-    def write(self, text):
-        os.write(self.fd, text)
-
-
 class CapturedFd(object):
     """
     CapturedFd encapsulates a file descriptor (e.g. 1 or 2) that is diverted
@@ -71,12 +63,11 @@ class CapturedFd(object):
     sys.stderr behave normally (e.g. go to the tty), while the C stdout/stderr
     ends up in a file that we can verify.
     """
-    def __init__(self, targetFd, originalDupedFd, filename, desc):
-        self.targetFd = targetFd
-        self.originalDupedFd = originalDupedFd
+    def __init__(self, filename, desc):
         self.filename = filename
         self.desc = desc
         self.expectpos = 0
+        self.file = None
 
     def readFileFrom(self, filename, pos, maxchars):
         """
@@ -94,26 +85,15 @@ class CapturedFd(object):
         that the caller has duped it and passed the dup to us
         in the constructor.
         """
-        filefd = os.open(self.filename, os.O_RDWR | os.O_CREAT | os.O_APPEND)
-        if filefd < 0:
-            raise Exception(self.testdir + ": cannot remove directory")
-        os.dup2(filefd, self.targetFd)
-        os.close(filefd)
+        self.file = open(self.filename, 'w')
+        return self.file
 
     def release(self):
         """
-        Stop capturing.  Restore the original fd from the duped copy.
+        Stop capturing.
         """
-        if self.originalDupedFd >= 0:
-            os.dup2(self.originalDupedFd, self.targetFd)
-
-    def show(self, pfx=None):
-        contents = self.readFileFrom(self.filename, 0, 1000)
-        if pfx != None:
-            pfx = ': ' + pfx
-        else:
-            pfx = ''
-        print self.desc + pfx + ' [pos=' + str(self.expectpos) + '] ' + contents
+        self.file.close()
+        self.file = None
 
     def check(self, testcase):
         """
@@ -121,13 +101,17 @@ class CapturedFd(object):
         file.  If there is, raise it as a test failure.
         This is generally called after 'release' is called.
         """
+        if self.file != None:
+            self.file.flush()
         filesize = os.path.getsize(self.filename)
         if filesize > self.expectpos:
             contents = self.readFileFrom(self.filename, self.expectpos, 10000)
-            print 'ERROR: ' + self.filename + ' unexpected ' + \
-                self.desc + ', contains:\n"' + contents + '"'
+            WiredTigerTestCase.prout('ERROR: ' + self.filename +
+                                     ' unexpected ' + self.desc +
+                                     ', contains:\n"' + contents + '"')
             testcase.fail('unexpected ' + self.desc + ', contains: "' +
                       shortenWithEllipsis(contents,100) + '"')
+        self.expectpos = filesize
 
     def checkAdditional(self, testcase, expect):
         """
@@ -135,6 +119,8 @@ class CapturedFd(object):
         output file.  If it has not, raise it as a test failure.
         In any case, reset the expected pos to account for the new output.
         """
+        if self.file != None:
+            self.file.flush()
         gotstr = self.readFileFrom(self.filename, self.expectpos, 1000)
         testcase.assertEqual(gotstr, expect, 'in ' + self.desc +
                              ', expected "' + expect + '", but got "' +
@@ -147,6 +133,8 @@ class CapturedFd(object):
         output file.  If it has not, raise it as a test failure.
         In any case, reset the expected pos to account for the new output.
         """
+        if self.file != None:
+            self.file.flush()
         gotstr = self.readFileFrom(self.filename, self.expectpos, 1000)
         if re.search(pat, gotstr) == None:
             testcase.fail('in ' + self.desc +
@@ -173,25 +161,16 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._verbose = verbose
+        WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
         WiredTigerTestCase._globalSetup = True
         WiredTigerTestCase._stdout = sys.stdout
         WiredTigerTestCase._stderr = sys.stderr
-        # newoutfd, newerrfd are dups of the originals
-        WiredTigerTestCase._newoutFd = os.dup(1)
-        WiredTigerTestCase._newerrFd = os.dup(2)
-        # newout, newerr are like stdout, stderr, but using the dups
-        WiredTigerTestCase._newout = FdWriter(WiredTigerTestCase._newoutFd)
-        WiredTigerTestCase._newerr = FdWriter(WiredTigerTestCase._newerrFd)
 
     def fdSetUp(self):
-        self.captureout = CapturedFd(1, WiredTigerTestCase._newoutFd,
-                                     'stdout.txt', 'standard output')
-        self.captureerr = CapturedFd(2, WiredTigerTestCase._newerrFd,
-                                     'stderr.txt', 'error output')
-        self.captureout.capture()
-        self.captureerr.capture()
-        sys.stdout = WiredTigerTestCase._newout
-        sys.stderr = WiredTigerTestCase._newerr
+        self.captureout = CapturedFd('stdout.txt', 'standard output')
+        self.captureerr = CapturedFd('stderr.txt', 'error output')
+        sys.stdout = self.captureout.capture()
+        sys.stderr = self.captureerr.capture()
         
     def fdTearDown(self):
         # restore stderr/stdout
@@ -357,7 +336,7 @@ class WiredTigerTestCase(unittest.TestCase):
         # of printing the message too many times.
         if not msg in WiredTigerTestCase._printOnceSeen:
             WiredTigerTestCase._printOnceSeen[msg] = msg
-            print msg
+            WiredTigerTestCase.prout(msg)
 
     def KNOWN_FAILURE(self, name):
         myname = self.simpleName()
@@ -373,10 +352,17 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def printVerbose(level, message):
         if level <= WiredTigerTestCase._verbose:
-            print message
+            WiredTigerTestCase.prout(message)
 
     def verbose(self, level, message):
         WiredTigerTestCase.printVerbose(level, message)
+
+    def prout(self, s):
+        WiredTigerTestCase.prout(s)
+
+    @staticmethod
+    def prout(s):
+        os.write(WiredTigerTestCase._dupout, s + '\n')
 
     def pr(self, s):
         """
@@ -393,7 +379,7 @@ class WiredTigerTestCase(unittest.TestCase):
         if len(beginning) > 0:
             msg += '\n'
         msg += '  ' + self.shortid() + ': ' + s
-        print(msg)
+        self.prout(msg)
         WiredTigerTestCase._resultfile.write(msg + '\n')
 
     def prexception(self, excinfo):

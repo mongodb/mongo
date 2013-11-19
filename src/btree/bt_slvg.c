@@ -435,6 +435,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TRACK *trk;
 
+	trk = NULL;
+
 	WT_RET(__wt_calloc_def(session, 1, &trk));
 	trk->ss = ss;
 
@@ -446,10 +448,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	*retp = trk;
 	return (0);
 
-err:	if (trk->addr.addr != NULL)
-		__wt_free(session, trk->addr.addr);
-	if (trk != NULL)
-		__wt_free(session, trk);
+err:	__wt_free(session, trk->addr.addr);
+	__wt_free(session, trk);
 	return (ret);
 }
 
@@ -1076,6 +1076,8 @@ __slvg_col_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
+	addr = NULL;
+
 	/* Allocate a column-store root (internal) page and fill it in. */
 	WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, &page));
 	page->parent = NULL;				/* Root page */
@@ -1093,10 +1095,12 @@ __slvg_col_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
-		addr->leaf_no_overflow = trk->ovfl_cnt == 0 ? 1 : 0;
+		addr->type =
+		    trk->ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
 
 		ref->page = NULL;
 		ref->addr = addr;
+		addr = NULL;
 		ref->key.recno = trk->col_start;
 		ref->state = WT_REF_DISK;
 
@@ -1119,7 +1123,9 @@ __slvg_col_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page);
+err:		if (addr != NULL)
+			__wt_free(session, addr);
+		__wt_page_out(session, &page);
 	}
 	return (ret);
 }
@@ -1627,10 +1633,9 @@ __slvg_row_trk_update_start(
 		qsort(ss->pages + slot, (size_t)i,
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
-	if (page != NULL)
+err:	if (page != NULL)
 		__wt_page_out(session, &page);
-
-err:	__wt_scr_free(&dsk);
+	__wt_scr_free(&dsk);
 	__wt_scr_free(&key);
 
 	return (ret);
@@ -1652,6 +1657,8 @@ __slvg_row_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 
+	addr = NULL;
+
 	/* Allocate a row-store root (internal) page and fill it in. */
 	WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, &page));
 	page->parent = NULL;
@@ -1668,10 +1675,12 @@ __slvg_row_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
-		addr->leaf_no_overflow = trk->ovfl_cnt == 0 ? 1 : 0;
+		addr->type =
+		    trk->ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
 
 		ref->page = NULL;
 		ref->addr = addr;
+		addr = NULL;
 		__wt_ref_key_clear(ref);
 		ref->state = WT_REF_DISK;
 
@@ -1698,7 +1707,9 @@ __slvg_row_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page);
+err:		if (addr != NULL)
+			__wt_free(session, addr);
+		__wt_page_out(session, &page);
 	}
 	return (ret);
 }

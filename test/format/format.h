@@ -46,6 +46,7 @@
 #include <db.h>
 #endif
 #include <wiredtiger.h>
+#include <gcc.h>				/* WiredTiger internal */
 
 #include <wiredtiger_ext.h>
 extern WT_EXTENSION_API *wt_api;
@@ -69,7 +70,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	RAW_PATH	".libs/raw_compress.so"
 
 #define	M(v)		((v) * 1000000)		/* Million */
-#define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
@@ -142,6 +142,7 @@ typedef struct {
 	char *c_data_source;
 	u_int c_delete_pct;
 	u_int c_dictionary;
+	u_int c_firstfit;
 	u_int c_hot_backups;
 	char *c_file_type;
 	u_int c_huffman_key;

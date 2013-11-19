@@ -37,8 +37,16 @@ class test_stat01(wttest.WiredTigerTestCase):
 
     tablename = 'test_stat01.wt'
     uri = 'file:' + tablename
-    config = 'key_format=S,allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
+    config = 'key_format=S,' +\
+        'allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
     nentries = 25
+
+    # Override WiredTigerTestCase, we have extensions.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,statistics=(fast),' +
+            'error_prefix="%s: "' % self.shortid())
+        return conn
 
     def statstr_to_int(self, str):
         """
@@ -75,13 +83,12 @@ class test_stat01(wttest.WiredTigerTestCase):
     def test_basic_conn_stats(self):
         self.printVerbose(2, 'overall database stats:')
         allstat_cursor = self.session.open_cursor('statistics:', None, None)
-        self.check_stats(
-            allstat_cursor, 10, 'blocks written by the block manager')
+        self.check_stats(allstat_cursor, 10, 'block manager: blocks written')
 
         # See that we can get a specific stat value by its key,
         # and verify that its entry is self-consistent
         values = allstat_cursor[stat.conn.block_write]
-        self.assertEqual(values[0], 'blocks written by the block manager')
+        self.assertEqual(values[0], 'block manager: blocks written')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
         allstat_cursor.close()

@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import fileinput, os, shutil, sys
+import fileinput, os, shutil, sys, textwrap
 from collections import defaultdict
 from datetime import datetime
 from subprocess import call
@@ -43,12 +43,12 @@ no_scale_per_second_list = [
     'cache: pages currently held in the cache',
     'files currently open',
     'open cursor count',
-    'block manager file allocation unit size',
-    'checkpoint size',
-    'file magic number',
-    'file major version number',
-    'minor version number',
-    'block manager file size in bytes',
+    'block manager: file allocation unit size',
+    'block manager: checkpoint size',
+    'block manager: file magic number',
+    'block manager: file major version number',
+    'block manager: minor version number',
+    'block manager: file size in bytes',
     'bloom filters in the LSM tree',
     'total size of bloom filters',
     'column-store variable-size deleted values',
@@ -73,8 +73,12 @@ no_scale_per_second_list = [
 ]
 # no scale-per-second list section: END
 
+reportno = 0
+
 # Plot a set of entries for a title.
-def plot(title, values, num):
+def plot(title, values):
+    global reportno
+
     # Ignore entries where the value never changes.
     skip = True
     t0, v0 = values[0]
@@ -83,10 +87,12 @@ def plot(title, values, num):
             skip = False
             break
     if skip:
-        print '\tskipping ' + title
+        print 'skipping: ' + title
         return
 
-    print 'building ' + title
+    print 'building: ' + title
+    reportno = reportno + 1
+    num = "%03d" % reportno
 
     ylabel = 'Value'
     if title.split(' ', 1)[1] in no_scale_per_second_list:
@@ -95,6 +101,8 @@ def plot(title, values, num):
         t1, v1 = values[1]
         seconds = (datetime.strptime(t1, TIMEFMT) -
             datetime.strptime(t0, TIMEFMT)).seconds
+	if seconds == 0:
+		seconds = 1
         ylabel += ' per second'
 
     # Write the raw data into a file for processing.
@@ -148,5 +156,6 @@ for line in fileinput.input(sys.argv[1:]):
     d[desc].append((month + " " + day + " " + time, v))
 
 # Plot each entry in the dictionary.
-for rno, items in enumerate(sorted(d.iteritems()), 1):
-    plot(items[0], items[1], "%03d" % rno)
+for items in sorted(d.iteritems()):
+    plot('\\n'.join(l for l in textwrap.wrap(items[0], 60)), items[1])
+

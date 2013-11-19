@@ -49,6 +49,7 @@ int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
+int cursor_statistics(WT_SESSION *session);
 int hot_backup(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
@@ -456,6 +457,41 @@ checkpoint_ops(WT_SESSION *session)
 }
 
 int
+cursor_statistics(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	/*! [Statistics cursor database] */
+	ret = session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor);
+	/*! [Statistics cursor database] */
+
+	/*! [Statistics cursor table] */
+	ret = session->open_cursor(
+	    session, "statistics:table:mytable", NULL, NULL, &cursor);
+	/*! [Statistics cursor table] */
+
+	/*! [Statistics cursor table fast] */
+	ret = session->open_cursor(session,
+	    "statistics:table:mytable", NULL, "statistics=(fast)", &cursor);
+	/*! [Statistics cursor table fast] */
+
+	/*! [Statistics clear configuration] */
+	ret = session->open_cursor(session,
+	    "statistics:", NULL, "statistics=(fast,clear)", &cursor);
+	/*! [Statistics clear configuration] */
+
+	/*! [Statistics cursor clear configuration] */
+	ret = session->open_cursor(session,
+	    "statistics:table:mytable",
+	    NULL, "statistics=(all,clear)", &cursor);
+	/*! [Statistics cursor clear configuration] */
+
+	return (ret);
+}
+
+int
 session_ops(WT_SESSION *session)
 {
 	int ret;
@@ -540,6 +576,11 @@ session_ops(WT_SESSION *session)
 	/*! [os_cache_max configuration] */
 	ret = session->drop(session, "table:mytable", NULL);
 #endif
+	/*! [Configure block_allocation] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,block_allocation=first");
+	/*! [Configure block_allocation] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
@@ -952,7 +993,7 @@ main(void)
 		(void)conn->close(conn, NULL);
 
 	/*! [Statistics configuration] */
-	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
+	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	/*! [Statistics configuration] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);

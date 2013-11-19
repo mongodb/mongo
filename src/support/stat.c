@@ -5,17 +5,22 @@
 void
 __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 {
-	stats->block_alloc.desc = "blocks allocated";
-	stats->block_allocsize.desc =
-	    "block manager file allocation unit size";
-	stats->block_checkpoint_size.desc = "checkpoint size";
+	/* Clear, so can also be called for reinitialization. */
+	memset(stats, 0, sizeof(*stats));
+
+	stats->allocation_size.desc =
+	    "block manager: file allocation unit size";
+	stats->block_alloc.desc = "block manager: blocks allocated";
+	stats->block_checkpoint_size.desc = "block manager: checkpoint size";
 	stats->block_extension.desc =
-	    "block allocations requiring file extension";
-	stats->block_free.desc = "blocks freed";
-	stats->block_magic.desc = "file magic number";
-	stats->block_major.desc = "file major version number";
-	stats->block_minor.desc = "minor version number";
-	stats->block_size.desc = "block manager file size in bytes";
+	    "block manager: allocations requiring file extension";
+	stats->block_free.desc = "block manager: blocks freed";
+	stats->block_magic.desc = "block manager: file magic number";
+	stats->block_major.desc = "block manager: file major version number";
+	stats->block_minor.desc = "block manager: minor version number";
+	stats->block_reuse_bytes.desc =
+	    "block manager: file bytes available for reuse";
+	stats->block_size.desc = "block manager: file size in bytes";
 	stats->bloom_count.desc = "bloom filters in the LSM tree";
 	stats->bloom_false_positive.desc = "bloom filter false positives";
 	stats->bloom_hit.desc = "bloom filter hits";
@@ -117,19 +122,20 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 }
 
 void
-__wt_stat_clear_dsrc_stats(void *stats_arg)
+__wt_stat_refresh_dsrc_stats(void *stats_arg)
 {
 	WT_DSRC_STATS *stats;
 
 	stats = (WT_DSRC_STATS *)stats_arg;
+	stats->allocation_size.v = 0;
 	stats->block_alloc.v = 0;
-	stats->block_allocsize.v = 0;
 	stats->block_checkpoint_size.v = 0;
 	stats->block_extension.v = 0;
 	stats->block_free.v = 0;
 	stats->block_magic.v = 0;
 	stats->block_major.v = 0;
 	stats->block_minor.v = 0;
+	stats->block_reuse_bytes.v = 0;
 	stats->block_size.v = 0;
 	stats->bloom_count.v = 0;
 	stats->bloom_false_positive.v = 0;
@@ -209,7 +215,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 }
 
 void
-__wt_stat_aggregate_dsrc_stats(void *child, void *parent)
+__wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 {
 	WT_DSRC_STATS *c, *p;
 
@@ -219,6 +225,7 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 	p->block_checkpoint_size.v += c->block_checkpoint_size.v;
 	p->block_extension.v += c->block_extension.v;
 	p->block_free.v += c->block_free.v;
+	p->block_reuse_bytes.v += c->block_reuse_bytes.v;
 	p->block_size.v += c->block_size.v;
 	p->bloom_count.v += c->bloom_count.v;
 	p->bloom_false_positive.v += c->bloom_false_positive.v;
@@ -298,14 +305,18 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 void
 __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 {
-	stats->block_byte_map_read.desc =
-	    "mapped bytes read by the block manager";
-	stats->block_byte_read.desc = "bytes read by the block manager";
-	stats->block_byte_write.desc = "bytes written by the block manager";
-	stats->block_map_read.desc = "mapped blocks read by the block manager";
-	stats->block_preload.desc = "blocks pre-loaded by the block manager";
-	stats->block_read.desc = "blocks read by the block manager";
-	stats->block_write.desc = "blocks written by the block manager";
+	/* Clear, so can also be called for reinitialization. */
+	memset(stats, 0, sizeof(*stats));
+
+	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
+	stats->block_byte_read.desc = "block manager: bytes read";
+	stats->block_byte_write.desc = "block manager: bytes written";
+	stats->block_locked_allocation.desc =
+	    "block manager: memory allocations while locked";
+	stats->block_map_read.desc = "block manager: mapped blocks read";
+	stats->block_preload.desc = "block manager: blocks pre-loaded";
+	stats->block_read.desc = "block manager: blocks read";
+	stats->block_write.desc = "block manager: blocks written";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_bytes_inuse.desc = "cache: bytes currently in the cache";
@@ -318,6 +329,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
+	stats->cache_eviction_force.desc =
+	    "cache: pages evicted because they exceeded the in memory maximum";
+	stats->cache_eviction_force_fail.desc =
+	    "cache: failed eviction of pages that exceeded the in memory maximum";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
@@ -349,35 +364,31 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
 	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
-	stats->dh_evict_locks.desc = "dhandle: locked by eviction";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
 	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
-	stats->log_bytes_user.desc =
-	    "log: total user provided log bytes written";
-	stats->log_bytes_written.desc = "log: total log bytes written";
+	stats->log_bytes_user.desc = "log: user provided log bytes written";
+	stats->log_bytes_written.desc = "log: log bytes written";
 	stats->log_max_filesize.desc = "log: maximum log file size";
-	stats->log_reads.desc = "log: total log read operations";
-	stats->log_scan_records.desc =
-	    "log: total records processed by log scan";
+	stats->log_reads.desc = "log: log read operations";
+	stats->log_scan_records.desc = "log: records processed by log scan";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
-	stats->log_scans.desc = "log: total log scan operations";
-	stats->log_slot_closes.desc = "log: total consolidated slot closures";
-	stats->log_slot_consolidated.desc =
-	    "log: total logging bytes consolidated";
-	stats->log_slot_joins.desc = "log: total consolidated slot joins";
-	stats->log_slot_races.desc = "log: total consolidated slot join races";
+	stats->log_scans.desc = "log: log scan operations";
+	stats->log_slot_closes.desc = "log: consolidated slot closures";
+	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
+	stats->log_slot_joins.desc = "log: consolidated slot joins";
+	stats->log_slot_races.desc = "log: consolidated slot join races";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_slot_transitions.desc =
-	    "log: total consolidated slot join transitions";
-	stats->log_sync.desc = "log: total log sync operations";
-	stats->log_writes.desc = "log: total log write operations";
+	    "log: consolidated slot join transitions";
+	stats->log_sync.desc = "log: log sync operations";
+	stats->log_writes.desc = "log: log write operations";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
-	stats->memory_allocation.desc = "total heap memory allocations";
-	stats->memory_free.desc = "total heap memory frees";
-	stats->memory_grow.desc = "total heap memory re-allocations";
+	stats->memory_allocation.desc = "memory allocations";
+	stats->memory_free.desc = "memory frees";
+	stats->memory_grow.desc = "memory re-allocations";
 	stats->read_io.desc = "total read I/Os";
 	stats->rec_pages.desc = "page reconciliation calls";
 	stats->rec_pages_eviction.desc =
@@ -398,7 +409,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 }
 
 void
-__wt_stat_clear_connection_stats(void *stats_arg)
+__wt_stat_refresh_connection_stats(void *stats_arg)
 {
 	WT_CONNECTION_STATS *stats;
 
@@ -406,6 +417,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
+	stats->block_locked_allocation.v = 0;
 	stats->block_map_read.v = 0;
 	stats->block_preload.v = 0;
 	stats->block_read.v = 0;
@@ -417,6 +429,8 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_eviction_clean.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
+	stats->cache_eviction_force.v = 0;
+	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_merge.v = 0;
@@ -439,7 +453,6 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
 	stats->dh_conn_handles.v = 0;
-	stats->dh_evict_locks.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_sweep_evict.v = 0;
 	stats->dh_sweeps.v = 0;

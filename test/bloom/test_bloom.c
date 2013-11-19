@@ -51,7 +51,7 @@ GLOBAL g;
 
 static int cleanup(void);
 void die(int e, const char *fmt, ...);
-static int handle_message(WT_EVENT_HANDLER *handler, const char *message);
+static int handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int signo);
 static int populate_entries(void);
 static int run(void);
@@ -61,7 +61,8 @@ static void usage(void);
 static WT_EVENT_HANDLER event_handler = {
 	NULL,
 	handle_message,
-	NULL
+	NULL,
+	NULL	/* Close handler. */
 };
 
 int
@@ -127,7 +128,7 @@ int setup(void)
 	int ret;
 	char config[512];
 
-	(void)system("rm -f WiredTiger* *.bf");
+	WT_UNUSED_RET(system("rm -f WiredTiger* *.bf"));
 
 	/*
 	 * This test doesn't test public Wired Tiger functionality, it still
@@ -264,9 +265,11 @@ static int populate_entries(void)
 }
 
 static int
-handle_message(WT_EVENT_HANDLER *handler, const char *message)
+handle_message(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
 	(void)handler;
+	(void)session;
 
 	return (printf("%s\n", message) < 0 ? -1 : 0);
 }

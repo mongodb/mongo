@@ -53,6 +53,7 @@ struct __wt_lsm_chunk {
 	uint64_t count;			/* Approximate count of records */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 	uint32_t refcnt;		/* Number of worker thread references */
+	uint32_t bloom_busy;		/* Number of worker thread references */
 
 	uint64_t txnid_max;		/* Newest transactional update */
 
@@ -63,7 +64,7 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_CHUNK_ONDISK	0x10
 #define	WT_LSM_CHUNK_STABLE	0x20
 	uint32_t flags;
-};
+} WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 /*
  * WT_LSM_TREE --
@@ -97,9 +98,8 @@ struct __wt_lsm_tree {
 	u_int merge_threads;
 
 #define	WT_LSM_BLOOM_MERGED				0x00000001
-#define	WT_LSM_BLOOM_NEWEST				0x00000002
-#define	WT_LSM_BLOOM_OFF				0x00000004
-#define	WT_LSM_BLOOM_OLDEST				0x00000008
+#define	WT_LSM_BLOOM_OFF				0x00000002
+#define	WT_LSM_BLOOM_OLDEST				0x00000004
 	uint32_t bloom;			/* Bloom creation policy */
 
 #define	WT_LSM_MAX_WORKERS	10
@@ -110,9 +110,6 @@ struct __wt_lsm_tree {
 	WT_SESSION_IMPL *ckpt_session;	/* For checkpoint worker */
 	pthread_t ckpt_tid;		/* LSM checkpoint worker thread */
 
-	WT_SESSION_IMPL *bloom_session;	/* For bloom worker */
-	pthread_t bloom_tid;		/* LSM bloom worker thread */
-
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	u_int nchunks;			/* Number of active chunks */
@@ -122,11 +119,10 @@ struct __wt_lsm_tree {
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 
-#define	WT_LSM_TREE_LOCKED	0x01
-#define	WT_LSM_TREE_NEED_SWITCH	0x02
-#define	WT_LSM_TREE_OPEN	0x04
-#define	WT_LSM_TREE_THROTTLE	0x08
-#define	WT_LSM_TREE_WORKING	0x10
+#define	WT_LSM_TREE_NEED_SWITCH	0x01
+#define	WT_LSM_TREE_OPEN	0x02
+#define	WT_LSM_TREE_THROTTLE	0x04
+#define	WT_LSM_TREE_WORKING	0x08
 	uint32_t flags;
 };
 

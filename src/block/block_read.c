@@ -48,7 +48,7 @@ __wt_bm_preload(WT_BM *bm,
 		}
 	}
 
-	WT_CSTAT_INCR(session, block_preload);
+	WT_STAT_FAST_CONN_INCR(session, block_preload);
 
 	return (0);
 }
@@ -80,15 +80,17 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		__wt_buf_free(session, buf);
 
 	/*
-	 * If we're going to be able to return mapped memory and the buffer
-	 * has allocated memory, discard it.
+	 * Map the block if it's possible.
 	 */
 	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
-	if (buf->mem != NULL && mapped)
-		__wt_buf_free(session, buf);
-
-	/* Map the block if it's possible. */
 	if (mapped) {
+		/*
+		 * If we're going to be able to return mapped memory and the
+		 * buffer has allocated memory, discard it.
+		 */
+		if (buf->mem != NULL)
+			__wt_buf_free(session, buf);
+
 		buf->mem = (uint8_t *)bm->map + offset;
 		buf->memsize = size;
 		buf->data = buf->mem;
@@ -96,11 +98,23 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		F_SET(buf, WT_ITEM_MAPPED);
 		WT_RET(__wt_mmap_preload(session, buf->mem, buf->size));
 
-		WT_CSTAT_INCR(session, block_map_read);
-		WT_CSTAT_INCRV(session, block_byte_map_read, size);
+		WT_STAT_FAST_CONN_INCR(session, block_map_read);
+		WT_STAT_FAST_CONN_INCRV(session, block_byte_map_read, size);
 		return (0);
 	}
 
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * In diagnostic mode, verify the block we're about to read isn't on
+	 * the available list, or for live systems, the discard list.
+	 *
+	 * Don't check during salvage, it's possible we're reading an already
+	 * freed overflow page.
+	 */
+	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
+		WT_RET(__wt_block_misplaced(
+		    session, block, "read", offset, size, bm->is_live));
+#endif
 	/* Read the block. */
 	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
 
@@ -137,19 +151,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, size, cksum);
 
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * In diagnostic mode, verify the block we're about to read isn't on
-	 * either the available or discard lists.
-	 *
-	 * Don't check during salvage, it's possible we're reading an already
-	 * freed overflow page.
-	 */
-	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
-		WT_RET(
-		    __wt_block_misplaced(session, block, "read", offset, size));
-#endif
-
 	/*
 	 * Grow the buffer as necessary and read the block.  Buffers should be
 	 * aligned for reading, but there are lots of buffers (for example, file
@@ -183,7 +184,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 		return (WT_ERROR);
 	}
 
-	WT_CSTAT_INCR(session, block_read);
-	WT_CSTAT_INCRV(session, block_byte_read, size);
+	WT_STAT_FAST_CONN_INCR(session, block_read);
+	WT_STAT_FAST_CONN_INCRV(session, block_byte_read, size);
 	return (0);
 }
