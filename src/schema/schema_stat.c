@@ -73,15 +73,13 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	/*
+	 * Process the column groups.
+	 *
 	 * Set the cursor to reference the data source statistics; we don't
 	 * initialize it, instead we copy (rather than aggregate), the first
 	 * column's statistics, which has the same effect.
 	 */
 	stats = &cst->u.dsrc_stats;
-	cst->stats_first = cst->stats = (WT_STATS *)stats;
-	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-
-	/* Process the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		WT_ERR(__wt_buf_fmt(
 		    session, buf, "statistics:%s", table->cgroups[i]->name));
@@ -106,6 +104,8 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
+
+	__wt_curstat_dsrc_final(cst);
 
 err:	__wt_schema_release_table(session, table);
 

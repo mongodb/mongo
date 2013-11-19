@@ -8,11 +8,13 @@ from dist import source_paths_list
 # Read the source files.
 from stat_data import dsrc_stats, connection_stats
 
-def print_struct(title, name, stats):
+def print_struct(title, name, base, stats):
 	'''Print the structures for the stat.h file.'''
 	f.write('/*\n')
 	f.write(' * Statistics entries for ' + title + '.\n')
 	f.write(' */\n')
+	f.write(
+	    '#define\tWT_' + name.upper() + '_STATS_BASE\t' + str(base) + '\n')
 	f.write('struct __wt_' + name + '_stats {\n')
 
 	for l in stats:
@@ -32,8 +34,9 @@ for line in open('../src/include/stat.h', 'r'):
 	elif line.count('Statistics section: BEGIN'):
 		f.write('\n')
 		skip = 1
-		print_struct('data sources', 'dsrc', dsrc_stats)
-		print_struct('connections', 'connection', connection_stats)
+		print_struct(
+		    'connections', 'connection', 1000, connection_stats)
+		print_struct('data sources', 'dsrc', 2000, dsrc_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
 
@@ -50,7 +53,7 @@ def print_defines():
  * @{
  */
 ''')
-	for v, l in enumerate(connection_stats):
+	for v, l in enumerate(connection_stats, 1000):
 		f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
 		f.write('#define\tWT_STAT_CONN_' + l.name.upper() + "\t" *
 		    max(1, 6 - int((len('WT_STAT_CONN_' + l.name)) / 8)) +
@@ -63,7 +66,7 @@ def print_defines():
  * @{
  */
 ''')
-	for v, l in enumerate(dsrc_stats):
+	for v, l in enumerate(dsrc_stats, 2000):
 		f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
 		f.write('#define\tWT_STAT_DSRC_' + l.name.upper() + "\t" *
 		    max(1, 6 - int((len('WT_STAT_DSRC_' + l.name)) / 8)) +
