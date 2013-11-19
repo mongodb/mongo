@@ -29,9 +29,8 @@
  */
 
 #ifdef OPT_DECLARE_STRUCT
-#define	DEF_OPT_AS_BOOL(name, initval, desc)		uint32_t name;
+#define	DEF_OPT_AS_BOOL(name, initval, desc)		int name;
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
-#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)
 #define	DEF_OPT_AS_INT(name, initval, desc)		int name;
 #define	DEF_OPT_AS_STRING(name, initval, desc)		const char *name;
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		uint32_t name;
@@ -39,24 +38,21 @@
 
 #ifdef OPT_DEFINE_DESC
 #define	DEF_OPT_AS_BOOL(name, initval, desc)				\
-	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name), 0 },
+	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
 	{ #name, desc, #initval, CONFIG_STRING_TYPE,                    \
-	offsetof(CONFIG, name), 0 },
-#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)				\
-	{ #name, desc, "0", FLAG_TYPE, offsetof(CONFIG, flags), bits },
+	offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_INT(name, initval, desc)				\
-	{ #name, desc, #initval, INT_TYPE, offsetof(CONFIG, name), 0 },
+	{ #name, desc, #initval, INT_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_STRING(name, initval, desc)				\
-	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name), 0 },
+	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_UINT32(name, initval, desc)				\
-	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name), 0 },
+	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name) },
 #endif
 
 #ifdef OPT_DEFINE_DEFAULT
 #define	DEF_OPT_AS_BOOL(name, initval, desc)		initval,
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
-#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)
 #define	DEF_OPT_AS_INT(name, initval, desc)		initval,
 #define	DEF_OPT_AS_STRING(name, initval, desc)		initval,
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		initval,
@@ -65,11 +61,10 @@
 /*
  * Each option listed here represents a CONFIG struct field that may be
  * altered on command line via -o and -O.  Each option appears here as:
- *    DEF_OPT_AS_STRING(name, initval, desc)
- *    DEF_OPT_AS_CONFIG_STRING(name, initval, desc)
  *    DEF_OPT_AS_BOOL(name, initval, desc)
+ *    DEF_OPT_AS_CONFIG_STRING(name, initval, desc)
+ *    DEF_OPT_AS_STRING(name, initval, desc)
  *    DEF_OPT_AS_UINT32(name, initval, desc)
- *    DEF_OPT_AS_FLAGVAL(name, bit, desc) 
  *
  * The first four forms (*_{CONFIG_STRING|STRING|BOOL|UINT}) have these
  * parameters:
@@ -81,13 +76,6 @@
  *
  * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
  * options are appended to existing content, whereas STRING options overwrite.
- *
- * DEF_OPT_AS_FLAGVAL defines an option that sets a bit in the CONFIG->flags
- * field.  It has these parameters:
- *    name:     an identifier used with -o or -O.
- *    bit:      the bit(s) to be set in CONFIG->flags when <name>=true.
- *              The bits will be 0 by default, or when <name>=false.
- *    desc:     a description that will appear in the usage message.
  */
 DEF_OPT_AS_UINT32(checkpoint_interval, 0,
     "checkpoint every <int> report intervals, zero to disable")
@@ -97,13 +85,13 @@ DEF_OPT_AS_BOOL(create, 1,
     "do population phase; set to false to use existing database")
 DEF_OPT_AS_UINT32(data_sz, 100, "data item size")
 DEF_OPT_AS_UINT32(icount, 5000, "number of records to insert")
-DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
+DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
 DEF_OPT_AS_INT(merge_sleep, 0,
     "post-populate sleep seconds for LSM merging activity (-1 for load time)")
-DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
+DEF_OPT_AS_BOOL(pareto, 0,
     "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the\n"
@@ -129,7 +117,6 @@ DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 
 #undef DEF_OPT_AS_BOOL
 #undef DEF_OPT_AS_CONFIG_STRING
-#undef DEF_OPT_AS_FLAGVAL
 #undef DEF_OPT_AS_INT
 #undef DEF_OPT_AS_STRING
 #undef DEF_OPT_AS_UINT32

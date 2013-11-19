@@ -45,16 +45,6 @@
 #include <wiredtiger_ext.h>
 #include <gcc.h>				/* WiredTiger internal */
 
-#ifndef F_CLR
-#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
-#endif
-#ifndef F_ISSET
-#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
-#endif
-#ifndef F_SET
-#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
-#endif
-
 typedef struct {		/* Per-thread structure */
 	void *cfg;		/* Enclosing handle */
 
@@ -75,11 +65,6 @@ typedef struct {
 
 	enum { WT_PERF_INIT, WT_PERF_POPULATE, WT_PERF_WORKER } phase;
 
-#define	PERF_INSERT_RMW		0x01
-#define	PERF_RAND_PARETO	0x02 /* Use the Pareto random distribution. */
-#define	PERF_RAND_WORKLOAD	0x04
-	uint32_t flags;
-
 	struct timeval phase_start_time;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
@@ -90,8 +75,7 @@ typedef struct {
 } CONFIG;
 
 typedef enum {
-	BOOL_TYPE, CONFIG_STRING_TYPE, FLAG_TYPE, INT_TYPE, STRING_TYPE,
-	UINT32_TYPE
+	BOOL_TYPE, CONFIG_STRING_TYPE, INT_TYPE, STRING_TYPE, UINT32_TYPE
 } CONFIG_OPT_TYPE;
 
 typedef struct {
@@ -100,7 +84,6 @@ typedef struct {
 	const char *defaultval;
 	CONFIG_OPT_TYPE type;
 	size_t offset;
-	uint32_t flagmask;
 } CONFIG_OPT;
 
 /* All options changeable on command line using -o or -O are listed here. */
@@ -160,7 +143,6 @@ CONFIG default_cfg = {
 	NULL,			/* logf */
 	NULL, NULL, NULL, NULL,	/* threads */
 	WT_PERF_INIT,		/* phase */
-	0,			/* flags */
 	{0, 0},			/* phase_start_time */
 
 #define	OPT_DEFINE_DEFAULT
@@ -323,8 +305,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 	}
 
 	while (g_running) {
-		if (!F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-		    IS_INSERT_WORKER(wtype))
+		if (cfg->random_range == 0 && IS_INSERT_WORKER(wtype))
 			next_val = cfg->icount + get_next_incr();
 		else
 			next_val = wtperf_rand(cfg);
@@ -382,7 +363,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 		}
 
 		/* Report errors and continue. */
-		if (op_ret == WT_NOTFOUND && F_ISSET(cfg, PERF_RAND_WORKLOAD))
+		if (op_ret == WT_NOTFOUND && cfg->random_range != 0)
 			continue;
 
 		/*
@@ -432,7 +413,7 @@ insert_thread(void *arg)
 
 	cfg = ((CONFIG_THREAD *)arg)->cfg;
 	worker((CONFIG_THREAD *)arg,
-	    F_ISSET(cfg, PERF_INSERT_RMW) ? WORKER_INSERT_RMW : WORKER_INSERT);
+	    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT);
 	return (NULL);
 }
 
@@ -1071,9 +1052,6 @@ main(int argc, char *argv[])
 	}
 	snprintf(cfg.uri, req_len, "table:%s", cfg.table_name);
 	
-	if (cfg.random_range > 0)
-		F_SET(&cfg, PERF_RAND_WORKLOAD);
-
 	if ((ret = setup_log_file(&cfg)) != 0)
 		goto err;
 
@@ -1293,7 +1271,6 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	char *newstr, **strp;
 	size_t i, nopt;
 	uint64_t newlen;
-	uint32_t *pconfigval;
 	void *valueloc;
 
 	popt = NULL;
@@ -1314,6 +1291,15 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	}
 	valueloc = ((unsigned char *)cfg + popt->offset);
 	switch (popt->type) {
+	case BOOL_TYPE:
+		if (v->type != WT_CONFIG_ITEM_BOOL) {
+			fprintf(stderr, "wtperf: Error: "
+			    "bad bool value for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
+		}
+		*(int *)valueloc = (int)v->val;
+		break;
 	case INT_TYPE:
 		if (v->type != WT_CONFIG_ITEM_NUM) {
 			fprintf(stderr, "wtperf: Error: "
@@ -1382,22 +1368,6 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		strncpy(newstr, v->str, v->len);
 		newstr[v->len] = '\0';
 		*strp = newstr;
-		break;
-	case BOOL_TYPE:
-	case FLAG_TYPE:
-		if (v->type != WT_CONFIG_ITEM_BOOL) {
-			fprintf(stderr, "wtperf: Error: "
-			    "bad bool value for \'%.*s=%.*s\'\n",
-			    (int)k->len, k->str, (int)v->len, v->str);
-			return (EINVAL);
-		}
-		pconfigval = (uint32_t *)valueloc;
-		if (popt->type == BOOL_TYPE)
-			*pconfigval = (uint32_t)v->val;
-		else if (v->val != 0)
-			*pconfigval |= popt->flagmask;
-		else
-			*pconfigval &= ~popt->flagmask;
 		break;
 	}
 	return (0);
@@ -1567,23 +1537,22 @@ config_opt_usage(void)
 		typestr = "?";
 		defaultval = config_opts[i].defaultval;
 		switch (config_opts[i].type) {
+		case BOOL_TYPE:
+			typestr = "bool";
+			if (strcmp(defaultval, "0") == 0)
+				defaultval = "true";
+			else
+				defaultval = "false";
+		case CONFIG_STRING_TYPE:
+		case STRING_TYPE:
+			typestr = "string";
+			break;
 		case INT_TYPE:
 			typestr = "int";
 			break;
 		case UINT32_TYPE:
 			typestr = "unsigned int";
 			break;
-		case STRING_TYPE:
-		case CONFIG_STRING_TYPE:
-			typestr = "string";
-			break;
-		case BOOL_TYPE:
-		case FLAG_TYPE:
-			typestr = "bool";
-			if (strcmp(defaultval, "0") == 0)
-				defaultval = "true";
-			else
-				defaultval = "false";
 		}
 		linelen = (size_t)printf("  %s=<%s> [%s]",
 		    config_opts[i].name, typestr, defaultval);
@@ -1713,10 +1682,10 @@ setup_log_file(CONFIG *cfg)
 uint64_t
 wtperf_value_range(CONFIG *cfg)
 {
-	if (F_ISSET(cfg, PERF_RAND_WORKLOAD))
-		return (cfg->icount + cfg->random_range);
-	else 
+	if (cfg->random_range == 0)
 		return (cfg->icount + g_nins_ops - (cfg->insert_threads + 1));
+	else
+		return (cfg->icount + cfg->random_range);
 }
 
 extern uint32_t __wt_random(void);
@@ -1734,7 +1703,7 @@ wtperf_rand(CONFIG *cfg)
 	rval = (uint64_t)__wt_random();
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
-	if (F_ISSET(cfg, PERF_RAND_PARETO)) {
+	if (cfg->pareto) {
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
 		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
@@ -1792,7 +1761,7 @@ print_config(CONFIG *cfg)
 	}
 	printf("\tNumber read threads: %" PRIu32 "\n", cfg->read_threads);
 	printf("\tNumber insert threads: %" PRIu32 "\n", cfg->insert_threads);
-	if (F_ISSET(cfg, PERF_INSERT_RMW))
+	if (cfg->insert_rmw)
 		printf("\tInsert operations are RMW.\n");
 	printf("\tNumber update threads: %" PRIu32 "\n", cfg->update_threads);
 	printf("\tkey size: %" PRIu32 " data size: %" PRIu32 "\n",
