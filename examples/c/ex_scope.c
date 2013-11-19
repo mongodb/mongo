@@ -54,10 +54,12 @@ cursor_scope_ops(WT_CURSOR *cursor)
 	int ret;
 
 	for (op = ops; op->key != NULL; op++) {
+		key = value = NULL;
+
 		/*! [cursor scope operation] */
-		strcpy(keybuf, op->key);
+		(void)snprintf(keybuf, sizeof(keybuf), "%s", op->key);
 		cursor->set_key(cursor, keybuf);
-		strcpy(valuebuf, op->value);
+		(void)snprintf(valuebuf, sizeof(valuebuf), "%s", op->value);
 		cursor->set_value(cursor, valuebuf);
 
 		/*
@@ -103,18 +105,18 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		 */
 
 		/* Check that the cursor's key and value are what we expect. */
-		if ((key == keybuf && op->apply != cursor->insert) ||
-		    (value == valuebuf &&
-		    op->apply != cursor->insert &&
-		    op->apply != cursor->remove)) {
-			fprintf(stderr,
-			    "Cursor points at application memory!\n");
-			return (EINVAL);
-		}
+		if (op->apply != cursor->insert)
+			if (key == keybuf ||
+			    (op->apply != cursor->remove &&
+			    value == valuebuf)) {
+				fprintf(stderr,
+				    "Cursor points at application memory!\n");
+				return (EINVAL);
+			}
 
 		if (strcmp(key, op->key) != 0 ||
-		    (strcmp(value, op->value) != 0 &&
-		    op->apply != cursor->remove)) {
+		    (op->apply != cursor->remove &&
+		    strcmp(value, op->value) != 0)) {
 			fprintf(stderr, "Unexpected key / value!\n");
 			return (EINVAL);
 		}

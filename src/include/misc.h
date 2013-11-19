@@ -16,11 +16,6 @@
 #define	WT_PETABYTE	((uint64_t)1125899906842624)
 
 /*
- * Size to build an entry prefix with a pathname.
- */
-#define	ENTRY_SIZE	128
-
-/*
  * Number of directory entries can grow dynamically.
  */
 #define	WT_DIR_ENTRY	32
@@ -62,28 +57,6 @@
 /* 10 level skip lists, 1/4 have a link to the next element. */
 #define	WT_SKIP_MAXDEPTH	10
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
-
-/* The number of hazard pointers that can be in use is grown dynamically. */
-#define	WT_HAZARD_INCR		10
-
-/*
- * Quiet compiler warnings about unused parameters.
- */
-#define	WT_UNUSED(var)	(void)(var)
-
-/* Add GCC-specific attributes to types and function declarations. */
-#ifdef __GNUC__
-#define	WT_GCC_ATTRIBUTE(x)	__attribute__(x)
-#else
-#define	WT_GCC_ATTRIBUTE(x)
-#endif
-
-/*
- * Attribute are only permitted on function declarations, not definitions.
- * This macro is a marker for function definitions that is rewritten by
- * dist/s_prototypes to create extern.h.
- */
-#define	WT_GCC_FUNC_ATTRIBUTE(x)
 
 /*
  * __wt_calloc_def --

@@ -11,6 +11,7 @@ src/block/block_map.c
 src/block/block_mgr.c
 src/block/block_open.c
 src/block/block_read.c
+src/block/block_session.c
 src/block/block_slvg.c
 src/block/block_vrfy.c
 src/block/block_write.c
@@ -55,10 +56,10 @@ src/config/config_concat.c
 src/config/config_def.c
 src/config/config_ext.c
 src/conn/conn_api.c
-src/conn/conn_dhandle.c
 src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
 src/conn/conn_ckpt.c
+src/conn/conn_dhandle.c
 src/conn/conn_handle.c
 src/conn/conn_log.c
 src/conn/conn_open.c
@@ -90,8 +91,8 @@ src/meta/meta_track.c
 src/meta/meta_turtle.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
-src/os_posix/os_dlopen.c
 src/os_posix/os_dir.c
+src/os_posix/os_dlopen.c
 src/os_posix/os_errno.c
 src/os_posix/os_exist.c
 src/os_posix/os_fallocate.c
@@ -127,6 +128,7 @@ src/schema/schema_truncate.c
 src/schema/schema_util.c
 src/schema/schema_worker.c
 src/session/session_api.c
+src/session/session_compact.c
 src/session/session_dhandle.c
 src/session/session_salvage.c
 src/support/cksum.c

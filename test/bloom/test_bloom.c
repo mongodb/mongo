@@ -128,7 +128,7 @@ int setup(void)
 	int ret;
 	char config[512];
 
-	(void)system("rm -f WiredTiger* *.bf");
+	WT_UNUSED_RET(system("rm -f WiredTiger* *.bf"));
 
 	/*
 	 * This test doesn't test public Wired Tiger functionality, it still

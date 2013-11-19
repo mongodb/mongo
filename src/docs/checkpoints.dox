@@ -43,6 +43,10 @@ checkpoint with the same name; if a previous checkpoint cannot be
 dropped (either because a cursor is reading from the previous
 checkpoint, or hot backups are in progress), the checkpoint will fail.
 
+Because checkpoints named by the application are not discarded until
+explicitly removed or replaced, they may prevent WT_SESSION::compact
+from accomplishing anything.
+
 Internal checkpoints (that is, checkpoints not named by the application)
 use the reserved name "WiredTigerCheckpoint".  Applications can open the
 most recent of these checkpoints by specifying "WiredTigerCheckpoint"

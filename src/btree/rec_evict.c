@@ -464,7 +464,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		 */
 		if (ret == EBUSY &&
 		    page->type == WT_PAGE_ROW_LEAF &&
-		    __wt_eviction_page_force(session, page)) {
+		    __wt_eviction_force_check(session, page)) {
 			*inmem_split = 1;
 			return (0);
 		}

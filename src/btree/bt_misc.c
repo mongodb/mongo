@@ -45,12 +45,14 @@ const char *
 __wt_cell_type_string(uint8_t type)
 {
 	switch (type) {
-	case WT_CELL_ADDR:
-		return ("addr");
 	case WT_CELL_ADDR_DEL:
 		return ("addr/del");
-	case WT_CELL_ADDR_LNO:
-		return ("addr/lno");
+	case WT_CELL_ADDR_INT:
+		return ("addr/int");
+	case WT_CELL_ADDR_LEAF:
+		return ("addr/leaf");
+	case WT_CELL_ADDR_LEAF_NO:
+		return ("addr/leaf-no");
 	case WT_CELL_DEL:
 		return ("deleted");
 	case WT_CELL_KEY:
@@ -96,8 +98,8 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
 		return (buf->data);
 	}
 
-	__wt_get_addr(page->parent, page->ref, &addr, &size);
-
+	(void)__wt_ref_info(
+	    session, page->parent, page->ref, &addr, &size, NULL);
 	return (__wt_addr_string(session, buf, addr, size));
 }
 

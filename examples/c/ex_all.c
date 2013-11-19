@@ -576,6 +576,11 @@ session_ops(WT_SESSION *session)
 	/*! [os_cache_max configuration] */
 	ret = session->drop(session, "table:mytable", NULL);
 #endif
+	/*! [Configure block_allocation] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,block_allocation=first");
+	/*! [Configure block_allocation] */
+	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,

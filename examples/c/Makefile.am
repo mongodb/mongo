@@ -24,4 +24,4 @@ TESTS = $(noinst_PROGRAMS)
 TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_TEST.XXXX` ; export WIREDTIGER_HOME ; rm -rf $$WIREDTIGER_HOME ; mkdir $$WIREDTIGER_HOME ;
 
 clean-local:
-	rm -rf WT_TEST*
+	rm -rf WT_TEST* *.core WiredTiger* *.wt

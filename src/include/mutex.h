@@ -17,7 +17,8 @@ struct __wt_condvar {
 	pthread_mutex_t mtx;		/* Mutex */
 	pthread_cond_t  cond;		/* Condition variable */
 
-	int signalled;			/* Condition signalled */
+	int waiters;			/* Numbers of waiters, or
+					   -1 if signalled with no waiters. */
 };
 
 /*
@@ -54,8 +55,10 @@ typedef volatile int
 typedef struct {
 	pthread_mutex_t lock;
 
-	const char *name;		/* Mutex name, for statistics */
-	int8_t id;			/* Current holder, for statistics */
+	uint64_t counter;		/* Statistics: counter */
+
+	const char *name;		/* Statistics: mutex name */
+	int8_t id;			/* Statistics: current holder ID */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
 } WT_SPINLOCK WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));

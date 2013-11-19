@@ -230,7 +230,7 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 	}
 
 err:	if (locked)
-		__wt_spin_lock(session, &S2C(session)->schema_lock);
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);
 	return (ret);
 }
 
@@ -263,10 +263,8 @@ __statlog_server(void *arg)
 	 * We also need a place to store the current path, because that's
 	 * how we know when to close/re-open the file.
 	 */
-	WT_ERR(__wt_buf_init(session, &path,
-	    strlen(conn->stat_path) + ENTRY_SIZE));
-	WT_ERR(__wt_buf_init(session, &tmp,
-	    strlen(conn->stat_path) + ENTRY_SIZE));
+	WT_ERR(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
+	WT_ERR(__wt_buf_init(session, &tmp, strlen(conn->stat_path) + 128));
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*

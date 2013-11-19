@@ -108,18 +108,6 @@ struct __wt_stats {
 } while (0)
 
 /*
- * Mutex statistics.
- */
-#define	WT_STATS_SPINLOCK_MAX	50
-struct __wt_connection_stats_spinlock {
-	const char *name;		/* Mutex name */
-	const char *file;		/* Caller's file/line */
-	int line;
-					/* Count of blocked calls */
-	u_int blocked[WT_STATS_SPINLOCK_MAX];
-};
-
-/*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
 /* Statistics section: BEGIN */
@@ -128,14 +116,15 @@ struct __wt_connection_stats_spinlock {
  * Statistics entries for data sources.
  */
 struct __wt_dsrc_stats {
+	WT_STATS allocation_size;
 	WT_STATS block_alloc;
-	WT_STATS block_allocsize;
 	WT_STATS block_checkpoint_size;
 	WT_STATS block_extension;
 	WT_STATS block_free;
 	WT_STATS block_magic;
 	WT_STATS block_major;
 	WT_STATS block_minor;
+	WT_STATS block_reuse_bytes;
 	WT_STATS block_size;
 	WT_STATS bloom_count;
 	WT_STATS bloom_false_positive;
@@ -222,6 +211,7 @@ struct __wt_connection_stats {
 	WT_STATS block_byte_map_read;
 	WT_STATS block_byte_read;
 	WT_STATS block_byte_write;
+	WT_STATS block_locked_allocation;
 	WT_STATS block_map_read;
 	WT_STATS block_preload;
 	WT_STATS block_read;
@@ -235,6 +225,8 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
+	WT_STATS cache_eviction_force;
+	WT_STATS cache_eviction_force_fail;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
 	WT_STATS cache_eviction_merge;

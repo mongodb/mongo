@@ -186,7 +186,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 
 	/*
 	 * Check for a set hazard pointer and complain if we find one.  We could
-	 * just check the session's hazard reference count, but this is a useful
+	 * just check the session's hazard pointer count, but this is a useful
 	 * diagnostic.
 	 */
 	for (found = 0, hp = session->hazard;

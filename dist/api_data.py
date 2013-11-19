@@ -127,6 +127,12 @@ lsm_config = [
 
 # Per-file configuration
 file_config = format_meta + [
+	Config('block_allocation', 'best', r'''
+		configure block allocation. Permitted values are \c "first" or
+		\c "best"; the \c "first" configuration uses a first-available
+		algorithm during block allocation, the \c "best" configuration
+		uses a best-fit algorithm''',
+		choices=['first', 'best',]),
 	Config('allocation_size', '4KB', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
@@ -329,6 +335,7 @@ connection_runtime_config = [
 		type='list', choices=[
 		    'block',
 		    'ckpt',
+		    'compact',
 		    'evict',
 		    'evictserver',
 		    'fileops',
@@ -366,13 +373,7 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.compact' : Method([
-	Config('trigger', '30', r'''
-		Compaction will not be attempted unless the specified
-		percentage of the underlying objects is expected to be
-		recovered by compaction''',
-		min='10', max='50'),
-]),
+'session.compact' : Method([]),
 
 'session.create' : Method(table_only_meta + file_config + lsm_config + source_meta + [
 	Config('exclusive', 'false', r'''
@@ -444,7 +445,7 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
-	Config('statistics', 'fast', r'''
+	Config('statistics', '', r'''
 		Specify the statistics to be gathered.  Choosing "all" gathers
 		statistics regardless of cost and may include traversing
 		on-disk files; "fast" gathers a subset of relatively

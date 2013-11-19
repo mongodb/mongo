@@ -31,8 +31,8 @@ static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
-	UNUSED(handler);
-	UNUSED(session);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	if (g.logfp != NULL)
 		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
@@ -48,8 +48,8 @@ static int
 handle_progress(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *operation, uint64_t progress)
 {
-	UNUSED(handler);
-	UNUSED(session);
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	track(operation, progress, NULL);
 	return (0);
@@ -185,9 +185,11 @@ wts_create(void)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
+	    "allocation_size=512,%s"
 	    "internal_page_max=%d,internal_item_max=%d,"
-	    "allocation_size=512,leaf_page_max=%d,leaf_item_max=%d",
+	    "leaf_page_max=%d,leaf_item_max=%d",
 	    (g.type == ROW) ? "u" : "r",
+	    g.c_firstfit ? "block_allocation=first," : "",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
 	switch (g.type) {

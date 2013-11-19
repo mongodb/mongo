@@ -20,22 +20,34 @@
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
-	WT_ERR(__clsm_enter(clsm, 0))
+	WT_ERR(__clsm_enter(clsm, 0));					\
+	F_SET(session, WT_SESSION_CACHE_BUSY)
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
-	WT_ERR(__clsm_enter(clsm, 1))
+	WT_ERR(__clsm_enter(clsm, 1));					\
+	F_SET(session, WT_SESSION_CACHE_BUSY)
+
+#define	WT_LSM_LEAVE(session)						\
+	API_END(session);						\
+	F_CLR(session, WT_SESSION_CACHE_BUSY);				\
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
 	CURSOR_UPDATE_API_END(session, ret);				\
+	F_CLR(session, WT_SESSION_CACHE_BUSY)
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_lookup(WT_CURSOR_LSM *);
 
+/*
+ * __clsm_enter --
+ *	Start an operation on an LSM cursor, update if the tree has changed.
+ */
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_SESSION_IMPL *session;
 	uint64_t *txnid_maxp;
@@ -48,6 +60,19 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 		return (0);
 
 	for (;;) {
+		/*
+		 * If the cursor looks up-to-date, check if the cache is full.
+		 * In case this call blocks, the check will be repeated before
+		 * proceeding.
+		 */
+		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+			goto open;
+
+		WT_RET(__wt_cache_full_check(session));
+
+		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+			goto open;
+
 		/* Update the maximum transaction ID in the primary chunk. */
 		if (update && (chunk = clsm->primary_chunk) != NULL) {
 			WT_RET(__wt_txn_autocommit_check(session));
@@ -55,7 +80,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 			    !TXNID_LE(myid, id);
 			    id = chunk->txnid_max) {
 				WT_ASSERT(session, myid != WT_TXN_NONE);
-				(void)WT_ATOMIC_CAS(chunk->txnid_max, id, myid);
+				(void)WT_ATOMIC_CAS(
+				    chunk->txnid_max, id, myid);
 			}
 		}
 
@@ -85,14 +111,16 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 		 *   - an update operation with a primary chunk, or
 		 *   - a read operation and the cursor is open for reading.
 		 */
-		if (clsm->dsk_gen == clsm->lsm_tree->dsk_gen &&
-		    (!update || session->txn.isolation != TXN_ISO_SNAPSHOT ||
+		if ((!update ||
+		    session->txn.isolation != TXN_ISO_SNAPSHOT ||
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
 		    ((update && clsm->primary_chunk != NULL) ||
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
-		WT_RET(__clsm_open_cursors(clsm, update, 0, 0));
+open:		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __clsm_open_cursors(clsm, update, 0, 0));
+		WT_RET(ret);
 	}
 
 	return (0);
@@ -196,7 +224,7 @@ __clsm_open_cursors(
 	} else
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
-	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 	locked = 1;
 	/*
 	 * If there is no in-memory chunk in the tree for an update operation,
@@ -210,20 +238,12 @@ __clsm_open_cursors(
 	if (update && (lsm_tree->nchunks == 0 ||
 	    F_ISSET(lsm_tree->chunk[lsm_tree->nchunks - 1],
 	    WT_LSM_CHUNK_ONDISK))) {
-		/*
-		 * Upgrade to a write lock and re-check that a switch is
-		 * required.
-		 */
-		WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
-		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
-
-		if (update && (lsm_tree->nchunks == 0 ||
-		    F_ISSET(lsm_tree->chunk[lsm_tree->nchunks - 1],
-		    WT_LSM_CHUNK_ONDISK))) {
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_lsm_tree_switch(session, lsm_tree));
-			WT_ERR(ret);
-		}
+		/* Release our lock because switch will get a write lock. */
+		locked = 0;
+		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
+		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
+		WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));
+		locked = 1;
 	}
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
@@ -327,13 +347,13 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		    (F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0))) {
 			saved_gen = lsm_tree->dsk_gen;
 			locked = 0;
-			WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
+			WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 			if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0)
 				WT_ERR(__clsm_close_cursors(
 				    clsm, 0, nchunks - nupdates));
 			WT_ERR(__clsm_close_cursors(
 			    clsm, ngood, clsm->nchunks));
-			WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
+			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));
 			locked = 1;
 			if (lsm_tree->dsk_gen != saved_gen)
 				goto retry;
@@ -404,7 +424,7 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 #ifdef HAVE_DIAGNOSTIC
 	/* Check that all cursors are open as expected. */
 	if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
-		for (i = 0, cp = clsm->cursors; i != nchunks; cp++, i++) {
+		for (i = 0, cp = clsm->cursors; i != clsm->nchunks; cp++, i++) {
 			chunk = lsm_tree->chunk[i + start_chunk];
 
 			/* Make sure the cursor is open. */
@@ -430,11 +450,12 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 	}
 #endif
 	if (locked)
-		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	return (ret);
 }
 
-/* __wt_clsm_init_merge --
+/*
+ * __wt_clsm_init_merge --
  *	Initialize an LSM cursor for a merge.
  */
 int
@@ -442,14 +463,20 @@ __wt_clsm_init_merge(
     WT_CURSOR *cursor, u_int start_chunk, uint32_t start_id, u_int nchunks)
 {
 	WT_CURSOR_LSM *clsm;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
 	F_SET(clsm, WT_CLSM_MERGE);
 	if (start_chunk != 0)
 		F_SET(clsm, WT_CLSM_MINOR_MERGE);
 	clsm->nchunks = nchunks;
 
-	return (__clsm_open_cursors(clsm, 0, start_chunk, start_id));
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __clsm_open_cursors(clsm, 0, start_chunk, start_id));
+	return (ret);
 }
 
 /*
@@ -618,7 +645,7 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	return (ret);
 }
 
@@ -699,7 +726,7 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	return (ret);
 }
 
@@ -849,7 +876,7 @@ __clsm_search(WT_CURSOR *cursor)
 
 	ret = __clsm_lookup(clsm);
 
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	return (ret);
 }
 
@@ -990,7 +1017,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		ret = WT_NOTFOUND;
 
 done:
-err:	API_END(session);
+err:	WT_LSM_LEAVE(session);
 	if (ret == 0) {
 		c = clsm->current;
 		WT_TRET(c->get_key(c, &cursor->key));
@@ -1088,13 +1115,13 @@ __clsm_put(WT_SESSION_IMPL *session,
 			 * small chunks.
 			 */
 			need_signal = 0;
-			WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 				need_signal = 1;
 			}
-			WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
+			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
 			if (need_signal)
 				WT_RET(__wt_cond_signal(
 				    session, lsm_tree->work_cond));

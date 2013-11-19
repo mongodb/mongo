@@ -58,7 +58,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	return (__sync_lock_test_and_set(t, 1));
+	return (__sync_lock_test_and_set(t, 1) == 0 ? 0 : EBUSY);
 }
 
 static inline void
@@ -139,21 +139,27 @@ __wt_spin_lock_func(WT_SESSION_IMPL *session,
 
 	/* If this caller hasn't yet registered, do so. */
 	if (*idp == WT_SPINLOCK_REGISTER)
-		__wt_spin_lock_register(session, file, line, t->name, idp);
+		__wt_spin_lock_register(session, t, file, line, idp);
 
-	/* Try to acquire the lock, if we fail, update blocked information. */
+	/*
+	 * Try to acquire the mutex.  On success, set our ID as the mutex holder
+	 * and flush (using a full barrier to minimize the window).  On failure,
+	 * update the blocking statistics and block on the mutex.
+	 *
+	 * Note the race between acquiring the lock and setting our ID as the
+	 * holder, this can appear in the output as mutexes blocking in ways
+	 * that can't actually happen (although still an indicator of a mutex
+	 * that's busier than we'd like).
+	 */
 	if (pthread_mutex_trylock(&t->lock)) {
-		/* Update blocking count. */
 		if (*idp >= 0 && t->id >= 0)
 			++S2C(session)->spinlock_stats[*idp].blocked[t->id];
-
-		/* Block and wait. */
 		pthread_mutex_lock(&t->lock);
 	}
 
-	/* We own the mutex, flush our ID as the holder. */
+	++t->counter;
 	t->id = *idp;
-	WT_WRITE_BARRIER();
+	WT_FULL_BARRIER();
 }
 
 #endif

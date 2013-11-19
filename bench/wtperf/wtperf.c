@@ -43,6 +43,7 @@
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
+#include <gcc.h>				/* WiredTiger internal */
 
 #ifndef F_CLR
 #define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
@@ -119,7 +120,7 @@ typedef enum {
 
 /* Forward function definitions. */
 void *checkpoint_worker(void *);
-void config_assign(CONFIG *, const CONFIG *);
+int config_assign(CONFIG *, const CONFIG *);
 void config_free(CONFIG *);
 int config_opt(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
 int config_opt_file(CONFIG *, WT_SESSION *, const char *);
@@ -132,11 +133,8 @@ int execute_workload(CONFIG *);
 int find_table_count(CONFIG *);
 void indent_lines(const char *, const char *);
 void *insert_thread(void *);
-void lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
-#ifdef __GNUC__
-    __attribute__((format (printf, 4, 5)))
-#endif
-;
+void lprintf(const CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
+    WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -271,7 +269,7 @@ sum_update_ops(CONFIG_THREAD *threads, u_int num)
 }
 
 static int
-enomem(CONFIG *cfg)
+enomem(const CONFIG *cfg)
 {
 	const char *msg;
 
@@ -576,7 +574,7 @@ stat_worker(void *arg)
 
 	uri_len = strlen("statistics:") + strlen(cfg->uri) + 1;
 	if ((stat_uri = malloc(uri_len)) == NULL) {
-		ret = enomem(cfg);
+		(void)enomem(cfg);
 		goto err;
 	}
 	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
@@ -633,11 +631,14 @@ stat_worker(void *arg)
 			    "open_cursor failed for data source statistics");
 			goto err;
 		}
-		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+		while ((ret = cursor->next(cursor)) == 0) {
+			assert(cursor->get_value(
+			    cursor, &desc, &pvalue, &value) == 0);
 			if (value != 0)
 				lprintf(cfg, 0, cfg->verbose,
 				    "stat:table: %s=%s", desc, pvalue);
+		}
+		assert(ret == WT_NOTFOUND);
 		assert(cursor->close(cursor) == 0);
 		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
@@ -648,11 +649,14 @@ stat_worker(void *arg)
 			    "open_cursor failed in statistics");
 			goto err;
 		}
-		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+		while ((ret = cursor->next(cursor)) == 0) {
+			assert(cursor->get_value(
+			    cursor, &desc, &pvalue, &value) == 0);
 			if (value != 0)
 				lprintf(cfg, 0, cfg->verbose,
 				    "stat:conn: %s=%s", desc, pvalue);
+		}
+		assert(ret == WT_NOTFOUND);
 		assert(cursor->close(cursor) == 0);
 	}
 err:	if (session != NULL)
@@ -955,15 +959,16 @@ main(int argc, char *argv[])
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
-	/* Setup the default configuration values. */
-	memset(&cfg, 0, sizeof(cfg));
-	config_assign(&cfg, &default_cfg);
-
 	conn = NULL;
 	parse_session = NULL;
-	checkpoint_created = stat_created = 0;
+	checkpoint_created = ret = stat_created = 0;
 	user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
+
+	/* Setup the default configuration values. */
+	memset(&cfg, 0, sizeof(cfg));
+	if (config_assign(&cfg, &default_cfg))
+		goto err;
 
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = getopt(argc, argv, opts)) != EOF)
@@ -1123,13 +1128,8 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
-	/* Sanity check run time and reporting interval. */
-	if (cfg.run_time == 0) {
-		fprintf(stderr, "run-time not configured.\n");
-		ret = EINVAL;
-		goto err;
-	}
-	if (cfg.report_interval > cfg.run_time) {
+	/* Sanity check reporting interval. */
+	if (cfg.run_time > 0 && cfg.report_interval > cfg.run_time) {
 		fprintf(stderr, "report-interval larger than the run-time.n");
 		ret = EINVAL;
 		goto err;
@@ -1233,7 +1233,7 @@ err:	g_util_running = 0;
 /* Assign the src config to the dest.
  * Any storage allocated in dest is freed as a result.
  */
-void
+int
 config_assign(CONFIG *dest, const CONFIG *src)
 {
 	size_t i, len;
@@ -1246,14 +1246,16 @@ config_assign(CONFIG *dest, const CONFIG *src)
 		if (config_opts[i].type == STRING_TYPE ||
 		    config_opts[i].type == CONFIG_STRING_TYPE) {
 			pstr = (char **)
-			    ((unsigned char *)dest + config_opts[i].offset);
+			    ((u_char *)dest + config_opts[i].offset);
 			if (*pstr != NULL) {
 				len = strlen(*pstr) + 1;
-				newstr = malloc(len);
+				if ((newstr = malloc(len)) == NULL)
+					return (enomem(src));
 				strncpy(newstr, *pstr, len);
 				*pstr = newstr;
 			}
 		}
+	return (0);
 }
 
 /* Free any storage allocated in the config struct.
@@ -1332,11 +1334,13 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		strp = (char **)valueloc;
 		newlen = v->len + 1;
 		if (*strp == NULL) {
-			newstr = calloc(newlen, sizeof(char));
+			if ((newstr = calloc(newlen, sizeof(char))) == NULL)
+				return (enomem(cfg));
 			strncpy(newstr, v->str, v->len);
 		} else {
 			newlen += (strlen(*strp) + 1);
-			newstr = calloc(newlen, sizeof(char));
+			if ((newstr = calloc(newlen, sizeof(char))) == NULL)
+				return (enomem(cfg));
 			snprintf(newstr, newlen,
 			    "%s,%*s", *strp, (int)v->len, v->str);
 			/* Free the old value now we've copied it. */
@@ -1352,7 +1356,8 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		free(*strp);
-		newstr = malloc(v->len + 1);
+		if ((newstr = malloc(v->len + 1)) == NULL)
+			return (enomem(cfg));
 		strncpy(newstr, v->str, v->len);
 		newstr[v->len] = '\0';
 		*strp = newstr;
@@ -1498,7 +1503,9 @@ config_opt_str(CONFIG *cfg, WT_SESSION *parse_session,
 	int ret;
 	char *optstr;
 
-	optstr = malloc(strlen(name) + strlen(value) + 4);  /* name="value" */
+							/* name="value" */
+	if ((optstr = malloc(strlen(name) + strlen(value) + 4)) == NULL)
+		return (enomem(cfg));
 	sprintf(optstr, "%s=\"%s\"", name, value);
 	ret = config_opt_line(cfg, parse_session, optstr);
 	free(optstr);
@@ -1513,7 +1520,9 @@ config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
 	int ret;
 	char *optstr;
 
-	optstr = malloc(strlen(name) + strlen(value) + 2);  /* name=value */
+							/* name=value */
+	if ((optstr = malloc(strlen(name) + strlen(value) + 2)) == NULL)
+		return (enomem(cfg));
 	sprintf(optstr, "%s=%s", name, value);
 	ret = config_opt_line(cfg, parse_session, optstr);
 	free(optstr);
@@ -1608,7 +1617,7 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp)
  * Log printf - output a log message.
  */
 void
-lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
+lprintf(const CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 {
 	va_list ap;
 

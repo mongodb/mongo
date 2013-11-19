@@ -47,10 +47,8 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
  */
-enum __wt_page_state;
-    typedef enum __wt_page_state WT_PAGE_STATE;
-enum __wt_txn_isolation;
-    typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
+typedef enum __wt_page_state WT_PAGE_STATE;
+typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_block;
@@ -217,6 +215,7 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#include "gcc.h"
 #include "hardware.h"
 #include "misc.h"
 #include "mutex.h"
@@ -254,10 +253,10 @@ struct __wt_update;
 #include "cell.i"
 
 #include "mutex.i"			/* required by btree.i */
+#include "txn.i"			/* required by btree.i */
 
 #include "btree.i"			/* required by cursor.i */
 #include "cache.i"			/* required by cursor.i */
-#include "txn.i"			/* required by cursor.i */
 #include "cursor.i"
 
 #include "bitstring.i"

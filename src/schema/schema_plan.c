@@ -14,6 +14,7 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_COLGROUP *colgroup;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
 	u_int cg, col, foundcg, foundcol, matchcg, matchcol;
 	int getnext;
 
@@ -40,7 +41,7 @@ cgcols:			cval = colgroup->colconf;
 			col = table->nkey_columns;
 		}
 		WT_RET(__wt_config_subinit(session, &conf, &cval));
-		for (; __wt_config_next(&conf, &k, &v) == 0; col++) {
+		for (; (ret = __wt_config_next(&conf, &k, &v)) == 0; col++) {
 			if (k.len == colname->len &&
 			    strncmp(colname->str, k.str, k.len) == 0) {
 				if (getnext) {
@@ -53,6 +54,7 @@ cgcols:			cval = colgroup->colconf;
 			    col == table->nkey_columns - 1)
 				goto cgcols;
 		}
+		WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
 		colgroup = NULL;
 	}
@@ -101,6 +103,7 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session,
 	WT_RET(__wt_config_subinit(session, &conf, colconf));
 	for (ncols = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; ncols++)
 		;
+	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
 	if (ncols != 0 && ncols != kcols + vcols)
 		WT_RET_MSG(session, EINVAL, "Number of columns in '%.*s' "
@@ -153,8 +156,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_ASSERT(session, coltype == WT_PROJ_VALUE);
 
 	}
-	if (ret != WT_NOTFOUND)
-		return (ret);
+	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
 	return (0);
 }
@@ -171,6 +173,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_RET;
 	u_int cg, col, current_cg, current_col, i, start_cg, start_col;
 	int have_it;
 	char coltype, current_coltype;
@@ -186,7 +189,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
 	current_coltype = coltype = WT_PROJ_KEY; /* Keep lint quiet. */
-	for (i = 0; __wt_config_next(&conf, &k, &v) == 0; i++) {
+	for (i = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; i++) {
 		have_it = 0;
 
 		while (__find_next_col(session, table,
@@ -241,6 +244,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			current_col = col + 1;
 		}
 	}
+	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
 	/* Special case empty plans. */
 	if (i == 0 && plan->size == 0)

@@ -16,40 +16,6 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
- * __wt_eviction_page_force --
- *	Check if a page matches the criteria for forced eviction.
- */
-static inline int
-__wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
-	/* Leaf pages only. */
-	if (page->type != WT_PAGE_COL_FIX &&
-	    page->type != WT_PAGE_COL_VAR && page->type != WT_PAGE_ROW_LEAF)
-		return (0);
-
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * It's hard to imagine a page with a huge memory footprint that's also
-	 * clean, check to be sure.
-	 */
-	if (!__wt_page_is_modified(page))
-		return (0);
-
-	return (1);
-}
-
-/*
  * Estimate the per-allocation overhead.  All implementations of malloc / free
  * have some kind of header and pad for alignment.  We can't know for sure what
  * that adds up to, but this is an estimate based on some measurements of heap
@@ -199,7 +165,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	/*
 	 * We return read-generations from the future (where "the future" is
 	 * measured by increments of the global read generation).  The reason
-	 * is because when acquiring a new hazard reference on a page, we can
+	 * is because when acquiring a new hazard pointer for a page, we can
 	 * check its read generation, and if the read generation isn't less
 	 * than the current global generation, we don't bother updating the
 	 * page.  In other words, the goal is to avoid some number of updates
@@ -249,8 +215,7 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Select a spinlock for the page; let the barrier immediately below
 	 * keep things from racing too badly.
 	 */
-	modify->page_lock =
-	    ++conn->page_lock_cnt % (uint32_t)WT_PAGE_LOCKS(conn);
+	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS(conn);
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
@@ -291,6 +256,10 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (F_ISSET(&session->txn, TXN_RUNNING))
 			page->modify->disk_snap_min = session->txn.snap_min;
 	}
+
+	/* Check if this is the largest transaction ID to update the page. */
+	if (TXNID_LT(page->modify->update_txn, session->txn.id))
+		page->modify->update_txn = session->txn.id;
 }
 
 /*
@@ -477,33 +446,55 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
- * __wt_get_addr --
- *	Return the addr/size pair for a reference.
+ * __wt_ref_info --
+ *	Return the addr/size and type triplet for a reference.
  */
-static inline void
-__wt_get_addr(
-    WT_PAGE *page, WT_REF *ref, const uint8_t **addrp, uint32_t *sizep)
+static inline int
+__wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
+    WT_REF *ref, const uint8_t **addrp, uint32_t *sizep, u_int *typep)
 {
+	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
 
+	addr = ref->addr;
 	unpack = &_unpack;
 
 	/*
 	 * If NULL, there is no location.
 	 * If off-page, the pointer references a WT_ADDR structure.
 	 * If on-page, the pointer references a cell.
+	 *
+	 * The type is of a limited set: internal, leaf or no-overflow leaf.
 	 */
-	if (ref->addr == NULL) {
+	if (addr == NULL) {
 		*addrp = NULL;
 		*sizep = 0;
-	} else if (__wt_off_page(page, ref->addr)) {
-		*addrp = ((WT_ADDR *)(ref->addr))->addr;
-		*sizep = ((WT_ADDR *)(ref->addr))->size;
+		if (typep != NULL)
+			*typep = 0;
+	} else if (__wt_off_page(page, addr)) {
+		*addrp = addr->addr;
+		*sizep = addr->size;
+		if (typep != NULL)
+			switch (addr->type) {
+			case WT_ADDR_INT:
+				*typep = WT_CELL_ADDR_INT;
+				break;
+			case WT_ADDR_LEAF:
+				*typep = WT_CELL_ADDR_LEAF;
+				break;
+			case WT_ADDR_LEAF_NO:
+				*typep = WT_CELL_ADDR_LEAF_NO;
+				break;
+			WT_ILLEGAL_VALUE(session);
+			}
 	} else {
-		__wt_cell_unpack(ref->addr, unpack);
+		__wt_cell_unpack((WT_CELL *)addr, unpack);
 		*addrp = unpack->data;
 		*sizep = unpack->size;
+		if (typep != NULL)
+			*typep = unpack->type;
 	}
+	return (0);
 }
 
 /*
@@ -527,6 +518,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * read generation and we have some chance of succeeding.
 	 */
 	if (!WT_TXN_ACTIVE(&session->txn) &&
+	    (page->modify == NULL ||
+	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) &&
 	    page->read_gen == WT_READ_GEN_OLDEST &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
@@ -534,7 +527,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-		if ((ret = __wt_evict_page(session, page)) == EBUSY)
+		ret = __wt_evict_page(session, page);
+		if (ret == 0)
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+		else
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_force_fail);
+		if (ret == EBUSY)
 			ret = 0;
 		return (ret);
 	}
@@ -613,6 +612,89 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_eviction_force_check --
+ *	Check if a page matches the criteria for forced eviction.
+ */
+static inline int
+__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
+
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR &&
+	    page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off, although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that has
+	 * never been modified, but check to be sure.
+	 */
+	if (page->modify == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
+ * __wt_eviction_force --
+ *      Check if the current transaction permits forced eviction of a page.
+ */
+static inline int
+__wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_TXN_STATE *txn_state;
+
+	/*
+	 * Only try if there is a chance of success.  If the page has already
+	 * been split and this transaction is already pinning the oldest ID so
+	 * that the page can't be evicted, it has to complete before eviction
+	 * can succeed.
+	 */
+	txn_state = &S2C(session)->txn_global.states[session->id];
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
+	    txn_state->snap_min == WT_TXN_NONE ||
+	    TXNID_LT(page->modify->update_txn, txn_state->snap_min))
+		return (1);
+
+	return (0);
+}
+
+/*
+ * __wt_eviction_force --
+ *      Forcefully evict a page, if possible.
+ */
+static inline int
+__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	/*
+	 * Check if eviction or splitting has a chance of succeeding, otherwise
+	 * stall to give other transactions a chance to complete.
+	 */
+	__wt_txn_update_oldest(session);
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
+	    __wt_txn_visible_all(session, page->modify->update_txn)) {
+		page->read_gen = WT_READ_GEN_OLDEST;
+		WT_RET(__wt_page_release(session, page));
+	} else {
+		WT_RET(__wt_page_release(session, page));
+		__wt_sleep(0, 10000);
+	}
+
+	return (0);
+}
+
+/*
  * __wt_skip_choose_depth --
  *	Randomly choose a depth for a skiplist insert.
  */
@@ -642,8 +724,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
 	btree = S2BT(session);
 	root = btree->root_page;
 
-	if (btree == NULL || root == NULL ||
-	    (child = root->u.intl.t->page) == NULL)
+	if (root == NULL || (child = root->u.intl.t->page) == NULL)
 		return (0);
 
 	/* Make sure this is a simple tree, or LSM should switch. */

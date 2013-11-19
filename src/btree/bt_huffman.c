@@ -232,6 +232,10 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	u_int entries, lineno;
 	char *file;
 
+	*tablep = NULL;
+	*entriesp = *numbytesp = 0;
+
+	fp = NULL;
 	file = NULL;
 	table = NULL;
 
@@ -300,10 +304,13 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 
 	*entriesp = lineno - 1;
 	*tablep = table;
-	return (0);
 
-err:	__wt_free(session, file);
-	__wt_free(session, table);
+	if (0) {
+err:		__wt_free(session, table);
+	}
+	if (fp != NULL)
+		(void)fclose(fp);
+	__wt_free(session, file);
 	return (ret);
 }
 

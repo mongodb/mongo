@@ -86,6 +86,7 @@ for f in \
 
 	# Early exits from critical loops
 	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
+	       -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
 	       -e '/va_start/,/va_end/{=;p;}' $f | \
 		sed 'N;s/\n/:/' | \
 		egrep -w 'return|WT_RET' | \
@@ -113,6 +114,7 @@ for f in \
 	    -e '/for /!s/;;$/;/' \
 	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \
+	    -e 's/hazard reference/hazard pointer/' \
 	    -e 's/^#define /#define	/' >$t
 
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)

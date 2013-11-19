@@ -141,13 +141,15 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+	pthread_t self;
+	struct timespec ts;
 	size_t len, remain, wlen;
 	int prefix_cnt;
 	const char *err, *prefix;
 	char *end, *p;
+	u_char tid[64];
 
 	/*
 	 * We're using a stack buffer because we want error messages no matter
@@ -159,37 +161,67 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 */
 	char s[2048];
 
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 *
+	 * Without a session, we don't have event handlers or prefixes for the
+	 * error message.  Write the error to stderr and call it a day.  (It's
+	 * almost impossible for that to happen given how early we allocate the
+	 * first session, but if the allocation of the first session fails, for
+	 * example, we can end up here without a session.)
+	 */
+	if (session == NULL) {
+		WT_RET_TEST((fprintf(stderr, "WiredTiger Error%s%s\n",
+		    error == 0 ? "" : ": ",
+		    error == 0 ? "" : wiredtiger_strerror(error)) < 0),
+		    __wt_errno());
+		return (0);
+	}
+
 	p = s;
 	end = s + sizeof(s);
 
-	dhandle = session->dhandle;
-
 	/*
-	 * We have several prefixes for the error message: the database error
+	 * We have several prefixes for the error message:
+	 * a timestamp and the process and thread ids, the database error
 	 * prefix, the data-source's name, and the session's name.  Write them
 	 * as a comma-separate list, followed by a colon.
 	 */
 	prefix_cnt = 0;
+	if (__wt_epoch(session, &ts) == 0) {
+		remain = WT_PTRDIFF(end, p);
+		self = pthread_self();
+		__wt_raw_to_hex_mem((const uint8_t *)&self, sizeof(self),
+		    tid, sizeof(tid));
+		wlen = (size_t)snprintf(p, remain,
+		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s]",
+		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
+		    (uint64_t)getpid(), tid);
+		p = wlen >= remain ? end : p + wlen;
+		prefix_cnt = 1;
+	}
 	if ((prefix = S2C(session)->error_prefix) != NULL) {
 		remain = WT_PTRDIFF(end, p);
-		wlen = (size_t)snprintf(p, remain, "%s", prefix);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
-	prefix = dhandle == NULL ? NULL : dhandle->name;
+	prefix = session->dhandle == NULL ? NULL : session->dhandle->name;
 	if (prefix != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if ((prefix = session->name) != NULL) {
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
 		p = wlen >= remain ? end : p + wlen;
-		++prefix_cnt;
+		prefix_cnt = 1;
 	}
 	if (prefix_cnt != 0) {
 		remain = WT_PTRDIFF(end, p);

@@ -213,7 +213,10 @@ __verify_dsk_row(
 			}
 			last_cell_type = WAS_KEY;
 			break;
-		case WT_CELL_ADDR:
+		case WT_CELL_ADDR_DEL:
+		case WT_CELL_ADDR_INT:
+		case WT_CELL_ADDR_LEAF:
+		case WT_CELL_ADDR_LEAF_NO:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
 			switch (last_cell_type) {
@@ -234,7 +237,10 @@ __verify_dsk_row(
 
 		/* Check if any referenced item is entirely in the file. */
 		switch (cell_type) {
-		case WT_CELL_ADDR:
+		case WT_CELL_ADDR_DEL:
+		case WT_CELL_ADDR_INT:
+		case WT_CELL_ADDR_LEAF:
+		case WT_CELL_ADDR_LEAF_NO:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
 			if (!bm->addr_valid(bm,
@@ -582,9 +588,10 @@ __err_cell_type(WT_SESSION_IMPL *session,
     uint32_t entry_num, const char *addr, uint8_t cell_type, uint8_t dsk_type)
 {
 	switch (cell_type) {
-	case WT_CELL_ADDR:
 	case WT_CELL_ADDR_DEL:
-	case WT_CELL_ADDR_LNO:
+	case WT_CELL_ADDR_INT:
+	case WT_CELL_ADDR_LEAF:
+	case WT_CELL_ADDR_LEAF_NO:
 		if (dsk_type == WT_PAGE_COL_INT ||
 		    dsk_type == WT_PAGE_ROW_INT)
 			return (0);

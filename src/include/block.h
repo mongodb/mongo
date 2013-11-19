@@ -86,8 +86,12 @@ struct __wt_size {
 
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Per-size offset skiplist */
 
-	/* Variable-length array, sized by the number of skiplist elements. */
-	WT_SIZE *next[0];			/* Size skiplist */
+	/*
+	 * We don't use a variable-length array for the size skiplist, we want
+	 * to be able to use any cached WT_SIZE structure as the head of a list,
+	 * and we don't know the related WT_EXT structure's depth.
+	 */
+	WT_SIZE *next[WT_SKIP_MAXDEPTH];	/* Size skiplist */
 };
 
 /*
@@ -147,9 +151,11 @@ struct __wt_bm {
 	int (*checkpoint_resolve)(WT_BM *, WT_SESSION_IMPL *);
 	int (*checkpoint_unload)(WT_BM *, WT_SESSION_IMPL *);
 	int (*close)(WT_BM *, WT_SESSION_IMPL *);
+	int (*compact_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*compact_page_skip)
 	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t, int *);
-	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int, int *);
+	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int *);
+	int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
 	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
 	int (*read)
@@ -194,13 +200,15 @@ struct __wt_block {
 	TAILQ_ENTRY(__wt_block) q;	/* Linked list of handles */
 
 	/* Configuration information, set when the file is opened. */
+	int	 allocfirst;		/* Allocation is first-fit */
+	int	 allocfirst_save;	/* Allocation is first-fit, saved */
 	uint32_t allocsize;		/* Allocation size */
-	u_int	 block_header;		/* Header length */
-
 	int64_t	 os_cache;		/* System buffer cache flush max */
 	int64_t	 os_cache_max;
 	int64_t	 os_cache_dirty;	/* System buffer cache write max */
 	int64_t	 os_cache_dirty_max;
+
+	u_int	 block_header;		/* Header length */
 
 	/*
 	 * There is only a single checkpoint in a file that can be written.  The
@@ -211,13 +219,7 @@ struct __wt_block {
 	 */
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
-
-	/*
-	 * Array of free WT_EXTLIST structures, if we're doing lots of I/O,
-	 * a cache avoids an allocation/free while holding the spin lock.
-	 */
-	WT_EXT *free_ext;		/* List of free entries */
-	u_int	free_ext_cnt;		/* Limit the number we cache */
+	int		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Salvage support */
 	off_t	slvg_off;		/* Salvage file offset */

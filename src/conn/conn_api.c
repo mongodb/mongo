@@ -499,24 +499,17 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 	WT_UNUSED(cfg);
 
-	/*
-	 * Close open, external sessions.
-	 * Additionally, the session's hazard pointer memory isn't discarded
-	 * during normal session close because access to it isn't serialized.
-	 * Discard it now.  Note the loop for the hazard pointer memory, it's
-	 * the entire session array, not only the active session count, as the
-	 * active session count may be less than the maximum session count.
-	 */
+	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
 		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {
 			wt_session = &s->iface;
 			/*
-			 * Notify the application if we are automatically
-			 * closing their session handle.
+			 * Notify the user that we are closing the session
+			 * handle via the registered close callback.
 			 */
 			if (s->event_handler->handle_close != NULL)
-				s->event_handler->handle_close(
-				    s->event_handler, wt_session, NULL);
+				WT_TRET(s->event_handler->handle_close(
+				    s->event_handler, wt_session, NULL));
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 
@@ -958,6 +951,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	} *ft, verbtypes[] = {
 		{ "block",		WT_VERB_block },
 		{ "ckpt",		WT_VERB_ckpt },
+		{ "compact",		WT_VERB_compact },
 		{ "evict",		WT_VERB_evict },
 		{ "evictserver",	WT_VERB_evictserver },
 		{ "fileops",		WT_VERB_fileops },
@@ -1032,6 +1026,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	*wt_connp = NULL;
 
+	conn = NULL;
 	session = NULL;
 
 	WT_RET(__wt_library_init());

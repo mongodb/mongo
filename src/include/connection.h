@@ -83,11 +83,12 @@ struct __wt_connection_impl {
 	/*
 	 * We distribute the btree page locks across a set of spin locks; it
 	 * can't be an array, we impose cache-line alignment and gcc doesn't
-	 * support that for arrays.
+	 * support that for arrays.  Don't use too many: they are only held for
+	 * very short operations, each one is 64 bytes, so 256 will fill the L1
+	 * cache on most CPUs.
 	 */
-#define	WT_PAGE_LOCKS(conn)						\
-	(sizeof((conn)->page_lock) / sizeof((conn)->page_lock[0]))
-	WT_SPINLOCK *page_lock[256];	/* Btree page spinlocks */
+#define	WT_PAGE_LOCKS(conn)	16
+	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
 	u_int	     page_lock_cnt;	/* Next spinlock to use */
 
 					/* Connection queue */
@@ -166,18 +167,31 @@ struct __wt_connection_impl {
 	const char	*ckpt_config;	/* Checkpoint configuration */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
+	int compact_in_memory_pass;	/* Compaction serialization */
+
 	/*
 	 * There are only three statistics states so far: "none", "fast" and
 	 * "all".  Keep it simple, "all" sets both variables, "fast" sets one
 	 * of them.
 	 */
-	int		 stat_all;	/* "all" statistics configured */
-	int		 stat_fast;	/* "fast" statistics configured */
-	int		 stat_clear;	/* "clear" statistics configured */
+	int stat_all;			/* "all" statistics configured */
+	int stat_fast;			/* "fast" statistics configured */
+	int stat_clear;			/* "clear" statistics configured */
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	WT_CONNECTION_STATS_SPINLOCK spinlock_stats[WT_STATS_SPINLOCK_MAX];
+#define	WT_SPINLOCK_MAX	25
+	/* Spinlock blocking matrix: sized 2x the number of spinlocks. */
+	struct __wt_connection_stats_spinlock {
+		const char *name;		/* Mutex name */
+		const char *file;		/* Caller's file/line */
+		int line;
+						/* Count of blocked calls */
+		u_int blocked[WT_SPINLOCK_MAX * 2];
+	} spinlock_stats[WT_SPINLOCK_MAX * 2];
+
+	/* Spinlock list: sized 1x the number of spinlocks. */
+	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
 #endif
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */

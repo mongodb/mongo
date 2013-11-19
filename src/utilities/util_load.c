@@ -212,12 +212,13 @@ config_read(char ***listp, int *hexp)
 		if ((list[entry] = strdup(l.mem)) == NULL)
 			return (util_err(errno, NULL));
 	}
+
+	/* Headers are required, and they're supposed to be in pairs. */
+	if (list == NULL || entry % 2 != 0)
+		return (format());
+
 	list[entry] = NULL;
 	*listp = list;
-
-	/* The lines are supposed to be in pairs. */
-	if (entry / 2 == 0)
-		return (format());
 
 	/* Leak the memory, I don't care. */
 	return (0);
@@ -354,8 +355,10 @@ config_rename(char **urip, const char *name)
 	 * Find the separating colon characters, but not the trailing one may
 	 * not be there.
 	 */
-	if ((p = strchr(*urip, ':')) == NULL)
+	if ((p = strchr(*urip, ':')) == NULL) {
+		free(buf);
 		return (format());
+	}
 	*p = '\0';
 	p = strchr(p + 1, ':');
 	snprintf(buf, len, "%s:%s%s", *urip, name, p == NULL ? "" : p);

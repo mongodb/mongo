@@ -68,7 +68,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 
 	/* We're shutting down.  Make sure everything gets freed. */
-	__wt_txn_refresh_force(session);
+	__wt_txn_update_oldest(session);
 
 	/*
 	 * Shut down server threads other than the eviction server, which is
@@ -153,7 +153,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		session = conn->default_session = &conn->dummy_session;
 	}
 
-	/* Free the hazard references for all sessions. */
+	/* Free the hazard pointers for all sessions. */
 	if ((s = conn->sessions) != NULL)
 		for (i = 0; i < conn->session_size; ++s, ++i)
 			if (s != session)

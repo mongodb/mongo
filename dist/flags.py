@@ -10,7 +10,6 @@ flags = {
 ###################################################
 	'cache_flush' : [
 		'SYNC_CHECKPOINT',
-		'SYNC_COMPACT',
 		'SYNC_DISCARD',
 		'SYNC_DISCARD_NOWRITE',
 		'SYNC_WRITE_LEAVES',
@@ -51,6 +50,7 @@ flags = {
 	'verbose' : [
 		'VERB_block',
 		'VERB_ckpt',
+		'VERB_compact',
 		'VERB_evict',
 		'VERB_evictserver',
 		'VERB_fileops',
@@ -80,9 +80,11 @@ flags = {
 		'CONN_SERVER_RUN',
 	],
 	'session' : [
+		'SESSION_CACHE_BUSY',
 		'SESSION_INTERNAL',
 		'SESSION_NO_CACHE',
 		'SESSION_NO_CACHE_CHECK',
+		'SESSION_NO_SCHEMA_LOCK',
 		'SESSION_SALVAGE_QUIET_ERR',
 		'SESSION_SCHEMA_LOCKED',
 	],

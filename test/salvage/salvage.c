@@ -157,7 +157,8 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	(void)system("rm -f WiredTiger WiredTiger.* __slvg.* __schema.*");
+	WT_UNUSED_RET(system(
+	    "rm -f WiredTiger WiredTiger.* __slvg.* __schema.*"));
 	assert((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*

@@ -24,6 +24,10 @@ build() {
 	    sed -e 's/^[	 ]*//' -e 's/[	 ]*{$//' | sort | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr a-z A-Z`
+		test "$t" = "enum" && {
+			echo "typedef $t $n $upper;"
+			continue
+		}
 		echo "$t $n;"
 		echo "    typedef $t $n $upper;"
 	done
