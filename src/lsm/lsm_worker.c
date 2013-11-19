@@ -106,8 +106,8 @@ __wt_lsm_merge_worker(void *vargs)
 	__wt_free(session, args);
 
 	saved_gen = lsm_tree->dsk_gen;
-	aggressive = try_bloom = 0;
-	stallms = 0;
+	aggressive = stallms = 0;
+	try_bloom = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		/*
