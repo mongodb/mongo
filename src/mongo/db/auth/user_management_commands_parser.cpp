@@ -584,6 +584,11 @@ namespace auth {
         if (!status.isOK()) {
             return status;
         }
+        if (!parsedPrivileges->size()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << cmdName << " command requires a non-empty "
+                                  "\"privileges\" array");
+        }
 
         return Status::OK();
     }
