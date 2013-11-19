@@ -1,3 +1,64 @@
+WiredTiger release 1.6.6, 2013-11-19
+------------------------------------
+
+The WiredTiger 1.6.6 release is a bugfix and performance tuning release.
+
+This release of WiredTiger contains a database format change. Database files
+from previous releases will need to be upgraded.
+
+A special note: the WiredTiger code base is now being regularly reviewed
+using the Coverity Static Analysis Verification Engine.  We'd like to
+thank Coverity for their on-going support of Open Source projects like
+WiredTiger!
+
+Significant changes include:
+
+* Performance changes include: limiting operations done inside update
+  serialization primitives, removing unnecessary memory barriers, replacing
+  spinlocks with atomic instructions, padding structures to avoid false
+  cache sharing, switching from per-file mutexes to per-page mutexes,
+  pre-allocating structures to avoid memory allocation while holding
+  mutexes, and using adaptive mutexes where available.
+  [#707, #718, #719]
+
+* A number of LSM stability and performance improvements: changes include
+  better merge algorithms, reduced locking, and higher concurrency.
+
+* A number of table compaction performance improvements, including changes
+  allowing compaction to no longer read unnecessary file blocks into the
+  cache, requires fewer passes over the file and support concurrent
+  checkpoints and eviction.  This change required an underlying file
+  format change, see the upgrading documentation for details.
+  [#756, #761]
+
+* WiredTiger statistics have been significantly improved:
+  
+  Statistics logging has been changed to aggregate information from all
+  open handles.  [#709, #717]
+
+  For performance reasons, statistics are now disabled by default, see
+  the upgrading documentation for details.  [#715]
+
+  Statistics configuration has been changed so the connection and cursor
+  configuration are consistent, with matching changes to the "wt stat"
+  command-line utility; see the upgrading documentation for details.
+
+* Update WT_EVENT_HANDLER interface to contain a new "handle close"
+  interface and to pass a WT_SESSION handle into all callbacks, see the
+  upgrading documentation for details. [#649]
+
+  Add timestamp, process ID and thread ID to messages generated via
+  WT_EVENT_HANDLER interface. [#753]
+
+* WiredTiger eviction improvements, supporting larger data-to-cache size
+  ratios. [#754]
+
+* Various fixes for handling overflow records. [#726, #743]
+
+* Overflow records are no longer tracked during bulk-loads, significantly
+  increasing bulk-load performance for some data sets.
+
+
 WiredTiger release 1.6.5, 2013-10-09
 ------------------------------------
 
