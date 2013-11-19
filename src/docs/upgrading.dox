@@ -71,6 +71,16 @@ application statistics configuration and cursors should be reviewed to
 confirm they are configured for the desired behavior;
 </dd>
 
+<dt>WT_EVENT_HANDLER interface changes</dt>
+<dd>
+Add a new WT_EVENT_HANDLER::handle_close callback that WiredTiger will call
+any time it automatically closes an application session or cursor handle.
+
+Additionally add a WT_SESSION parameter into the existing
+WT_EVENT_HANDLER::handle_error, WT_EVENT_HANDLER::handle_message and
+WT_EVENT_HANDLER::handle_progress callback functions.
+</dd>
+
 @section version_165 Upgrading to Version 1.6.5
 <dl>
 
