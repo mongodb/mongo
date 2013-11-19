@@ -8,6 +8,7 @@ env.Library(
         "canonical_query.cpp",
         "index_tag.cpp",
         "parsed_projection.cpp",
+        "plan_cache.cpp",
         "plan_enumerator.cpp",
         "planner_access.cpp",
         "planner_analysis.cpp",

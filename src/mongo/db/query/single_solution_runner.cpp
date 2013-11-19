@@ -46,11 +46,9 @@ namespace mongo {
                                                WorkingSet* ws)
         : _canonicalQuery(canonicalQuery),
           _solution(soln),
-          _exec(new PlanExecutor(ws, root)) {
-    }
+          _exec(new PlanExecutor(ws, root)) { }
 
-    SingleSolutionRunner::~SingleSolutionRunner() {
-    }
+    SingleSolutionRunner::~SingleSolutionRunner() { }
 
     Runner::RunnerState SingleSolutionRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         return _exec->getNext(objOut, dlOut);

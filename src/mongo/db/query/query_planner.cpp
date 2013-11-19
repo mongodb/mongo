@@ -161,9 +161,42 @@ namespace mongo {
     }
 
     // static
+    Status QueryPlanner::planFromCache(const CanonicalQuery& query,
+                                       const QueryPlannerParams& params,
+                                       CachedSolution* cachedSoln,
+                                       QuerySolution** out) {
+
+        // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
+        MatchExpression* clone = query.root()->shallowClone();
+
+        // XXX: Use data in cachedSoln to tag 'clone' with the indices used.  The tags use an index
+        // ID which is an index into some vector of IndexEntry(s).  How do we maintain this across
+        // calls to plan?  Do we want to store in the soln the keypatterns of the indices and just
+        // map those to an index into params.indices?  Might be easiest thing to do, and certainly
+        // most intelligible for debugging.
+
+        // Use the cached index assignments to build solnRoot.  Takes ownership of clone.
+        QuerySolutionNode* solnRoot =
+            QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices);
+
+        // XXX: are the NULL cases an error/when does this happen / can this happen?
+        if (NULL != solnRoot) {
+            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+            if (NULL != soln) {
+                QLOG() << "Planner: adding cached solution:\n" << soln->toString() << endl;
+                *out = soln;
+            }
+        }
+
+        // XXX: if any NULLs return error status?
+        return Status::OK();
+    }
+
+    // static
     Status QueryPlanner::plan(const CanonicalQuery& query,
                               const QueryPlannerParams& params,
                               std::vector<QuerySolution*>* out) {
+
         QLOG() << "=============================\n"
                << "Beginning planning, options = " << optionString(params.options) << endl
                << "Canonical query:\n" << query.toString() << endl

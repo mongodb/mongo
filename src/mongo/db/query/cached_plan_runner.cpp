@@ -36,28 +36,31 @@
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
     CachedPlanRunner::CachedPlanRunner(CanonicalQuery* canonicalQuery,
-                                       CachedSolution* cached,
+                                       QuerySolution* solution,
                                        PlanStage* root,
                                        WorkingSet* ws)
         : _canonicalQuery(canonicalQuery),
-          _cachedQuery(cached),
+          _solution(solution),
           _exec(new PlanExecutor(ws, root)),
-          _updatedCache(false) {
-    }
+          _updatedCache(false) { }
 
-    CachedPlanRunner::~CachedPlanRunner() {
-    }
+    CachedPlanRunner::~CachedPlanRunner() { }
 
     Runner::RunnerState CachedPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         Runner::RunnerState state = _exec->getNext(objOut, dlOut);
+
+        // This could be called several times and we don't want to update the cache every time.
         if (Runner::RUNNER_EOF == state && !_updatedCache) {
             updateCache();
         }
+
         return state;
     }
 
@@ -116,28 +119,23 @@ namespace mongo {
 
     void CachedPlanRunner::updateCache() {
         _updatedCache = true;
+#if 0
+        Database* db = cc().database();
+        verify(NULL != db);
+        Collection* collection = db->getCollection(_canonicalQuery->ns());
+        verify(NULL != collection);
+        PlanCache* cache = collection->infoCache()->getPlanCache();
 
-        // We're done.  Update the cache.
-        PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
+        auto_ptr<CacheEntryFeedback> feedback(new CacheEntryFeedback());
+        // XXX: what else can we provide here?
+        feedback->stats.reset(_exec->getStats());
+        Status fbs = cache->feedback(_solution->key, feedback.release());
 
-        // TODO: Is this an error?
-        if (NULL == cache) { return; }
-
-        // TODO: How do we decide this?
-        bool shouldRemovePlan = false;
-
-        if (shouldRemovePlan) {
-            if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
-                warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
-                    " somebody else did already?";
-                return;
-            }
+        if (!fbs.isOK()) {
+            // XXX: probably not a warning, could happen.
+            warning() << "Failed to update cache: " << fbs.toString() << endl;
         }
-
-        // We're done running.  Update cache.
-        auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
-        feedback->stats = _exec->getStats();
-        cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
+#endif
     }
 
 } // namespace mongo

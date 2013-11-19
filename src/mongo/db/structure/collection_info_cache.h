@@ -30,7 +30,10 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/index_set.h"
+#include "mongo/db/query/plan_cache.h"
 
 namespace mongo {
 
@@ -50,6 +53,15 @@ namespace mongo {
          */
         void reset();
 
+        //
+        // New Query Execution
+        //
+
+        /**
+         * Get the PlanCache for this collection.
+         */
+        PlanCache* getPlanCache() const;
+
         // -------------------
 
         /* get set of index keys for this namespace.  handy to quickly check if a given
@@ -63,6 +75,9 @@ namespace mongo {
 
         // ---------------------
 
+        /**
+         * Called when an index is added to this collection.
+         */
         void addedIndex() { reset(); }
 
         void clearQueryCache();
@@ -78,7 +93,10 @@ namespace mongo {
         bool _keysComputed;
         IndexPathSet _indexedPaths;
 
+        // A cache for query plans.
+        boost::scoped_ptr<PlanCache> _planCache;
+
         void computeIndexKeys();
     };
 
-}
+}  // namespace mongo

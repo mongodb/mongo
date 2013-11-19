@@ -36,6 +36,8 @@
 namespace mongo {
 
     struct QueryPlannerParams {
+        QueryPlannerParams() : options(DEFAULT) { }
+
         enum Options {
             // You probably want to set this.
             DEFAULT = 0,

@@ -34,10 +34,12 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -291,7 +293,8 @@ namespace mongo {
 
         if (_failure || _killed) { return false; }
 
-        size_t bestChild = PlanRanker::pickBestPlan(_candidates, NULL);
+        auto_ptr<PlanRankingDecision> ranking(new PlanRankingDecision());
+        size_t bestChild = PlanRanker::pickBestPlan(_candidates, ranking.get());
 
         // Run the best plan.  Store it.
         _bestPlan.reset(new PlanExecutor(_candidates[bestChild].ws,
@@ -318,11 +321,13 @@ namespace mongo {
             }
         }
 
-        // TODO:
         // Store the choice we just made in the cache.
-        // QueryPlanCache* cache = PlanCache::get(somenamespace);
-        // cache->add(_query, *_candidates[bestChild]->solution, decision->bestPlanStats);
-        // delete decision;
+        Database* db = cc().database();
+        verify(NULL != db);
+        Collection* collection = db->getCollection(_query->ns());
+        verify(NULL != collection);
+        PlanCache* cache = collection->infoCache()->getPlanCache();
+        cache->add(*_query, *_bestSolution, ranking.release());
 
         // Clear out the candidate plans, leaving only stats as we're all done w/them.
         for (size_t i = 0; i < _candidates.size(); ++i) {

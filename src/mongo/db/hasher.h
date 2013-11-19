@@ -100,9 +100,6 @@ namespace mongo {
          */
         static long long int hash64( const BSONElement& e , HashSeed seed );
 
-    private:
-        BSONElementHasher();
-
         /* This incrementally computes the hash of BSONElement "e"
          * using hash function "h".  If "includeFieldName" is true,
          * then the name of the field is hashed in between the type of
@@ -112,6 +109,9 @@ namespace mongo {
          * Used as a helper for hash64 above.
          */
         static void recursiveHash( Hasher* h , const BSONElement& e , bool includeFieldName );
+
+    private:
+        BSONElementHasher();
 
     };
 

@@ -33,6 +33,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/namespace_details-inl.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/util/debug_util.h"
 
@@ -43,12 +44,14 @@ namespace mongo {
 
     CollectionInfoCache::CollectionInfoCache( Collection* collection )
         : _collection( collection ),
-          _keysComputed( false ) { }
+          _keysComputed( false ),
+          _planCache(new PlanCache()) { }
 
     void CollectionInfoCache::reset() {
         Lock::assertWriteLocked( _collection->ns().ns() );
         clearQueryCache();
         _keysComputed = false;
+        _planCache->clear();
     }
 
     void CollectionInfoCache::computeIndexKeys() {
@@ -76,6 +79,10 @@ namespace mongo {
 
     void CollectionInfoCache::clearQueryCache() {
         // TODO: hook up w/new cache when impl
+    }
+
+    PlanCache* CollectionInfoCache::getPlanCache() const {
+        return _planCache.get();
     }
 
 }

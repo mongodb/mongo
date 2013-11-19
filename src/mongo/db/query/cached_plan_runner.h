@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/runner.h"
 
 namespace mongo {
@@ -48,16 +49,16 @@ namespace mongo {
     /**
      * CachedPlanRunner runs a plan retrieved from the cache.
      *
-     * Cached plans are bundled with information describing why the plan is in the cache.
-     *
      * If we run a plan from the cache and behavior wildly deviates from expected behavior, we may
      * remove the plan from the cache.  See plan_cache.h.
      */
     class CachedPlanRunner : public Runner {
     public:
-
-        /**  Takes ownership of all arguments. */
-        CachedPlanRunner(CanonicalQuery* canonicalQuery, CachedSolution* cached,
+        /**
+         * Takes ownership of all arguments.
+         * XXX: what args should this really take?  probably a cachekey as well?
+         */
+        CachedPlanRunner(CanonicalQuery* canonicalQuery, QuerySolution* solution,
                          PlanStage* root, WorkingSet* ws);
 
         virtual ~CachedPlanRunner();
@@ -89,11 +90,13 @@ namespace mongo {
         void updateCache();
 
         boost::scoped_ptr<CanonicalQuery> _canonicalQuery;
-        boost::scoped_ptr<CachedSolution> _cachedQuery;
+        boost::scoped_ptr<QuerySolution> _solution;
         boost::scoped_ptr<PlanExecutor> _exec;
 
         // Have we updated the cache with our plan stats yet?
         bool _updatedCache;
+
+        // CacheKey _cacheKey;
     };
 
 }  // namespace mongo

@@ -29,105 +29,179 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/canonical_query.h"
 
 namespace mongo {
+
+    class PlanRankingDecision;
+    class QuerySolution;
+    class QuerySolutionNode;
 
     /**
      * TODO: Debug commands:
      * 1. show canonical form of query
      * 2. show plans generated for query without (and with) cache
      * 3. print out cache.
-     * 4. clear all elements from cache / otherwise manipulate cache.
+     * 4. clear all elements from cache
+     * 5. pin and unpin cached solutions
+     */
+
+    /**
+     * TODO HK notes
+
+     * must cache query w/shape, not exact data.
+
+     * cache should be LRU with some cap on size
+
+     * order doesn't matter: ensure that cache entry for query={a:1, b:1} same for query={b:1, a:1}
+
+     * cache whenever possible
+
+     * write ops should invalidate but tell plan_cache there was a write op, don't enforce policy elsewhere,
+       enforce here.
+
+     * cache key is sort + query shape
+
+     * {x:1} and {x:{$gt:7}} not same shape for now -- operator matters
      */
 
     /**
      * When the CachedPlanRunner runs a cached query, it can provide feedback to the cache.  This
      * feedback is available to anyone who retrieves that query in the future.
      */
-    struct CachedSolutionFeedback {
-        PlanStageStats* stats;
+    struct PlanCacheEntryFeedback {
+        // How well did the cached plan perform?
+        boost::scoped_ptr<PlanStageStats> stats;
+    };
+
+    // TODO: Is this binary data really?
+    typedef std::string PlanCacheKey;
+
+    /**
+     * Information returned from a get(...) query.
+     */
+    struct CachedSolution {
+        // Owned here.
+        // XXX: what type is this?  it's really a tree where the node is a tag on a matchexpression.
+        void* plannerData;
+
+        // Key used to provide feedback on the entry.
+        PlanCacheKey key;
+
+        // For debugging.
+        std::string toString() const;
+
+        // XXX: no copying
     };
 
     /**
-     * A cached solution to a query.
+     * Used internally by the cache to track entries and their performance over time.
      */
-    struct CachedSolution {
-        ~CachedSolution() {
-            for (size_t i = 0; i < feedback.size(); ++i) {
-                delete feedback[i];
-            }
-        }
+    class PlanCacheEntry {
+    private:
+        MONGO_DISALLOW_COPYING(PlanCacheEntry);
+    public:
+        // TODO: Do we want to store more information about the query here?
 
-        // The best solution for the CanonicalQuery.
-        scoped_ptr<QuerySolution> solution;
+        /**
+         * Create a new PlanCacheEntry.
+         * Grabs any planner-specific data required from the solution.
+         * Takes ownership of the PlanRankingDecision that placed the plan in the cache.
+         * XXX: what else should this take?
+         */
+        PlanCacheEntry(const QuerySolution& s,
+                   PlanRankingDecision* d);
+
+        ~PlanCacheEntry();
+
+        // For debugging.
+        std::string toString() const;
+
+        // Data provided to the planner to allow it to recreate the solution this entry represents.
+        // TODO: This is the same thing as the TBD type in CachedSolution.
+        // CachedSolution must be fully owned so we'll copy this to return it.
+        void* plannerData;
 
         // Why the best solution was picked.
-        scoped_ptr<PlanRankingDecision> decision;
+        // TODO: Do we want to store other information like the other plans considered?
+        boost::scoped_ptr<PlanRankingDecision> decision;
 
-        // Annotations from cached runs.
-        // TODO: How many of these do we really want to keep?
-        vector<CachedSolutionFeedback*> feedback;
-    private:
-        MONGO_DISALLOW_COPYING(CachedSolution);
+        // Annotations from cached runs.  The CachedSolutionRunner provides these stats about its
+        // runs when they complete.  TODO: How many of these do we really want to keep?
+        std::vector<PlanCacheEntryFeedback*> feedback;
+
+        // Is this pinned in the cache?  If so, we will never remove it as a result of feedback.
+        bool pinned;
     };
 
     /**
      * Caches the best solution to a query.  Aside from the (CanonicalQuery -> QuerySolution)
-     * mapping, the cache contains information on why that mapping was made, and statistics on the
+     * mapping, the cache contains information on why that mapping was made and statistics on the
      * cache entry's actual performance on subsequent runs.
+     *
+     * XXX: lock in here!  this can be called by many threads at the same time since the only above-this
+     * locking required is a read lock on the ns.
      */
     class PlanCache {
+    private:
+        MONGO_DISALLOW_COPYING(PlanCache);
     public:
-        /**
-         * Get the (global) cache for the provided namespace.  Must not be held across yields.
-         * As such, there is no locking required.
-         */
-        static PlanCache* get(const string& ns) { return NULL; }
+        PlanCache() { }
+
+        ~PlanCache();
 
         /**
          * Record 'solution' as the best plan for 'query' which was picked for reasons detailed in
          * 'why'.
          *
-         * Takes ownership of all arguments.
+         * Takes ownership of 'why'.
          *
-         * If the mapping was added successfully, returns true.
-         * If the mapping already existed or some other error occurred, returns false;
+         * If the mapping was added successfully, returns Status::OK().
+         * If the mapping already existed or some other error occurred, returns another Status.
          */
-        bool add(CanonicalQuery* query, QuerySolution* solution, PlanRankingDecision* why) {
-            return false;
-        }
+        Status add(const CanonicalQuery& query,
+                   const QuerySolution& soln,
+                   PlanRankingDecision* why);
 
         /**
-         * Look up the cached solution for the provided query.  If a cached solution exists, return
-         * a copy of it which the caller then owns.  If no cached solution exists, returns NULL.
+         * Look up the cached data access for the provided 'query'.  Used by the query planner
+         * to shortcut planning.
          *
-         * TODO: Allow querying for exact query and querying for the shape of the query.
+         * If there is no entry in the cache for the 'query', returns an error Status.
+         *
+         * If there is an entry in the cache, populates 'crOut' and returns Status::OK().  Caller
+         * owns '*crOut'.
          */
-        CachedSolution* get(const CanonicalQuery& query) {
-            return NULL;
-        }
+        Status get(const CanonicalQuery& query, CachedSolution** crOut);
 
         /**
          * When the CachedPlanRunner runs a plan out of the cache, we want to record data about the
-         * plan's performance.  Cache takes ownership of 'feedback'.
+         * plan's performance.  The CachedPlanRunner calls feedback(...) at the end of query
+         * execution in order to do this.
          *
-         * If the (query, solution) pair isn't in the cache, the cache deletes feedback and returns
-         * false.  Otherwise, returns true.
+         * Cache takes ownership of 'feedback'.
+         *
+         * If the entry corresponding to 'ck' isn't in the cache anymore, the feedback is ignored
+         * and an error Status is returned.
+         *
+         * If the entry corresponding to 'ck' still exists, 'feedback' is added to the run
+         * statistics about the plan.  Status::OK() is returned.
          */
-        bool feedback(const CanonicalQuery& query, const QuerySolution& solution,
-                      const CachedSolutionFeedback* feedback) {
-            return false;
-        }
+        Status feedback(const PlanCacheKey& ck, PlanCacheEntryFeedback* feedback);
 
         /**
-         * Remove the (query, solution) pair from our cache.  Returns true if the plan was removed,
-         * false if it wasn't found.
+         * Remove the entry corresponding to 'ck' from the cache.  Returns Status::OK() if the plan
+         * was present and removed and an error status otherwise.
          */
-        bool remove(const CanonicalQuery& query, const QuerySolution& solution) {
-            return false;
-        }
+        Status remove(const PlanCacheKey& ck);
+
+        /**
+         * Remove *all* entries.
+         */
+        void clear();
+
+    private:
+        unordered_map<PlanCacheKey, PlanCacheEntry*> _cache;
     };
 
 }  // namespace mongo

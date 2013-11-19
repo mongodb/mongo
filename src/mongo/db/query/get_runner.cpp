@@ -89,24 +89,6 @@ namespace mongo {
         verify(rawCanonicalQuery);
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
-        // Try to look up a cached solution for the query.
-        // TODO: Can the cache have negative data about a solution?
-        PlanCache* localCache = PlanCache::get(canonicalQuery->ns());
-        if (NULL != localCache) {
-            CachedSolution* cs = localCache->get(*canonicalQuery);
-            if (NULL != cs) {
-                // We have a cached solution.  Hand the canonical query and cached solution off to
-                // the cached plan runner, which takes ownership of both.
-                WorkingSet* ws;
-                PlanStage* root;
-                verify(StageBuilder::build(*cs->solution, &root, &ws));
-                *out = new CachedPlanRunner(canonicalQuery.release(), cs, root, ws);
-                return Status::OK();
-            }
-        }
-
-        // No entry in cache for the query.  We have to solve the query ourself.
-
         // Get the indices that we could possibly use.
         Database* db = cc().database();
         verify( db );
@@ -181,6 +163,21 @@ namespace mongo {
                 // If there's no metadata don't bother w/the shard filter since we won't know what
                 // the key pattern is anyway...
                 plannerParams.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+        }
+
+        // Try to look up a cached solution for the query.
+        //
+        // XXX: we don't want to do this if there is a hint or if max/min is set.
+        //
+        // TODO: Can the cache have negative data about a solution?
+        CachedSolution* rawCS;
+        if (collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
+            // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+            QuerySolution *qs;
+            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, rawCS, &qs);
+            if (status.isOK()) {
+                // XXX: create new CachedSolutionRunner here.
             }
         }
 
