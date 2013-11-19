@@ -96,8 +96,8 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	uint64_t saved_gen;
-	u_int chunk_wait, id, stallms;
-	int aggressive, old_aggressive, progress, try_bloom;
+	u_int aggressive, chunk_wait, id, old_aggressive, stallms;
+	int progress, try_bloom;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
