@@ -1,6 +1,7 @@
 #include "yaml-cpp/ostream_wrapper.h"
 #include <cstring>
 #include <iostream>
+#include <algorithm>
 
 namespace YAML
 {
