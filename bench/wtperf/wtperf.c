@@ -1540,9 +1540,9 @@ config_opt_usage(void)
 		case BOOL_TYPE:
 			typestr = "bool";
 			if (strcmp(defaultval, "0") == 0)
-				defaultval = "true";
-			else
 				defaultval = "false";
+			else
+				defaultval = "true";
 			break;
 		case CONFIG_STRING_TYPE:
 		case STRING_TYPE:
