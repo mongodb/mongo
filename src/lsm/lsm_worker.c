@@ -326,8 +326,11 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    session, chunk->uri, NULL, NULL, 0));
 			saved_isolation = session->txn.isolation;
 			session->txn.isolation = TXN_ISO_EVICTION;
+			__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 			ret = __wt_bt_cache_op(
 			    session, NULL, WT_SYNC_WRITE_LEAVES);
+			__wt_spin_unlock(
+			    session, &S2C(session)->checkpoint_lock);
 			session->txn.isolation = saved_isolation;
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
