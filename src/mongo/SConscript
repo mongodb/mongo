@@ -423,7 +423,6 @@ env.Library("coredb", [
         "db/querypattern.cpp",
         "db/queryutil.cpp",
         "db/stats/timer_stats.cpp",
-        "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ]
         + tcmallocServerStatus
@@ -623,6 +622,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/ops/update_lifecycle_impl.cpp",
 
                     # most commands are only for mongod
+                    "db/stats/top.cpp",
                     "db/commands/apply_ops.cpp",
                     "db/commands/dbhash.cpp",
                     "db/commands/merge_chunks_cmd.cpp",
