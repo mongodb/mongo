@@ -2069,6 +2069,7 @@ var authCommandsLib = {
         {
             testname: "top",
             command: {top: 1},
+            skipSharded: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
