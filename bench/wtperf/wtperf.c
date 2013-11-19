@@ -114,7 +114,6 @@ void config_opt_usage(void);
 int execute_populate(CONFIG *);
 int execute_workload(CONFIG *);
 int find_table_count(CONFIG *);
-void indent_lines(const char *, const char *);
 void *insert_thread(void *);
 void lprintf(const CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
     WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
@@ -1521,16 +1520,37 @@ config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
 	return (ret);
 }
 
+static void
+pretty_print(const char *p, const char *indent)
+{
+	const char *t;
+
+	for (;; p = t + 1) {
+		if (strlen(p) <= 70)
+			break;
+		for (t = p + 70; t > p && *t != ' '; --t)
+			;
+		if (t == p)			/* No spaces? */
+			break;
+		printf("%s%.*s\n",
+		    indent == NULL ? "" : indent, (int)(t - p), p);
+	}
+	if (*p != '\0')
+		printf("%s%s\n", indent == NULL ? "" : indent, p);
+}
+
 void
 config_opt_usage(void)
 {
-	size_t i, linelen, nopt;
+	size_t i, nopt;
 	const char *defaultval, *typestr;
 
-	printf("Following are options settable using -o or -O, "
-	    "showing [default value].\n");
-	printf("String values must be enclosed by \" quotes, ");
-	printf("boolean values must be either true or false.\n\n");
+	pretty_print(
+	    "The following are options settable using -o or -O, showing the "
+	    "type and default value.\n", NULL);
+	pretty_print(
+	    "String values must be enclosed in \" quotes, boolean values must "
+	    "be either true or false.\n", NULL);
 
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
 	for (i = 0; i < nopt; i++) {
@@ -1538,7 +1558,7 @@ config_opt_usage(void)
 		defaultval = config_opts[i].defaultval;
 		switch (config_opts[i].type) {
 		case BOOL_TYPE:
-			typestr = "bool";
+			typestr = "boolean";
 			if (strcmp(defaultval, "0") == 0)
 				defaultval = "false";
 			else
@@ -1555,14 +1575,9 @@ config_opt_usage(void)
 			typestr = "unsigned int";
 			break;
 		}
-		linelen = (size_t)printf("  %s=<%s> [%s]",
+		printf("%s (%s, default %s)\n",
 		    config_opts[i].name, typestr, defaultval);
-		if (linelen + 2 + strlen(config_opts[i].description) < 80)
-			printf("  %s\n", config_opts[i].description);
-		else {
-			printf("\n");
-			indent_lines(config_opts[i].description, "        ");
-		}
+		pretty_print(config_opts[i].description, "\t");
 	}
 }
 
@@ -1721,24 +1736,6 @@ wtperf_rand(CONFIG *cfg)
 	/* Avoid zero - LSM doesn't like it. */
 	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return (rval);
-}
-
-void
-indent_lines(const char *lines, const char *indent)
-{
-	const char *bol, *eol;
-	int len;
-
-	bol = lines;
-	while (bol != NULL) {
-		eol = strchr(bol, '\n');
-		if (eol == NULL)
-			len = (int)strlen(bol);
-		else
-			len = (int)(eol++ - bol);
-		printf("%s%.*s\n", indent, len, bol);
-		bol = eol;
-	}
 }
 
 void

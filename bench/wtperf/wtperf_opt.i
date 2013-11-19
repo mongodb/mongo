@@ -94,12 +94,12 @@ DEF_OPT_AS_INT(merge_sleep, 0,
 DEF_OPT_AS_BOOL(pareto, 0,
     "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
-    "number of operations to group into each transaction in the\n"
-    "populate phase. Zero for auto-commit.")
+    "number of operations to group into each transaction in the populate "
+    "phase, zero for auto-commit")
 DEF_OPT_AS_UINT32(populate_threads, 1, "number of populate threads")
 DEF_OPT_AS_UINT32(random_range, 0,
-    "if non-zero, use random inserts in workload, reads and updates\n"
-    "ignore WT_NOTFOUND")
+    "if non-zero, use random inserts in workload, reads and updates ignore "
+    "WT_NOTFOUND")
 DEF_OPT_AS_UINT32(read_threads, 2, "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
     "how often to output throughput information")
@@ -109,8 +109,8 @@ DEF_OPT_AS_UINT32(stat_interval, 0,
 DEF_OPT_AS_CONFIG_STRING(table_config, DEFAULT_LSM_CONFIG,
     "table configuration string")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
-    "transaction configuration string,\n"
-    "relevant when populate_opts_per_txn is nonzero")
+    "transaction configuration string, relevant when populate_opts_per_txn "
+    "is nonzero")
 DEF_OPT_AS_UINT32(update_threads, 0, "number of update threads")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
