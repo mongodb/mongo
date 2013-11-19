@@ -208,7 +208,7 @@ __clsm_open_cursors(
 	chunk = NULL;
 
 	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
-	ckpt_cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
+	ckpt_cfg[1] = "checkpoint=" WT_CHECKPOINT ",raw";
 	ckpt_cfg[2] = NULL;
 
 	/* Copy the key, so we don't lose the cursor position. */

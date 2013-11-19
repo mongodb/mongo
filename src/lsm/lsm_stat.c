@@ -27,7 +27,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
 	   WT_CONFIG_BASE(session, session_open_cursor),
-	   "checkpoint=WiredTigerCheckpoint", NULL, NULL };
+	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = 0;
 	WT_RET(__wt_lsm_tree_get(session, uri, 0, &lsm_tree));
