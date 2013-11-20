@@ -75,7 +75,9 @@ if ( ( typeof WriteResult ) == 'undefined' ){
 
         if ( !this._ok ) {
 
-            result.code |= WriteResult.getUnknownErrorCode();
+            if (result.code == null) {
+                result.code = WriteResult.getUnknownErrorCode();
+            }
 
             var topLevelError = { code : NumberInt( result.code ).toNumber(),
                                   errmsg : result.errmsg.toString(),
