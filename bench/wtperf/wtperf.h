@@ -49,6 +49,7 @@ typedef struct {		/* Per-thread structure */
 	void *cfg;		/* Enclosing configuration */
 
 	pthread_t  handle;	/* Handle */
+	uint64_t   ckpt_ops;	/* Checkpoint ops */
 	uint64_t   insert_ops;	/* Insert ops */
 	uint64_t   read_ops;	/* Read ops */
 	uint64_t   update_ops;	/* Update ops */

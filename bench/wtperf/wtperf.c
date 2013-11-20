@@ -81,9 +81,9 @@ static const char * const large_config_str =
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
-static uint64_t g_ninsert_ops;		/* insert operations */
-static uint64_t g_nread_ops;		/* read operations */
-static uint64_t g_nupdate_ops;		/* update operations */
+static uint64_t g_insert_ops;		/* insert operations */
+static uint64_t g_read_ops;		/* read operations */
+static uint64_t g_update_ops;		/* update operations */
 
 static uint64_t g_insert_key;		/* insert key */
 
@@ -489,23 +489,23 @@ stat_worker(void *arg)
 
 		switch (cfg->phase) {
 		case WT_PERF_POPULATE:
-			g_ninsert_ops = sum_insert_ops(
+			g_insert_ops = sum_insert_ops(
 			    cfg->popthreads, cfg->populate_threads);
 			lprintf(cfg, 0, cfg->verbose,
 			    "inserts: %" PRIu64 ", elapsed time: %.2f",
-			    g_ninsert_ops, secs);
+			    g_insert_ops, secs);
 			break;
 		case WT_PERF_WORKER:
-			g_ninsert_ops =
+			g_insert_ops =
 			    sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-			g_nread_ops =
+			g_read_ops =
 			    sum_read_ops(cfg->rthreads, cfg->read_threads);
-			g_nupdate_ops =
+			g_update_ops =
 			    sum_update_ops(cfg->uthreads, cfg->update_threads);
 			lprintf(cfg, 0, cfg->verbose,
 			    "reads: %" PRIu64 " inserts: %" PRIu64
 			    " updates: %" PRIu64 ", elapsed time: %.2f",
-			    g_nread_ops, g_ninsert_ops, g_nupdate_ops, secs);
+			    g_read_ops, g_insert_ops, g_update_ops, secs);
 			break;
 		case WT_PERF_INIT:
 		default:
@@ -658,12 +658,12 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
-		g_ninsert_ops =
+		g_insert_ops =
 		    sum_insert_ops(cfg->popthreads, cfg->populate_threads);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts in %" PRIu32 " secs",
-		    g_ninsert_ops - last_ops, cfg->report_interval);
-		last_ops = g_ninsert_ops;
+		    g_insert_ops - last_ops, cfg->report_interval);
+		last_ops = g_insert_ops;
 	}
 	assert(gettimeofday(&e, NULL) == 0);
 
@@ -724,7 +724,7 @@ execute_workload(CONFIG *cfg)
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
 
 	g_insert_key = 0;
-	g_ninsert_ops = g_nread_ops = g_nupdate_ops = 0;
+	g_insert_ops = g_read_ops = g_update_ops = 0;
 	g_running = 1;
 	g_threads_quit = 0;
 
@@ -760,27 +760,27 @@ execute_workload(CONFIG *cfg)
 		if (run_time == 0)
 			break;
 
-		g_ninsert_ops =
+		g_insert_ops =
 		    sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-		g_nread_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
-		g_nupdate_ops =
+		g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
+		g_update_ops =
 		    sum_update_ops(cfg->uthreads, cfg->update_threads);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
 		    " updates in %" PRIu32 " secs",
-		    g_nread_ops - last_reads,
-		    g_ninsert_ops - last_inserts,
-		    g_nupdate_ops - last_updates,
+		    g_read_ops - last_reads,
+		    g_insert_ops - last_inserts,
+		    g_update_ops - last_updates,
 		    cfg->report_interval);
-		last_reads = g_nread_ops;
-		last_inserts = g_ninsert_ops;
-		last_updates = g_nupdate_ops;
+		last_reads = g_read_ops;
+		last_inserts = g_insert_ops;
+		last_updates = g_update_ops;
 	}
 
 	/* One final summation of the operations we've completed. */
-	g_ninsert_ops = sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-	g_nread_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
-	g_nupdate_ops = sum_update_ops(cfg->uthreads, cfg->update_threads);
+	g_insert_ops = sum_insert_ops(cfg->ithreads, cfg->insert_threads);
+	g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
+	g_update_ops = sum_update_ops(cfg->uthreads, cfg->update_threads);
 
 err:	g_running = 0;
 	if (cfg->read_threads != 0 && (tret =
@@ -1084,13 +1084,13 @@ main(int argc, char *argv[])
 
 	if (cfg.read_threads != 0)
 		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " read operations", g_nread_ops);
+		    "Executed %" PRIu64 " read operations", g_read_ops);
 	if (cfg.insert_threads != 0)
 		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " insert operations", g_ninsert_ops);
+		    "Executed %" PRIu64 " insert operations", g_insert_ops);
 	if (cfg.update_threads != 0)
 		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " update operations", g_nupdate_ops);
+		    "Executed %" PRIu64 " update operations", g_update_ops);
 
 	if (0) {
 einval:		ret = EINVAL;
