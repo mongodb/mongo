@@ -52,6 +52,10 @@ namespace mongo {
         static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
                                    const BSONObj& proj, CanonicalQuery** out);
 
+        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+                                   const BSONObj& proj, long long skip, long long limit,
+                                   CanonicalQuery** out);
+
         // What namespace is this query over?
         const string& ns() const { return _pq->ns(); }
 

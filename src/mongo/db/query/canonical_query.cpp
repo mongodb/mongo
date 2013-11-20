@@ -50,46 +50,34 @@ namespace mongo {
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         CanonicalQuery** out) {
-        LiteParsedQuery* lpq;
-        // Pass empty sort and projection.
         BSONObj emptyObj;
-        Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, emptyObj, emptyObj, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
-
-        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq);
-        if (!initStatus.isOK()) { return initStatus; }
-
-        *out = cq.release();
-        return Status::OK();
+        return CanonicalQuery::canonicalize(ns, query, emptyObj, emptyObj, 0, 0, out);
     }
 
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         long long skip, long long limit,
                                         CanonicalQuery** out) {
-        LiteParsedQuery* lpq;
-        // Pass empty sort and projection.
         BSONObj emptyObj;
-        Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, emptyObj, emptyObj, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
-
-        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq);
-        if (!initStatus.isOK()) { return initStatus; }
-
-        *out = cq.release();
-        return Status::OK();
+        return CanonicalQuery::canonicalize(ns, query, emptyObj, emptyObj, skip, limit, out);
     }
 
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         const BSONObj& sort, const BSONObj& proj,
                                         CanonicalQuery** out) {
+        return CanonicalQuery::canonicalize(ns, query, sort, proj, 0, 0, out);
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
+                                        const BSONObj& sort, const BSONObj& proj,
+                                        long long skip, long long limit,
+                                        CanonicalQuery** out) {
         LiteParsedQuery* lpq;
         // Pass empty sort and projection.
         BSONObj emptyObj;
-        Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, proj, sort, &lpq);
+        Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());

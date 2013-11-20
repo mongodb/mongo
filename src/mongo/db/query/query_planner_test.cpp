@@ -64,6 +64,10 @@ namespace {
 
     class IndexAssignmentTest : public mongo::unittest::Test {
     protected:
+        void setUp() {
+            addIndex(BSON("_id" << 1));
+        }
+
         void tearDown() {
             delete cq;
 
@@ -92,33 +96,26 @@ namespace {
         //
 
         void runQuery(BSONObj query) {
-            solns.clear();
-            queryObj = query.getOwned();
-            Status s = CanonicalQuery::canonicalize(ns, queryObj, &cq);
-            if (!s.isOK()) { cq = NULL; }
-            ASSERT_OK(s);
-            params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
-            QueryPlanner::plan(*cq, params, &solns);
+            runQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), 0, 0);
         }
 
-        void runDetailedQuery(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
-            solns.clear();
-            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, &cq);
-            if (!s.isOK()) { cq = NULL; }
-            ASSERT_OK(s);
-            params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
-            QueryPlanner::plan(*cq, params, &solns);
-            ASSERT_GREATER_THAN(solns.size(), 0U);
+        void runQuerySortProj(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
+            runQuerySortProjSkipLimit(query, sort, proj, 0, 0);
         }
 
         void runQuerySkipLimit(const BSONObj& query, long long skip, long long limit) {
+            runQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), skip, limit);
+        }
+
+        void runQuerySortProjSkipLimit(const BSONObj& query,
+                                       const BSONObj& sort, const BSONObj& proj,
+                                       long long skip, long long limit) {
             solns.clear();
-            Status s = CanonicalQuery::canonicalize(ns, query, skip, limit, &cq);
+            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
             QueryPlanner::plan(*cq, params, &solns);
-            ASSERT_GREATER_THAN(solns.size(), 0U);
         }
 
         //
@@ -491,7 +488,6 @@ namespace {
         addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {a: 21}]}"));
 
-        dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: 1}");
         assertSolutionExists("{fetch: {ixscan: {a:1}}}");
@@ -549,18 +545,81 @@ namespace {
     }
 
     //
-    // Basic covering
+    // Logically equivalent queries
+    //
+
+    TEST_F(IndexAssignmentTest, EquivalentAndsOne) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{$and: [{a: 1}, {b: {$all: [10, 20]}}]}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, EquivalentAndsTwo) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{$and: [{a: 1, b: 10}, {a: 1, b: 20}]}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
+    }
+
+    //
+    // Covering
     //
 
     TEST_F(IndexAssignmentTest, BasicCovering) {
         addIndex(BSON("x" << 1));
         // query, sort, proj
-        runDetailedQuery(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        runQuerySortProj(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
 
-        ASSERT_EQUALS(solns.size(), 2U);
+        ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{proj: {spec: {_id: 0, x: 1}, node: {ixscan: {x: 1}}}}");
         assertSolutionExists("{proj: {spec: {_id: 0, x: 1}, node: {cscan: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, DottedFieldCovering) {
+        addIndex(BSON("a.b" << 1));
+        runQuerySortProj(fromjson("{'a.b': 5}"), BSONObj(), fromjson("{_id: 0, 'a.b': 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, 'a.b': 1}, node: {cscan: 1}}}");
+        // SERVER-2104
+        //assertSolutionExists("{proj: {spec: {_id: 0, 'a.b': 1}, node: {'a.b': 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, IdCovering) {
+        runQuerySortProj(fromjson("{_id: {$gt: 10}}"), BSONObj(), fromjson("{_id: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 1}, node: {ixscan: {_id: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, ProjNonCovering) {
+        addIndex(BSON("x" << 1));
+        runQuerySortProj(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{x: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {x: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {x: 1}, node: {fetch: {ixscan: {x: 1}}}}}");
+    }
+
+    //
+    // Basic sort
+    //
+
+    TEST_F(IndexAssignmentTest, BasicSort) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        runQuerySortProj(fromjson("{ a : 5 }"), BSON("b" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{sort: {pattern: {b: 1}, node: {fetch: {ixscan: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {ixscan: {b: 1}}}");
     }
 
     //
@@ -570,11 +629,20 @@ namespace {
     TEST_F(IndexAssignmentTest, BasicSortElim) {
         addIndex(BSON("x" << 1));
         // query, sort, proj
-        runDetailedQuery(fromjson("{ x : {$gt: 1}}"), fromjson("{x: 1}"), BSONObj());
+        runQuerySortProj(fromjson("{ x : {$gt: 1}}"), fromjson("{x: 1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{sort: {pattern: {x: 1}, node: {cscan: 1}}}");
         assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SortElimCompound) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuerySortProj(fromjson("{ a : 5 }"), BSON("b" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
     }
 
     //
@@ -676,7 +744,6 @@ namespace {
         addIndex(BSON("a.b.c" << 1));
         runQuery(fromjson("  { a:{ $elemMatch:{ d:{ $elemMatch:{ e:{ $lte:1 } } },"
                                                "b:{ $elemMatch:{ c:{ $gte:1 } } } } } }"));
-        dumpSolutions();
 
         ASSERT_EQUALS(getNumSolutions(), 3U);
         assertSolutionExists("{cscan: 1}");
@@ -819,6 +886,18 @@ namespace {
                                            "{fetch: {ixscan: {b: '2dsphere'}}}]}}");
     }
 
+    //
+    // $in
+    //
+
+    TEST_F(IndexAssignmentTest, InWithSort) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuerySortProjSkipLimit(fromjson("{a: {$in: [3, 1, 8]}}"),
+                                  BSON("b" << 1), BSONObj(), 0, 1);
+
+        assertSolutionExists("{limit: {n: 1, node: {sort: {pattern: {b: 1}, node: {cscan: 1}}}}}");
+        // TODO SERVER-1205 there should be a mergeSort solution
+    }
 
     //
     // Multiple solutions
@@ -859,7 +938,7 @@ namespace {
     TEST_F(IndexAssignmentTest, MergeSort) {
         addIndex(BSON("a" << 1 << "c" << 1));
         addIndex(BSON("b" << 1 << "c" << 1));
-        runDetailedQuery(fromjson("{$or: [{a:1}, {b:1}]}"), fromjson("{c:1}"), BSONObj());
+        runQuerySortProj(fromjson("{$or: [{a:1}, {b:1}]}"), fromjson("{c:1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{fetch: {mergeSort: {nodes: [{ixscan: {a: 1, c: 1}}, {ixscan: {b: 1, c: 1}}]}}}");
@@ -870,7 +949,7 @@ namespace {
     TEST_F(IndexAssignmentTest, NoMergeSortIfNoSortWanted) {
         addIndex(BSON("a" << 1 << "c" << 1));
         addIndex(BSON("b" << 1 << "c" << 1));
-        runDetailedQuery(fromjson("{$or: [{a:1}, {b:1}]}"), BSONObj(), BSONObj());
+        runQuerySortProj(fromjson("{$or: [{a:1}, {b:1}]}"), BSONObj(), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: 1}");
@@ -882,7 +961,7 @@ namespace {
         addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
         BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
         BSONObj sort = fromjson("{timestamp: -1}");
-        runDetailedQuery(query, sort, BSONObj());
+        runQuerySortProj(query, sort, BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{sort: {pattern: {timestamp: -1}, node: {cscan: 1}}}");
@@ -892,7 +971,7 @@ namespace {
     // SERVER-9257
     TEST_F(IndexAssignmentTest, CompoundGeoNoGeoPredicate) {
         addIndex(BSON("creationDate" << 1 << "foo.bar" << "2dsphere"));
-        runDetailedQuery(fromjson("{creationDate: { $gt: 7}}"),
+        runQuerySortProj(fromjson("{creationDate: { $gt: 7}}"),
                          fromjson("{creationDate: 1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
@@ -903,7 +982,7 @@ namespace {
     // Basic "keep sort in mind with an OR"
     TEST_F(IndexAssignmentTest, MergeSortEvenIfSameIndex) {
         addIndex(BSON("a" << 1 << "b" << 1));
-        runDetailedQuery(fromjson("{$or: [{a:1}, {a:7}]}"), fromjson("{b:1}"), BSONObj());
+        runQuerySortProj(fromjson("{$or: [{a:1}, {a:7}]}"), fromjson("{b:1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: 1}}}");
@@ -912,7 +991,7 @@ namespace {
 
     TEST_F(IndexAssignmentTest, ReverseScanForSort) {
         addIndex(BSON("_id" << 1));
-        runDetailedQuery(BSONObj(), fromjson("{_id: -1}"), BSONObj());
+        runQuerySortProj(BSONObj(), fromjson("{_id: -1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{sort: {pattern: {_id: -1}, node: {cscan: 1}}}");
