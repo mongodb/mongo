@@ -117,6 +117,17 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 2 << 3 ) ) ) );
     }
 
+    TEST( MatchExpressionParserArrayTest, AllNull ) {
+        BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( BSONNULL ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSONNULL ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL ) ) ) );
+    }
+
     TEST( MatchExpressionParserArrayTest, AllBadArg ) {
         BSONObj query = BSON( "x" << BSON( "$all" << 1 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
