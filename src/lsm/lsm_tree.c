@@ -375,7 +375,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 */
 	tmpconfig = "";
 #ifdef HAVE_SYNC_FILE_RANGE
-	if (!S2C(conn->direct_io))
+	if (!S2C(session)->direct_io)
 		tmpconfig = "os_cache_dirty_max=8MB,";
 #endif
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
