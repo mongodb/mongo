@@ -417,35 +417,11 @@ static void *
 stat_worker(void *arg)
 {
 	CONFIG *cfg;
-	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
 	struct timeval e;
 	double secs;
-	size_t uri_len;
-	uint64_t value;
 	uint32_t i;
-	int ret;
-	const char *desc, *pvalue;
-	char *stat_uri;
 
-	session = NULL;
 	cfg = (CONFIG *)arg;
-	conn = cfg->conn;
-	stat_uri = NULL;
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "open_session failed in statistics thread.");
-		goto err;
-	}
-
-	uri_len = strlen("statistics:") + strlen(cfg->uri) + 1;
-	if ((stat_uri = malloc(uri_len)) == NULL) {
-		(void)enomem(cfg);
-		goto err;
-	}
-	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
 
 	while (g_util_running) {
 		/* Break the sleep up, so we notice interrupts faster. */
@@ -493,52 +469,9 @@ stat_worker(void *arg)
 		default:
 			break;
 		}
-
-		/* Report data-source statistics. */
-		if ((ret = session->open_cursor(session, stat_uri,
-		    NULL, "statistics=(clear)", &cursor)) != 0) {
-			/*
-			 * It is possible the data source is exclusively
-			 * locked at this moment.  Ignore it and try again.
-			 */
-			if (ret == EBUSY)
-				continue;
-			lprintf(cfg, ret, 0,
-			    "open_cursor failed for data source statistics");
-			goto err;
-		}
-		while ((ret = cursor->next(cursor)) == 0) {
-			assert(cursor->get_value(
-			    cursor, &desc, &pvalue, &value) == 0);
-			if (value != 0)
-				lprintf(cfg, 0, cfg->verbose,
-				    "stat:table: %s=%s", desc, pvalue);
-		}
-		assert(ret == WT_NOTFOUND);
-		assert(cursor->close(cursor) == 0);
-		lprintf(cfg, 0, cfg->verbose, "-----------------");
-
-		/* Report connection statistics. */
-		if ((ret = session->open_cursor(session, "statistics:",
-		    NULL, "statistics=(clear)", &cursor)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "open_cursor failed in statistics");
-			goto err;
-		}
-		while ((ret = cursor->next(cursor)) == 0) {
-			assert(cursor->get_value(
-			    cursor, &desc, &pvalue, &value) == 0);
-			if (value != 0)
-				lprintf(cfg, 0, cfg->verbose,
-				    "stat:conn: %s=%s", desc, pvalue);
-		}
-		assert(ret == WT_NOTFOUND);
-		assert(cursor->close(cursor) == 0);
 	}
-err:	if (session != NULL)
-		assert(session->close(session, NULL) == 0);
-	free(stat_uri);
-	return (arg);
+
+	return (NULL);
 }
 
 static void *
