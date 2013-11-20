@@ -86,11 +86,10 @@ static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
 static uint64_t g_ninsert_ops;		/* insert operations */
-static uint64_t g_npop_ops;		/* population count, key assignment */
 static uint64_t g_nread_ops;		/* read operations */
 static uint64_t g_nupdate_ops;		/* update operations */
 
-static uint64_t g_insert_key = 0;	/* insert key */
+static uint64_t g_insert_key;		/* insert key */
 
 static int g_running;			/* threads are running */
 static int g_threads_quit;		/* threads that exited early */
@@ -120,13 +119,6 @@ static void	*update_thread(void *);
 static void	 worker(CONFIG_THREAD *, worker_type);
 static uint64_t	 wtperf_rand(CONFIG *);
 static uint64_t	 wtperf_value_range(CONFIG *);
-
-/* Retrieve an ID for the next populate operation. */
-static inline uint64_t
-get_next_populate(void)
-{
-	return (ATOMIC_ADD(g_npop_ops, 1));
-}
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
@@ -347,7 +339,7 @@ static void *
 populate_thread(void *arg)
 {
 	CONFIG *cfg;
-	CONFIG_THREAD *threads;
+	CONFIG_THREAD *thread;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
@@ -356,8 +348,8 @@ populate_thread(void *arg)
 	int intxn, ret;
 	char *data_buf, *key_buf;
 
-	threads = (CONFIG_THREAD *)arg;
-	cfg = threads->cfg;
+	thread = (CONFIG_THREAD *)arg;
+	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
 	data_buf = key_buf = NULL;
@@ -388,7 +380,7 @@ populate_thread(void *arg)
 	/* Populate the database. */
 	if (cfg->populate_ops_per_txn == 0)
 		for (;;) {
-			op = get_next_populate();
+			op = get_next_incr();
 			if (op > cfg->icount)
 				break;
 
@@ -399,10 +391,11 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
 			}
+			++thread->insert_ops;
 		}
 	else {
 		for (intxn = 0, opcount = 0;;) {
-			op = get_next_populate();
+			op = get_next_incr();
 			if (op > cfg->icount)
 				break;
 
@@ -418,6 +411,7 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
 			}
+			++thread->insert_ops;
 
 			if (++opcount < cfg->populate_ops_per_txn)
 				continue;
@@ -499,9 +493,11 @@ stat_worker(void *arg)
 
 		switch (cfg->phase) {
 		case WT_PERF_POPULATE:
+			g_ninsert_ops = sum_insert_ops(
+			    cfg->popthreads, cfg->populate_threads);
 			lprintf(cfg, 0, cfg->verbose,
 			    "inserts: %" PRIu64 ", elapsed time: %.2f",
-			    g_npop_ops, secs);
+			    g_ninsert_ops, secs);
 			break;
 		case WT_PERF_WORKER:
 			g_ninsert_ops =
@@ -644,7 +640,7 @@ execute_populate(CONFIG *cfg)
 	}
 	assert(session->close(session, NULL) == 0);
 
-	g_npop_ops = 0;
+	g_insert_key = 0;
 	g_running = 1;
 	g_threads_quit = 0;
 	if ((ret = start_threads(cfg,
@@ -653,7 +649,7 @@ execute_populate(CONFIG *cfg)
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
 	for (elapsed = 0, interval = 0, last_ops = 0;
-	    g_npop_ops < cfg->icount && g_threads_quit == 0;) {
+	    g_insert_key < cfg->icount && g_threads_quit == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
 		 * granularity, each 100th increment of elapsed is a single
@@ -666,10 +662,12 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
+		g_ninsert_ops =
+		    sum_insert_ops(cfg->popthreads, cfg->populate_threads);
 		lprintf(cfg, 0, 1,
-		    "%" PRIu64 " ops in %" PRIu32 " secs",
-		    g_npop_ops - last_ops, cfg->report_interval);
-		last_ops = g_npop_ops;
+		    "%" PRIu64 " populate inserts in %" PRIu32 " secs",
+		    g_ninsert_ops - last_ops, cfg->report_interval);
+		last_ops = g_ninsert_ops;
 	}
 	assert(gettimeofday(&e, NULL) == 0);
 
@@ -729,6 +727,7 @@ execute_workload(CONFIG *cfg)
 	    ", insert %" PRIu32 ", update %" PRIu32,
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
 
+	g_insert_key = 0;
 	g_ninsert_ops = g_nread_ops = g_nupdate_ops = 0;
 	g_running = 1;
 	g_threads_quit = 0;
