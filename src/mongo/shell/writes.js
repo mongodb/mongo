@@ -71,7 +71,7 @@ if ( ( typeof WriteResult ) == 'undefined' ){
         this._opType = opType;
         assert( opType == 'insert' || opType == 'update' || opType == 'remove' );
 
-        this._ok = result.ok ? true : false;
+        this._ok = result.ok == 0 ? false : true;
 
         if ( !this._ok ) {
 
