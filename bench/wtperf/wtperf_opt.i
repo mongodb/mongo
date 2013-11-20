@@ -106,7 +106,9 @@ DEF_OPT_AS_UINT32(report_interval, 2,
 DEF_OPT_AS_UINT32(run_time, 2, "number of seconds to run workload phase")
 DEF_OPT_AS_UINT32(stat_interval, 0,
     "log statistics every <int> report intervals, zero to disable")
-DEF_OPT_AS_CONFIG_STRING(table_config, DEFAULT_LSM_CONFIG,
+DEF_OPT_AS_CONFIG_STRING(table_config,
+    "key_format=S,value_format=S,type=lsm,exclusive=true,"
+    "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
     "table configuration string")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "

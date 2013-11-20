@@ -27,10 +27,6 @@
 
 #include "wtperf.h"
 
-#define	DEFAULT_LSM_CONFIG						\
-	"key_format=S,value_format=S,type=lsm,exclusive=true,"		\
-	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
-
 #define	IS_INSERT_WORKER(w)						\
     ((w) == WORKER_INSERT || (w) == WORKER_INSERT_RMW)
 

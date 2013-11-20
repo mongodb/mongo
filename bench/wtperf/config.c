@@ -387,7 +387,7 @@ config_opt_usage(void)
 			typestr = "unsigned int";
 			break;
 		}
-		printf("%s (%s, default %s)\n",
+		printf("%s (%s, default=%s)\n",
 		    config_opts[i].name, typestr, defaultval);
 		pretty_print(config_opts[i].description, "\t");
 	}
