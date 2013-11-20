@@ -1132,7 +1132,7 @@ DB.prototype.logout = function(){
 
 // For backwards compatibility
 DB.prototype.removeUser = function( username, writeConcern ) {
-    print("WARNING: db.removeUser has been deprected, please use db.dropUser instead");
+    print("WARNING: db.removeUser has been deprecated, please use db.dropUser instead");
     return db.dropUser(username, writeConcern);
 }
 
