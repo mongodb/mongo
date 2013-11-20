@@ -130,12 +130,11 @@ __wt_lsm_merge(
 
 		/*
 		 * If we have enough chunks for a merge and the next chunk is
-		 * in a different generation, stop.  If we try to span more
-		 * than two generations, give up.
+		 * in a different generation, stop.
 		 */
-		if ((nchunks >= merge_min &&
-		    chunk->generation > previous->generation) ||
-		    chunk->generation > youngest->generation + 1)
+		if (nchunks >= merge_min &&
+		    chunk->generation > previous->generation &&
+		    chunk->generation <= youngest->generation + 1)
 			break;
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
@@ -154,13 +153,15 @@ __wt_lsm_merge(
 
 	if (nchunks > 0) {
 		chunk = lsm_tree->chunk[start_chunk];
+		youngest = lsm_tree->chunk[end_chunk];
 		start_id = chunk->id;
 
 		/*
 		 * Don't do small merges or merge across more than 2
 		 * generations.
 		 */
-		if (nchunks < merge_min) {
+		if (nchunks < merge_min ||
+		    chunk->generation > youngest->generation + 1) {
 			for (i = 0; i < nchunks; i++)
 				F_CLR(lsm_tree->chunk[start_chunk + i],
 				    WT_LSM_CHUNK_MERGING);

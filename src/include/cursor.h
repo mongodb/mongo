@@ -236,6 +236,7 @@ struct __wt_cursor_stat {
 
 	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
+	int	  stats_base;		/* Base statistics value */
 	int	  stats_count;		/* Count of stats elements */
 
 	union {				/* Copies of the statistics */

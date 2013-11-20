@@ -636,6 +636,7 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
