@@ -174,7 +174,6 @@ Mongo.prototype.useWriteCommands = function() {
         this._useWriteCommands = _useWriteCommandsDefault();
     }
     else {
-        print("WARNING: connected to a server which does not support write commands.");
         this._useWriteCommands = false;
     }
     
