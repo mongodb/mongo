@@ -115,9 +115,8 @@ __wt_lsm_merge_worker(void *vargs)
 		 * is busy.
 		 */
 		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
-				WT_WITH_SCHEMA_LOCK(session, ret =
-				    __wt_lsm_tree_switch(session, lsm_tree));
+			WT_WITH_SCHEMA_LOCK(session, ret =
+			    __wt_lsm_tree_switch(session, lsm_tree));
 			WT_ERR(ret);
 		}
 
@@ -151,7 +150,8 @@ __wt_lsm_merge_worker(void *vargs)
 			aggressive = 0;
 			stallms = 0;
 			saved_gen = lsm_tree->dsk_gen;
-		} else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		} else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 			/*
 			 * The "main" thread polls 10 times per second,
 			 * secondary threads once per second.
@@ -259,6 +259,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
 	u_int i, j;
+	int locked;
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
@@ -321,17 +322,38 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * interfering with an application checkpoint: we have
 			 * already checked that all of the updates in this
 			 * chunk are globally visible.
+			 *
+			 * !!! We can wait here for checkpoints and fsyncs to
+			 * complete, which can be a long time.
+			 *
+			 * Don't keep waiting for the lock if application
+			 * threads are waiting for a switch.  Don't skip
+			 * flushing the leaves either: that just means we'll
+			 * hold the schema lock for (much) longer, which blocks
+			 * the world.
 			 */
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
-			saved_isolation = session->txn.isolation;
-			session->txn.isolation = TXN_ISO_EVICTION;
-			__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-			ret = __wt_bt_cache_op(
-			    session, NULL, WT_SYNC_WRITE_LEAVES);
-			__wt_spin_unlock(
-			    session, &S2C(session)->checkpoint_lock);
-			session->txn.isolation = saved_isolation;
+			for (locked = 0;
+			    !locked && ret == 0 &&
+			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);) {
+				if ((ret = __wt_spin_trylock(session,
+				    &S2C(session)->checkpoint_lock)) == 0)
+					locked = 1;
+				else if (ret == EBUSY) {
+					__wt_yield();
+					ret = 0;
+				}
+			}
+			if (locked) {
+				saved_isolation = session->txn.isolation;
+				session->txn.isolation = TXN_ISO_EVICTION;
+				ret = __wt_bt_cache_op(
+				    session, NULL, WT_SYNC_WRITE_LEAVES);
+				session->txn.isolation = saved_isolation;
+				__wt_spin_unlock(
+				    session, &S2C(session)->checkpoint_lock);
+			}
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
 
