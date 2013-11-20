@@ -750,6 +750,7 @@ execute_workload(CONFIG *cfg)
 	}
 
 	/* One final summation of the operations we've completed. */
+	g_ckpt_ops = sum_ckpt_ops(cfg->ckptthreads, cfg->checkpoint_threads);
 	g_insert_ops = sum_insert_ops(cfg->ithreads, cfg->insert_threads);
 	g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
 	g_update_ops = sum_update_ops(cfg->uthreads, cfg->update_threads);
