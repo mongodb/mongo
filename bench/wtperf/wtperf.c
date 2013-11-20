@@ -608,8 +608,6 @@ err:	if (session != NULL)
 static int
 execute_populate(CONFIG *cfg)
 {
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	struct timeval e;
 	double secs;
 	uint64_t last_ops;
@@ -617,24 +615,8 @@ execute_populate(CONFIG *cfg)
 	u_int sleepsec;
 	int elapsed, ret;
 
-	conn = cfg->conn;
 	cfg->phase = WT_PERF_POPULATE;
 	lprintf(cfg, 0, 1, "Starting populate threads");
-
-	/* First create the table. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "Error opening a session on %s", cfg->home);
-		return (ret);
-	}
-
-	if ((ret = session->create(
-	    session, cfg->uri, cfg->table_config)) != 0) {
-		lprintf(cfg, ret, 0, "Error creating table %s", cfg->uri);
-		assert(session->close(session, NULL) == 0);
-		return (ret);
-	}
-	assert(session->close(session, NULL) == 0);
 
 	g_insert_key = 0;
 	g_running = 1;
@@ -850,7 +832,7 @@ main(int argc, char *argv[])
 {
 	CONFIG cfg;
 	WT_CONNECTION *conn;
-	WT_SESSION *parse_session;
+	WT_SESSION *session;
 	pthread_t checkpoint_thread, stat_thread;
 	size_t len;
 	uint64_t req_len;
@@ -861,7 +843,7 @@ main(int argc, char *argv[])
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
 	conn = NULL;
-	parse_session = NULL;
+	session = NULL;
 	checkpoint_created = ret = stat_created = 0;
 	user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
@@ -909,7 +891,7 @@ main(int argc, char *argv[])
 		lprintf(&cfg, ret, 0, "wiredtiger_open: %s", tmphome);
 		goto err;
 	}
-	if ((ret = conn->open_session(conn, NULL, NULL, &parse_session)) != 0) {
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(&cfg, ret, 0, "Error creating session");
 		goto err;
 	}
@@ -923,22 +905,22 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'S':
 			if (config_opt_line(
-			    &cfg, parse_session, small_config_str) != 0)
+			    &cfg, session, small_config_str) != 0)
 				goto einval;
 			break;
 		case 'M':
 			if (config_opt_line(
-			    &cfg, parse_session, med_config_str) != 0)
+			    &cfg, session, med_config_str) != 0)
 				goto einval;
 			break;
 		case 'L':
 			if (config_opt_line(
-			    &cfg, parse_session, large_config_str) != 0)
+			    &cfg, session, large_config_str) != 0)
 				goto einval;
 			break;
 		case 'O':
 			if (config_opt_file(
-			    &cfg, parse_session, optarg) != 0)
+			    &cfg, session, optarg) != 0)
 				goto einval;
 			break;
 		default:
@@ -952,7 +934,7 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'o':
 			/* Allow -o key=value */
-			if (config_opt_line(&cfg, parse_session, optarg) != 0)
+			if (config_opt_line(&cfg, session, optarg) != 0)
 				goto einval;
 			break;
 		case 'C':
@@ -992,7 +974,7 @@ main(int argc, char *argv[])
 		    cfg.verbose > 1 ? debug_cconfig : "",
 		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
 		if ((ret = config_opt_str(
-		    &cfg, parse_session, "conn_config", cc_buf)) != 0)
+		    &cfg, session, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
 	if (cfg.verbose > 1 || user_tconfig != NULL) {
@@ -1009,12 +991,12 @@ main(int argc, char *argv[])
 		    cfg.verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
 		if ((ret = config_opt_str(
-		    &cfg, parse_session, "table_config", tc_buf)) != 0)
+		    &cfg, session, "table_config", tc_buf)) != 0)
 			goto err;
 	}
 
-	ret = parse_session->close(parse_session, NULL);
-	parse_session = NULL;
+	ret = session->close(session, NULL);
+	session = NULL;
 	if (ret != 0) {
 		lprintf(&cfg, ret, 0, "WT_SESSION.close");
 		goto err;
@@ -1043,6 +1025,19 @@ main(int argc, char *argv[])
 		goto err;
 	}
 	cfg.conn = conn;
+					/* Create the table. */
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		lprintf(&cfg, ret, 0,
+		    "Error opening a session on %s", cfg.home);
+		goto err;
+	}
+	if ((ret = session->create(
+	    session, cfg.uri, cfg.table_config)) != 0) {
+		lprintf(&cfg, ret, 0, "Error creating table %s", cfg.uri);
+		goto err;
+	}
+	assert(session->close(session, NULL) == 0);
+	session = NULL;
 
 	g_util_running = 1;		/* Start the statistics thread. */
 	if (cfg.stat_interval != 0) {
@@ -1104,8 +1099,6 @@ err:	g_util_running = 0;
 	    (ret = pthread_join(stat_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining stat thread.");
 
-	if (parse_session != NULL)
-		assert(parse_session->close(parse_session, NULL) == 0);
 	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
 		lprintf(&cfg, ret, 0,
 		    "Error closing connection to %s", cfg.home);
