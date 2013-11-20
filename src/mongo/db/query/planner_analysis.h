@@ -34,21 +34,35 @@
 
 namespace mongo {
 
-    /**
-     * QueryPlanner's job is to provide an entry point to the query planning and optimization
-     * process.
-     */
-    class QueryPlanner {
+    class QueryPlannerAnalysis {
     public:
         /**
-         * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
-         * indices and other data in 'params' to plan with.
+         * In brief: performs sort and covering analysis.
          *
-         * Caller owns pointers in *out.
+         * The solution rooted at 'solnRoot' provides data for the query, whether through some
+         * configuration of indices or through a collection scan.  Additional stages may be required
+         * to perform sorting, projection, or other operations that are independent of the source
+         * of the data.  These stages are added atop 'solnRoot'.
+         *
+         * 'taggedRoot' is a copy of the parse tree.  Nodes in 'solnRoot' may point into it.
+         *
+         * Takes ownership of 'solnRoot' and 'taggedRoot'.
+         *
+         * Returns NULL if a solution cannot be constructed given the requirements in 'params'.
+         *
+         * Caller owns the returned QuerySolution.
          */
-        static void plan(const CanonicalQuery& query,
-                         const QueryPlannerParams& params,
-                         vector<QuerySolution*>* out);
+        static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
+                                                const QueryPlannerParams& params,
+                                                QuerySolutionNode* solnRoot);
+
+        /**
+         * Get the bounds for the sort in 'query' used by the sort stage.  Output the bounds
+         * in 'node'.
+         *
+         * XXX TODO: move into sort stage...
+         */
+        static void getBoundsForSort(const CanonicalQuery& query, SortNode* node);
     };
 
 }  // namespace mongo

@@ -28,27 +28,48 @@
 
 #pragma once
 
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
+#include <vector>
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/query/index_entry.h"
 
 namespace mongo {
 
-    /**
-     * QueryPlanner's job is to provide an entry point to the query planning and optimization
-     * process.
-     */
-    class QueryPlanner {
-    public:
-        /**
-         * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
-         * indices and other data in 'params' to plan with.
-         *
-         * Caller owns pointers in *out.
-         */
-        static void plan(const CanonicalQuery& query,
-                         const QueryPlannerParams& params,
-                         vector<QuerySolution*>* out);
+    struct QueryPlannerParams {
+        enum Options {
+            // You probably want to set this.
+            DEFAULT = 0,
+
+            // Set this if you don't want a table scan.
+            // See http://docs.mongodb.org/manual/reference/parameters/
+            NO_TABLE_SCAN = 1,
+
+            // Set this if you want a collscan outputted even if there's an ixscan.
+            INCLUDE_COLLSCAN = 2,
+
+            // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
+            // shouldn't be on this shard" stage before projection.
+            //
+            // In order to set this, you must check
+            // shardingState.needCollectionMetadata(current_namespace) in the same lock that you use
+            // to build the query runner.
+            INCLUDE_SHARD_FILTER = 4,
+
+            // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
+            // provided by an index.
+            NO_BLOCKING_SORT = 8,
+        };
+
+        // See Options enum above.
+        size_t options;
+
+        // What indices are available for planning?
+        vector<IndexEntry> indices;
+
+        // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
+        // stage.  If we know the shard key, we can perform covering analysis instead of always
+        // forcing a fetch.
+        BSONObj shardKey;
     };
 
 }  // namespace mongo

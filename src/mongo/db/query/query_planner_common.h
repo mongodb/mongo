@@ -26,10 +26,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
+    /**
+     * Methods used by several parts of the planning process.
+     */
     class QueryPlannerCommon {
     public:
         /**
@@ -52,6 +57,61 @@ namespace mongo {
                 }
             }
             return false;
+        }
+
+        /**
+         * Assumes the provided BSONObj is of the form {field1: -+1, ..., field2: -+1}
+         * Returns a BSONObj with the values negated.
+         */
+        static BSONObj reverseSortObj(const BSONObj& sortObj) {
+            BSONObjBuilder reverseBob;
+            BSONObjIterator it(sortObj);
+            while (it.more()) {
+                BSONElement elt = it.next();
+                reverseBob.append(elt.fieldName(), elt.numberInt() * -1);
+            }
+            return reverseBob.obj();
+        }
+
+        /**
+         * Traverses the tree rooted at 'node'.  For every STAGE_IXSCAN encountered, reverse
+         * the scan direction and index bounds.
+         */
+        static void reverseScans(QuerySolutionNode* node) {
+            StageType type = node->getType();
+
+            if (STAGE_IXSCAN == type) {
+                IndexScanNode* isn = static_cast<IndexScanNode*>(node);
+                isn->direction *= -1;
+
+                for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
+                    vector<Interval>& iv = isn->bounds.fields[i].intervals;
+                    // Step 1: reverse the list.
+                    std::reverse(iv.begin(), iv.end());
+                    // Step 2: reverse each interval.
+                    for (size_t j = 0; j < iv.size(); ++j) {
+                        iv[j].reverse();
+                    }
+                }
+                if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
+                    verify(0);
+                }
+                // TODO: we can just negate every value in the already computed properties.
+                isn->computeProperties();
+            }
+            else if (STAGE_SORT_MERGE == type) {
+                // reverse direction of comparison for merge
+                MergeSortNode* msn = static_cast<MergeSortNode*>(node);
+                msn->sort = reverseSortObj(msn->sort);
+            }
+            else {
+                verify(STAGE_SORT != type);
+                // This shouldn't be here...
+            }
+
+            for (size_t i = 0; i < node->children.size(); ++i) {
+                reverseScans(node->children[i]);
+            }
         }
     };
 
