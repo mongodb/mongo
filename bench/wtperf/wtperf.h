@@ -46,9 +46,10 @@
 #include <gcc.h>				/* WiredTiger internal */
 
 typedef struct {		/* Per-thread structure */
-	void *cfg;		/* Enclosing handle */
+	void *cfg;		/* Enclosing configuration */
 
 	pthread_t  handle;	/* Handle */
+	uint64_t   insert_ops;	/* Insert ops */
 	uint64_t   read_ops;	/* Read ops */
 	uint64_t   update_ops;	/* Update ops */
 } CONFIG_THREAD;
