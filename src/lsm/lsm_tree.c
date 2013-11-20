@@ -369,13 +369,18 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, lsm_tree->merge_threads <= WT_LSM_MAX_WORKERS);
 
 	/*
-	 * Set up the config for each chunk.  To avoid high latencies from
-	 * fsync, flush the cache every 8MB by default (will be overridden by
+	 * Set up the config for each chunk.  If possible, avoid high latencies
+	 * from fsync by flushing the cache every 8MB (will be overridden by
 	 * any application setting).
 	 */
+	tmpconfig = "";
+#ifdef HAVE_SYNC_FILE_RANGE
+	if (!S2C(conn->direct_io))
+		tmpconfig = "os_cache_dirty_max=8MB,";
+#endif
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "os_cache_dirty_max=8MB,%s,key_format=u,value_format=u", config));
+	    "%s%s,key_format=u,value_format=u", tmpconfig, config));
 	lsm_tree->file_config = __wt_buf_steal(session, buf, NULL);
 
 	/* Create the first chunk and flush the metadata. */
