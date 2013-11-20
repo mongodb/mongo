@@ -43,8 +43,21 @@ namespace mongo {
 
     class BtreeKeyGenerator;
 
-    // External params for the sort stage.  Declared below.
-    class SortStageParams;
+    // Parameters that must be provided to a SortStage
+    class SortStageParams {
+    public:
+        SortStageParams() { }
+
+        // How we're sorting.
+        BSONObj pattern;
+
+        // The query.  Used to create the IndexBounds for the sorting.
+        BSONObj query;
+
+        // TODO: Implement this.
+        // Must be >= 0.  Equal to 0 for no limit.
+        // int limit;
+    };
 
     /**
      * Sorts the input received from the child according to the sort pattern provided.
@@ -68,6 +81,8 @@ namespace mongo {
         PlanStageStats* getStats();
 
     private:
+        void getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj);
+
         // Not owned by us.
         WorkingSet* _ws;
 
@@ -90,6 +105,8 @@ namespace mongo {
             // See sorta.js.
             DiskLoc loc;
         };
+
+        // The data we buffer and sort.
         vector<SortableDataItem> _data;
 
         // Iterates through _data post-sort returning it.
@@ -129,23 +146,6 @@ namespace mongo {
 
         // The usage in bytes of all bufered data that we're sorting.
         size_t _memUsage;
-    };
-
-    // Parameters that must be provided to a SortStage
-    class SortStageParams {
-    public:
-        SortStageParams() : hasBounds(false) { }
-
-        // How we're sorting.
-        BSONObj pattern;
-
-        IndexBounds bounds;
-
-        bool hasBounds;
-
-        // TODO: Implement this.
-        // Must be >= 0.  Equal to 0 for no limit.
-        // int limit;
     };
 
 }  // namespace mongo

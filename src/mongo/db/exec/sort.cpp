@@ -32,18 +32,11 @@
 
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/query/query_planner.h"
 
 namespace mongo {
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
-
-    namespace {
-        void dumpKeys(const BSONObjSet& keys) {
-            for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
-                std::cout << "key: " << it->toString() << std::endl;
-            }
-        }
-    }  // namespace
 
     struct SortStage::WorkingSetComparator {
         explicit WorkingSetComparator(BSONObj p) : pattern(p) { }
@@ -65,9 +58,11 @@ namespace mongo {
           _pattern(params.pattern),
           _sorted(false),
           _resultIterator(_data.end()),
-          _bounds(params.bounds),
-          _hasBounds(params.hasBounds),
+          _hasBounds(false),
           _memUsage(0) {
+
+        // Fill out _bounds and _hasBounds.
+        getBoundsForSort(params.query, params.pattern);
 
         _cmp.reset(new WorkingSetComparator(_pattern));
 
@@ -82,14 +77,63 @@ namespace mongo {
             fieldNames.push_back(patternElt.fieldName());
             fixed.push_back(BSONElement());
         }
+
         _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */));
 
-        // See comment on the operator() call about sort semantics and why we need a
-        // to use a bounds checker here.
-        _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _pattern, 1 /* == order */));
+        if (_hasBounds) {
+            // See comment on the operator() call about sort semantics and why we need a
+            // to use a bounds checker here.
+            _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _pattern, 1 /* == order */));
+        }
     }
 
     SortStage::~SortStage() { }
+
+    void SortStage::getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj) {
+        QueryPlannerParams params;
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+        IndexEntry sortOrder(sortObj, true, false, "doesnt_matter");
+        params.indices.push_back(sortOrder);
+
+        CanonicalQuery* rawQueryForSort;
+        verify(CanonicalQuery::canonicalize("fake_ns",
+                                            queryObj,
+                                            &rawQueryForSort).isOK());
+        auto_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
+
+        vector<QuerySolution*> solns;
+        QueryPlanner::plan(*queryForSort, params, &solns);
+
+        // TODO: are there ever > 1 solns?  If so, do we look for a specific soln?
+        if (1 == solns.size()) {
+            IndexScanNode* ixScan = NULL;
+            QuerySolutionNode* rootNode = solns[0]->root.get();
+
+            if (rootNode->getType() == STAGE_FETCH) {
+                FetchNode* fetchNode = static_cast<FetchNode*>(rootNode);
+                if (fetchNode->children[0]->getType() != STAGE_IXSCAN) {
+                    delete solns[0];
+                    // No bounds.
+                    return;
+                }
+                ixScan = static_cast<IndexScanNode*>(fetchNode->children[0]);
+            }
+            else if (rootNode->getType() == STAGE_IXSCAN) {
+                ixScan = static_cast<IndexScanNode*>(rootNode);
+            }
+
+            if (ixScan) {
+                // XXX use .swap?
+                _bounds = ixScan->bounds;
+                _hasBounds = true;
+            }
+        }
+
+        for (size_t i = 0; i < solns.size(); ++i) {
+            delete solns[i];
+        }
+    }
 
     bool SortStage::isEOF() {
         // We're done when our child has no more results, we've sorted the child's results, and
@@ -140,7 +184,6 @@ namespace mongo {
                 BSONObjSet keys(patternCmp);
                 // XXX keyGen will throw on a "parallel array"
                 _keyGen->getKeys(member->obj, &keys);
-                // dumpKeys(keys);
 
                 // To decide which key to use in sorting, we consider not only the sort pattern
                 // but also if a given key, matches the query. Assume a query {a: {$gte: 5}} and
@@ -149,15 +192,16 @@ namespace mongo {
                 // set and thus that array should sort based on the '10' key. To find such key,
                 // we use the bounds for the query.
                 BSONObj sortKey;
-                for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
-                    if (!_hasBounds) {
-                        sortKey = *it;
-                        break;
-                    }
-
-                    if (_boundsChecker->isValidKey(*it)) {
-                        sortKey = *it;
-                        break;
+                if (!_hasBounds) {
+                    sortKey = *keys.begin();
+                }
+                else {
+                    verify(NULL != _boundsChecker.get());
+                    for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
+                        if (_boundsChecker->isValidKey(*it)) {
+                            sortKey = *it;
+                            break;
+                        }
                     }
                 }
 
@@ -165,8 +209,8 @@ namespace mongo {
                     // We assume that if the document made it throught the sort stage, than it
                     // matches the query and thus should contain at least on array item that
                     // is within the query bounds.
-                    cout << "can't find bounds for obj " << member->obj.toString() << endl;
-                    cout << "bounds are " << _bounds.toString() << endl;
+                    log() << "can't find bounds for obj " << member->obj.toString() << endl;
+                    log() << "bounds are " << _bounds.toString() << endl;
                     verify(0);
                 }
 

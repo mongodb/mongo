@@ -38,56 +38,6 @@
 namespace mongo {
 
     // static
-    void QueryPlannerAnalysis::getBoundsForSort(const CanonicalQuery& query, SortNode* node) {
-        QueryPlannerParams params;
-        params.options = QueryPlannerParams::NO_TABLE_SCAN;
-
-        IndexEntry sortOrder(query.getParsed().getSort(), true, false, "doesnt_matter");
-        params.indices.push_back(sortOrder);
-
-        CanonicalQuery* rawQueryForSort;
-        verify(CanonicalQuery::canonicalize(query.ns(),
-                                            query.getQueryObj(),
-                                            &rawQueryForSort).isOK());
-        auto_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
-
-        vector<QuerySolution*> solns;
-        //QLOG() << "Trying to get bounds for sort\n";
-        bool old = qlogOff();
-        QueryPlanner::plan(*queryForSort, params, &solns);
-        if (old) { qlogOn(); }
-        //QLOG() << "Exit planning for bounds for sort\n";
-
-        // TODO: are there ever >1 solns?  If so, do we look for a specific soln?
-        if (1 == solns.size()) {
-            IndexScanNode* ixScan = NULL;
-            QuerySolutionNode* rootNode = solns[0]->root.get();
-
-            if (rootNode->getType() == STAGE_FETCH) {
-                FetchNode* fetchNode = static_cast<FetchNode*>(rootNode);
-                if (fetchNode->children[0]->getType() != STAGE_IXSCAN) {
-                    delete solns[0];
-                    // No bounds.
-                    return;
-                }
-                ixScan = static_cast<IndexScanNode*>(fetchNode->children[0]);
-            }
-            else if (rootNode->getType() == STAGE_IXSCAN) {
-                ixScan = static_cast<IndexScanNode*>(rootNode);
-            }
-
-            if (ixScan) {
-                node->bounds = ixScan->bounds;
-                node->hasBounds = true;
-            }
-        }
-
-        for (size_t i = 0; i < solns.size(); ++i) {
-            delete solns[i];
-        }
-    }
-
-    // static
     QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& query,
                                                    const QueryPlannerParams& params,
                                                    QuerySolutionNode* solnRoot) {
@@ -158,7 +108,7 @@ namespace mongo {
                         soln->hasSortStage = true;
                         SortNode* sort = new SortNode();
                         sort->pattern = sortObj;
-                        getBoundsForSort(query, sort);
+                        sort->query = query.getParsed().getFilter();
                         sort->children.push_back(solnRoot);
                         solnRoot = sort;
                         blockingSort = true;

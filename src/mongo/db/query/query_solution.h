@@ -403,7 +403,7 @@ namespace mongo {
     };
 
     struct SortNode : public QuerySolutionNode {
-        SortNode() : hasBounds(false) { }
+        SortNode() { }
         virtual ~SortNode() { }
 
         virtual StageType getType() const { return STAGE_SORT; }
@@ -428,10 +428,7 @@ namespace mongo {
 
         BSONObj pattern;
 
-        bool hasBounds;
-
-        // XXX
-        IndexBounds bounds;
+        BSONObj query;
     };
 
     struct LimitNode : public QuerySolutionNode {

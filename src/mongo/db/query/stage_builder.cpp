@@ -101,8 +101,7 @@ namespace mongo {
             if (NULL == childStage) { return NULL; }
             SortStageParams params;
             params.pattern = sn->pattern;
-            params.bounds = sn->bounds;
-            params.hasBounds = sn->hasBounds;
+            params.query = sn->query;
             return new SortStage(params, ws, childStage);
         }
         else if (STAGE_PROJECTION == root->getType()) {

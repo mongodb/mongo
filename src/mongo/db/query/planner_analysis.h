@@ -55,14 +55,6 @@ namespace mongo {
         static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
                                                 const QueryPlannerParams& params,
                                                 QuerySolutionNode* solnRoot);
-
-        /**
-         * Get the bounds for the sort in 'query' used by the sort stage.  Output the bounds
-         * in 'node'.
-         *
-         * XXX TODO: move into sort stage...
-         */
-        static void getBoundsForSort(const CanonicalQuery& query, SortNode* node);
     };
 
 }  // namespace mongo
