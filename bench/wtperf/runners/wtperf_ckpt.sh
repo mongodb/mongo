@@ -96,7 +96,7 @@ rm -rf $OUT_DIR && mkdir $OUT_DIR
 
 # Run the benchmarks..
 # for ckpt in "" "-c 120"; do
-for ckpt in "checkpoint_interval=120"; do
+for ckpt in "checkpoint_threads=1,checkpoint_interval=120"; do
 	# for opts in "" "-C eviction_dirty_target=20"; do
 	for opts in ""; do
 		if [ $VERBOSE -ne 0 ]; then

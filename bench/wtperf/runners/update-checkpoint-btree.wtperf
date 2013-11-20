@@ -3,6 +3,7 @@ conn_config="cache_size=1G"
 table_config="type=file"
 icount=5000000
 report_interval=5
+checkpoint_threads=1
 checkpoint_interval=10
 run_time=120
 populate_threads=1

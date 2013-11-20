@@ -77,8 +77,8 @@
  * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
  * options are appended to existing content, whereas STRING options overwrite.
  */
-DEF_OPT_AS_UINT32(checkpoint_interval, 0,
-    "checkpoint every <int> report intervals, zero to disable")
+DEF_OPT_AS_UINT32(checkpoint_interval, 120, "checkpoint every interval seconds")
+DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
 DEF_OPT_AS_BOOL(create, 1,

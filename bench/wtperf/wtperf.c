@@ -32,13 +32,13 @@
 
 /* Default values. */
 static const CONFIG default_cfg = {
-	"WT_TEST",		/* home */
-	NULL,			/* uri */
-	NULL,			/* conn */
-	NULL,			/* logf */
-	NULL, NULL, NULL, NULL,	/* threads */
-	WT_PERF_INIT,		/* phase */
-	{0, 0},			/* phase_start_time */
+	"WT_TEST",			/* home */
+	NULL,				/* uri */
+	NULL,				/* conn */
+	NULL,				/* logf */
+	NULL, NULL, NULL, NULL, NULL,	/* threads */
+	WT_PERF_INIT,			/* phase */
+	{0, 0},				/* phase_start_time */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -81,6 +81,7 @@ static const char * const large_config_str =
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
+static uint64_t g_ckpt_ops;		/* checkpoint operations */
 static uint64_t g_insert_ops;		/* insert operations */
 static uint64_t g_read_ops;		/* read operations */
 static uint64_t g_update_ops;		/* update operations */
@@ -123,50 +124,27 @@ get_next_incr(void)
 	return (ATOMIC_ADD(g_insert_key, 1));
 }
 
-/* Return the total thread insert operations. */
-static inline uint64_t
-sum_insert_ops(CONFIG_THREAD *threads, u_int num)
-{
-	uint64_t total;
-	u_int i;
-
-	if (threads == NULL)
-		return (0);
-
-	for (i = 0, total = 0; i < num; ++i, ++threads)
-		total += threads->insert_ops;
-	return (total);
+/*
+ * Return total ops for a group of threads.
+ */
+#define	WTPERF_SUM_OPS(field)						\
+static inline uint64_t							\
+sum_##field##_ops(CONFIG_THREAD *threads, u_int num)			\
+{									\
+	uint64_t total;							\
+	u_int i;							\
+									\
+	if (threads == NULL)						\
+		return (0);						\
+									\
+	for (i = 0, total = 0; i < num; ++i, ++threads)			\
+		total += threads->field##_ops;				\
+	return (total);							\
 }
-
-/* Return the total thread read operations. */
-static inline uint64_t
-sum_read_ops(CONFIG_THREAD *threads, u_int num)
-{
-	uint64_t total;
-	u_int i;
-
-	if (threads == NULL)
-		return (0);
-
-	for (i = 0, total = 0; i < num; ++i, ++threads)
-		total += threads->read_ops;
-	return (total);
-}
-
-/* Return the total thread update operations. */
-static inline uint64_t
-sum_update_ops(CONFIG_THREAD *threads, u_int num)
-{
-	uint64_t total;
-	u_int i;
-
-	if (threads == NULL)
-		return (0);
-
-	for (i = 0, total = 0; i < num; ++i, ++threads)
-		total += threads->update_ops;
-	return (total);
-}
+WTPERF_SUM_OPS(ckpt)
+WTPERF_SUM_OPS(insert)
+WTPERF_SUM_OPS(read)
+WTPERF_SUM_OPS(update)
 
 static void
 worker(CONFIG_THREAD *thread, worker_type wtype)
@@ -496,6 +474,8 @@ stat_worker(void *arg)
 			    g_insert_ops, secs);
 			break;
 		case WT_PERF_WORKER:
+			g_ckpt_ops = sum_ckpt_ops(
+			    cfg->ckptthreads, cfg->checkpoint_threads);
 			g_insert_ops =
 			    sum_insert_ops(cfg->ithreads, cfg->insert_threads);
 			g_read_ops =
@@ -504,8 +484,10 @@ stat_worker(void *arg)
 			    sum_update_ops(cfg->uthreads, cfg->update_threads);
 			lprintf(cfg, 0, cfg->verbose,
 			    "reads: %" PRIu64 " inserts: %" PRIu64
-			    " updates: %" PRIu64 ", elapsed time: %.2f",
-			    g_read_ops, g_insert_ops, g_update_ops, secs);
+			    " updates: %" PRIu64 ", checkpoints: %" PRIu64
+			    ", elapsed time: %.2f",
+			    g_read_ops,
+			    g_insert_ops, g_update_ops, g_ckpt_ops, secs);
 			break;
 		case WT_PERF_INIT:
 		default:
@@ -563,6 +545,7 @@ static void *
 checkpoint_worker(void *arg)
 {
 	CONFIG *cfg;
+	CONFIG_THREAD *thread;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	struct timeval e, s;
@@ -570,7 +553,8 @@ checkpoint_worker(void *arg)
 	uint32_t i;
 	int ret;
 
-	cfg = (CONFIG *)arg;
+	thread = (CONFIG_THREAD *)arg;
+	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
 
@@ -594,15 +578,17 @@ checkpoint_worker(void *arg)
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
 			continue;
 		}
+		++thread->ckpt_ops;
+
 		assert(gettimeofday(&e, NULL) == 0);
 		ms = (e.tv_sec * 1000) + (e.tv_usec / 1000.0);
 		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
-		lprintf(cfg, 0, 1,
-		    "Finished checkpoint in %" PRIu64 " ms.", ms);
 	}
+
 err:	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
-	return (arg);
+
+	return (NULL);
 }
 
 static int
@@ -690,14 +676,14 @@ execute_populate(CONFIG *cfg)
 static int
 execute_workload(CONFIG *cfg)
 {
-	uint64_t last_inserts, last_reads, last_updates;
+	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
 	uint32_t interval, run_time;
 	int ret, tret;
 
 	lprintf(cfg, 0, 1, "Starting worker threads");
 	cfg->phase = WT_PERF_WORKER;
 
-	last_inserts = last_reads = last_updates = 0;
+	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 
 	lprintf(cfg, 0, 1,
@@ -742,6 +728,8 @@ execute_workload(CONFIG *cfg)
 		if (run_time == 0)
 			break;
 
+		g_ckpt_ops =
+		    sum_ckpt_ops(cfg->ckptthreads, cfg->checkpoint_threads);
 		g_insert_ops =
 		    sum_insert_ops(cfg->ithreads, cfg->insert_threads);
 		g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
@@ -749,14 +737,16 @@ execute_workload(CONFIG *cfg)
 		    sum_update_ops(cfg->uthreads, cfg->update_threads);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
-		    " updates in %" PRIu32 " secs",
+		    " updates, %" PRIu64 " checkpoints in %" PRIu32 " secs",
 		    g_read_ops - last_reads,
 		    g_insert_ops - last_inserts,
 		    g_update_ops - last_updates,
+		    g_ckpt_ops - last_ckpts,
 		    cfg->report_interval);
 		last_reads = g_read_ops;
 		last_inserts = g_insert_ops;
 		last_updates = g_update_ops;
+		last_ckpts = g_ckpt_ops;
 	}
 
 	/* One final summation of the operations we've completed. */
@@ -833,10 +823,10 @@ main(int argc, char *argv[])
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t checkpoint_thread, stat_thread;
+	pthread_t stat_thread;
 	size_t len;
 	uint64_t req_len;
-	int ch, checkpoint_created, ret, stat_created;
+	int ch, ret, stat_created, tret;
 	const char *opts = "C:O:T:h:o:SML";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
@@ -844,7 +834,7 @@ main(int argc, char *argv[])
 
 	conn = NULL;
 	session = NULL;
-	checkpoint_created = ret = stat_created = 0;
+	ret = stat_created = 0;
 	user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
@@ -1048,21 +1038,17 @@ main(int argc, char *argv[])
 			goto err;
 		}
 		stat_created = 1;
-	}				/* Start the checkpoint thread. */
-	if (cfg.checkpoint_interval != 0) {
-		if ((ret = pthread_create(
-		    &checkpoint_thread, NULL, checkpoint_worker, &cfg)) != 0) {
-			lprintf(
-			    &cfg, ret, 0, "Error creating checkpoint thread.");
-			goto err;
-		}
-		checkpoint_created = 1;
 	}
 					/* If creating, populate the table. */
 	if (cfg.create != 0 && execute_populate(&cfg) != 0)
 		goto err;
 					/* Not creating, set insert count. */
 	if (cfg.create == 0 && find_table_count(&cfg) != 0)
+		goto err;
+					/* Start the checkpoint thread. */
+	if (cfg.checkpoint_threads != 0 &&
+	    start_threads(&cfg,
+	    cfg.checkpoint_threads, &cfg.ckptthreads, checkpoint_worker) != 0)
 		goto err;
 					/* Execute the workload. */
 	if (cfg.run_time != 0 &&
@@ -1071,11 +1057,12 @@ main(int argc, char *argv[])
 		goto err;
 
 	lprintf(&cfg, 0, 1,
-	    "Ran performance test example with %" PRIu32 " read threads, %"
-	    PRIu32 " insert threads and %" PRIu32 " update threads for %"
+	    "Run completed: %" PRIu32 " read threads, %"
+	    PRIu32 " insert threads, %" PRIu32 " update threads and %"
+	    PRIu32 " checkpoint threads for %"
 	    PRIu32 " seconds.",
 	    cfg.read_threads, cfg.insert_threads,
-	    cfg.update_threads, cfg.run_time);
+	    cfg.update_threads, cfg.checkpoint_threads, cfg.run_time);
 
 	if (cfg.read_threads != 0)
 		lprintf(&cfg, 0, 1,
@@ -1086,22 +1073,33 @@ main(int argc, char *argv[])
 	if (cfg.update_threads != 0)
 		lprintf(&cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations", g_update_ops);
+	if (cfg.checkpoint_threads != 0)
+		lprintf(&cfg, 0, 1,
+		    "Executed %" PRIu64 " checkpoint operations", g_ckpt_ops);
 
 	if (0) {
 einval:		ret = EINVAL;
 	}
 err:	g_util_running = 0;
 
-	if (checkpoint_created != 0 &&
-	    (ret = pthread_join(checkpoint_thread, NULL)) != 0)
-		lprintf(&cfg, ret, 0, "Error joining checkpoint thread.");
-	if (stat_created != 0 &&
-	    (ret = pthread_join(stat_thread, NULL)) != 0)
-		lprintf(&cfg, ret, 0, "Error joining stat thread.");
+	if (cfg.checkpoint_threads != 0 &&
+	    (tret = stop_threads(&cfg, 1, &cfg.ckptthreads)) != 0)
+		if (ret == 0)
+			ret = tret;
 
-	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
+	if (stat_created != 0 &&
+	    (tret = pthread_join(stat_thread, NULL)) != 0) {
+		lprintf(&cfg, ret, 0, "Error joining stat thread.");
+		if (ret == 0)
+			ret = tret;
+	}
+
+	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0) {
 		lprintf(&cfg, ret, 0,
 		    "Error closing connection to %s", cfg.home);
+		if (ret == 0)
+			ret = tret;
+	}
 
 	if (cfg.logf != NULL) {
 		assert(fflush(cfg.logf) == 0);
