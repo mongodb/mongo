@@ -338,6 +338,10 @@ namespace mongo {
         }
 
     private:
+        /**
+         * Recursion limit when converting from JS objects to BSON.
+         */
+        static const int objectDepthLimit = 500;
 
         /**
          * Attach data to obj such that the data has the same lifetime as the Object obj points to.

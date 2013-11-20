@@ -1565,6 +1565,10 @@ namespace mongo {
     void V8Scope::v8ToMongoElement(BSONObjBuilder & b, const StringData& sname,
                                    v8::Handle<v8::Value> value, int depth,
                                    BSONObj* originalParent) {
+        uassert(17279,
+                str::stream() << "Exceeded depth limit of " << objectDepthLimit
+                              << " when converting js object to BSON. Do you have a cycle?",
+                depth < objectDepthLimit);
 
         // Null char should be at the end, not in the string
         uassert(16985,
