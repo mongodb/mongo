@@ -194,6 +194,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	saved_isolation = session->isolation;
 	txn = &session->txn;
 	tracking = 0;
+	full = 0;
 
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
