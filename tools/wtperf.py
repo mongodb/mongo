@@ -57,7 +57,7 @@ set title "wtperf run"
 set xlabel "Time"
 set xtics rotate by -45
 set xdata time
-set ylabel "Operations per second"
+set ylabel "Thousands of operations per second"
 set yrange [0:]\n''')
 
 it = iter(ckptlist)
@@ -68,7 +68,7 @@ for start, stop in zip(it, it):
 
 of.write('''
 set output 'monitor.png'
-plot "monitor" using 1:2 title "Reads", "monitor" using 1:3 title "Updates", "monitor" using 1:4 title "Inserts"\n''')
+plot "monitor" using 1:($2/1000) title "Reads", "monitor" using 1:($3/1000) title "Updates", "monitor" using 1:($4/1000) title "Inserts"\n''')
 
 of.close()
 call(["gnuplot", "gnuplot.cmd"])
