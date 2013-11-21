@@ -1019,7 +1019,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * Increase the buffer size of any slots we can get access
 		 * to, so future consolidations are likely to succeed.
 		 */
-		__wt_log_slot_grow_buffers(session, 4 * rdup_len);
+		WT_ERR(__wt_log_slot_grow_buffers(session, 4 * rdup_len));
 		return (0);
 	}
 	WT_ERR(ret);
