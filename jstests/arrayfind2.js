@@ -22,11 +22,6 @@ go( "no index" );
 t.ensureIndex( { a : 1 } );
 go( "index(a)" );
 
-// QUERY MIGRATION
-// New query systems does not print bounds for a query that doesn use indices
-// printjson( t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain() );
-// assert.eq( {}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
-
 t.ensureIndex( { "a.x": 1 } );
 
 assert.eq( {"a.x":[[3,3]]}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
