@@ -712,6 +712,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 
 	conn = S2C(session);
 	log = conn->log;
+	log_fh = NULL;
 	logfiles = NULL;
 	WT_CLEAR(buf);
 
@@ -783,7 +784,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
 	}
-	log_fh = NULL;
 	WT_ERR(__log_openfile(session, 0, &log_fh, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	if (LF_ISSET(WT_LOGSCAN_ONE))
