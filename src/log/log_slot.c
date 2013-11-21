@@ -251,7 +251,7 @@ __wt_log_slot_notify(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	slot->slot_state =
 	    (int64_t)WT_LOG_SLOT_DONE - (int64_t)slot->slot_group_size;
-	__wt_cond_signal(session, slot->slot_done_cond);
+	WT_RET(__wt_cond_signal(session, slot->slot_done_cond));
 	return (0);
 }
 
