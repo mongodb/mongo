@@ -54,7 +54,8 @@ set style data lines
 set datafile sep ','
 set timefmt "%H:%M:%S"
 set title "wtperf run"
-set xlabel "Time"
+set format x "%M:%S"
+set xlabel "Time (minutes:seconds)"
 set xtics rotate by -45
 set xdata time
 set ylabel "Thousands of operations per second"
