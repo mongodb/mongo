@@ -486,7 +486,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 } while (0)
 
 /*
- * __config_process_value
+ * __config_process_value --
  *	Deal with special config values like true / false.
  */
 static int

@@ -197,6 +197,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
 	}
 
+	/* Get the file ID. */
+	WT_RET(__wt_config_gets(session, cfg, "id", &cval));
+	btree->id = (uint32_t)cval.val;
+
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
@@ -513,7 +517,7 @@ __wt_btree_new_leaf_page(
 }
 
 /*
- * __wt_btree_no_eviction --
+ * __wt_btree_evictable --
  *      Setup or release a cache-resident tree.
  */
 void
@@ -701,6 +705,10 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	return (split_size);
 }
 
+/*
+ * pse1 --
+ *	Page size error message 1.
+ */
 static int
 pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 {
@@ -710,6 +718,10 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 	    type, max, ovfl);
 }
 
+/*
+ * pse2 --
+ *	Page size error message 2.
+ */
 static int
 pse2(WT_SESSION_IMPL *session,
     const char *type, uint32_t max, uint32_t ovfl, int pct)

@@ -962,6 +962,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "overflow",		WT_VERB_overflow },
 		{ "read",		WT_VERB_read },
 		{ "reconcile",		WT_VERB_reconcile },
+		{ "recovery",		WT_VERB_recovery },
 		{ "salvage",		WT_VERB_salvage },
 		{ "shared_cache",	WT_VERB_shared_cache },
 		{ "verify",		WT_VERB_verify },

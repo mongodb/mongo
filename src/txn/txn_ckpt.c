@@ -65,7 +65,7 @@ err:	if (cursor != NULL)
  */
 static int
 __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
-	int (*op)(WT_SESSION_IMPL *, const char *[]))
+	int (*op)(WT_SESSION_IMPL *, const char *[]), int *fullp)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
@@ -132,6 +132,8 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	}
 
 err:	__wt_scr_free(&tmp);
+	if (ret == 0 && fullp != NULL)
+		*fullp = !target_list;
 	return (ret);
 }
 
@@ -186,7 +188,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	void *saved_meta_next;
-	int tracking;
+	int full, tracking;
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
@@ -214,16 +216,27 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_write_leaves));
+	WT_ERR(__checkpoint_apply(
+	    session, cfg, __wt_checkpoint_write_leaves, &full));
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
+
+	/* Tell logging that we are about to start a database checkpoint. */
+	if (S2C(session)->logging && full)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	/* Start a snapshot transaction for the checkpoint. */
 	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
-	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
+	/* Tell logging that we have started a database checkpoint. */
+	if (S2C(session)->logging && full)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, full, WT_TXN_LOG_CKPT_START, NULL));
+
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
 	/* Release the snapshot transaction, before syncing the file(s). */
 	__wt_txn_release(session);
@@ -233,7 +246,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * lazy checkpoints, but we don't support them yet).
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+		WT_ERR(__checkpoint_apply(
+		    session, cfg, __wt_checkpoint_sync, NULL));
 
 	/* Checkpoint the metadata file. */
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
@@ -280,6 +294,13 @@ err:	/*
 		__wt_txn_release(session);
 	else
 		__wt_txn_release_snapshot(session);
+
+	/* Tell logging that we have finished a database checkpoint. */
+	if (S2C(session)->logging && full)
+		WT_TRET(__wt_txn_checkpoint_log(session, full,
+		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
+		    NULL));
+
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
@@ -415,6 +436,7 @@ __checkpoint_worker(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_LSN ckptlsn;
 	const char *name;
 	int deleted, force, hot_backup_locked, track_ckpt;
 	char *name_alloc;
@@ -425,6 +447,9 @@ __checkpoint_worker(
 
 	bm = btree->bm;
 	ckpt = ckptbase = NULL;
+	INIT_LSN(&ckptlsn);
+	dhandle = session->dhandle;
+	name_alloc = NULL;
 	hot_backup_locked = 0;
 	name_alloc = NULL;
 	track_ckpt = 1;
@@ -695,6 +720,11 @@ __checkpoint_worker(
 	 */
 	WT_ERR(__wt_bt_cache_force_write(session));
 
+	/* Tell logging that a file checkpoint is starting. */
+	if (S2C(session)->logging)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
+
 	/*
 	 * Clear the tree's modified flag; any changes before we clear the flag
 	 * are guaranteed to be part of this checkpoint (unless reconciliation
@@ -723,8 +753,8 @@ __checkpoint_worker(
 			ckpt->write_gen = btree->write_gen;
 
 fake:	/* Update the object's metadata. */
-	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
-	WT_ERR(ret);
+	WT_ERR(__wt_meta_ckptlist_set(
+	    session, dhandle->name, ckptbase, &ckptlsn));
 
 	/*
 	 * If we wrote a checkpoint (rather than faking one), pages may be
@@ -739,6 +769,11 @@ fake:	/* Update the object's metadata. */
 		else
 			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
+
+	/* Tell logging that the checkpoint is complete. */
+	if (S2C(session)->logging)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
 err:	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);

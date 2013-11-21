@@ -52,7 +52,7 @@ err:	__wt_free(session, cond);
 }
 
 /*
- * __wt_cond_wait
+ * __wt_cond_wait --
  *	Wait on a mutex, optionally timing out.
  */
 int
@@ -192,7 +192,7 @@ err:		__wt_free(session, rwlock);
 }
 
 /*
- * __wt_readlock
+ * __wt_readlock --
  *	Get a shared lock.
  */
 int
@@ -210,7 +210,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 }
 
 /*
- * __wt_try_writelock
+ * __wt_try_writelock --
  *	Try to get an exclusive lock, or fail immediately if unavailable.
  */
 int
@@ -229,7 +229,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 }
 
 /*
- * __wt_writelock
+ * __wt_writelock --
  *	Wait to get an exclusive lock.
  */
 int

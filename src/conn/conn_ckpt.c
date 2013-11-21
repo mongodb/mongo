@@ -73,7 +73,7 @@ __ckpt_server(void *arg)
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 
 		/* Wait... */
-		WT_ERR(
+		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
 	}
 
@@ -84,7 +84,7 @@ err:		__wt_err(session, ret, "checkpoint server error");
 }
 
 /*
- * __wt_checkpoint_create -
+ * __wt_checkpoint_create --
  *	Start the checkpoint server thread.
  */
 int
@@ -120,7 +120,7 @@ __wt_checkpoint_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 }
 
 /*
- * __wt_checkpoint_destroy -
+ * __wt_checkpoint_destroy --
  *	Destroy the checkpoint server thread.
  */
 int

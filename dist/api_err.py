@@ -28,8 +28,11 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 			if 'undoc' in err.flags:
 				tfile.write('/*! @cond internal */\n')
 			tfile.write('/*!%s.%s */\n' %
-			    (('\n * ' if err.long_desc else ' ') + err.desc[0].upper() + err.desc[1:],
-			    ''.join('\n * ' + l for l in textwrap.wrap(textwrap.dedent(err.long_desc).strip(), 77)) + '\n' if err.long_desc else ''))
+			    (('\n * ' if err.long_desc else ' ') +
+                    err.desc[0].upper() + err.desc[1:],
+			    ''.join('\n * ' + l for l in textwrap.wrap(
+                    textwrap.dedent(err.long_desc).strip(), 77)) +
+                '\n' if err.long_desc else ''))
 			tfile.write('#define\t%s\t%d\n' % (err.name, v))
 			v -= 1
 			if 'undoc' in err.flags:

@@ -157,6 +157,10 @@ err:	if (force && ret == WT_NOTFOUND)
 	return (ret);
 }
 
+/*
+ * __wt_schema_drop --
+ *	Process a WT_SESSION::drop operation for all supported types.
+ */
 int
 __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {

@@ -155,6 +155,10 @@ hex2byte(const u_char *from, u_char *to)
 	return (0);
 }
 
+/*
+ * __hex_fmterr --
+ *	Hex format error message.
+ */
 static int
 __hex_fmterr(WT_SESSION_IMPL *session)
 {

@@ -70,6 +70,7 @@ DUPLICATEV
 DbCursor
 DbEnv
 Decrement
+EAGAIN
 EB
 EBUSY
 EINTR
@@ -115,6 +116,7 @@ IMPL's
 INDX
 INIT
 INITIALIZER
+INMEM
 INSERT's
 INUSE
 ISSET
@@ -131,6 +133,7 @@ Kounavis
 LEX
 LF
 LNO
+LOGSCAN
 LRU
 LSB
 LSM
@@ -441,6 +444,7 @@ errv
 errx
 esc
 eventv
+evictable
 evictserver
 exactp
 extern
@@ -458,8 +462,10 @@ ffs
 fgetln
 fh
 filefrag
+fileid
 filename
 filenames
+fileop
 fileops
 filesize
 filesystem
@@ -467,6 +473,7 @@ firstfit
 fixup
 flcs
 fmt
+fmterr
 fnv
 foc
 fopen
@@ -569,6 +576,7 @@ logf
 logmgr
 lognum
 logput
+logread
 lookup
 lookups
 lr
@@ -683,6 +691,7 @@ printf
 printlog
 priv
 ps
+pse
 psp
 pthread
 putK
@@ -833,6 +842,7 @@ treplacement
 trk
 trk's
 troot
+trunc
 trywrlock
 tsalvage
 tsplit
@@ -895,6 +905,7 @@ versa
 vlcs
 vmsg
 vpack
+vprintf
 vrfy
 vsize
 vslot

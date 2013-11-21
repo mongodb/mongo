@@ -210,9 +210,9 @@ err:		if (entry != NULL) {
 }
 
 /*
- * __wt_config_check--
+ * __wt_config_check --
  *	Check the keys in an application-supplied config string match what is
- * specified in an array of check strings.
+ *	specified in an array of check strings.
  */
 int
 __wt_config_check(WT_SESSION_IMPL *session,

@@ -405,6 +405,12 @@ typedef int int_void;
 %}
 };
 
+%extend __wt_session {
+	int log_printf(const char *msg) {
+                return self->log_printf(self, "%s", msg);
+        }
+};
+
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;
 %immutable __wt_cursor::uri;
@@ -412,20 +418,20 @@ typedef int int_void;
 %ignore __wt_cursor::value_format;
 %immutable __wt_session::connection;
 
-%ignore __wt_buf;
+%ignore __wt_collator;
+%ignore __wt_compressor;
 %ignore __wt_config_item;
+%ignore __wt_data_source;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_item;
 
-%ignore __wt_collator;
 %ignore __wt_connection::add_collator;
-%ignore __wt_compressor;
 %ignore __wt_connection::add_compressor;
-%ignore __wt_data_source;
 %ignore __wt_connection::add_data_source;
 %ignore __wt_connection::add_extractor;
 %ignore __wt_connection::get_extension_api;
+%ignore __wt_session::log_printf;
 
 %ignore wiredtiger_struct_pack;
 %ignore wiredtiger_struct_size;

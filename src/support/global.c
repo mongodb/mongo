@@ -10,6 +10,10 @@
 WT_PROCESS __wt_process;			/* Per-process structure */
 static int __wt_pthread_once_failed;		/* If initialization failed */
 
+/*
+ * __system_is_little_endian --
+ *	Check if the system is little endian.
+ */
 static int
 __system_is_little_endian(void)
 {
@@ -28,6 +32,10 @@ __system_is_little_endian(void)
 	return (EINVAL);
 }
 
+/*
+ * __wt_pthread_once --
+ *	Global initialization, run once.
+ */
 static void
 __wt_pthread_once(void)
 {

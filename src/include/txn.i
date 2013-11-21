@@ -5,41 +5,25 @@
  * See the file LICENSE for redistribution information.
  */
 
+static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
+static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
+
 /*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
-__wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
+__txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 {
 	WT_TXN *txn;
 
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-	WT_RET(__wt_realloc_def(
-	    session, &txn->mod_alloc, txn->mod_count + 1, &txn->mod));
+	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
+	    txn->mod_count + 1, &txn->mod));
 
-	txn->mod[txn->mod_count++] = id;
-	*id = txn->id;
-	return (0);
-}
-
-/*
- * __wt_txn_modify_ref --
- *	Mark a WT_REF object modified by the current transaction.
- */
-static inline int
-__wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
-	WT_RET(__wt_realloc_def(
-	    session, &txn->modref_alloc, txn->modref_count + 1, &txn->modref));
-
-	txn->modref[txn->modref_count++] = ref;
-	ref->txnid = txn->id;
+	*opp = &txn->mod[txn->mod_count++];
+	WT_CLEAR(**opp);
 	return (0);
 }
 
@@ -59,6 +43,48 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, txn->mod_count > 0);
 		txn->mod_count--;
 	}
+}
+
+/*
+ * __wt_txn_modify --
+ *	Mark a WT_UPDATE object modified by the current transaction.
+ */
+static inline int
+__wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+{
+	WT_DECL_RET;
+	WT_TXN_OP *op;
+
+	WT_RET(__txn_next_op(session, &op));
+	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
+	    TXN_OP_INMEM : TXN_OP_BASIC;
+	/* If we are logging, we need a reference to the key. */
+	if (cbt->btree->type == BTREE_ROW && S2C(session)->logging)
+		WT_ERR(__wt_row_key_get(cbt, &op->u.op.key));
+	op->u.op.ins = cbt->ins;
+	op->u.op.upd = upd;
+	op->fileid = S2BT(session)->id;
+	upd->txnid = session->txn.id;
+	if (0) {
+err:            __wt_txn_unmodify(session);
+	}
+	return (ret);
+}
+
+/*
+ * __wt_txn_modify_ref --
+ *	Mark a WT_REF object modified by the current transaction.
+ */
+static inline int
+__wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_TXN_OP *op;
+
+	WT_RET(__txn_next_op(session, &op));
+	op->type = TXN_OP_REF;
+	op->u.ref = ref;
+	ref->txnid = session->txn.id;
+	return (0);
 }
 
 /*

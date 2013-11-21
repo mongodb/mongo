@@ -42,6 +42,7 @@ no_scale_per_second_list = [
     'cache: tracked dirty pages in the cache',
     'cache: pages currently held in the cache',
     'files currently open',
+    'log: total log buffer size',
     'open cursor count',
     'block manager: file allocation unit size',
     'block manager: checkpoint size',
@@ -68,7 +69,7 @@ no_scale_per_second_list = [
     'overflow values cached in memory',
     'chunks in the LSM tree',
     'highest merge generation in the LSM tree',
-    'reconciliation maximum number of splits created for a page',
+    'reconciliation maximum splits for a page',
     'open cursor count',
 ]
 # no scale-per-second list section: END

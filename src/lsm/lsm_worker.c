@@ -156,7 +156,7 @@ __wt_lsm_merge_worker(void *vargs)
 			 * The "main" thread polls 10 times per second,
 			 * secondary threads once per second.
 			 */
-			WT_ERR(__wt_cond_wait(
+			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond,
 			    id == 0 ? 100000 : 1000000));
 			stallms += (id == 0) ? 100 : 1000;
@@ -409,7 +409,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
-			WT_ERR(__wt_cond_wait(
+			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}
 err:	__lsm_unpin_chunks(session, &cookie);

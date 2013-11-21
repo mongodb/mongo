@@ -1227,9 +1227,9 @@ struct __wt_connection {
 	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
 	 * "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
 	 * "hazard"\, \c "log"\, \c "lsm"\, \c "mutex"\, \c "overflow"\, \c
-	 * "read"\, \c "readserver"\, \c "reconcile"\, \c "salvage"\, \c
-	 * "shared_cache"\, \c "verify"\, \c "version"\, \c "write"; default
-	 * empty.}
+	 * "read"\, \c "readserver"\, \c "reconcile"\, \c "recovery"\, \c
+	 * "salvage"\, \c "shared_cache"\, \c "verify"\, \c "version"\, \c
+	 * "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1482,7 +1482,7 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
  * flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
- * maximum size of the log file., an integer between 1MB and 2GB; default \c
+ * maximum size of log files., an integer between 100KB and 2GB; default \c
  * 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
  * which the log files are written.  If the value is not an absolute path name\,
@@ -1560,8 +1560,8 @@ struct __wt_connection {
  * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
  * "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
  * "log"\, \c "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\,
- * \c "reconcile"\, \c "salvage"\, \c "shared_cache"\, \c "verify"\, \c
- * "version"\, \c "write"; default empty.}
+ * \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\, \c
+ * "verify"\, \c "version"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
@@ -2499,74 +2499,86 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_DH_SESSION_HANDLES			1041
 /*! dhandle: sweeps conflicting with evict */
 #define	WT_STAT_CONN_DH_SWEEP_EVICT			1042
-/*! dhandle: number of sweep attempts */
+/*! dhandle: sweep attempts */
 #define	WT_STAT_CONN_DH_SWEEPS				1043
 /*! files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				1044
+/*! log: log buffer size increases */
+#define	WT_STAT_CONN_LOG_BUFFER_GROW			1045
+/*! log: total log buffer size */
+#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1046
 /*! log: user provided log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_USER			1045
+#define	WT_STAT_CONN_LOG_BYTES_USER			1047
 /*! log: log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1046
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1048
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1047
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1049
 /*! log: log read operations */
-#define	WT_STAT_CONN_LOG_READS				1048
+#define	WT_STAT_CONN_LOG_READS				1050
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1049
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1051
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1050
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1052
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1051
+#define	WT_STAT_CONN_LOG_SCANS				1053
 /*! log: consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1052
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1054
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1053
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1055
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1054
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1056
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1055
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1057
+/*! log: log slot ready wait timeouts */
+#define	WT_STAT_CONN_LOG_SLOT_READY_WAIT_TIMEOUT	1058
+/*! log: log slot release wait timeouts */
+#define	WT_STAT_CONN_LOG_SLOT_RELEASE_WAIT_TIMEOUT	1059
+/*! log: slots selected for switching that were unavailable */
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1060
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1056
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1061
+/*! log: failed to find a slot large enough for record */
+#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1062
 /*! log: consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1057
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1063
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				1058
+#define	WT_STAT_CONN_LOG_SYNC				1064
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				1059
+#define	WT_STAT_CONN_LOG_WRITES				1065
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1060
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1066
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1061
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1067
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1062
+#define	WT_STAT_CONN_MEMORY_FREE			1068
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1063
+#define	WT_STAT_CONN_MEMORY_GROW			1069
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1064
+#define	WT_STAT_CONN_READ_IO				1070
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1065
+#define	WT_STAT_CONN_REC_PAGES				1071
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1066
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1072
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1067
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1073
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1068
+#define	WT_STAT_CONN_RWLOCK_READ			1074
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1069
+#define	WT_STAT_CONN_RWLOCK_WRITE			1075
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1070
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1076
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1071
+#define	WT_STAT_CONN_TXN_BEGIN				1077
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1072
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1078
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1073
+#define	WT_STAT_CONN_TXN_COMMIT				1079
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1074
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1080
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1075
+#define	WT_STAT_CONN_TXN_ROLLBACK			1081
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1076
+#define	WT_STAT_CONN_WRITE_IO				1082
 
 /*!
  * @}
@@ -2739,7 +2751,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2080
 /*! reconciliation leaf pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			2081
-/*! reconciliation maximum number of splits created for a page */
+/*! reconciliation maximum splits for a page */
 #define	WT_STAT_DSRC_REC_SPLIT_MAX			2082
 /*! object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			2083

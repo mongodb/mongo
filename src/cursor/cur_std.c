@@ -19,7 +19,7 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
-/* 
+/*
  * __wt_cursor_noop --
  *	Cursor noop.
  */
@@ -137,6 +137,44 @@ __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 	if (!raw_set)
 		F_SET(cursor, WT_CURSTD_RAW);
 	cursor->set_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
+}
+
+/*
+ * __wt_cursor_get_raw_value --
+ *	Temporarily force raw mode in a cursor to get a canonical copy of
+ * the value.
+ */
+int
+__wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
+{
+	WT_DECL_RET;
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	ret = cursor->get_value(cursor, value);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
+	return (ret);
+}
+
+/*
+ * __wt_cursor_set_raw_value --
+ *	Temporarily force raw mode in a cursor to set a canonical copy of
+ * the value.
+ */
+void
+__wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
+{
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	cursor->set_value(cursor, value);
 	if (!raw_set)
 		F_CLR(cursor, WT_CURSTD_RAW);
 }

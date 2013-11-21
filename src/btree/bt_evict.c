@@ -169,7 +169,8 @@ __wt_cache_evict_server(void *arg)
 		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_VERBOSE_ERR(session, evictserver, "sleeping");
 		/* Don't rely on signals: check periodically. */
-		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
+		WT_ERR_TIMEDOUT_OK(
+		    __wt_cond_wait(session, cache->evict_cond, 100000));
 		WT_VERBOSE_ERR(session, evictserver, "waking");
 	}
 
@@ -350,9 +351,9 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_evict_file_exclusive_on
+ * __wt_evict_file_exclusive_on --
  *	Get exclusive eviction access to a file and discard any of the file's
- * blocks queued for eviction.
+ *	blocks queued for eviction.
  */
 void
 __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
@@ -398,7 +399,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_evict_file_exclusive_off
+ * __wt_evict_file_exclusive_off --
  *	Release exclusive eviction access to a file.
  */
 void
