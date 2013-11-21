@@ -104,8 +104,8 @@ DEF_OPT_AS_UINT32(read_threads, 2, "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
     "how often to output throughput information")
 DEF_OPT_AS_UINT32(run_time, 2, "number of seconds to run workload phase")
-DEF_OPT_AS_UINT32(stat_interval, 0,
-    "log statistics every interval seconds, zero to disable")
+DEF_OPT_AS_UINT32(sample_interval, 0,
+    "performance logging every interval seconds, 0 to disable")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",

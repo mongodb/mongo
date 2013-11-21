@@ -88,9 +88,9 @@ static uint64_t g_update_ops;		/* update operations */
 
 static uint64_t g_insert_key;		/* insert key */
 
-static int g_running;			/* threads are running */
-static int g_threads_quit;		/* threads that exited early */
-static int g_util_running;		/* utility threads are running */
+static volatile int g_ckpt;		/* checkpoint in progress */
+static volatile int g_error;		/* worker thread error */
+static volatile int g_stop;		/* quit running */
 
 /*
  * Atomic update where needed.
@@ -110,7 +110,7 @@ static void	*populate_thread(void *);
 static void	*read_thread(void *);
 static int	 start_threads(
 		    CONFIG *, u_int, CONFIG_THREAD **, void *(*func)(void *));
-static void	*stat_worker(void *);
+static void	*monitor(void *);
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD **);
 static void	*update_thread(void *);
 static void	 worker(CONFIG_THREAD *, worker_type);
@@ -187,7 +187,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 		goto err;
 	}
 
-	while (g_running) {
+	while (!g_stop) {
 		if (cfg->random_range == 0 && IS_INSERT_WORKER(wtype))
 			next_val = cfg->icount + get_next_incr();
 		else
@@ -277,7 +277,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 
 	/* To ensure managing thread knows if we exited early. */
 err:	if (ret != 0)
-		++g_threads_quit;
+		g_error = 1;
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
 	free(data_buf);
@@ -405,7 +405,7 @@ populate_thread(void *arg)
 
 	/* To ensure managing thread knows if we exited early. */
 err:	if (ret != 0)
-		++g_threads_quit;
+		g_error = 1;
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
 	free(data_buf);
@@ -414,62 +414,74 @@ err:	if (ret != 0)
 }
 
 static void *
-stat_worker(void *arg)
+monitor(void *arg)
 {
+	struct timespec t;
+	struct tm *tm, _tm;
 	CONFIG *cfg;
-	struct timeval e;
-	double secs;
+	FILE *fp;
+	uint64_t reads, inserts, updates;
+	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t i;
+	size_t len;
+	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
+	fp = NULL;
+	path = NULL;
 
-	while (g_util_running) {
-		/* Break the sleep up, so we notice interrupts faster. */
-		for (i = 0; i < cfg->stat_interval; i++) {
+	/* Open the logging file. */
+	len = strlen(cfg->home) + 100;
+	if ((path = malloc(len)) == NULL) {
+		(void)enomem(cfg);
+		goto err;
+	}
+	snprintf(path, len, "%s/monitor", cfg->home);
+	if ((fp = fopen(path, "w")) == NULL) {
+		lprintf(cfg, errno, 0, "%s", path);
+		goto err;
+	}
+#ifdef __WRITE_A_HEADER
+	fprintf(fp, "time,reads,inserts,updates,checkpoints");
+#endif
+
+	/* Wait for something to happen... */
+	while (cfg->phase == WT_PERF_INIT)
+		sched_yield();
+
+	last_reads = last_inserts = last_updates = 0;
+	while (!g_stop) {
+		for (i = 0; i < cfg->sample_interval; i++) {
 			sleep(1);
-			if (!g_util_running)
+			if (g_stop)
 				break;
 		}
 
-		/* Generic header. */
-		lprintf(cfg, 0, cfg->verbose,
-		    "=======================================");
-		assert(gettimeofday(&e, NULL) == 0);
-		secs = e.tv_sec + e.tv_usec / 1000000.0;
-		secs -= (cfg->phase_start_time.tv_sec +
-		    cfg->phase_start_time.tv_usec / 1000000.0);
-		if (secs == 0)
-			++secs;
+		reads = sum_read_ops(cfg->rthreads, cfg->read_threads);
+		inserts = sum_insert_ops(cfg->ithreads, cfg->insert_threads);
+		updates = sum_update_ops(cfg->uthreads, cfg->update_threads);
 
-		switch (cfg->phase) {
-		case WT_PERF_POPULATE:
-			g_insert_ops = sum_insert_ops(
-			    cfg->popthreads, cfg->populate_threads);
-			lprintf(cfg, 0, cfg->verbose,
-			    "inserts: %" PRIu64 ", elapsed time: %.2f",
-			    g_insert_ops, secs);
-			break;
-		case WT_PERF_WORKER:
-			g_ckpt_ops = sum_ckpt_ops(
-			    cfg->ckptthreads, cfg->checkpoint_threads);
-			g_insert_ops =
-			    sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-			g_read_ops =
-			    sum_read_ops(cfg->rthreads, cfg->read_threads);
-			g_update_ops =
-			    sum_update_ops(cfg->uthreads, cfg->update_threads);
-			lprintf(cfg, 0, cfg->verbose,
-			    "reads: %" PRIu64 " inserts: %" PRIu64
-			    " updates: %" PRIu64 ", checkpoints: %" PRIu64
-			    ", elapsed time: %.2f",
-			    g_read_ops,
-			    g_insert_ops, g_update_ops, g_ckpt_ops, secs);
-			break;
-		case WT_PERF_INIT:
-		default:
-			break;
-		}
+		assert(clock_gettime(CLOCK_REALTIME, &t) == 0);
+		tm = localtime_r(&t.tv_sec, &_tm);
+		(void)strftime(buf, sizeof(buf), "%T", tm);
+
+		(void)fprintf(fp,
+		    "%s,%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%c\n",
+		    buf,
+		    reads - last_reads, inserts - last_inserts,
+		    updates - last_updates, g_ckpt ? 'Y' : 'N');
+
+		last_reads = reads;
+		last_inserts = inserts;
+		last_updates = updates;
 	}
+
+	if (0) {
+err:		g_error = 1;
+	}
+	if (fp != NULL)
+		(void)fclose(fp);
+	free(path);
 
 	return (NULL);
 }
@@ -497,20 +509,25 @@ checkpoint_worker(void *arg)
 		goto err;
 	}
 
-	while (g_util_running) {
+	while (!g_stop) {
 		/* Break the sleep up, so we notice interrupts faster. */
-		for (i = 0;
-		    i < cfg->checkpoint_interval && g_util_running; i++)
+		for (i = 0; i < cfg->checkpoint_interval; i++) {
 			sleep(1);
-		if (!g_util_running)
+			if (g_stop)
+				break;
+		}
+
+		/* If we're done, no need for a wrapup checkpoint. */
+		if (g_stop)
 			break;
 
 		assert(gettimeofday(&s, NULL) == 0);
+		g_ckpt = 1;
 		if ((ret = session->checkpoint(session, NULL)) != 0) {
-			/* Report errors and continue. */
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
-			continue;
+			goto err;
 		}
+		g_ckpt = 0;
 		++thread->ckpt_ops;
 
 		assert(gettimeofday(&e, NULL) == 0);
@@ -518,7 +535,11 @@ checkpoint_worker(void *arg)
 		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
 	}
 
-err:	if (session != NULL)
+	if (0) {
+err:		g_error = 1;
+	}
+
+	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
 
 	return (NULL);
@@ -538,15 +559,13 @@ execute_populate(CONFIG *cfg)
 	lprintf(cfg, 0, 1, "Starting populate threads");
 
 	g_insert_key = 0;
-	g_running = 1;
-	g_threads_quit = 0;
 	if ((ret = start_threads(cfg,
 	    cfg->populate_threads, &cfg->popthreads, populate_thread)) != 0)
 		return (ret);
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
 	for (elapsed = 0, interval = 0, last_ops = 0;
-	    g_insert_key < cfg->icount && g_threads_quit == 0;) {
+	    g_insert_key < cfg->icount && g_error == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
 		 * granularity, each 100th increment of elapsed is a single
@@ -568,13 +587,12 @@ execute_populate(CONFIG *cfg)
 	}
 	assert(gettimeofday(&e, NULL) == 0);
 
-	g_running = 0;
 	if ((ret =
 	    stop_threads(cfg, cfg->populate_threads, &cfg->popthreads)) != 0)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
-	if (g_threads_quit != 0) {
+	if (g_error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Populate thread(s) exited without finishing.");
 		return (WT_ERROR);
@@ -626,8 +644,6 @@ execute_workload(CONFIG *cfg)
 
 	g_insert_key = 0;
 	g_insert_ops = g_read_ops = g_update_ops = 0;
-	g_running = 1;
-	g_threads_quit = 0;
 
 	if (cfg->read_threads != 0 && (tret = start_threads(
 	    cfg, cfg->read_threads, &cfg->rthreads, read_thread)) != 0 &&
@@ -649,7 +665,7 @@ execute_workload(CONFIG *cfg)
 	}
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
-	for (run_time = cfg->run_time; g_threads_quit == 0;) {
+	for (run_time = cfg->run_time; g_error == 0;) {
 		if (cfg->report_interval == 0 ||
 		    run_time < cfg->report_interval)
 			interval = run_time;
@@ -688,7 +704,7 @@ execute_workload(CONFIG *cfg)
 	g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
 	g_update_ops = sum_update_ops(cfg->uthreads, cfg->update_threads);
 
-err:	g_running = 0;
+err:	g_stop = 1;
 	if (cfg->read_threads != 0 && (tret =
 	    stop_threads(cfg, cfg->read_threads, &cfg->rthreads)) != 0 &&
 	    ret == 0)
@@ -704,7 +720,7 @@ err:	g_running = 0;
 		ret = tret;
 
 	/* Report if any worker threads didn't finish. */
-	if (g_threads_quit != 0) {
+	if (g_error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Worker thread(s) exited without finishing.");
 		if (ret == 0)
@@ -757,10 +773,10 @@ main(int argc, char *argv[])
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t stat_thread;
+	pthread_t monitor_thread;
 	size_t len;
 	uint64_t req_len;
-	int ch, ret, stat_created, tret;
+	int ch, monitor_created, ret, tret;
 	const char *opts = "C:O:T:h:o:SML";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
@@ -768,7 +784,7 @@ main(int argc, char *argv[])
 
 	conn = NULL;
 	session = NULL;
-	ret = stat_created = 0;
+	monitor_created = ret = 0;
 	user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
@@ -962,16 +978,15 @@ main(int argc, char *argv[])
 	}
 	assert(session->close(session, NULL) == 0);
 	session = NULL;
-
-	g_util_running = 1;		/* Start the statistics thread. */
-	if (cfg.stat_interval != 0) {
+					/* Start the monitor thread. */
+	if (cfg.sample_interval != 0) {
 		if ((ret = pthread_create(
-		    &stat_thread, NULL, stat_worker, &cfg)) != 0) {
+		    &monitor_thread, NULL, monitor, &cfg)) != 0) {
 			lprintf(
-			    &cfg, ret, 0, "Error creating statistics thread.");
+			    &cfg, ret, 0, "Error creating monitor thread.");
 			goto err;
 		}
-		stat_created = 1;
+		monitor_created = 1;
 	}
 					/* If creating, populate the table. */
 	if (cfg.create != 0 && execute_populate(&cfg) != 0)
@@ -1014,16 +1029,16 @@ main(int argc, char *argv[])
 	if (0) {
 einval:		ret = EINVAL;
 	}
-err:	g_util_running = 0;
+err:	g_stop = 1;
 
 	if (cfg.checkpoint_threads != 0 &&
 	    (tret = stop_threads(&cfg, 1, &cfg.ckptthreads)) != 0)
 		if (ret == 0)
 			ret = tret;
 
-	if (stat_created != 0 &&
-	    (tret = pthread_join(stat_thread, NULL)) != 0) {
-		lprintf(&cfg, ret, 0, "Error joining stat thread.");
+	if (monitor_created != 0 &&
+	    (tret = pthread_join(monitor_thread, NULL)) != 0) {
+		lprintf(&cfg, ret, 0, "Error joining monitor thread.");
 		if (ret == 0)
 			ret = tret;
 	}
@@ -1088,9 +1103,11 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp)
 			return (ret);
 		}
 
-	free(*threadsp);
+	/*
+	 * Don't free the thread memory, the monitor thread might be reading
+	 * it and we don't want to race.
+	 */
 	*threadsp = NULL;
-
 	return (0);
 }
 

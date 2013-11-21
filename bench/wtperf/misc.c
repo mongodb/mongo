@@ -49,7 +49,7 @@ setup_log_file(CONFIG *cfg)
 
 	ret = 0;
 
-	if (cfg->verbose < 1 && cfg->stat_interval == 0)
+	if (cfg->verbose < 1)
 		return (0);
 
 	if ((fname = calloc(strlen(cfg->home) +

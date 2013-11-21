@@ -406,7 +406,7 @@ print_config(CONFIG *cfg)
 	printf(
 	    "\tCheckpoint interval: %" PRIu32 "\n", cfg->checkpoint_interval);
 	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
-	printf("\tStatistics interval: %" PRIu32 "\n", cfg->stat_interval);
+	printf("\tSampling interval: %" PRIu32 "\n", cfg->sample_interval);
 	if (cfg->create) {
 		printf("\tInsert count: %" PRIu32 "\n", cfg->icount);
 		printf("\tNumber populate threads: %" PRIu32 "\n",
