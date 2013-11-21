@@ -957,6 +957,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
+	myslot.slot = NULL;
 	INIT_LSN(&tmp_lsn);
 	/*
 	 * Assume the WT_ITEM the user passed is a WT_LOG_RECORD, which has
@@ -1058,7 +1059,8 @@ err:
 	 * If we're not synchronous, only report if our own operation got
 	 * an error.
 	 */
-	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC) && ret == 0)
+	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC) && ret == 0 &&
+	    myslot.slot != NULL)
 		ret = myslot.slot->slot_error;
 	return (ret);
 }

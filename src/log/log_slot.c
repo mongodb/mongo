@@ -315,7 +315,7 @@ __wt_log_slot_free(WT_LOGSLOT *slot)
  *	active buffer.
  */
 int
-__wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
+__wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, size_t newsize)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -342,7 +342,7 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 		    slot->slot_state != WT_LOG_SLOT_READY)
 			continue;
 		/* Don't keep growing unrelated buffers. */
-		if (slot->slot_buf.memsize > (size_t)(10 * newsize) &&
+		if (slot->slot_buf.memsize > (10 * newsize) &&
 		    !F_ISSET(slot, SLOT_BUF_GROW))
 			continue;
 		orig_state = WT_ATOMIC_CAS_VAL(
@@ -358,7 +358,7 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 		old_size = slot->slot_buf.memsize;
 		F_CLR(slot, SLOT_BUF_GROW);
 		WT_ERR(__wt_buf_grow(session, &slot->slot_buf,
-		    WT_MAX(slot->slot_buf.memsize * 2, (size_t)newsize)));
+		    WT_MAX(slot->slot_buf.memsize * 2, newsize)));
 		slot->slot_state = orig_state;
 		total_growth += slot->slot_buf.memsize - old_size;
 	}
