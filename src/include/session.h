@@ -96,6 +96,7 @@ struct __wt_session_impl {
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
+	void	*lang_private;		/* Language specific private storage */
 
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */

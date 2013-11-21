@@ -163,21 +163,19 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 	u_int i;
 
 	/*
-	 * If we are inserting a new size onto the size skiplist, we'll need
-	 * a new WT_EXT structure for that skiplist.
+	 * If we are inserting a new size onto the size skiplist, we'll need a
+	 * new WT_SIZE structure for that skiplist.
 	 */
 	__block_size_srch(el->sz, ext->size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL || szp->size != ext->size) {
-		WT_RET(__wt_calloc(session, 1,
-		    sizeof(WT_SIZE) + ext->depth * sizeof(WT_SIZE *), &szp));
+		WT_RET(__wt_block_size_alloc(session, &szp));
 		szp->size = ext->size;
 		szp->depth = ext->depth;
 		for (i = 0; i < ext->depth; ++i) {
 			szp->next[i] = *sstack[i];
 			*sstack[i] = szp;
 		}
-		WT_STAT_FAST_CONN_INCR(session, block_locked_allocation);
 	}
 
 	/* Insert the new WT_EXT structure into the offset skiplist. */
@@ -213,7 +211,7 @@ __block_off_insert(
 {
 	WT_EXT *ext;
 
-	WT_RET(__wt_block_ext_alloc(session, &ext, 1));
+	WT_RET(__wt_block_ext_alloc(session, &ext));
 	ext->off = off;
 	ext->size = size;
 
@@ -321,7 +319,7 @@ __block_off_remove(
 	if (szp->off[0] == NULL) {
 		for (i = 0; i < szp->depth; ++i)
 			*sstack[i] = szp->next[i];
-		__wt_free(session, szp);
+		__wt_block_size_free(session, szp);
 	}
 
 	--el->entries;
@@ -552,7 +550,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 #ifdef HAVE_DIAGNOSTIC
 	WT_RET(__wt_block_misplaced(session, block, "free", offset, size, 1));
 #endif
-	WT_RET(__wt_block_ext_alloc(session, NULL, 5));
+	WT_RET(__wt_block_ext_prealloc(session, 5));
 	__wt_spin_lock(session, &block->live_lock);
 	ret = __wt_block_off_free(session, block, offset, (off_t)size);
 	__wt_spin_unlock(session, &block->live_lock);

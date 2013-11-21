@@ -46,8 +46,6 @@ connection_stats = [
 	Stat('block_byte_map_read', 'block manager: mapped bytes read'),
 	Stat('block_byte_read', 'block manager: bytes read'),
 	Stat('block_byte_write', 'block manager: bytes written'),
-	Stat('block_locked_allocation',
-	    'block manager: memory allocations while locked'),
 	Stat('block_map_read', 'block manager: mapped blocks read'),
 	Stat('block_preload', 'block manager: blocks pre-loaded'),
 	Stat('block_read', 'block manager: blocks read'),

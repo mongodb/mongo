@@ -841,6 +841,8 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_close(WT_SESSION_IMPL *session)
 {
+	int needsync;
+
 	/*
 	 * Checkpoint handles are read-only: closing one discards its blocks,
 	 * otherwise there's no work to do.
@@ -850,11 +852,12 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session)
 		    __wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
-	 * Otherwise, checkpoint the file and optionally flush the writes to
-	 * stable storage.
+	 * Otherwise, checkpoint the file and, if it was modified, optionally
+	 * flush the writes to stable storage.
 	 */
+	needsync = S2BT(session)->modified;
 	WT_RET(__checkpoint_worker(session, NULL, 0));
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+	if (needsync && F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		WT_RET(__wt_checkpoint_sync(session, NULL));
 	return (0);
 }

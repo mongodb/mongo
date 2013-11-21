@@ -45,6 +45,7 @@
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\
+	NULL,				/* lang_private */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
@@ -236,6 +237,7 @@ struct __wt_cursor_stat {
 
 	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
+	int	  stats_base;		/* Base statistics value */
 	int	  stats_count;		/* Count of stats elements */
 
 	union {				/* Copies of the statistics */

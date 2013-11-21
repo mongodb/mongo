@@ -555,6 +555,7 @@ keyv
 kv
 kvs
 kvsbdb
+latencies
 ld
 len
 lenp
@@ -680,6 +681,7 @@ poptable
 posint
 posix
 pre
+prealloc
 preload
 prepended
 presize

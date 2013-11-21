@@ -11,6 +11,15 @@ static int  __curstat_next(WT_CURSOR *cursor);
 static int  __curstat_prev(WT_CURSOR *cursor);
 
 /*
+ * The statistics identifier is an offset from a base to ensure the integer ID
+ * values don't overlap (the idea is if they overlap it's easy for application
+ * writers to confuse them).
+ */
+#define	WT_STAT_KEY_MAX(cst)	(((cst)->stats_base + (cst)->stats_count) - 1)
+#define	WT_STAT_KEY_MIN(cst)	((cst)->stats_base)
+#define	WT_STAT_KEY_OFFSET(cst)	((cst)->key - (cst)->stats_base)
+
+/*
  * __curstat_print_value --
  *	Convert statistics cursor value to printable format.
  */
@@ -91,11 +100,13 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
-		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v));
+		    cst->stats_first[WT_STAT_KEY_OFFSET(cst)].desc,
+		    cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
 		    cursor->value_format,
-		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v));
+		    cst->stats_first[WT_STAT_KEY_OFFSET(cst)].desc,
+		    cst->pv.data, cst->v));
 
 		item = va_arg(ap, WT_ITEM *);
 		item->data = cursor->value.data;
@@ -106,7 +117,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		 * pointer support isn't documented, but it's a cheap test.
 		 */
 		if ((p = va_arg(ap, const char **)) != NULL)
-			*p = cst->stats_first[cst->key].desc;
+			*p = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].desc;
 		if ((p = va_arg(ap, const char **)) != NULL)
 			*p = cst->pv.data;
 		if ((v = va_arg(ap, uint64_t *)) != NULL)
@@ -178,14 +189,14 @@ __curstat_next(WT_CURSOR *cursor)
 	/* Move to the next item. */
 	if (cst->notpositioned) {
 		cst->notpositioned = 0;
-		cst->key = 0;
-	} else if (cst->key < cst->stats_count - 1)
+		cst->key = WT_STAT_KEY_MIN(cst);
+	} else if (cst->key < WT_STAT_KEY_MAX(cst))
 		++cst->key;
 	else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		WT_ERR(WT_NOTFOUND);
 	}
-	cst->v = cst->stats_first[cst->key].v;
+	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -210,15 +221,15 @@ __curstat_prev(WT_CURSOR *cursor)
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
 		cst->notpositioned = 0;
-		cst->key = cst->stats_count - 1;
-	} else if (cst->key > 0)
+		cst->key = WT_STAT_KEY_MAX(cst);
+	} else if (cst->key > WT_STAT_KEY_MIN(cst))
 		--cst->key;
 	else {
 		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 		WT_ERR(WT_NOTFOUND);
 	}
 
-	cst->v = cst->stats_first[cst->key].v;
+	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -264,10 +275,10 @@ __curstat_search(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_SET);
 
-	if (cst->key < 0 || cst->key >= cst->stats_count)
+	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
 
-	cst->v = cst->stats_first[cst->key].v;
+	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -318,6 +329,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 		__wt_stat_refresh_connection_stats(&conn->stats);
 
 	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.conn_stats;
+	cst->stats_base = WT_CONNECTION_STATS_BASE;
 	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
 }
 
@@ -381,9 +393,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		cst->u.dsrc_stats = dhandle->stats;
 		if (cst->stat_clear)
 			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
-
-		cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
-		cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+		__wt_curstat_dsrc_final(cst);
 	}
 
 	/* Release the handle, we're done with it. */
@@ -413,6 +423,19 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	}
 
 	return (ret);
+}
+
+/*
+ * __wt_curstat_dsrc_final --
+ *	Finalize a data-source statistics cursor.
+ */
+void
+__wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
+{
+
+	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+	cst->stats_base = WT_DSRC_STATS_BASE;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 }
 
 /*

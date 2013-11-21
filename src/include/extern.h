@@ -162,10 +162,12 @@ extern int __wt_block_read_off(WT_SESSION_IMPL *session,
     off_t offset,
     uint32_t size,
     uint32_t cksum);
-extern int __wt_block_ext_alloc(WT_SESSION_IMPL *session,
-    WT_EXT **extp,
-    u_int max);
+extern int __wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp);
 extern void __wt_block_ext_free(WT_SESSION_IMPL *session, WT_EXT *ext);
+extern int __wt_block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp);
+extern void __wt_block_size_free(WT_SESSION_IMPL *session, WT_SIZE *sz);
+extern int __wt_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max);
+extern int __wt_block_ext_discard(WT_SESSION_IMPL *session, u_int max);
 extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,
@@ -635,6 +637,7 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -848,7 +851,7 @@ extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 extern int __wt_lsm_merge( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     u_int id,
-    int aggressive);
+    u_int aggressive);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_curstat_lsm_init( WT_SESSION_IMPL *session,
