@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 
@@ -128,7 +129,7 @@ namespace mongo {
          */
         static QuerySolutionNode* makeLeafNode(const IndexEntry& index,
                                                MatchExpression* expr,
-                                               bool* exact);
+                                               IndexBoundsBuilder::BoundsTightness* tightnessOut);
 
         /**
          * Merge the predicate 'expr' with the leaf node 'node'.
@@ -136,7 +137,7 @@ namespace mongo {
         static void mergeWithLeafNode(MatchExpression* expr,
                                       const IndexEntry& index,
                                       size_t pos,
-                                      bool* exactOut,
+                                      IndexBoundsBuilder::BoundsTightness* tightnessOut,
                                       QuerySolutionNode* node,
                                       MatchExpression::MatchType mergeType);
 
