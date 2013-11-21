@@ -14,16 +14,12 @@ t.ensureIndex( {a:1} );
 explain = t.find( {a:null,b:null} ).skip( 1 ).explain( true );
 assert.eq( 0, explain.n );
 
-// QUERY MIGRATION
-// printjson( explain )
-// Old Comment: With multiple plans, the skip information is not known to the plan
-// In the new query system, the skip applies to alternative plans as well
-// assert.eq( 1, explain.allPlans[ 0 ].n );
+printjson( explain );
+assert.eq( 0, explain.allPlans[ 0 ].n );
 
 t.dropIndexes();
 explain = t.find().skip( 1 ).sort({a:1}).explain( true );
 // Skip is applied for an in memory sort.
 assert.eq( 0, explain.n );
 printjson(explain);
-// See above comment about query migration
-// assert.eq( 1, explain.allPlans[ 0 ].n );
+assert.eq( 0, explain.allPlans[ 0 ].n );

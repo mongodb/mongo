@@ -64,8 +64,7 @@ assert.eq( 1, t.count( { a:{ $lte:new Date( 1 ) } } ) );
 // Querying for 'undefined' triggers an error.
 t.drop();
 t.ensureIndex( { a:1 } );
-// QUERY_MIGRATION: WHAT DO WE REALLY WANT TO CHECK FOR HERE?
-// assert.throws( function() { t.count( { a:undefined } ); } );
+assert.throws( function() { t.count( { a:undefined } ); } );
 
 
 // Count using a descending order index.
