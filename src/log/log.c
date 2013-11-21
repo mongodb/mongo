@@ -36,6 +36,9 @@ __wt_log_get_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
 	WT_CONNECTION_IMPL *conn;
 	const char *log_path;
 
+	*countp = 0;
+	*filesp = NULL;
+
 	conn = S2C(session);
 	log_path = conn->log_path;
 	if (log_path == NULL)
@@ -330,6 +333,7 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t this_log)
 	conn = S2C(session);
 	log = conn->log;
 	log_fh = NULL;
+	logcount = 0;
 	logfiles = NULL;
 
 	/*
