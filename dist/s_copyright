@@ -72,7 +72,10 @@ check()
 for i in `cd .. &&
     find [a-z]* -name '*.[chi]' \
         -o -name '*.cxx' -o -name '*.java' -o -name '*.py' |
-    sed -e '/test\/3rdparty\//d' -e 's/^\.\///'`; do
+    sed -e '/test\/3rdparty\//d' \
+	-e '/^build/d' \
+	-e 's/^\.\///'`
+do
 	check $i
 done
 

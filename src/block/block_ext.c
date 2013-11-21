@@ -867,7 +867,7 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 }
 
 /*
- * __wt_block_insert_ext, __block_merge --
+ * __wt_block_insert_ext --
  *	Insert an extent into an extent list, merging if possible.
  */
 int
@@ -887,6 +887,12 @@ __wt_block_insert_ext(
 	 */
 	return (__block_merge(session, el, off, size));
 }
+
+/*
+ * __block_merge --
+ *	Insert an extent into an extent list, merging if possible (internal
+ *	version).
+ */
 static int
 __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 {
@@ -1239,6 +1245,10 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	memset(el, 0, sizeof(*el));
 }
 
+/*
+ * __block_extlist_dump --
+ *	Dump an extent list as verbose messages.
+ */
 static int
 __block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)

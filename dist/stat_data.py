@@ -69,9 +69,10 @@ connection_stats = [
 	Stat('cache_eviction_fail',
 	    'cache: pages selected for eviction unable to be evicted'),
 	Stat('cache_eviction_force',
-		'cache: pages evicted because they exceeded the in memory maximum'),
+	    'cache: pages evicted because they exceeded the in memory maximum'),
 	Stat('cache_eviction_force_fail',
-		'cache: failed eviction of pages that exceeded the in memory maximum'),
+	    'cache: failed eviction of pages that exceeded the ' +
+	    'in memory maximum'),
 	Stat('cache_eviction_hazard',
 	    'cache: hazard pointer blocked page eviction'),
 	Stat('cache_eviction_internal', 'cache: internal pages evicted'),
@@ -98,11 +99,15 @@ connection_stats = [
 	Stat('dh_conn_handles', 'dhandle: connection dhandles swept'),
 	Stat('dh_session_handles', 'dhandle: session dhandles swept'),
 	Stat('dh_sweep_evict', 'dhandle: sweeps conflicting with evict'),
-	Stat('dh_sweeps', 'dhandle: number of sweep attempts'),
+	Stat('dh_sweeps', 'dhandle: sweep attempts'),
 
 	##########################################
 	# Logging statistics
 	##########################################
+	Stat('log_buffer_grow',
+	    'log: log buffer size increases'),
+	Stat('log_buffer_size',
+	    'log: total log buffer size', 'no_clear,no_scale'),
 	Stat('log_bytes_user', 'log: user provided log bytes written'),
 	Stat('log_bytes_written', 'log: log bytes written'),
 	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),
@@ -115,9 +120,17 @@ connection_stats = [
 
 	Stat('log_slot_consolidated', 'log: logging bytes consolidated'),
 	Stat('log_slot_closes', 'log: consolidated slot closures'),
+	Stat('log_slot_ready_wait_timeout',
+	    'log: log slot ready wait timeouts'),
 	Stat('log_slot_joins', 'log: consolidated slot joins'),
 	Stat('log_slot_races', 'log: consolidated slot join races'),
+	Stat('log_slot_release_wait_timeout',
+	    'log: log slot release wait timeouts'),
+	Stat('log_slot_switch_fails',
+	    'log: slots selected for switching that were unavailable'),
 	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
+	Stat('log_slot_toosmall',
+	    'log: failed to find a slot large enough for record'),
 	Stat('log_slot_transitions', 'log: consolidated slot join transitions'),
 
 	##########################################
@@ -245,7 +258,8 @@ dsrc_stats = [
 	##########################################
 	Stat('block_alloc', 'block manager: blocks allocated'),
 	Stat('allocation_size',
-	    'block manager: file allocation unit size', 'no_aggregate,no_scale'),
+	    'block manager: file allocation unit size',
+	    'no_aggregate,no_scale'),
 	Stat('block_checkpoint_size',
 	    'block manager: checkpoint size', 'no_scale'),
 	Stat('block_extension',
@@ -320,7 +334,7 @@ dsrc_stats = [
 	Stat('rec_split_leaf', 'reconciliation leaf pages split'),
 
 	Stat('rec_split_max',
-	    'reconciliation maximum number of splits created for a page',
+	    'reconciliation maximum splits for a page',
 	    'max_aggregate,no_scale'),
 
 	##########################################

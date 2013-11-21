@@ -6,6 +6,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 l=`(cd .. &&
     find bench/wtperf examples ext src test -name '*.[chisy]' &&
+    find dist -name '*.py' &&
     find src -name '*.in') |
     grep -v 'support/stat\.c'`
 

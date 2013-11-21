@@ -114,8 +114,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "reconciliation failed because an update could not be included";
 	stats->rec_split_internal.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
-	stats->rec_split_max.desc =
-	    "reconciliation maximum number of splits created for a page";
+	stats->rec_split_max.desc = "reconciliation maximum splits for a page";
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
@@ -364,8 +363,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
-	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
+	stats->dh_sweeps.desc = "dhandle: sweep attempts";
 	stats->file_open.desc = "files currently open";
+	stats->log_buffer_grow.desc = "log: log buffer size increases";
+	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc = "log: user provided log bytes written";
 	stats->log_bytes_written.desc = "log: log bytes written";
 	stats->log_max_filesize.desc = "log: maximum log file size";
@@ -378,7 +379,15 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
 	stats->log_slot_joins.desc = "log: consolidated slot joins";
 	stats->log_slot_races.desc = "log: consolidated slot join races";
+	stats->log_slot_ready_wait_timeout.desc =
+	    "log: log slot ready wait timeouts";
+	stats->log_slot_release_wait_timeout.desc =
+	    "log: log slot release wait timeouts";
+	stats->log_slot_switch_fails.desc =
+	    "log: slots selected for switching that were unavailable";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
+	stats->log_slot_toosmall.desc =
+	    "log: failed to find a slot large enough for record";
 	stats->log_slot_transitions.desc =
 	    "log: consolidated slot join transitions";
 	stats->log_sync.desc = "log: log sync operations";
@@ -453,6 +462,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->dh_session_handles.v = 0;
 	stats->dh_sweep_evict.v = 0;
 	stats->dh_sweeps.v = 0;
+	stats->log_buffer_grow.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;
@@ -463,7 +473,11 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_slot_consolidated.v = 0;
 	stats->log_slot_joins.v = 0;
 	stats->log_slot_races.v = 0;
+	stats->log_slot_ready_wait_timeout.v = 0;
+	stats->log_slot_release_wait_timeout.v = 0;
+	stats->log_slot_switch_fails.v = 0;
 	stats->log_slot_toobig.v = 0;
+	stats->log_slot_toosmall.v = 0;
 	stats->log_slot_transitions.v = 0;
 	stats->log_sync.v = 0;
 	stats->log_writes.v = 0;

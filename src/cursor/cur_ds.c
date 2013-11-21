@@ -36,7 +36,7 @@ __curds_txn_leave(WT_SESSION_IMPL *session)
 }
 
 /*
- * __curds_key_set -
+ * __curds_key_set --
  *	Set the key for the data-source.
  */
 static int
@@ -57,7 +57,7 @@ err:	return (ret);
 }
 
 /*
- * __curds_value_set -
+ * __curds_value_set --
  *	Set the value for the data-source.
  */
 static int
@@ -77,7 +77,7 @@ err:	return (ret);
 }
 
 /*
- * __curds_cursor_resolve -
+ * __curds_cursor_resolve --
  *	Resolve cursor operation.
  */
 static int

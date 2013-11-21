@@ -203,7 +203,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	WT_UNUSED_RET(system("rm -f WiredTiger.* __wt*"));
+	WT_UNUSED_RET(system("rm -f WiredTiger* __wt*"));
 }
 
 static int

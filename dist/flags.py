@@ -18,17 +18,16 @@ flags = {
 		'FILE_TYPE_DATA',
 		'FILE_TYPE_LOG'
 	],
-        'log_scan' : [
+	'log_scan' : [
 		'LOGSCAN_FIRST',
 		'LOGSCAN_FROM_CKP',
 		'LOGSCAN_ONE',
 		'LOGSCAN_RECOVER'
-        ],
-        'log_write' : [
-		'LOG_CKPT',
+	],
+	'log_write' : [
 		'LOG_DSYNC',
 		'LOG_FSYNC'
-        ],
+	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',
@@ -47,6 +46,12 @@ flags = {
 		'TREE_SKIP_LEAF',
 		'TREE_WAIT',
 	],
+	'txn_log_checkpoint' : [
+		'TXN_LOG_CKPT_FAIL',
+		'TXN_LOG_CKPT_PREPARE',
+		'TXN_LOG_CKPT_START',
+		'TXN_LOG_CKPT_STOP',
+	],
 	'verbose' : [
 		'VERB_block',
 		'VERB_ckpt',
@@ -61,6 +66,7 @@ flags = {
 		'VERB_overflow',
 		'VERB_read',
 		'VERB_reconcile',
+		'VERB_recovery',
 		'VERB_salvage',
 		'VERB_shared_cache',
 		'VERB_verify',
@@ -82,6 +88,8 @@ flags = {
 	'session' : [
 		'SESSION_CACHE_BUSY',
 		'SESSION_INTERNAL',
+		'SESSION_LOGGING_DISABLED',
+		'SESSION_LOGGING_INMEM',
 		'SESSION_NO_CACHE',
 		'SESSION_NO_CACHE_CHECK',
 		'SESSION_NO_SCHEMA_LOCK',

@@ -137,7 +137,7 @@ done:	session->excl_next = 0;
 }
 
 /*
- * __rec_root_update  --
+ * __rec_root_update --
  *	Update a root page's reference on eviction (clean or dirty).
  */
 static void
@@ -147,7 +147,7 @@ __rec_root_update(WT_SESSION_IMPL *session)
 }
 
 /*
- * __rec_page_clean_update  --
+ * __rec_page_clean_update --
  *	Update a clean page's reference on eviction.
  */
 static void

@@ -3,7 +3,6 @@
 
 import re, string, sys, textwrap
 from dist import compare_srcfile
-from dist import source_paths_list
 
 # Read the source files.
 from stat_data import dsrc_stats, connection_stats

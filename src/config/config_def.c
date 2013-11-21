@@ -46,8 +46,8 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "verbose", "list",
 	    "choices=[\"block\",\"ckpt\",\"compact\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\""
-	    ",\"overflow\",\"read\",\"readserver\",\"reconcile\",\"salvage\","
-	    "\"shared_cache\",\"verify\",\"version\",\"write\"]",
+	    ",\"overflow\",\"read\",\"readserver\",\"reconcile\",\"recovery\""
+	    ",\"salvage\",\"shared_cache\",\"verify\",\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -60,6 +60,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "block_compressor", "string", NULL, NULL},
 	{ "cache_resident", "boolean", NULL, NULL},
 	{ "checkpoint", "string", NULL, NULL},
+	{ "checkpoint_lsn", "string", NULL, NULL},
 	{ "checksum", "string",
 	    "choices=[\"on\",\"off\",\"uncompressed\"]",
 	    NULL},
@@ -69,6 +70,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "format", "string", "choices=[\"btree\"]", NULL},
 	{ "huffman_key", "string", NULL, NULL},
 	{ "huffman_value", "string", NULL, NULL},
+	{ "id", "string", NULL, NULL},
 	{ "internal_item_max", "int", "min=0", NULL},
 	{ "internal_key_truncate", "boolean", NULL, NULL},
 	{ "internal_page_max", "int", "min=512B,max=512MB", NULL},
@@ -216,7 +218,7 @@ static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ "archive", "boolean", NULL, NULL },
 	{ "enabled", "boolean", NULL, NULL },
-	{ "file_max", "int", "min=1MB,max=2GB", NULL },
+	{ "file_max", "int", "min=100KB,max=2GB", NULL },
 	{ "path", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -263,8 +265,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "verbose", "list",
 	    "choices=[\"block\",\"ckpt\",\"compact\",\"evict\","
 	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\""
-	    ",\"overflow\",\"read\",\"readserver\",\"reconcile\",\"salvage\","
-	    "\"shared_cache\",\"verify\",\"version\",\"write\"]",
+	    ",\"overflow\",\"read\",\"readserver\",\"reconcile\",\"recovery\""
+	    ",\"salvage\",\"shared_cache\",\"verify\",\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -316,13 +318,14 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "file.meta",
 	  "allocation_size=4KB,block_allocation=best,block_compressor=,"
-	  "cache_resident=0,checkpoint=,checksum=uncompressed,collator=,"
-	  "columns=,dictionary=0,format=btree,huffman_key=,huffman_value=,"
-	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB"
-	  ",key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
-	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
-	  "prefix_compression=,prefix_compression_min=4,split_pct=75,"
-	  "value_format=u,version=(major=0,minor=0)",
+	  "cache_resident=0,checkpoint=,checkpoint_lsn=,"
+	  "checksum=uncompressed,collator=,columns=,dictionary=0,"
+	  "format=btree,huffman_key=,huffman_value=,id=,internal_item_max=0"
+	  ",internal_key_truncate=,internal_page_max=4KB,key_format=u,"
+	  "key_gap=10,leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB"
+	  ",os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
+	  "prefix_compression_min=4,split_pct=75,value_format=u,"
+	  "version=(major=0,minor=0)",
 	  confchk_file_meta
 	},
 	{ "index.meta",

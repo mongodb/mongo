@@ -340,11 +340,13 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	va_list ap;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NO_CONF(session, log_printf);
 
 	va_start(ap, fmt);
-	ret =__wt_log_vprintf(session, fmt, ap);
+	ret = __wt_log_vprintf(session, fmt, ap);
 	va_end(ap);
 
+err:	API_END(session);
 	return (ret);
 }
 

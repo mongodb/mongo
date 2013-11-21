@@ -25,13 +25,47 @@
 %}
 
 %{
-typedef int bool;
+#include "../src/include/wt_internal.h"
+
+/*
+ * Closed handle checking:
+ *
+ * The typedef WT_CURSOR_NULLABLE used in wiredtiger.h is only made
+ * visible to the SWIG parser and is used to identify arguments of
+ * Cursor type that are permitted to be null.  Likewise, typedefs
+ * WT_{CURSOR,SESSION,CONNECTION}_CLOSED identify 'close' calls that
+ * need explicit nulling of the swigCPtr.  These typedefs permit
+ * special casing in typemaps for input args.
+ *
+ * We want SWIG to see these 'fake' typenames, but not the compiler.
+ */
+#define WT_CURSOR_NULLABLE		WT_CURSOR
+#define WT_CURSOR_CLOSED		WT_CURSOR
+#define WT_SESSION_CLOSED		WT_SESSION
+#define WT_CONNECTION_CLOSED		WT_CONNECTION
+
+/*
+ * For Connections, Sessions and Cursors created in Java, each of
+ * WT_CONNECTION_IMPL, WT_SESSION_IMPL and WT_CURSOR have a
+ * lang_private field that store a pointer to a JAVA_CALLBACK, alloced
+ * during the various open calls.  {conn,session,cursor}CloseHandler()
+ * functions reach into the associated java object, set the swigCPtr
+ * to 0, and free the JAVA_CALLBACK. Typemaps matching Connection,
+ * Session, Cursor args use the NULL_CHECK macro, which checks if
+ * swigCPtr is 0.
+ */
+typedef struct {
+	JNIEnv *jnienv;		/* jni env that created the Session/Cursor */
+	jobject jobj;		/* the java Session/Cursor object */
+	jfieldID fid;		/* cached Cursor.swigCPtr field id in session */
+} JAVA_CALLBACK;
 
 static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 	jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/WiredTigerException");
 	if (excep)
 		(*jenv)->ThrowNew(jenv, excep, msg);
 }
+
 %}
 
 /* No finalizers */
@@ -71,7 +105,7 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 %}
 
 %typemap(argout) WT_ITEM * %{
-	(*jenv)->ReleaseByteArrayElements(jenv, $input, $1->data, 0);
+	(*jenv)->ReleaseByteArrayElements(jenv, $input, (void *)$1->data, 0);
 %}
 
 %typemap(out) WT_ITEM %{
@@ -94,6 +128,15 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 	$result = $1;
 %}
 
+%define NULL_CHECK(val, name)
+	if (!val) { 
+     		SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, 
+		#name " is null"); 
+		return 0; 
+	}
+%enddef
+
+%define WT_CLASS(type, class, name, closeHandler)
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
@@ -105,8 +148,26 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
  * and we use consecutive argument matching of typemaps to convert two args to
  * one.
  */
-%define WT_CLASS(type, class, name)
-%typemap(in, numinputs=0) type *name "$1 = *(type **)&jarg1;"
+%typemap(in, numinputs=0) type *name {
+	$1 = *(type **)&jarg1;
+	NULL_CHECK($1, $1_name)
+}
+
+%typemap(in, numinputs=0) class ## _CLOSED *name {
+	$1 = *(type **)&jarg1;
+	NULL_CHECK($1, $1_name)
+	closeHandler;
+}
+
+%typemap(in) class ## _NULLABLE * {
+	$1 = *(type **)&$input;
+}
+
+%typemap(in) type * {
+	$1 = *(type **)&$input;
+	NULL_CHECK($1, $1_name)
+}
+
 %typemap(javaimports) type "
 /**
   * @copydoc class
@@ -126,9 +187,9 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
  */
 %}
 
-WT_CLASS(struct __wt_connection, WT_CONNECTION, connection)
-WT_CLASS(struct __wt_session, WT_SESSION, session)
-WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor)
+WT_CLASS(struct __wt_connection, WT_CONNECTION, connection, connCloseHandler($1))
+WT_CLASS(struct __wt_session, WT_SESSION, session, sessionCloseHandler($1))
+WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor, cursorCloseHandler($1))
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
 %javamethodmodifiers SIGNATURE_CLASS::METHOD "
@@ -168,6 +229,103 @@ WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor)
 %javaconst(1);
 %inline %{
 enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
+%}
+
+%wrapper %{
+/* Zero out SWIG's pointer to the C object,
+ * equivalent to 'jobj.swigCPtr = 0;' in java.
+ */
+static int
+javaClose(JAVA_CALLBACK *jcb, jfieldID *pfid)
+{
+	jclass cls;
+	jfieldID fid;
+	JNIEnv *env;
+
+	env = jcb->jnienv;
+
+	if (pfid == NULL || *pfid == NULL) {
+		cls = (*env)->GetObjectClass(env, jcb->jobj);
+		*pfid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
+		if (pfid != NULL)
+			*pfid = fid;
+	}
+	(*env)->SetLongField(env, jcb->jobj, *pfid, 0L);
+	(*env)->DeleteGlobalRef(env, jcb->jobj);
+	return (0);
+}
+
+/* Connection specific close handler. */
+static int
+connCloseHandler(WT_CONNECTION *conn_arg)
+{
+	int ret;
+	JAVA_CALLBACK *jcb;
+	WT_CONNECTION_IMPL *conn;
+
+	conn = (WT_CONNECTION_IMPL *)conn_arg;
+	jcb = (JAVA_CALLBACK *)conn->lang_private;
+	conn->lang_private = NULL;
+	ret = javaClose(jcb, NULL);
+	__wt_free(conn->default_session, jcb);
+
+	return (0);
+}
+
+/* Session specific close handler. */
+static int
+sessionCloseHandler(WT_SESSION *session_arg)
+{
+	int ret;
+	JAVA_CALLBACK *jcb;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)session_arg;
+	jcb = (JAVA_CALLBACK *)session->lang_private;
+	session->lang_private = NULL;
+	ret = javaClose(jcb, NULL);
+	__wt_free(session, jcb);
+
+	return (ret);
+}
+
+/* Cursor specific close handler. */
+static int
+cursorCloseHandler(WT_CURSOR *cursor)
+{
+	int ret;
+	JAVA_CALLBACK *jcb;
+	JAVA_CALLBACK *sess_jcb;
+
+	static jfieldID ccp_fid = NULL;     /* cursor cptr fid, computed once */
+
+	jcb = (JAVA_CALLBACK *)cursor->lang_private;
+	sess_jcb = (JAVA_CALLBACK *)
+	    ((WT_SESSION_IMPL *)cursor->session)->lang_private;
+	cursor->lang_private = NULL;
+	ret = javaClose(jcb, &sess_jcb->fid);
+	__wt_free((WT_SESSION_IMPL *)cursor->session, jcb);
+
+	return (ret);
+}
+
+/* Add event handler support. */
+static int
+javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
+	WT_CURSOR *cursor)
+{
+	int ret;
+
+	WT_UNUSED(handler);
+
+	if (cursor != NULL)
+		ret = cursorCloseHandler(cursor);
+	else
+		ret = sessionCloseHandler(session);
+	return (ret);
+}
+
+WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 %}
 
 %extend __wt_cursor {
@@ -237,6 +395,14 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 		return cmp;
 	}
+
+	%javamethodmodifiers java_init "protected";
+	int java_init(jobject jcursor) {
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
+		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jcursor);
+		JCALL1(DeleteLocalRef, jcb->jnienv, jcursor);
+		return (0);
+	}
 }
 
 /* Cache key/value formats in Cursor */
@@ -257,6 +423,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
    valueFormat = getValue_format();
    keyPacker = new PackOutputStream(keyFormat);
    valuePacker = new PackOutputStream(valueFormat);
+   wiredtigerJNI.Cursor_java_init(swigCPtr, this, this);
  }
 
  protected static long getCPtr($javaclassname obj) {
@@ -784,14 +951,63 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
 
+%define TRACKED_CLASS(jclassname, ctypename, java_init_fcn, implclass)
+%ignore jclassname::jclassname();
+
+%typemap(javabody) struct ctypename %{
+ private long swigCPtr;
+ protected boolean swigCMemOwn;
+
+ protected $javaclassname(long cPtr, boolean cMemoryOwn) {
+   swigCMemOwn = cMemoryOwn;
+   swigCPtr = cPtr;
+   java_init_fcn(swigCPtr, this, this);
+ }
+
+ protected static long getCPtr($javaclassname obj) {
+   return (obj == null) ? 0 : obj.swigCPtr;
+ }
+%}
+
+%extend ctypename {
+	%javamethodmodifiers java_init "protected";
+	int java_init(jobject jsess) {
+		implclass *session = (implclass *)$self;
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)session->lang_private;
+		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jsess);
+		JCALL1(DeleteLocalRef, jcb->jnienv, jsess);
+		return (0);
+	}
+}
+%enddef
+
+TRACKED_CLASS(Session, __wt_session, wiredtigerJNI.Session_java_init, WT_SESSION_IMPL)
+TRACKED_CLASS(Connection, __wt_connection, wiredtigerJNI.Connection_java_init, WT_CONNECTION_IMPL)
+/* Note: Cursor incorporates the elements of TRACKED_CLASS into its
+ * custom constructor and %extend clause.
+ */
+
 %include "wiredtiger.h"
 
 /* Return new connections, sessions and cursors. */
 %inline {
 WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *config) {
+	extern WT_EVENT_HANDLER javaApiEventHandler;
 	WT_CONNECTION *conn = NULL;
+	WT_CONNECTION_IMPL *connimpl;
+	JAVA_CALLBACK *jcb;
 	int ret;
-	if ((ret = wiredtiger_open(home, NULL, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(home, &javaApiEventHandler, config, &conn)) != 0)
+		goto err;
+
+	connimpl = (WT_CONNECTION_IMPL *)conn;
+	if ((ret = __wt_calloc_def(connimpl->default_session, 1, &jcb)) != 0)
+		goto err;
+
+	jcb->jnienv = jenv;
+	connimpl->lang_private = jcb;
+
+err:	if (ret != 0)
 		throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 	return conn;
 }
@@ -799,22 +1015,48 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 
 %extend __wt_connection {
 	WT_SESSION *open_session_wrap(JNIEnv *jenv, const char *config) {
+		extern WT_EVENT_HANDLER javaApiEventHandler;
 		WT_SESSION *session = NULL;
+		WT_SESSION_IMPL *sessionimpl;
+		JAVA_CALLBACK *jcb;
 		int ret;
-		if ((ret = $self->open_session($self, NULL, config, &session)) != 0)
+
+		if ((ret = $self->open_session($self, &javaApiEventHandler, config, &session)) != 0)
+			goto err;
+
+		sessionimpl = (WT_SESSION_IMPL *)session;
+		if ((ret = __wt_calloc_def(sessionimpl, 1, &jcb)) != 0)
+			goto err;
+
+		jcb->jnienv = jenv;
+		sessionimpl->lang_private = jcb;
+
+err:		if (ret != 0)
 			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 		return session;
 	}
 }
 
 %extend __wt_session {
-	WT_CURSOR *open_cursor_wrap(JNIEnv *jenv, const char *uri, WT_CURSOR *to_dup, const char *config) {
+	WT_CURSOR *open_cursor_wrap(JNIEnv *jenv, const char *uri, WT_CURSOR_NULLABLE *to_dup, const char *config) {
 		WT_CURSOR *cursor = NULL;
+		JAVA_CALLBACK *jcb;
 		int ret;
+
 		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
+			goto err;
+
+		cursor->flags |= WT_CURSTD_RAW;
+
+		if ((ret = __wt_calloc_def((WT_SESSION_IMPL *)cursor->session,
+			    1, &jcb)) != 0)
+			goto err;
+
+		jcb->jnienv = jenv;
+		cursor->lang_private = jcb;
+
+err:		if (ret != 0)
 			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
-		else
-			cursor->flags |= WT_CURSTD_RAW;
 		return cursor;
 	}
 }

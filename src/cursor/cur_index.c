@@ -303,6 +303,10 @@ err:	API_END(session);
 	return (ret);
 }
 
+/*
+ * __curindex_open_colgroups --
+ *	Open cursors on the column groups required for an index cursor.
+ */
 static int
 __curindex_open_colgroups(
     WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg_arg[])

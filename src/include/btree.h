@@ -66,6 +66,8 @@ struct __wt_btree {
 					/* Row-store comparison function */
 	WT_COLLATOR *collator;		/* Comparison function */
 
+	uint32_t id;			/* File ID, for logging */
+
 	uint32_t key_gap;		/* Row-store prefix key gap */
 
 	uint32_t allocsize;		/* Allocation size */

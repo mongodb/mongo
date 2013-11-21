@@ -223,7 +223,7 @@ __wt_lsm_tree_setup_chunk(
 }
 
 /*
- * __wt_lsm_start_worker --
+ * __lsm_tree_start_worker --
  *	Start the worker thread for an LSM tree.
  */
 static int
@@ -526,7 +526,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __lsm_tree_throttle --
+ * __wt_lsm_tree_throttle --
  *	Calculate whether LSM updates need to be throttled.
  */
 void

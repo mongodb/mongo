@@ -66,7 +66,7 @@ __wt_spin_lock_register(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_statlog_spinlock_dump --
+ * __wt_statlog_dump_spinlock --
  *	Log the spin-lock statistics.
  */
 int

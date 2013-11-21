@@ -77,7 +77,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
-	WT_TRET(__wt_logmgr_destroy(conn));
 	WT_TRET(__wt_checkpoint_destroy(conn));
 	WT_TRET(__wt_statlog_destroy(conn));
 
@@ -86,6 +85,17 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(conn));
+
+	/*
+	 * Now that all data handles are closed, tell logging that a checkpoint
+	 * has completed then shut down the log manager (only after closing
+	 * data handles).
+	 */
+	if (conn->logging) {
+		WT_TRET(__wt_txn_checkpoint_log(
+		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
+		WT_TRET(__wt_logmgr_destroy(conn));
+	}
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)

@@ -36,7 +36,8 @@ for line in open(f, 'r'):
 
 	m = cfunc_re.match(line)
 	if m:
-		tfile.write('COPYDOC(__' + curr_class.lower() + ', ' + curr_class.upper() + ', ' + m.group(1) + ')\n')
+		tfile.write('COPYDOC(__' + curr_class.lower() + ', ' +
+                curr_class.upper() + ', ' + m.group(1) + ')\n')
 
 tfile.close()
 compare_srcfile(tmp_file, o)

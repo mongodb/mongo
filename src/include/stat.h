@@ -162,6 +162,8 @@ struct __wt_connection_stats {
 	WT_STATS dh_sweep_evict;
 	WT_STATS dh_sweeps;
 	WT_STATS file_open;
+	WT_STATS log_buffer_grow;
+	WT_STATS log_buffer_size;
 	WT_STATS log_bytes_user;
 	WT_STATS log_bytes_written;
 	WT_STATS log_max_filesize;
@@ -173,7 +175,11 @@ struct __wt_connection_stats {
 	WT_STATS log_slot_consolidated;
 	WT_STATS log_slot_joins;
 	WT_STATS log_slot_races;
+	WT_STATS log_slot_ready_wait_timeout;
+	WT_STATS log_slot_release_wait_timeout;
+	WT_STATS log_slot_switch_fails;
 	WT_STATS log_slot_toobig;
+	WT_STATS log_slot_toosmall;
 	WT_STATS log_slot_transitions;
 	WT_STATS log_sync;
 	WT_STATS log_writes;

@@ -46,6 +46,10 @@ __wt_direct_io_size_check(WT_SESSION_IMPL *session,
 	return (0);
 }
 
+/*
+ * __create_file --
+ *	Create a new 'file:' object.
+ */
 static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
@@ -84,13 +88,15 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
 	/*
-	 * If creating an ordinary file, append the current version numbers to
-	 * the passed-in configuration and insert the resulting configuration
-	 * into the metadata.
+	 * If creating an ordinary file, append the file ID and current version
+	 * numbers to the passed-in configuration and insert the resulting
+	 * configuration into the metadata.
 	 */
 	if (!is_metadata) {
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
-		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
+		WT_ERR(__wt_buf_fmt(session, val,
+		    "id=%" PRIu32 ",version=(major=%d,minor=%d)",
+		    ++S2C(session)->next_file_id,
 		    WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
 		for (p = filecfg; *p != NULL; ++p)
 			;
@@ -120,6 +126,10 @@ err:	__wt_scr_free(&val);
 	return (ret);
 }
 
+/*
+ * __wt_schema_colgroup_source --
+ *	Get the URI of the data source for a column group.
+ */
 int
 __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
     WT_TABLE *table, const char *cgname, const char *config, WT_ITEM *buf)
@@ -152,6 +162,10 @@ __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
 	return (0);
 }
 
+/*
+ * __create_colgroup --
+ *	Create a column group.
+ */
 static int
 __create_colgroup(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
@@ -257,6 +271,10 @@ err:	__wt_free(session, cgconf);
 	return (ret);
 }
 
+/*
+ * __wt_schema_index_source --
+ *	Get the URI of the data source for an index.
+ */
 int
 __wt_schema_index_source(WT_SESSION_IMPL *session,
     WT_TABLE *table, const char *idxname, const char *config, WT_ITEM *buf)
@@ -285,6 +303,10 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 	return (0);
 }
 
+/*
+ * __create_index --
+ *	Create an index.
+ */
 static int
 __create_index(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
@@ -415,6 +437,10 @@ err:	__wt_free(session, idxconf);
 	return (ret);
 }
 
+/*
+ * __create_table --
+ *	Create a table.
+ */
 static int
 __create_table(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
@@ -488,6 +514,10 @@ err:		if (table != NULL) {
 	return (ret);
 }
 
+/*
+ * __create_data_source --
+ *	Create a custom data source.
+ */
 static int
 __create_data_source(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_DATA_SOURCE *dsrc)
@@ -517,6 +547,10 @@ __create_data_source(WT_SESSION_IMPL *session,
 	return (dsrc->create(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg));
 }
 
+/*
+ * __wt_schema_create --
+ *	Process a WT_SESSION::create operation for all supported types.
+ */
 int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *uri, const char *config)

@@ -296,7 +296,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn->mod_count = txn->modref_count = 0;
+	txn->mod_count = 0;
 	txn->notify = NULL;
 
 	txn_global = &S2C(session)->txn_global;
@@ -327,7 +327,10 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_OP *op;
+	u_int i;
 
 	WT_UNUSED(cfg);
 
@@ -339,8 +342,29 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Commit notification. */
 	if (txn->notify != NULL)
-		WT_RET(txn->notify->notify(txn->notify, (WT_SESSION *)session,
-		    txn->id, 1));
+		WT_TRET(txn->notify->notify(txn->notify,
+		    (WT_SESSION *)session, txn->id, 1));
+
+	/* If we are logging, write a commit log record. */
+	if (ret == 0 &&
+	    txn->mod_count > 0 && S2C(session)->logging &&
+	    !F_ISSET(session, WT_SESSION_LOGGING_DISABLED))
+		ret = __wt_txn_log_commit(session, cfg);
+
+	/*
+	 * If anything went wrong, roll back.
+	 *
+	 * !!!
+	 * Nothing can fail after this point.
+	 */
+	if (ret != 0) {
+		WT_TRET(__wt_txn_rollback(session, cfg));
+		return (ret);
+	}
+
+	/* Free memory associated with updates. */
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+		__wt_txn_op_free(session, op);
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
@@ -364,9 +388,8 @@ int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DECL_RET;
-	WT_REF **rp;
 	WT_TXN *txn;
-	uint64_t **m;
+	WT_TXN_OP *op;
 	u_int i;
 
 	WT_UNUSED(cfg);
@@ -381,12 +404,29 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		    txn->id, 0));
 
 	/* Rollback updates. */
-	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
-		**m = WT_TXN_ABORTED;
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
+		switch (op->type) {
+		case TXN_OP_BASIC:
+		case TXN_OP_INMEM:
+			op->u.op.upd->txnid = WT_TXN_ABORTED;
+			break;
+		case TXN_OP_REF:
+			__wt_tree_walk_delete_rollback(op->u.ref);
+			break;
+		case TXN_OP_TRUNCATE_COL:
+		case TXN_OP_TRUNCATE_ROW:
+			/*
+			 * Nothing to do: these operations are only logged for
+			 * recovery.  The in-memory changes will be rolled back
+			 * with a combination of TXN_OP_REF and TXN_OP_INMEM
+			 * operations.
+			 */
+			break;
+		}
 
-	/* Rollback fast deletes. */
-	for (i = 0, rp = txn->modref; i < txn->modref_count; i++, rp++)
-		__wt_tree_walk_delete_rollback(*rp);
+		/* Free any memory allocated for the operation. */
+		__wt_txn_op_free(session, op);
+	}
 
 	__wt_txn_release(session);
 	return (ret);
@@ -412,7 +452,6 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	 * for eviction.
 	 */
 	txn->mod = NULL;
-	txn->modref = NULL;
 
 	txn->isolation = session->isolation;
 	return (0);
@@ -429,7 +468,6 @@ __wt_txn_destroy(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 	__wt_free(session, txn->mod);
-	__wt_free(session, txn->modref);
 	__wt_free(session, txn->snapshot);
 }
 
