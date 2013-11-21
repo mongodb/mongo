@@ -32,61 +32,81 @@
 
 namespace mongo {
 
-    const WorkingSetID WorkingSet::INVALID_ID = -1;
+    WorkingSet::MemberHolder::MemberHolder() : flagged(false), member(NULL) { }
+    WorkingSet::MemberHolder::~MemberHolder() {}
 
-    WorkingSet::WorkingSet() : _nextId(0) { }
+    WorkingSet::WorkingSet() : _freeList(INVALID_ID) { }
 
     WorkingSet::~WorkingSet() {
-        for (DataMap::const_iterator i = _data.begin(); i != _data.end(); ++i) {
-            delete i->second;
+        for (size_t i = 0; i < _data.size(); i++) {
+            delete _data[i].member;
         }
     }
 
     WorkingSetID WorkingSet::allocate() {
-        verify(_data.end() == _data.find(_nextId));
-        _data[_nextId] = new WorkingSetMember();
-        return _nextId++;
-    }
+        if (_freeList == INVALID_ID) {
+            // The free list is empty so we need to make a single new WSM to return. This relies on
+            // vector::resize being amortized O(1) for efficient allocation. Note that the free list
+            // remains empty until something is returned by a call to free().
+            WorkingSetID id = _data.size();
+            _data.resize(_data.size() + 1);
+            _data.back().nextFreeOrSelf = id;
+            _data.back().member = new WorkingSetMember();
+            return id;
+        }
 
-    WorkingSetMember* WorkingSet::get(const WorkingSetID& i) {
-        DataMap::iterator it = _data.find(i);
-        verify(_data.end() != it);
-        return it->second;
+        // Pop the head off the free list and return it.
+        WorkingSetID id = _freeList;
+        _freeList = _data[id].nextFreeOrSelf;
+        _data[id].nextFreeOrSelf = id; // set to self to mark as in-use
+        return id;
     }
 
     void WorkingSet::free(const WorkingSetID& i) {
-        DataMap::iterator it = _data.find(i);
-        verify(_data.end() != it);
-        delete it->second;
-        _data.erase(it);
+        MemberHolder& holder = _data[i];
+        verify(i < _data.size()); // ID has been allocated.
+        verify(holder.nextFreeOrSelf == i); // ID currently in use.
 
-        unordered_set<WorkingSetID>::iterator flagIt = _flagged.find(i);
-        if (_flagged.end() != flagIt) {
-            _flagged.erase(flagIt);
-        }
+        // Free resources and push this WSM to the head of the freelist.
+        holder.member->clear();
+        holder.nextFreeOrSelf = _freeList;
+        _freeList = i;
     }
 
     void WorkingSet::flagForReview(const WorkingSetID& i) {
         WorkingSetMember* member = get(i);
         verify(WorkingSetMember::OWNED_OBJ == member->state);
-        _flagged.insert(i);
+        _data[i].flagged = true;
     }
 
-    const unordered_set<WorkingSetID>& WorkingSet::getFlagged() const {
-        return _flagged;
+    unordered_set<WorkingSetID> WorkingSet::getFlagged() const {
+        // This is slow, but it is only for tests.
+        unordered_set<WorkingSetID> out;
+        for (size_t i = 0; i < _data.size(); i++) {
+            if (_data[i].flagged) {
+                out.insert(i);
+            }
+        }
+        return out;
     }
 
     bool WorkingSet::isFlagged(WorkingSetID id) const {
-        return _flagged.end() != _flagged.find(id);
+        verify(id < _data.size());
+        return _data[id].flagged;
     }
 
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
 
-    WorkingSetMember::~WorkingSetMember() {
-        unordered_map<size_t, WorkingSetComputedData*>::const_iterator it;
-        for (it = _computed.begin(); it != _computed.end(); it++) {
-            delete it->second;
+    WorkingSetMember::~WorkingSetMember() { }
+
+    void WorkingSetMember::clear() {
+        for (size_t i = 0; i < WSM_COMPUTED_NUM_TYPES; i++) {
+            _computed[i].reset();
         }
+
+        keyData.clear();
+        obj = BSONObj();
+        state = WorkingSetMember::INVALID;
     }
 
     bool WorkingSetMember::hasLoc() const {
@@ -106,18 +126,17 @@ namespace mongo {
     }
 
     bool WorkingSetMember::hasComputed(const WorkingSetComputedDataType type) const {
-        return _computed.end() != _computed.find(type);
+        return _computed[type];
     }
 
     const WorkingSetComputedData* WorkingSetMember::getComputed(const WorkingSetComputedDataType type) const {
-        unordered_map<size_t, WorkingSetComputedData*>::const_iterator it = _computed.find(type);
-        verify(_computed.end() != it);
-        return it->second;
+        verify(_computed[type]);
+        return _computed[type].get();
     }
 
     void WorkingSetMember::addComputed(WorkingSetComputedData* data) {
         verify(!hasComputed(data->type()));
-        _computed[data->type()] = data;
+        _computed[data->type()].reset(data);
     }
 
     bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {
