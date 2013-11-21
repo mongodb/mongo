@@ -74,10 +74,11 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 /*
  * Helper to a cursor if this operation is to be applied during recovery.
  */
-#define	GET_RECOVERY_CURSOR(s, r, lsnp, fileid, cp)			\
-	WT_ERR(__recovery_cursor((s), (r), (lsnp), (fileid), 0, (cp)));	\
-	WT_VERBOSE_ERR(session, recovery,				\
-	    "%s op %d to file %d at LSN %u/%" PRIuMAX,		\
+#define	GET_RECOVERY_CURSOR(session, r, lsnp, fileid, cp)		\
+	WT_ERR(__recovery_cursor(					\
+	    (session), (r), (lsnp), (fileid), 0, (cp)));		\
+	WT_VERBOSE_ERR((session), recovery,				\
+	    "%s op %d to file %d at LSN %u/%" PRIuMAX,			\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
 	    optype, fileid, lsnp->file, (uintmax_t)lsnp->offset);	\
 	if (cursor == NULL)						\
