@@ -221,9 +221,10 @@ namespace mongo {
             // Go field by field.
             if (_includeID) {
                 BSONElement elt;
-                member->getFieldDotted("_id", &elt);
-                verify(!elt.eoo());
-                bob.appendAs(elt, "_id");
+                // Sometimes the _id field doesn't exist...
+                if (member->getFieldDotted("_id", &elt) && !elt.eoo()) {
+                    bob.appendAs(elt, "_id");
+                }
             }
 
             BSONObjIterator it(_source);
