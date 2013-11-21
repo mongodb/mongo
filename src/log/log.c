@@ -1085,7 +1085,7 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	va_end(ap_copy);
 
 	WT_RET(
-	    __wt_logrec_alloc(session, sizeof (WT_LOG_RECORD) + len, &logrec));
+	    __wt_logrec_alloc(session, sizeof(WT_LOG_RECORD) + len, &logrec));
 
 	/*
 	 * We're writing a record with the type (an integer) followed by a

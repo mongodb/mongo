@@ -58,7 +58,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    TXN_OP_INMEM : TXN_OP_BASIC;
-	/* If we are logging, logging, we need a reference to the key. */
+	/* If we are logging, we need a reference to the key. */
 	if (cbt->btree->type == BTREE_ROW && S2C(session)->logging)
 		WT_ERR(__wt_row_key_get(cbt, &op->u.op.key));
 	op->u.op.ins = cbt->ins;
