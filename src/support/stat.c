@@ -114,8 +114,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "reconciliation failed because an update could not be included";
 	stats->rec_split_internal.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
-	stats->rec_split_max.desc =
-	    "reconciliation maximum number of splits created for a page";
+	stats->rec_split_max.desc = "reconciliation maximum splits for a page";
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
@@ -364,10 +363,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
-	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
+	stats->dh_sweeps.desc = "dhandle: sweep attempts";
 	stats->file_open.desc = "files currently open";
-	stats->log_buffer_grow.desc =
-	    "log: number of times the log buffer size increased";
+	stats->log_buffer_grow.desc = "log: log buffer size increases";
 	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc = "log: user provided log bytes written";
 	stats->log_bytes_written.desc = "log: log bytes written";
@@ -386,7 +384,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_release_wait_timeout.desc =
 	    "log: log slot release wait timeouts";
 	stats->log_slot_switch_fails.desc =
-	    "log: number of slots selected for switching that were not available";
+	    "log: slots selected for switching that were unavailable";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_slot_toosmall.desc =
 	    "log: failed to find a slot large enough for record";

@@ -2499,11 +2499,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_DH_SESSION_HANDLES			1041
 /*! dhandle: sweeps conflicting with evict */
 #define	WT_STAT_CONN_DH_SWEEP_EVICT			1042
-/*! dhandle: number of sweep attempts */
+/*! dhandle: sweep attempts */
 #define	WT_STAT_CONN_DH_SWEEPS				1043
 /*! files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				1044
-/*! log: number of times the log buffer size increased */
+/*! log: log buffer size increases */
 #define	WT_STAT_CONN_LOG_BUFFER_GROW			1045
 /*! log: total log buffer size */
 #define	WT_STAT_CONN_LOG_BUFFER_SIZE			1046
@@ -2533,7 +2533,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SLOT_READY_WAIT_TIMEOUT	1058
 /*! log: log slot release wait timeouts */
 #define	WT_STAT_CONN_LOG_SLOT_RELEASE_WAIT_TIMEOUT	1059
-/*! log: number of slots selected for switching that were not available */
+/*! log: slots selected for switching that were unavailable */
 #define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1060
 /*! log: record size exceeded maximum */
 #define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1061
@@ -2751,7 +2751,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2080
 /*! reconciliation leaf pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			2081
-/*! reconciliation maximum number of splits created for a page */
+/*! reconciliation maximum splits for a page */
 #define	WT_STAT_DSRC_REC_SPLIT_MAX			2082
 /*! object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			2083

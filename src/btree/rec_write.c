@@ -568,7 +568,7 @@ __rec_write_init(
 }
 
 /*
- * __wt_rec_destroy --
+ * __rec_destroy --
  *	Clean up the reconciliation structure.
  */
 static void

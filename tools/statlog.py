@@ -69,7 +69,7 @@ no_scale_per_second_list = [
     'overflow values cached in memory',
     'chunks in the LSM tree',
     'highest merge generation in the LSM tree',
-    'reconciliation maximum number of splits created for a page',
+    'reconciliation maximum splits for a page',
     'open cursor count',
 ]
 # no scale-per-second list section: END
