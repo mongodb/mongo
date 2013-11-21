@@ -522,7 +522,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		log->sync_lsn = slot->slot_end_lsn;
 	}
 	log->write_lsn = slot->slot_end_lsn;
-	__wt_cond_signal(session, log->log_release_cond);
+	WT_ERR(__wt_cond_signal(session, log->log_release_cond));
 	if (F_ISSET(slot, SLOT_BUF_GROW)) {
 		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
 		F_CLR(slot, SLOT_BUF_GROW);
