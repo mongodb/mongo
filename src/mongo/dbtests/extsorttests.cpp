@@ -20,7 +20,7 @@
 
 #include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_based_builder.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/temp_dir.h"
@@ -297,10 +297,14 @@ namespace ExtSortTests {
             _client.createCollection( _ns );
             // Take a write lock.
             Client::WriteContext ctx( _ns );
+            Collection* coll = ctx.ctx().db()->getCollection( _ns );
             // Do a write to ensure the implementation will interrupt sort() even after a write has
             // occurred.
-            BSONObj newDoc;
-            theDataFileMgr.insertWithObjMod( _ns, newDoc );
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID( "_id", &id );
+            coll->insertDocument( b.obj(), true );
             // Create a sorter with a max file size of only 10k, to trigger a file flush after a
             // relatively small number of inserts.
             auto_ptr<ExternalSortComparison> cmp(BtreeBasedBuilder::getComparison(0,
@@ -341,10 +345,14 @@ namespace ExtSortTests {
             _client.createCollection( _ns );
             // Take a write lock.
             Client::WriteContext ctx( _ns );
+            Collection* coll = ctx.ctx().db()->getCollection( _ns );
             // Do a write to ensure the implementation will interrupt sort() even after a write has
             // occurred.
-            BSONObj newDoc;
-            theDataFileMgr.insertWithObjMod( _ns, newDoc );
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID( "_id", &id );
+            coll->insertDocument( b.obj(), true );
             // Create a sorter.
             BSONObjExternalSorter sorter(_aFirstSort);
             // Add keys to the sorter.
