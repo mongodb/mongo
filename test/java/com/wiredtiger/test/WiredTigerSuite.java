@@ -31,6 +31,7 @@ import org.junit.runners.Suite;
 
 @RunWith(Suite.class)
 @Suite.SuiteClasses( {
+    AutoCloseTest.class,
     CursorTest.class,
     CursorTest02.class,
     PackTest.class

@@ -80,6 +80,18 @@ struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
+#if defined(SWIGJAVA)
+#define WT_HANDLE_NULLABLE(typename)	typename##_NULLABLE
+#define WT_HANDLE_CLOSED(typename)	typename##_CLOSED
+typedef WT_CURSOR			WT_CURSOR_NULLABLE;
+typedef WT_CURSOR			WT_CURSOR_CLOSED;
+typedef WT_SESSION			WT_SESSION_CLOSED;
+typedef WT_CONNECTION			WT_CONNECTION_CLOSED;
+#elif !defined(DOXYGEN)
+#define WT_HANDLE_NULLABLE(typename)	typename
+#define WT_HANDLE_CLOSED(typename)	typename
+#endif
+
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
  * a length (limited to 4GB for items stored in tables).  WT_ITEM structures do
@@ -459,7 +471,7 @@ struct __wt_cursor {
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
-	int __F(close)(WT_CURSOR *cursor);
+	int __F(close)(WT_HANDLE_CLOSED(WT_CURSOR) *cursor);
 
 	/*
 	 * Protected fields, only to be used by cursor implementations.
@@ -477,6 +489,8 @@ struct __wt_cursor {
 
 	uint64_t recno;			/* Record number, normal and raw mode */
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
+
+	void	*lang_private;		/* Language specific private storage */
 
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
@@ -523,7 +537,8 @@ struct __wt_session {
 	 * @configempty{session.close, see dist/api_data.py}
 	 * @errors
 	 */
-	int __F(close)(WT_SESSION *session, const char *config);
+	int __F(close)(WT_HANDLE_CLOSED(WT_SESSION) *session,
+	    const char *config);
 
 	/*!
 	 * Reconfigure a session handle.
@@ -689,7 +704,7 @@ struct __wt_session {
 	 * @errors
 	 */
 	int __F(open_cursor)(WT_SESSION *session,
-	    const char *uri, WT_CURSOR *to_dup,
+	    const char *uri, WT_HANDLE_NULLABLE(WT_CURSOR) *to_dup,
 	    const char *config, WT_CURSOR **cursorp);
 	/*! @} */
 
@@ -975,7 +990,9 @@ struct __wt_session {
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
-	    WT_CURSOR *start, WT_CURSOR *stop, const char *config);
+	    WT_HANDLE_NULLABLE(WT_CURSOR) *start,
+	    WT_HANDLE_NULLABLE(WT_CURSOR) *stop,
+	    const char *config);
 
 	/*!
 	 * Upgrade a file or table.
@@ -1148,7 +1165,8 @@ struct __wt_connection {
 	 * @configempty{connection.close, see dist/api_data.py}
 	 * @errors
 	 */
-	int __F(close)(WT_CONNECTION *connection, const char *config);
+	int __F(close)(WT_HANDLE_CLOSED(WT_CONNECTION) *connection,
+	    const char *config);
 
 	/*!
 	 * Reconfigure a connection handle.
