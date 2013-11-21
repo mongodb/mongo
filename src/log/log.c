@@ -715,6 +715,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	conn = S2C(session);
 	log = conn->log;
 	log_fh = NULL;
+	logcount = 0;
 	logfiles = NULL;
 	WT_CLEAR(buf);
 
