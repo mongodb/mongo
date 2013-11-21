@@ -64,13 +64,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': -Infinity, '': 1}"), true, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLteNumberMin) {
@@ -78,13 +78,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << negativeInfinity << "" << numberMin), true, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLteNegativeInfinity) {
@@ -92,13 +92,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': -Infinity, '': -Infinity}"), true, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNumber) {
@@ -106,13 +106,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': -Infinity, '': 1}"), true, false)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNumberMin) {
@@ -120,13 +120,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << negativeInfinity << "" << numberMin), true, false)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNegativeInfinity) {
@@ -134,11 +134,11 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumber) {
@@ -146,13 +146,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': 1, '': Infinity}"), false, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumberMax) {
@@ -160,13 +160,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << numberMax << "" << positiveInfinity), false, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtPositiveInfinity) {
@@ -174,11 +174,11 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumber) {
@@ -186,13 +186,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': 1, '': Infinity}"), true, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumberMax) {
@@ -200,13 +200,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << numberMax << "" << positiveInfinity), true, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtePositiveInfinity) {
@@ -214,13 +214,13 @@ namespace {
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
-        bool exact;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &exact);
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': Infinity, '': Infinity}"), true, true)));
-        ASSERT(exact);
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
 }  // namespace

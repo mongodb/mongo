@@ -42,9 +42,10 @@
 
 namespace mongo {
 
-    string IndexBoundsBuilder::simpleRegex(const char* regex, const char* flags, bool* exact) {
+    string IndexBoundsBuilder::simpleRegex(const char* regex, const char* flags,
+                                           BoundsTightness* tightnessOut) {
         string r = "";
-        *exact = false;
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
 
         bool multilineOK;
         if ( regex[0] == '\\' && regex[1] == 'A') {
@@ -138,7 +139,7 @@ namespace mongo {
 
         if ( r.empty() && *regex == 0 ) {
             r = ss.str();
-            *exact = !r.empty();
+            *tightnessOut = r.empty() ? IndexBoundsBuilder::INEXACT_FETCH : IndexBoundsBuilder::EXACT;
         }
 
         return r;
@@ -178,17 +179,17 @@ namespace mongo {
 
     // static
     void IndexBoundsBuilder::translateAndIntersect(const MatchExpression* expr, const BSONElement& elt,
-                                                   OrderedIntervalList* oilOut, bool* exactOut) {
+                                                   OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
         OrderedIntervalList arg;
-        translate(expr, elt, &arg, exactOut);
+        translate(expr, elt, &arg, tightnessOut);
         // translate outputs arg in sorted order.  intersectize assumes that its arguments are sorted.
         intersectize(arg, oilOut);
     }
 
     // static
     void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
-                                               OrderedIntervalList* oilOut, bool* exactOut) {
-        translate(expr, elt, oilOut, exactOut);
+                                               OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
+        translate(expr, elt, oilOut, tightnessOut);
         unionize(oilOut);
     }
 
@@ -203,7 +204,7 @@ namespace mongo {
 
     // static
     void IndexBoundsBuilder::translate(const MatchExpression* expr, const BSONElement& elt,
-                                       OrderedIntervalList* oilOut, bool* exactOut) {
+                                       OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
         oilOut->name = elt.fieldName();
 
         bool isHashed = false;
@@ -218,16 +219,14 @@ namespace mongo {
 
         if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
             OrderedIntervalList acc;
-            bool exact;
-            translate(expr->getChild(0), elt, &acc, &exact);
-            if (!exact) {
-                *exactOut = false;
-            }
+            translate(expr->getChild(0), elt, &acc, tightnessOut);
+
             for (size_t i = 1; i < expr->numChildren(); ++i) {
                 OrderedIntervalList next;
-                translate(expr->getChild(i), elt, &next, &exact);
-                if (!exact) {
-                    *exactOut = false;
+                BoundsTightness tightness;
+                translate(expr->getChild(i), elt, &next, &tightness);
+                if (tightness != IndexBoundsBuilder::EXACT) {
+                    *tightnessOut = tightness;
                 }
                 intersectize(next, &acc);
             }
@@ -242,7 +241,7 @@ namespace mongo {
         }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
-            translateEquality(node->getData(), isHashed, oilOut, exactOut);
+            translateEquality(node->getData(), isHashed, oilOut, tightnessOut);
         }
         else if (MatchExpression::LTE == expr->matchType()) {
             const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
@@ -251,7 +250,7 @@ namespace mongo {
             // Everything is <= MaxKey.
             if (MaxKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
-                *exactOut = true;
+                *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
 
@@ -268,7 +267,7 @@ namespace mongo {
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
             // XXX: only exact if not (null or array)
-            *exactOut = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
         }
         else if (MatchExpression::LT == expr->matchType()) {
             const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
@@ -277,7 +276,7 @@ namespace mongo {
             // Everything is <= MaxKey.
             if (MaxKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
-                *exactOut = true;
+                *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
 
@@ -302,7 +301,7 @@ namespace mongo {
             }
 
             // XXX: only exact if not (null or array)
-            *exactOut = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
         }
         else if (MatchExpression::GT == expr->matchType()) {
             const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
@@ -311,7 +310,7 @@ namespace mongo {
             // Everything is > MinKey.
             if (MinKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
-                *exactOut = true;
+                *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
 
@@ -334,7 +333,7 @@ namespace mongo {
             }
 
             // XXX: only exact if not (null or array)
-            *exactOut = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
         }
         else if (MatchExpression::GTE == expr->matchType()) {
             const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
@@ -343,7 +342,7 @@ namespace mongo {
             // Everything is >= MinKey.
             if (MinKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
-                *exactOut = true;
+                *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
 
@@ -360,11 +359,11 @@ namespace mongo {
 
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, typeMatch(dataObj)));
             // XXX: only exact if not (null or array)
-            *exactOut = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
         }
         else if (MatchExpression::REGEX == expr->matchType()) {
             const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);
-            translateRegex(rme, oilOut, exactOut);
+            translateRegex(rme, oilOut, tightnessOut);
         }
         else if (MatchExpression::MOD == expr->matchType()) {
             BSONObjBuilder bob;
@@ -373,7 +372,7 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
-            *exactOut = false;
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
             const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
@@ -383,30 +382,29 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
-            *exactOut = false;
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else if (MatchExpression::MATCH_IN == expr->matchType()) {
             const InMatchExpression* ime = static_cast<const InMatchExpression*>(expr);
             const ArrayFilterEntries& afr = ime->getData();
 
-            *exactOut = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
 
             // Create our various intervals.
 
-            bool thisBoundExact = false;
+            IndexBoundsBuilder::BoundsTightness tightness;
             for (BSONElementSet::iterator it = afr.equalities().begin();
                  it != afr.equalities().end(); ++it) {
-
-                translateEquality(*it, isHashed, oilOut, &thisBoundExact);
-                if (!thisBoundExact) {
-                    *exactOut = false;
+                translateEquality(*it, isHashed, oilOut, &tightness);
+                if (tightness != IndexBoundsBuilder::EXACT) {
+                    *tightnessOut = tightness;
                 }
             }
 
             for (size_t i = 0; i < afr.numRegexes(); ++i) {
-                translateRegex(afr.regex(i), oilOut, &thisBoundExact);
-                if (!thisBoundExact) {
-                    *exactOut = false;
+                translateRegex(afr.regex(i), oilOut, &tightness);
+                if (tightness != IndexBoundsBuilder::EXACT) {
+                    *tightnessOut = tightness;
                 }
             }
 
@@ -428,7 +426,7 @@ namespace mongo {
 
             const S2Region& region = gme->getGeoQuery().getRegion();
             ExpressionMapping::cover2dsphere(region, oilOut);
-            *exactOut = false;
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else {
             warning() << "Planner error, trying to build bounds for expr "
@@ -613,12 +611,12 @@ namespace mongo {
 
     // static
     void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
-                                            OrderedIntervalList* oilOut, bool* exact) {
+                                            OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
 
-        const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), exact);
+        const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), tightnessOut);
 
         // QLOG() << "regex bounds start is " << start << endl;
-        // Note that 'exact' is set by simpleRegex above.
+        // Note that 'tightnessOut' is set by simpleRegex above.
         if (!start.empty()) {
             string end = start;
             end[end.size() - 1]++;
@@ -641,7 +639,7 @@ namespace mongo {
 
     // static
     void IndexBoundsBuilder::translateEquality(const BSONElement& data, bool isHashed,
-                                               OrderedIntervalList* oil, bool* exact) {
+                                               OrderedIntervalList* oil, BoundsTightness* tightnessOut) {
         // We have to copy the data out of the parse tree and stuff it into the index
         // bounds.  BSONValue will be useful here.
         BSONObj dataObj;
@@ -657,17 +655,17 @@ namespace mongo {
         if (Array == dataObj.firstElement().type()) {
             // XXX: bad
             oil->intervals.push_back(allValues());
-            *exact = false;
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else {
             verify(dataObj.isOwned());
             oil->intervals.push_back(makePointInterval(dataObj));
             // XXX: it's exact if the index isn't sparse?
             if (dataObj.firstElement().isNull() || isHashed) {
-                *exact = false;
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
             else {
-                *exact = true;
+                *tightnessOut = IndexBoundsBuilder::EXACT;
             }
         }
     }
