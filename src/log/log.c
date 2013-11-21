@@ -681,10 +681,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	cksum = logrec->checksum;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, logrec->len);
-	if (logrec->checksum != cksum) {
+	if (logrec->checksum != cksum)
 		WT_ERR_MSG(session, WT_ERROR, "log_read: Bad checksum");
-		goto err;
-	}
 	record->size = logrec->len;
 	WT_STAT_FAST_CONN_INCR(session, log_reads);
 err:
