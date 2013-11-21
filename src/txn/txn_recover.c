@@ -435,7 +435,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	conn->next_file_id = r.max_fileid;
 
 err:	modified = r.modified;
-	__recovery_free(&r);
+	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
 
