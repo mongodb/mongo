@@ -37,8 +37,6 @@ static const CONFIG default_cfg = {
 	NULL,				/* conn */
 	NULL,				/* logf */
 	NULL, NULL, NULL, NULL, NULL,	/* threads */
-	WT_PERF_INIT,			/* phase */
-	{0, 0},				/* phase_start_time */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -445,10 +443,6 @@ monitor(void *arg)
 	fprintf(fp, "time,reads,inserts,updates,checkpoints");
 #endif
 
-	/* Wait for something to happen... */
-	while (cfg->phase == WT_PERF_INIT)
-		sched_yield();
-
 	last_reads = last_inserts = last_updates = 0;
 	while (!g_stop) {
 		for (i = 0; i < cfg->sample_interval; i++) {
@@ -548,14 +542,13 @@ err:		g_error = 1;
 static int
 execute_populate(CONFIG *cfg)
 {
-	struct timeval e;
+	struct timeval start, stop;
 	double secs;
 	uint64_t last_ops;
 	uint32_t interval;
 	u_int sleepsec;
 	int elapsed, ret;
 
-	cfg->phase = WT_PERF_POPULATE;
 	lprintf(cfg, 0, 1, "Starting populate threads");
 
 	g_insert_key = 0;
@@ -563,7 +556,7 @@ execute_populate(CONFIG *cfg)
 	    cfg->populate_threads, &cfg->popthreads, populate_thread)) != 0)
 		return (ret);
 
-	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
+	assert(gettimeofday(&start, NULL) == 0);
 	for (elapsed = 0, interval = 0, last_ops = 0;
 	    g_insert_key < cfg->icount && g_error == 0;) {
 		/*
@@ -585,7 +578,7 @@ execute_populate(CONFIG *cfg)
 		    g_insert_ops - last_ops, cfg->report_interval);
 		last_ops = g_insert_ops;
 	}
-	assert(gettimeofday(&e, NULL) == 0);
+	assert(gettimeofday(&stop, NULL) == 0);
 
 	if ((ret =
 	    stop_threads(cfg, cfg->populate_threads, &cfg->popthreads)) != 0)
@@ -599,9 +592,8 @@ execute_populate(CONFIG *cfg)
 	}
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
-	secs = e.tv_sec + e.tv_usec / 1000000.0;
-	secs -= cfg->phase_start_time.tv_sec +
-	    cfg->phase_start_time.tv_usec / 1000000.0;
+	secs = stop.tv_sec + stop.tv_usec / 1000000.0;
+	secs -= start.tv_sec + start.tv_usec / 1000000.0;
 	if (secs == 0)
 		++secs;
 	lprintf(cfg, 0, 1,
@@ -614,11 +606,10 @@ execute_populate(CONFIG *cfg)
 	 */
 	if (cfg->merge_sleep) {
 		if (cfg->merge_sleep < 0)
-			sleepsec =
-			    (u_int)(e.tv_sec - cfg->phase_start_time.tv_sec);
+			sleepsec = (u_int)(stop.tv_sec - start.tv_sec);
 		else
 			sleepsec = (u_int)cfg->merge_sleep;
-		lprintf(cfg, 0, 1, "Sleep %d seconds for merging", sleepsec);
+		lprintf(cfg, 0, 1, "Sleep %u seconds for merging", sleepsec);
 		(void)sleep(sleepsec);
 	}
 	return (0);
@@ -632,7 +623,6 @@ execute_workload(CONFIG *cfg)
 	int ret, tret;
 
 	lprintf(cfg, 0, 1, "Starting worker threads");
-	cfg->phase = WT_PERF_WORKER;
 
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
@@ -664,7 +654,6 @@ execute_workload(CONFIG *cfg)
 		goto err;
 	}
 
-	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
 	for (run_time = cfg->run_time; g_error == 0;) {
 		if (cfg->report_interval == 0 ||
 		    run_time < cfg->report_interval)

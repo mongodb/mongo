@@ -67,10 +67,6 @@ typedef struct {
 	CONFIG_THREAD *ckptthreads,
 	    *ithreads, *popthreads, *rthreads, *uthreads;
 
-	enum { WT_PERF_INIT, WT_PERF_POPULATE, WT_PERF_WORKER } phase;
-
-	struct timeval phase_start_time;
-
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
