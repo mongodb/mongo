@@ -41,15 +41,20 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	WT_CURSOR *c;
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
 	    "overwrite", NULL };
+	int metadata_op;
 
 	c = NULL;
 
 	/*
+	 * Metadata operations have an id of 0.  Match operations based
+	 * on the id and the current pass of recovery for metadata.
+	 *
 	 * Only apply operations in the correct metadata phase, and if the LSN
 	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped.
 	 */
-	if (r->metadata_only != (id == 0) ||
+	metadata_op = (id == 0);
+	if (r->metadata_only != metadata_op ||
 	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
 		;
 	else if (id > r->max_fileid)
