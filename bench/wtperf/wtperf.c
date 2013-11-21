@@ -186,7 +186,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 	}
 
 	while (!g_stop) {
-		if (cfg->random_range == 0 && IS_INSERT_WORKER(wtype))
+		if (!cfg->random_range && IS_INSERT_WORKER(wtype))
 			next_val = cfg->icount + get_next_incr();
 		else
 			next_val = wtperf_rand(cfg);
@@ -246,7 +246,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 		}
 
 		/* Report errors and continue. */
-		if (op_ret == WT_NOTFOUND && cfg->random_range != 0)
+		if (op_ret == WT_NOTFOUND && cfg->random_range)
 			continue;
 
 		/*
@@ -1103,10 +1103,10 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp)
 static uint64_t
 wtperf_value_range(CONFIG *cfg)
 {
-	if (cfg->random_range == 0)
-		return (cfg->icount + g_insert_key - (cfg->insert_threads + 1));
-	else
+	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
+	else
+		return (cfg->icount + g_insert_key - (cfg->insert_threads + 1));
 }
 
 extern uint32_t __wt_random(void);

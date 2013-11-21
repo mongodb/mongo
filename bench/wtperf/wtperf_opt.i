@@ -82,28 +82,26 @@ DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
 DEF_OPT_AS_BOOL(create, 1,
-    "do population phase; set to false to use existing database")
+    "do population phase; false to use existing database")
 DEF_OPT_AS_UINT32(data_sz, 100, "data item size")
-DEF_OPT_AS_UINT32(icount, 5000, "number of records to insert")
+DEF_OPT_AS_UINT32(icount, 5000, "number of records to initially populate")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
 DEF_OPT_AS_INT(merge_sleep, 0,
     "post-populate sleep seconds for LSM merging activity (-1 for load time)")
-DEF_OPT_AS_BOOL(pareto, 0,
-    "use pareto 80/20 distribution for random numbers")
+DEF_OPT_AS_BOOL(pareto, 0, "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the populate "
     "phase, zero for auto-commit")
-DEF_OPT_AS_UINT32(populate_threads, 1, "number of populate threads")
-DEF_OPT_AS_UINT32(random_range, 0,
-    "if non-zero, use random inserts in workload, reads and updates ignore "
-    "WT_NOTFOUND")
+DEF_OPT_AS_UINT32(populate_threads, 1,
+    "number of populate threads, 1 for bulk load")
+DEF_OPT_AS_BOOL(random_range, 0, "if true, use random inserts in workload")
 DEF_OPT_AS_UINT32(read_threads, 2, "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
-    "how often to output throughput information")
-DEF_OPT_AS_UINT32(run_time, 2, "number of seconds to run workload phase")
+    "output throughput information every interval seconds, 0 to disable")
+DEF_OPT_AS_UINT32(run_time, 2, "seconds to run workload phase")
 DEF_OPT_AS_UINT32(sample_interval, 0,
     "performance logging every interval seconds, 0 to disable")
 DEF_OPT_AS_CONFIG_STRING(table_config,
