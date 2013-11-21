@@ -29,6 +29,7 @@ main(int argc, char *argv[])
 	const char *cmd_config, *config;
 
 	conn = NULL;
+	p = NULL;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -183,6 +184,9 @@ main(int argc, char *argv[])
 
 err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
+
+	if (p != NULL)
+		free(p);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
