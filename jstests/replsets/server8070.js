@@ -80,6 +80,8 @@ print("Do some writes - 2 & 3 should have up to write #75 in their buffers, but 
 for (var i = 50; i < 75; i++) {
     primary.bar.insert({x: i});
 }
+var primaryCollectionSize = primary.bar.find().itcount();
+print("primary collection size: " + primaryCollectionSize);
 var last = primary.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
 
 print("waiting a bit for the secondaries to get the write");
@@ -107,7 +109,8 @@ var fixed = function() {
                 function() {
                     var syncingTo = member3.adminCommand({replSetGetStatus:1}).syncingTo;
                     return syncingTo == getHostName()+":"+replSet.ports[1];
-                }
+                },
+                "Expected outcome: Replication member 3 did not attempt to sync from member 2"
             );
         }
     );
@@ -117,17 +120,25 @@ var fixed = function() {
 fixed();
 
 print(" --- pause 3's bgsync thread ---");
-member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'alwaysOn'});
+var rsBgSyncProduceResult3 = member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'alwaysOn'});
+assert.eq(1, rsBgSyncProduceResult3.ok, "member 3 rsBgSyncProduce admin command failed");
+
+// count documents in member 3
+assert.eq(26, member3.getSisterDB("foo").bar.find().itcount(), "collection size incorrect before applying ops 25-75");
 
 print("Allow 3 to apply ops 25-75");
-member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+var rsSyncApplyStopResult3 = member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+assert.eq(1, rsSyncApplyStopResult3.ok, "member 3 rsSyncApplyStop admin command failed");
+
 assert.soon(
     function() {
         var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1)
             .next();
-        print("primary: " + tojson(last.ts) + " secondary: " + tojson(last3.ts));
+        print("primary: " + tojson(last, '', true) + " secondary: " + tojson(last3, '', true));
+        print("member 3 collection size: " + member3.getSisterDB("foo").bar.find().itcount());
         return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i))
-    }
+    },
+    "Replication member 3 did not apply ops 25-75"
 );
 
 print(" --- start 3's bgsync thread ---");
