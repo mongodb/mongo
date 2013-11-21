@@ -59,7 +59,9 @@ namespace mongo {
         while (it.more()) {
             BSONElement e = it.next();
 
-            if (!e.isNumber()) { hasNonSimple = true; }
+            if (!e.isNumber() && !e.isBoolean()) {
+                hasNonSimple = true;
+            }
 
             if (Object == e.type()) {
                 BSONObj obj = e.embeddedObject();

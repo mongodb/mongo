@@ -109,16 +109,15 @@ env.CppUnitTest(
     ],
 )
 
-#TODO(hk): port to parsed_projection_test
-#env.CppUnitTest(
-    #target="lite_projection_test",
-    #source=[
-        #"lite_projection_test.cpp"
-    #],
-    #LIBDEPS=[
-        #"query_planner",
-    #],
-#)
+env.CppUnitTest(
+    target="parsed_projection_test",
+    source=[
+        "parsed_projection_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
 
 env.CppUnitTest(
     target="query_planner_test",
