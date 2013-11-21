@@ -236,7 +236,7 @@ namespace {
                 BSONElement child = projObj["node"];
                 if (child.eoo() || !child.isABSONObj()) { return false; }
 
-                return (spec.Obj() == pn->liteProjection->getProjectionSpec())
+                return (spec.Obj() == pn->projection)
                        && solutionMatches(child.Obj(), pn->children[0]);
             }
             else if (STAGE_SORT == trueSoln->getType()) {
