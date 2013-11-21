@@ -174,8 +174,8 @@ struct __wt_log_op_desc {
  */
 #define	WT_LOGREC_CHECKPOINT	0
 #define	WT_LOGREC_COMMIT	1
-#define	WT_LOGREC_DEBUG	2
-#define	WT_LOGREC_FILE_SYNC	3
+#define	WT_LOGREC_FILE_SYNC	2
+#define	WT_LOGREC_MESSAGE	3
 #define	WT_LOGOP_COL_PUT	0
 #define	WT_LOGOP_COL_REMOVE	1
 #define	WT_LOGOP_COL_TRUNCATE	2

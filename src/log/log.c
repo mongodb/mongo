@@ -749,6 +749,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 
 			start_lsn = *lsnp;
 		}
+
+		end_lsn = log->alloc_lsn;
 	} else {
 		/*
 		 * If logging is not configured, we can still print out the log
@@ -781,7 +783,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
 	}
-	end_lsn = log->alloc_lsn;
 	log_fh = NULL;
 	WT_ERR(__log_openfile(session, 0, &log_fh, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
@@ -863,7 +864,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			 * where we truncate the log, this is where it should
 			 * end.
 			 */
-			log->trunc_lsn = rd_lsn;
+			if (log != NULL)
+				log->trunc_lsn = rd_lsn;
 			break;
 		}
 
@@ -1066,10 +1068,12 @@ int
 __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(buf);
-	WT_LOG_RECORD *logrec;
+	WT_DECL_ITEM(logrec);
+	WT_DECL_RET;
 	va_list ap_copy;
-	size_t len;
+	const char *rec_fmt = WT_UNCHECKED_STRING(I);
+	uint32_t rectype = WT_LOGREC_MESSAGE;
+	size_t header_size, len;
 
 	conn = S2C(session);
 
@@ -1077,18 +1081,31 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 		return (0);
 
 	va_copy(ap_copy, ap);
-	len = (size_t)vsnprintf(NULL, 0, fmt, ap_copy) + sizeof(WT_LOG_RECORD);
+	len = (size_t)vsnprintf(NULL, 0, fmt, ap_copy) + 1;
 	va_end(ap_copy);
 
-	WT_RET(__wt_scr_alloc(session, 0, &buf));
-	WT_RET(__wt_buf_initsize(session, buf, len));
+	WT_RET(
+	    __wt_logrec_alloc(session, sizeof (WT_LOG_RECORD) + len, &logrec));
 
-	logrec = (WT_LOG_RECORD *)buf->mem;
-	(void)vsnprintf((char *)logrec->record, len, fmt, ap);
+	/*
+	 * We're writing a record with the type (an integer) followed by a
+	 * string (NUL-terminated data).  To avoid writing the string into
+	 * a buffer before copying it, we write the header first, then the
+	 * raw bytes of the string.
+	 */
+	WT_ERR(__wt_struct_size(session, &header_size, rec_fmt, rectype));
+	WT_ERR(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, header_size,
+	    rec_fmt, rectype));
+	logrec->size += (uint32_t)header_size;
 
-	WT_VERBOSE_RET(session, log,
-	    "log_printf: %s", (char *)logrec->record);
-	WT_RET(__wt_log_write(session, buf, NULL, 0));
-	__wt_scr_free(&buf);
-	return (0);
+	(void)vsnprintf((char *)logrec->data + logrec->size, len, fmt, ap);
+
+	WT_VERBOSE_ERR(session, log,
+	    "log_printf: %s", (char *)logrec->data + logrec->size);
+
+	logrec->size += len;
+	WT_ERR(__wt_log_write(session, logrec, NULL, 0));
+err:	__wt_scr_free(&logrec);
+	return (ret);
 }

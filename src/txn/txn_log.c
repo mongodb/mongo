@@ -355,9 +355,12 @@ __txn_printlog(
     WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
 {
 	FILE *out;
+	WT_LSN ckpt_lsn;
 	const uint8_t *end, *p;
+	const char *msg;
 	uint64_t txnid;
-	uint32_t rectype;
+	uint32_t fileid, rectype;
+	int32_t start;
 
 	out = cookie;
 
@@ -368,17 +371,44 @@ __txn_printlog(
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
 	if (fprintf(out, "  { \"lsn\" : [%" PRIu32 ",%" PRId64 "],\n",
-	    lsnp->file, lsnp->offset) < 0 ||
-	    fprintf(out, "    \"type\" : %d,\n", (int)rectype) < 0)
+	    lsnp->file, lsnp->offset) < 0)
 		return (errno);
 
 	switch (rectype) {
+	case WT_LOGREC_CHECKPOINT:
+		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
+		    WT_UNCHECKED_STRING(IQ), &ckpt_lsn.file, &ckpt_lsn.offset));
+		if (fprintf(out, "    \"type\" : \"checkpoint\"\n") < 0 ||
+		    fprintf(
+		    out, "    \"ckpt_lsn\" : [%" PRIu32 ",%" PRId64 "],\n",
+		    ckpt_lsn.file, ckpt_lsn.offset) < 0)
+			return (errno);
+		break;
+
 	case WT_LOGREC_COMMIT:
 		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
-		if (fprintf(
-		    out, "    \"txnid\" : %" PRIu64 ",\n", txnid) < 0)
+		if (fprintf(out, "    \"type\" : \"commit\"\n") < 0 ||
+		    fprintf(out, "    \"txnid\" : %" PRIu64 ",\n", txnid) < 0)
 			return (errno);
 		WT_RET(__txn_commit_printlog(session, &p, end, out));
+		break;
+
+	case WT_LOGREC_FILE_SYNC:
+		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
+		    WT_UNCHECKED_STRING(Ii), &fileid, &start));
+		if (fprintf(out, "    \"type\" : \"file_sync\"\n") < 0 ||
+		    fprintf(out, "    \"fileid\" : %" PRIu32 "\n",
+		    fileid) < 0 ||
+		    fprintf(out, "    \"start\" : %" PRId32 "\n", start) < 0)
+			return (errno);
+		break;
+
+	case WT_LOGREC_MESSAGE:
+		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
+		    WT_UNCHECKED_STRING(S), &msg));
+		if (fprintf(out, "    \"type\" : \"message\"\n") < 0 ||
+		    fprintf(out, "    \"message\" : \"%s\"\n", msg) < 0)
+			return (errno);
 		break;
 	}
 
