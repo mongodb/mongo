@@ -359,7 +359,7 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 		F_CLR(slot, SLOT_BUF_GROW);
 		WT_ERR(__wt_buf_grow(session, &slot->slot_buf,
 		    WT_MAX(slot->slot_buf.memsize * 2, (size_t)newsize)));
-		WT_ATOMIC_STORE(slot->slot_state, orig_state);
+		slot->slot_state = orig_state;
 		total_growth += slot->slot_buf.memsize - old_size;
 	}
 err:	__wt_spin_unlock(session, &log->log_slot_lock);
