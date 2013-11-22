@@ -642,22 +642,15 @@ namespace mongo {
                                                OrderedIntervalList* oil, BoundsTightness* tightnessOut) {
         // We have to copy the data out of the parse tree and stuff it into the index
         // bounds.  BSONValue will be useful here.
-        BSONObj dataObj;
+        if (Array != data.type()) {
+            BSONObj dataObj;
+            if (isHashed) {
+                dataObj = ExpressionMapping::hash(data);
+            }
+            else {
+                dataObj = objFromElement(data);
+            }
 
-        if (isHashed) {
-            dataObj = ExpressionMapping::hash(data);
-        }
-        else {
-            dataObj = objFromElement(data);
-        }
-
-        // UNITTEST 11738048
-        if (Array == dataObj.firstElement().type()) {
-            // XXX: bad
-            oil->intervals.push_back(allValues());
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
-        }
-        else {
             verify(dataObj.isOwned());
             oil->intervals.push_back(makePointInterval(dataObj));
             // XXX: it's exact if the index isn't sparse?
@@ -667,6 +660,33 @@ namespace mongo {
             else {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
+        }
+        // In the following cases, 'data' is an array. Using
+        // arrays with hashed indices is currently not supported,
+        // so we don't have to worry about that case.
+        else if (data.Obj().isEmpty()) { // Array == data.type()
+            // XXX: tighten bounds in empty case
+            oil->intervals.push_back(allValues());
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        }
+        else { // Array == data.type() && !data.Obj().isEmpty()
+            BSONObj dataObj = objFromElement(data);
+            BSONElement firstEl = data.Obj().firstElement();
+
+            // Use the first element in the array to construct the
+            // first interval. (Using the first is arbitrary; we could
+            // just as well use any array element.). If the query is
+            // {a: [1, 2, 3]}, for example, then using the bounds [1, 1]
+            // for the multikey index will pick up every document containing
+            // the array [1, 2, 3].
+            oil->intervals.push_back(makePointInterval(objFromElement(firstEl)));
+
+            // The second point interval uses the entire array. This is
+            // necessary so that the query {a: [1, 2, 3]} will match
+            // documents like {a: [[1, 2, 3], 4, 5]}.
+            oil->intervals.push_back(makePointInterval(dataObj));
+
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
     }
 

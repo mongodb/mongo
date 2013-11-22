@@ -760,6 +760,15 @@ namespace {
         assertSolutionExists("{fetch: {ixscan: {'a.b': 1, 'a.c': 1}}}");
     }
 
+    TEST_F(IndexAssignmentTest, ArrayEquality) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{a : [1, 2, 3]}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+    }
+
     //
     // Geo
     // http://docs.mongodb.org/manual/reference/operator/query-geospatial/#geospatial-query-compatibility-chart
