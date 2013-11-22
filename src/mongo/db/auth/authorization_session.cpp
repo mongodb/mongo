@@ -348,7 +348,8 @@ namespace {
         }
         ResourcePattern resourceSearchList[resourceSearchListCapacity];
         const int resourceSearchListLength =
-                buildResourceSearchList(ResourcePattern::forClusterResource(), resourceSearchList);
+                buildResourceSearchList(ResourcePattern::forDatabaseName(userName.getDB()),
+                                        resourceSearchList);
 
         ActionSet actions;
         for (int i = 0; i < resourceSearchListLength; ++i) {
