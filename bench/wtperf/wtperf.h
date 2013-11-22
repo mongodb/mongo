@@ -94,9 +94,10 @@ void	 config_free(CONFIG *);
 int	 config_opt_file(CONFIG *, WT_SESSION *, const char *);
 int	 config_opt_line(CONFIG *, WT_SESSION *, const char *);
 int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
+void	 config_print(CONFIG *);
+int	 config_sanity(CONFIG *);
 int	 enomem(const CONFIG *);
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
-void	 print_config(CONFIG *);
 int	 setup_log_file(CONFIG *);
 void	 usage(void);

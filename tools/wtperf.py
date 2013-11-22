@@ -32,8 +32,6 @@ from subprocess import call
 # Python script to read wtperf monitor output and create a performance
 # graph.
 
-TIMEFMT = "%b %d %H:%M:%S"
-
 # Read the monitor file and figure out when checkpoint was running.
 in_ckpt = 'N'
 ckptlist=[]
@@ -47,7 +45,7 @@ with open('monitor', 'r') as csvfile:
 # Write a command file for gnuplot.
 of = open("gnuplot.cmd", "w")
 of.write('''
-set terminal png nocrop
+set terminal png nocrop size 800,600
 set autoscale
 set grid
 set style data lines
@@ -58,7 +56,7 @@ set format x "%M:%S"
 set xlabel "Time (minutes:seconds)"
 set xtics rotate by -45
 set xdata time
-set ylabel "Thousands of operations per second"
+set ylabel "Operations per second (hundreds)"
 set yrange [0:]\n''')
 
 it = iter(ckptlist)
@@ -69,7 +67,7 @@ for start, stop in zip(it, it):
 
 of.write('''
 set output 'monitor.png'
-plot "monitor" using 1:($2/1000) title "Reads", "monitor" using 1:($3/1000) title "Updates", "monitor" using 1:($4/1000) title "Inserts"\n''')
+plot "monitor" using 1:($2/100) title "Reads", "monitor" using 1:($3/100) title "Updates", "monitor" using 1:($4/100) title "Inserts"\n''')
 
 of.close()
 call(["gnuplot", "gnuplot.cmd"])

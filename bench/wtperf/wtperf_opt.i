@@ -101,7 +101,10 @@ DEF_OPT_AS_BOOL(random_range, 0, "if true, use random inserts in workload")
 DEF_OPT_AS_UINT32(read_threads, 2, "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
     "output throughput information every interval seconds, 0 to disable")
-DEF_OPT_AS_UINT32(run_time, 2, "seconds to run workload phase")
+DEF_OPT_AS_UINT32(run_ops, 0,
+    "total read, insert and update workload operations, 0 to use only run_time")
+DEF_OPT_AS_UINT32(run_time, 0,
+    "total workload seconds, 0 to use only run_ops")
 DEF_OPT_AS_UINT32(sample_interval, 0,
     "performance logging every interval seconds, 0 to disable")
 DEF_OPT_AS_CONFIG_STRING(table_config,

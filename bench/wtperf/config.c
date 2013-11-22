@@ -393,8 +393,27 @@ config_opt_usage(void)
 	}
 }
 
+int
+config_sanity(CONFIG *cfg)
+{
+	if (cfg->run_time > 0 &&
+	    (cfg->checkpoint_interval > cfg->run_time ||
+	    cfg->report_interval > cfg->run_time ||
+	    cfg->sample_interval > cfg->run_time)) {
+		fprintf(stderr, "interval value longer than the run-time\n");
+		return (EINVAL);
+	}
+	if ((cfg->run_time == 0 && cfg->run_ops == 0) ||
+	    (cfg->run_time != 0 && cfg->run_ops != 0)) {
+		fprintf(stderr,
+		    "run-time and run-ops cannot both be set or zero\n");
+		return (EINVAL);
+	}
+	return (0);
+}
+
 void
-print_config(CONFIG *cfg)
+config_print(CONFIG *cfg)
 {
 	printf("Workload configuration:\n");
 	printf("\thome: %s\n", cfg->home);
@@ -402,6 +421,8 @@ print_config(CONFIG *cfg)
 	printf("\tConnection configuration: %s\n", cfg->conn_config);
 	printf("\tTable configuration: %s\n", cfg->table_config);
 	printf("\t%s\n", cfg->create ? "Creating" : "Using existing");
+	printf("\tWorkload period/operations: %" PRIu32 "/%" PRIu32 "\n",
+	    cfg->run_time, cfg->run_ops);
 	printf("\tWorkload period: %" PRIu32 "\n", cfg->run_time);
 	printf(
 	    "\tCheckpoint interval: %" PRIu32 "\n", cfg->checkpoint_interval);

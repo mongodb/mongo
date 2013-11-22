@@ -104,12 +104,12 @@ static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*insert_thread(void *);
+static void	*monitor(void *);
 static void	*populate_thread(void *);
 static void	*read_thread(void *);
 static int	 start_threads(
 		    CONFIG *, u_int, CONFIG_THREAD **, void *(*func)(void *));
-static void	*monitor(void *);
-static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD **);
+static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*update_thread(void *);
 static void	 worker(CONFIG_THREAD *, worker_type);
 static uint64_t	 wtperf_rand(CONFIG *);
@@ -462,8 +462,10 @@ monitor(void *arg)
 		(void)fprintf(fp,
 		    "%s,%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%c\n",
 		    buf,
-		    reads - last_reads, inserts - last_inserts,
-		    updates - last_updates, g_ckpt ? 'Y' : 'N');
+		    (reads - last_reads) / cfg->sample_interval,
+		    (inserts - last_inserts) / cfg->sample_interval,
+		    (updates - last_updates) / cfg->sample_interval,
+		    g_ckpt ? 'Y' : 'N');
 
 		last_reads = reads;
 		last_inserts = inserts;
@@ -581,7 +583,7 @@ execute_populate(CONFIG *cfg)
 	assert(gettimeofday(&stop, NULL) == 0);
 
 	if ((ret =
-	    stop_threads(cfg, cfg->populate_threads, &cfg->popthreads)) != 0)
+	    stop_threads(cfg, cfg->populate_threads, cfg->popthreads)) != 0)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
@@ -619,10 +621,11 @@ static int
 execute_workload(CONFIG *cfg)
 {
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
-	uint32_t interval, run_time;
+	uint32_t interval, run_ops, run_time;
 	int ret, tret;
 
-	lprintf(cfg, 0, 1, "Starting worker threads");
+	g_insert_key = 0;
+	g_insert_ops = g_read_ops = g_update_ops = 0;
 
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
@@ -631,9 +634,6 @@ execute_workload(CONFIG *cfg)
 	    "Starting workload threads: read %" PRIu32
 	    ", insert %" PRIu32 ", update %" PRIu32,
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
-
-	g_insert_key = 0;
-	g_insert_ops = g_read_ops = g_update_ops = 0;
 
 	if (cfg->read_threads != 0 && (tret = start_threads(
 	    cfg, cfg->read_threads, &cfg->rthreads, read_thread)) != 0 &&
@@ -654,18 +654,22 @@ execute_workload(CONFIG *cfg)
 		goto err;
 	}
 
-	for (run_time = cfg->run_time; g_error == 0;) {
-		if (cfg->report_interval == 0 ||
-		    run_time < cfg->report_interval)
-			interval = run_time;
-		else
-			interval = cfg->report_interval;
-		(void)sleep(interval);
+	for (interval = cfg->report_interval,
+	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
+		/*
+		 * Sleep for one second at a time.
+		 * If we are tracking run time, check to see if we're done, and
+		 * if we're only tracking run time, go back to sleep.
+		 */
+		sleep(1);
+		if (run_time != 0) {
+			if (--run_time == 0)
+				break;
+			if (!interval && !run_ops)
+				continue;
+		}
 
-		run_time -= interval;
-		if (run_time == 0)
-			break;
-
+		/* Sum the operations we've done. */
 		g_ckpt_ops =
 		    sum_ckpt_ops(cfg->ckptthreads, cfg->checkpoint_threads);
 		g_insert_ops =
@@ -673,6 +677,17 @@ execute_workload(CONFIG *cfg)
 		g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
 		g_update_ops =
 		    sum_update_ops(cfg->uthreads, cfg->update_threads);
+
+		/* If we're checking total operations, see if we're done. */
+		if (run_ops != 0 &&
+		    run_ops <= g_insert_ops + g_read_ops + g_update_ops)
+			break;
+
+		/* If writing out throughput information, see if it's time. */
+		if (interval == 0 || --interval > 0)
+			continue;
+		interval = cfg->report_interval;
+
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
 		    " updates, %" PRIu64 " checkpoints in %" PRIu32 " secs",
@@ -687,24 +702,18 @@ execute_workload(CONFIG *cfg)
 		last_ckpts = g_ckpt_ops;
 	}
 
-	/* One final summation of the operations we've completed. */
-	g_ckpt_ops = sum_ckpt_ops(cfg->ckptthreads, cfg->checkpoint_threads);
-	g_insert_ops = sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-	g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
-	g_update_ops = sum_update_ops(cfg->uthreads, cfg->update_threads);
-
 err:	g_stop = 1;
 	if (cfg->read_threads != 0 && (tret =
-	    stop_threads(cfg, cfg->read_threads, &cfg->rthreads)) != 0 &&
+	    stop_threads(cfg, cfg->read_threads, cfg->rthreads)) != 0 &&
 	    ret == 0)
 		ret = tret;
 	if (cfg->insert_threads != 0 && (tret =
-	    stop_threads(cfg, cfg->insert_threads, &cfg->ithreads)) != 0 &&
+	    stop_threads(cfg, cfg->insert_threads, cfg->ithreads)) != 0 &&
 	    ret == 0)
 		ret = tret;
 
 	if (cfg->update_threads != 0 && (tret =
-	    stop_threads(cfg, cfg->update_threads, &cfg->uthreads)) != 0 &&
+	    stop_threads(cfg, cfg->update_threads, cfg->uthreads)) != 0 &&
 	    ret == 0)
 		ret = tret;
 
@@ -937,15 +946,11 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
-	/* Sanity check reporting interval. */
-	if (cfg.run_time > 0 && cfg.report_interval > cfg.run_time) {
-		fprintf(stderr, "report-interval larger than the run-time.n");
-		ret = EINVAL;
+	if (config_sanity(&cfg))	/* Sanity-check the configuration */
 		goto err;
-	}
 
 	if (cfg.verbose > 1)		/* Display the configuration. */
-		print_config(&cfg);
+		config_print(&cfg);
 
 					/* Open the real connection. */
 	if ((ret = wiredtiger_open(
@@ -989,8 +994,7 @@ main(int argc, char *argv[])
 	    cfg.checkpoint_threads, &cfg.ckptthreads, checkpoint_worker) != 0)
 		goto err;
 					/* Execute the workload. */
-	if (cfg.run_time != 0 &&
-	    cfg.read_threads + cfg.insert_threads + cfg.update_threads != 0 &&
+	if ((cfg.run_time != 0 || cfg.run_ops != 0) &&
 	    (ret = execute_workload(&cfg)) != 0)
 		goto err;
 
@@ -998,10 +1002,20 @@ main(int argc, char *argv[])
 	    "Run completed: %" PRIu32 " read threads, %"
 	    PRIu32 " insert threads, %" PRIu32 " update threads and %"
 	    PRIu32 " checkpoint threads for %"
-	    PRIu32 " seconds.",
+	    PRIu32 " %s.",
 	    cfg.read_threads, cfg.insert_threads,
-	    cfg.update_threads, cfg.checkpoint_threads, cfg.run_time);
+	    cfg.update_threads, cfg.checkpoint_threads,
+	    cfg.run_time == 0 ? cfg.run_ops : cfg.run_time,
+	    cfg.run_time == 0 ? "operations" : "seconds");
 
+	/*
+	 * One final summation of the operations we've completed, output that
+	 * information.
+	 */
+	g_read_ops = sum_read_ops(cfg.rthreads, cfg.read_threads);
+	g_insert_ops = sum_insert_ops(cfg.ithreads, cfg.insert_threads);
+	g_update_ops = sum_update_ops(cfg.uthreads, cfg.update_threads);
+	g_ckpt_ops = sum_ckpt_ops(cfg.ckptthreads, cfg.checkpoint_threads);
 	if (cfg.read_threads != 0)
 		lprintf(&cfg, 0, 1,
 		    "Executed %" PRIu64 " read operations", g_read_ops);
@@ -1021,7 +1035,7 @@ einval:		ret = EINVAL;
 err:	g_stop = 1;
 
 	if (cfg.checkpoint_threads != 0 &&
-	    (tret = stop_threads(&cfg, 1, &cfg.ckptthreads)) != 0)
+	    (tret = stop_threads(&cfg, 1, cfg.ckptthreads)) != 0)
 		if (ret == 0)
 			ret = tret;
 
@@ -1077,13 +1091,12 @@ start_threads(
 }
 
 static int
-stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp)
+stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 {
-	CONFIG_THREAD *threads;
 	u_int i;
 	int ret;
 
-	if ((threads = *threadsp) == NULL)
+	if (threads == NULL)
 		return (0);
 
 	for (i = 0; i < num; ++i, ++threads)
@@ -1093,10 +1106,11 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp)
 		}
 
 	/*
-	 * Don't free the thread memory, the monitor thread might be reading
-	 * it and we don't want to race.
+	 * We don't free the thread structures or NULL the reference when we
+	 * stop the threads, it is still being read by the monitor thread
+	 * (among others).  This is a standalone program, leaking memory isn't
+	 * a concern, and it's simpler that way.
 	 */
-	*threadsp = NULL;
 	return (0);
 }
 
