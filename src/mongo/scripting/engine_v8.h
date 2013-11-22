@@ -341,7 +341,7 @@ namespace mongo {
         /**
          * Recursion limit when converting from JS objects to BSON.
          */
-        enum { objectDepthLimit = 500 };
+        static const int objectDepthLimit = 500;
 
         /**
          * Attach data to obj such that the data has the same lifetime as the Object obj points to.

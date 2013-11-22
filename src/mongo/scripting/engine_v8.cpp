@@ -28,6 +28,10 @@ using namespace mongoutils;
 
 namespace mongo {
 
+#ifndef _MSC_EXTENSIONS
+    const int V8Scope::objectDepthLimit;
+#endif
+
     // Generated symbols for JS files
     namespace JSFiles {
         extern const JSFile types;
