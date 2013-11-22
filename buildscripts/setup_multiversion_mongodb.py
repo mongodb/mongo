@@ -129,9 +129,9 @@ CL_HELP_MESSAGE = \
 Downloads and installs particular mongodb versions into an install directory and symlinks the binaries with versions to
 another directory.
 
-Usage: install_multiversion_mongodb.sh INSTALL_DIR LINK_DIR PLATFORM_AND_ARCH VERSION1 [VERSION2 VERSION3 ...]
+Usage: setup_multiversion_mongodb.py INSTALL_DIR LINK_DIR PLATFORM_AND_ARCH VERSION1 [VERSION2 VERSION3 ...]
 
-Ex: install_multiversion_mongodb.sh ./install ./link "Linux/x86_64" "2.0.6" "2.0.3-rc0" "2.0" "2.2" "2.3"
+Ex: setup_multiversion_mongodb.py ./install ./link "Linux/x86_64" "2.0.6" "2.0.3-rc0" "2.0" "2.2" "2.3"
 
 If "rc" is included in the version name, we'll use the exact rc, otherwise we'll pull the highest non-rc
 version compatible with the version specified.
