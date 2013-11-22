@@ -323,20 +323,14 @@ namespace {
                 BSON("user" << "v2read" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "password") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "read" <<
-                                                "db" << "test" <<
-                                                "canDelegate" << false <<
-                                                "hasRole" << true))),
+                     "roles" << BSON_ARRAY(BSON("role" << "read" << "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
                 BSON("user" << "v2cluster" <<
                      "db" << "admin" <<
                      "credentials" << BSON("MONGODB-CR" << "password") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" <<
-                                                "db" << "admin" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true))),
+                     "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" << "db" << "admin"))),
                 BSONObj()));
 
         User* v2read;
