@@ -148,7 +148,7 @@ __txn_op_apply(
 
 		/* Set the keys. */
 		if (start != NULL)
-			start->set_key(stop, start_recno);
+			start->set_key(start, start_recno);
 		if (stop != NULL)
 			stop->set_key(stop, stop_recno);
 
