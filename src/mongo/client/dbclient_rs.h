@@ -518,10 +518,51 @@ namespace mongo {
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
 
+        /**
+         *  Authenticate using supplied credentials.  Authenticates against the primary node, fails
+         *  if node is down.
+         *  Credentials are cached for future connections.
+         *
+         *  See DBClientWithCommands::auth() for more details.
+         *
+         *  This is the default authentication mode for DBClientReplicaSet connections.
+         */
+        void authPrimary(const BSONObj& params);
+
+        /**
+         * Same as above, but authorizes access to a particular database.
+         *
+         * See DBClientWithCommands::auth() for more details.
+         */
+        bool authPrimary(const string &dbname,
+                         const string &username,
+                         const string &password_text,
+                         string& errmsg,
+                         bool digestPassword);
+
+        /**
+         * Authenticate using supplied credentials.  Prefers authentication against the primary
+         * node, will fall back to a secondary and retry if the primary node is down but
+         * secondaries are still available.
+         * Credentials are cached for future connections.
+         *
+         * See DBClientWithCommands::auth() for more details.
+         */
+        void authAny(const BSONObj& params);
+
+        /**
+         * Same as above, but authorizes access to a particular database.
+         *
+         * See DBClientWithCommands::auth() for more details.
+         */
+        bool authAny( const string &dbname,
+                      const string &username,
+                      const string &password_text,
+                      string& errmsg,
+                      bool digestPassword );
 
     protected:
-        /** Authorize.  Authorizes all nodes as needed
-        */
+
         virtual void _auth(const BSONObj& params);
 
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }

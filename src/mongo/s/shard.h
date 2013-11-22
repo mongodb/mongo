@@ -290,7 +290,11 @@ namespace mongo {
          */
         bool runCommand( const string& db , const BSONObj& cmd , BSONObj& res );
 
+        // Whether or not we release connections from the thread-local cache after a read
         static bool releaseConnectionsAfterResponse;
+
+        // Controls whether we throw on initially failing to set a version
+        static bool ignoreInitialVersionFailure;
 
         /** checks all of my thread local connections for the version of this ns */
         static void checkMyConnectionVersions( const string & ns );

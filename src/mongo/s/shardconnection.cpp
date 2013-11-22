@@ -22,6 +22,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
@@ -33,7 +34,13 @@
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(ignoreInitialVersionFailure, bool, false);
+    bool ShardConnection::ignoreInitialVersionFailure( false );
+    ExportedServerParameter<bool>
+        _ignoreInitialVersionFailure( ServerParameterSet::getGlobal(),
+                                      "ignoreInitialVersionFailure",
+                                      &ShardConnection::ignoreInitialVersionFailure,
+                                      true,
+                                      true );
 
     DBConnectionPool shardConnectionPool;
 
@@ -237,6 +244,12 @@ namespace mongo {
             vector<Shard> all;
             Shard::getAllShards( all );
 
+            scoped_ptr<LastError::Disabled> ignoreForGLE;
+            if ( ShardConnection::ignoreInitialVersionFailure ) {
+                // Don't report exceptions here as errors in GetLastError if ignoring failures
+                ignoreForGLE.reset( new LastError::Disabled( lastError.get( false ) ) );
+            }
+
             // Now only check top-level shard connections
             for ( unsigned i=0; i<all.size(); i++ ) {
 
@@ -252,12 +265,12 @@ namespace mongo {
 
                     versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
                 }
-                catch ( const std::exception& e ) {
+                catch ( const DBException& ex ) {
 
-                    warning() << "problem while initially checking shard versions on"
-                              << " " << shard.getName() << causedBy(e) << endl;
+                    warning() << "problem while initially checking shard versions on "
+                              << shard.getName() << causedBy( ex ) << endl;
                     
-                    if ( !ignoreInitialVersionFailure ) {
+                    if ( !ShardConnection::ignoreInitialVersionFailure ) {
                         throw;
                     }
                     else {

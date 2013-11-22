@@ -30,6 +30,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
@@ -38,6 +39,8 @@
 #include "mongo/s/version_manager.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(authOnPrimaryOnly, bool, true);
 
     class StaticShardInfo {
     public:
@@ -411,14 +414,26 @@ namespace mongo {
 
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
         if( !noauth ) {
+            bool result;
             string err;
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
 
-            bool result = conn->auth( "local",
-                                      internalSecurity.user,
-                                      internalSecurity.pwd,
-                                      err,
-                                      false );
+            if ( conn->type() == ConnectionString::SET && !authOnPrimaryOnly ) {
+                DBClientReplicaSet* setConn = dynamic_cast<DBClientReplicaSet*>(conn);
+                verify(setConn);
+                result = setConn->authAny( "local",
+                                           internalSecurity.user,
+                                           internalSecurity.pwd,
+                                           err,
+                                           false );
+            }
+            else {
+                result = conn->auth( "local",
+                                     internalSecurity.user,
+                                     internalSecurity.pwd,
+                                     err,
+                                     false );
+            }
 
             uassert( 15847, str::stream() << "can't authenticate to server "
                                           << conn->getServerAddress() << causedBy( err ), result );

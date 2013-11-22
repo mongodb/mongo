@@ -1593,6 +1593,18 @@ namespace mongo {
         return _getMonitor()->isAnyNodeOk();
     }
 
+    void DBClientReplicaSet::authPrimary(const BSONObj& params) {
+        _auth(params);
+    }
+
+    bool DBClientReplicaSet::authPrimary( const string &dbname,
+                                          const string &username,
+                                          const string &password_text,
+                                          string& errmsg,
+                                          bool digestPassword ) {
+        return auth( dbname, username, password_text, errmsg, digestPassword );
+    }
+
     void DBClientReplicaSet::_auth(const BSONObj& params) {
         DBClientConnection * m = checkMaster();
 
@@ -1618,6 +1630,99 @@ namespace mongo {
 
         // now that it does, we should save so that for a new node we can auth
         _auths[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
+    }
+
+    bool DBClientReplicaSet::authAny( const string &dbname,
+                                      const string &username,
+                                      const string &password_text,
+                                      string& errmsg,
+                                      bool digestPassword ) {
+        try {
+            authAny(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+                         saslCommandPrincipalSourceFieldName << dbname <<
+                         saslCommandPrincipalFieldName << username <<
+                         saslCommandPasswordFieldName << password_text <<
+                         saslCommandDigestPasswordFieldName << digestPassword));
+            return true;
+        } catch(const UserException& ex) {
+            if (ex.getCode() != ErrorCodes::AuthenticationFailed)
+                throw;
+            errmsg = ex.what();
+            return false;
+        }
+    }
+
+    static bool isAuthException( const DBException& ex ) {
+        return ex.getCode() == ErrorCodes::AuthenticationFailed;
+    }
+
+    void DBClientReplicaSet::authAny( const BSONObj& params ) {
+
+        // We prefer to authenticate against a primary, but otherwise a secondary is ok too
+        // Empty tag matches every secondary
+        TagSet tags(BSON_ARRAY(BSONObj()));
+        shared_ptr<ReadPreferenceSetting> readPref(
+            new ReadPreferenceSetting( ReadPreference_PrimaryPreferred, tags ) );
+
+        LOG(3) << "dbclient_rs authentication of " << _getMonitor()->getName() << endl;
+
+        // NOTE that we retry MAX_RETRY + 1 times, since we're always primary preferred we don't
+        // fallback to the primary.
+        Status lastNodeStatus = Status::OK();
+        for ( size_t retry = 0; retry < MAX_RETRY + 1; retry++ ) {
+            try {
+                DBClientConnection* conn = selectNodeUsingTags( readPref );
+
+                if ( conn == NULL ) {
+                    break;
+                }
+
+                conn->auth( params );
+
+                // Cache the new auth information since we've now validated it's good
+                _auths[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
+
+                // Ensure the only child connection open is the one we authenticated against - other
+                // child connections may not have full authentication information.
+                // NOTE: _lastSlaveOkConn may or may not be the same as _master
+                dassert(_lastSlaveOkConn.get() == conn || _master.get() == conn);
+                if ( conn != _lastSlaveOkConn.get() ) {
+                    _lastSlaveOkHost = HostAndPort();
+                    _lastSlaveOkConn.reset();
+                }
+                if ( conn != _master.get() ) {
+                    _masterHost = HostAndPort();
+                    _master.reset();
+                }
+
+                return;
+            }
+            catch ( const DBException &ex ) {
+
+                // We care if we can't authenticate (i.e. bad password) in credential params.
+                // We shouldn't be unauthorized since we aren't doing anything yet.
+                if ( isAuthException( ex ) ) {
+                    throw;
+                }
+
+                StringBuilder errMsgB;
+                errMsgB << "can't authenticate against replica set node "
+                        << _lastSlaveOkHost.toString();
+                lastNodeStatus = ex.toStatus( errMsgB.str() );
+
+                LOG(1) << lastNodeStatus.reason() << endl;
+                invalidateLastSlaveOkCache();
+            }
+        }
+
+        if ( lastNodeStatus.isOK() ) {
+            StringBuilder assertMsgB;
+            assertMsgB << "Failed to authenticate, no good nodes in " << _getMonitor()->getName();
+            uasserted( ErrorCodes::NodeNotFound, assertMsgB.str() );
+        }
+        else {
+            uasserted( lastNodeStatus.code(), lastNodeStatus.reason() );
+        }
     }
 
     void DBClientReplicaSet::logout(const string &dbname, BSONObj& info) {

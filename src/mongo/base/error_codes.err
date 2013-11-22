@@ -27,4 +27,7 @@ error_code("AlreadyInitialized", 23)
 error_code("LockTimeout", 24)
 error_code("RemoteValidationError", 25)
 
+# Non-sequential error codes (for compatibility only)
+error_code("NodeNotFound", 74)
+
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

@@ -103,23 +103,46 @@ namespace mongo {
 
         WriteBackListener::init( *conn_in );
 
-        DBClientBase* conn = getVersionable( conn_in );
-        verify( conn ); // errors thrown above
+        bool ok;
+        DBClientBase* conn = NULL;
+        try {
+            // May throw if replica set primary is down
+            conn = getVersionable( conn_in );
+            dassert( conn ); // errors thrown above
 
-        BSONObjBuilder cmdBuilder;
+            BSONObjBuilder cmdBuilder;
 
-        cmdBuilder.append( "setShardVersion" , "" );
-        cmdBuilder.appendBool( "init", true );
-        cmdBuilder.append( "configdb" , configServer.modelServer() );
-        cmdBuilder.appendOID( "serverID" , &serverID );
-        cmdBuilder.appendBool( "authoritative" , true );
+            cmdBuilder.append( "setShardVersion" , "" );
+            cmdBuilder.appendBool( "init", true );
+            cmdBuilder.append( "configdb" , configServer.modelServer() );
+            cmdBuilder.appendOID( "serverID" , &serverID );
+            cmdBuilder.appendBool( "authoritative" , true );
 
-        BSONObj cmd = cmdBuilder.obj();
+            BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1) << "initializing shard connection to " << conn->toString() << endl;
-        LOG(2) << "initial sharding settings : " << cmd << endl;
+            LOG(1) << "initializing shard connection to " << conn->toString() << endl;
+            LOG(2) << "initial sharding settings : " << cmd << endl;
 
-        bool ok = conn->runCommand("admin", cmd, result, 0);
+            ok = conn->runCommand("admin", cmd, result, 0);
+        }
+        catch( const DBException& ex ) {
+
+            bool ignoreFailure = ShardConnection::ignoreInitialVersionFailure
+                                 && conn_in->type() == ConnectionString::SET;
+            if ( !ignoreFailure )
+                throw;
+
+            // Using initShardVersion is not strictly required when talking to replica sets - it is
+            // preferred to do so because it registers mongos early with the mongod.  This info is
+            // also sent by checkShardVersion before a connection is used for a write or read.
+
+            OCCASIONALLY {
+                warning() << "failed to initialize new replica set connection version, "
+                          << "will initialize on first use" << endl;
+            }
+
+            return true;
+        }
 
         // HACK for backwards compatibility with v1.8.x, v2.0.0 and v2.0.1
         // Result is false, but will still initialize serverID and configdb
