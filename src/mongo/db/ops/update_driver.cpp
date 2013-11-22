@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
@@ -159,69 +160,116 @@ namespace mongo {
 
     Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
                                                          mutablebson::Document& doc) const {
+        CanonicalQuery* rawCG;
+        // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed
+        Status s = CanonicalQuery::canonicalize("", query, &rawCG);
+        if (!s.isOK())
+            return s;
+        scoped_ptr<CanonicalQuery> cq(rawCG);
+        return populateDocumentWithQueryFields(rawCG, doc);
+    }
+
+    Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery* query,
+                                                         mutablebson::Document& doc) const {
+
+        MatchExpression* root = query->root();
+
+        MatchExpression::MatchType rootType = root->matchType();
+
+        // These copies are needed until we apply the modifiers at the end.
+        std::vector<BSONObj> copies;
+
+        // We only care about equality and "and"ed equality fields, everything else is ignored
+        if (rootType != MatchExpression::EQ && rootType != MatchExpression::AND)
+            return Status::OK();
+
         if (isDocReplacement()) {
-            BSONElement idElem = query.getField("_id");
+            BSONElement idElem = query->getQueryObj().getField("_id");
+
             // Replacement mods need the _id field copied explicitly.
             if (idElem.ok()) {
                 mb::Element elem = doc.makeElement(idElem);
                 return doc.root().pushFront(elem);
             }
+
+            return Status::OK();
+        }
+
+        // Create a new UpdateDriver to create the base doc from the query
+        Options opts;
+        opts.logOp = false;
+        opts.multi = false;
+        opts.upsert = true;
+        opts.modOptions = modOptions();
+
+        UpdateDriver insertDriver(opts);
+        insertDriver.setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
+
+        // If we are a single equality match query
+        if (root->matchType() == MatchExpression::EQ) {
+            EqualityMatchExpression* eqMatch =
+                    static_cast<EqualityMatchExpression*>(root);
+
+            const BSONElement matchData = eqMatch->getData();
+            BSONElement childElem = matchData;
+
+            // Make copy to new path if not the same field name (for cases like $all)
+            if (!root->path().empty() && matchData.fieldNameStringData() != root->path()) {
+                BSONObjBuilder copyBuilder;
+                copyBuilder.appendAs(eqMatch->getData(), root->path());
+                const BSONObj copy = copyBuilder.obj();
+                copies.push_back(copy);
+                childElem = copy[root->path()];
+            }
+
+            // Add this element as a $set modifier
+            Status s = insertDriver.addAndParse(modifiertable::MOD_SET,
+                                                childElem);
+            if (!s.isOK())
+                return s;
+
         }
         else {
-            // Create a new UpdateDriver to create the base doc from the query
-            Options opts;
-            opts.logOp = false;
-            opts.multi = false;
-            opts.upsert = true;
-            opts.modOptions = modOptions();
 
-            UpdateDriver insertDriver(opts);
-            insertDriver.setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
+            // parse query $set mods, including only equality stuff
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                MatchExpression* child = root->getChild(i);
+                if (child->matchType() == MatchExpression::EQ) {
+                    EqualityMatchExpression* eqMatch =
+                            static_cast<EqualityMatchExpression*>(child);
 
-            // parse query $set mods, removing non-equality stuff
-            BSONObjIteratorSorted i(query);
-            while (i.more()) {
-                BSONElement e = i.next();
-                // TODO: get this logic/exclude-list from the query system?
-                if (e.fieldName()[0] == '$')
-                    continue;
+                    const BSONElement matchData = eqMatch->getData();
+                    BSONElement childElem = matchData;
 
-
-                if (e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$') {
-                    // we have something like { x : { $gt : 5 } }
-                    // this can be a query piece
-                    // or can be a dbref or something
-
-                    int op = e.embeddedObject().firstElement().getGtLtOp();
-                    if (op > 0) {
-                        // This means this is a $gt type filter, so don't make it part of the new
-                        // object.
-                        continue;
+                    // Make copy to new path if not the same field name (for cases like $all)
+                    if (!child->path().empty() &&
+                            matchData.fieldNameStringData() != child->path()) {
+                        BSONObjBuilder copyBuilder;
+                        copyBuilder.appendAs(eqMatch->getData(), child->path());
+                        const BSONObj copy = copyBuilder.obj();
+                        copies.push_back(copy);
+                        childElem = copy[child->path()];
                     }
 
-                    if (mongoutils::str::equals(e.embeddedObject().firstElement().fieldName(),
-                                                  "$not")) {
-                        // A $not filter operator is not detected in getGtLtOp() and should not
-                        // become part of the new object.
-                        continue;
-                    }
+                    // Add this element as a $set modifier
+                    Status s = insertDriver.addAndParse(modifiertable::MOD_SET,
+                                                        childElem);
+                    if (!s.isOK())
+                        return s;
                 }
-
-                // Add this element as a $set modifier
-                Status s = insertDriver.addAndParse(modifiertable::MOD_SET, e);
-                if (!s.isOK())
-                    return s;
-            }
-
-            // update the document with base field
-            Status s = insertDriver.update(StringData(), &doc);
-            if (!s.isOK()) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              str::stream() << "Cannot create base during"
-                                               " insert of update. Caused by :"
-                                            << s.toString());
             }
         }
+
+        // update the document with base field
+        Status s = insertDriver.update(StringData(), &doc);
+        copies.clear();
+        if (!s.isOK()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          str::stream() << "Cannot create base during"
+                                           " insert of update. Caused by :"
+                                        << s.toString());
+        }
+
         return Status::OK();
     }
 

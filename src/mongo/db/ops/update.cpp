@@ -692,7 +692,7 @@ namespace mongo {
 
         // Calling createFromQuery will populate the 'doc' with fields from the query which
         // creates the base of the update for the inserterd doc (because upsert was true)
-        uassertStatusOK(driver->populateDocumentWithQueryFields(request.getQuery(), doc));
+        uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
         if (!driver->isDocReplacement()) {
             opDebug->fastmodinsert = true;
             // We need all the fields from the query to compare against for validation below.

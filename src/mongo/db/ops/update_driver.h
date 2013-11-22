@@ -31,14 +31,15 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/ops/modifier_table.h"
+#include "mongo/db/query/canonical_query.h"
 
 namespace mongo {
 
@@ -67,7 +68,11 @@ namespace mongo {
          * Returns Status::OK() if the document can be used. If there are any error or
          * conflicts along the way then those errors will be returned.
          */
-        Status populateDocumentWithQueryFields(const BSONObj& query, mutablebson::Document& doc) const;
+        Status populateDocumentWithQueryFields(const BSONObj& query,
+                                               mutablebson::Document& doc) const;
+
+        Status populateDocumentWithQueryFields(const CanonicalQuery* query,
+                                               mutablebson::Document& doc) const;
 
         /**
          * return a BSONObj with the _id field of the doc passed in, or the doc itself.

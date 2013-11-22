@@ -205,6 +205,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/index_set',
         'update',
     ],
@@ -223,6 +224,7 @@ env.CppUnitTest(
     source='update_driver_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/query/query_planner',
         'update_driver',
     ],
 )
