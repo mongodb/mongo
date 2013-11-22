@@ -557,7 +557,7 @@ namespace {
             else if (iterator->_dottedName == "chunkSize") {
                 ASSERT_EQUALS(iterator->_singleName, "chunkSize");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
-                ASSERT_EQUALS(iterator->_description, "maximum amount of data per chunk");
+                ASSERT_EQUALS(iterator->_description, "maximum amount of data per chunk (in MB)");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
