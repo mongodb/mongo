@@ -706,7 +706,6 @@ namespace mongo {
 
     /* Usage:
        admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
-       Note: doesn't work with authentication enabled, except as old-style users.
     */
     class CmdCopyDb : public Command {
     public:
