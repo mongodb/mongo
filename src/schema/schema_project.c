@@ -288,7 +288,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 		}
 
 		/* We have to get a key or value before any operations. */
-		WT_ASSERT(session, buf != NULL);
+		WT_ASSERT(session, skip || buf != NULL);
 
 		/*
 		 * Otherwise, the argument is a count, where a missing
