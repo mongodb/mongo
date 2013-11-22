@@ -185,7 +185,7 @@ namespace mongo {
     };
 
     struct TextNode : public QuerySolutionNode {
-        TextNode() : _numWanted(100) { }
+        TextNode() { }
         virtual ~TextNode() { }
 
         virtual StageType getType() const { return STAGE_TEXT; }
@@ -200,7 +200,6 @@ namespace mongo {
 
         BSONObjSet _sort;
 
-        uint32_t _numWanted;
         BSONObj  _indexKeyPattern;
         std::string _query;
         std::string _language;

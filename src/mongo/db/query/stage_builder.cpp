@@ -208,7 +208,6 @@ namespace mongo {
             params.ns = ns;
             params.index = index;
             params.spec = fam->getSpec();
-            params.limit = node->_numWanted;
             Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
             if (!s.isOK()) { return NULL; }
 

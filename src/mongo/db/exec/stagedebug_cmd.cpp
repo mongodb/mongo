@@ -363,7 +363,6 @@ namespace mongo {
                 TextStageParams params(fam->getSpec());
                 params.ns = ns;
                 params.index = index;
-                params.limit = 100;
 
                 // XXX: Deal with non-empty filters.  This is a hack to put in covering information
                 // that can only be checked for equality.  We ignore this now.

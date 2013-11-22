@@ -197,13 +197,6 @@ namespace mongo {
             _results.push_back(ScoredLocation(loc, score));
         }
 
-        // Sort results by score (not always in correct order, especially w.r.t. multiterm).
-        sort(_results.begin(), _results.end());
-
-        if (_results.size() > _params.limit) {
-            _results.resize(_params.limit);
-        }
-
         _filledOutResults = true;
 
         if (_results.size() == 0) {

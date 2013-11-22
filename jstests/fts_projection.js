@@ -3,22 +3,21 @@
 var t = db.getSiblingDB("test").getCollection("fts_projection");
 t.drop();
 
-db.adminCommand({setParameter:1, textSearchEnabled:true});
-db.adminCommand({setParameter:1, newQueryFrameworkEnabled:true});
+db.adminCommand({setParameter: 1, textSearchEnabled: true});
+db.adminCommand({setParameter: 1, newQueryFrameworkEnabled: true});
 
-t.insert({_id:0, _idCopy: 0, a:"textual content"});
-t.insert({_id:1, _idCopy: 1, a:"additional content"});
-t.insert({_id:2, _idCopy: 2, a:"irrelevant content"});
+t.insert({_id: 0, a: "textual content"});
+t.insert({_id: 1, a: "additional content"});
+t.insert({_id: 2, a: "irrelevant content"});
 t.ensureIndex({a:"text"});
 
 // Project the text score.
-// TODO(hk): Allow sorting with metadata.
 var results = t.find({$text: {$search: "textual content -irrelevant"}}, {_idCopy:0, score:{$meta: "text"}}).toArray();
 // printjson(results);
+// Scores should exist.
 assert.eq(results.length, 2);
-assert.eq(results[0]._id, 0);
-assert.eq(results[1]._id, 1);
-assert(results[0].score > results[1].score);
+assert(results[0].score);
+assert(results[1].score);
 
 //
 // Edge/error cases:
@@ -36,7 +35,7 @@ assert.throws(function() { t.find({$text: {$search: "textual content -irrelevant
 // TODO: Clobber an existing field and behave nicely.
 
 // Don't crash if we have no text score.
-var results = t.find({a: /text/}, {score:{$meta: "text"}}).toArray();
+var results = t.find({a: /text/}, {score: {$meta: "text"}}).toArray();
 // printjson(results);
 
 // No textScore proj. with nested fields

@@ -4,44 +4,42 @@ var t = db.getSiblingDB("test").getCollection("fts_querylang");
 var cursor;
 var results;
 
-db.adminCommand({setParameter:1, textSearchEnabled:true});
-db.adminCommand({setParameter:1, newQueryFrameworkEnabled:true});
+db.adminCommand({setParameter: 1, textSearchEnabled: true});
+db.adminCommand({setParameter: 1, newQueryFrameworkEnabled: true});
 
 t.drop();
 
-t.insert({_id:0, _idCopy: 0, a:"textual content"});
-t.insert({_id:1, _idCopy: 1, a:"additional content"});
-t.insert({_id:2, _idCopy: 2, a:"irrelevant content"});
-t.ensureIndex({a:"text"});
+t.insert({_id: 0, unindexedField: 0, a: "textual content"});
+t.insert({_id: 1, unindexedField: 1, a: "additional content"});
+t.insert({_id: 2, unindexedField: 2, a: "irrelevant content"});
+t.ensureIndex({a: "text"});
 
 // Test text query with no results.
 assert.eq(false, t.find({$text: {$search: "words"}}).hasNext());
 
-// Test implicit sort for basic text query.
+// Test basic text query.
 results = t.find({$text: {$search: "textual content -irrelevant"}}).toArray();
+assert.eq(results.length, 2);
+assert.neq(results[0]._id, 2);
+assert.neq(results[1]._id, 2);
+
+// Test sort with basic text query.
+results = t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).toArray();
 assert.eq(results.length, 2);
 assert.eq(results[0]._id, 0);
 assert.eq(results[1]._id, 1);
 
-// Test implicit limit for basic text query.
-for (var i=0; i<200; i++) {
-    t.insert({a: "temporary content"})
-}
-results = t.find({$text: {$search: "textual content -irrelevant"}}).toArray();
-assert.eq(results.length, 100);
-t.remove({a: "temporary content"});
-
-// Test skip for basic text query.
-results = t.find({$text: {$search: "textual content -irrelevant"}}).skip(1).toArray();
+// Test skip with basic text query.
+results = t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).skip(1).toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 1);
 
-// Test explicit limit for basic text query.
-results = t.find({$text: {$search: "textual content -irrelevant"}}).limit(1).toArray();
+// Test limit with basic text query.
+results = t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).limit(1).toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 0);
 
-// TODO Test basic text query with explicit sort, once sort is enabled in the new query framework.
+// TODO Test basic text query with sort, once sort is enabled in the new query framework.
 
 // TODO Test basic text query with projection, once projection is enabled in the new query
 // framework.
@@ -54,15 +52,9 @@ assert.eq(results[0]._id, 1);
 
 // Test $and of basic text query with unindexed expression.
 results = t.find({$text: {$search: "content -irrelevant"},
-                  _idCopy: 1}).toArray();
+                  unindexedField: 1}).toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 1);
-
-// TODO Test that $or of basic text query with indexed expression is disallowed.
-
-// Test that $or of basic text query with unindexed expression is disallowed.
-assert.throws(function() { t.find({$or: [{$text: {$search: "content -irrelevant"}},
-                                         {_idCopy: 2}]}).itcount(); });
 
 // TODO Test invalid inputs for $text, $search, $language.
 

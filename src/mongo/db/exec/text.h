@@ -69,9 +69,6 @@ namespace mongo {
 
         // The text query.
         FTSQuery query;
-
-        // Limit for this stage.
-        size_t limit;
     };
 
     /**

@@ -31,68 +31,172 @@
 #include <algorithm>
 
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner.h"
 
 namespace mongo {
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
 
-    struct SortStage::WorkingSetComparator {
-        explicit WorkingSetComparator(BSONObj p) : pattern(p) { }
+    SortStageKeyGenerator::SortStageKeyGenerator(const BSONObj& sortSpec, const BSONObj& queryObj) {
+        _hasBounds = false;
+        _sortHasMeta = false;
+        _rawSortSpec = sortSpec;
 
-        bool operator()(const SortableDataItem& lhs, const SortableDataItem rhs) const {
-            int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false /* ignore field names */);
-            if (0 != result) {
-                return result < 0;
+        // 'sortSpec' can be a mix of $meta and index key expressions.  We pick it apart so that
+        // we only generate Btree keys for the index key expressions.
+
+        // The Btree key fields go in here.  We pass this fake index key pattern to the Btree
+        // key generator below as part of generating sort keys for the docs.
+        BSONObjBuilder btreeBob;
+
+        // The pattern we use to woCompare keys.  Each field in 'sortSpec' will go in here with
+        // a value of 1 or -1.  The Btree key fields are verbatim, meta fields have a default.
+        BSONObjBuilder comparatorBob;
+
+        BSONObjIterator it(sortSpec);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            if (elt.isNumber()) {
+                // Btree key.  elt (should be) foo: 1 or foo: -1.
+                comparatorBob.append(elt);
+                btreeBob.append(elt);
             }
-            return lhs.loc < rhs.loc;
+            else if (LiteParsedQuery::isTextMeta(elt)) {
+                // Sort text score decreasing by default.  Field name doesn't matter but we choose
+                // something that a user shouldn't ever have.
+                comparatorBob.append("$meta_text", -1);
+                _sortHasMeta = true;
+            }
+            else {
+                // Sort spec. should have been validated before here.
+                verify(false);
+            }
         }
 
-        BSONObj pattern;
-    };
+        // Our pattern for woComparing keys.
+        _comparatorObj = comparatorBob.obj();
 
-    SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
-        : _ws(ws),
-          _child(child),
-          _pattern(params.pattern),
-          _sorted(false),
-          _resultIterator(_data.end()),
-          _hasBounds(false),
-          _memUsage(0) {
+        // The fake index key pattern used to generate Btree keys.
+        _btreeObj = btreeBob.obj();
 
-        // Fill out _bounds and _hasBounds.
-        getBoundsForSort(params.query, params.pattern);
-
-        _cmp.reset(new WorkingSetComparator(_pattern));
+        // If we're just sorting by meta, don't bother with all the key stuff.
+        if (_btreeObj.isEmpty()) {
+            return;
+        }
 
         // We'll need to treat arrays as if we were to create an index over them. that is,
         // we may need to unnest the first level and consider each array element to decide
         // the sort order.
         std::vector<const char *> fieldNames;
         std::vector<BSONElement> fixed;
-        BSONObjIterator it(_pattern);
-        while (it.more()) {
-            BSONElement patternElt = it.next();
+        BSONObjIterator btreeIt(_btreeObj);
+        while (btreeIt.more()) {
+            BSONElement patternElt = btreeIt.next();
             fieldNames.push_back(patternElt.fieldName());
             fixed.push_back(BSONElement());
         }
 
         _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */));
 
+        // The bounds checker only works on the Btree part of the sort key.
+        getBoundsForSort(queryObj, _btreeObj);
+
         if (_hasBounds) {
-            // See comment on the operator() call about sort semantics and why we need a
-            // to use a bounds checker here.
-            _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _pattern, 1 /* == order */));
+            _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _btreeObj, 1 /* == order */));
         }
     }
 
-    SortStage::~SortStage() { }
+    BSONObj SortStageKeyGenerator::getSortKey(const WorkingSetMember& member) const {
+        BSONObj btreeKeyToUse = getBtreeKey(member.obj);
 
-    void SortStage::getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj) {
+        if (!_sortHasMeta) {
+            return btreeKeyToUse;
+        }
+
+        BSONObjBuilder mergedKeyBob;
+
+        // Merge metadata into the key.
+        BSONObjIterator it(_rawSortSpec);
+        BSONObjIterator btreeIt(btreeKeyToUse);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            if (elt.isNumber()) {
+                // Merge btree key elt.
+                mergedKeyBob.append(btreeIt.next());
+            }
+            else if (LiteParsedQuery::isTextMeta(elt)) {
+                // Add text score metadata
+                double score = 0.0;
+                if (member.hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
+                    const TextScoreComputedData* scoreData
+                        = static_cast<const TextScoreComputedData*>(
+                                member.getComputed(WSM_COMPUTED_TEXT_SCORE));
+                    score = scoreData->getScore();
+                }
+                mergedKeyBob.append("$meta_text", score);
+            }
+        }
+
+        return mergedKeyBob.obj();
+    }
+
+    BSONObj SortStageKeyGenerator::getBtreeKey(const BSONObj& memberObj) const {
+        if (_btreeObj.isEmpty()) {
+            return BSONObj();
+        }
+
+        // We will sort '_data' in the same order an index over '_pattern' would have.  This is
+        // tricky.  Consider the sort pattern {a:1} and the document {a:[1, 10]}. We have
+        // potentially two keys we could use to sort on. Here we extract these keys.
+        BSONObjCmp patternCmp(_btreeObj);
+        BSONObjSet keys(patternCmp);
+
+        // keyGen can throw on a "parallel array."  Previously we'd error out of sort.
+        // For now we just accept the doc verbatim.  TODO: Do we want to error?
+        try {
+            _keyGen->getKeys(memberObj, &keys);
+        }
+        catch (...) {
+            return memberObj;
+        }
+
+        if (keys.empty()) {
+            // TODO: will this ever happen?  don't think it should.
+            return memberObj;
+        }
+
+        // No bounds?  No problem!  Use the first key.
+        if (!_hasBounds) {
+            // Note that we sort 'keys' according to the pattern '_btreeObj'.
+            return *keys.begin();
+        }
+
+        // To decide which key to use in sorting, we must consider not only the sort pattern but
+        // the query.  Assume we have the query {a: {$gte: 5}} and a document {a:1}.  That
+        // document wouldn't match the query.  As such, the key '1' in an array {a: [1, 10]}
+        // should not be considered as being part of the result set and thus that array cannot
+        // sort using the key '1'.  To ensure that the keys we sort by are valid w.r.t. the
+        // query we use a bounds checker.
+        verify(NULL != _boundsChecker.get());
+        for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
+            if (_boundsChecker->isValidKey(*it)) {
+                return *it;
+            }
+        }
+
+        // No key in our bounds.
+        // TODO: will this ever happen?  don't think it should.
+        return *keys.begin();
+    }
+
+    void SortStageKeyGenerator::getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj) {
         QueryPlannerParams params;
         params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
+        // We're creating a "virtual index" with key pattern equal to the sort order.
         IndexEntry sortOrder(sortObj, true, false, "doesnt_matter");
         params.indices.push_back(sortOrder);
 
@@ -124,8 +228,7 @@ namespace mongo {
             }
 
             if (ixScan) {
-                // XXX use .swap?
-                _bounds = ixScan->bounds;
+                _bounds.fields.swap(ixScan->bounds.fields);
                 _hasBounds = true;
             }
         }
@@ -135,6 +238,33 @@ namespace mongo {
         }
     }
 
+    struct SortStage::WorkingSetComparator {
+        explicit WorkingSetComparator(BSONObj p) : pattern(p) { }
+
+        bool operator()(const SortableDataItem& lhs, const SortableDataItem& rhs) const {
+            // False means ignore field names.
+            int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false);
+            if (0 != result) {
+                return result < 0;
+            }
+            // Indices use DiskLoc as an additional sort key so we must as well.
+            return lhs.loc < rhs.loc;
+        }
+
+        BSONObj pattern;
+    };
+
+    SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
+        : _ws(ws),
+          _child(child),
+          _pattern(params.pattern),
+          _query(params.query),
+          _sorted(false),
+          _resultIterator(_data.end()),
+          _memUsage(0) { }
+
+    SortStage::~SortStage() { }
+
     bool SortStage::isEOF() {
         // We're done when our child has no more results, we've sorted the child's results, and
         // we've returned all sorted results.
@@ -143,6 +273,12 @@ namespace mongo {
 
     PlanStage::StageState SortStage::work(WorkingSetID* out) {
         ++_commonStats.works;
+
+        if (NULL == _sortKeyGen) {
+            // This is heavy and should be done as part of work().
+            _sortKeyGen.reset(new SortStageKeyGenerator(_pattern, _query));
+            return PlanStage::NEED_TIME;
+        }
 
         if (_memUsage > kMaxBytes) {
             return PlanStage::FAILURE;
@@ -160,66 +296,24 @@ namespace mongo {
                 // A DiskLoc may be invalidated at any time (during a yield).  We need to get into
                 // the WorkingSet as quickly as possible to handle it.
                 WorkingSetMember* member = _ws->get(id);
+
+                // Planner must put a fetch before we get here.
+                verify(member->hasObj());
+
+                // TODO: This should always be true...?
                 if (member->hasLoc()) {
                     _wsidByDiskLoc[member->loc] = id;
                 }
 
                 // Do some accounting to make sure we're not using too much memory.
-                if (member->hasLoc()) {
-                    _memUsage += sizeof(DiskLoc);
-                }
+                _memUsage += sizeof(DiskLoc) + member->obj.objsize();
 
-                // We are not supposed (yet) to sort over anything other than objects.  In other
-                // words, the query planner wouldn't put a sort atop anything that wouldn't have a
-                // collection scan as a leaf.
-                verify(member->hasObj());
-                _memUsage += member->obj.objsize();
-
-                // We will sort '_data' in the same order an index over '_pattern' would
-                // have. This has very nuanced implications. Consider the sort pattern {a:1}
-                // and the document {a:[1,10]}. We have potentially two keys we could use to
-                // sort on. Here we extract these keys. In the next step we decide which one to
-                // use.
-                BSONObjCmp patternCmp(_pattern);
-                BSONObjSet keys(patternCmp);
-                // XXX keyGen will throw on a "parallel array"
-                _keyGen->getKeys(member->obj, &keys);
-
-                // To decide which key to use in sorting, we consider not only the sort pattern
-                // but also if a given key, matches the query. Assume a query {a: {$gte: 5}} and
-                // a document {a:1}. That document wouldn't match. In the same sense, the key '1'
-                // in an array {a: [1,10]} should not be considered as being part of the result
-                // set and thus that array should sort based on the '10' key. To find such key,
-                // we use the bounds for the query.
-                BSONObj sortKey;
-                if (!_hasBounds) {
-                    sortKey = *keys.begin();
-                }
-                else {
-                    verify(NULL != _boundsChecker.get());
-                    for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
-                        if (_boundsChecker->isValidKey(*it)) {
-                            sortKey = *it;
-                            break;
-                        }
-                    }
-                }
-
-                if (sortKey.isEmpty()) {
-                    // We assume that if the document made it throught the sort stage, than it
-                    // matches the query and thus should contain at least on array item that
-                    // is within the query bounds.
-                    log() << "can't find bounds for obj " << member->obj.toString() << endl;
-                    log() << "bounds are " << _bounds.toString() << endl;
-                    verify(0);
-                }
-
-                // We let the data stay in the WorkingSet and sort using the selected portion
-                // of the object in that working set member.
+                // The data remains in the WorkingSet and we wrap the WSID with the sort key.
                 SortableDataItem item;
+                item.sortKey = _sortKeyGen->getSortKey(*member);
                 item.wsid = id;
-                item.sortKey = sortKey;
                 if (member->hasLoc()) {
+                    // The DiskLoc breaks ties when sorting two WSMs with the same sort key.
                     item.loc = member->loc;
                 }
                 _data.push_back(item);
@@ -230,7 +324,8 @@ namespace mongo {
             else if (PlanStage::IS_EOF == code) {
                 // TODO: We don't need the lock for this.  We could ask for a yield and do this work
                 // unlocked.  Also, this is performing a lot of work for one call to work(...)
-                std::sort(_data.begin(), _data.end(), *_cmp);
+                WorkingSetComparator cmp(_sortKeyGen->getSortComparator());
+                std::sort(_data.begin(), _data.end(), cmp);
                 _resultIterator = _data.begin();
                 _sorted = true;
                 ++_commonStats.needTime;
