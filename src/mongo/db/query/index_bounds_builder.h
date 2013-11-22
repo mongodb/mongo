@@ -40,6 +40,14 @@ namespace mongo {
      */
     class IndexBoundsBuilder {
     public:
+
+        enum BoundsTightness {
+            // Index bounds are exact.
+            EXACT,
+            // Index bounds are inexact, and a fetch is required.
+            INEXACT_FETCH
+        };
+
         /**
          * Populate the provided O.I.L. with one interval goes from MinKey to MaxKey (or vice-versa
          * depending on the index direction).
@@ -56,21 +64,21 @@ namespace mongo {
          * expr->isArray() must be true, and expr->isLogical() must be false.  
          */
         static void translate(const MatchExpression* expr, const BSONElement& elt,
-                              OrderedIntervalList* oilOut, bool* exactOut);
+                              OrderedIntervalList* oilOut, BoundsTightness* tightnessOut);
 
         /**
          * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
          * with the bounds in oilOut, which is an in/out parameter.
          */
         static void translateAndIntersect(const MatchExpression* expr, const BSONElement& elt,
-                                          OrderedIntervalList* oilOut, bool* exactOut);
+                                          OrderedIntervalList* oilOut, BoundsTightness* tightnessOut);
 
         /**
          * Creates bounds for 'expr' (indexed according to 'elt').  Unions those bounds
          * with the bounds in oilOut, which is an in/out parameter.
          */
         static void translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
-                                      OrderedIntervalList* oilOut, bool* exactOut);
+                                      OrderedIntervalList* oilOut, BoundsTightness* tightnessOut);
 
         /**
          * Make a range interval from the provided object.
@@ -111,15 +119,15 @@ namespace mongo {
          *
          *  used to optimize queries in some simple regex cases that start with '^'
          */
-        static string simpleRegex(const char* regex, const char* flags, bool* exact);
+        static string simpleRegex(const char* regex, const char* flags, BoundsTightness* tightnessOut);
 
         static Interval allValues();
 
         static void translateRegex(const RegexMatchExpression* rme, OrderedIntervalList* oil,
-                                   bool* exact);
+                                   BoundsTightness* tightnessOut);
 
         static void translateEquality(const BSONElement& data, bool isHashed,
-                                      OrderedIntervalList* oil, bool* exact);
+                                      OrderedIntervalList* oil, BoundsTightness* tightnessOut);
 
         static void unionize(OrderedIntervalList* oilOut);
         static void intersectize(const OrderedIntervalList& arg, OrderedIntervalList* oilOut);

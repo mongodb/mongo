@@ -76,7 +76,7 @@ namespace mongo {
     // static
     QuerySolutionNode* QueryPlannerAccess::makeLeafNode(const IndexEntry& index,
                                                         MatchExpression* expr,
-                                                        bool* exact) {
+                                                        IndexBoundsBuilder::BoundsTightness* tightnessOut) {
         // QLOG() << "making leaf node for " << expr->toString() << endl;
         // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
         // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
@@ -92,7 +92,7 @@ namespace mongo {
 
         if (MatchExpression::GEO_NEAR == expr->matchType()) {
             // We must not keep the expression node around.
-            *exact = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
             GeoNearMatchExpression* nearExpr = static_cast<GeoNearMatchExpression*>(expr);
             // 2d geoNear requires a hard limit and as such we take it out before it gets here.  If
             // this happens it's a bug.
@@ -105,7 +105,7 @@ namespace mongo {
         }
         else if (indexIs2D) {
             // We must not keep the expression node around.
-            *exact = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
             verify(MatchExpression::GEO == expr->matchType());
             GeoMatchExpression* nearExpr = static_cast<GeoMatchExpression*>(expr);
             verify(indexIs2D);
@@ -116,7 +116,7 @@ namespace mongo {
         }
         else if (MatchExpression::TEXT == expr->matchType()) {
             // We must not keep the expression node around.
-            *exact = true;
+            *tightnessOut = IndexBoundsBuilder::EXACT;
             TextMatchExpression* textExpr = static_cast<TextMatchExpression*>(expr);
             TextNode* ret = new TextNode();
             ret->_indexKeyPattern = index.keyPattern;
@@ -135,7 +135,7 @@ namespace mongo {
             isn->bounds.fields.resize(index.keyPattern.nFields());
 
             IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(),
-                                          &isn->bounds.fields[0], exact);
+                                          &isn->bounds.fields[0], tightnessOut);
 
             // QLOG() << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
             return isn;
@@ -143,8 +143,8 @@ namespace mongo {
     }
 
     void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, const IndexEntry& index,
-                                         size_t pos, bool* exactOut, QuerySolutionNode* node,
-                                         MatchExpression::MatchType mergeType) {
+                                         size_t pos, IndexBoundsBuilder::BoundsTightness* tightnessOut,
+                                         QuerySolutionNode* node, MatchExpression::MatchType mergeType) {
 
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
@@ -152,7 +152,7 @@ namespace mongo {
         if (STAGE_GEO_2D == type) {
             // XXX: 'expr' is possibly indexed by 'node'.  Right now we don't take advantage
             // of covering for 2d indices.
-            *exactOut = false;
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             return;
         }
 
@@ -177,7 +177,7 @@ namespace mongo {
             keyElt = it.next();
         }
         verify(!keyElt.eoo());
-        *exactOut = false;
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
 
         //QLOG() << "current bounds are " << currentScan->bounds.toString() << endl;
         //QLOG() << "node merging in " << child->toString() << endl;
@@ -190,15 +190,15 @@ namespace mongo {
         OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
         if (boundsToFillOut->fields[pos].name.empty()) {
-            IndexBoundsBuilder::translate(expr, keyElt, oil, exactOut);
+            IndexBoundsBuilder::translate(expr, keyElt, oil, tightnessOut);
         }
         else {
             if (MatchExpression::AND == mergeType) {
-                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, oil, exactOut);
+                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, oil, tightnessOut);
             }
             else {
                 verify(MatchExpression::OR == mergeType);
-                IndexBoundsBuilder::translateAndUnion(expr, keyElt, oil, exactOut);
+                IndexBoundsBuilder::translateAndUnion(expr, keyElt, oil, tightnessOut);
             }
         }
     }
@@ -418,11 +418,11 @@ namespace mongo {
                 // the bounds and filters.
                 verify(currentIndexNumber == ixtag->index);
 
-                bool exact = false;
-                mergeWithLeafNode(child, indices[currentIndexNumber], ixtag->pos, &exact,
+                IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
+                mergeWithLeafNode(child, indices[currentIndexNumber], ixtag->pos, &tightness,
                                   currentScan.get(), root->matchType());
 
-                if (exact) {
+                if (tightness == IndexBoundsBuilder::EXACT) {
                     root->getChildVector()->erase(root->getChildVector()->begin()
                                                   + curChild);
                     delete child;
@@ -465,11 +465,11 @@ namespace mongo {
 
                 currentIndexNumber = ixtag->index;
 
-                bool exact = false;
+                IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
                 currentScan.reset(makeLeafNode(indices[currentIndexNumber],
-                                                child, &exact));
+                                                child, &tightness));
 
-                if (exact && !inArrayOperator) {
+                if (tightness == IndexBoundsBuilder::EXACT && !inArrayOperator) {
                     // The bounds answer the predicate, and we can remove the expression from the
                     // root.  NOTE(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe
                     // optimize later.
@@ -710,9 +710,9 @@ namespace mongo {
                 // Make an index scan over the tagged index #.
                 IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 
-                bool exact = false;
+                IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
                 QuerySolutionNode* soln = makeLeafNode(indices[tag->index], root,
-                                                       &exact);
+                                                       &tightness);
                 verify(NULL != soln);
                 stringstream ss;
                 soln->appendToString(&ss, 0);
@@ -730,7 +730,7 @@ namespace mongo {
                 // superset of documents that satisfy the predicate, and we must check the
                 // predicate.
 
-                if (exact) {
+                if (tightness == IndexBoundsBuilder::EXACT) {
                     return soln;
                 }
 
