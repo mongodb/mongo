@@ -419,7 +419,7 @@ namespace mongo {
                     if (index.sparse) {
                         continue;
                     }
-                    const BSONObj& kp = index.keyPattern;
+                    const BSONObj kp = LiteParsedQuery::normalizeSortOrder(index.keyPattern);
                     if (providesSort(query, kp)) {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."
                                << endl;

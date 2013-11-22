@@ -662,6 +662,15 @@ namespace {
         assertSolutionExists("{fetch: {ixscan: {b: 1}}}");
     }
 
+    TEST_F(IndexAssignmentTest, BasicSortBooleanIndexKeyPattern) {
+        addIndex(BSON("a" << true));
+        runQuerySortProj(fromjson("{ a : 5 }"), BSON("a" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {a: true}}}");
+    }
+
     //
     // Basic sort elimination
     //

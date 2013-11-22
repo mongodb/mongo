@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/lite_parsed_query.h"
 
 namespace mongo {
 
@@ -373,7 +374,8 @@ namespace mongo {
         BSONObj sortPattern;
         {
             BSONObjBuilder sortBob;
-            BSONObjIterator it(indexKeyPattern);
+            BSONObj normalizedIndexKeyPattern(LiteParsedQuery::normalizeSortOrder(indexKeyPattern));
+            BSONObjIterator it(normalizedIndexKeyPattern);
             while (it.more()) {
                 BSONElement elt = it.next();
                 // Zero is returned if elt is not a number.  This happens when elt is hashed or

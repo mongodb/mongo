@@ -86,6 +86,68 @@ namespace mongo {
         return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
     }
 
+    // static
+    bool LiteParsedQuery::isTextMeta(BSONElement elt) {
+        // elt must be foo: {$meta: "text"}
+        if (mongo::Object != elt.type()) {
+            return false;
+        }
+        BSONObj metaObj = elt.Obj();
+        BSONObjIterator metaIt(metaObj);
+        // must have exactly 1 element
+        if (!metaIt.more()) {
+            return false;
+        }
+        BSONElement metaElt = metaIt.next();
+        if (!mongoutils::str::equals("$meta", metaElt.fieldName())) {
+            return false;
+        }
+        if (mongo::String != metaElt.type()) {
+            return false;
+        }
+        if (!mongoutils::str::equals("text", metaElt.valuestr())) {
+            return false;
+        }
+        // must have exactly 1 element
+        if (metaIt.more()) {
+            return false;
+        }
+        return true;
+    }
+
+    // static
+    bool LiteParsedQuery::isValidSortOrder(const BSONObj& sortObj) {
+        BSONObjIterator i(sortObj);
+        while (i.more()) {
+            BSONElement e = i.next();
+            if (isTextMeta(e)) {
+                continue;
+            }
+            long long n = e.safeNumberLong();
+            if (!(e.isNumber() && (n == -1LL || n == 1LL))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // static
+    BSONObj LiteParsedQuery::normalizeSortOrder(const BSONObj& sortObj) {
+        BSONObjBuilder b;
+        BSONObjIterator i(sortObj);
+        while (i.more()) {
+            BSONElement e = i.next();
+            if (isTextMeta(e)) {
+                b.append(e);
+                continue;
+            }
+            long long n = e.safeNumberLong();
+            int sortOrder = n >= 0 ? 1 : -1;
+            b.append(e.fieldName(), sortOrder);
+        }
+        return b.obj();
+    }
+
     LiteParsedQuery::LiteParsedQuery() : _wantMore(true), _explain(false), _snapshot(false),
                                          _returnKey(false), _showDiskLoc(false), _maxScan(0),
                                          _maxTimeMS(0) { }
@@ -129,6 +191,11 @@ namespace mongo {
         }
 
         _hasReadPref = queryObj.hasField("$readPreference");
+
+        if (!isValidSortOrder(_sort)) {
+            return Status(ErrorCodes::BadValue, "bad sort specification");
+        }
+        _sort = normalizeSortOrder(_sort);
 
         return Status::OK();
     }

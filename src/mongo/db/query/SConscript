@@ -111,6 +111,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="lite_parsed_query_test",
+    source=[
+        "lite_parsed_query_test.cpp"
+    ],
+    LIBDEPS=[
+        "lite_parsed_query",
+    ],
+)
+
+env.CppUnitTest(
     target="parsed_projection_test",
     source=[
         "parsed_projection_test.cpp"

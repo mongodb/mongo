@@ -62,6 +62,30 @@ namespace mongo {
          */
         static StatusWith<int> parseMaxTimeMSQuery(const BSONObj& queryObj);
 
+        /**
+         * Helper function to identify text search sort key
+         * Example: {a: {$meta: "text"}}
+         */
+        static bool isTextMeta(BSONElement elt);
+
+        /**
+         * Helper function to validate a sort object.
+         * Returns true if each element satisfies one of:
+         * 1. a number with value 1
+         * 2. a number with value -1
+         * 3. isTextMeta
+         */
+        static bool isValidSortOrder(const BSONObj& sortObj);
+
+        /**
+         * Helper function to create a normalized sort object.
+         * Each element of the object returned satisfies one of:
+         * 1. a number with value 1
+         * 2. a number with value -1
+         * 3. isTextMeta
+         */
+        static BSONObj normalizeSortOrder(const BSONObj& sortObj);
+
         // Name of the maxTimeMS command option.
         static const string cmdOptionMaxTimeMS;
 
