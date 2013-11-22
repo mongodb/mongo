@@ -283,6 +283,20 @@ namespace mongo {
         ASSERT( !lt.matchesBSON( BSON( "b" << 4 ), NULL ) );
     }
 
+    TEST( LtOp, MatchesDotNotationNull) {
+        BSONObj operand = BSON( "$lt" << BSONNULL );
+        LTMatchExpression lt;
+        ASSERT( lt.init( "a.b", operand[ "$lt" ] ).isOK() );
+        ASSERT( !lt.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSONObj() ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSONNULL ) ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "a" << 4 ) << BSON( "b" << 4 ) ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 4 ) ) ), NULL ) );
+    }
+
     TEST( LtOp, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
         LTMatchExpression lt;
@@ -419,6 +433,20 @@ namespace mongo {
         ASSERT( !lte.matchesBSON( BSON( "a" << 4 ), NULL ) );
         // A non-existent field is treated same way as an empty bson object
         ASSERT( lte.matchesBSON( BSON( "b" << 4 ), NULL ) );
+    }
+
+    TEST( LteOp, MatchesDotNotationNull) {
+        BSONObj operand = BSON( "$lte" << BSONNULL );
+        LTEMatchExpression lte;
+        ASSERT( lte.init( "a.b", operand[ "$lte" ] ).isOK() );
+        ASSERT( lte.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSONObj() ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSONNULL ) ) ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "a" << 4 ) << BSON( "b" << 4 ) ) ), NULL ) );
+        ASSERT( !lte.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( !lte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 4 ) ) ), NULL ) );
     }
 
     TEST( LteOp, MatchesMinKey ) {
@@ -561,6 +589,20 @@ namespace mongo {
         ASSERT( !gt.matchesBSON( BSON( "b" << 4 ), NULL ) );
     }
 
+    TEST( GtOp, MatchesDotNotationNull) {
+        BSONObj operand = BSON( "$gt" << BSONNULL );
+        GTMatchExpression gt;
+        ASSERT( gt.init( "a.b", operand[ "$gt" ] ).isOK() );
+        ASSERT( !gt.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSONObj() ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSONNULL ) ) ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "a" << 4 ) << BSON( "b" << 4 ) ) ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 4 ) ) ), NULL ) );
+    }
+
     TEST( GtOp, MatchesMinKey ) {
         BSONObj operand = BSON( "a" << MinKey );
         GTMatchExpression gt;
@@ -698,6 +740,20 @@ namespace mongo {
         ASSERT( !gte.matchesBSON( BSON( "a" << 4 ), NULL ) );
         // A non-existent field is treated same way as an empty bson object
         ASSERT( gte.matchesBSON( BSON( "b" << 4 ), NULL ) );
+    }
+
+    TEST( ComparisonMatchExpression, MatchesDotNotationNull) {
+        BSONObj operand = BSON( "$gte" << BSONNULL );
+        GTEMatchExpression gte;
+        ASSERT( gte.init( "a.b", operand[ "$gte" ] ).isOK() );
+        ASSERT( gte.matchesBSON( BSONObj(), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSONNULL ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << 4 ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSONObj() ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << BSONNULL ) ) ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "a" << 4 ) << BSON( "b" << 4 ) ) ), NULL ) );
+        ASSERT( !gte.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( !gte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON( "b" << 4 ) ) ), NULL ) );
     }
 
     TEST( ComparisonMatchExpression, MatchesMinKey ) {

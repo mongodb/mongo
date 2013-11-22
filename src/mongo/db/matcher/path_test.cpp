@@ -136,6 +136,34 @@ namespace mongo {
         ASSERT( !cursor.more() );
     }
 
+    TEST( Path, NestedMissing1 ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b" ).isOK() );
+
+        BSONObj doc = BSON( "a" << 4 );
+
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( cursor.more() );
+        BSONElementIterator::Context e = cursor.next();
+        ASSERT( e.element().eoo() );
+        ASSERT( e.arrayOffset().eoo() );
+        ASSERT( !e.outerArray() );
+
+        ASSERT( !cursor.more() );
+    }
+
+    TEST( Path, NestedMissing2 ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b" ).isOK() );
+
+        BSONObj doc = BSON( "a" << BSON_ARRAY( 4 ) );
+
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( !cursor.more() );
+    }
+
     TEST( Path, NestedNoLeaf1 ) {
         ElementPath p;
         ASSERT( p.init( "a.b" ).isOK() );
