@@ -439,10 +439,10 @@ jsTest.addAuth = function(conn) {
     print ("Adding admin user on connection: " + localconn);
     try {
         localconn._skipAuth = true; // Make sure we don't try to authenticate the conn while adding the user
-        return localconn.getDB('admin').addUser({user: jsTestOptions().adminUser,
-                                                 pwd: jsTestOptions().adminPassword,
-                                                 roles: ["__system"]},
-                                                'majority', 60000);
+        return localconn.getDB('admin').createUser({user: jsTestOptions().adminUser,
+                                                    pwd: jsTestOptions().adminPassword,
+                                                    roles: ["__system"]},
+                                                   {w: 'majority', wtimeout: 60000});
     } finally {
         localconn._skipAuth = false;
     }
