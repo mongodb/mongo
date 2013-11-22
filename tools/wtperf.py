@@ -41,6 +41,8 @@ with open('monitor', 'r') as csvfile:
 	if row[4] != in_ckpt:
 	    ckptlist.append(row[0])
 	    in_ckpt = row[4]
+if in_ckpt == 'Y':
+    ckptlist.append(row[0])
 
 # Write a command file for gnuplot.
 of = open("gnuplot.cmd", "w")
