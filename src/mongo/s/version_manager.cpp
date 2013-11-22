@@ -115,23 +115,45 @@ namespace mongo {
 
         WriteBackListener::init( *conn_in );
 
-        DBClientBase* conn = getVersionable( conn_in );
-        verify( conn ); // errors thrown above
+        bool ok;
+        DBClientBase* conn = NULL;
+        try {
+            // May throw if replica set primary is down
+            conn = getVersionable( conn_in );
+            dassert( conn ); // errors thrown above
 
-        BSONObjBuilder cmdBuilder;
+            BSONObjBuilder cmdBuilder;
 
-        cmdBuilder.append( "setShardVersion" , "" );
-        cmdBuilder.appendBool( "init", true );
-        cmdBuilder.append( "configdb" , configServer.modelServer() );
-        cmdBuilder.appendOID( "serverID" , &serverID );
-        cmdBuilder.appendBool( "authoritative" , true );
+            cmdBuilder.append( "setShardVersion" , "" );
+            cmdBuilder.appendBool( "init", true );
+            cmdBuilder.append( "configdb" , configServer.modelServer() );
+            cmdBuilder.appendOID( "serverID" , &serverID );
+            cmdBuilder.appendBool( "authoritative" , true );
 
-        BSONObj cmd = cmdBuilder.obj();
+            BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1) << "initializing shard connection to " << conn->toString() << endl;
-        LOG(2) << "initial sharding settings : " << cmd << endl;
+            LOG(1) << "initializing shard connection to " << conn->toString() << endl;
+            LOG(2) << "initial sharding settings : " << cmd << endl;
 
-        bool ok = conn->runCommand("admin", cmd, result, 0);
+            ok = conn->runCommand("admin", cmd, result, 0);
+        }
+        catch( const DBException& ex ) {
+
+            if ( conn_in->type() != ConnectionString::SET ) {
+                throw;
+            }
+
+            // NOTE: Only old-style cluster operations will talk via DBClientReplicaSets - using
+            // checkShardVersion is required (which includes initShardVersion information) if these
+            // connections are used.
+
+            OCCASIONALLY {
+                warning() << "failed to initialize new replica set connection version, "
+                          << "will initialize on first use" << endl;
+            }
+
+            return true;
+        }
 
         // HACK for backwards compatibility with v1.8.x, v2.0.0 and v2.0.1
         // Result is false, but will still initialize serverID and configdb

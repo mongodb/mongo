@@ -1546,33 +1546,77 @@ namespace mongo {
         return _getMonitor()->isAnyNodeOk();
     }
 
-    void DBClientReplicaSet::_auth(const BSONObj& params) {
-        DBClientConnection * m = checkMaster();
+    static bool isAuthException( const DBException& ex ) {
+        return ex.getCode() == ErrorCodes::AuthenticationFailed;
+    }
 
-        // first make sure it actually works
-        m->auth(params);
+    void DBClientReplicaSet::_auth( const BSONObj& params ) {
 
-        /* Also authenticate the cached secondary connection. Note that this is only
-         * needed when we actually have something cached and is last known to be
-         * working.
-         */
-        if (_lastSlaveOkConn.get() != NULL && !_lastSlaveOkConn->isFailed()) {
+        // We prefer to authenticate against a primary, but otherwise a secondary is ok too
+        // Empty tag matches every secondary
+        TagSet tags(BSON_ARRAY(BSONObj()));
+        shared_ptr<ReadPreferenceSetting> readPref(
+            new ReadPreferenceSetting( ReadPreference_PrimaryPreferred, tags ) );
+
+        LOG(3) << "dbclient_rs authentication of " << _getMonitor()->getName() << endl;
+
+        // NOTE that we retry MAX_RETRY + 1 times, since we're always primary preferred we don't
+        // fallback to the primary.
+        Status lastNodeStatus = Status::OK();
+        for ( size_t retry = 0; retry < MAX_RETRY + 1; retry++ ) {
             try {
-                _lastSlaveOkConn->auth(params);
+                DBClientConnection* conn = selectNodeUsingTags( readPref );
+
+                if ( conn == NULL ) {
+                    break;
+                }
+
+                conn->auth( params );
+
+                // Cache the new auth information since we now validated it's good
+                _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
+
+                // Ensure the only child connection open is the one we authenticated against - other
+                // child connections may not have full authentication information.
+                // NOTE: _lastSlaveOkConn may or may not be the same as _master
+                dassert(_lastSlaveOkConn.get() == conn || _master.get() == conn);
+                if ( conn != _lastSlaveOkConn.get() ) {
+                    _lastSlaveOkHost = HostAndPort();
+                    _lastSlaveOkConn.reset();
+                }
+                if ( conn != _master.get() ) {
+                    _masterHost = HostAndPort();
+                    _master.reset();
+                }
+
+                return;
             }
-            catch (const DBException& ex) {
-                LOG(1) << "Failed to authenticate secondary, clearing cached connection: "
-                       << causedBy(ex) << endl;
-                // We need to clear the cached connection because it will not match the set
-                // of cached username/pwd. Anything can be wrong here: user was removed in between
-                // authenticating to primary and secondary, user not yet replicated to secondary,
-                // secondary connection failed, etc.
+            catch ( const DBException &ex ) {
+
+                // We care if we can't authenticate (i.e. bad password) in credential params.
+                // We shouldn't be unauthorized since we aren't doing anything yet.
+                if ( isAuthException( ex ) ) {
+                    throw;
+                }
+
+                StringBuilder errMsgB;
+                errMsgB << "can't authenticate against replica set node "
+                        << _lastSlaveOkHost.toString();
+                lastNodeStatus = ex.toStatus( errMsgB.str() );
+
+                LOG(1) << lastNodeStatus.reason() << endl;
                 invalidateLastSlaveOkCache();
             }
         }
 
-        // now that it does, we should save so that for a new node we can auth
-        _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
+        if ( lastNodeStatus.isOK() ) {
+            StringBuilder assertMsgB;
+            assertMsgB << "Failed to authenticate, no good nodes in " << _getMonitor()->getName();
+            uasserted( ErrorCodes::NodeNotFound, assertMsgB.str() );
+        }
+        else {
+            uasserted( lastNodeStatus.code(), lastNodeStatus.reason() );
+        }
     }
 
     void DBClientReplicaSet::logout(const string &dbname, BSONObj& info) {

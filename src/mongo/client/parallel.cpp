@@ -716,26 +716,27 @@ namespace mongo {
         }
 
         const DBClientBase* rawConn = state->conn->getRawConn();
-        if (( _options & QueryOption_SlaveOk ) &&
-                rawConn->type() == ConnectionString::SET &&
-                rawConn->isFailed() ) {
-            /* A side effect of this short circuiting is this will not be
-             * able figure out that the primary is now up on it's own and
-             * has to rely on other threads to refresh the node states.
-             */
+        bool allowShardVersionFailure = ( _options & QueryOption_SlaveOk )
+                                        && rawConn->type() == ConnectionString::SET;
+
+        if ( allowShardVersionFailure && rawConn->isFailed() ) {
+
+            state->conn->donotCheckVersion();
+
+            // A side effect of this short circuiting is the mongos will not be able figure out that
+            // the primary is now up on it's own and has to rely on other threads to refresh node
+            // states.
 
             OCCASIONALLY {
-                const DBClientReplicaSet* repl =
-                    dynamic_cast<const DBClientReplicaSet*>( rawConn );
+                const DBClientReplicaSet* repl = dynamic_cast<const DBClientReplicaSet*>( rawConn );
+                dassert(repl);
                 warning() << "Primary for " << repl->getServerAddress()
                           << " was down before, bypassing setShardVersion."
-                          << " Local config view can be stale." << endl;
+                          << " The local replica set view and targeting may be stale." << endl;
             }
-        } else {
+        }
+        else {
             try {
-                /* TODO: Undo SERVER-5797. This try-catch is a temporary hack until
-                 * secondaries can properly handle shard versioning
-                 */
                 if ( state->conn->setVersion() ) {
                     // It's actually okay if we set the version here, since either the
                     // manager will be verified as compatible, or if the manager doesn't
@@ -743,19 +744,20 @@ namespace mongo {
                     LOG( pc ) << "needed to set remote version on connection to value "
                               << "compatible with " << vinfo << endl;
                 }
-            } catch ( const DBException& dbEx ) {
-                if ( (dbEx.getCode() == 10009 /* no master */ &&
-                        ( _options & QueryOption_SlaveOk )) ) {
+            }
+            catch ( const DBException& dbEx ) {
+                if ( allowShardVersionFailure ) {
+
+                    // It's okay if we don't set the version when talking to a secondary, we can
+                    // be stale in any case.
 
                     OCCASIONALLY {
                         const DBClientReplicaSet* repl =
-                            dynamic_cast<const DBClientReplicaSet*>(
-                                    state->conn->getRawConn() );
-
-                        warning() << "Cannot contact primary for "
-                                  << repl->getServerAddress()
-                                  << " to check shard version. "
-                                  << "SlaveOk query can be sent to the wrong shard."
+                            dynamic_cast<const DBClientReplicaSet*>( state->conn->getRawConn() );
+                        dassert(repl);
+                        warning() << "Cannot contact primary for " << repl->getServerAddress()
+                                  << " to check shard version."
+                                  << " The local replica set view and targeting may be stale."
                                   << endl;
                     }
                 }
