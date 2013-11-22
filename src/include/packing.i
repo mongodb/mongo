@@ -468,6 +468,7 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 		return (__pack_write(session, &pv, &p, size));
 	}
 
+	WT_CLEAR(pv);
 	WT_RET(__pack_init(session, &pack, fmt));
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_PACK_GET(session, pv, ap);
@@ -495,8 +496,6 @@ __wt_struct_sizev(
 	WT_PACK_VALUE pv;
 	size_t total;
 
-	WT_CLEAR(pv);
-
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
 		WT_PACK_GET(session, pv, ap);
@@ -504,6 +503,7 @@ __wt_struct_sizev(
 		return (0);
 	}
 
+	WT_CLEAR(pv);
 	WT_RET(__pack_init(session, &pack, fmt));
 	for (total = 0; __pack_next(&pack, &pv) == 0;) {
 		WT_PACK_GET(session, pv, ap);
@@ -536,6 +536,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
+	WT_CLEAR(pv);
 	WT_RET(__pack_init(session, &pack, fmt));
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));

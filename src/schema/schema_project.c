@@ -69,6 +69,9 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 			continue;
 		}
 
+		/* We have to get a key or value before any operations. */
+		WT_ASSERT(session, buf != NULL);
+
 		/*
 		 * Otherwise, the argument is a count, where a missing
 		 * count means a count of 1.
@@ -283,6 +286,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 			end = p + buf->size;
 			continue;
 		}
+
+		/* We have to get a key or value before any operations. */
+		WT_ASSERT(session, buf != NULL);
 
 		/*
 		 * Otherwise, the argument is a count, where a missing

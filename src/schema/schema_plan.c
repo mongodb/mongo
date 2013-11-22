@@ -93,6 +93,8 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session,
 	WT_PACK_VALUE pv;
 	u_int kcols, ncols, vcols;
 
+	WT_CLEAR(pv);
+
 	WT_RET(__pack_init(session, &pack, key_format));
 	for (kcols = 0; (ret = __pack_next(&pack, &pv)) == 0; kcols++)
 		;
