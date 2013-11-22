@@ -21,6 +21,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -166,26 +167,26 @@ namespace {
         }
 
         // want to do it sync
-        set<MongoFile*> seen;
-        while ( true ) {
-            auto_ptr<Flushable> f;
+
+        // get a thread-safe Flushable object for each file first in a single lock
+        // so that we can iterate and flush without doing any locking here
+        OwnedPointerVector<Flushable> thingsToFlushWrapper;
+        vector<Flushable*>& thingsToFlush = thingsToFlushWrapper.mutableVector();
+        {
             LockMongoFilesShared lk;
             for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-                MongoFile * mmf = *i;
-                if ( ! mmf )
+                MongoFile* mmf = *i;
+                if ( !mmf )
                     continue;
-                if ( seen.count( mmf ) )
-                    continue;
-                f.reset( mmf->prepareFlush() );
-                seen.insert( mmf );
-                break;
+                thingsToFlush.push_back( mmf->prepareFlush() );
             }
-            if ( ! f.get() )
-                break;
-
-            f->flush();
         }
-        return seen.size();
+
+        for ( size_t i = 0; i < thingsToFlush.size(); i++ ) {
+            thingsToFlush[i]->flush();
+        }
+
+        return thingsToFlush.size();
     }
 
     void MongoFile::created() {
