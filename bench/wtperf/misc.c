@@ -40,6 +40,24 @@ enomem(const CONFIG *cfg)
 	return (ENOMEM);
 }
 
+const char *
+op_name(uint8_t *op)
+{
+	switch (*op) {
+	case WORKER_INSERT:
+		return ("insert");
+	case WORKER_INSERT_RMW:
+		return ("insert_rmw");
+	case WORKER_READ:
+		return ("read");
+	case WORKER_UPDATE:
+		return ("update");
+	default:
+		return ("unknown");
+	}
+	/* NOTREACHED */
+}
+
 /* Setup the logging output mechanism. */
 int
 setup_log_file(CONFIG *cfg)

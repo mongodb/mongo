@@ -27,9 +27,6 @@
 
 #include "wtperf.h"
 
-#define	IS_INSERT_WORKER(w)						\
-    ((w) == WORKER_INSERT || (w) == WORKER_INSERT_RMW)
-
 /* Default values. */
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
@@ -79,6 +76,8 @@ static const char * const large_config_str =
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
+static uint8_t run_mix_ops[100];	/* run-mix operation schedule */
+
 static uint64_t g_ckpt_ops;		/* checkpoint operations */
 static uint64_t g_insert_ops;		/* insert operations */
 static uint64_t g_read_ops;		/* read operations */
@@ -111,7 +110,7 @@ static int	 start_threads(
 		    CONFIG *, u_int, CONFIG_THREAD **, void *(*func)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*update_thread(void *);
-static void	 worker(CONFIG_THREAD *, worker_type);
+static void	 worker(CONFIG_THREAD *);
 static uint64_t	 wtperf_rand(CONFIG *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
@@ -127,16 +126,39 @@ get_next_incr(void)
  */
 #define	WTPERF_SUM_OPS(field)						\
 static inline uint64_t							\
-sum_##field##_ops(CONFIG_THREAD *threads, u_int num)			\
+sum_##field##_ops(CONFIG *cfg, CONFIG_THREAD *thread, u_int thread_cnt)	\
 {									\
 	uint64_t total;							\
 	u_int i;							\
 									\
-	if (threads == NULL)						\
-		return (0);						\
+	total = 0;							\
 									\
-	for (i = 0, total = 0; i < num; ++i, ++threads)			\
-		total += threads->field##_ops;				\
+	/* If a set of threads specified, review only them. */		\
+	if (thread != NULL) {						\
+		for (i = 0;						\
+		    thread != NULL && i < thread_cnt; ++i, ++thread)	\
+			total += thread->field##_ops;			\
+		return (total);						\
+	}								\
+									\
+	/* Otherwise, review all worker threads. */			\
+	for (i = 0, thread = cfg->ckptthreads;				\
+	    thread != NULL && i < cfg->checkpoint_threads;		\
+	    ++i, ++thread)						\
+		total += thread->field##_ops;				\
+	for (i = 0, thread = cfg->ithreads;				\
+	    thread != NULL && i < cfg->insert_threads;			\
+	    ++i, ++thread)						\
+		total += thread->field##_ops;				\
+	for (i = 0, thread = cfg->rthreads;				\
+	    thread != NULL && i < cfg->read_threads;			\
+	    ++i, ++thread)						\
+		total += thread->field##_ops;				\
+	for (i = 0, thread = cfg->uthreads;				\
+	    thread != NULL && i < cfg->update_threads;			\
+	    ++i, ++thread)						\
+		total += thread->field##_ops;				\
+									\
 	return (total);							\
 }
 WTPERF_SUM_OPS(ckpt)
@@ -145,7 +167,7 @@ WTPERF_SUM_OPS(read)
 WTPERF_SUM_OPS(update)
 
 static void
-worker(CONFIG_THREAD *thread, worker_type wtype)
+worker(CONFIG_THREAD *thread)
 {
 	CONFIG *cfg;
 	WT_CONNECTION *conn;
@@ -153,26 +175,16 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 	WT_SESSION *session;
 	uint64_t next_val;
 	int op_ret, ret;
+	uint8_t *op, *op_end;
 	char *data_buf, *key_buf, *value;
-	const char *op_name;
 
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
-	data_buf = key_buf = NULL;
 	op_ret = 0;
 
-	if ((key_buf = calloc(cfg->key_sz + 1, 1)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	if (IS_INSERT_WORKER(wtype) || wtype == WORKER_UPDATE) {
-		if ((data_buf = calloc(cfg->data_sz, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
-		memset(data_buf, 'a', cfg->data_sz - 1);
-	}
+	key_buf = thread->key_buf;
+	data_buf = thread->data_buf;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
@@ -185,34 +197,49 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 		goto err;
 	}
 
+	op = thread->ops;
+	op_end = thread->ops + sizeof(thread->ops);
 	while (!g_stop) {
-		if (!cfg->random_range && IS_INSERT_WORKER(wtype))
-			next_val = cfg->icount + get_next_incr();
-		else
+		switch (*op) {
+		case WORKER_INSERT:
+		case WORKER_INSERT_RMW:
+			if (cfg->random_range)
+				next_val = wtperf_rand(cfg);
+			else
+				next_val = cfg->icount + get_next_incr();
+			break;
+		case WORKER_READ:
+		case WORKER_UPDATE:
 			next_val = wtperf_rand(cfg);
 
-		/*
-		 * If the workload is started without a populate phase we
-		 * rely on at least one insert to get a valid item id.
-		 */
-		if (!IS_INSERT_WORKER(wtype) &&
-		    wtperf_value_range(cfg) < next_val)
-			continue;
+			/*
+			 * If the workload is started without a populate phase
+			 * we rely on at least one insert to get a valid item
+			 * id.
+			 */
+			if (wtperf_value_range(cfg) < next_val)
+				continue;
+			break;
+		default:
+			ret = EINVAL;
+			goto err;
+		}
+
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		cursor->set_key(cursor, key_buf);
-		switch (wtype) {
+
+		switch (*op) {
 		case WORKER_READ:
 			if ((op_ret = cursor->search(cursor)) == 0) {
 				++thread->read_ops;
+				if (++op == op_end)
+					op = thread->ops;
 				continue;
 			}
-			op_name = "read";
 			break;
 		case WORKER_INSERT_RMW:
-			if ((op_ret = cursor->search(cursor)) != WT_NOTFOUND) {
-				op_name="insert_rmw";
+			if ((op_ret = cursor->search(cursor)) != WT_NOTFOUND)
 				break;
-			}
 			/* All error returns reset the cursor buffers. */
 			cursor->set_key(cursor, key_buf);
 			/* FALLTHROUGH */
@@ -220,9 +247,10 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 			cursor->set_value(cursor, data_buf);
 			if ((op_ret = cursor->insert(cursor)) == 0) {
 				++thread->insert_ops;
+				if (++op == op_end)
+					op = thread->ops;
 				continue;
 			}
-			op_name = "insert";
 			break;
 		case WORKER_UPDATE:
 			if ((op_ret = cursor->search(cursor)) == 0) {
@@ -235,13 +263,14 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 				cursor->set_value(cursor, data_buf);
 				if ((op_ret = cursor->update(cursor)) == 0) {
 					++thread->update_ops;
+					if (++op == op_end)
+						op = thread->ops;
 					continue;
 				}
 			}
-			op_name = "update";
 			break;
 		default:
-			lprintf(cfg, EINVAL, 0, "Invalid worker type");
+			ret = EINVAL;
 			goto err;
 		}
 
@@ -254,56 +283,134 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 		 * threads, and the failed op was for an old item.
 		 */
 		if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
-		    (wtype == WORKER_READ || wtype == WORKER_UPDATE)) {
+		    (*op == WORKER_READ || *op == WORKER_UPDATE)) {
 			if (next_val < cfg->icount)
 				lprintf(cfg, WT_PANIC, 0,
 				    "%s not found for: %s. Value was"
 				    " inserted during populate",
-				    op_name, key_buf);
+				    op_name(op), key_buf);
 			if (next_val * 1.1 > wtperf_value_range(cfg))
 				continue;
 			lprintf(cfg, op_ret, 1,
 			    "%s not found for: %s, range: %" PRIu64
 			    " an insert is likely more than ten "
 			    "percent behind reads",
-			    op_name, key_buf, wtperf_value_range(cfg));
+			    op_name(op), key_buf, wtperf_value_range(cfg));
 		} else
 			lprintf(cfg, op_ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
-			    op_name, key_buf, wtperf_value_range(cfg));
+			    op_name(op), key_buf, wtperf_value_range(cfg));
 	}
 
 	/* To ensure managing thread knows if we exited early. */
 err:	if (ret != 0)
 		g_error = 1;
+
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
-	free(data_buf);
-	free(key_buf);
+}
+
+/*
+ * run_mix_schedule_op --
+ *	Replace read operations with another operation, in the configured
+ * percentage.
+ */
+static void
+run_mix_schedule_op(int op, uint32_t op_cnt)
+{
+	u_int i, jump;
+	uint8_t *p, *end;
+
+	/* Jump around the array to roughly spread out the operations. */
+	jump = 100 / op_cnt;
+
+	/*
+	 * Find a read operation and replace it with another operation.  This
+	 * this is roughly n-squared, but it's an N of 100, leave it.
+	 */
+	p = run_mix_ops;
+	end = run_mix_ops + sizeof(run_mix_ops);
+	for (i = 0; i < op_cnt; ++i) {
+		for (; *p != WORKER_READ; ++p)
+			if (p == end)
+				p = run_mix_ops;
+		*p = op;
+
+		if (end - jump < p)
+			p = run_mix_ops;
+		else
+			p += jump;
+	}
+}
+
+/*
+ * run_mix_schedule --
+ *	Schedule the mixed-run operations.
+ */
+static void
+run_mix_schedule(CONFIG *cfg)
+{
+	/* Default to read, then fill in other operations. */
+	memset(run_mix_ops, WORKER_READ, sizeof(run_mix_ops));
+	run_mix_schedule_op(
+	    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
+	    cfg->run_mix_inserts);
+	run_mix_schedule_op(WORKER_UPDATE, cfg->run_mix_updates);
+}
+
+/*
+ * op_setup --
+ *	Set up the thread's operation list.
+ */
+static void
+op_setup(CONFIG *cfg, int op, CONFIG_THREAD *thread)
+{
+
+	/*
+	 * If we're not running a job mix, it's easy, all of the operations
+	 * are the same.
+	 */
+	if (cfg->run_mix_inserts == 0 && cfg->run_mix_updates == 0)
+		memset(thread->ops, op, sizeof(thread->ops));
+	else
+		memcpy(thread->ops, run_mix_ops, sizeof(thread->ops));
 }
 
 static void *
 read_thread(void *arg)
 {
-	worker((CONFIG_THREAD *)arg, WORKER_READ);
+	CONFIG_THREAD *thread;
+
+	thread = (CONFIG_THREAD *)arg;
+
+	op_setup(thread->cfg, WORKER_READ, thread);
+	worker(thread);
 	return (NULL);
 }
 
 static void *
 insert_thread(void *arg)
 {
-	CONFIG *cfg;
+	CONFIG_THREAD *thread;
 
-	cfg = ((CONFIG_THREAD *)arg)->cfg;
-	worker((CONFIG_THREAD *)arg,
-	    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT);
+	thread = (CONFIG_THREAD *)arg;
+
+	op_setup(thread->cfg,
+	    thread->cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
+	    thread);
+	worker(thread);
 	return (NULL);
 }
 
 static void *
 update_thread(void *arg)
 {
-	worker((CONFIG_THREAD *)arg, WORKER_UPDATE);
+	CONFIG_THREAD *thread;
+
+	thread = (CONFIG_THREAD *)arg;
+
+	op_setup(thread->cfg, WORKER_UPDATE, thread);
+	worker(thread);
 	return (NULL);
 }
 
@@ -324,18 +431,10 @@ populate_thread(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
-	data_buf = key_buf = NULL;
 	ret = 0;
 
-	if ((key_buf = calloc(cfg->key_sz + 1, 1)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	if ((data_buf = calloc(cfg->data_sz, 1)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	memset(data_buf, 'a', cfg->data_sz - 1);
+	key_buf = thread->key_buf;
+	data_buf = thread->data_buf;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
@@ -406,8 +505,6 @@ err:	if (ret != 0)
 		g_error = 1;
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
-	free(data_buf);
-	free(key_buf);
 	return (NULL);
 }
 
@@ -451,9 +548,9 @@ monitor(void *arg)
 				break;
 		}
 
-		reads = sum_read_ops(cfg->rthreads, cfg->read_threads);
-		inserts = sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-		updates = sum_update_ops(cfg->uthreads, cfg->update_threads);
+		reads = sum_read_ops(cfg, NULL, 0);
+		inserts = sum_insert_ops(cfg, NULL, 0);
+		updates = sum_update_ops(cfg, NULL, 0);
 
 		assert(clock_gettime(CLOCK_REALTIME, &t) == 0);
 		tm = localtime_r(&t.tv_sec, &_tm);
@@ -574,7 +671,7 @@ execute_populate(CONFIG *cfg)
 			continue;
 		interval = 0;
 		g_insert_ops =
-		    sum_insert_ops(cfg->popthreads, cfg->populate_threads);
+		    sum_insert_ops(cfg, cfg->popthreads, cfg->populate_threads);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts in %" PRIu32 " secs",
 		    g_insert_ops - last_ops, cfg->report_interval);
@@ -630,6 +727,10 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 
+	/* Schedule run-mix operations, as necessary. */
+	if (cfg->run_mix_inserts != 0 || cfg->run_mix_updates != 0)
+		run_mix_schedule(cfg);
+
 	lprintf(cfg, 0, 1,
 	    "Starting workload threads: read %" PRIu32
 	    ", insert %" PRIu32 ", update %" PRIu32,
@@ -670,13 +771,10 @@ execute_workload(CONFIG *cfg)
 		}
 
 		/* Sum the operations we've done. */
-		g_ckpt_ops =
-		    sum_ckpt_ops(cfg->ckptthreads, cfg->checkpoint_threads);
-		g_insert_ops =
-		    sum_insert_ops(cfg->ithreads, cfg->insert_threads);
-		g_read_ops = sum_read_ops(cfg->rthreads, cfg->read_threads);
-		g_update_ops =
-		    sum_update_ops(cfg->uthreads, cfg->update_threads);
+		g_ckpt_ops = sum_ckpt_ops(cfg, NULL, 0);
+		g_insert_ops = sum_insert_ops(cfg, NULL, 0);
+		g_read_ops = sum_read_ops(cfg, NULL, 0);
+		g_update_ops = sum_update_ops(cfg, NULL, 0);
 
 		/* If we're checking total operations, see if we're done. */
 		if (run_ops != 0 &&
@@ -773,7 +871,7 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	pthread_t monitor_thread;
 	size_t len;
-	uint64_t req_len;
+	uint64_t req_len, total_ops;
 	int ch, monitor_created, ret, tret;
 	const char *opts = "C:O:T:h:o:SML";
 	const char *wtperftmp_subdir = "wtperftmp";
@@ -1012,19 +1110,23 @@ main(int argc, char *argv[])
 	 * One final summation of the operations we've completed, output that
 	 * information.
 	 */
-	g_read_ops = sum_read_ops(cfg.rthreads, cfg.read_threads);
-	g_insert_ops = sum_insert_ops(cfg.ithreads, cfg.insert_threads);
-	g_update_ops = sum_update_ops(cfg.uthreads, cfg.update_threads);
-	g_ckpt_ops = sum_ckpt_ops(cfg.ckptthreads, cfg.checkpoint_threads);
+	g_read_ops = sum_read_ops(&cfg, NULL, 0);
+	g_insert_ops = sum_insert_ops(&cfg, NULL, 0);
+	g_update_ops = sum_update_ops(&cfg, NULL, 0);
+	g_ckpt_ops = sum_ckpt_ops(&cfg, NULL, 0);
+	total_ops = g_read_ops + g_insert_ops + g_update_ops;
 	if (cfg.read_threads != 0)
 		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " read operations", g_read_ops);
+		    "Executed %" PRIu64 " read operations (%" PRIu64 "%%)",
+		    g_read_ops, (g_read_ops * 100) / total_ops);
 	if (cfg.insert_threads != 0)
 		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " insert operations", g_insert_ops);
+		    "Executed %" PRIu64 " insert operations (%" PRIu64 "%%)",
+		    g_insert_ops, (g_insert_ops * 100) / total_ops);
 	if (cfg.update_threads != 0)
 		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " update operations", g_update_ops);
+		    "Executed %" PRIu64 " update operations (%" PRIu64 "%%)",
+		    g_update_ops, (g_update_ops * 100) / total_ops);
 	if (cfg.checkpoint_threads != 0)
 		lprintf(&cfg, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations", g_ckpt_ops);
@@ -1071,18 +1173,29 @@ static int
 start_threads(
     CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp, void *(*func)(void *))
 {
-	CONFIG_THREAD *threads;
+	CONFIG_THREAD *thread;
 	u_int i;
 	int ret;
 
 	if ((*threadsp = calloc(num, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
 
-	for (i = 0, threads = *threadsp; i < num; ++i, ++threads) {
-		threads->cfg = cfg;
+	for (i = 0, thread = *threadsp; i < num; ++i, ++thread) {
+		thread->cfg = cfg;
+
+		/*
+		 * Every thread gets a key/data buffer because we don't bother
+		 * to distinguish between threads needing them and threads that
+		 * don't, it's not enough memory to bother.
+		 */
+		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
+			return (enomem(cfg));
+		if ((thread->data_buf = calloc(cfg->data_sz, 1)) == NULL)
+			return (enomem(cfg));
+		memset(thread->data_buf, 'a', cfg->data_sz - 1);
 
 		if ((ret = pthread_create(
-		    &threads->handle, NULL, func, threads)) != 0) {
+		    &thread->handle, NULL, func, thread)) != 0) {
 			lprintf(cfg, ret, 0, "Error creating thread");
 			return (ret);
 		}
@@ -1106,10 +1219,10 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 		}
 
 	/*
-	 * We don't free the thread structures or NULL the reference when we
-	 * stop the threads, it is still being read by the monitor thread
-	 * (among others).  This is a standalone program, leaking memory isn't
-	 * a concern, and it's simpler that way.
+	 * We don't free the thread structures or any memory referenced, or NULL
+	 * the reference when we stop the threads; the thread structure is still
+	 * being read by the monitor thread (among others).  As a standalone
+	 * program, leaking memory isn't a concern, and it's simpler that way.
 	 */
 	return (0);
 }

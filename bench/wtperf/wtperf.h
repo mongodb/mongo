@@ -43,26 +43,18 @@
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
-#include <gcc.h>				/* WiredTiger internal */
+#include <gcc.h>			/* WiredTiger internal */
 
-typedef struct {		/* Per-thread structure */
-	void *cfg;		/* Enclosing configuration */
+typedef struct __config CONFIG;
+typedef struct __config_thread CONFIG_THREAD;
 
-	pthread_t  handle;	/* Handle */
+struct __config {			/* Configuration struction */
+	const char *home;		/* WiredTiger home */
+	char *uri;			/* Object URI */
 
-	uint64_t   ckpt_ops;	/* Checkpoint ops */
-	uint64_t   insert_ops;	/* Insert ops */
-	uint64_t   read_ops;	/* Read ops */
-	uint64_t   update_ops;	/* Update ops */
-} CONFIG_THREAD;
+	WT_CONNECTION *conn;		/* Database connection */
 
-typedef struct {
-	const char *home;	/* WiredTiger home */
-	char *uri;		/* Object URI */
-
-	WT_CONNECTION *conn;	/* Database connection */
-
-	FILE *logf;		/* Logging handle */
+	FILE *logf;			/* Logging handle */
 
 	CONFIG_THREAD *ckptthreads,
 	    *ithreads, *popthreads, *rthreads, *uthreads;
@@ -71,7 +63,7 @@ typedef struct {
 #define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
 #undef OPT_DECLARE_STRUCT
-} CONFIG;
+};
 
 typedef enum {
 	BOOL_TYPE, CONFIG_STRING_TYPE, INT_TYPE, STRING_TYPE, UINT32_TYPE
@@ -85,9 +77,24 @@ typedef struct {
 	size_t offset;
 } CONFIG_OPT;
 
-/* Worker thread types. */
-typedef enum {
-    WORKER_READ, WORKER_INSERT, WORKER_INSERT_RMW, WORKER_UPDATE } worker_type;
+struct __config_thread {		/* Per-thread structure */
+	CONFIG *cfg;			/* Enclosing configuration */
+
+	pthread_t  handle;		/* Handle */
+
+	char *key_buf, *data_buf;	/* Key/data memory */
+
+#define	WORKER_READ		1	/* Read */
+#define	WORKER_INSERT		2	/* Insert */
+#define	WORKER_INSERT_RMW	3	/* Insert with read-modify-write */
+#define	WORKER_UPDATE		4	/* Update */
+	uint8_t	   ops[100];		/* Thread operations */
+
+	uint64_t   ckpt_ops;		/* Checkpoint ops */
+	uint64_t   insert_ops;		/* Insert ops */
+	uint64_t   read_ops;		/* Read ops */
+	uint64_t   update_ops;		/* Update ops */
+};
 
 int	 config_assign(CONFIG *, const CONFIG *);
 void	 config_free(CONFIG *);
@@ -97,6 +104,8 @@ int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
 int	 enomem(const CONFIG *);
+const char *
+	 op_name(uint8_t *);
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 int	 setup_log_file(CONFIG *);

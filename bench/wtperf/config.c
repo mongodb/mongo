@@ -396,6 +396,16 @@ config_opt_usage(void)
 int
 config_sanity(CONFIG *cfg)
 {
+	/* Run-time or operation count, must be one or the other. */
+	if ((cfg->run_time == 0 && cfg->run_ops == 0) ||
+	    (cfg->run_time != 0 && cfg->run_ops != 0)) {
+		fprintf(stderr,
+		    "one of either run-time or run-ops must be set, "
+		    "but not both\n");
+		return (EINVAL);
+	}
+
+	/* Various intervals should be less than the run-time. */
 	if (cfg->run_time > 0 &&
 	    (cfg->checkpoint_interval > cfg->run_time ||
 	    cfg->report_interval > cfg->run_time ||
@@ -403,10 +413,11 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (EINVAL);
 	}
-	if ((cfg->run_time == 0 && cfg->run_ops == 0) ||
-	    (cfg->run_time != 0 && cfg->run_ops != 0)) {
+
+	/* Job mix shouldn't be more than 100%. */
+	if (cfg->run_mix_inserts + cfg->run_mix_updates > 100) {
 		fprintf(stderr,
-		    "run-time and run-ops cannot both be set or zero\n");
+		    "job mix percentages cannot be more than 100\n");
 		return (EINVAL);
 	}
 	return (0);
@@ -419,11 +430,10 @@ config_print(CONFIG *cfg)
 	printf("\thome: %s\n", cfg->home);
 	printf("\ttable_name: %s\n", cfg->table_name);
 	printf("\tConnection configuration: %s\n", cfg->conn_config);
-	printf("\tTable configuration: %s\n", cfg->table_config);
-	printf("\t%s\n", cfg->create ? "Creating" : "Using existing");
+	printf("\tTable configuration: %s (%s)\n",
+	    cfg->table_config, cfg->create ? "creating new" : "using existing");
 	printf("\tWorkload period/operations: %" PRIu32 "/%" PRIu32 "\n",
 	    cfg->run_time, cfg->run_ops);
-	printf("\tWorkload period: %" PRIu32 "\n", cfg->run_time);
 	printf(
 	    "\tCheckpoint interval: %" PRIu32 "\n", cfg->checkpoint_interval);
 	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
@@ -433,11 +443,20 @@ config_print(CONFIG *cfg)
 		printf("\tNumber populate threads: %" PRIu32 "\n",
 		    cfg->populate_threads);
 	}
-	printf("\tNumber read threads: %" PRIu32 "\n", cfg->read_threads);
-	printf("\tNumber insert threads: %" PRIu32 "\n", cfg->insert_threads);
-	if (cfg->insert_rmw)
-		printf("\tInsert operations are RMW.\n");
-	printf("\tNumber update threads: %" PRIu32 "\n", cfg->update_threads);
+	if (cfg->run_mix_inserts == 0 && cfg->run_mix_updates == 0) {
+		printf("\tNumber read threads: %" PRIu32 "\n",
+		    cfg->read_threads);
+		printf(
+		    "\tNumber insert threads: %" PRIu32 "%s\n",
+		    cfg->insert_threads,
+		    cfg->insert_rmw ? " (inserts are RMW)" : "");
+		printf("\tNumber update threads: %" PRIu32 "\n",
+		    cfg->update_threads);
+	} else
+		printf("\tOperation mix is %"
+		    PRIu32 "reads, %" PRIu32 " inserts, %" PRIu32 " updates\n",
+		    100 - (cfg->run_mix_inserts + cfg->run_mix_updates),
+		    cfg->run_mix_inserts, cfg->run_mix_updates);
 	printf("\tkey size: %" PRIu32 " data size: %" PRIu32 "\n",
 	    cfg->key_sz, cfg->data_sz);
 	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
