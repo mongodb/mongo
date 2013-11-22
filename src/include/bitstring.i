@@ -312,6 +312,6 @@ __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 static inline void
 __bit_setv_recno(WT_PAGE *page, uint64_t recno, uint8_t width, uint8_t value)
 {
-	return (__bit_setv(page->u.col_fix.bitf,
-	    recno - page->u.col_fix.recno, width, value));
+	__bit_setv(page->u.col_fix.bitf,
+	    recno - page->u.col_fix.recno, width, value);
 }

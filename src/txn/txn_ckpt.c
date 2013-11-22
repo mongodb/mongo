@@ -188,12 +188,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	void *saved_meta_next;
-	int full, tracking;
+	int full, started, tracking;
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
 	txn = &session->txn;
-	tracking = 0;
+	full = started = tracking = 0;
 
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
@@ -232,9 +232,11 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
 	/* Tell logging that we have started a database checkpoint. */
-	if (S2C(session)->logging && full)
+	if (S2C(session)->logging && full) {
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
+		started = 1;
+	}
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
@@ -296,7 +298,7 @@ err:	/*
 		__wt_txn_release_snapshot(session);
 
 	/* Tell logging that we have finished a database checkpoint. */
-	if (S2C(session)->logging && full)
+	if (S2C(session)->logging && started)
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
@@ -442,10 +444,8 @@ __checkpoint_worker(
 	char *name_alloc;
 
 	btree = S2BT(session);
-	conn = S2C(session);
-	dhandle = session->dhandle;
-
 	bm = btree->bm;
+	conn = S2C(session);
 	ckpt = ckptbase = NULL;
 	INIT_LSN(&ckptlsn);
 	dhandle = session->dhandle;

@@ -41,15 +41,20 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	WT_CURSOR *c;
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
 	    "overwrite", NULL };
+	int metadata_op;
 
 	c = NULL;
 
 	/*
+	 * Metadata operations have an id of 0.  Match operations based
+	 * on the id and the current pass of recovery for metadata.
+	 *
 	 * Only apply operations in the correct metadata phase, and if the LSN
 	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped.
 	 */
-	if (r->metadata_only != (id == 0) ||
+	metadata_op = (id == 0);
+	if (r->metadata_only != metadata_op ||
 	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
 		;
 	else if (id > r->max_fileid)
@@ -74,10 +79,11 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 /*
  * Helper to a cursor if this operation is to be applied during recovery.
  */
-#define	GET_RECOVERY_CURSOR(s, r, lsnp, fileid, cp)			\
-	WT_ERR(__recovery_cursor((s), (r), (lsnp), (fileid), 0, (cp)));	\
-	WT_VERBOSE_ERR(session, recovery,				\
-	    "%s op %d to file %d at LSN %u/%" PRIuMAX,		\
+#define	GET_RECOVERY_CURSOR(session, r, lsnp, fileid, cp)		\
+	WT_ERR(__recovery_cursor(					\
+	    (session), (r), (lsnp), (fileid), 0, (cp)));		\
+	WT_VERBOSE_ERR((session), recovery,				\
+	    "%s op %d to file %d at LSN %u/%" PRIuMAX,			\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
 	    optype, fileid, lsnp->file, (uintmax_t)lsnp->offset);	\
 	if (cursor == NULL)						\
@@ -142,7 +148,7 @@ __txn_op_apply(
 
 		/* Set the keys. */
 		if (start != NULL)
-			start->set_key(stop, start_recno);
+			start->set_key(start, start_recno);
 		if (stop != NULL)
 			stop->set_key(stop, stop_recno);
 

@@ -62,6 +62,7 @@ __wt_log_get_active_files(
 	uint32_t id;
 	u_int count, i;
 
+	id = 0;
 	log = S2C(session)->log;
 
 	WT_RET(__wt_log_get_files(session, &files, &count));
@@ -592,7 +593,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	logrec->len = log->allocsize;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, log->allocsize);
-	memset(&tmp, 0, sizeof(tmp));
+	WT_CLEAR(tmp);
 	myslot.slot = &tmp;
 	myslot.offset = 0;
 
@@ -914,16 +915,15 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	int locked;
 
 	log = S2C(session)->log;
-	locked = 0;
 	myslot.slot = &tmp;
 	myslot.offset = 0;
+	WT_CLEAR(tmp);
 
 	/* Fast path the contended case. */
 	if (__wt_spin_trylock(session, &log->log_slot_lock) != 0)
 		return (EAGAIN);
-
-	memset(&tmp, 0, sizeof(tmp));
 	locked = 1;
+
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, SLOT_SYNC);
 	WT_ERR(__log_acquire(session, record->size, &tmp));

@@ -50,7 +50,7 @@ __wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 	bms = session->block_manager;
 
 	/* Return a WT_EXT structure for use from a cached list. */
-	if (extp != NULL && bms != NULL && bms->ext_cache != NULL) {
+	if (bms != NULL && bms->ext_cache != NULL) {
 		(*extp) = bms->ext_cache;
 		bms->ext_cache = bms->ext_cache->next[0];
 
@@ -159,7 +159,7 @@ __wt_block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp)
 	bms = session->block_manager;
 
 	/* Return a WT_SIZE structure for use from a cached list. */
-	if (szp != NULL && bms != NULL && bms->sz_cache != NULL) {
+	if (bms != NULL && bms->sz_cache != NULL) {
 		(*szp) = bms->sz_cache;
 		bms->sz_cache = bms->sz_cache->next[0];
 

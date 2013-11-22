@@ -168,6 +168,7 @@ static int
 config_read(char ***listp, int *hexp)
 {
 	ULINE l;
+	WT_DECL_RET;
 	int entry, eof, max_entry;
 	const char *s;
 	char **list;
@@ -199,29 +200,37 @@ config_read(char ***listp, int *hexp)
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
-		if (util_read_line(&l, 0, &eof))
-			return (1);
+		if ((ret = util_read_line(&l, 0, &eof)) != 0)
+			goto err;
 		if (strcmp(l.mem, "Data") == 0)
 			break;
 
 		/* Grow the array of header lines as necessary. */
 		if ((max_entry == 0 || entry == max_entry - 1) &&
 		    (list = realloc(list,
-		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
-			return (util_err(errno, NULL));
-		if ((list[entry] = strdup(l.mem)) == NULL)
-			return (util_err(errno, NULL));
+		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL) {
+			ret = util_err(errno, NULL);
+			goto err;
+		}
+		if ((list[entry] = strdup(l.mem)) == NULL) {
+			ret = util_err(errno, NULL);
+			goto err;
+		}
 	}
 
 	/* Headers are required, and they're supposed to be in pairs. */
-	if (list == NULL || entry % 2 != 0)
-		return (format());
+	if (list == NULL || entry % 2 != 0) {
+		ret = format();
+		goto err;
+	}
 
 	list[entry] = NULL;
 	*listp = list;
 
-	/* Leak the memory, I don't care. */
-	return (0);
+	if (0) {
+err:		free(list);
+	}
+	return (ret);
 }
 
 /*
