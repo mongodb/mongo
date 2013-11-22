@@ -75,7 +75,7 @@ namespace mongo {
                 "upgrade meta data version");
 
         sharding_options.addOptionChaining("chunkSize", "chunkSize", moe::Int,
-                "maximum amount of data per chunk");
+                "maximum amount of data per chunk (in MB)");
 
         sharding_options.addOptionChaining("ipv6", "ipv6", moe::Switch,
                 "enable IPv6 support (disabled by default)");
