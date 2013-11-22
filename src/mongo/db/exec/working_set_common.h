@@ -40,6 +40,11 @@ namespace mongo {
          * Returns true if the fetch and invalidate succeeded, false otherwise.
          */
         static bool fetchAndInvalidateLoc(WorkingSetMember* member);
+
+        /**
+         * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
+         */
+        static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
     };
 
 }  // namespace mongo

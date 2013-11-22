@@ -48,4 +48,20 @@ namespace mongo {
         return true;
     }
 
+    // static
+    void WorkingSetCommon::initFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
+        dest->loc = src.loc;
+        dest->obj = src.obj;
+        dest->keyData = src.keyData;
+        dest->state = src.state;
+
+        if (src.hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
+            dest->addComputed(src.getComputed(WSM_COMPUTED_TEXT_SCORE)->clone());
+        }
+
+        if (src.hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
+            dest->addComputed(src.getComputed(WSM_COMPUTED_GEO_DISTANCE)->clone());
+        }
+    }
+
 }  // namespace mongo

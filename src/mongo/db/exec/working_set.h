@@ -29,6 +29,8 @@
 #pragma once
 
 #include <vector>
+
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_map.h"
@@ -149,6 +151,9 @@ namespace mongo {
      * A WorkingSetMember may have any of the data above.
      */
     struct WorkingSetMember {
+    private:
+        MONGO_DISALLOW_COPYING(WorkingSetMember);
+    public:
         WorkingSetMember();
         ~WorkingSetMember();
 

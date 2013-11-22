@@ -71,6 +71,9 @@ namespace mongo {
 
         /**
          * ...data is returned (and we ADVANCED)
+         *
+         * Allocates a new member and copies 'member' into it.
+         * Does not take ownership of anything in 'member'.
          */
         void pushBack(const WorkingSetMember& member);
 
@@ -80,7 +83,7 @@ namespace mongo {
 
         // The data we return.
         std::queue<PlanStage::StageState> _results;
-        std::queue<WorkingSetMember> _members;
+        std::queue<WorkingSetID> _members;
     };
 
 }  // namespace mongo
