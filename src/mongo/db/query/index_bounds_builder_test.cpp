@@ -223,4 +223,117 @@ namespace {
         ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
+    TEST(SimpleRegexTest, RootedLine) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("^foo", "", &tightness);
+        ASSERT_EQUALS(prefix, "foo");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedString) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("\\Afoo", "", &tightness);
+        ASSERT_EQUALS(prefix, "foo");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedOptionalFirstChar) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("^f?oo", "", &tightness);
+        ASSERT_EQUALS(prefix, "");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(SimpleRegexTest, RootedOptionalSecondChar) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("^fz?oo", "", &tightness);
+        ASSERT_EQUALS(prefix, "f");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(SimpleRegexTest, RootedMultiline) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("^foo", "m", &tightness);
+        ASSERT_EQUALS(prefix, "");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(SimpleRegexTest, RootedStringMultiline) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("\\Afoo", "m", &tightness);
+        ASSERT_EQUALS(prefix, "foo");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedCaseInsensitiveMulti) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex("\\Afoo", "mi", &tightness);
+        ASSERT_EQUALS(prefix, "");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(SimpleRegexTest, RootedComplex) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+                "\\Af \t\vo\n\ro  \\ \\# #comment", "mx", &tightness);
+        ASSERT_EQUALS(prefix, "foo #");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteral) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qasdf\\E", "", &tightness);
+        ASSERT_EQUALS(prefix, "asdf");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteralWithExtra) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qasdf\\E.*", "", &tightness);
+        ASSERT_EQUALS(prefix, "asdf");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteralNoEnd) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qasdf", "", &tightness);
+        ASSERT_EQUALS(prefix, "asdf");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteralBackslash) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qasdf\\\\E", "", &tightness);
+        ASSERT_EQUALS(prefix, "asdf\\");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteralDotStar) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qas.*df\\E", "", &tightness);
+        ASSERT_EQUALS(prefix, "as.*df");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteralNestedEscape) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qas\\Q[df\\E", "", &tightness);
+        ASSERT_EQUALS(prefix, "as\\Q[df");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(SimpleRegexTest, RootedLiteralNestedEscapeEnd) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^\\Qas\\E\\\\E\\Q$df\\E", "", &tightness);
+        ASSERT_EQUALS(prefix, "as\\E$df");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
 }  // namespace

@@ -20,7 +20,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -1880,76 +1879,6 @@ namespace mongo {
         _orSets.pop_front();
         _originalOrSets.pop_front();
     }
-    
-    struct SimpleRegexUnitTest : StartupTest {
-        void run() {
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^foo");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "foo" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f?oo");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^fz?oo");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f", "");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "\\Af", "");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f", "m");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "\\Af", "m");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "\\Af", "mi");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "\\Af \t\vo\n\ro  \\ \\# #comment", "mx");
-                BSONObj o = b.done();
-                verify( simpleRegex(o.firstElement()) == "foo #" );
-            }
-            {
-                verify( simpleRegex("^\\Qasdf\\E", "", NULL) == "asdf" );
-                verify( simpleRegex("^\\Qasdf\\E.*", "", NULL) == "asdf" );
-                verify( simpleRegex("^\\Qasdf", "", NULL) == "asdf" ); // PCRE supports this
-                verify( simpleRegex("^\\Qasdf\\\\E", "", NULL) == "asdf\\" );
-                verify( simpleRegex("^\\Qas.*df\\E", "", NULL) == "as.*df" );
-                verify( simpleRegex("^\\Qas\\Q[df\\E", "", NULL) == "as\\Q[df" );
-                verify( simpleRegex("^\\Qas\\E\\\\E\\Q$df\\E", "", NULL) == "as\\E$df" ); // quoted string containing \E
-            }
-
-        }
-    } simple_regex_unittest;
-
 
     long long applySkipLimit( long long num , const BSONObj& cmd ) {
         BSONElement s = cmd["skip"];
