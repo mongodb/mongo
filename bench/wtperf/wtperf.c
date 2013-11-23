@@ -237,7 +237,7 @@ worker(CONFIG_THREAD *thread)
 				trk = &thread->read;
 				break;
 			}
-			break;
+			goto op_err;
 		case WORKER_INSERT_RMW:
 			if ((ret = cursor->search(cursor)) != WT_NOTFOUND)
 				goto op_err;
