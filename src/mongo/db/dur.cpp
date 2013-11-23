@@ -578,7 +578,11 @@ namespace mongo {
             }
 
             JSectHeader h;
-            PREPLOGBUFFER(h,ab); // need to be in readlock (writes excluded) for this
+            // need to be in readlock (writes excluded) for this as write intent stuctures point into 
+            // the private mmap for their actual data.  i suppose we could lock individual databases 
+            // and do them one at a time or in parallel (surely the latter would make sense if one went 
+            // that route...)
+            PREPLOGBUFFER(h,ab); 
 
             LockMongoFilesShared lk3;
 
@@ -648,7 +652,8 @@ namespace mongo {
                 AlignedBuilder &ab = __theBuilder;
 
                 // we need to make sure two group commits aren't running at the same time
-                // (and we are only read locked in the dbMutex, so it could happen)
+                // (and we are only read locked in the dbMutex, so it could happen -- while 
+                // there is only one dur thread, "early commits" can be done by other threads)
                 SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
 
                 commitJob.commitingBegin();
