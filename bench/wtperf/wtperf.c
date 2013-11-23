@@ -122,66 +122,56 @@ get_next_incr(void)
 }
 
 /*
- * Return total ops for a group of threads.
+ * track_aggro_update --
+ *	Update an operation's tracking structure with new latency information.
  */
-#define	WTPERF_SUM_OPS(field)						\
-static inline uint64_t							\
-sum_##field##_ops(CONFIG *cfg, CONFIG_THREAD *thread, u_int thread_cnt)	\
-{									\
-	uint64_t total;							\
-	u_int i;							\
-									\
-	total = 0;							\
-									\
-	/* If a set of threads specified, review only them. */		\
-	if (thread != NULL) {						\
-		for (i = 0;						\
-		    thread != NULL && i < thread_cnt; ++i, ++thread)	\
-			total += thread->field##_ops;			\
-		return (total);						\
-	}								\
-									\
-	/* Otherwise, review all worker threads. */			\
-	for (i = 0, thread = cfg->ckptthreads;				\
-	    thread != NULL && i < cfg->checkpoint_threads;		\
-	    ++i, ++thread)						\
-		total += thread->field##_ops;				\
-	for (i = 0, thread = cfg->ithreads;				\
-	    thread != NULL && i < cfg->insert_threads;			\
-	    ++i, ++thread)						\
-		total += thread->field##_ops;				\
-	for (i = 0, thread = cfg->rthreads;				\
-	    thread != NULL && i < cfg->read_threads;			\
-	    ++i, ++thread)						\
-		total += thread->field##_ops;				\
-	for (i = 0, thread = cfg->uthreads;				\
-	    thread != NULL && i < cfg->update_threads;			\
-	    ++i, ++thread)						\
-		total += thread->field##_ops;				\
-									\
-	return (total);							\
+static inline void
+track_aggro_update(TRACK *trk, uint64_t v)
+{
+	/*
+	 * Update a latency bucket.
+	 * First buckets: usecs from 100us to 1000us at 100us each.
+	 */
+	if (v < us_to_ns(1000))
+		trk->us[ns_to_us(v)] += trk->aggro;
+
+	/*
+	 * Second buckets: millseconds from 1ms to 1000ms, at 1ms each.
+	 */
+	else if (v < ms_to_ns(1000))
+		trk->ms[ns_to_ms(v)] += trk->aggro;
+
+	/*
+	 * Third buckets are seconds from 1s to 100s, at 1s each.
+	 */
+	else if (v < sec_to_ns(100))
+		trk->sec[ns_to_sec(v)] += trk->aggro;
+
+	/* >100 seconds, accumulate in the biggest bucket. */
+	else
+		trk->sec[ELEMENTS(trk->sec) - 1] += trk->aggro;
+	trk->aggro = 0;
 }
-WTPERF_SUM_OPS(ckpt)
-WTPERF_SUM_OPS(insert)
-WTPERF_SUM_OPS(read)
-WTPERF_SUM_OPS(update)
 
 static void
 worker(CONFIG_THREAD *thread)
 {
+	struct timespec *last, _last, *t, _t, *tmp;
 	CONFIG *cfg;
+	TRACK *trk;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t next_val;
-	int op_ret, ret;
+	long nsecs;
+	uint64_t next_val, v;
+	uint32_t aggro;
+	int ret;
 	uint8_t *op, *op_end;
 	char *data_buf, *key_buf, *value;
 
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
-	op_ret = 0;
 
 	key_buf = thread->key_buf;
 	data_buf = thread->data_buf;
@@ -197,8 +187,13 @@ worker(CONFIG_THREAD *thread)
 		goto err;
 	}
 
-	op = thread->ops;
-	op_end = thread->ops + sizeof(thread->ops);
+	t = &_t;
+	last = &_last;
+	assert(clock_gettime(CLOCK_REALTIME, last) == 0);
+
+	op = thread->schedule;
+	op_end = thread->schedule + sizeof(thread->schedule);
+	aggro = 0;
 	while (!g_stop) {
 		switch (*op) {
 		case WORKER_INSERT:
@@ -230,30 +225,36 @@ worker(CONFIG_THREAD *thread)
 
 		switch (*op) {
 		case WORKER_READ:
-			if ((op_ret = cursor->search(cursor)) == 0) {
-				++thread->read_ops;
-				if (++op == op_end)
-					op = thread->ops;
-				continue;
+			/*
+			 * Reads can fail with WT_NOTFOUND: we may be searching
+			 * in a random range, or an insert thread might have
+			 * updated the last record in the table but not yet
+			 * finished the actual insert.  Count failed search in
+			 * a random range as a "read".
+			 */
+			ret = cursor->search(cursor);
+			if (ret == 0 || ret == WT_NOTFOUND) {
+				trk = &thread->read;
+				break;
 			}
 			break;
 		case WORKER_INSERT_RMW:
-			if ((op_ret = cursor->search(cursor)) != WT_NOTFOUND)
-				break;
-			/* All error returns reset the cursor buffers. */
+			if ((ret = cursor->search(cursor)) != WT_NOTFOUND)
+				goto op_err;
+
+			/* The error return reset the cursor's key. */
 			cursor->set_key(cursor, key_buf);
+
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
 			cursor->set_value(cursor, data_buf);
-			if ((op_ret = cursor->insert(cursor)) == 0) {
-				++thread->insert_ops;
-				if (++op == op_end)
-					op = thread->ops;
-				continue;
+			if ((ret = cursor->insert(cursor)) == 0) {
+				trk = &thread->insert;
+				break;
 			}
-			break;
+			goto op_err;
 		case WORKER_UPDATE:
-			if ((op_ret = cursor->search(cursor)) == 0) {
+			if ((ret = cursor->search(cursor)) == 0) {
 				assert(cursor->get_value(cursor, &value) == 0);
 				memcpy(data_buf, value, cfg->data_sz);
 				if (data_buf[0] == 'a')
@@ -261,45 +262,59 @@ worker(CONFIG_THREAD *thread)
 				else
 					data_buf[0] = 'a';
 				cursor->set_value(cursor, data_buf);
-				if ((op_ret = cursor->update(cursor)) == 0) {
-					++thread->update_ops;
-					if (++op == op_end)
-						op = thread->ops;
-					continue;
+				if ((ret = cursor->update(cursor)) == 0) {
+					trk = &thread->update;
+					break;
 				}
+				goto op_err;
 			}
-			break;
+
+			/*
+			 * Reads can fail with WT_NOTFOUND: we may be searching
+			 * in a random range, or an insert thread might have
+			 * updated the last record in the table but not yet
+			 * finished the actual insert.  Count failed search in
+			 * a random range as a "read".
+			 */
+			if (ret == WT_NOTFOUND) {
+				trk = &thread->read;
+				break;
+			}
+
+op_err:			lprintf(cfg, ret, 0,
+			    "%s failed for: %s, range: %"PRIu64,
+			    op_name(op), key_buf, wtperf_value_range(cfg));
+			goto err;
 		default:
 			ret = EINVAL;
 			goto err;
 		}
 
-		/* Report errors and continue. */
-		if (op_ret == WT_NOTFOUND && cfg->random_range)
+		if (++op == op_end)	/* Schedule the next operation. */
+			op = thread->schedule;
+
+		++trk->ops;		/* Increment operation counts. */
+		++trk->aggro;
+					/* Aggregate, or continue. */
+		if (++aggro < cfg->latency_aggregate)
 			continue;
 
-		/*
-		 * Emit a warning instead of an error if there are insert
-		 * threads, and the failed op was for an old item.
-		 */
-		if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
-		    (*op == WORKER_READ || *op == WORKER_UPDATE)) {
-			if (next_val < cfg->icount)
-				lprintf(cfg, WT_PANIC, 0,
-				    "%s not found for: %s. Value was"
-				    " inserted during populate",
-				    op_name(op), key_buf);
-			if (next_val * 1.1 > wtperf_value_range(cfg))
-				continue;
-			lprintf(cfg, op_ret, 1,
-			    "%s not found for: %s, range: %" PRIu64
-			    " an insert is likely more than ten "
-			    "percent behind reads",
-			    op_name(op), key_buf, wtperf_value_range(cfg));
-		} else
-			lprintf(cfg, op_ret, 0,
-			    "%s failed for: %s, range: %"PRIu64,
-			    op_name(op), key_buf, wtperf_value_range(cfg));
+					/* Calculate how long the calls took. */
+		assert(clock_gettime(CLOCK_REALTIME, t) == 0);
+		nsecs = t->tv_nsec - last->tv_nsec;
+		nsecs += (t->tv_sec - last->tv_sec) * BILLION;
+
+		tmp = last;		/* Swap timers. */
+		last = t;
+		t = tmp;
+					/* Get nanoseconds per call. */
+		v = (uint64_t)nsecs / aggro;
+		aggro = 0;
+
+					/* Update the call latencies. */
+		track_aggro_update(&thread->insert, v);
+		track_aggro_update(&thread->read, v);
+		track_aggro_update(&thread->update, v);
 	}
 
 	/* To ensure managing thread knows if we exited early. */
@@ -371,9 +386,9 @@ op_setup(CONFIG *cfg, int op, CONFIG_THREAD *thread)
 	 * are the same.
 	 */
 	if (cfg->run_mix_inserts == 0 && cfg->run_mix_updates == 0)
-		memset(thread->ops, op, sizeof(thread->ops));
+		memset(thread->schedule, op, sizeof(thread->schedule));
 	else
-		memcpy(thread->ops, run_mix_ops, sizeof(thread->ops));
+		memcpy(thread->schedule, run_mix_ops, sizeof(thread->schedule));
 }
 
 static void *
@@ -462,7 +477,7 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
 			}
-			++thread->insert_ops;
+			++thread->insert.ops;
 		}
 	else {
 		for (intxn = 0, opcount = 0;;) {
@@ -482,7 +497,7 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
 			}
-			++thread->insert_ops;
+			++thread->insert.ops;
 
 			if (++opcount < cfg->populate_ops_per_txn)
 				continue;
@@ -548,9 +563,9 @@ monitor(void *arg)
 				break;
 		}
 
-		reads = sum_read_ops(cfg, NULL, 0);
-		inserts = sum_insert_ops(cfg, NULL, 0);
-		updates = sum_update_ops(cfg, NULL, 0);
+		reads = sum_read_ops(cfg);
+		inserts = sum_insert_ops(cfg);
+		updates = sum_update_ops(cfg);
 
 		assert(clock_gettime(CLOCK_REALTIME, &t) == 0);
 		tm = localtime_r(&t.tv_sec, &_tm);
@@ -621,7 +636,7 @@ checkpoint_worker(void *arg)
 			goto err;
 		}
 		g_ckpt = 0;
-		++thread->ckpt_ops;
+		++thread->ckpt.ops;
 
 		assert(gettimeofday(&e, NULL) == 0);
 		ms = (e.tv_sec * 1000) + (e.tv_usec / 1000.0);
@@ -670,8 +685,7 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
-		g_insert_ops =
-		    sum_insert_ops(cfg, cfg->popthreads, cfg->populate_threads);
+		g_insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts in %" PRIu32 " secs",
 		    g_insert_ops - last_ops, cfg->report_interval);
@@ -771,10 +785,10 @@ execute_workload(CONFIG *cfg)
 		}
 
 		/* Sum the operations we've done. */
-		g_ckpt_ops = sum_ckpt_ops(cfg, NULL, 0);
-		g_insert_ops = sum_insert_ops(cfg, NULL, 0);
-		g_read_ops = sum_read_ops(cfg, NULL, 0);
-		g_update_ops = sum_update_ops(cfg, NULL, 0);
+		g_ckpt_ops = sum_ckpt_ops(cfg);
+		g_insert_ops = sum_insert_ops(cfg);
+		g_read_ops = sum_read_ops(cfg);
+		g_update_ops = sum_update_ops(cfg);
 
 		/* If we're checking total operations, see if we're done. */
 		if (run_ops != 0 &&
@@ -1096,6 +1110,8 @@ main(int argc, char *argv[])
 	    (ret = execute_workload(&cfg)) != 0)
 		goto err;
 
+	dump_latency(&cfg);
+
 	lprintf(&cfg, 0, 1,
 	    "Run completed: %" PRIu32 " read threads, %"
 	    PRIu32 " insert threads, %" PRIu32 " update threads and %"
@@ -1110,10 +1126,10 @@ main(int argc, char *argv[])
 	 * One final summation of the operations we've completed, output that
 	 * information.
 	 */
-	g_read_ops = sum_read_ops(&cfg, NULL, 0);
-	g_insert_ops = sum_insert_ops(&cfg, NULL, 0);
-	g_update_ops = sum_update_ops(&cfg, NULL, 0);
-	g_ckpt_ops = sum_ckpt_ops(&cfg, NULL, 0);
+	g_read_ops = sum_read_ops(&cfg);
+	g_insert_ops = sum_insert_ops(&cfg);
+	g_update_ops = sum_update_ops(&cfg);
+	g_ckpt_ops = sum_ckpt_ops(&cfg);
 	total_ops = g_read_ops + g_insert_ops + g_update_ops;
 	if (cfg.read_threads != 0)
 		lprintf(&cfg, 0, 1,

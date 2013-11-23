@@ -77,10 +77,43 @@ typedef struct {
 	size_t offset;
 } CONFIG_OPT;
 
+#define	THOUSAND	(1000ULL)
+#define	MILLION		(1000000ULL)
+#define	BILLION		(1000000000ULL)
+#define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
+
+#define	ns_to_ms(v)	((v) / MILLION)
+#define	ns_to_sec(v)	((v) / BILLION)
+#define	ns_to_us(v)	((v) / THOUSAND)
+
+#define	us_to_ms(v)	((v) / THOUSAND)
+#define	us_to_ns(v)	((v) * THOUSAND)
+#define	us_to_sec(v)	((v) / MILLION)
+
+#define	ms_to_ns(v)	((v) * MILLION)
+#define	ms_to_us(v)	((v) * THOUSAND)
+#define	ms_to_sec(v)	((v) / THOUSAND)
+
+#define	sec_to_ns(v)	((v) * BILLION)
+#define	sec_to_us(v)	((v) * MILLION)
+#define	sec_to_ms(v)	((v) * THOUSAND)
+
+typedef struct {
+	uint64_t ops;			/* Total operations */
+	uint32_t aggro;			/* Aggregated operations */
+
+	/*
+	 * Latency buckets.
+	 */
+	uint64_t us[1000];		/* < 1us ... 1000us */
+	uint64_t ms[1000];		/* < 1ms ... 1000ms */
+	uint64_t sec[100];		/* < 1s 2s ... 100s */
+} TRACK;
+
 struct __config_thread {		/* Per-thread structure */
 	CONFIG *cfg;			/* Enclosing configuration */
 
-	pthread_t  handle;		/* Handle */
+	pthread_t handle;		/* Handle */
 
 	char *key_buf, *data_buf;	/* Key/data memory */
 
@@ -88,12 +121,12 @@ struct __config_thread {		/* Per-thread structure */
 #define	WORKER_INSERT		2	/* Insert */
 #define	WORKER_INSERT_RMW	3	/* Insert with read-modify-write */
 #define	WORKER_UPDATE		4	/* Update */
-	uint8_t	   ops[100];		/* Thread operations */
+	uint8_t	schedule[100];		/* Thread operations */
 
-	uint64_t   ckpt_ops;		/* Checkpoint ops */
-	uint64_t   insert_ops;		/* Insert ops */
-	uint64_t   read_ops;		/* Read ops */
-	uint64_t   update_ops;		/* Update ops */
+	TRACK ckpt;			/* Checkpoint operations */
+	TRACK insert;			/* Insert operations */
+	TRACK read;			/* Read operations */
+	TRACK update;			/* Update operations */
 };
 
 int	 config_assign(CONFIG *, const CONFIG *);
@@ -103,10 +136,16 @@ int	 config_opt_line(CONFIG *, WT_SESSION *, const char *);
 int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
+void	 dump_latency(CONFIG *);
 int	 enomem(const CONFIG *);
 const char *
 	 op_name(uint8_t *);
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 int	 setup_log_file(CONFIG *);
+uint64_t sum_ckpt_ops(CONFIG *);
+uint64_t sum_insert_ops(CONFIG *);
+uint64_t sum_pop_ops(CONFIG *);
+uint64_t sum_read_ops(CONFIG *);
+uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
