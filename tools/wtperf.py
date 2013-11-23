@@ -47,11 +47,11 @@ if in_ckpt == 'Y':
 # Write a command file for gnuplot.
 of = open("gnuplot.cmd", "w")
 of.write('''
-set terminal png nocrop size 800,600
 set autoscale
+set datafile sep ','
 set grid
 set style data lines
-set datafile sep ','
+set terminal png nocrop size 800,600
 set timefmt "%H:%M:%S"
 set title "wtperf run"
 set format x "%M:%S"
@@ -70,7 +70,61 @@ for start, stop in zip(it, it):
 of.write('''
 set output 'monitor.png'
 plot "monitor" using 1:($2/100) title "Reads", "monitor" using 1:($3/100) title "Updates", "monitor" using 1:($4/100) title "Inserts"\n''')
-
 of.close()
+
 call(["gnuplot", "gnuplot.cmd"])
 os.remove("gnuplot.cmd")
+
+def plot_latency(name):
+	# Latency plot: cumulative operations vs. latency
+	of = open("gnuplot.cmd", "w")
+	of.write('''
+set autoscale
+set datafile sep ','
+set grid
+set style data lines
+set terminal png nocrop size 800,600
+set title "wtperf %(NAME)s cumulative latency distribution"
+set xlabel "Latency (ms)"
+set xrange [1:]
+set xtics rotate by -45
+set logscale x
+set ylabel "%% operations"
+set yrange [0:]
+set output '%(NAME)s.latency1.png'
+plot "latency.%(NAME)s" using 1:(($3 * 100)/$4) title "%(NAME)s"\n''' % {
+	'NAME' : name
+	})
+	of.close()
+
+	call(["gnuplot", "gnuplot.cmd"])
+	os.remove("gnuplot.cmd")
+
+	# Latency plot: pct operations vs. latency
+	of = open("gnuplot.cmd", "w")
+	of.write('''
+set autoscale
+set datafile sep ','
+set grid
+set style data points
+set terminal png nocrop size 800,600
+set title "wtperf %(NAME)s latency distribution"
+set xlabel "Latency (ms)"
+set xrange [1:]
+set xtics rotate by -45
+set logscale x
+set ylabel "%% operations"
+set yrange [0:]
+set output '%(NAME)s.latency2.png'
+plot "latency.%(NAME)s" using (($2 * 100)/$4) title "%(NAME)s"\n''' % {
+	'NAME' : name
+	})
+	of.close()
+
+	call(["gnuplot", "gnuplot.cmd"])
+	os.remove("gnuplot.cmd")
+
+
+plot_latency("insert")
+plot_latency("read")
+plot_latency("update")
