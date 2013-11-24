@@ -35,5 +35,7 @@ s_dumpcmp: $(srcdir)/s_dumpcmp.sh
 backup:
 	rm -rf BACKUP && cp -p -r RUNDIR BACKUP
 
+TESTS = smoke.sh
+
 clean-local:
 	rm -rf RUNDIR *.core
