@@ -7,9 +7,7 @@ wtperf_LDFLAGS = -static
 wtperf_SOURCES =\
 	config.c misc.c wtperf.c wtperf.h wtperf_opt.i
 
-# The benchmark can be run with no arguments as simple smoke tests
 TESTS = smoke.sh
-
 TESTS_ENVIRONMENT = rm -rf WT_TEST ; mkdir WT_TEST ;
 
 clean-local:
