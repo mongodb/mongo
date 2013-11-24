@@ -402,7 +402,7 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr,
 		    "one of either run-time or run-ops must be set, "
 		    "but not both\n");
-		return (EINVAL);
+		return (1);
 	}
 
 	/* Various intervals should be less than the run-time. */
@@ -411,14 +411,14 @@ config_sanity(CONFIG *cfg)
 	    cfg->report_interval > cfg->run_time ||
 	    cfg->sample_interval > cfg->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
-		return (EINVAL);
+		return (1);
 	}
 
 	/* Job mix shouldn't be more than 100%. */
 	if (cfg->run_mix_inserts + cfg->run_mix_updates > 100) {
 		fprintf(stderr,
 		    "job mix percentages cannot be more than 100\n");
-		return (EINVAL);
+		return (1);
 	}
 	return (0);
 }

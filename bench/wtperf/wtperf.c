@@ -1058,7 +1058,8 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
-	if (config_sanity(&cfg))	/* Sanity-check the configuration */
+					/* Sanity-check the configuration */
+	if (config_sanity(&cfg) != 0)
 		goto err;
 
 	if (cfg.verbose > 1)		/* Display the configuration. */
@@ -1149,8 +1150,10 @@ main(int argc, char *argv[])
 
 	if (0) {
 einval:		ret = EINVAL;
+err:		if (ret == 0)
+			ret = EXIT_FAILURE;
 	}
-err:	g_stop = 1;
+	g_stop = 1;
 
 	if (cfg.checkpoint_threads != 0 &&
 	    (tret = stop_threads(&cfg, 1, cfg.ckptthreads)) != 0)
@@ -1182,7 +1185,7 @@ err:	g_stop = 1;
 	free(tc_buf);
 	free(tmphome);
 
-	return (ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 static int
