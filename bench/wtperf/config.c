@@ -407,7 +407,8 @@ config_sanity(CONFIG *cfg)
 
 	/* Various intervals should be less than the run-time. */
 	if (cfg->run_time > 0 &&
-	    (cfg->checkpoint_interval > cfg->run_time ||
+	    ((cfg->checkpoint_threads != 0 &&
+	    cfg->checkpoint_interval > cfg->run_time) ||
 	    cfg->report_interval > cfg->run_time ||
 	    cfg->sample_interval > cfg->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
