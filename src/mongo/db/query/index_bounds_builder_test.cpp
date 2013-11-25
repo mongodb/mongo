@@ -84,7 +84,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << negativeInfinity << "" << numberMin), true, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLteNegativeInfinity) {
@@ -98,7 +98,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': -Infinity, '': -Infinity}"), true, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNumber) {
@@ -112,7 +112,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': -Infinity, '': 1}"), true, false)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNumberMin) {
@@ -126,7 +126,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << negativeInfinity << "" << numberMin), true, false)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNegativeInfinity) {
@@ -138,7 +138,7 @@ namespace {
         IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumber) {
@@ -152,7 +152,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': 1, '': Infinity}"), false, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumberMax) {
@@ -166,7 +166,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << numberMax << "" << positiveInfinity), false, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtPositiveInfinity) {
@@ -178,7 +178,7 @@ namespace {
         IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumber) {
@@ -192,7 +192,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': 1, '': Infinity}"), true, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumberMax) {
@@ -206,7 +206,7 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(BSON("" << numberMax << "" << positiveInfinity), true, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtePositiveInfinity) {
@@ -220,7 +220,23 @@ namespace {
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': Infinity, '': Infinity}"), true, true)));
-        ASSERT(tightness == IndexBoundsBuilder::EXACT);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateArrayEqualBasic) {
+        BSONObj obj = fromjson("{a: [1, 2, 3]}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': 1, '': 1}"), true, true)));
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(fromjson("{'': [1, 2, 3], '': [1, 2, 3]}"), true, true)));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     }
 
     TEST(SimpleRegexTest, RootedLine) {
