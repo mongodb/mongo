@@ -366,10 +366,12 @@ run_mix_schedule(CONFIG *cfg)
 {
 	/* Default to read, then fill in other operations. */
 	memset(g_run_mix_ops, WORKER_READ, sizeof(g_run_mix_ops));
-	run_mix_schedule_op(
-	    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
-	    cfg->run_mix_inserts);
-	run_mix_schedule_op(WORKER_UPDATE, cfg->run_mix_updates);
+	if (cfg->run_mix_inserts)
+		run_mix_schedule_op(
+		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
+		    cfg->run_mix_inserts);
+	if (cfg->run_mix_updates)
+		run_mix_schedule_op(WORKER_UPDATE, cfg->run_mix_updates);
 }
 
 /*
