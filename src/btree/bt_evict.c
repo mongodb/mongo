@@ -650,6 +650,13 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	cache->evict_entries = entries;
 
 	if (entries == 0) {
+		/*
+		 * If there are no entries, there cannot be any candidates.
+		 * Make sure application threads don't read past the end of the
+		 * candidate list, or they may race with the next walk.
+		 */
+		cache->evict_candidates = 0;
+		cache->evict_current = NULL;
 		__wt_spin_unlock(session, &cache->evict_lock);
 		return (0);
 	}

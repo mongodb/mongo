@@ -88,12 +88,10 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	u_int kcols, ncols, vcols;
-
-	WT_CLEAR(pv);
 
 	WT_RET(__pack_init(session, &pack, key_format));
 	for (kcols = 0; (ret = __pack_next(&pack, &pv)) == 0; kcols++)
@@ -311,11 +309,9 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 {
 	WT_CONFIG config;
 	WT_CONFIG_ITEM k, next_k, next_v;
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
-	WT_PACK_VALUE pv;
 	int have_next;
-
-	WT_CLEAR(pv);		/* -Wuninitialized */
 
 	WT_RET(__wt_config_initn(session, &config, columns, len));
 	/*
@@ -381,10 +377,8 @@ int
 __wt_struct_truncate(WT_SESSION_IMPL *session,
     const char *input_fmt, u_int ncols, WT_ITEM *format)
 {
+	WT_DECL_PACK_VALUE(pv);
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
-
-	WT_CLEAR(pv);   /* -Wuninitialized */
 
 	WT_RET(__pack_init(session, &pack, input_fmt));
 	while (ncols-- > 0) {

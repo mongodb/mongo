@@ -250,14 +250,13 @@ __wt_meta_ckptlist_get(
 	WT_CKPT *ckpt, *ckptbase;
 	WT_CONFIG ckptconf;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	size_t allocated, slot;
 	const char *config;
 
 	*ckptbasep = NULL;
 
-	buf = NULL;
 	ckptbase = NULL;
 	allocated = slot = 0;
 	config = NULL;
@@ -370,12 +369,10 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 {
 	struct timespec ts;
 	WT_CKPT *ckpt;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	int64_t maxorder;
 	const char *sep;
-
-	buf = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	maxorder = 0;
