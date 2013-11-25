@@ -14,14 +14,13 @@
 static int
 __metadata_config(WT_SESSION_IMPL *session, const char **metaconfp)
 {
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	const char *cfg[] = { WT_CONFIG_BASE(session, file_meta), NULL, NULL };
 	const char *metaconf;
 
 	*metaconfp = NULL;
 
-	buf = NULL;
 	metaconf = NULL;
 
 	/* Create a turtle file with default values. */

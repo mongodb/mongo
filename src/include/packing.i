@@ -24,7 +24,8 @@ typedef struct {
 	char type;
 } WT_PACK_VALUE;
 
-#define	WT_DECL_PACK_VALUE(pv)  WT_PACK_VALUE pv = { { 0 }, 0, 0, 0 }
+#define	WT_PACK_VALUE_INIT  { { 0 }, 0, 0, 0 }
+#define	WT_DECL_PACK_VALUE(pv)  WT_PACK_VALUE pv = WT_PACK_VALUE_INIT
 
 typedef struct {
 	WT_SESSION_IMPL *session;
@@ -32,6 +33,9 @@ typedef struct {
 	unsigned long repeats;
 	WT_PACK_VALUE lastv;
 } WT_PACK;
+
+#define	WT_PACK_INIT    { NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT }
+#define	WT_DECL_PACK(pack)  WT_PACK pack = WT_PACK_INIT
 
 static inline int
 __pack_initn(
