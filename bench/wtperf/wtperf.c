@@ -114,6 +114,10 @@ static void	 worker(CONFIG_THREAD *);
 static uint64_t	 wtperf_rand(CONFIG *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
+/* We use a couple of WiredTiger library routines to simplify portability. */
+extern int	__wt_epoch(void *, struct timespec *);
+extern uint32_t	__wt_random(void);
+
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
 get_next_incr(void)
@@ -187,7 +191,7 @@ worker(CONFIG_THREAD *thread)
 
 	t = &_t;
 	last = &_last;
-	assert(clock_gettime(CLOCK_REALTIME, last) == 0);
+	assert(__wt_epoch(NULL, last) == 0);
 
 	op = thread->schedule;
 	op_end = thread->schedule + sizeof(thread->schedule);
@@ -298,7 +302,7 @@ op_err:			lprintf(cfg, ret, 0,
 			continue;
 
 					/* Calculate how long the calls took. */
-		assert(clock_gettime(CLOCK_REALTIME, t) == 0);
+		assert(__wt_epoch(NULL, t) == 0);
 		nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
 		nsecs += sec_to_ns((uint64_t)(t->tv_sec - last->tv_sec));
 
@@ -1264,8 +1268,6 @@ wtperf_value_range(CONFIG *cfg)
 	else
 		return (cfg->icount + g_insert_key - (cfg->insert_threads + 1));
 }
-
-extern uint32_t __wt_random(void);
 
 static uint64_t
 wtperf_rand(CONFIG *cfg)
