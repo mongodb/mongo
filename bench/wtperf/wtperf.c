@@ -162,8 +162,7 @@ worker(CONFIG_THREAD *thread)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	long nsecs;
-	uint64_t next_val, v;
+	uint64_t next_val, nsecs, v;
 	uint32_t aggro;
 	int ret;
 	uint8_t *op, *op_end;
@@ -301,8 +300,8 @@ op_err:			lprintf(cfg, ret, 0,
 
 					/* Calculate how long the calls took. */
 		assert(clock_gettime(CLOCK_REALTIME, t) == 0);
-		nsecs = t->tv_nsec - last->tv_nsec;
-		nsecs += (t->tv_sec - last->tv_sec) * BILLION;
+		nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
+		nsecs += sec_to_ns((uint64_t)(t->tv_sec - last->tv_sec));
 
 		tmp = last;		/* Swap timers. */
 		last = t;

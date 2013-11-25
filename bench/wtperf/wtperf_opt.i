@@ -99,7 +99,8 @@ DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "phase, zero for auto-commit")
 DEF_OPT_AS_UINT32(populate_threads, 1,
     "number of populate threads, 1 for bulk load")
-DEF_OPT_AS_BOOL(random_range, 0, "if true, use random inserts in workload")
+DEF_OPT_AS_UINT32(random_range, 0,
+    "if non zero choose a value from within this range as the key for operations.")
 DEF_OPT_AS_UINT32(read_threads, 2, "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
     "output throughput information every interval seconds, 0 to disable")
