@@ -150,7 +150,6 @@ track_aggregated_update(TRACK *trk, uint64_t v)
 	/* >100 seconds, accumulate in the biggest bucket. */
 	else
 		trk->sec[ELEMENTS(trk->sec) - 1] += trk->aggregated;
-	trk->aggregated = 0;
 }
 
 static void
@@ -308,12 +307,13 @@ op_err:			lprintf(cfg, ret, 0,
 		t = tmp;
 					/* Get nanoseconds per call. */
 		v = (uint64_t)nsecs / aggregated;
-		aggregated = 0;
 
 					/* Update the call latencies. */
 		track_aggregated_update(&thread->insert, v);
 		track_aggregated_update(&thread->read, v);
 		track_aggregated_update(&thread->update, v);
+
+		aggregated = trk->aggregated = 0;
 	}
 
 	/* To ensure managing thread knows if we exited early. */
