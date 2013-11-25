@@ -149,6 +149,10 @@ namespace mongo {
         if (params.count("ssl.allowInvalidCertificates")) {
             sslGlobalParams.sslAllowInvalidCertificates = true;
         }
+        if (params.count("ssl.FIPSMode")) {
+            sslGlobalParams.sslFIPSMode = true;
+        }
+
         if (params.count("ssl.sslOnNormalPorts")) {
             if (params.count("ssl.mode")) {
                     return Status(ErrorCodes::BadValue, 
@@ -172,9 +176,6 @@ namespace mongo {
             if (!sslGlobalParams.sslCRLFile.empty() &&
                 sslGlobalParams.sslCAFile.empty()) {
                 return Status(ErrorCodes::BadValue, "need sslCAFile with sslCRLFile");
-            }
-            if (params.count("ssl.FIPSMode")) {
-                sslGlobalParams.sslFIPSMode = true;
             }
             if (sslGlobalParams.sslCAFile.empty()) {
                 warning() << "No SSL certificate validation can be performed since no CA file "
