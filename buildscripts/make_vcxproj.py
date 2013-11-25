@@ -14,6 +14,8 @@
 import sys
 import os
 
+target = sys.argv[1]
+
 footer= """
   </ItemGroup>
 
@@ -42,7 +44,11 @@ def get_defines(x):
 
 common_defines = get_defines(common_defines_str.split(' '))
 
-print "\n<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>"
+f = open('buildscripts/vcxproj.header', 'r')
+header = f.read().replace("_TARGET_", target)
+print header
+
+print "<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>"
 print ';'.join(common_defines) + ";%(PreprocessorDefinitions)"
 print "</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n"
 print "<ItemGroup>\n"
@@ -55,14 +61,32 @@ common_defines.add("_DEBUG")
 common_defines.add("V8_TARGET_ARCH_X64")
 common_defines.add("V8_TARGET_ARCH_IA32")
 
+machine_path = ""
+
+def add_globally(path):
+    print "\n</ItemGroup>\n"
+    print "<ItemDefinitionGroup><ClCompile><AdditionalIncludeDirectories>" + machine_path + "</AdditionalIncludeDirectories></ClCompile></ItemDefinitionGroup>"
+    print "<ItemGroup>\n"
+
 def say(x,line):
     # buildinfo.cpp is for scons only -- see version.cpp for more info
     if not "buildinfo.cpp" in x:
+        if x.startswith('build\\'):
+            #global machine_path
+            #if not machine_path:
+            #    machine_path = x.split("mongo")[0]
+            #sys.stderr.write("todo: adding machine gen'd include path " + machine_path + " to vcxproj\n")
+            sys.stderr.write("adding machine gen'd file " + x + " to vcxproj\n")
         xtra = ""
-        # it would be better to look at the command line inclusions comprehensively instead of hard code
-        # this way, but this will get us going...
-        if "v8\\src" in x:
-            xtra = "<AdditionalIncludeDirectories>src\\third_party\\v8\\src</AdditionalIncludeDirectories>"
+        if "v8\\src" in x: # or machine_path:
+            xtra = "<AdditionalIncludeDirectories>"
+            # it would be better to look at the command line inclusions comprehensively instead of hard code
+            # this way, but this will get us going...
+            if "v8\\src" in x:
+                xtra += "src\\third_party\\v8\\src;"
+            #if machine_path:
+            #    xtra += machine_path
+            xtra += "</AdditionalIncludeDirectories>"
         # add /D command line items that are uncommon
         defines = ""
         for s in get_defines(line):
@@ -73,11 +97,24 @@ def say(x,line):
             xtra += "<PreprocessorDefinitions>" + defines + "%(PreprocessorDefinitions)</PreprocessorDefinitions>"
         print "    <ClCompile Include=\"" + x + "\">" + xtra + "</ClCompile>"
 
+from shutil import copyfile
+
+# for the machine generated files we copy them into the src build tree locally.
+# this is annoying but vstudio doesn't seem to like having parallel sets of -I include
+# paths so had to do this to make it happy
+def pyth(x):
+    for s in x:
+        if s.startswith("build") and s.endswith(".h"):
+            sys.stderr.write("copying " + s + " to src/ tree\n")
+            copyfile(s, 'src\mongo' + s.split("mongo")[1])
+
 def main ():
     for line in sys.stdin:
         x = line.split(' ')
         if x[0] == "cl":
             say(x[3],x)
+        elif "python" in x[0]:
+            pyth(x)
     print footer
 
 main()

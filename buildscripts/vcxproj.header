@@ -43,10 +43,10 @@
   </ItemGroup>
 
   <PropertyGroup Label="Globals">
-    <ProjectName>mongod</ProjectName>
-    <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid>
+    <ProjectName>_TARGET_</ProjectName>
+    <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>mongod</RootNamespace>
+    <RootNamespace>_TARGET_</RootNamespace>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -98,7 +98,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <ObjectFileName>%(RelativeDir)/</ObjectFileName>
-      <AdditionalIncludeDirectories>src\mongo;src;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;src\mongo;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2;src\third_party\yaml-cpp-0.5.1\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
       <DisableSpecificWarnings>4355;4800;4267;4244;4351</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
