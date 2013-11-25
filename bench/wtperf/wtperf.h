@@ -100,7 +100,7 @@ typedef struct {
 
 typedef struct {
 	uint64_t ops;			/* Total operations */
-	uint32_t aggro;			/* Aggregated operations */
+	uint32_t aggregated;		/* Aggregated operations */
 
 	/*
 	 * Latency buckets.

@@ -122,35 +122,35 @@ get_next_incr(void)
 }
 
 /*
- * track_aggro_update --
+ * track_aggregated_update --
  *	Update an operation's tracking structure with new latency information.
  */
 static inline void
-track_aggro_update(TRACK *trk, uint64_t v)
+track_aggregated_update(TRACK *trk, uint64_t v)
 {
 	/*
 	 * Update a latency bucket.
 	 * First buckets: usecs from 100us to 1000us at 100us each.
 	 */
 	if (v < us_to_ns(1000))
-		trk->us[ns_to_us(v)] += trk->aggro;
+		trk->us[ns_to_us(v)] += trk->aggregated;
 
 	/*
 	 * Second buckets: millseconds from 1ms to 1000ms, at 1ms each.
 	 */
 	else if (v < ms_to_ns(1000))
-		trk->ms[ns_to_ms(v)] += trk->aggro;
+		trk->ms[ns_to_ms(v)] += trk->aggregated;
 
 	/*
 	 * Third buckets are seconds from 1s to 100s, at 1s each.
 	 */
 	else if (v < sec_to_ns(100))
-		trk->sec[ns_to_sec(v)] += trk->aggro;
+		trk->sec[ns_to_sec(v)] += trk->aggregated;
 
 	/* >100 seconds, accumulate in the biggest bucket. */
 	else
-		trk->sec[ELEMENTS(trk->sec) - 1] += trk->aggro;
-	trk->aggro = 0;
+		trk->sec[ELEMENTS(trk->sec) - 1] += trk->aggregated;
+	trk->aggregated = 0;
 }
 
 static void
@@ -163,7 +163,7 @@ worker(CONFIG_THREAD *thread)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint64_t next_val, nsecs, v;
-	uint32_t aggro;
+	uint32_t aggregated;
 	int ret;
 	uint8_t *op, *op_end;
 	char *data_buf, *key_buf, *value;
@@ -192,7 +192,7 @@ worker(CONFIG_THREAD *thread)
 
 	op = thread->schedule;
 	op_end = thread->schedule + sizeof(thread->schedule);
-	aggro = 0;
+	aggregated = 0;
 	while (!g_stop) {
 		switch (*op) {
 		case WORKER_INSERT:
@@ -293,9 +293,9 @@ op_err:			lprintf(cfg, ret, 0,
 			op = thread->schedule;
 
 		++trk->ops;		/* Increment operation counts. */
-		++trk->aggro;
+		++trk->aggregated;
 					/* Aggregate, or continue. */
-		if (++aggro < cfg->latency_aggregate)
+		if (++aggregated < cfg->latency_aggregate)
 			continue;
 
 					/* Calculate how long the calls took. */
@@ -307,13 +307,13 @@ op_err:			lprintf(cfg, ret, 0,
 		last = t;
 		t = tmp;
 					/* Get nanoseconds per call. */
-		v = (uint64_t)nsecs / aggro;
-		aggro = 0;
+		v = (uint64_t)nsecs / aggregated;
+		aggregated = 0;
 
 					/* Update the call latencies. */
-		track_aggro_update(&thread->insert, v);
-		track_aggro_update(&thread->read, v);
-		track_aggro_update(&thread->update, v);
+		track_aggregated_update(&thread->insert, v);
+		track_aggregated_update(&thread->read, v);
+		track_aggregated_update(&thread->update, v);
 	}
 
 	/* To ensure managing thread knows if we exited early. */
