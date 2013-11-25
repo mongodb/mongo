@@ -127,7 +127,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->boundDollar = matchedField.toString();
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);

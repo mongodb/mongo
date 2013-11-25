@@ -113,8 +113,8 @@ namespace mongo {
             // TODO: Context for mod error messages would be helpful
             // include mod code, etc.
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Cannot increment with non-numeric argument: "
-                                        << modExpr);
+                          str::stream() << "Cannot increment with non-numeric argument: {"
+                                        << modExpr << "}");
         }
 
         _val = modExpr;
@@ -189,13 +189,13 @@ namespace mongo {
         // If the value being $inc'ed is the same as the one already in the doc, than this is a
         // noOp.
         if (!_preparedState->elemFound.isNumeric()) {
-            mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+            mb::Element idElem = mb::findFirstChildNamed(root, "_id");
             return Status(
                 ErrorCodes::BadValue,
-                str::stream() << "Cannot apply $inc to a value of non-numeric type."
+                str::stream() << "Cannot apply $inc to a value of non-numeric type. {"
                               << idElem.toString()
-                              << " has the field " <<  _preparedState->elemFound.getFieldName()
-                              << " of non-numeric type "
+                              << "} has the field '" <<  _preparedState->elemFound.getFieldName()
+                              << "' of non-numeric type "
                               << typeName(_preparedState->elemFound.getType()));
         }
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
@@ -208,9 +208,11 @@ namespace mongo {
 
         // If the result of the addition is invalid, we must return an error.
         if (!_preparedState->newValue.isValid()) {
+            mb::Element idElem = mb::findFirstChildNamed(root, "_id");
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Failed to apply $inc operations to current value: "
-                                        << currentValue.debugString());
+                          str::stream() << "Failed to apply $inc operations to current value ("
+                                        << currentValue.debugString() << ") for document {"
+                                        << idElem.toString() << "}");
         }
 
         // If the values are identical (same type, same value), then this is a no-op.

@@ -138,9 +138,9 @@ namespace mongo {
             default:
                 return Status(ErrorCodes::BadValue,
                               str::stream() << typeName(modExpr.type())
-                              << " is not valid type. Please use boolean ('true') "
-                                      "or a $type ({$type: 'timestamp/date'} expression. "
-                                      );
+                              << " is not valid type for $currentDate."
+                                 " Please use a boolean ('true')"
+                                 " or a $type expression ({$type: 'timestamp/date'}).");
         }
 
         return Status::OK();

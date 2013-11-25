@@ -87,7 +87,8 @@ namespace mongo {
         if (modExpr.type() != Object) {
             // Impossible, really since the caller check this already...
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "object replace expects full object but type was "
+                          str::stream() << "Document replacement expects a complete document"
+                                           " but the type supplied was "
                                         << modExpr.type());
         }
 
@@ -149,7 +150,9 @@ namespace mongo {
                 if (srcIdElement.ok()) {
                     if (srcIdElement.compareWithBSONElement(dstIdElement, true) != 0) {
                         return Status(ErrorCodes::ImmutableField,
-                                      "The _id field cannot be changed.");
+                                      str::stream() << "The _id field cannot be changed from {"
+                                                    << srcIdElement.toString() << "} to {"
+                                                    << dstIdElement.toString() << "}.");
                     }
                     continue;
                 }
@@ -159,13 +162,6 @@ namespace mongo {
             if (!status.isOK()) {
                 return status;
             }
-        }
-
-        // Error if the _id changed
-        if (srcIdElement.ok() && !dstIdElement.eoo() &&
-            (srcIdElement.compareWithBSONElement(dstIdElement) != 0)) {
-
-            return Status(ErrorCodes::CannotMutateObject, "The _id field cannot be changed");
         }
 
         return Status::OK();

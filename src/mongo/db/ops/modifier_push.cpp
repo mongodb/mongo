@@ -98,7 +98,10 @@ namespace mongo {
             // The $each clause must be an array.
             *eachElem = modExpr.embeddedObject()[kEach];
             if (eachElem->type() != Array) {
-                return Status(ErrorCodes::BadValue, "$each must be an array");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The argument to $each in $push must be"
+                                               " an array but it was of type "
+                                            << typeName(eachElem->type()));
             }
 
             // There must be only one $each clause.
@@ -108,7 +111,8 @@ namespace mongo {
                 BSONElement modElem = itMod.next();
                 if (mongoutils::str::equals(modElem.fieldName(), kEach)) {
                     if (seenEach) {
-                        return Status(ErrorCodes::BadValue, "duplicated $each clause");
+                        return Status(ErrorCodes::BadValue,
+                                      "Only one $each clause is supported.");
                     }
                     seenEach = true;
                 }
@@ -123,21 +127,24 @@ namespace mongo {
                 BSONElement elem = itPush.next();
                 if (mongoutils::str::equals(elem.fieldName(), kSlice)) {
                     if (seenSlice) {
-                        return Status(ErrorCodes::BadValue, "duplicate $slice clause");
+                        return Status(ErrorCodes::BadValue,
+                                      "Only one $slice clause is supported.");
                     }
                     *sliceElem = elem;
                     seenSlice = true;
                 }
                 else if (mongoutils::str::equals(elem.fieldName(), kSort)) {
                     if (seenSort) {
-                        return Status(ErrorCodes::BadValue, "duplicate $sort clause");
+                        return Status(ErrorCodes::BadValue,
+                                      "Only one $sort clause is supported.");
                     }
                     *sortElem = elem;
                     seenSort = true;
                 }
                 else if (mongoutils::str::equals(elem.fieldName(), kPosition)) {
                     if (seenPosition) {
-                        return Status(ErrorCodes::BadValue, "duplicate $position clause");
+                        return Status(ErrorCodes::BadValue,
+                                      "Only one $position clause is supported.");
                     }
                     *positionElem = elem;
                     seenPosition = true;
@@ -253,7 +260,7 @@ namespace mongo {
             if (_pushMode == PUSH_ALL) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "$pushAll requires an array of values "
-                                      "but was given an embedded document, not an array.");
+                                      "but was given an embedded document.");
             }
 
             // If any known clause ($each, $slice, or $sort) is present, we'd assume
@@ -296,7 +303,7 @@ namespace mongo {
             if (!sliceElem.isNumber()) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The value for $slice must "
-                                               "a be a numeric value not "
+                                               "be a numeric value not a "
                                             << typeName(sliceElem.type()));
             }
 
@@ -323,7 +330,7 @@ namespace mongo {
             if (!positionElem.isNumber()) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The value for $position must "
-                                               "a be a positive numeric value not "
+                                               "be a positive numeric value not a "
                                             << typeName(positionElem.type()));
             }
 
@@ -463,12 +470,12 @@ namespace mongo {
             // If the path exists, we require the target field to be already an
             // array.
             if (destExists && _preparedState->elemFound.getType() != Array) {
-                mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+                mb::Element idElem = mb::findFirstChildNamed(root, "_id");
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "The field '" << _fieldRef.dottedField() << "'"
-                                            << " must be and array but is of type "
+                                            << " must be an array but is of type "
                                             << typeName(_preparedState->elemFound.getType())
-                                            << " in document " << idElem.toString() );
+                                            << " in document {" << idElem.toString() << "}");
             }
         }
         else {

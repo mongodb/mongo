@@ -103,17 +103,17 @@ namespace mongo {
             // Check whether there is indeed a list of mods under this modifier.
             if (outerModElem.type() != Object) {
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "List of $mods must be an embedded document"
-                                                  " but it is a  "
+                              str::stream() << "Modifiers operate on fields but we found a "
                                             << typeName(outerModElem.type())
-                                            << " instead.");
+                                            << " instead. For example: {$mod: {<field>: ...}}"
+                                            << " not {" << outerModElem.toString() << "}");
             }
 
             // Check whether there are indeed mods under this modifier.
             if (outerModElem.embeddedObject().isEmpty()) {
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream() << outerModElem.fieldName()
-                                            << " is empty. You must specify a field like so: "
+                              str::stream() << "'" << outerModElem.fieldName()
+                                            << "' is empty. You must specify a field like so: "
                                                     "{$mod: {<field>: ...}}");
             }
 
