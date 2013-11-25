@@ -201,6 +201,7 @@ void	 bdb_read(uint64_t, void *, uint32_t *, int *);
 void	 bdb_remove(uint64_t, int *);
 void	 bdb_update(const void *, uint32_t, const void *, uint32_t, int *);
 
+void	*compact(void *);
 void	 config_clear(void);
 void	 config_error(void);
 void	 config_file(const char *);

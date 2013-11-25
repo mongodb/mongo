@@ -103,8 +103,7 @@ hot_backup(void *arg)
 	conn = g.wts_conn;
 
 	/* Open a session. */
-	if ((ret = conn->open_session(
-	    conn, NULL, NULL, &session)) != 0)
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
 	/*
