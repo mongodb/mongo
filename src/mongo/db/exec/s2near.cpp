@@ -249,7 +249,7 @@ namespace mongo {
         }
 
         // If the distance to the doc satisfies our distance criteria,
-        if (minDistance >= _innerRadius && minDistance < _outerRadius) {
+        if (minDistance >= _innerRadius && minDistance <= _outerRadius) {
             _results.push(Result(*out, minDistance));
             if (member->hasLoc()) {
                 _invalidationMap[member->loc] = *out;

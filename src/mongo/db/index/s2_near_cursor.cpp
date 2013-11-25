@@ -329,7 +329,7 @@ namespace mongo {
                 if (minDistance < _returnedDistance) { continue; }
 
                 // If the min. distance satisfies our distance criteria
-                if (minDistance >= _innerRadius && minDistance < _outerRadius) {
+                if (minDistance >= _innerRadius && minDistance <= _outerRadius) {
                     // The result is valid.  We have to de-dup ourselves here.
                     if (_returned.end() == _returned.find(cursor->currLoc())) {
                         _results.push(Result(cursor->currLoc(), cursor->currKey(),
