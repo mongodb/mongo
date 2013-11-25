@@ -1064,26 +1064,29 @@ main(int argc, char *argv[])
 	if (cfg.verbose > 1)		/* Display the configuration. */
 		config_print(&cfg);
 
-					/* Open the real connection. */
-	if ((ret = wiredtiger_open(
+	if ((ret = wiredtiger_open(	/* Open the real connection. */
 	    cfg.home, NULL, cfg.conn_config, &conn)) != 0) {
 		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
 		goto err;
 	}
 	cfg.conn = conn;
-					/* Create the table. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(&cfg, ret, 0,
-		    "Error opening a session on %s", cfg.home);
-		goto err;
+
+	if (cfg.create != 0) {		/* If creating, create the table. */
+		if ((ret =
+		    conn->open_session(conn, NULL, NULL, &session)) != 0) {
+			lprintf(&cfg, ret, 0,
+			    "Error opening a session on %s", cfg.home);
+			goto err;
+		}
+		if ((ret = session->create(
+		    session, cfg.uri, cfg.table_config)) != 0) {
+			lprintf(&cfg,
+			    ret, 0, "Error creating table %s", cfg.uri);
+			goto err;
+		}
+		assert(session->close(session, NULL) == 0);
+		session = NULL;
 	}
-	if ((ret = session->create(
-	    session, cfg.uri, cfg.table_config)) != 0) {
-		lprintf(&cfg, ret, 0, "Error creating table %s", cfg.uri);
-		goto err;
-	}
-	assert(session->close(session, NULL) == 0);
-	session = NULL;
 					/* Start the monitor thread. */
 	if (cfg.sample_interval != 0) {
 		if ((ret = pthread_create(
