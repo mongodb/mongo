@@ -89,7 +89,7 @@ DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
-DEF_OPT_AS_UINT32(latency_aggregate, 100,
+DEF_OPT_AS_UINT32(latency_aggregate, 1,
     "number of operations to aggregate when measuring latency")
 DEF_OPT_AS_INT(merge_sleep, 0,
     "post-populate sleep seconds for LSM merging activity (-1 for load time)")
