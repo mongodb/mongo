@@ -352,6 +352,12 @@ env.Library('mongocommon', commonFiles,
                      ] +
                      extraCommonLibdeps)
 
+env.CppUnitTest(
+    target="util/version_test",
+    source=["util/version_test.cpp"],
+    LIBDEPS=["mongocommon"]
+)
+
 env.Library('background_job', ["util/background.cpp"],
             LIBDEPS=['spin_lock'])
 

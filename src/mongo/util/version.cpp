@@ -31,7 +31,6 @@
 #include "mongo/util/net/ssl_manager.h" 
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
-#include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/version.h"
 
@@ -198,28 +197,4 @@ namespace mongo {
        result.appendBool( "debug" , debug );
        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
     }
-
-    class VersionArrayTest : public StartupTest {
-    public:
-        void run() {
-            verify( toVersionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );
-            verify( toVersionArray("1.2.0") == BSON_ARRAY(1 << 2 << 0 << 0) );
-            verify( toVersionArray("2.0.0") == BSON_ARRAY(2 << 0 << 0 << 0) );
-
-            verify( toVersionArray("1.2.3-pre-") == BSON_ARRAY(1 << 2 << 3 << -100) );
-            verify( toVersionArray("1.2.0-pre-") == BSON_ARRAY(1 << 2 << 0 << -100) );
-            verify( toVersionArray("2.0.0-pre-") == BSON_ARRAY(2 << 0 << 0 << -100) );
-
-            verify( toVersionArray("1.2.3-rc0") == BSON_ARRAY(1 << 2 << 3 << -10) );
-            verify( toVersionArray("1.2.0-rc1") == BSON_ARRAY(1 << 2 << 0 << -9) );
-            verify( toVersionArray("2.0.0-rc2") == BSON_ARRAY(2 << 0 << 0 << -8) );
-
-            // Note that the pre of an rc is the same as the rc itself
-            verify( toVersionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
-            verify( toVersionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
-            verify( toVersionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
-
-            LOG(1) << "versionArrayTest passed" << endl;
-        }
-    } versionArrayTest;
 }
