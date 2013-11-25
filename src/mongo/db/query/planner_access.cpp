@@ -427,14 +427,22 @@ namespace mongo {
                                                   + curChild);
                     delete child;
                 }
-                // In the AND case, the filter can be brought above the AND node.
-                // But in the OR case, the filter only applies to one branch, so
-                // we must affix curChild's filter now. In order to apply the filter
-                // to the proper OR branch, create a FETCH node with the filter whose
-                // child is the IXSCAN.
-                else if (root->matchType() == MatchExpression::OR) {
-                    verify(NULL != currentScan.get());
+                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
+                    // The bounds are not exact, but the information needed to
+                    // evaluate the predicate is in the index key. Remove the
+                    // MatchExpression from its parent and attach it to the filter
+                    // of the index scan we're building.
+                    root->getChildVector()->erase(root->getChildVector()->begin()
+                                                  + curChild);
 
+                    _addFilterToSolutionNode(currentScan.get(), child, root->matchType());
+                }
+                else if (root->matchType() == MatchExpression::OR) {
+                    // In the AND case, the filter can be brought above the AND node.
+                    // But in the OR case, the filter only applies to one branch, so
+                    // we must affix curChild's filter now. In order to apply the filter
+                    // to the proper OR branch, create a FETCH node with the filter whose
+                    // child is the IXSCAN.
                     finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
                     root->getChildVector()->erase(root->getChildVector()->begin()
                                                   + curChild);
@@ -478,14 +486,22 @@ namespace mongo {
                     delete child;
                     // Don't increment curChild.
                 }
-                // In the AND case, the filter can be brought above the AND node.
-                // But in the OR case, the filter only applies to one branch, so
-                // we must affix curChild's filter now. In order to apply the filter
-                // to the proper OR branch, create a FETCH node with the filter whose
-                // child is the IXSCAN.
-                else if (root->matchType() == MatchExpression::OR) {
-                    verify(NULL != currentScan.get());
+                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
+                    // The bounds are not exact, but the information needed to
+                    // evaluate the predicate is in the index key. Remove the
+                    // MatchExpression from its parent and attach it to the filter
+                    // of the index scan we're building.
+                    root->getChildVector()->erase(root->getChildVector()->begin()
+                                                  + curChild);
 
+                    _addFilterToSolutionNode(currentScan.get(), child, root->matchType());
+                }
+                else if (root->matchType() == MatchExpression::OR) {
+                    // In the AND case, the filter can be brought above the AND node.
+                    // But in the OR case, the filter only applies to one branch, so
+                    // we must affix curChild's filter now. In order to apply the filter
+                    // to the proper OR branch, create a FETCH node with the filter whose
+                    // child is the IXSCAN.
                     finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
                     root->getChildVector()->erase(root->getChildVector()->begin()
                                                   + curChild);
@@ -733,12 +749,18 @@ namespace mongo {
                 if (tightness == IndexBoundsBuilder::EXACT) {
                     return soln;
                 }
-
-                FetchNode* fetch = new FetchNode();
-                verify(NULL != autoRoot.get());
-                fetch->filter.reset(autoRoot.release());
-                fetch->children.push_back(soln);
-                return fetch;
+                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
+                    verify(NULL == soln->filter.get());
+                    soln->filter.reset(autoRoot.release());
+                    return soln;
+                }
+                else { // tightness == IndexBoundsBuilder::INEXACT_FETCH
+                    FetchNode* fetch = new FetchNode();
+                    verify(NULL != autoRoot.get());
+                    fetch->filter.reset(autoRoot.release());
+                    fetch->children.push_back(soln);
+                    return fetch;
+                }
             }
             else if (Indexability::arrayUsesIndexOnChildren(root)) {
                 QuerySolutionNode* solution = NULL;
@@ -838,6 +860,40 @@ namespace mongo {
         }
 
         return solnRoot;
+    }
+
+    // static
+    void QueryPlannerAccess::_addFilterToSolutionNode(QuerySolutionNode* node,
+                                                      MatchExpression* match,
+                                                      MatchExpression::MatchType type) {
+        if (NULL == node->filter) {
+            node->filter.reset(match);
+        }
+        // The 'node' already has either an AND or OR filter that matches
+        // 'type'. Add 'match' as another branch of the filter.
+        else if (type == node->filter->matchType()) {
+            ListOfMatchExpression* listFilter =
+                static_cast<ListOfMatchExpression*>(node->filter.get());
+            listFilter->add(match);
+        }
+        // The 'node' already has a filter that does not match
+        // 'type'. If 'type' is AND, then combine 'match' with
+        // the existing filter by adding an AND. If 'type' is OR,
+        // combine by adding an OR node.
+        else {
+            ListOfMatchExpression* listFilter;
+            if (MatchExpression::AND == type) {
+                listFilter = new AndMatchExpression();
+            }
+            else {
+                verify(MatchExpression::OR == type);
+                listFilter = new OrMatchExpression();
+            }
+            MatchExpression* oldFilter = node->filter->shallowClone();
+            listFilter->add(oldFilter);
+            listFilter->add(match);
+            node->filter.reset(listFilter);
+        }
     }
 
 }  // namespace mongo

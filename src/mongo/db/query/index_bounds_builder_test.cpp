@@ -239,6 +239,10 @@ namespace {
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     }
 
+    //
+    // Test simpleRegex
+    //
+
     TEST(SimpleRegexTest, RootedLine) {
         IndexBoundsBuilder::BoundsTightness tightness;
         string prefix = IndexBoundsBuilder::simpleRegex("^foo", "", &tightness);
@@ -257,21 +261,21 @@ namespace {
         IndexBoundsBuilder::BoundsTightness tightness;
         string prefix = IndexBoundsBuilder::simpleRegex("^f?oo", "", &tightness);
         ASSERT_EQUALS(prefix, "");
-        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
     }
 
     TEST(SimpleRegexTest, RootedOptionalSecondChar) {
         IndexBoundsBuilder::BoundsTightness tightness;
         string prefix = IndexBoundsBuilder::simpleRegex("^fz?oo", "", &tightness);
         ASSERT_EQUALS(prefix, "f");
-        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
     }
 
     TEST(SimpleRegexTest, RootedMultiline) {
         IndexBoundsBuilder::BoundsTightness tightness;
         string prefix = IndexBoundsBuilder::simpleRegex("^foo", "m", &tightness);
         ASSERT_EQUALS(prefix, "");
-        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
     }
 
     TEST(SimpleRegexTest, RootedStringMultiline) {
@@ -285,7 +289,7 @@ namespace {
         IndexBoundsBuilder::BoundsTightness tightness;
         string prefix = IndexBoundsBuilder::simpleRegex("\\Afoo", "mi", &tightness);
         ASSERT_EQUALS(prefix, "");
-        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
     }
 
     TEST(SimpleRegexTest, RootedComplex) {
@@ -293,7 +297,7 @@ namespace {
         string prefix = IndexBoundsBuilder::simpleRegex(
                 "\\Af \t\vo\n\ro  \\ \\# #comment", "mx", &tightness);
         ASSERT_EQUALS(prefix, "foo #");
-        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
     }
 
     TEST(SimpleRegexTest, RootedLiteral) {
@@ -309,7 +313,7 @@ namespace {
         string prefix = IndexBoundsBuilder::simpleRegex(
             "^\\Qasdf\\E.*", "", &tightness);
         ASSERT_EQUALS(prefix, "asdf");
-        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
     }
 
     TEST(SimpleRegexTest, RootedLiteralNoEnd) {
@@ -350,6 +354,40 @@ namespace {
             "^\\Qas\\E\\\\E\\Q$df\\E", "", &tightness);
         ASSERT_EQUALS(prefix, "as\\E$df");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    //
+    // Regex bounds
+    //
+
+    TEST(IndexBoundsBuilderTest, SimpleNonPrefixRegex) {
+        BSONObj obj = fromjson("{a: /foo/}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': '', '': {}}"), true, false)));
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(fromjson("{'': /foo/, '': /foo/}"), true, true)));
+        ASSERT(tightness == IndexBoundsBuilder::INEXACT_COVERED);
+    }
+
+    TEST(IndexBoundsBuilderTest, SimplePrefixRegex) {
+        BSONObj obj = fromjson("{a: /^foo/}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': 'foo', '': 'fop'}"), true, false)));
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(fromjson("{'': /^foo/, '': /^foo/}"), true, true)));
+        ASSERT(tightness == IndexBoundsBuilder::EXACT);
     }
 
 }  // namespace

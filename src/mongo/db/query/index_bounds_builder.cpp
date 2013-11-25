@@ -45,7 +45,7 @@ namespace mongo {
     string IndexBoundsBuilder::simpleRegex(const char* regex, const char* flags,
                                            BoundsTightness* tightnessOut) {
         string r = "";
-        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
 
         bool multilineOK;
         if ( regex[0] == '\\' && regex[1] == 'A') {
@@ -139,7 +139,7 @@ namespace mongo {
 
         if ( r.empty() && *regex == 0 ) {
             r = ss.str();
-            *tightnessOut = r.empty() ? IndexBoundsBuilder::INEXACT_FETCH : IndexBoundsBuilder::EXACT;
+            *tightnessOut = r.empty() ? IndexBoundsBuilder::INEXACT_COVERED : IndexBoundsBuilder::EXACT;
         }
 
         return r;

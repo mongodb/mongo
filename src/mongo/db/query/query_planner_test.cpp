@@ -1096,6 +1096,115 @@ namespace {
         assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
     }
 
+    //
+    // Regex
+    //
+
+    TEST_F(IndexAssignmentTest, PrefixRegex) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{a: /^foo/}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, PrefixRegexCovering) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{a: /^foo/}"), BSONObj(), fromjson("{_id: 0, a: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NonPrefixRegex) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{a: /foo/}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NonPrefixRegexCovering) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{a: /foo/}"), BSONObj(), fromjson("{_id: 0, a: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NonPrefixRegexAnd) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{a: /foo/, b: 2}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NonPrefixRegexAndCovering) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuerySortProj(fromjson("{a: /foo/, b: 2}"), BSONObj(),
+                         fromjson("{_id: 0, a: 1, b: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1, b: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1, b: 1}, node: {ixscan: {a: 1, b: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NonPrefixRegexOrCovering) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{$or: [{a: /0/}, {a: /1/}]}"), BSONObj(),
+                         fromjson("{_id: 0, a: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NonPrefixRegexInCovering) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{a: {$in: [/foo/, /bar/]}}"), BSONObj(),
+                         fromjson("{_id: 0, a: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, TwoRegexCompoundIndexCovering) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuerySortProj(fromjson("{a: /0/, b: /1/}"), BSONObj(),
+                         fromjson("{_id: 0, a: 1, b: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1, b: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1, b: 1}, node: {ixscan: {a: 1, b: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, TwoRegexSameFieldCovering) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{$and: [{a: /0/}, {a: /1/}]}"), BSONObj(),
+                         fromjson("{_id: 0, a: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, ThreeRegexSameFieldCovering) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{$and: [{a: /0/}, {a: /1/}, {a: /2/}]}"), BSONObj(),
+                         fromjson("{_id: 0, a: 1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
+    }
+
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
     //                second is not working (until the machinery is in place)
     //
