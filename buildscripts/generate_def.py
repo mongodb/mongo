@@ -26,6 +26,14 @@ import string
 import subprocess
 import sys
 
+# These symbols appear in the 32-bit linkermember section 1, but
+# we don't want to export them.
+blacklist = ( "_MemoryBarrier",
+              "_md5_append",
+              "_md5_finish",
+              "_md5_init",
+              "_wmemcpy",
+              "_wmemmove" )
 
 def main(argv):
     defFilename = argv[1]
@@ -53,6 +61,10 @@ def main(argv):
             # the symbol section ends at this label
             if line.startswith("  Summary"):
                 break
+            # filter out some symbols we don't want - symbol starts at column 10
+            if (line.startswith(blacklist, 10)):
+                continue
+
             # leave off the symbol address in the first 10 characters
             defFile.write(line[10:])
             
