@@ -76,7 +76,7 @@ static const char * const large_config_str =
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
-static uint8_t run_mix_ops[100];	/* run-mix operation schedule */
+static uint8_t g_run_mix_ops[100];	/* run-mix operation schedule */
 
 static uint64_t g_ckpt_ops;		/* checkpoint operations */
 static uint64_t g_insert_ops;		/* insert operations */
@@ -342,16 +342,16 @@ run_mix_schedule_op(int op, uint32_t op_cnt)
 	 * Find a read operation and replace it with another operation.  This
 	 * is roughly n-squared, but it's an N of 100, leave it.
 	 */
-	p = run_mix_ops;
-	end = run_mix_ops + sizeof(run_mix_ops);
+	p = g_run_mix_ops;
+	end = g_run_mix_ops + sizeof(g_run_mix_ops);
 	for (i = 0; i < op_cnt; ++i) {
 		for (; *p != WORKER_READ; ++p)
 			if (p == end)
-				p = run_mix_ops;
+				p = g_run_mix_ops;
 		*p = op;
 
 		if (end - jump < p)
-			p = run_mix_ops;
+			p = g_run_mix_ops;
 		else
 			p += jump;
 	}
@@ -365,7 +365,7 @@ static void
 run_mix_schedule(CONFIG *cfg)
 {
 	/* Default to read, then fill in other operations. */
-	memset(run_mix_ops, WORKER_READ, sizeof(run_mix_ops));
+	memset(g_run_mix_ops, WORKER_READ, sizeof(g_run_mix_ops));
 	run_mix_schedule_op(
 	    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
 	    cfg->run_mix_inserts);
@@ -387,7 +387,8 @@ op_setup(CONFIG *cfg, int op, CONFIG_THREAD *thread)
 	if (cfg->run_mix_inserts == 0 && cfg->run_mix_updates == 0)
 		memset(thread->schedule, op, sizeof(thread->schedule));
 	else
-		memcpy(thread->schedule, run_mix_ops, sizeof(thread->schedule));
+		memcpy(
+		    thread->schedule, g_run_mix_ops, sizeof(thread->schedule));
 }
 
 static void *
