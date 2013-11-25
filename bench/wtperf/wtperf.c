@@ -340,7 +340,7 @@ run_mix_schedule_op(int op, uint32_t op_cnt)
 
 	/*
 	 * Find a read operation and replace it with another operation.  This
-	 * this is roughly n-squared, but it's an N of 100, leave it.
+	 * is roughly n-squared, but it's an N of 100, leave it.
 	 */
 	p = run_mix_ops;
 	end = run_mix_ops + sizeof(run_mix_ops);
