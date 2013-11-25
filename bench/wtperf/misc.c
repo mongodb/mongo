@@ -31,7 +31,7 @@
  * Return total operations count for a group of threads.
  */
 static uint64_t
-sum_ops(CONFIG *cfg, size_t off)
+sum_ops(CONFIG *cfg, size_t field_offset)
 {
 	CONFIG_THREAD *thread;
 	uint64_t total;
@@ -42,19 +42,19 @@ sum_ops(CONFIG *cfg, size_t off)
 	for (i = 0, thread = cfg->ckptthreads;
 	    thread != NULL && i < cfg->checkpoint_threads;
 	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + off))->ops;
+		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 	for (i = 0, thread = cfg->ithreads;
 	    thread != NULL && i < cfg->insert_threads;
 	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + off))->ops;
+		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 	for (i = 0, thread = cfg->rthreads;
 	    thread != NULL && i < cfg->read_threads;
 	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + off))->ops;
+		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 	for (i = 0, thread = cfg->uthreads;
 	    thread != NULL && i < cfg->update_threads;
 	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + off))->ops;
+		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 
 	return (total);
 }
@@ -103,12 +103,12 @@ sum_update_ops(CONFIG *cfg)
  *	Sum latency for a single thread.
  */
 static void
-sum_latency_thread(CONFIG_THREAD *thread, size_t off, TRACK *total)
+sum_latency_thread(CONFIG_THREAD *thread, size_t field_offset, TRACK *total)
 {
 	TRACK *trk;
 	u_int i;
 
-	trk = (TRACK *)((uint8_t *)thread + off);
+	trk = (TRACK *)((uint8_t *)thread + field_offset);
 
 	for (i = 0; i < ELEMENTS(trk->us); ++i) {
 		total->ops += trk->us[i];
@@ -129,7 +129,7 @@ sum_latency_thread(CONFIG_THREAD *thread, size_t off, TRACK *total)
  *	Sum latency for a set of threads.
  */
 static void
-sum_latency(CONFIG *cfg, size_t off, TRACK *total)
+sum_latency(CONFIG *cfg, size_t field_offset, TRACK *total)
 {
 	CONFIG_THREAD *thread;
 	u_int i;
@@ -138,13 +138,13 @@ sum_latency(CONFIG *cfg, size_t off, TRACK *total)
 
 	for (i = 0, thread = cfg->ithreads;
 	    thread != NULL && i < cfg->insert_threads; ++i, ++thread)
-		sum_latency_thread(thread, off, total);
+		sum_latency_thread(thread, field_offset, total);
 	for (i = 0, thread = cfg->rthreads;
 	    thread != NULL && i < cfg->read_threads; ++i, ++thread)
-		sum_latency_thread(thread, off, total);
+		sum_latency_thread(thread, field_offset, total);
 	for (i = 0, thread = cfg->uthreads;
 	    thread != NULL && i < cfg->update_threads; ++i, ++thread)
-		sum_latency_thread(thread, off, total);
+		sum_latency_thread(thread, field_offset, total);
 }
 
 static void
