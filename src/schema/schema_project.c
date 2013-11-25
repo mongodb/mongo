@@ -17,9 +17,10 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
     WT_CURSOR **cp, const char *proj_arg, va_list ap)
 {
 	WT_CURSOR *c;
+	WT_DECL_PACK_VALUE(pv);
 	WT_ITEM *buf;
 	WT_PACK pack;
-	WT_PACK_VALUE pv, old_pv;
+	WT_PACK_VALUE old_pv;
 	char *proj;
 	uint8_t *p, *end;
 	const uint8_t *next;
@@ -156,14 +157,13 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
     WT_CURSOR **cp, const char *proj_arg, va_list ap)
 {
 	WT_CURSOR *c;
+	WT_DECL_PACK_VALUE(pv);
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	char *proj;
 	uint8_t *p, *end;
 	uint32_t arg;
 
 	WT_CLEAR(pack);		/* -Wuninitialized */
-	WT_CLEAR(pv);		/* -Wuninitialized */
 	p = end = NULL;		/* -Wuninitialized */
 
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
@@ -225,9 +225,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
     const char *proj_arg, int key_only, const char *vformat, WT_ITEM *value)
 {
 	WT_CURSOR *c;
+	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_PACK_VALUE(vpv);
 	WT_ITEM *buf;
 	WT_PACK pack, vpack;
-	WT_PACK_VALUE pv, vpv;
 	char *proj;
 	uint8_t *end, *p;
 	const uint8_t *next, *vp, *vend;
@@ -236,7 +237,6 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	int skip;
 
 	WT_CLEAR(pack);		/* -Wuninitialized */
-	WT_CLEAR(vpv);		/* -Wuninitialized */
 	buf = NULL;		/* -Wuninitialized */
 	p = end = NULL;		/* -Wuninitialized */
 
@@ -393,8 +393,9 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *c;
 	WT_ITEM *buf;
+	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_PACK_VALUE(vpv);
 	WT_PACK pack, vpack;
-	WT_PACK_VALUE pv, vpv;
 	char *proj;
 	const uint8_t *p, *end;
 	uint8_t *vp;
@@ -402,8 +403,6 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	uint32_t arg;
 
 	WT_CLEAR(pack);		/* -Wuninitialized */
-	WT_CLEAR(pv);		/* -Wuninitialized */
-	WT_CLEAR(vpv);		/* -Wuninitialized */
 	p = end = NULL;		/* -Wuninitialized */
 
 	WT_RET(__wt_buf_init(session, value, 0));

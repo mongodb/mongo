@@ -16,14 +16,12 @@ int
 __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt, size_t len, int *fixedp, uint32_t *fixed_lenp)
 {
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	int fields;
 
 	WT_RET(__pack_initn(session, &pack, fmt, len));
-
-	WT_CLEAR(pv);
 	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
 		;
 
