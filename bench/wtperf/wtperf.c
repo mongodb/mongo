@@ -1101,55 +1101,49 @@ main(int argc, char *argv[])
 					/* If creating, populate the table. */
 	if (cfg.create != 0 && execute_populate(&cfg) != 0)
 		goto err;
-					/* Not creating, set insert count. */
-	if (cfg.create == 0 && find_table_count(&cfg) != 0)
-		goto err;
+					/* Optional workload. */
+	if (cfg.run_time != 0 || cfg.run_ops != 0) {
+					/* Didn't create, set insert count. */
+		if (cfg.create == 0 && find_table_count(&cfg) != 0)
+			goto err;
 					/* Start the checkpoint thread. */
-	if (cfg.checkpoint_threads != 0 &&
-	    start_threads(&cfg,
-	    cfg.checkpoint_threads, &cfg.ckptthreads, checkpoint_worker) != 0)
-		goto err;
+		if (cfg.checkpoint_threads != 0 &&
+		    start_threads(&cfg, cfg.checkpoint_threads,
+		    &cfg.ckptthreads, checkpoint_worker) != 0)
+			goto err;
 					/* Execute the workload. */
-	if ((cfg.run_time != 0 || cfg.run_ops != 0) &&
-	    (ret = execute_workload(&cfg)) != 0)
-		goto err;
+		if ((ret = execute_workload(&cfg)) != 0)
+			goto err;
 
-	dump_latency(&cfg);
+		/* One final summation of the operations we've completed. */
+		g_read_ops = sum_read_ops(&cfg);
+		g_insert_ops = sum_insert_ops(&cfg);
+		g_update_ops = sum_update_ops(&cfg);
+		g_ckpt_ops = sum_ckpt_ops(&cfg);
+		total_ops = g_read_ops + g_insert_ops + g_update_ops;
 
-	lprintf(&cfg, 0, 1,
-	    "Run completed: %" PRIu32 " read threads, %"
-	    PRIu32 " insert threads, %" PRIu32 " update threads and %"
-	    PRIu32 " checkpoint threads for %"
-	    PRIu32 " %s.",
-	    cfg.read_threads, cfg.insert_threads,
-	    cfg.update_threads, cfg.checkpoint_threads,
-	    cfg.run_time == 0 ? cfg.run_ops : cfg.run_time,
-	    cfg.run_time == 0 ? "operations" : "seconds");
+		if (cfg.read_threads != 0)
+			lprintf(&cfg, 0, 1,
+			    "Executed %" PRIu64 " read operations (%" PRIu64
+			    "%%)",
+			    g_read_ops, (g_read_ops * 100) / total_ops);
+		if (cfg.insert_threads != 0)
+			lprintf(&cfg, 0, 1,
+			    "Executed %" PRIu64 " insert operations (%" PRIu64
+			    "%%)",
+			    g_insert_ops, (g_insert_ops * 100) / total_ops);
+		if (cfg.update_threads != 0)
+			lprintf(&cfg, 0, 1,
+			    "Executed %" PRIu64 " update operations (%" PRIu64
+			    "%%)",
+			    g_update_ops, (g_update_ops * 100) / total_ops);
+		if (cfg.checkpoint_threads != 0)
+			lprintf(&cfg, 0, 1,
+			    "Executed %" PRIu64 " checkpoint operations",
+			    g_ckpt_ops);
 
-	/*
-	 * One final summation of the operations we've completed, output that
-	 * information.
-	 */
-	g_read_ops = sum_read_ops(&cfg);
-	g_insert_ops = sum_insert_ops(&cfg);
-	g_update_ops = sum_update_ops(&cfg);
-	g_ckpt_ops = sum_ckpt_ops(&cfg);
-	total_ops = g_read_ops + g_insert_ops + g_update_ops;
-	if (cfg.read_threads != 0)
-		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " read operations (%" PRIu64 "%%)",
-		    g_read_ops, (g_read_ops * 100) / total_ops);
-	if (cfg.insert_threads != 0)
-		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " insert operations (%" PRIu64 "%%)",
-		    g_insert_ops, (g_insert_ops * 100) / total_ops);
-	if (cfg.update_threads != 0)
-		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " update operations (%" PRIu64 "%%)",
-		    g_update_ops, (g_update_ops * 100) / total_ops);
-	if (cfg.checkpoint_threads != 0)
-		lprintf(&cfg, 0, 1,
-		    "Executed %" PRIu64 " checkpoint operations", g_ckpt_ops);
+		dump_latency(&cfg);
+	}
 
 	if (0) {
 einval:		ret = EINVAL;
@@ -1176,6 +1170,17 @@ err:		if (ret == 0)
 		if (ret == 0)
 			ret = tret;
 	}
+
+	if (ret == 0)
+		lprintf(&cfg, 0, 1,
+		    "Run completed: %" PRIu32 " read threads, %"
+		    PRIu32 " insert threads, %" PRIu32 " update threads and %"
+		    PRIu32 " checkpoint threads for %"
+		    PRIu32 " %s.",
+		    cfg.read_threads, cfg.insert_threads,
+		    cfg.update_threads, cfg.checkpoint_threads,
+		    cfg.run_time == 0 ? cfg.run_ops : cfg.run_time,
+		    cfg.run_time == 0 ? "operations" : "seconds");
 
 	if (cfg.logf != NULL) {
 		assert(fflush(cfg.logf) == 0);

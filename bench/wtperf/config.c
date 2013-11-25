@@ -396,15 +396,6 @@ config_opt_usage(void)
 int
 config_sanity(CONFIG *cfg)
 {
-	/* Run-time or operation count, must be one or the other. */
-	if ((cfg->run_time == 0 && cfg->run_ops == 0) ||
-	    (cfg->run_time != 0 && cfg->run_ops != 0)) {
-		fprintf(stderr,
-		    "one of either run-time or run-ops must be set, "
-		    "but not both\n");
-		return (1);
-	}
-
 	/* Various intervals should be less than the run-time. */
 	if (cfg->run_time > 0 &&
 	    ((cfg->checkpoint_threads != 0 &&
