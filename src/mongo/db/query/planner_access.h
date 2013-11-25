@@ -155,6 +155,17 @@ namespace mongo {
          * Aligns OILs (and bounds) according to the kp direction * the scanDir.
          */
         static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+
+    private:
+        /**
+         * Add the filter 'match' to the query solution node 'node'. Takes
+         * ownership of 'match'.
+         *
+         * The MatchType, 'type', indicates whether 'match' is a child of an
+         * AND or an OR match expression.
+         */
+        static void _addFilterToSolutionNode(QuerySolutionNode* node, MatchExpression* match,
+                                             MatchExpression::MatchType type);
     };
 
 }  // namespace mongo

@@ -45,7 +45,9 @@ namespace mongo {
             // Index bounds are exact.
             EXACT,
             // Index bounds are inexact, and a fetch is required.
-            INEXACT_FETCH
+            INEXACT_FETCH,
+            // Index bounds are inexact, but no fetch is required
+            INEXACT_COVERED
         };
 
         /**
