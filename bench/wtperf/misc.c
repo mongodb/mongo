@@ -99,6 +99,86 @@ sum_update_ops(CONFIG *cfg)
 }
 
 /*
+ * latency_monitor --
+ *	Get average, minimum and maximum latency for this period.
+ */
+void
+latency_monitor(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+{
+	static uint32_t last_avg = 0, last_max = 0, last_min = 0;
+	CONFIG_THREAD *thread;
+	uint64_t ops, latency, tmp;
+	uint32_t max, min;
+	u_int i;
+
+	ops = latency = 0;
+	max = 0;
+	min = UINT32_MAX;
+	for (i = 0, thread = cfg->ithreads;
+	    thread != NULL && i < cfg->insert_threads; ++i, ++thread) {
+		tmp = thread->total_ops;
+		ops += tmp - thread->last_ops;
+		thread->last_ops = tmp;
+		tmp = thread->total_latency;
+		latency += tmp - thread->last_latency;
+		thread->last_latency = tmp;
+
+		if (min > thread->min_latency)
+			min = thread->min_latency;
+		thread->min_latency = UINT32_MAX;
+		if (max < thread->max_latency)
+			max = thread->max_latency;
+		thread->max_latency = 0;
+	}
+	for (i = 0, thread = cfg->rthreads;
+	    thread != NULL && i < cfg->read_threads; ++i, ++thread) {
+		tmp = thread->total_ops;
+		ops += tmp - thread->last_ops;
+		thread->last_ops = tmp;
+		tmp = thread->total_latency;
+		latency += tmp - thread->last_latency;
+		thread->last_latency = tmp;
+
+		if (min > thread->min_latency)
+			min = thread->min_latency;
+		thread->min_latency = UINT32_MAX;
+		if (max < thread->max_latency)
+			max = thread->max_latency;
+		thread->max_latency = 0;
+	}
+	for (i = 0, thread = cfg->uthreads;
+	    thread != NULL && i < cfg->update_threads; ++i, ++thread) {
+		tmp = thread->total_ops;
+		ops += tmp - thread->last_ops;
+		thread->last_ops = tmp;
+		tmp = thread->total_latency;
+		latency += tmp - thread->last_latency;
+		thread->last_latency = tmp;
+
+		if (min > thread->min_latency)
+			min = thread->min_latency;
+		thread->min_latency = UINT32_MAX;
+		if (max < thread->max_latency)
+			max = thread->max_latency;
+		thread->max_latency = 0;
+	}
+
+	/*
+	 * If nothing happened, graph the average, minimum and maximum as they
+	 * were the last time, it keeps the graphs from having discontinuities.
+	 */
+	if (ops == 0) {
+		*avgp = last_avg;
+		*minp = last_min;
+		*maxp = last_max;
+	} else {
+		*minp = last_min = min;
+		*maxp = last_max = max;
+		*avgp = last_avg = (uint32_t)(latency / ops);
+	}
+}
+
+/*
  * sum_latency_thread --
  *	Sum latency for a single thread.
  */
@@ -166,7 +246,7 @@ sum_update_latency(CONFIG *cfg, TRACK *total)
 }
 
 static void
-dump_latency_single(CONFIG *cfg, TRACK *total, const char *name)
+latency_print_single(CONFIG *cfg, TRACK *total, const char *name)
 {
 	FILE *fp;
 	u_int i;
@@ -179,13 +259,18 @@ dump_latency_single(CONFIG *cfg, TRACK *total, const char *name)
 		return;
 	}
 
+#ifdef __WRITE_A_HEADER
+	fprintf(fp,
+	    "usecs,operations,cumulative-operations,total-operations\n");
+#endif
+
 	cumops = 0;
 	for (i = 0; i < ELEMENTS(total->us); ++i) {
 		if (total->us[i] == 0)
 			continue;
 		cumops += total->us[i];
 		fprintf(fp,
-		    "%u,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "\n",
+		    "%u,%" PRIu32 ",%" PRIu64 ",%" PRIu64 "\n",
 		    (i + 1), total->us[i], cumops, total->ops);
 	}
 	for (i = 1; i < ELEMENTS(total->ms); ++i) {
@@ -193,7 +278,7 @@ dump_latency_single(CONFIG *cfg, TRACK *total, const char *name)
 			continue;
 		cumops += total->ms[i];
 		fprintf(fp,
-		    "%llu,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "\n",
+		    "%llu,%" PRIu32 ",%" PRIu64 ",%" PRIu64 "\n",
 		    ms_to_us(i + 1), total->ms[i], cumops, total->ops);
 	}
 	for (i = 1; i < ELEMENTS(total->sec); ++i) {
@@ -201,7 +286,7 @@ dump_latency_single(CONFIG *cfg, TRACK *total, const char *name)
 			continue;
 		cumops += total->sec[i];
 		fprintf(fp,
-		    "%llu,%" PRIu64 ",%" PRIu64 ",%" PRIu64 "\n",
+		    "%llu,%" PRIu32 ",%" PRIu64 ",%" PRIu64 "\n",
 		    sec_to_us(i + 1), total->sec[i], cumops, total->ops);
 	}
 
@@ -209,16 +294,16 @@ dump_latency_single(CONFIG *cfg, TRACK *total, const char *name)
 }
 
 void
-dump_latency(CONFIG *cfg)
+latency_print(CONFIG *cfg)
 {
 	TRACK total;
 
 	sum_insert_latency(cfg, &total);
-	dump_latency_single(cfg, &total, "insert");
+	latency_print_single(cfg, &total, "insert");
 	sum_read_latency(cfg, &total);
-	dump_latency_single(cfg, &total, "read");
+	latency_print_single(cfg, &total, "read");
 	sum_update_latency(cfg, &total);
-	dump_latency_single(cfg, &total, "update");
+	latency_print_single(cfg, &total, "update");
 }
 
 int

@@ -77,10 +77,11 @@ typedef struct {
 	size_t offset;
 } CONFIG_OPT;
 
+#define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
+
 #define	THOUSAND	(1000ULL)
 #define	MILLION		(1000000ULL)
 #define	BILLION		(1000000000ULL)
-#define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
 #define	ns_to_ms(v)	((v) / MILLION)
 #define	ns_to_sec(v)	((v) / BILLION)
@@ -105,9 +106,9 @@ typedef struct {
 	/*
 	 * Latency buckets.
 	 */
-	uint64_t us[1000];		/* < 1us ... 1000us */
-	uint64_t ms[1000];		/* < 1ms ... 1000ms */
-	uint64_t sec[100];		/* < 1s 2s ... 100s */
+	uint32_t us[1000];		/* < 1us ... 1000us */
+	uint32_t ms[1000];		/* < 1ms ... 1000ms */
+	uint32_t sec[100];		/* < 1s 2s ... 100s */
 } TRACK;
 
 struct __config_thread {		/* Per-thread structure */
@@ -123,6 +124,25 @@ struct __config_thread {		/* Per-thread structure */
 #define	WORKER_UPDATE		4	/* Update */
 	uint8_t	schedule[100];		/* Thread operations */
 
+	/*
+	 * Threads maintain the total thread operation and total latency they've
+	 * experienced; the monitor thread periodically copies these values into
+	 * the last_XXX fields.
+	 */
+	uint64_t total_ops;		/* Total thread operations */
+	uint64_t total_latency;		/* Total thread latency (NS) */
+
+	uint64_t last_ops;		/* Last read by monitor thread */
+	uint64_t last_latency;
+
+	/*
+	 * Each thread also maintains a minimum/maximum latency, shared with the
+	 * monitor thread, that is, the monitor thread resets it with min/max
+	 * values so it's recalculated again for a new period.
+	 */
+	uint32_t min_latency;		/* Minimum latency (NS) */
+	uint32_t max_latency;		/* Maximum latency (NS) */
+
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
@@ -136,7 +156,8 @@ int	 config_opt_line(CONFIG *, WT_SESSION *, const char *);
 int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
-void	 dump_latency(CONFIG *);
+void	 latency_monitor(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
+void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
 const char *
 	 op_name(uint8_t *);
