@@ -357,9 +357,9 @@ __txn_printlog(
 	FILE *out;
 	WT_LSN ckpt_lsn;
 	const uint8_t *end, *p;
-	const char *msg;
+	const char *str;
 	uint64_t txnid;
-	uint32_t fileid, rectype;
+	uint32_t rectype;
 	int32_t start;
 
 	out = cookie;
@@ -395,19 +395,18 @@ __txn_printlog(
 
 	case WT_LOGREC_FILE_SYNC:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
-		    WT_UNCHECKED_STRING(Ii), &fileid, &start));
+		    WT_UNCHECKED_STRING(SI), &str, &start));
 		if (fprintf(out, "    \"type\" : \"file_sync\"\n") < 0 ||
-		    fprintf(out, "    \"fileid\" : %" PRIu32 "\n",
-		    fileid) < 0 ||
+		    fprintf(out, "    \"name\" : \"%s\"\n", str) < 0 ||
 		    fprintf(out, "    \"start\" : %" PRId32 "\n", start) < 0)
 			return (errno);
 		break;
 
 	case WT_LOGREC_MESSAGE:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
-		    WT_UNCHECKED_STRING(S), &msg));
+		    WT_UNCHECKED_STRING(S), &str));
 		if (fprintf(out, "    \"type\" : \"message\"\n") < 0 ||
-		    fprintf(out, "    \"message\" : \"%s\"\n", msg) < 0)
+		    fprintf(out, "    \"message\" : \"%s\"\n", str) < 0)
 			return (errno);
 		break;
 	}
