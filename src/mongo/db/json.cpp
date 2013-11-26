@@ -369,6 +369,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         Date_t date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
         if (_input == endptr) {
             return parseError("Date expecting integer milliseconds");
@@ -377,6 +379,8 @@ namespace mongo {
             /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
             * See SERVER-8330 and SERVER-8573 */
             errno = 0;
+            // SERVER-11920: We should use parseNumberFromString here, but that function requires
+            // that we know ahead of time where the number ends, which is not currently the case.
             date = strtoull(_input, &endptr, 10);
             if (errno == ERANGE) {
                 return parseError("Date milliseconds overflow");
@@ -406,6 +410,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t seconds = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp seconds overflow");
@@ -428,6 +434,8 @@ namespace mongo {
             return parseError("Negative increment in \"$timestamp\"");
         }
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t count = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp increment overflow");
@@ -583,6 +591,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         Date_t date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
         if (_input == endptr) {
             return parseError("Date expecting integer milliseconds");
@@ -591,6 +601,8 @@ namespace mongo {
             /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
             * See SERVER-8330 and SERVER-8573 */
             errno = 0;
+            // SERVER-11920: We should use parseNumberFromString here, but that function requires
+            // that we know ahead of time where the number ends, which is not currently the case.
             date = strtoull(_input, &endptr, 10);
             if (errno == ERANGE) {
                 return parseError("Date milliseconds overflow");
@@ -613,6 +625,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t seconds = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp seconds overflow");
@@ -628,6 +642,8 @@ namespace mongo {
             return parseError("Negative seconds in \"$timestamp\"");
         }
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t count = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp increment overflow");
@@ -672,6 +688,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         int64_t val = strtoll(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("NumberLong out of range");
@@ -693,6 +711,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         int32_t val = strtol(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("NumberInt out of range");
@@ -806,6 +826,8 @@ namespace mongo {
 
         // reset errno to make sure that we are getting it from strtod
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         retd = strtod(_input, &endptrd);
         // if pointer does not move, we found no digits
         if (_input == endptrd) {
@@ -816,6 +838,8 @@ namespace mongo {
         }
         // reset errno to make sure that we are getting it from strtoll
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         retll = strtoll(_input, &endptrll, 10);
         if (endptrll < endptrd || errno == ERANGE) {
             // The number either had characters only meaningful for a double or
