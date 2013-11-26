@@ -272,10 +272,16 @@ namespace mongo {
         bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
             switch (Lock::isLocked()) {
                 case '\0': {
-                    DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
+                    // lock_w() can call in this state at times if a commit is needed before attempting 
+                    // its lock.
                     Lock::GlobalRead r;
                     if( commitJob.bytes() < UncommittedBytesLimit ) {
                         // someone else beat us to it
+                        //
+                        // note before of 'R' state, many threads can pile-in to this point and 
+                        // still fall through to below, and they will exit without doing work later
+                        // once inside groupCommitMutex.  this is all likely inefficient.  maybe 
+                        // groupCommitMutex should be on top.
                         return false;
                     }
                     commitNow();
