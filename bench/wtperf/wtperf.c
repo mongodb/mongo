@@ -1272,6 +1272,10 @@ start_threads(
 			return (enomem(cfg));
 		memset(thread->data_buf, 'a', cfg->data_sz - 1);
 
+		/*
+		 * Every thread gets tracking information and is initialized
+		 * for latency measurements, for the same reason.
+		 */
 		thread->ckpt.min_latency =
 		thread->insert.min_latency = thread->read.min_latency =
 		thread->update.min_latency = UINT32_MAX;
