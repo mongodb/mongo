@@ -52,7 +52,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int busy, count, full, loops;
+	int busy, count, full;
 
 	/*
 	 * If the current transaction is keeping the oldest ID pinned, it is in
@@ -90,7 +90,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
 		return (0);
 
-	for (loops = 0;; loops++) {
+	for (;;) {
 		switch (ret = __wt_evict_lru_page(session, 1)) {
 		case 0:
 			if (--count == 0)
@@ -122,16 +122,12 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		}
 
 		/* Wait for the queue to re-populate before trying again. */
-		if (loops < 20)
-			__wt_yield();
-		else
-			WT_RET(__wt_cond_wait(session,
-			    S2C(session)->cache->evict_waiter_cond, 100000));
+		WT_RET(__wt_cond_wait(session,
+		    S2C(session)->cache->evict_waiter_cond, 100000));
 
 		/* Check if things have changed so that we are busy. */
-		busy = busy || (txn_state->snap_min != WT_TXN_NONE &&
-		    txn_global->current != txn_global->oldest_id);
-		if (busy)
-			count = 1;
+		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
+		    txn_global->current != txn_global->oldest_id)
+			busy = count = 1;
 	}
 }
