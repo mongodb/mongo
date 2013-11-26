@@ -144,7 +144,7 @@ namespace mongo {
                 throw;
             }
 
-            if( cursor->isSharded() ){
+            if( cursor->isSharded() && (cursor->getShardCount() > 1)){
                 ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
 
                 BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
@@ -169,15 +169,15 @@ namespace mongo {
                 replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
                         startFrom, hasMore ? cc->getId() : 0 );
             }
-            else{
+            else{ //not sharded or only one shard is used
                 // Remote cursors are stored remotely, we shouldn't need this around.
                 // TODO: we should probably just make cursor an auto_ptr
                 scoped_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
 
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
-                ShardPtr primary = cursor->getPrimary();
-                verify( primary.get() );
-                DBClientCursorPtr shardCursor = cursor->getShardCursor( *primary );
+                ShardPtr shard = cursor->getTheOnlyShard();
+                verify( shard.get() );
+                DBClientCursorPtr shardCursor = cursor->getShardCursor( *shard );
 
                 // Implicitly stores the cursor in the cache
                 r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );

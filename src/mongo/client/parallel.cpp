@@ -903,7 +903,7 @@ namespace mongo {
 
                     // Do a sharded query if this is not a primary shard *and* this is a versioned query,
                     // or if the number of shards to query is > 1
-                    if( ( isVersioned() && ! primary ) || _qShards.size() > 1 ){
+                    if( ( isVersioned() && !primary && todo.size() > 1) || _qShards.size() > 1 ){
 
                         state->cursor.reset( new DBClientCursor( state->conn->get(), ns, _qSpec.query(),
                                                                  isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
@@ -1278,6 +1278,31 @@ namespace mongo {
         if( _cursorMap.size() == 0 ) return true;
         if( _cursorMap.begin()->second.pcState->manager ) return true;
         return false;
+    }
+
+    int ParallelSortClusteredCursor::getShardCount() {
+        return _cursorMap.size();
+    }
+
+    /**
+     * getOnlyShardOrPrimary
+     * if collection is not sharded, return primary
+     * if only shard is used, return this shard
+     */
+    ShardPtr ParallelSortClusteredCursor::getTheOnlyShard() {
+        if (!isVersioned()){
+            LOG(5) << "getTheOnlyShard : !isVersioned()" << endl;
+            return ShardPtr();
+        }
+        if (_cursorMap.size() > 1){
+            LOG(5) << "_cursorMap.size() > 1" << endl;
+            return ShardPtr();
+        }
+
+
+        map< Shard, PCMData >::iterator i = _cursorMap.begin();
+        LOG(5) << "return only shard: " << i->first.toString() << endl;
+        return ShardPtr( new Shard( i->first ) );
     }
 
     ShardPtr ParallelSortClusteredCursor::getPrimary() {
