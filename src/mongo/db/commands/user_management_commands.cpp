@@ -288,7 +288,7 @@ namespace mongo {
             return Status(
                     ErrorCodes::AuthSchemaIncompatible,
                     str::stream() << "The usersInfo and rolesInfo commands require auth data to "
-                    "have schema  version " << AuthorizationManager::schemaVersion26Final <<
+                    "have schema version " << AuthorizationManager::schemaVersion26Final <<
                     " or " << AuthorizationManager::schemaVersion26Upgrade <<
                     " but found " << foundSchemaVersion);
         }
