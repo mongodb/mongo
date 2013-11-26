@@ -128,6 +128,9 @@ namespace mongo {
         double _innerRadius;
         double _outerRadius;
 
+        // True if we are looking at last annulus
+        bool _outerRadiusInclusive;
+
         // When we search the next annulus, what to adjust our radius by?  Grows when we search an
         // annulus and find no results.
         double _radiusIncrement;

@@ -76,6 +76,7 @@ namespace mongo {
 
         // We grow _outerRadius in nextAnnulus() below.
         _innerRadius = _outerRadius = _minDistance;
+        _outerRadiusInclusive = false;
 
         // XXX: where do we grab finestIndexedLevel from really?  idx descriptor?
         int finestIndexedLevel = S2::kAvgEdge.GetClosestLevel(500.0 / kRadiusOfEarthInMeters);
@@ -141,7 +142,10 @@ namespace mongo {
         // Step 1: Grow the annulus.
         _innerRadius = _outerRadius;
         _outerRadius += _radiusIncrement;
-        _outerRadius = min(_outerRadius, _maxDistance);
+        if (_outerRadius >= _maxDistance) {
+            _outerRadius = _maxDistance;
+            _outerRadiusInclusive = true;
+        }
         verify(_innerRadius <= _outerRadius);
 
         // We might have just grown our radius beyond anything reasonable.
@@ -249,7 +253,8 @@ namespace mongo {
         }
 
         // If the distance to the doc satisfies our distance criteria,
-        if (minDistance >= _innerRadius && minDistance <= _outerRadius) {
+        if (minDistance >= _innerRadius &&
+            (_outerRadiusInclusive ? minDistance <= _outerRadius : minDistance < _outerRadius)) {
             _results.push(Result(*out, minDistance));
             if (member->hasLoc()) {
                 _invalidationMap[member->loc] = *out;
