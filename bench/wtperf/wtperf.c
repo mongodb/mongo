@@ -695,7 +695,8 @@ execute_populate(CONFIG *cfg)
 	u_int sleepsec;
 	int elapsed, ret;
 
-	lprintf(cfg, 0, 1, "Starting populate threads");
+	lprintf(cfg, 0, 1,
+	    "Starting %" PRIu32 " populate thread(s)", cfg->populate_threads);
 
 	g_insert_key = 0;
 	if ((ret = start_threads(cfg,
@@ -773,14 +774,21 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 
+	if (cfg->run_mix_inserts != 0 || cfg->run_mix_updates != 0)
+		lprintf(cfg, 0, 1,
+		    "Starting %" PRIu32 " worker threads",
+		    cfg->read_threads +
+		    cfg->insert_threads + cfg->update_threads);
+	else
+		lprintf(cfg, 0, 1,
+		    "Starting worker threads: read %" PRIu32
+		    ", insert %" PRIu32 ", update %" PRIu32,
+		    cfg->read_threads,
+		    cfg->insert_threads, cfg->update_threads);
+
 	/* Schedule run-mix operations, as necessary. */
 	if (cfg->run_mix_inserts != 0 || cfg->run_mix_updates != 0)
 		run_mix_schedule(cfg);
-
-	lprintf(cfg, 0, 1,
-	    "Starting workload threads: read %" PRIu32
-	    ", insert %" PRIu32 ", update %" PRIu32,
-	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
 
 	if (cfg->read_threads != 0 && (tret = start_threads(
 	    cfg, cfg->read_threads, &cfg->rthreads, read_thread)) != 0 &&
@@ -912,7 +920,7 @@ err:	assert(session->close(session, NULL) == 0);
 int
 main(int argc, char *argv[])
 {
-	CONFIG cfg;
+	CONFIG *cfg, _cfg;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	pthread_t monitor_thread;
@@ -931,15 +939,16 @@ main(int argc, char *argv[])
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
 	/* Setup the default configuration values. */
-	memset(&cfg, 0, sizeof(cfg));
-	if (config_assign(&cfg, &default_cfg))
+	cfg = &_cfg;
+	memset(cfg, 0, sizeof(*cfg));
+	if (config_assign(cfg, &default_cfg))
 		goto err;
 
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'h':
-			cfg.home = optarg;
+			cfg->home = optarg;
 			break;
 		case '?':
 			fprintf(stderr, "Invalid option\n");
@@ -953,15 +962,15 @@ main(int argc, char *argv[])
 	 * session in order to use the extension configuration parser.  We will
 	 * open the real WiredTiger database after parsing the options.
 	 */
-	len = strlen(cfg.home) + strlen(wtperftmp_subdir) + 2;
+	len = strlen(cfg->home) + strlen(wtperftmp_subdir) + 2;
 	if ((tmphome = malloc(len)) == NULL) {
-		ret = enomem(&cfg);
+		ret = enomem(cfg);
 		goto err;
 	}
-	snprintf(tmphome, len, "%s/%s", cfg.home, wtperftmp_subdir);
+	snprintf(tmphome, len, "%s/%s", cfg->home, wtperftmp_subdir);
 	len = len * 2 + 100;
 	if ((cmd = malloc(len)) == NULL) {
-		ret = enomem(&cfg);
+		ret = enomem(cfg);
 		goto err;
 	}
 	snprintf(cmd, len, "rm -rf %s && mkdir %s", tmphome, tmphome);
@@ -970,11 +979,11 @@ main(int argc, char *argv[])
 		goto einval;
 	}
 	if ((ret = wiredtiger_open(tmphome, NULL, "create", &conn)) != 0) {
-		lprintf(&cfg, ret, 0, "wiredtiger_open: %s", tmphome);
+		lprintf(cfg, ret, 0, "wiredtiger_open: %s", tmphome);
 		goto err;
 	}
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(&cfg, ret, 0, "Error creating session");
+		lprintf(cfg, ret, 0, "Error creating session");
 		goto err;
 	}
 
@@ -987,22 +996,20 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'S':
 			if (config_opt_line(
-			    &cfg, session, small_config_str) != 0)
+			    cfg, session, small_config_str) != 0)
 				goto einval;
 			break;
 		case 'M':
-			if (config_opt_line(
-			    &cfg, session, med_config_str) != 0)
+			if (config_opt_line(cfg, session, med_config_str) != 0)
 				goto einval;
 			break;
 		case 'L':
 			if (config_opt_line(
-			    &cfg, session, large_config_str) != 0)
+			    cfg, session, large_config_str) != 0)
 				goto einval;
 			break;
 		case 'O':
-			if (config_opt_file(
-			    &cfg, session, optarg) != 0)
+			if (config_opt_file(cfg, session, optarg) != 0)
 				goto einval;
 			break;
 		default:
@@ -1016,7 +1023,7 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'o':
 			/* Allow -o key=value */
-			if (config_opt_line(&cfg, session, optarg) != 0)
+			if (config_opt_line(cfg, session, optarg) != 0)
 				goto einval;
 			break;
 		case 'C':
@@ -1028,153 +1035,150 @@ main(int argc, char *argv[])
 		}
 
 	/* Build the URI from the table name. */
-	req_len = strlen("table:") + strlen(cfg.table_name) + 1;
-	if ((cfg.uri = calloc(req_len, 1)) == NULL) {
-		ret = enomem(&cfg);
+	req_len = strlen("table:") + strlen(cfg->table_name) + 1;
+	if ((cfg->uri = calloc(req_len, 1)) == NULL) {
+		ret = enomem(cfg);
 		goto err;
 	}
-	snprintf(cfg.uri, req_len, "table:%s", cfg.table_name);
+	snprintf(cfg->uri, req_len, "table:%s", cfg->table_name);
 	
-	if ((ret = setup_log_file(&cfg)) != 0)
+	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
 
 	/* Make stdout line buffered, so verbose output appears quickly. */
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* Concatenate non-default configuration strings. */
-	if (cfg.verbose > 1 || user_cconfig != NULL) {
-		req_len = strlen(cfg.conn_config) + strlen(debug_cconfig) + 3;
+	if (cfg->verbose > 1 || user_cconfig != NULL) {
+		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
 		if ((cc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(&cfg);
+			ret = enomem(cfg);
 			goto err;
 		}
 		snprintf(cc_buf, req_len, "%s%s%s%s%s",
-		    cfg.conn_config,
-		    cfg.verbose > 1 ? "," : "",
-		    cfg.verbose > 1 ? debug_cconfig : "",
+		    cfg->conn_config,
+		    cfg->verbose > 1 ? "," : "",
+		    cfg->verbose > 1 ? debug_cconfig : "",
 		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
 		if ((ret = config_opt_str(
-		    &cfg, session, "conn_config", cc_buf)) != 0)
+		    cfg, session, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg.verbose > 1 || user_tconfig != NULL) {
-		req_len = strlen(cfg.table_config) + strlen(debug_tconfig) + 3;
+	if (cfg->verbose > 1 || user_tconfig != NULL) {
+		req_len = strlen(cfg->table_config) + strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(&cfg);
+			ret = enomem(cfg);
 			goto err;
 		}
 		snprintf(tc_buf, req_len, "%s%s%s%s%s",
-		    cfg.table_config,
-		    cfg.verbose > 1 ? "," : "",
-		    cfg.verbose > 1 ? debug_tconfig : "",
+		    cfg->table_config,
+		    cfg->verbose > 1 ? "," : "",
+		    cfg->verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
 		if ((ret = config_opt_str(
-		    &cfg, session, "table_config", tc_buf)) != 0)
+		    cfg, session, "table_config", tc_buf)) != 0)
 			goto err;
 	}
 
 	ret = session->close(session, NULL);
 	session = NULL;
 	if (ret != 0) {
-		lprintf(&cfg, ret, 0, "WT_SESSION.close");
+		lprintf(cfg, ret, 0, "WT_SESSION.close");
 		goto err;
 	}
 	ret = conn->close(conn, NULL);
 	conn = NULL;
 	if (ret != 0) {
-		lprintf(&cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
+		lprintf(cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
 		goto err;
 	}
 
 					/* Sanity-check the configuration */
-	if (config_sanity(&cfg) != 0)
+	if (config_sanity(cfg) != 0)
 		goto err;
 
-	if (cfg.verbose > 1)		/* Display the configuration. */
-		config_print(&cfg);
+	if (cfg->verbose > 1)		/* Display the configuration. */
+		config_print(cfg);
 
 	if ((ret = wiredtiger_open(	/* Open the real connection. */
-	    cfg.home, NULL, cfg.conn_config, &conn)) != 0) {
-		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
+	    cfg->home, NULL, cfg->conn_config, &conn)) != 0) {
+		lprintf(cfg, ret, 0, "Error connecting to %s", cfg->home);
 		goto err;
 	}
-	cfg.conn = conn;
+	cfg->conn = conn;
 
-	if (cfg.create != 0) {		/* If creating, create the table. */
+	if (cfg->create != 0) {		/* If creating, create the table. */
 		if ((ret =
 		    conn->open_session(conn, NULL, NULL, &session)) != 0) {
-			lprintf(&cfg, ret, 0,
-			    "Error opening a session on %s", cfg.home);
+			lprintf(cfg, ret, 0,
+			    "Error opening a session on %s", cfg->home);
 			goto err;
 		}
 		if ((ret = session->create(
-		    session, cfg.uri, cfg.table_config)) != 0) {
-			lprintf(&cfg,
-			    ret, 0, "Error creating table %s", cfg.uri);
+		    session, cfg->uri, cfg->table_config)) != 0) {
+			lprintf(cfg,
+			    ret, 0, "Error creating table %s", cfg->uri);
 			goto err;
 		}
 		assert(session->close(session, NULL) == 0);
 		session = NULL;
 	}
 					/* Start the monitor thread. */
-	if (cfg.sample_interval != 0) {
+	if (cfg->sample_interval != 0) {
 		if ((ret = pthread_create(
-		    &monitor_thread, NULL, monitor, &cfg)) != 0) {
+		    &monitor_thread, NULL, monitor, cfg)) != 0) {
 			lprintf(
-			    &cfg, ret, 0, "Error creating monitor thread.");
+			    cfg, ret, 0, "Error creating monitor thread.");
 			goto err;
 		}
 		monitor_created = 1;
 	}
 					/* If creating, populate the table. */
-	if (cfg.create != 0 && execute_populate(&cfg) != 0)
+	if (cfg->create != 0 && execute_populate(cfg) != 0)
 		goto err;
 					/* Optional workload. */
-	if (cfg.run_time != 0 || cfg.run_ops != 0) {
+	if (cfg->run_time != 0 || cfg->run_ops != 0) {
 					/* Didn't create, set insert count. */
-		if (cfg.create == 0 && find_table_count(&cfg) != 0)
+		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;
 					/* Start the checkpoint thread. */
-		if (cfg.checkpoint_threads != 0 &&
-		    start_threads(&cfg, cfg.checkpoint_threads,
-		    &cfg.ckptthreads, checkpoint_worker) != 0)
-			goto err;
+		if (cfg->checkpoint_threads != 0) {
+			lprintf(cfg, 0, 1,
+			    "Starting %" PRIu32 " checkpoint thread(s)",
+			    cfg->checkpoint_threads);
+			if (start_threads(cfg, cfg->checkpoint_threads,
+			    &cfg->ckptthreads, checkpoint_worker) != 0)
+				goto err;
+		}
 					/* Execute the workload. */
-		if ((ret = execute_workload(&cfg)) != 0)
+		if ((ret = execute_workload(cfg)) != 0)
 			goto err;
 
 		/* One final summation of the operations we've completed. */
-		g_read_ops = sum_read_ops(&cfg);
-		g_insert_ops = sum_insert_ops(&cfg);
-		g_update_ops = sum_update_ops(&cfg);
-		g_ckpt_ops = sum_ckpt_ops(&cfg);
+		g_read_ops = sum_read_ops(cfg);
+		g_insert_ops = sum_insert_ops(cfg);
+		g_update_ops = sum_update_ops(cfg);
+		g_ckpt_ops = sum_ckpt_ops(cfg);
 		total_ops = g_read_ops + g_insert_ops + g_update_ops;
 
-		if (cfg.read_threads != 0)
-			lprintf(&cfg, 0, 1,
-			    "Executed %" PRIu64 " read operations (%" PRIu64
-			    "%%)",
-			    g_read_ops, (g_read_ops * 100) / total_ops);
-		if (cfg.insert_threads != 0)
-			lprintf(&cfg, 0, 1,
-			    "Executed %" PRIu64 " insert operations (%" PRIu64
-			    "%%)",
-			    g_insert_ops, (g_insert_ops * 100) / total_ops);
-		if (cfg.update_threads != 0)
-			lprintf(&cfg, 0, 1,
-			    "Executed %" PRIu64 " update operations (%" PRIu64
-			    "%%)",
-			    g_update_ops, (g_update_ops * 100) / total_ops);
-		if (cfg.checkpoint_threads != 0)
-			lprintf(&cfg, 0, 1,
-			    "Executed %" PRIu64 " checkpoint operations",
-			    g_ckpt_ops);
+		lprintf(cfg, 0, 1,
+		    "Executed %" PRIu64 " read operations (%" PRIu64 "%%)",
+		    g_read_ops, (g_read_ops * 100) / total_ops);
+		lprintf(cfg, 0, 1,
+		    "Executed %" PRIu64 " insert operations (%" PRIu64 "%%)",
+		    g_insert_ops, (g_insert_ops * 100) / total_ops);
+		lprintf(cfg, 0, 1,
+		    "Executed %" PRIu64 " update operations (%" PRIu64 "%%)",
+		    g_update_ops, (g_update_ops * 100) / total_ops);
+		lprintf(cfg, 0, 1,
+		    "Executed %" PRIu64 " checkpoint operations",
+		    g_ckpt_ops);
 
-		latency_print(&cfg);
+		latency_print(cfg);
 	}
 
 	if (0) {
@@ -1184,41 +1188,35 @@ err:		if (ret == 0)
 	}
 	g_stop = 1;
 
-	if (cfg.checkpoint_threads != 0 &&
-	    (tret = stop_threads(&cfg, 1, cfg.ckptthreads)) != 0)
+	if (cfg->checkpoint_threads != 0 &&
+	    (tret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
 			ret = tret;
 
 	if (monitor_created != 0 &&
 	    (tret = pthread_join(monitor_thread, NULL)) != 0) {
-		lprintf(&cfg, ret, 0, "Error joining monitor thread.");
+		lprintf(cfg, ret, 0, "Error joining monitor thread.");
 		if (ret == 0)
 			ret = tret;
 	}
 
 	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0) {
-		lprintf(&cfg, ret, 0,
-		    "Error closing connection to %s", cfg.home);
+		lprintf(cfg, ret, 0,
+		    "Error closing connection to %s", cfg->home);
 		if (ret == 0)
 			ret = tret;
 	}
 
 	if (ret == 0)
-		lprintf(&cfg, 0, 1,
-		    "Run completed: %" PRIu32 " read threads, %"
-		    PRIu32 " insert threads, %" PRIu32 " update threads and %"
-		    PRIu32 " checkpoint threads for %"
-		    PRIu32 " %s.",
-		    cfg.read_threads, cfg.insert_threads,
-		    cfg.update_threads, cfg.checkpoint_threads,
-		    cfg.run_time == 0 ? cfg.run_ops : cfg.run_time,
-		    cfg.run_time == 0 ? "operations" : "seconds");
+		lprintf(cfg, 0, 1, "Run completed: %" PRIu32 " %s",
+		    cfg->run_time == 0 ? cfg->run_ops : cfg->run_time,
+		    cfg->run_time == 0 ? "operations" : "seconds");
 
-	if (cfg.logf != NULL) {
-		assert(fflush(cfg.logf) == 0);
-		assert(fclose(cfg.logf) == 0);
+	if (cfg->logf != NULL) {
+		assert(fflush(cfg->logf) == 0);
+		assert(fclose(cfg->logf) == 0);
 	}
-	config_free(&cfg);
+	config_free(cfg);
 
 	free(cc_buf);
 	free(cmd);
