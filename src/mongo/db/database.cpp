@@ -302,8 +302,8 @@ namespace mongo {
         }
         catch( DBException& e ) {
             stringstream ss;
-            ss << "drop: dropIndexes for collection failed - consider trying repair ";
-            ss << " cause: " << e.what();
+            ss << "drop: dropIndexes for collection failed. cause: " << e.what();
+            ss << ". See http://dochub.mongodb.org/core/data-recovery";
             warning() << ss.str() << endl;
             return Status( ErrorCodes::InternalError, ss.str() );
         }

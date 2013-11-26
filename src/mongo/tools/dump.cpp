@@ -420,7 +420,6 @@ public:
 
     int run() {
         if (mongoDumpGlobalParams.repair){
-            toolError() << "repair is a work in progress" << std::endl;
             return repair();
         }
 

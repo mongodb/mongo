@@ -121,7 +121,8 @@ namespace mongo {
 
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
             log() << "getFile(): n=" << n << endl;
-            massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
+            massert( 10295 , "getFile(): bad file number value (corrupt db?)."
+                    " See http://dochub.mongodb.org/core/data-recovery", false);
         }
         DEV {
             if ( n > 100 ) {

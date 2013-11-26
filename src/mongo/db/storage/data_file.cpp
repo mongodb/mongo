@@ -63,15 +63,15 @@ namespace mongo {
     }
 
     NOINLINE_DECL void DataFile::badOfs2(int ofs) const {
-        stringstream ss;
-        ss << "bad offset:" << ofs << " accessing file: " << mmf.filename() << " - consider repairing database";
-        uasserted(13441, ss.str());
+        uasserted(13441, str::stream() << "bad offset:" << ofs
+                  << " accessing file: " << mmf.filename()
+                  << ". See http://dochub.mongodb.org/core/data-recovery");
     }
 
     NOINLINE_DECL void DataFile::badOfs(int ofs) const {
-        stringstream ss;
-        ss << "bad offset:" << ofs << " accessing file: " << mmf.filename() << " - consider repairing database";
-        uasserted(13440, ss.str());
+        uasserted(13440, str::stream()  << "bad offset:" << ofs
+                  << " accessing file: " << mmf.filename()
+                  << ". See http://dochub.mongodb.org/core/data-recovery");
     }
 
     int DataFile::defaultSize( const char *filename ) const {

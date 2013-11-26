@@ -418,7 +418,7 @@ namespace mongo {
             }
             
             if ( !valid ) {
-                result.append("advice", "ns corrupt, requires repair");
+                result.append("advice", "ns corrupt. See http://dochub.mongodb.org/core/data-recovery");
             }
 
         }
