@@ -32,19 +32,20 @@ from subprocess import call
 # Python script to read wtperf monitor output and create a performance
 # graph.
 
-# Read the monitor file and figure out when checkpoint was running.
+# Read the monitor file and figure out when a checkpoint was running.
 in_ckpt = 'N'
 ckptlist=[]
 with open('monitor', 'r') as csvfile:
     reader = csv.reader(csvfile)
     for row in reader:
-	if row[4] != in_ckpt:
-	    ckptlist.append(row[0])
-	    in_ckpt = row[4]
+        if row[4] != in_ckpt:
+            ckptlist.append(row[0])
+            in_ckpt = row[4]
 if in_ckpt == 'Y':
     ckptlist.append(row[0])
 
-# Write a command file for gnuplot.
+
+# Graph time vs. read, insert and update operations per second.
 of = open("gnuplot.cmd", "w")
 of.write('''
 set autoscale
@@ -60,13 +61,11 @@ set xtics rotate by -45
 set xdata time
 set ylabel "Operations per second (hundreds)"
 set yrange [0:]\n''')
-
 it = iter(ckptlist)
 for start, stop in zip(it, it):
-	of.write('set object rectangle from first \'' + start +\
-	    '\', graph 0 ' + ' to first \'' + stop +\
-	    '\', graph 1 fc rgb "gray" back\n')
-
+    of.write('set object rectangle from first \'' + start +\
+        '\', graph 0 ' + ' to first \'' + stop +\
+        '\', graph 1 fc rgb "gray" back\n')
 of.write('''
 set output 'monitor.png'
 plot "monitor" using 1:($2/100) title "Reads", "monitor" using 1:($3/100) title "Updates", "monitor" using 1:($4/100) title "Inserts"\n''')
@@ -75,17 +74,50 @@ of.close()
 call(["gnuplot", "gnuplot.cmd"])
 os.remove("gnuplot.cmd")
 
+
+# Graph time vs. average, minimium, maximum latency.
+of = open("gnuplot.cmd", "w")
+of.write('''
+set autoscale
+set datafile sep ','
+set grid
+set style data lines
+set terminal png nocrop size 800,600
+set timefmt "%H:%M:%S"
+set title "wtperf run"
+set format x "%M:%S"
+set xlabel "Time (minutes:seconds)"
+set xtics rotate by -45
+set xdata time
+set ylabel "Latency (us)"
+set logscale y
+set yrange [1:]\n''')
+it = iter(ckptlist)
+for start, stop in zip(it, it):
+        of.write('set object rectangle from first \'' + start +\
+            '\', graph 0 ' + ' to first \'' + stop +\
+            '\', graph 1 fc rgb "gray" back\n')
+of.write('''
+set output 'latency.png'
+plot "monitor" using 1:($6 / 1000) title "Average", "monitor" using 1:($7 / 1000) title "Minimum", "monitor" using 1:($8 / 1000) title "Maximum"\n''')
+of.close()
+
+call(["gnuplot", "gnuplot.cmd"])
+os.remove("gnuplot.cmd")
+
+
+# Graph latency vs. % operations (cumulative)
 def plot_latency(name):
-	# Latency plot: cumulative operations vs. latency
-	of = open("gnuplot.cmd", "w")
-	of.write('''
+    # Latency plot: cumulative operations vs. latency
+    of = open("gnuplot.cmd", "w")
+    of.write('''
 set autoscale
 set datafile sep ','
 set grid
 set style data lines
 set terminal png nocrop size 800,600
 set title "wtperf %(NAME)s cumulative latency distribution"
-set xlabel "Latency (ms)"
+set xlabel "Latency (us)"
 set xrange [1:]
 set xtics rotate by -45
 set logscale x
@@ -93,23 +125,23 @@ set ylabel "%% operations"
 set yrange [0:]
 set output '%(NAME)s.latency1.png'
 plot "latency.%(NAME)s" using 1:(($3 * 100)/$4) title "%(NAME)s"\n''' % {
-	'NAME' : name
-	})
-	of.close()
+        'NAME' : name
+        })
+    of.close()
 
-	call(["gnuplot", "gnuplot.cmd"])
-	os.remove("gnuplot.cmd")
+    call(["gnuplot", "gnuplot.cmd"])
+    os.remove("gnuplot.cmd")
 
-	# Latency plot: pct operations vs. latency
-	of = open("gnuplot.cmd", "w")
-	of.write('''
+# Graph latency vs. % operations
+    of = open("gnuplot.cmd", "w")
+    of.write('''
 set autoscale
 set datafile sep ','
 set grid
 set style data points
 set terminal png nocrop size 800,600
 set title "wtperf %(NAME)s latency distribution"
-set xlabel "Latency (ms)"
+set xlabel "Latency (us)"
 set xrange [1:]
 set xtics rotate by -45
 set logscale x
@@ -117,12 +149,12 @@ set ylabel "%% operations"
 set yrange [0:]
 set output '%(NAME)s.latency2.png'
 plot "latency.%(NAME)s" using (($2 * 100)/$4) title "%(NAME)s"\n''' % {
-	'NAME' : name
-	})
-	of.close()
+        'NAME' : name
+        })
+    of.close()
 
-	call(["gnuplot", "gnuplot.cmd"])
-	os.remove("gnuplot.cmd")
+    call(["gnuplot", "gnuplot.cmd"])
+    os.remove("gnuplot.cmd")
 
 
 plot_latency("insert")
