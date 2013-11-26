@@ -480,7 +480,11 @@ namespace mongo {
 
             if (!usingIndexToSort) {
                 for (size_t i = 0; i < params.indices.size(); ++i) {
-                    const BSONObj& kp = params.indices[i].keyPattern;
+                    const IndexEntry& index = params.indices[i];
+                    if (index.sparse) {
+                        continue;
+                    }
+                    const BSONObj& kp = index.keyPattern;
                     if (providesSort(query, kp)) {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."
                                << endl;

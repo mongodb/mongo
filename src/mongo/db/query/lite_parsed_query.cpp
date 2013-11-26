@@ -39,9 +39,11 @@ namespace mongo {
     // static
     Status LiteParsedQuery::make(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
                                  const BSONObj& query, const BSONObj& proj, const BSONObj& sort,
+                                 const BSONObj& hint,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort;
+        pq->_hint = hint;
 
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (status.isOK()) { *out = pq.release(); }

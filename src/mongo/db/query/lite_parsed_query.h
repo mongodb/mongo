@@ -47,6 +47,7 @@ namespace mongo {
                            const BSONObj& query,
                            const BSONObj& proj,
                            const BSONObj& sort,
+                           const BSONObj& hint,
                            LiteParsedQuery** out);
 
         /**

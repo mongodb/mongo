@@ -30,6 +30,8 @@
  * This file contains tests for mongo/db/query/query_planner.cpp
  */
 
+#include <ostream>
+#include <sstream>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -110,8 +112,19 @@ namespace {
         void runQuerySortProjSkipLimit(const BSONObj& query,
                                        const BSONObj& sort, const BSONObj& proj,
                                        long long skip, long long limit) {
+            runQueryFull(query, sort, proj, skip, limit, BSONObj());
+        }
+
+        void runQuerySortHint(const BSONObj& query, const BSONObj& sort, const BSONObj& hint) {
+            runQueryFull(query, sort, BSONObj(), 0, 0, hint);
+        }
+
+        void runQueryFull(const BSONObj& query,
+                          const BSONObj& sort, const BSONObj& proj,
+                          long long skip, long long limit,
+                          const BSONObj& hint) {
             solns.clear();
-            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, &cq);
+            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint, &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
@@ -126,12 +139,31 @@ namespace {
             return solns.size();
         }
 
-        void dumpSolutions() const {
+        void dumpSolutions(ostream& ost) const {
             for (vector<QuerySolution*>::const_iterator it = solns.begin();
                     it != solns.end();
                     ++it) {
-                cout << (*it)->toString() << endl;
+                ost << (*it)->toString() << endl;
             }
+        }
+
+        void dumpSolutions() const {
+            dumpSolutions(std::cout);
+        }
+
+        /**
+         * Checks number solutions. Generates assertion message
+         * containing solution dump if applicable.
+         */
+        void assertNumSolutions(size_t expectSolutions) const {
+            if (getNumSolutions() == expectSolutions) {
+                return;
+            }
+            std::stringstream ss;
+            ss << "expected " << expectSolutions << " solutions but got " << getNumSolutions()
+               << " instead. solutions generated: " << std::endl;
+            dumpSolutions(ss);
+            FAIL(ss.str());
         }
 
         /**
@@ -314,7 +346,15 @@ namespace {
                     ++matches;
                 }
             }
-            ASSERT_EQUALS(matches, expectMatches);
+            if (matches == expectMatches) {
+                return;
+            }
+            std::stringstream ss;
+            ss << "expected " << expectMatches << " matches for solution " << solnJson
+               << " but got " << matches
+               << " instead. all solutions generated: " << std::endl;
+            dumpSolutions(ss);
+            FAIL(ss.str());
         }
 
         // TODO:
@@ -1005,6 +1045,46 @@ namespace {
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{sort: {pattern: {_id: -1}, node: {cscan: 1}}}");
         assertSolutionExists("{fetch: {ixscan: {_id: 1}}}");
+    }
+
+    //
+    // Sparse indices, SERVER-8067
+    // Each index in this block of tests is sparse.
+    //
+
+    TEST_F(IndexAssignmentTest, SparseIndexIgnoreForSort) {
+        addIndex(fromjson("{a: 1}"), false, true);
+        runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SparseIndexHintForSort) {
+        addIndex(fromjson("{a: 1}"), false, true);
+        runQuerySortHint(BSONObj(), fromjson("{a: 1}"), fromjson("{a: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SparseIndexPreferCompoundIndexForSort) {
+        addIndex(fromjson("{a: 1}"), false, true);
+        addIndex(fromjson("{a: 1, b: 1}"));
+        runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1, b: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SparseIndexForQuery) {
+        addIndex(fromjson("{a: 1}"), false, true);
+        runQuerySortProj(fromjson("{a: 1}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
     }
 
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates

@@ -74,10 +74,21 @@ namespace mongo {
                                         const BSONObj& sort, const BSONObj& proj,
                                         long long skip, long long limit,
                                         CanonicalQuery** out) {
+        BSONObj emptyObj;
+        return CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, emptyObj, out);
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
+                                        const BSONObj& sort, const BSONObj& proj,
+                                        long long skip, long long limit,
+                                        const BSONObj& hint,
+                                        CanonicalQuery** out) {
         LiteParsedQuery* lpq;
         // Pass empty sort and projection.
         BSONObj emptyObj;
-        Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort, &lpq);
+        Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort,
+                                                   hint, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
