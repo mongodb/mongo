@@ -145,7 +145,7 @@ Array.shuffle = function(arr){
 }
 
 Array.tojson = function(a, indent, nolint){
-    var lineEnding = nolint ? " " : "\n";
+    var elementSeparator = nolint ? " " : "\n";
 
     if (!indent)
         indent = "";
@@ -156,20 +156,24 @@ Array.tojson = function(a, indent, nolint){
         return "[ ]";
     }
 
-    var s = "[" + lineEnding;
-    indent += "\t";
+    var s = "[" + elementSeparator;
+
+    // add to indent if we are pretty
+    if (!nolint)
+      indent += "\t";
+
     for (var i=0; i<a.length; i++){
         s += indent + tojson(a[i], indent, nolint);
         if (i < a.length - 1){
-            s += "," + lineEnding;
+            s += "," + elementSeparator;
         }
     }
-    if (a.length == 0) {
-        s += indent;
-    }
 
-    indent = indent.substring(1);
-    s += lineEnding+indent+"]";
+    // remove from indent if we are pretty
+    if (!nolint)
+      indent = indent.substring(1);
+
+    s += elementSeparator + indent + "]";
     return s;
 }
 
