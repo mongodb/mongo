@@ -97,7 +97,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 			return (ret);
 
 		WT_RET(__wt_eviction_check(session, &full, 0));
-		if (full < 100)
+		if (full < (busy ? 100 : 95))
 			return (0);
 		if (ret == EBUSY)
 			continue;
@@ -107,7 +107,6 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		 * transaction is the one holding back the oldest ID, we can't
 		 * wait forever.  We'll block next time we are not busy.
 		 */
-		__wt_txn_update_oldest(session);
 		if (busy &&
 		    (txn_state->id == S2C(session)->txn_global.oldest_id ||
 		    txn_state->snap_min == S2C(session)->txn_global.oldest_id))
@@ -116,5 +115,10 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		/* Wait for the queue to re-populate before trying again. */
 		WT_RET(__wt_cond_wait(session,
 		    S2C(session)->cache->evict_waiter_cond, 10000));
+
+		/* Check if things have changed so that we are busy. */
+		__wt_txn_update_oldest(session);
+		busy = busy || (txn_state->snap_min != WT_TXN_NONE &&
+		    txn_global->current != txn_global->oldest_id);
 	}
 }
