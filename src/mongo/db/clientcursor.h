@@ -115,7 +115,7 @@ namespace mongo {
         // Yielding.
         // 
 
-        static void staticYield(int micros, const StringData& ns, Record* rec);
+        static void staticYield(int micros, const StringData& ns, const Record* rec);
 
         //
         // Static methods about all ClientCursors  TODO: Document.

@@ -257,7 +257,8 @@ namespace mongo {
 
     string CanonicalQuery::toString() const {
         stringstream ss;
-        ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn() << " skip=" << _pq->getSkip() << endl;
+        ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn()
+           << " skip=" << _pq->getSkip() << endl;
         // The expression tree puts an endl on for us.
         ss << "Tree: " << _root->toString();
         ss << "Sort: " << _pq->getSort().toString() << endl;

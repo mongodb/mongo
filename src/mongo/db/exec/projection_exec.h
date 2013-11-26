@@ -73,6 +73,15 @@ namespace mongo {
          */
         Status transform(WorkingSetMember* member) const;
 
+        /**
+         * Apply this projection to the object 'in'.
+         * 'this' must be a simple inclusion/exclusion projection.
+         *
+         * Upon success, 'out' is set to the new object and Status::OK() is returned.
+         * Otherwise, returns an error Status and *out is not mutated.
+         */
+        Status transform(const BSONObj& in, BSONObj* out) const;
+
     private:
         //
         // Initialization

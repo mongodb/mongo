@@ -283,6 +283,16 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status ProjectionExec::transform(const BSONObj& in, BSONObj* out) const {
+        BSONObjBuilder bob;
+        Status s = transform(in, &bob, NULL);
+        if (!s.isOK()) {
+            return s;
+        }
+        *out = bob.obj();
+        return Status::OK();
+    }
+
     Status ProjectionExec::transform(const BSONObj& in,
                                      BSONObjBuilder* bob,
                                      const MatchDetails* details) const {

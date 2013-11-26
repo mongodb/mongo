@@ -68,36 +68,6 @@ namespace mongo {
         return false;
     }
 
-    // Copied verbatim from queryutil.cpp.
-    static bool isSimpleIdQuery(const BSONObj& query) {
-        BSONObjIterator it(query);
-
-        if (!it.more()) {
-            return false;
-        }
-
-        BSONElement elt = it.next();
-
-        if (it.more()) {
-            return false;
-        }
-
-        if (strcmp("_id", elt.fieldName()) != 0) {
-            return false;
-        }
-
-        // e.g. not something like { _id : { $gt : ...
-        if (elt.isSimpleType()) {
-            return true;
-        }
-
-        if (elt.type() == Object) {
-            return elt.Obj().firstElementFieldName()[0] != '$';
-        }
-
-        return false;
-    }
-
     string optionString(size_t options) {
         stringstream ss;
 
@@ -166,41 +136,6 @@ namespace mongo {
                << "Canonical query:\n" << query.toString() << endl
                << "============================="
                << endl;
-
-        // The shortcut formerly known as IDHACK.  See if it's a simple _id query.  If so we might
-        // just make an ixscan over the _id index and bypass the rest of planning entirely.
-        if (!query.getParsed().isExplain() && !query.getParsed().showDiskLoc()
-            && isSimpleIdQuery(query.getParsed().getFilter())
-            && !query.getParsed().hasOption(QueryOption_CursorTailable)) {
-
-            // See if we can find an _id index.
-            for (size_t i = 0; i < params.indices.size(); ++i) {
-                if (isIdIndex(params.indices[i].keyPattern)) {
-                    const IndexEntry& index = params.indices[i];
-                    QLOG() << "IDHACK using index " << index.toString() << endl;
-
-                    // If so, we make a simple scan to find the doc.
-                    IndexScanNode* isn = new IndexScanNode();
-                    isn->indexKeyPattern = index.keyPattern;
-                    isn->indexIsMultiKey = index.multikey;
-                    isn->direction = 1;
-                    isn->bounds.isSimpleRange = true;
-                    BSONObj key = getKeyFromQuery(index.keyPattern, query.getParsed().getFilter());
-                    isn->bounds.startKey = isn->bounds.endKey = key;
-                    isn->bounds.endKeyInclusive = true;
-                    isn->computeProperties();
-
-                    QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, isn);
-
-                    if (NULL != soln) {
-                        out->push_back(soln);
-                        QLOG() << "IDHACK solution is:\n" << (*out)[0]->toString() << endl;
-                        // And that's it.
-                        return;
-                    }
-                }
-            }
-        }
 
         for (size_t i = 0; i < params.indices.size(); ++i) {
             QLOG() << "idx " << i << " is " << params.indices[i].toString() << endl;

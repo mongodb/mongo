@@ -42,6 +42,7 @@
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
+#include "mongo/db/query/idhack_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
@@ -135,6 +136,39 @@ namespace mongo {
         return true;
     }
 
+    // Copied verbatim from queryutil.cpp.
+    static bool isSimpleIdQuery(const BSONObj& query) {
+        // Just one field name.
+        BSONObjIterator it(query);
+        if (!it.more()) { return false; }
+
+        BSONElement elt = it.next();
+        if (it.more()) { return false; }
+
+        // Which is _id...
+        if (strcmp("_id", elt.fieldName()) != 0) {
+            return false;
+        }
+
+        // And not something like { _id : { $gt : ...
+        if (elt.isSimpleType()) { return true; }
+
+        // And if the value is an object...
+        if (elt.type() == Object) {
+            // Can't do this.
+            return elt.Obj().firstElementFieldName()[0] != '$';
+        }
+
+        return false;
+    }
+
+    static bool canUseIDHack(const CanonicalQuery& query) {
+        return !query.getParsed().isExplain()
+            && !query.getParsed().showDiskLoc()
+            && isSimpleIdQuery(query.getParsed().getFilter())
+            && !query.getParsed().hasOption(QueryOption_CursorTailable);
+    }
+
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
@@ -176,12 +210,20 @@ namespace mongo {
 
         NamespaceDetails* nsd = collection->details();
 
+        // If we have an _id index we can use the idhack runner.
+        if (canUseIDHack(*canonicalQuery) && (-1 != nsd->findIdIndex())) {
+            *out = new IDHackRunner(collection, canonicalQuery.release());
+            return Status::OK();
+        }
+
         // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
         QueryPlannerParams plannerParams;
         for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
             IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor( i );
-            plannerParams.indices.push_back(
-                IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse(), desc->indexName()));
+            plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
+                                                       desc->isMultikey(),
+                                                       desc->isSparse(),
+                                                       desc->indexName()));
         }
 
         // Tailable: If the query requests tailable the collection must be capped.

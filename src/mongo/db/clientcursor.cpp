@@ -391,7 +391,7 @@ namespace mongo {
 #endif
     }
 
-    void ClientCursor::staticYield(int micros, const StringData& ns, Record* rec) {
+    void ClientCursor::staticYield(int micros, const StringData& ns, const Record* rec) {
         bool haveReadLock = Lock::isReadLocked();
 
         killCurrentOp.checkForInterrupt( false );
