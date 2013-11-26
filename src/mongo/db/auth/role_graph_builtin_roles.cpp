@@ -130,7 +130,6 @@ namespace {
             << ActionType::dropUser
             << ActionType::dropRole
             << ActionType::grantRole
-            << ActionType::invalidateUserCache // hostManager gets this also
             << ActionType::revokeRole
             << ActionType::viewUser
             << ActionType::viewRole;
@@ -196,7 +195,7 @@ namespace {
             << ActionType::diagLogging
             << ActionType::flushRouterConfig // clusterManager gets this also
             << ActionType::fsync
-            << ActionType::invalidateUserCache // userAdmin gets this also
+            << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
             << ActionType::killop
             << ActionType::resync; // clusterManager gets this also
 
@@ -343,6 +342,9 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"),
