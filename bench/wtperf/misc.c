@@ -99,14 +99,16 @@ sum_update_ops(CONFIG *cfg)
 }
 
 /*
- * latency_monitor --
- *	Get average, minimum and maximum latency for this period.
+ * latency_op --
+ *	Get average, minimum and maximum latency for this period for a
+ * particular operation.
  */
-void
-latency_monitor(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+static void
+latency_op(CONFIG *cfg,
+    size_t field_offset, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
-	static uint32_t last_avg = 0, last_max = 0, last_min = 0;
 	CONFIG_THREAD *thread;
+	TRACK *track;
 	uint64_t ops, latency, tmp;
 	uint32_t max, min;
 	u_int i;
@@ -116,65 +118,128 @@ latency_monitor(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 	min = UINT32_MAX;
 	for (i = 0, thread = cfg->ithreads;
 	    thread != NULL && i < cfg->insert_threads; ++i, ++thread) {
-		tmp = thread->total_ops;
-		ops += tmp - thread->last_ops;
-		thread->last_ops = tmp;
-		tmp = thread->total_latency;
-		latency += tmp - thread->last_latency;
-		thread->last_latency = tmp;
+		track = (TRACK *)((uint8_t *)thread + field_offset);
+		tmp = track->ops;
+		ops += tmp - track->last_ops;
+		track->last_ops = tmp;
+		tmp = track->latency;
+		latency += tmp - track->last_latency;
+		track->last_latency = tmp;
 
-		if (min > thread->min_latency)
-			min = thread->min_latency;
-		thread->min_latency = UINT32_MAX;
-		if (max < thread->max_latency)
-			max = thread->max_latency;
-		thread->max_latency = 0;
+		if (min > track->min_latency)
+			min = track->min_latency;
+		track->min_latency = UINT32_MAX;
+		if (max < track->max_latency)
+			max = track->max_latency;
+		track->max_latency = 0;
 	}
 	for (i = 0, thread = cfg->rthreads;
 	    thread != NULL && i < cfg->read_threads; ++i, ++thread) {
-		tmp = thread->total_ops;
-		ops += tmp - thread->last_ops;
-		thread->last_ops = tmp;
-		tmp = thread->total_latency;
-		latency += tmp - thread->last_latency;
-		thread->last_latency = tmp;
+		track = (TRACK *)((uint8_t *)thread + field_offset);
+		tmp = track->ops;
+		ops += tmp - track->last_ops;
+		track->last_ops = tmp;
+		tmp = track->latency;
+		latency += tmp - track->last_latency;
+		track->last_latency = tmp;
 
-		if (min > thread->min_latency)
-			min = thread->min_latency;
-		thread->min_latency = UINT32_MAX;
-		if (max < thread->max_latency)
-			max = thread->max_latency;
-		thread->max_latency = 0;
+		if (min > track->min_latency)
+			min = track->min_latency;
+		track->min_latency = UINT32_MAX;
+		if (max < track->max_latency)
+			max = track->max_latency;
+		track->max_latency = 0;
 	}
 	for (i = 0, thread = cfg->uthreads;
 	    thread != NULL && i < cfg->update_threads; ++i, ++thread) {
-		tmp = thread->total_ops;
-		ops += tmp - thread->last_ops;
-		thread->last_ops = tmp;
-		tmp = thread->total_latency;
-		latency += tmp - thread->last_latency;
-		thread->last_latency = tmp;
+		track = (TRACK *)((uint8_t *)thread + field_offset);
+		tmp = track->ops;
+		ops += tmp - track->last_ops;
+		track->last_ops = tmp;
+		tmp = track->latency;
+		latency += tmp - track->last_latency;
+		track->last_latency = tmp;
 
-		if (min > thread->min_latency)
-			min = thread->min_latency;
-		thread->min_latency = UINT32_MAX;
-		if (max < thread->max_latency)
-			max = thread->max_latency;
-		thread->max_latency = 0;
+		if (min > track->min_latency)
+			min = track->min_latency;
+		track->min_latency = UINT32_MAX;
+		if (max < track->max_latency)
+			max = track->max_latency;
+		track->max_latency = 0;
 	}
+
+	if (ops == 0)
+		*avgp = *minp = *maxp = 0;
+	else {
+		*minp = min;
+		*maxp = max;
+		*avgp = (uint32_t)(latency / ops);
+	}
+}
+
+void
+latency_read(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+{
+	static uint32_t last_avg = 0, last_max = 0, last_min = 0;
+
+	latency_op(cfg, offsetof(CONFIG_THREAD, read), avgp, minp, maxp);
 
 	/*
 	 * If nothing happened, graph the average, minimum and maximum as they
 	 * were the last time, it keeps the graphs from having discontinuities.
 	 */
-	if (ops == 0) {
+	if (*minp == 0) {
 		*avgp = last_avg;
 		*minp = last_min;
 		*maxp = last_max;
 	} else {
-		*minp = last_min = min;
-		*maxp = last_max = max;
-		*avgp = last_avg = (uint32_t)(latency / ops);
+		last_avg = *avgp;
+		last_min = *minp;
+		last_max = *maxp;
+	}
+}
+
+void
+latency_insert(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+{
+	static uint32_t last_avg = 0, last_max = 0, last_min = 0;
+
+	latency_op(cfg, offsetof(CONFIG_THREAD, insert), avgp, minp, maxp);
+
+	/*
+	 * If nothing happened, graph the average, minimum and maximum as they
+	 * were the last time, it keeps the graphs from having discontinuities.
+	 */
+	if (*minp == 0) {
+		*avgp = last_avg;
+		*minp = last_min;
+		*maxp = last_max;
+	} else {
+		last_avg = *avgp;
+		last_min = *minp;
+		last_max = *maxp;
+	}
+}
+
+void
+latency_update(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
+{
+	static uint32_t last_avg = 0, last_max = 0, last_min = 0;
+
+	latency_op(cfg, offsetof(CONFIG_THREAD, update), avgp, minp, maxp);
+
+	/*
+	 * If nothing happened, graph the average, minimum and maximum as they
+	 * were the last time, it keeps the graphs from having discontinuities.
+	 */
+	if (*minp == 0) {
+		*avgp = last_avg;
+		*minp = last_min;
+		*maxp = last_max;
+	} else {
+		last_avg = *avgp;
+		last_min = *minp;
+		last_max = *maxp;
 	}
 }
 

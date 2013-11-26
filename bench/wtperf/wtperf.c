@@ -130,10 +130,22 @@ get_next_incr(void)
  *	Update an operation's tracking structure with new latency information.
  */
 static inline void
-track_aggregated_update(TRACK *trk, uint64_t v)
+track_aggregated_update(TRACK *trk, uint64_t nsecs, uint32_t aggregated)
 {
+	uint64_t v;
+
 	if (trk->aggregated == 0)
 		return;
+
+					/* average nanoseconds per call */
+	v = (uint64_t)nsecs / aggregated;
+
+	trk->latency += nsecs;		/* track total latency */
+
+	if (v > trk->max_latency)	/* track max/min latency */
+		trk->max_latency = (uint32_t)v;
+	if (v < trk->min_latency)
+		trk->min_latency = (uint32_t)v;
 
 	/*
 	 * Update a latency bucket.
@@ -170,7 +182,7 @@ worker(CONFIG_THREAD *thread)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t next_val, nsecs, v;
+	uint64_t next_val, nsecs;
 	uint32_t aggregated;
 	int ret;
 	uint8_t last_op, *op, *op_end;
@@ -196,9 +208,6 @@ worker(CONFIG_THREAD *thread)
 
 	op = thread->schedule;
 	op_end = thread->schedule + sizeof(thread->schedule);
-
-	thread->min_latency = UINT32_MAX;
-	thread->max_latency = 0;
 
 	t = &_t;
 	last = &_last;
@@ -321,28 +330,15 @@ op_err:			lprintf(cfg, ret, 0,
 		nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
 		nsecs += sec_to_ns((uint64_t)(t->tv_sec - last->tv_sec));
 
+					/* update call latencies */
+		track_aggregated_update(&thread->insert, nsecs, aggregated);
+		track_aggregated_update(&thread->read, nsecs, aggregated);
+		track_aggregated_update(&thread->update, nsecs, aggregated);
+		aggregated = 0;
+
 		tmp = last;		/* swap timers */
 		last = t;
 		t = tmp;
-
-					/* update total latency, ops */
-		thread->total_ops += aggregated;
-		thread->total_latency += nsecs;
-
-					/* average nanoseconds per call */
-		v = (uint64_t)nsecs / aggregated;
-		aggregated = 0;
-
-					/* track per call max/min latency */
-		if (v > thread->max_latency)
-			thread->max_latency = (uint32_t)v;
-		if (v < thread->min_latency)
-			thread->min_latency = (uint32_t)v;
-
-					/* update call latencies */
-		track_aggregated_update(&thread->insert, v);
-		track_aggregated_update(&thread->read, v);
-		track_aggregated_update(&thread->update, v);
 	}
 
 	/* To ensure managing thread knows if we exited early. */
@@ -563,8 +559,11 @@ monitor(void *arg)
 	FILE *fp;
 	uint64_t reads, inserts, updates;
 	uint64_t last_reads, last_inserts, last_updates;
-	uint32_t avg_latency, i, max_latency, min_latency;
+	uint32_t read_avg, read_min, read_max;
+	uint32_t insert_avg, insert_min, insert_max;
+	uint32_t update_avg, update_min, update_max;
 	size_t len;
+	u_int i;
 	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
@@ -584,11 +583,17 @@ monitor(void *arg)
 	}
 #ifdef __WRITE_A_HEADER
 	fprintf(fp,
-	    "#time,read-operations,insert-operations,update-operations,"
+	    "#time,"
+	    "read operations,insert operations,update operations,"
 	    "checkpoints,"
-	    "average-latency(NS),minimum-latency(NS),maximum-latency(NS)\n");
+	    "read average latency(NS),read minimum latency(NS),"
+	    "read maximum latency(NS),"
+	    "insert average latency(NS),insert min latency(NS),"
+	    "insert maximum latency(NS),"
+	    "update average latency(NS),update min latency(NS),"
+	    "update maximum latency(NS)"
+	    "\n");
 #endif
-
 	last_reads = last_inserts = last_updates = 0;
 	while (!g_stop) {
 		for (i = 0; i < cfg->sample_interval; i++) {
@@ -599,25 +604,33 @@ monitor(void *arg)
 		if (g_stop)		/* avoid partial statistics */
 			break;
 
-		reads = sum_read_ops(cfg);
-		inserts = sum_insert_ops(cfg);
-		updates = sum_update_ops(cfg);
-		latency_monitor(cfg, &avg_latency, &min_latency, &max_latency);
-
 		assert(__wt_epoch(NULL, &t) == 0);
 		tm = localtime_r(&t.tv_sec, &_tm);
 		(void)strftime(buf, sizeof(buf), "%T", tm);
 
+		reads = sum_read_ops(cfg);
+		inserts = sum_insert_ops(cfg);
+		updates = sum_update_ops(cfg);
+		latency_read(cfg, &read_avg, &read_min, &read_max);
+		latency_insert(cfg, &insert_avg, &insert_min, &insert_max);
+		latency_update(cfg, &update_avg, &update_min, &update_max);
+
 		(void)fprintf(fp,
-		    "%s,%" PRIu64 ",%" PRIu64 ",%" PRIu64
+		    "%s"
+		    ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
 		    ",%c"
-		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
+		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
+		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
+		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
+		    "\n",
 		    buf,
 		    (reads - last_reads) / cfg->sample_interval,
 		    (inserts - last_inserts) / cfg->sample_interval,
 		    (updates - last_updates) / cfg->sample_interval,
 		    g_ckpt ? 'Y' : 'N',
-		    avg_latency, min_latency, max_latency);
+		    read_avg, read_min, read_max,
+		    insert_avg, insert_min, insert_max,
+		    update_avg, update_min, update_max);
 
 		last_reads = reads;
 		last_inserts = inserts;
@@ -1258,6 +1271,12 @@ start_threads(
 		if ((thread->data_buf = calloc(cfg->data_sz, 1)) == NULL)
 			return (enomem(cfg));
 		memset(thread->data_buf, 'a', cfg->data_sz - 1);
+
+		thread->ckpt.min_latency =
+		thread->insert.min_latency = thread->read.min_latency =
+		thread->update.min_latency = UINT32_MAX;
+		thread->ckpt.max_latency = thread->insert.max_latency =
+		thread->read.max_latency = thread->update.max_latency = 0;
 
 		if ((ret = pthread_create(
 		    &thread->handle, NULL, func, thread)) != 0) {

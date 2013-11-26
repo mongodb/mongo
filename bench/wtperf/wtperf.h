@@ -100,7 +100,28 @@ typedef struct {
 #define	sec_to_ms(v)	((v) * THOUSAND)
 
 typedef struct {
+	/*
+	 * Threads maintain the total thread operation and total latency they've
+	 * experienced; the monitor thread periodically copies these values into
+	 * the last_XXX fields.
+	 */
 	uint64_t ops;			/* Total operations */
+	uint64_t latency;		/* Total latency */
+
+	uint64_t last_ops;		/* Last read by monitor thread */
+	uint64_t last_latency;
+
+	/*
+	 * Minimum/maximum latency, shared with the monitor thread, that is, the
+	 * monitor thread clears it so it's recalculated again for each period.
+	 */
+	uint32_t min_latency;		/* Minimum latency (NS) */
+	uint32_t max_latency;		/* Maximum latency (NS) */
+
+	/*
+	 * To avoid reading the clock so often, operations of a single type are
+	 * aggregated into a single clock read, and are counted here.
+	 */
 	uint32_t aggregated;		/* Aggregated operations */
 
 	/*
@@ -124,25 +145,6 @@ struct __config_thread {		/* Per-thread structure */
 #define	WORKER_UPDATE		4	/* Update */
 	uint8_t	schedule[100];		/* Thread operations */
 
-	/*
-	 * Threads maintain the total thread operation and total latency they've
-	 * experienced; the monitor thread periodically copies these values into
-	 * the last_XXX fields.
-	 */
-	uint64_t total_ops;		/* Total thread operations */
-	uint64_t total_latency;		/* Total thread latency (NS) */
-
-	uint64_t last_ops;		/* Last read by monitor thread */
-	uint64_t last_latency;
-
-	/*
-	 * Each thread also maintains a minimum/maximum latency, shared with the
-	 * monitor thread, that is, the monitor thread resets it with min/max
-	 * values so it's recalculated again for a new period.
-	 */
-	uint32_t min_latency;		/* Minimum latency (NS) */
-	uint32_t max_latency;		/* Maximum latency (NS) */
-
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
@@ -156,7 +158,9 @@ int	 config_opt_line(CONFIG *, WT_SESSION *, const char *);
 int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
-void	 latency_monitor(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
+void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
+void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
+void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
 const char *
