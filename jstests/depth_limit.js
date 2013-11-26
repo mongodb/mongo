@@ -1,5 +1,6 @@
 // SERVER-11781 Don't crash when converting deeply nested or cyclical JS objects to BSON.
 
+if (0) { // disabled for now
 function assertTooBig(obj) {
     // This used to crash rather than throwing an exception.
     assert.throws(function(){Object.bsonsize(obj)});
@@ -44,3 +45,4 @@ assertTooBig(objWithDepth(objDepthLimit));
 var arrayDepthLimit = objDepthLimit - 1; // one lower due to wrapping object
 assertNotTooBig({array: arrayWithDepth(arrayDepthLimit - 1)});
 assertTooBig({array: arrayWithDepth(arrayDepthLimit)});
+}
