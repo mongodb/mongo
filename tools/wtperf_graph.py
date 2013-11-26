@@ -54,7 +54,7 @@ set grid
 set style data lines
 set terminal png nocrop size 800,600
 set timefmt "%H:%M:%S"
-set title "wtperf run"
+set title "read, insert and update operations per second"
 set format x "%M:%S"
 set xlabel "Time (minutes:seconds)"
 set xtics rotate by -45
@@ -70,45 +70,12 @@ of.write('''
 set output 'monitor.png'
 plot "monitor" using 1:($2/100) title "Reads", "monitor" using 1:($3/100) title "Updates", "monitor" using 1:($4/100) title "Inserts"\n''')
 of.close()
-
 call(["gnuplot", "gnuplot.cmd"])
 os.remove("gnuplot.cmd")
 
 
-# Graph time vs. average, minimium, maximum latency.
-of = open("gnuplot.cmd", "w")
-of.write('''
-set autoscale
-set datafile sep ','
-set grid
-set style data lines
-set terminal png nocrop size 800,600
-set timefmt "%H:%M:%S"
-set title "wtperf run"
-set format x "%M:%S"
-set xlabel "Time (minutes:seconds)"
-set xtics rotate by -45
-set xdata time
-set ylabel "Latency (us)"
-set logscale y
-set yrange [1:]\n''')
-it = iter(ckptlist)
-for start, stop in zip(it, it):
-        of.write('set object rectangle from first \'' + start +\
-            '\', graph 0 ' + ' to first \'' + stop +\
-            '\', graph 1 fc rgb "gray" back\n')
-of.write('''
-set output 'latency.png'
-plot "monitor" using 1:($6 / 1000) title "Average", "monitor" using 1:($7 / 1000) title "Minimum", "monitor" using 1:($8 / 1000) title "Maximum"\n''')
-of.close()
-
-call(["gnuplot", "gnuplot.cmd"])
-os.remove("gnuplot.cmd")
-
-
-# Graph latency vs. % operations (cumulative)
-def plot_latency(name):
-    # Latency plot: cumulative operations vs. latency
+# Graph time vs. average, minimium, maximum latency for an operation.
+def plot_latency_operation(name, col_avg, col_min, col_max):
     of = open("gnuplot.cmd", "w")
     of.write('''
 set autoscale
@@ -116,23 +83,37 @@ set datafile sep ','
 set grid
 set style data lines
 set terminal png nocrop size 800,600
-set title "wtperf %(NAME)s cumulative latency distribution"
-set xlabel "Latency (us)"
-set xrange [1:]
+set timefmt "%%H:%%M:%%S"
+set title "%(NAME)s: average, minimum and maximum latency"
+set format x "%%M:%%S"
+set xlabel "Time (minutes:seconds)"
 set xtics rotate by -45
-set logscale x
-set ylabel "%% operations"
-set yrange [0:]
+set xdata time
+set ylabel "Latency (us)"
+set logscale y
+set yrange [1:]\n''' % {
+    'NAME' : name
+    })
+    it = iter(ckptlist)
+    for start, stop in zip(it, it):
+	of.write('set object rectangle from first \'' + start +\
+	    '\', graph 0 ' + ' to first \'' + stop +\
+	    '\', graph 1 fc rgb "gray" back\n')
+    of.write('''
 set output '%(NAME)s.latency1.png'
-plot "latency.%(NAME)s" using 1:(($3 * 100)/$4) title "%(NAME)s"\n''' % {
-        'NAME' : name
-        })
+plot "monitor" using 1:($%(COL_AVG)d / 1000) title "Average Latency", "monitor" using 1:($%(COL_MIN)d / 1000) title "Minimum Latency", "monitor" using 1:($%(COL_MAX)d / 1000) title "Maximum Latency"\n''' % {
+    'NAME' : name,
+    'COL_AVG' : col_avg,
+    'COL_MIN' : col_min,
+    'COL_MAX' : col_max
+    })
     of.close()
-
     call(["gnuplot", "gnuplot.cmd"])
     os.remove("gnuplot.cmd")
 
+
 # Graph latency vs. % operations
+def plot_latency_percent(name):
     of = open("gnuplot.cmd", "w")
     of.write('''
 set autoscale
@@ -140,7 +121,7 @@ set datafile sep ','
 set grid
 set style data points
 set terminal png nocrop size 800,600
-set title "wtperf %(NAME)s latency distribution"
+set title "%(NAME)s: latency distribution"
 set xlabel "Latency (us)"
 set xrange [1:]
 set xtics rotate by -45
@@ -152,11 +133,39 @@ plot "latency.%(NAME)s" using (($2 * 100)/$4) title "%(NAME)s"\n''' % {
         'NAME' : name
         })
     of.close()
-
     call(["gnuplot", "gnuplot.cmd"])
     os.remove("gnuplot.cmd")
 
 
-plot_latency("insert")
-plot_latency("read")
-plot_latency("update")
+# Graph latency vs. % operations (cumulative)
+def plot_latency_cumulative_percent(name):
+    # Latency plot: cumulative operations vs. latency
+    of = open("gnuplot.cmd", "w")
+    of.write('''
+set autoscale
+set datafile sep ','
+set grid
+set style data lines
+set terminal png nocrop size 800,600
+set title "%(NAME)s: cumulative latency distribution"
+set xlabel "Latency (us)"
+set xrange [1:]
+set xtics rotate by -45
+set logscale x
+set ylabel "%% operations"
+set yrange [0:]
+set output '%(NAME)s.latency3.png'
+plot "latency.%(NAME)s" using 1:(($3 * 100)/$4) title "%(NAME)s"\n''' % {
+        'NAME' : name
+        })
+    of.close()
+    call(["gnuplot", "gnuplot.cmd"])
+    os.remove("gnuplot.cmd")
+
+
+column = 6		# average, minimum, maximum start in column 6
+for op in ['read', 'insert', 'update']:
+    plot_latency_operation(op, column, column + 1, column + 2)
+    column = column + 3
+    plot_latency_percent(op)
+    plot_latency_cumulative_percent(op)
