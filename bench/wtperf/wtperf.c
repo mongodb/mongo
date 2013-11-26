@@ -132,6 +132,9 @@ get_next_incr(void)
 static inline void
 track_aggregated_update(TRACK *trk, uint64_t v)
 {
+	if (trk->aggregated == 0)
+		return;
+
 	/*
 	 * Update a latency bucket.
 	 * First buckets: usecs from 100us to 1000us at 100us each.
@@ -170,7 +173,7 @@ worker(CONFIG_THREAD *thread)
 	uint64_t next_val, nsecs, v;
 	uint32_t aggregated;
 	int ret;
-	uint8_t *op, *op_end;
+	uint8_t last_op, *op, *op_end;
 	char *data_buf, *key_buf, *value;
 
 	cfg = thread->cfg;
@@ -298,14 +301,19 @@ op_err:			lprintf(cfg, ret, 0,
 			goto err;
 		}
 
+		++trk->ops;		/* increment operation counts */
+		++trk->aggregated;
+		++aggregated;
+
+		last_op = *op;
 		if (++op == op_end)	/* schedule the next operation */
 			op = thread->schedule;
 
-		++trk->ops;		/* increment operation counts */
-		++trk->aggregated;
-
-					/* aggregate, or continue */
-		if (++aggregated < cfg->latency_aggregate)
+		/*
+		 * Stop aggregation if the operation is going to change or we
+		 * reach the configurable limit.
+		 */
+		if (aggregated < cfg->latency_aggregate && last_op == *op)
 			continue;
 
 					/* calculate how long the calls took */
