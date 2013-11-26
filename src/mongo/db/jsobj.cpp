@@ -78,11 +78,11 @@ namespace mongo {
             s << '"' << escape( string(valuestr(), valuestrsize()-1) ) << '"';
             break;
         case NumberLong:
-            if (format == JS) {
+            if (format == JS || format == TenGen) {
                 s << "NumberLong(" << _numberLong() << ")";
             }
             else {
-                s << _numberLong();
+                s << "{ \"$numberLong\" : \"" << _numberLong() << "\" }";
             }
             break;
         case NumberInt:

@@ -117,6 +117,7 @@ namespace mongo {
              *   | REGEXOBJECT
              *   | REFOBJECT
              *   | UNDEFINEDOBJECT
+             *   | NUMBERLONGOBJECT
              *
              */
         public:
@@ -178,6 +179,12 @@ namespace mongo {
              *     { FIELD("$undefined") : true }
              */
             Status undefinedObject(const StringData& fieldName, BSONObjBuilder&);
+
+            /*
+             * NUMBERLONGOBJECT :
+             *     { FIELD("$numberLong") : "<number>" }
+             */
+            Status numberLongObject(const StringData& fieldName, BSONObjBuilder&);
 
             /*
              * ARRAY :

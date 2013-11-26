@@ -137,6 +137,37 @@ namespace JsonTests {
             }
         };
 
+        class NumberLongStrict {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", 20000LL);
+                ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"20000\" } }",
+                              b.done().jsonString(Strict));
+            }
+        };
+
+        // Test a NumberLong that is too big to fit into a 32 bit integer
+        class NumberLongStrictLarge {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", 9223372036854775807LL);
+                ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"9223372036854775807\" } }",
+                              b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberLongStrictNegative {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", -20000LL);
+                ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"-20000\" } }",
+                              b.done().jsonString(Strict));
+            }
+        };
+
         class SingleBoolMember {
         public:
             void run() {
@@ -2477,6 +2508,9 @@ namespace JsonTests {
             add< JsonStringTests::InvalidNumbers >();
             add< JsonStringTests::NumberPrecision >();
             add< JsonStringTests::NegativeNumber >();
+            add< JsonStringTests::NumberLongStrict >();
+            add< JsonStringTests::NumberLongStrictLarge >();
+            add< JsonStringTests::NumberLongStrictNegative >();
             add< JsonStringTests::SingleBoolMember >();
             add< JsonStringTests::SingleNullMember >();
             add< JsonStringTests::SingleUndefinedMember >();
