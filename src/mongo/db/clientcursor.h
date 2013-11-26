@@ -238,6 +238,16 @@ namespace mongo {
         static bool recoverFromYield( const YieldData &data );
         static int suggestYieldMicros();
 
+        /**
+         * Is this ClientCursor backed by an aggregation pipeline. Defaults to false.
+         *
+         * Agg Runners differ from others in that they manage their own locking internally and
+         * should not be killed or destroyed when the underlying collection is deleted.
+         *
+         * Note: This should *not* be set for the internal cursor used as input to an aggregation.
+         */
+        bool isAggCursor;
+
         //
         // Cursor-only DEPRECATED methods.
         //

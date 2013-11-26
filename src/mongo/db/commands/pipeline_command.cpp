@@ -47,6 +47,75 @@
 
 namespace mongo {
 
+namespace {
+    /**
+     * This is a Runner implementation backed by an aggregation pipeline.
+     */
+    class PipelineRunner : public Runner {
+    public:
+        PipelineRunner(intrusive_ptr<Pipeline> pipeline)
+            : _pipeline(pipeline)
+        {}
+
+        virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
+            if (!objOut || dlOut)
+                return RUNNER_ERROR;
+
+            if (!_stash.empty()) {
+                *objOut = _stash.back();
+                _stash.pop_back();
+                return RUNNER_ADVANCED;
+            }
+
+            if (boost::optional<Document> next = _pipeline->output()->getNext()) {
+                *objOut = next->toBson();
+                return RUNNER_ADVANCED;
+            }
+
+            return RUNNER_EOF;
+        }
+        virtual bool isEOF() {
+            if (!_stash.empty())
+                return false;
+
+            if (boost::optional<Document> next = _pipeline->output()->getNext()) {
+                _stash.push_back(next->toBson());
+                return false;
+            }
+
+            return true;
+        }
+        virtual const string& ns() {
+            return _pipeline->getContext()->ns.ns();
+        }
+
+        virtual Status getExplainPlan(TypeExplain** explain) const {
+            // This should never get called in practice anyway.
+            return Status(ErrorCodes::InternalError,
+                          "PipelineCursor doesn't implement getExplainPlan");
+        }
+
+        // These are all no-ops for PipelineRunners
+        virtual void setYieldPolicy(YieldPolicy policy) {}
+        virtual void invalidate(const DiskLoc& dl) {}
+        virtual void kill() {}
+        virtual void saveState() {}
+        virtual bool restoreState() { return true; }
+
+        /**
+         * Make obj the next object returned by getNext().
+         */
+        void pushBack(const BSONObj& obj) {
+            _stash.push_back(obj);
+        }
+
+    private:
+        // Things in the _stash sould be returned before pulling items from _pipeline.
+        intrusive_ptr<Pipeline> _pipeline;
+        vector<BSONObj> _stash;
+    };
+}
+
     static bool isCursorCommand(BSONObj cmdObj) {
         BSONElement cursorElem = cmdObj["cursor"];
         if (cursorElem.eoo())
@@ -79,40 +148,39 @@ namespace mongo {
                                     ? batchSizeElem.numberLong()
                                     : 101; // same as query
 
-        // Using limited cursor API that ignores many edge cases. Should be sufficient for commands.
         ClientCursorPin pin(id);
         ClientCursor* cursor = pin.c();
 
         massert(16958, "Cursor shouldn't have been deleted",
                 cursor);
 
-        // Make sure this cursor won't disappear on us
-        fassert(16959, !cursor->c()->shouldDestroyOnNSDeletion());
-        fassert(16960, !cursor->c()->requiresLock());
-
+        verify(cursor->isAggCursor);
+        PipelineRunner* runner = dynamic_cast<PipelineRunner*>(cursor->getRunner());
+        verify(runner);
         try {
             const string cursorNs = cursor->ns(); // we need this after cursor may have been deleted
 
             // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
             BSONArrayBuilder resultsArray;
             const int byteLimit = MaxBytesToReturnToClientAtOnce;
-            for (int objCount = 0; objCount < batchSize && cursor->ok(); objCount++) {
-                BSONObj current = cursor->current();
-                if (resultsArray.len() + current.objsize() > byteLimit)
-                    break; // too big. current will be the first doc in the second batch
+            BSONObj next;
+            for (int objCount = 0; objCount < batchSize; objCount++) {
+                // The initial getNext() on a PipelineRunner may be very expensive so we don't do it
+                // when batchSize is 0 since that indicates a desire for a fast return.
+                if (runner->getNext(&next, NULL) != Runner::RUNNER_ADVANCED) {
+                    pin.deleteUnderlying();
+                    id = 0;
+                    cursor = NULL; // make it an obvious error to use cursor after this point
+                    break;
+                }
 
-                resultsArray.append(current);
-                cursor->advance();
-            }
+                if (resultsArray.len() + next.objsize() > byteLimit) {
+                    // too big. next will be the first doc in the second batch
+                    runner->pushBack(next);
+                    break;
+                }
 
-            // The initial ok() on a cursor may be very expensive so we don't do it when batchSize
-            // is 0 since that indicates a desire for a fast return.
-            if (batchSize != 0 && !cursor->ok()) {
-                // There is no more data. Kill the cursor.
-                pin.release();
-                ClientCursor::erase(id);
-                id = 0;
-                cursor = NULL; // make it an obvious error to use cursor after this point
+                resultsArray.append(next);
             }
 
             if (cursor) {
@@ -129,78 +197,11 @@ namespace mongo {
         }
         catch (...) {
             // Clean up cursor on way out of scope.
-            pin.release();
-            ClientCursor::erase(id);
+            pin.deleteUnderlying();
             throw;
         }
     }
 
-
-    class PipelineCursor : public Cursor {
-    public:
-        PipelineCursor(intrusive_ptr<Pipeline> pipeline)
-            : _pipeline(pipeline)
-            , _started(false)
-            , _done(false)
-        {}
-
-        // "core" cursor protocol
-        virtual bool ok() {
-            if (!_started) {
-                _started = true;
-                getNext();
-            }
-            return !_done;
-        }
-        virtual bool advance() {
-            if (!_started) {
-                _started = true;
-                // skip first result
-                getNext();
-            }
-
-            getNext();
-            return !_done;
-        }
-        virtual BSONObj current() {
-            verify(ok());
-            return _currentObj;
-        }
-
-        virtual bool requiresLock() { return false; }
-        virtual bool shouldDestroyOnNSDeletion() { return false; }
-
-        virtual Record* _current() { return NULL; }
-        virtual DiskLoc currLoc() { return DiskLoc(); }
-        virtual DiskLoc refLoc() { return DiskLoc(); }
-        virtual bool supportGetMore() { return true; }
-        virtual bool supportYields() { return false; } // has wrong semantics
-        virtual bool getsetdup(DiskLoc loc) { return false; } // we don't generate dups
-        virtual bool isMultiKey() const { return false; }
-        virtual bool modifiedKeys() const { return false; }
-        virtual string toString() { return "Aggregate_Cursor"; }
-
-        // These probably won't be needed once aggregation supports it's own explain.
-        virtual long long nscanned() { return 0; }
-        virtual void explainDetails( BSONObjBuilder& b ) { return; }
-    private:
-        const DocumentSource* iterator() const { return _pipeline->output(); }
-        DocumentSource* iterator() { return _pipeline->output(); }
-
-        void getNext() {
-            if (boost::optional<Document> result = iterator()->getNext()) {
-                _currentObj = result->toBson();
-            }
-            else {
-                _done = true;
-            }
-        }
-
-        intrusive_ptr<Pipeline> _pipeline;
-        bool _started;
-        bool _done;
-        BSONObj _currentObj;
-    };
 
     class PipelineCommand :
         public Command {
@@ -271,9 +272,8 @@ namespace mongo {
                 {
                     // Set up cursor
                     Client::ReadContext ctx(ns);
-                    shared_ptr<Cursor> cursor(new PipelineCursor(pPipeline));
-                    // cc will be owned by cursor manager
-                    ClientCursor* cc = new ClientCursor(0, cursor, ns, cmdObj.getOwned());
+                    ClientCursor* cc = new ClientCursor(new PipelineRunner(pPipeline));
+                    cc->isAggCursor = true; // enable special locking and ns deletion behavior
                     id = cc->cursorid();
                 }
 

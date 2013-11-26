@@ -138,8 +138,8 @@ namespace mongo {
         BufBuilder bb(bufSize);
         bb.skip(sizeof(QueryResult));
 
-        // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
-        Client::ReadContext ctx(ns);
+        // This is a read lock.
+        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
 
         QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
 
@@ -184,6 +184,11 @@ namespace mongo {
 
             // TODO: What is pass?
             if (0 == pass) { cc->updateSlaveLocation(curop); }
+
+            if (cc->isAggCursor) {
+                // Agg cursors handle their own locking internally.
+                ctx.reset(); // unlocks
+            }
 
             CollectionMetadataPtr collMetadata = cc->getCollMetadata();
 

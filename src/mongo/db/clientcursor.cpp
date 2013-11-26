@@ -99,6 +99,8 @@ namespace mongo {
         verify( _db );
         verify( _db->ownsNS( _ns ) );
 
+        isAggCursor = false;
+
         _idleAgeMillis = 0;
         _leftoverMaxTimeMicros = 0;
         _pinValue = 0;
@@ -184,6 +186,12 @@ namespace mongo {
         CCById::const_iterator it = clientCursorsById.begin();
         while (it != clientCursorsById.end()) {
             ClientCursor* cc = it->second;
+
+            // Aggregation cursors don't have their lifetime bound to the underlying collection.
+            if (cc->isAggCursor) {
+                ++it;
+                continue;
+            }
 
             // We're only interested in cursors over one db.
             if (cc->_db != db) {
