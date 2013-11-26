@@ -140,24 +140,24 @@ err:	__wt_logrec_free(session, &logrec);
 static int
 __txn_log_file_sync(WT_SESSION_IMPL *session, uint32_t flags, WT_LSN *lsnp)
 {
-	WT_DATA_HANDLE *dhandle;
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_DECL_ITEM(logrec);
-	const char *fmt = WT_UNCHECKED_STRING(ISI);
+	const char *fmt = WT_UNCHECKED_STRING(III);
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_FILE_SYNC;
 	int start;
 
-	dhandle = session->dhandle;
+	btree = S2BT(session);
 	start = LF_ISSET(WT_TXN_LOG_CKPT_START);
 
 	WT_RET(__wt_struct_size(
-	    session, &header_size, fmt, rectype, dhandle->name, start));
+	    session, &header_size, fmt, rectype, btree->id, start));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
 	WT_ERR(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, header_size,
-	    fmt, rectype, dhandle->name, start));
+	    fmt, rectype, btree->id, start));
 	logrec->size += (uint32_t)header_size;
 
 	WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
@@ -357,9 +357,9 @@ __txn_printlog(
 	FILE *out;
 	WT_LSN ckpt_lsn;
 	const uint8_t *end, *p;
-	const char *str;
+	const char *msg;
 	uint64_t txnid;
-	uint32_t rectype;
+	uint32_t fileid, rectype;
 	int32_t start;
 
 	out = cookie;
@@ -395,18 +395,19 @@ __txn_printlog(
 
 	case WT_LOGREC_FILE_SYNC:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
-		    WT_UNCHECKED_STRING(SI), &str, &start));
+		    WT_UNCHECKED_STRING(Ii), &fileid, &start));
 		if (fprintf(out, "    \"type\" : \"file_sync\"\n") < 0 ||
-		    fprintf(out, "    \"name\" : \"%s\"\n", str) < 0 ||
+		    fprintf(out, "    \"fileid\" : %" PRIu32 "\n",
+		    fileid) < 0 ||
 		    fprintf(out, "    \"start\" : %" PRId32 "\n", start) < 0)
 			return (errno);
 		break;
 
 	case WT_LOGREC_MESSAGE:
 		WT_RET(__wt_struct_unpack(session, p, WT_PTRDIFF(end, p),
-		    WT_UNCHECKED_STRING(S), &str));
+		    WT_UNCHECKED_STRING(S), &msg));
 		if (fprintf(out, "    \"type\" : \"message\"\n") < 0 ||
-		    fprintf(out, "    \"message\" : \"%s\"\n", str) < 0)
+		    fprintf(out, "    \"message\" : \"%s\"\n", msg) < 0)
 			return (errno);
 		break;
 	}
