@@ -573,7 +573,7 @@ monitor(void *arg)
 		inserts = sum_insert_ops(cfg);
 		updates = sum_update_ops(cfg);
 
-		assert(clock_gettime(CLOCK_REALTIME, &t) == 0);
+		assert(__wt_epoch(NULL, &t) == 0);
 		tm = localtime_r(&t.tv_sec, &_tm);
 		(void)strftime(buf, sizeof(buf), "%T", tm);
 
