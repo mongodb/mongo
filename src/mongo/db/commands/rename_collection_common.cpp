@@ -50,17 +50,28 @@ namespace rename_collection {
         bool dropTarget = cmdObj["dropTarget"].trueValue();
 
         if (sourceNS.db() == targetNS.db() && !sourceNS.isSystem() && !targetNS.isSystem()) {
-            bool authed1 = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            // If renaming within the same database, then if you have renameCollectionSameDB and
+            // either can read both of source and dest collections or *can't* read either of source
+            // or dest collection, then you get can do the rename, even without insert on the
+            // destination collection.
+            bool canRename = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(sourceNS.db()),
                     ActionType::renameCollectionSameDB);
 
-            bool authed2 = true;
+            bool canDropTargetIfNeeded = true;
             if (dropTarget) {
-                authed2 = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forExactNamespace(targetNS), ActionType::dropCollection);
+                canDropTargetIfNeeded =
+                        client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forExactNamespace(targetNS),
+                            ActionType::dropCollection);
             }
 
-            if (authed1 && authed2) {
+            bool canReadSrc = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
+            bool canReadDest = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(targetNS), ActionType::find);
+
+            if (canRename && canDropTargetIfNeeded && (canReadSrc || !canReadDest)) {
                 return Status::OK();
             }
         }

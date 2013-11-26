@@ -25,7 +25,7 @@ function testProperAuthorization(conn, t, testcase) {
     adminDb.auth("admin", "password");
     assert.commandWorked(adminDb.runCommand({
         updateRole: testRole,
-        privileges: testcase.requiredPrivileges
+        privileges: testcase.privileges
     }));
     adminDb.logout();
 
@@ -36,13 +36,13 @@ function testProperAuthorization(conn, t, testcase) {
     if (!testcase.expectFail && res.ok != 1) {
         out = "command failed with " + tojson(res) +
               " on db " + testcase.runOnDb +
-              " with privileges " + tojson(testcase.requiredPrivileges);
+              " with privileges " + tojson(testcase.privileges);
     }
     else if (testcase.expectFail && res.code == authErrCode) {
             out = "expected authorization success" +
                   " but received " + tojson(res) + 
                   " on db " + testcase.runOnDb +
-                  " with privileges " + tojson(testcase.requiredPrivileges);
+                  " with privileges " + tojson(testcase.privileges);
     }
 
     firstDb.logout();
@@ -50,7 +50,7 @@ function testProperAuthorization(conn, t, testcase) {
     return out;
 }
 
-function testInsufficientPrivilege(conn, t, testcase, privilege) {
+function testInsufficientPrivileges(conn, t, testcase, privileges) {
     var out = "";
 
     var runOnDb = conn.getDB(testcase.runOnDb);
@@ -62,7 +62,7 @@ function testInsufficientPrivilege(conn, t, testcase, privilege) {
     adminDb.auth("admin", "password");
     assert.commandWorked(adminDb.runCommand({
         updateRole: testRole,
-        privileges: [ privilege ]
+        privileges: privileges
     }));
     adminDb.logout();
 
@@ -73,7 +73,7 @@ function testInsufficientPrivilege(conn, t, testcase, privilege) {
     if (res.ok == 1 || res.code != authErrCode) {
         out = "expected authorization failure " +
               " but received " + tojson(res) +
-              " with privilege " + tojson(privilege);
+              " with privileges " + tojson(privileges);
     }
 
     firstDb.logout();
@@ -87,13 +87,22 @@ function runOneTest(conn, t) {
 
     for (var i = 0; i < t.testcases.length; i++) {
         var testcase = t.testcases[i];
-        var privileges = testcase.requiredPrivileges;
+        var privileges = testcase.privileges;
 
-        if (!("requiredPrivileges" in testcase)) {
+        if (!("privileges" in testcase)) {
             continue;
         }
-        else if ((privileges.length == 1 && privileges[0].actions.length > 1)
-                 || privileges.length > 1) {
+
+        if (testcase.expectAuthzFailure) {
+            msg = testInsufficientPrivileges(conn, t, testcase, testcase.privileges);
+            if (msg) {
+                failures.push(t.testname + ": " + msg);
+            }
+            continue;
+        }
+
+        if ((privileges.length == 1 && privileges[0].actions.length > 1)
+            || privileges.length > 1) {
             for (var j = 0; j < privileges.length; j++) {
                 var p = privileges[j];
                 var resource = p.resource;
@@ -101,7 +110,7 @@ function runOneTest(conn, t) {
 
                 for (var k = 0; k < actions.length; k++) {
                     var privDoc = { resource: resource, actions: [actions[k]] };
-                    msg = testInsufficientPrivilege(conn, t, testcase, privDoc);
+                    msg = testInsufficientPrivileges(conn, t, testcase, [privDoc]);
                     if (msg) {
                         failures.push(t.testname + ": " + msg);
                     }
@@ -115,7 +124,7 @@ function runOneTest(conn, t) {
         }
 
         // test resource pattern where collection is ""
-        testcase.requiredPrivileges.forEach(function(j) {
+        testcase.privileges.forEach(function(j) {
             if (j.resource.collection) {
                 j.resource.collection = "";
             }
@@ -126,7 +135,7 @@ function runOneTest(conn, t) {
         }
 
         // test resource pattern where database is ""
-        testcase.requiredPrivileges.forEach(function(j) {
+        testcase.privileges.forEach(function(j) {
             if (j.resource.db) {
                 j.resource.db = "";
             }
