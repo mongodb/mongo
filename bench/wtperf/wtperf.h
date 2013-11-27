@@ -56,8 +56,7 @@ struct __config {			/* Configuration struction */
 
 	FILE *logf;			/* Logging handle */
 
-	CONFIG_THREAD *ckptthreads,
-	    *ithreads, *popthreads, *rthreads, *uthreads;
+	CONFIG_THREAD *ckptthreads, *popthreads, *workers;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT

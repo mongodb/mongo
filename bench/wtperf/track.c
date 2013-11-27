@@ -28,38 +28,6 @@
 #include "wtperf.h"
 
 /*
- * Return total operations count for a group of threads.
- */
-static uint64_t
-sum_ops(CONFIG *cfg, size_t field_offset)
-{
-	CONFIG_THREAD *thread;
-	uint64_t total;
-	u_int i;
-
-	total = 0;
-
-	for (i = 0, thread = cfg->ckptthreads;
-	    thread != NULL && i < cfg->checkpoint_threads;
-	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
-	for (i = 0, thread = cfg->ithreads;
-	    thread != NULL && i < cfg->insert_threads;
-	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
-	for (i = 0, thread = cfg->rthreads;
-	    thread != NULL && i < cfg->read_threads;
-	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
-	for (i = 0, thread = cfg->uthreads;
-	    thread != NULL && i < cfg->update_threads;
-	    ++i, ++thread)
-		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
-
-	return (total);
-}
-
-/*
  * Return total insert operations for the populate phase.
  */
 uint64_t
@@ -77,10 +45,42 @@ sum_pop_ops(CONFIG *cfg)
 	return (total);
 }
 
+/*
+ * Return total checkpoint operations.
+ */
 uint64_t
 sum_ckpt_ops(CONFIG *cfg)
 {
-	return (sum_ops(cfg, offsetof(CONFIG_THREAD, ckpt)));
+	CONFIG_THREAD *thread;
+	uint64_t total;
+	u_int i;
+
+	total = 0;
+
+	for (i = 0, thread = cfg->ckptthreads;
+	    thread != NULL && i < cfg->checkpoint_threads; ++i, ++thread)
+		total += thread->ckpt.ops;
+	return (total);
+}
+
+/*
+ * Return total operations count for the worker threads.
+ */
+static uint64_t
+sum_ops(CONFIG *cfg, size_t field_offset)
+{
+	CONFIG_THREAD *thread;
+	uint64_t total;
+	u_int i, num;
+
+	total = 0;
+
+	num = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+	for (i = 0, thread = cfg->workers;
+	    thread != NULL && i < num; ++i, ++thread)
+		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
+
+	return (total);
 }
 uint64_t
 sum_insert_ops(CONFIG *cfg)
@@ -111,47 +111,15 @@ latency_op(CONFIG *cfg,
 	TRACK *track;
 	uint64_t ops, latency, tmp;
 	uint32_t max, min;
-	u_int i;
+	u_int i, num;
 
 	ops = latency = 0;
 	max = 0;
 	min = UINT32_MAX;
-	for (i = 0, thread = cfg->ithreads;
-	    thread != NULL && i < cfg->insert_threads; ++i, ++thread) {
-		track = (TRACK *)((uint8_t *)thread + field_offset);
-		tmp = track->ops;
-		ops += tmp - track->last_ops;
-		track->last_ops = tmp;
-		tmp = track->latency;
-		latency += tmp - track->last_latency;
-		track->last_latency = tmp;
 
-		if (min > track->min_latency)
-			min = track->min_latency;
-		track->min_latency = UINT32_MAX;
-		if (max < track->max_latency)
-			max = track->max_latency;
-		track->max_latency = 0;
-	}
-	for (i = 0, thread = cfg->rthreads;
-	    thread != NULL && i < cfg->read_threads; ++i, ++thread) {
-		track = (TRACK *)((uint8_t *)thread + field_offset);
-		tmp = track->ops;
-		ops += tmp - track->last_ops;
-		track->last_ops = tmp;
-		tmp = track->latency;
-		latency += tmp - track->last_latency;
-		track->last_latency = tmp;
-
-		if (min > track->min_latency)
-			min = track->min_latency;
-		track->min_latency = UINT32_MAX;
-		if (max < track->max_latency)
-			max = track->max_latency;
-		track->max_latency = 0;
-	}
-	for (i = 0, thread = cfg->uthreads;
-	    thread != NULL && i < cfg->update_threads; ++i, ++thread) {
+	num = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+	for (i = 0, thread = cfg->workers;
+	    thread != NULL && i < num; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
 		tmp = track->ops;
 		ops += tmp - track->last_ops;
@@ -176,7 +144,6 @@ latency_op(CONFIG *cfg,
 		*avgp = (uint32_t)(latency / ops);
 	}
 }
-
 void
 latency_read(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
@@ -198,7 +165,6 @@ latency_read(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 		last_max = *maxp;
 	}
 }
-
 void
 latency_insert(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
@@ -220,7 +186,6 @@ latency_insert(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 		last_max = *maxp;
 	}
 }
-
 void
 latency_update(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
@@ -244,32 +209,6 @@ latency_update(CONFIG *cfg, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 }
 
 /*
- * sum_latency_thread --
- *	Sum latency for a single thread.
- */
-static void
-sum_latency_thread(CONFIG_THREAD *thread, size_t field_offset, TRACK *total)
-{
-	TRACK *trk;
-	u_int i;
-
-	trk = (TRACK *)((uint8_t *)thread + field_offset);
-
-	for (i = 0; i < ELEMENTS(trk->us); ++i) {
-		total->ops += trk->us[i];
-		total->us[i] += trk->us[i];
-	}
-	for (i = 0; i < ELEMENTS(trk->ms); ++i) {
-		total->ops += trk->ms[i];
-		total->ms[i] += trk->ms[i];
-	}
-	for (i = 0; i < ELEMENTS(trk->sec); ++i) {
-		total->ops += trk->sec[i];
-		total->sec[i] += trk->sec[i];
-	}
-}
-
-/*
  * sum_latency --
  *	Sum latency for a set of threads.
  */
@@ -277,33 +216,40 @@ static void
 sum_latency(CONFIG *cfg, size_t field_offset, TRACK *total)
 {
 	CONFIG_THREAD *thread;
-	u_int i;
+	TRACK *trk;
+	u_int i, j, num;
 
 	memset(total, 0, sizeof(*total));
 
-	for (i = 0, thread = cfg->ithreads;
-	    thread != NULL && i < cfg->insert_threads; ++i, ++thread)
-		sum_latency_thread(thread, field_offset, total);
-	for (i = 0, thread = cfg->rthreads;
-	    thread != NULL && i < cfg->read_threads; ++i, ++thread)
-		sum_latency_thread(thread, field_offset, total);
-	for (i = 0, thread = cfg->uthreads;
-	    thread != NULL && i < cfg->update_threads; ++i, ++thread)
-		sum_latency_thread(thread, field_offset, total);
-}
+	num = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+	for (i = 0, thread = cfg->workers;
+	    thread != NULL && i < num; ++i, ++thread) {
+		trk = (TRACK *)((uint8_t *)thread + field_offset);
 
+		for (j = 0; j < ELEMENTS(trk->us); ++j) {
+			total->ops += trk->us[j];
+			total->us[j] += trk->us[j];
+		}
+		for (j = 0; j < ELEMENTS(trk->ms); ++j) {
+			total->ops += trk->ms[j];
+			total->ms[j] += trk->ms[j];
+		}
+		for (j = 0; j < ELEMENTS(trk->sec); ++j) {
+			total->ops += trk->sec[j];
+			total->sec[j] += trk->sec[j];
+		}
+	}
+}
 static void
 sum_insert_latency(CONFIG *cfg, TRACK *total)
 {
 	sum_latency(cfg, offsetof(CONFIG_THREAD, insert), total);
 }
-
 static void
 sum_read_latency(CONFIG *cfg, TRACK *total)
 {
 	sum_latency(cfg, offsetof(CONFIG_THREAD, read), total);
 }
-
 static void
 sum_update_latency(CONFIG *cfg, TRACK *total)
 {

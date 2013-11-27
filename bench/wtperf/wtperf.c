@@ -33,7 +33,7 @@ static const CONFIG default_cfg = {
 	NULL,				/* uri */
 	NULL,				/* conn */
 	NULL,				/* logf */
-	NULL, NULL, NULL, NULL, NULL,	/* threads */
+	NULL, NULL, NULL,		/* threads */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -107,7 +107,7 @@ static void	*monitor(void *);
 static void	*populate_thread(void *);
 static void	*read_thread(void *);
 static int	 start_threads(
-		    CONFIG *, u_int, CONFIG_THREAD **, void *(*func)(void *));
+		    CONFIG *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*update_thread(void *);
 static void	 worker(CONFIG_THREAD *);
@@ -719,10 +719,14 @@ execute_populate(CONFIG *cfg)
 	lprintf(cfg, 0, 1,
 	    "Starting %" PRIu32 " populate thread(s)", cfg->populate_threads);
 
-	g_insert_key = 0;
+	if ((cfg->popthreads =
+	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
+		return (enomem(cfg));
 	if ((ret = start_threads(cfg,
-	    cfg->populate_threads, &cfg->popthreads, populate_thread)) != 0)
+	    cfg->popthreads, cfg->populate_threads, populate_thread)) != 0)
 		return (ret);
+
+	g_insert_key = 0;
 
 	assert(gettimeofday(&start, NULL) == 0);
 	for (elapsed = 0, interval = 0, last_ops = 0;
@@ -810,25 +814,25 @@ execute_workload(CONFIG *cfg)
 	/* Schedule run-mix operations, as necessary. */
 	if (cfg->run_mix_inserts != 0 || cfg->run_mix_updates != 0)
 		run_mix_schedule(cfg);
-
-	if (cfg->read_threads != 0 && (tret = start_threads(
-	    cfg, cfg->read_threads, &cfg->rthreads, read_thread)) != 0 &&
-	    ret == 0) {
-		ret = tret;
+	
+	/* Start the worker threads. */
+	if ((cfg->workers = calloc(
+	    cfg->read_threads + cfg->insert_threads + cfg->update_threads,
+	    sizeof(CONFIG_THREAD))) == NULL) {
+		ret = enomem(cfg);
 		goto err;
 	}
-	if (cfg->insert_threads != 0 && (tret = start_threads(
-	    cfg, cfg->insert_threads, &cfg->ithreads, insert_thread)) != 0 &&
-	    ret == 0) {
-		ret = tret;
+	if ((ret = start_threads(cfg,
+	    &cfg->workers[0], cfg->read_threads, read_thread)) != 0)
 		goto err;
-	}
-	if (cfg->update_threads != 0 && (tret = start_threads(
-	    cfg, cfg->update_threads, &cfg->uthreads, update_thread)) != 0 &&
-	    ret == 0) {
-		ret = tret;
+	if ((ret = start_threads(cfg,
+	    &cfg->workers[cfg->read_threads],
+	    cfg->insert_threads, insert_thread)) != 0)
 		goto err;
-	}
+	if ((ret = start_threads(cfg,
+	    &cfg->workers[cfg->read_threads + cfg->insert_threads],
+	    cfg->update_threads, update_thread)) != 0)
+		goto err;
 
 	for (interval = cfg->report_interval,
 	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
@@ -875,19 +879,9 @@ execute_workload(CONFIG *cfg)
 		last_ckpts = g_ckpt_ops;
 	}
 
-err:	g_stop = 1;
-	if (cfg->read_threads != 0 && (tret =
-	    stop_threads(cfg, cfg->read_threads, cfg->rthreads)) != 0 &&
-	    ret == 0)
-		ret = tret;
-	if (cfg->insert_threads != 0 && (tret =
-	    stop_threads(cfg, cfg->insert_threads, cfg->ithreads)) != 0 &&
-	    ret == 0)
-		ret = tret;
-
-	if (cfg->update_threads != 0 && (tret =
-	    stop_threads(cfg, cfg->update_threads, cfg->uthreads)) != 0 &&
-	    ret == 0)
+err:	if ((tret = stop_threads(cfg,
+	    cfg->read_threads + cfg->insert_threads + cfg->update_threads,
+	    cfg->workers)) != 0 && ret == 0)
 		ret = tret;
 
 	/* Report if any worker threads didn't finish. */
@@ -1171,8 +1165,14 @@ main(int argc, char *argv[])
 			lprintf(cfg, 0, 1,
 			    "Starting %" PRIu32 " checkpoint thread(s)",
 			    cfg->checkpoint_threads);
-			if (start_threads(cfg, cfg->checkpoint_threads,
-			    &cfg->ckptthreads, checkpoint_worker) != 0)
+			if ((cfg->ckptthreads =
+			    calloc(cfg->checkpoint_threads,
+			    sizeof(CONFIG_THREAD))) == NULL) {
+				ret = enomem(cfg);
+				goto err;
+			}
+			if (start_threads(cfg, cfg->ckptthreads, 
+			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
 		}
 					/* Execute the workload. */
@@ -1209,8 +1209,7 @@ err:		if (ret == 0)
 	}
 	g_stop = 1;
 
-	if (cfg->checkpoint_threads != 0 &&
-	    (tret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
+	if ((tret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
 			ret = tret;
 
@@ -1249,16 +1248,12 @@ err:		if (ret == 0)
 
 static int
 start_threads(
-    CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp, void *(*func)(void *))
+    CONFIG *cfg, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
 {
-	CONFIG_THREAD *thread;
 	u_int i;
 	int ret;
 
-	if ((*threadsp = calloc(num, sizeof(CONFIG_THREAD))) == NULL)
-		return (enomem(cfg));
-
-	for (i = 0, thread = *threadsp; i < num; ++i, ++thread) {
+	for (i = 0; i < num; ++i, ++thread) {
 		thread->cfg = cfg;
 
 		/*
@@ -1297,7 +1292,7 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	u_int i;
 	int ret;
 
-	if (threads == NULL)
+	if (num == 0 || threads == NULL)
 		return (0);
 
 	for (i = 0; i < num; ++i, ++threads)
