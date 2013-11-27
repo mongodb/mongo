@@ -86,7 +86,7 @@ static uint64_t g_update_ops;		/* update operations */
 static uint64_t g_insert_key;		/* insert key */
 
 static volatile int g_ckpt;		/* checkpoint in progress */
-static volatile int g_error;		/* worker thread error */
+static volatile int g_error;		/* thread error */
 static volatile int g_stop;		/* notify threads to stop */
 
 /*
@@ -236,8 +236,7 @@ worker(CONFIG_THREAD *thread)
 				continue;
 			break;
 		default:
-			ret = EINVAL;
-			goto err;
+			goto err;		/* can't happen */
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
@@ -306,8 +305,7 @@ op_err:			lprintf(cfg, ret, 0,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
 			goto err;
 		default:
-			ret = EINVAL;
-			goto err;
+			goto err;		/* can't happen */
 		}
 
 		++trk->ops;		/* increment operation counts */
@@ -341,9 +339,10 @@ op_err:			lprintf(cfg, ret, 0,
 		t = tmp;
 	}
 
-	/* To ensure managing thread knows if we exited early. */
-err:	if (ret != 0)
-		g_error = 1;
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		g_error = g_stop = 1;
+	}
 
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
@@ -542,9 +541,11 @@ populate_thread(void *arg)
 			    "Fail committing, transaction was aborted");
 	}
 
-	/* To ensure managing thread knows if we exited early. */
-err:	if (ret != 0)
-		g_error = 1;
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		g_error = g_stop = 1;
+	}
+
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
 	return (NULL);
@@ -638,9 +639,11 @@ monitor(void *arg)
 		last_updates = updates;
 	}
 
+	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = 1;
+err:		g_error = g_stop = 1;
 	}
+
 	if (fp != NULL)
 		(void)fclose(fp);
 	free(path);
@@ -696,13 +699,13 @@ checkpoint_worker(void *arg)
 		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
 	}
 
+	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = 1;
+err:		g_error = g_stop = 1;
 	}
 
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
-
 	return (NULL);
 }
 
