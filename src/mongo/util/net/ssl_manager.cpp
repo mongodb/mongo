@@ -217,7 +217,7 @@ namespace mongo {
              * Given an error code from an SSL-type IO function, logs an
              * appropriate message and throws a SocketException
              */
-            MONGO_COMPILER_NORETURN void _handleSSLError(int code);
+            MONGO_COMPILER_NORETURN void _handleSSLError(int code, int ret);
 
             /*
              * Init the SSL context using parameters provided in params.
@@ -456,7 +456,7 @@ namespace mongo {
         } while(!_doneWithSSLOp(conn, status)); 
  
         if (status <= 0)
-            _handleSSLError(SSL_get_error(conn, status));
+            _handleSSLError(SSL_get_error(conn, status), status);
         return status;
     }
 
@@ -467,7 +467,7 @@ namespace mongo {
         } while(!_doneWithSSLOp(conn, status));
  
         if (status <= 0)
-            _handleSSLError(SSL_get_error(conn, status));
+            _handleSSLError(SSL_get_error(conn, status), status);
         return status;
     }
 
@@ -490,7 +490,7 @@ namespace mongo {
         } while(!_doneWithSSLOp(conn, status));
  
         if (status < 0)
-            _handleSSLError(SSL_get_error(conn, status));
+            _handleSSLError(SSL_get_error(conn, status), status);
         return status;
     }
 
@@ -741,7 +741,7 @@ namespace mongo {
         } while(!_doneWithSSLOp(sslConn, ret));
  
         if (ret != 1)
-            _handleSSLError(SSL_get_error(sslConn, ret));
+            _handleSSLError(SSL_get_error(sslConn, ret), ret);
  
         sslGuard.Dismiss();
         bioGuard.Dismiss();
@@ -759,7 +759,7 @@ namespace mongo {
         } while(!_doneWithSSLOp(sslConn, ret));
  
         if (ret != 1)
-            _handleSSLError(SSL_get_error(sslConn, ret));
+            _handleSSLError(SSL_get_error(sslConn, ret), ret);
  
         sslGuard.Dismiss();
         bioGuard.Dismiss();
@@ -884,8 +884,8 @@ namespace mongo {
         return msg;
     }
 
-    void SSLManager::_handleSSLError(int code) {
-        int ret = ERR_get_error();
+    void SSLManager::_handleSSLError(int code, int ret) {
+        int err = ERR_get_error();
         
         switch (code) {
         case SSL_ERROR_WANT_READ:
@@ -898,13 +898,25 @@ namespace mongo {
             break;
 
         case SSL_ERROR_ZERO_RETURN: 
-        case SSL_ERROR_SYSCALL:
-            LOG(3) << "SSL network connection closed"; 
+            // TODO: Check if we can avoid throwing an exception for this condition
+            LOG(3) << "SSL network connection closed";
             break;
-
+        case SSL_ERROR_SYSCALL:
+            // If ERR_get_error returned 0, the error queue is empty
+            // check the return value of the actual SSL operation
+            if (err != 0) {
+                error() << "SSL: " << getSSLErrorMessage(err);
+            }
+            else if (ret == 0) {
+                error() << "Unexpected EOF encountered during SSL communication";
+            }
+            else {
+                error() << "The SSL BIO reported an I/O error " << errnoWithDescription();
+            }
+            break;
         case SSL_ERROR_SSL:
         {
-            error() << "SSL: " << getSSLErrorMessage(ret);
+            error() << "SSL: " << getSSLErrorMessage(err);
             break;
         }
         
