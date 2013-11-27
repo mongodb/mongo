@@ -408,6 +408,15 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
 
+        // $regex does not with numbers
+        query = BSON( "x" << BSON( "$regex" << 123 ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
+        query = BSON( "x" << BSON( "$regex" << BSON_ARRAY("abc") ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
         query = BSON( "x" << BSON( "$optionas" << "i" ) );
         result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
