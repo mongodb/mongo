@@ -186,7 +186,7 @@ worker(CONFIG_THREAD *thread)
 	uint32_t aggregated;
 	int ret;
 	uint8_t last_op, *op, *op_end;
-	char *data_buf, *key_buf, *value;
+	char *value_buf, *key_buf, *value;
 
 	cfg = thread->cfg;
 	conn = cfg->conn;
@@ -204,7 +204,7 @@ worker(CONFIG_THREAD *thread)
 	}
 
 	key_buf = thread->key_buf;
-	data_buf = thread->data_buf;
+	value_buf = thread->value_buf;
 
 	op = thread->schedule;
 	op_end = thread->schedule + sizeof(thread->schedule);
@@ -266,7 +266,7 @@ worker(CONFIG_THREAD *thread)
 
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
-			cursor->set_value(cursor, data_buf);
+			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) == 0) {
 				trk = &thread->insert;
 				break;
@@ -275,12 +275,12 @@ worker(CONFIG_THREAD *thread)
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
 				assert(cursor->get_value(cursor, &value) == 0);
-				memcpy(data_buf, value, cfg->data_sz);
-				if (data_buf[0] == 'a')
-					data_buf[0] = 'b';
+				memcpy(value_buf, value, cfg->data_sz);
+				if (value_buf[0] == 'a')
+					value_buf[0] = 'b';
 				else
-					data_buf[0] = 'a';
-				cursor->set_value(cursor, data_buf);
+					value_buf[0] = 'a';
+				cursor->set_value(cursor, value_buf);
 				if ((ret = cursor->update(cursor)) == 0) {
 					trk = &thread->update;
 					break;
@@ -466,7 +466,7 @@ populate_thread(void *arg)
 	uint32_t opcount;
 	uint64_t op;
 	int intxn, ret;
-	char *data_buf, *key_buf;
+	char *value_buf, *key_buf;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -475,7 +475,7 @@ populate_thread(void *arg)
 	ret = 0;
 
 	key_buf = thread->key_buf;
-	data_buf = thread->data_buf;
+	value_buf = thread->value_buf;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
@@ -498,7 +498,7 @@ populate_thread(void *arg)
 
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 			cursor->set_key(cursor, key_buf);
-			cursor->set_value(cursor, data_buf);
+			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
@@ -518,7 +518,7 @@ populate_thread(void *arg)
 			}
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 			cursor->set_key(cursor, key_buf);
-			cursor->set_value(cursor, data_buf);
+			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
@@ -1286,9 +1286,9 @@ start_threads(
 		 */
 		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->data_buf = calloc(cfg->data_sz, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->data_sz, 1)) == NULL)
 			return (enomem(cfg));
-		memset(thread->data_buf, 'a', cfg->data_sz - 1);
+		memset(thread->value_buf, 'a', cfg->data_sz - 1);
 
 		/*
 		 * Every thread gets tracking information and is initialized
@@ -1318,11 +1318,17 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	if (num == 0 || threads == NULL)
 		return (0);
 
-	for (i = 0; i < num; ++i, ++threads)
+	for (i = 0; i < num; ++i, ++threads) {
 		if ((ret = pthread_join(threads->handle, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
 			return (ret);
 		}
+
+		free(threads->key_buf);
+		threads->key_buf = NULL;
+		free(threads->value_buf);
+		threads->value_buf = NULL;
+	}
 
 	/*
 	 * We don't free the thread structures or any memory referenced, or NULL

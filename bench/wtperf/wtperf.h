@@ -136,7 +136,7 @@ struct __config_thread {		/* Per-thread structure */
 
 	pthread_t handle;		/* Handle */
 
-	char *key_buf, *data_buf;	/* Key/data memory */
+	char *key_buf, *value_buf;	/* Key/value memory */
 
 #define	WORKER_READ		1	/* Read */
 #define	WORKER_INSERT		2	/* Insert */
