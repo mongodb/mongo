@@ -87,7 +87,7 @@ static uint64_t g_insert_key;		/* insert key */
 
 static volatile int g_ckpt;		/* checkpoint in progress */
 static volatile int g_error;		/* worker thread error */
-static volatile int g_stop;		/* quit running */
+static volatile int g_stop;		/* Notify threads to stop */
 
 /*
  * Atomic update where needed.
@@ -1207,8 +1207,6 @@ einval:		ret = EINVAL;
 err:		if (ret == 0)
 			ret = EXIT_FAILURE;
 	}
-	g_stop = 1;
-
 	if ((tret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
 			ret = tret;
@@ -1295,11 +1293,17 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	if (num == 0 || threads == NULL)
 		return (0);
 
+	/* Notify threads that they are done. */
+	g_stop = 1;
+
 	for (i = 0; i < num; ++i, ++threads)
 		if ((ret = pthread_join(threads->handle, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
 			return (ret);
 		}
+
+	/* Reset the stop flag so the next phase can start. */
+	g_stop = 0;
 
 	/*
 	 * We don't free the thread structures or any memory referenced, or NULL
