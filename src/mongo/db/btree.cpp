@@ -45,6 +45,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/server.h"
 #include "mongo/util/startup_test.h"
@@ -1253,10 +1254,7 @@ namespace mongo {
         const Ordering ord = Ordering::make(id.keyPattern());
         DiskLoc loc = locate(id, thisLoc, key, ord, pos, found, recordLoc, 1);
         if ( found ) {
-            if ( key.objsize() > this->KeyMax ) {
-                OCCASIONALLY problem() << "unindex: key too large to index but was found for " << id.indexNamespace() << " reIndex suggested" << endl;
-            }            
-            loc.btreemod<V>()->delKeyAtPos(loc, id, pos, ord);            
+            loc.btreemod<V>()->delKeyAtPos(loc, id, pos, ord);
             return true;
         }
         return false;
@@ -1719,8 +1717,13 @@ namespace mongo {
                              const Key& key, const Ordering &order, bool dupsAllowed,
                              const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
         if ( key.dataSize() > this->KeyMax ) {
-            problem() << "ERROR: key too large len:" << key.dataSize() << " max:" << this->KeyMax << ' ' << key.dataSize() << ' ' << idx.indexNamespace() << endl;
-            return 2;
+            string msg = str::stream() << "ERROR: key too large len:" << key.dataSize()
+                                       << " max:" << this->KeyMax << ' ' << key.dataSize()
+                                       << ' ' << idx.indexNamespace();
+            problem() << msg << endl;
+            if ( isMaster( NULL ) ) {
+                uasserted( 17281, msg );
+            }
         }
         verify( key.dataSize() > 0 );
 
@@ -1798,11 +1801,16 @@ namespace mongo {
         guessIncreasing = _key.firstElementType() == jstOID && idx.isIdIndex();
         KeyOwned key(_key);
 
-        dassert(toplevel); 
+        dassert(toplevel);
         if ( toplevel ) {
             if ( key.dataSize() > this->KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() << ' ' << key.dataSize() << ' ' << key.toString() << endl;
-                return 3;
+                string msg = str::stream() << "Btree::insert: key too large to index, failing "
+                                           << idx.indexNamespace() << ' ' << key.dataSize() << ' '
+                                           << key.toString();
+                problem() << msg << endl;
+                if ( isMaster( NULL ) ) {
+                    uasserted( 17280, msg );
+                }
             }
         }
 

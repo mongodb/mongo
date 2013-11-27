@@ -37,6 +37,7 @@ assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
 // Single insert, with error.
 opCounters = db.serverStatus().opcounters;
 t.insert({_id:0})
+print( db.getLastError() )
 assert(db.getLastError());
 assert.eq(opCounters.insert + (isMongos ? 1 : 0), db.serverStatus().opcounters.insert);
 

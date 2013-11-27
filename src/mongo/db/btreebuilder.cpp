@@ -42,6 +42,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
@@ -80,8 +81,13 @@ namespace mongo {
 
         auto_ptr< KeyOwned > key( new KeyOwned(_key) );
         if ( key->dataSize() > BtreeBucket<V>::KeyMax ) {
-            problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace() 
-                      << ' ' << key->dataSize() << ' ' << key->toString() << endl;
+            string msg = str::stream() << "Btree::insert: key too large to index, failing "
+                                       << idx.indexNamespace()
+                                       << ' ' << key->dataSize() << ' ' << key->toString();
+            problem() << msg << endl;
+            if ( isMaster( NULL ) ) {
+                uasserted( 17282, msg );
+            }
             return;
         }
 

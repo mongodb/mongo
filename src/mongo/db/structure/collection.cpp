@@ -161,7 +161,7 @@ namespace mongo {
 
             // normal case -- we can roll back
             deleteDocument( loc.getValue(), false, true, NULL );
-            throw;
+            return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
         }
 
         // TODO: this is what the old code did, but is it correct?
@@ -251,7 +251,7 @@ namespace mongo {
         }
 
         if ( oldRecord->netLength() < objNew.objsize() ) {
-            // doesn't fit.  reallocate -----------------------------------------------------
+            // doesn't fit, have to move to new location
 
             if ( _details->isCapped() )
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
@@ -260,7 +260,11 @@ namespace mongo {
 
             moveCounter.increment();
             _details->paddingTooSmall();
-            deleteDocument( oldLocation );
+
+            // unindex old record, don't delete
+            // this way, if inserting new doc fails, we can re-index this one
+            ClientCursor::aboutToDelete(_ns.ns(), _details, oldLocation);
+            _indexCatalog.unindexRecord( objOld, oldLocation, true );
 
             if ( debug ) {
                 if (debug->nmoved == -1) // default of -1 rather than 0
@@ -269,7 +273,19 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            return insertDocument( objNew, enforceQuota );
+            StatusWith<DiskLoc> loc = insertDocument( objNew, enforceQuota );
+
+            if ( loc.isOK() ) {
+                // insert successful, now lets deallocate the old location
+                // remmeber its already unindexed
+                _recordStore.deallocRecord( oldLocation, oldRecord );
+            }
+            else {
+                // new doc insert failed, so lets re-index the old document and location
+                _indexCatalog.indexRecord( objOld, oldLocation );
+            }
+
+            return loc;
         }
 
         _infoCache.notifyOfWriteOp();

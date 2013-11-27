@@ -611,7 +611,8 @@ namespace mongo {
         Collection* collection = getCollection( _namespacesName );
         if ( !collection )
             collection = createCollection( _namespacesName );
-        collection->insertDocument( obj, false );
+        StatusWith<DiskLoc> loc = collection->insertDocument( obj, false );
+        uassertStatusOK( loc.getStatus() );
     }
 
     Status Database::_dropNS( const StringData& ns ) {

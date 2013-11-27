@@ -12,17 +12,19 @@ function makeNestObj(depth){
 
 t = db.objNestTest;
 t.drop();
+
 t.ensureIndex({a:1});
 
-nestedObj = makeNestObj(300);
+n = 1;
+while ( true ) {
+    var before = t.count();
+    t.insert( { _id : n, a : makeNestObj(n) } );
+    var after = t.count();
+    if ( before == after )
+        break;
+    n++;
+}
 
-t.insert( { tst : "test1", a : nestedObj }, true );
-t.insert( { tst : "test2", a : nestedObj }, true );
-t.insert( { tst : "test3", a : nestedObj }, true );
+assert( n > 30, "not enough n: " + n );
 
-assert.eq(3, t.count(), "records in collection");
-assert.eq(1, t.find({tst : "test2"}).count(), "find test");
-
-//make sure index insertion failed (nesting must be large enough)
-assert.eq(0, t.find().hint({a:1}).explain().n, "index not empty");
-print("Test succeeded!")
+assert.eq( t.count(), t.find( { _id : { $gt : 0 } } ).hint( { a : 1 } ).itcount() );

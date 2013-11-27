@@ -10,7 +10,7 @@ for( i = 0; i < 100; ++i ) {
 }
 
 for( i = 0; i < 40; ++i ) {
-    t.save( {a:big} );
+    t.save( {a:0,x:big} );
 }
 
 function memoryException( sortSpec, querySpec ) {
@@ -45,9 +45,13 @@ memoryException( {b:1} );
 noMemoryException( {_id:1} );
 noMemoryException( {$natural:1} );
 
+assert.eq( 1, t.getIndexes().length );
+
 t.ensureIndex( {a:1} );
 t.ensureIndex( {b:1} );
 t.ensureIndex( {c:1} );
+
+assert.eq( 4, t.getIndexes().length );
 
 // These sorts are now indexed.
 noMemoryException( {a:1} );
