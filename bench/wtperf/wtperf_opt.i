@@ -83,12 +83,12 @@ DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
-DEF_OPT_AS_UINT32(data_sz, 100, "data item size")
+DEF_OPT_AS_UINT32(value_sz, 100, "value size")
 DEF_OPT_AS_UINT32(icount, 5000, "number of records to initially populate")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
-DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
+DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_UINT32(latency_aggregate, 50,
     "maximum identical operations to aggregate when measuring latency")
 DEF_OPT_AS_INT(merge_sleep, 0,

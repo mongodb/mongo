@@ -44,7 +44,7 @@ static const char * const small_config_str =
     "conn_config=\"cache_size=500MB\","
     "table_config=\"lsm_chunk_size=5MB\","
     "icount=500000,"
-    "data_sz=100,"
+    "value_sz=100,"
     "key_sz=20,"
     "report_interval=5,"
     "run_time=20,"
@@ -55,7 +55,7 @@ static const char * const med_config_str =
     "conn_config=\"cache_size=1GB\","
     "table_config=\"lsm_chunk_size=20MB\","
     "icount=50000000,"
-    "data_sz=100,"
+    "value_sz=100,"
     "key_sz=20,"
     "report_interval=5,"
     "run_time=100,"
@@ -66,7 +66,7 @@ static const char * const large_config_str =
     "conn_config=\"cache_size=2GB\","
     "table_config=\"lsm_chunk_size=50MB\","
     "icount=500000000,"
-    "data_sz=100,"
+    "value_sz=100,"
     "key_sz=20,"
     "report_interval=5,"
     "run_time=600,"
@@ -275,7 +275,7 @@ worker(CONFIG_THREAD *thread)
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
 				assert(cursor->get_value(cursor, &value) == 0);
-				memcpy(value_buf, value, cfg->data_sz);
+				memcpy(value_buf, value, cfg->value_sz);
 				if (value_buf[0] == 'a')
 					value_buf[0] = 'b';
 				else
@@ -1286,9 +1286,9 @@ start_threads(
 		 */
 		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->value_buf = calloc(cfg->data_sz, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
-		memset(thread->value_buf, 'a', cfg->data_sz - 1);
+		memset(thread->value_buf, 'a', cfg->value_sz - 1);
 
 		/*
 		 * Every thread gets tracking information and is initialized
