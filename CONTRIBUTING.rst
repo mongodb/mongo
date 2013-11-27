@@ -39,6 +39,22 @@ your solution will take.
 .. _SERVER project: https://jira.mongodb.org/browse/SERVER
 
 
+The Life Cycle of a Pull Request
+--------------------------------
+
+When you submit a pull request, here is what happens:
+
+- The MongoDB engineering team will review your pull request to make sure you have included a
+  SERVER ticket in your request and signed the contributor agreement.
+- You should receive a response from one of our engineers with additional questions about your
+  contributions.
+- If your pull request matches a ticket and is aligned with the Server Roadmap, it will get
+  triaged and reviewed by the Kernel team.
+- Pull requests that have been reviewed and approved will be signed off and merged into a
+  development branch and the associated JIRA SERVER issue will be resolved with an expected
+  fixVersion.
+
+
 Style Guide
 -----------
 
