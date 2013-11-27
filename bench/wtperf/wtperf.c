@@ -87,7 +87,7 @@ static uint64_t g_insert_key;		/* insert key */
 
 static volatile int g_ckpt;		/* checkpoint in progress */
 static volatile int g_error;		/* worker thread error */
-static volatile int g_stop;		/* Notify threads to stop */
+static volatile int g_stop;		/* notify threads to stop */
 
 /*
  * Atomic update where needed.
@@ -601,7 +601,8 @@ monitor(void *arg)
 			if (g_stop)
 				break;
 		}
-		if (g_stop)		/* avoid partial statistics */
+		/* If the workers are done, don't bother with a final call. */
+		if (g_stop)
 			break;
 
 		assert(__wt_epoch(NULL, &t) == 0);
@@ -677,8 +678,7 @@ checkpoint_worker(void *arg)
 			if (g_stop)
 				break;
 		}
-
-		/* If we're done, no need for a wrapup checkpoint. */
+		/* If the workers are done, don't bother with a final call. */
 		if (g_stop)
 			break;
 
@@ -896,7 +896,10 @@ execute_workload(CONFIG *cfg)
 		last_ckpts = g_ckpt_ops;
 	}
 
-err:	if ((tret = stop_threads(cfg,
+	/* Notify the worker threads they are done. */
+err:	g_stop = 1;
+
+	if ((tret = stop_threads(cfg,
 	    cfg->read_threads + cfg->insert_threads + cfg->update_threads,
 	    cfg->workers)) != 0 && ret == 0)
 		ret = tret;
@@ -1312,17 +1315,11 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	if (num == 0 || threads == NULL)
 		return (0);
 
-	/* Notify threads that they are done. */
-	g_stop = 1;
-
 	for (i = 0; i < num; ++i, ++threads)
 		if ((ret = pthread_join(threads->handle, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
 			return (ret);
 		}
-
-	/* Reset the stop flag so the next phase can start. */
-	g_stop = 0;
 
 	/*
 	 * We don't free the thread structures or any memory referenced, or NULL
