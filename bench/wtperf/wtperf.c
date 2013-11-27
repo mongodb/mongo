@@ -948,7 +948,6 @@ int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
-	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	pthread_t monitor_thread;
 	size_t len;
@@ -959,7 +958,6 @@ main(int argc, char *argv[])
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
-	conn = NULL;
 	session = NULL;
 	monitor_created = ret = 0;
 	user_cconfig = user_tconfig = NULL;
@@ -1005,11 +1003,13 @@ main(int argc, char *argv[])
 		fprintf(stderr, "%s: failed\n", cmd);
 		goto einval;
 	}
-	if ((ret = wiredtiger_open(tmphome, NULL, "create", &conn)) != 0) {
+	if ((ret = wiredtiger_open(
+	    tmphome, NULL, "create", &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "wiredtiger_open: %s", tmphome);
 		goto err;
 	}
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+	if ((ret = cfg->conn->open_session(
+	    cfg->conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0, "Error creating session");
 		goto err;
 	}
@@ -1117,8 +1117,8 @@ main(int argc, char *argv[])
 		lprintf(cfg, ret, 0, "WT_SESSION.close");
 		goto err;
 	}
-	ret = conn->close(conn, NULL);
-	conn = NULL;
+	ret = cfg->conn->close(cfg->conn, NULL);
+	cfg->conn = NULL;
 	if (ret != 0) {
 		lprintf(cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
 		goto err;
@@ -1132,15 +1132,14 @@ main(int argc, char *argv[])
 		config_print(cfg);
 
 	if ((ret = wiredtiger_open(	/* Open the real connection. */
-	    cfg->home, NULL, cfg->conn_config, &conn)) != 0) {
+	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "Error connecting to %s", cfg->home);
 		goto err;
 	}
-	cfg->conn = conn;
 
 	if (cfg->create != 0) {		/* If creating, create the table. */
-		if ((ret =
-		    conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		if ((ret = cfg->conn->open_session(
+		    cfg->conn, NULL, NULL, &session)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error opening a session on %s", cfg->home);
 			goto err;
@@ -1230,7 +1229,8 @@ err:		if (ret == 0)
 			ret = tret;
 	}
 
-	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0) {
+	if (cfg->conn != NULL &&
+	    (tret = cfg->conn->close(cfg->conn, NULL)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "Error closing connection to %s", cfg->home);
 		if (ret == 0)
