@@ -30,6 +30,15 @@ MongoDB JIRA.  Before creating any new tickets, please search the existing backl
 tickets that represent your change request.  If there is not one, then you should create a new
 ticket.
 
+For upcoming releases, issues are ordered by "fixVersion":
+
+- “2.#.#” are things we want and have scheduled.
+- "2.#.w" are things we want but don't think we have time for.
+- "2.#.x" are things the Kernel team wants but *really* does not have time for.
+
+Avoid tickets with fixVersion "Needs Triage". This is the default fixVersion for new tickets, 
+and it indicates that no decision has been made on the ticket request for the roadmap.
+
 For bugs, please clearly describe the issue you are resolving, including the platforms on which
 the issue is present and clear steps to reproduce.
 
@@ -37,6 +46,19 @@ For improvements or feature requests, be sure to explain the goal or use case an
 your solution will take.
 
 .. _SERVER project: https://jira.mongodb.org/browse/SERVER
+
+The Life-cycle of a Pull Request 
+--------------------------------
+
+When you submit a pull request, here is what happens:
+
+* The MongoDB engineering team will review your pull request to make sure you have included 
+a SERVER ticket in your request and signed the contributor agreement.
+* You should receive a response from one of our engineers with additional questions about your contributions.
+* If your pull request matches a ticket and is aligned with the Server Roadmap, it will 
+get triaged and reviewed by the Kernel team.
+* Pull requests that have been reviewed and approved will be signed off and merged into a development
+branch and the associated Jira SERVER issue will be resolved with an expected fixVersion.
 
 
 Style Guide
