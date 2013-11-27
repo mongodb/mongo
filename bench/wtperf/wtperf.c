@@ -1251,6 +1251,8 @@ err:		if (ret == 0)
 		assert(fflush(cfg->logf) == 0);
 		assert(fclose(cfg->logf) == 0);
 	}
+	free(cfg->popthreads);
+	free(cfg->workers);
 	config_free(cfg);
 
 	free(cc_buf);
