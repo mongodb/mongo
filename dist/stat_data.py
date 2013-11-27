@@ -69,10 +69,10 @@ connection_stats = [
 	Stat('cache_eviction_fail',
 	    'cache: pages selected for eviction unable to be evicted'),
 	Stat('cache_eviction_force',
-	    'cache: pages evicted because they exceeded the in memory maximum'),
+	    'cache: pages evicted because they exceeded the in-memory maximum'),
 	Stat('cache_eviction_force_fail',
 	    'cache: failed eviction of pages that exceeded the ' +
-	    'in memory maximum'),
+	    'in-memory maximum'),
 	Stat('cache_eviction_hazard',
 	    'cache: hazard pointer blocked page eviction'),
 	Stat('cache_eviction_internal', 'cache: internal pages evicted'),

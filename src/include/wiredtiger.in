@@ -2445,9 +2445,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1014
 /*! cache: pages selected for eviction unable to be evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_FAIL		1015
-/*! cache: pages evicted because they exceeded the in memory maximum */
+/*! cache: pages evicted because they exceeded the in-memory maximum */
 #define	WT_STAT_CONN_CACHE_EVICTION_FORCE		1016
-/*! cache: failed eviction of pages that exceeded the in memory maximum */
+/*! cache: failed eviction of pages that exceeded the in-memory maximum */
 #define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL		1017
 /*! cache: hazard pointer blocked page eviction */
 #define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		1018

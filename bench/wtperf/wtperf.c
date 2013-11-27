@@ -608,7 +608,7 @@ monitor(void *arg)
 
 		assert(__wt_epoch(NULL, &t) == 0);
 		tm = localtime_r(&t.tv_sec, &_tm);
-		(void)strftime(buf, sizeof(buf), "%T", tm);
+		(void)strftime(buf, sizeof(buf), "%b %d %H:%M:%S", tm);
 
 		reads = sum_read_ops(cfg);
 		inserts = sum_insert_ops(cfg);
