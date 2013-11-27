@@ -272,7 +272,8 @@ namespace mongo {
                 return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
                                 "Unable to set sslMode, SSL support is not compiled into server");
 #endif
-                if (str != "preferSSL" && str != "requireSSL") { 
+                if (str != "disabled" && str != "allowSSL" &&
+                    str != "preferSSL" && str != "requireSSL") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                                     "Invalid value for sslMode via setParameter command: " 
                                     << str);
@@ -331,7 +332,8 @@ namespace mongo {
             }
 
             virtual Status setFromString(const std::string& str) {
-                if (str != "sendX509" && str != "x509") { 
+                if (str != "keyFile" && str != "sendKeyFile" &&
+                    str != "sendX509" && str != "x509") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                                     "Invalid value for clusterAuthMode via setParameter command: "
                                     << str);
