@@ -277,7 +277,7 @@ namespace mongo {
 
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location
-                // remmeber its already unindexed
+                // remember its already unindexed
                 _recordStore.deallocRecord( oldLocation, oldRecord );
             }
             else {
