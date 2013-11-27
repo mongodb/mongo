@@ -237,10 +237,14 @@ __wt_lsm_merge(
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 
+#define	LSM_MERGE_CHECK_INTERVAL	1000
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
-		if (insert_count % 1000 &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
-			WT_ERR(EINTR);
+		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
+			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+				WT_ERR(EINTR);
+			WT_STAT_FAST_CONN_INCRV(session,
+			    lsm_rows_merged, LSM_MERGE_CHECK_INTERVAL);
+		}
 
 		WT_ERR(src->get_key(src, &key));
 		dest->set_key(dest, &key);
@@ -252,7 +256,8 @@ __wt_lsm_merge(
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_STAT_FAST_CONN_INCRV(session, lsm_rows_merged, insert_count);
+	WT_STAT_FAST_CONN_INCRV(session,
+	    lsm_rows_merged, insert_count % LSM_MERGE_CHECK_INTERVAL);
 	WT_VERBOSE_ERR(session, lsm,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
