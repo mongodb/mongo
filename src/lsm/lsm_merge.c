@@ -67,7 +67,6 @@ __wt_lsm_merge(
 	bloom = NULL;
 	create_bloom = 0;
 	dest = src = NULL;
-	merge_min = aggressive ? 2 : lsm_tree->merge_min;
 	start_id = 0;
 
 	/*
@@ -85,6 +84,16 @@ __wt_lsm_merge(
 	 * long time.
 	 */
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
+
+	/*
+	 * If the tree is open read-only, be very aggressive.  Otherwise, we
+	 * can spend a long time waiting for merges to start in read-only
+	 * applications.
+	 */
+	if (F_ISSET(
+	    lsm_tree->chunk[lsm_tree->nchunks - 1], WT_LSM_CHUNK_ONDISK))
+		aggressive = 100;
+	merge_min = aggressive ? 2 : lsm_tree->merge_min;
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a

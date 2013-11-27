@@ -771,6 +771,18 @@ execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f", secs, cfg->icount / secs);
 
 	/*
+	 * Reopen the connection.  We do this so that the workload phase always
+	 * starts with the on-disk files, and so that read-only workloads can
+	 * be identified.  This is particularly important for LSM, where the
+	 * merge algorithm is more aggressive for read-only trees.
+	 */
+	if ((ret = cfg->conn->close(cfg->conn, NULL)) != 0)
+		return (ret);
+	if ((ret = wiredtiger_open(
+	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0)
+		return (ret);
+
+	/*
 	 * If configured, sleep for awhile to allow LSM merging to complete in
 	 * the background.  If user specifies -1, then sleep for as long as it
 	 * took to load.
