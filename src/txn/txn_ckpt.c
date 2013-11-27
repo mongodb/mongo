@@ -195,6 +195,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	full = started = tracking = 0;
 
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
+
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
 	 *
@@ -307,6 +309,9 @@ err:	/*
 
 	__wt_scr_free(&tmp);
 	session->isolation = txn->isolation = saved_isolation;
+
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+
 	return (ret);
 }
 

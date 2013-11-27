@@ -2571,14 +2571,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_BEGIN				1077
 /*! transaction checkpoints */
 #define	WT_STAT_CONN_TXN_CHECKPOINT			1078
+/*! transaction checkpoint currently running */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1079
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1079
+#define	WT_STAT_CONN_TXN_COMMIT				1080
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1080
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1081
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1081
+#define	WT_STAT_CONN_TXN_ROLLBACK			1082
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1082
+#define	WT_STAT_CONN_WRITE_IO				1083
 
 /*!
  * @}

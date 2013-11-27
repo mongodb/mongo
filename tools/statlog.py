@@ -44,6 +44,7 @@ no_scale_per_second_list = [
     'files currently open',
     'log: total log buffer size',
     'open cursor count',
+    'transaction checkpoint currently running',
     'block manager: file allocation unit size',
     'block manager: checkpoint size',
     'block manager: file magic number',
@@ -115,7 +116,7 @@ def plot(title, values):
     # Write a command file for gnuplot.
     of = open("gnuplot.cmd", "w")
     of.write('''
-set terminal png nocrop
+set terminal png nocrop size 800,600
 set autoscale
 set grid
 set style data linespoints

@@ -408,6 +408,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_checkpoint.desc = "transaction checkpoints";
+	stats->txn_checkpoint_running.desc =
+	    "transaction checkpoint currently running";
 	stats->txn_commit.desc = "transactions committed";
 	stats->txn_fail_cache.desc =
 	    "transaction failures due to cache overflow";

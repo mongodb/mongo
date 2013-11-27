@@ -146,6 +146,9 @@ connection_stats = [
 	##########################################
 	Stat('txn_begin', 'transactions'),
 	Stat('txn_checkpoint', 'transaction checkpoints'),
+	Stat('txn_checkpoint_running',
+	    'transaction checkpoint currently running',
+	    'no_aggregate,no_clear,no_scale'),
 	Stat('txn_commit', 'transactions committed'),
 	Stat('txn_fail_cache', 'transaction failures due to cache overflow'),
 	Stat('txn_rollback', 'transactions rolled-back'),
