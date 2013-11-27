@@ -28,11 +28,6 @@
 *    it in the license file.
 */
 
-/* SHARDING: 
-   I believe this file is for mongod only.
-   See s/commands_public.cpp for mongos.
-*/
-
 #include "mongo/pch.h"
 
 #include <time.h>
@@ -79,124 +74,6 @@
 #include "mongo/util/md5.hpp"
 
 namespace mongo {
-
-    /* reset any errors so that getlasterror comes back clean.
-
-       useful before performing a long series of operations where we want to
-       see if any of the operations triggered an error, but don't want to check
-       after each op as that woudl be a client/server turnaround.
-    */
-    class CmdResetError : public Command {
-    public:
-        virtual LockType locktype() const { return NONE; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual void help( stringstream& help ) const {
-            help << "reset error state (used with getpreverror)";
-        }
-        CmdResetError() : Command("resetError", false, "reseterror") {}
-        bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            LastError *le = lastError.get();
-            verify( le );
-            le->reset();
-            return true;
-        }
-    } cmdResetError;
-
-    /* set by replica sets if specified in the configuration.
-       a pointer is used to avoid any possible locking issues with lockless reading (see below locktype() is NONE
-       and would like to keep that)
-       (for now, it simply orphans any old copy as config changes should be extremely rare).
-       note: once non-null, never goes to null again.
-    */
-    BSONObj *getLastErrorDefault = 0;
-
-    class CmdGetLastError : public Command {
-    public:
-        CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
-        virtual LockType locktype() const { return NONE;  }
-        virtual bool logTheOp()           { return false; }
-        virtual bool slaveOk() const      { return true;  }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual void help( stringstream& help ) const {
-            help << "return error status of the last operation on this connection\n"
-                 << "options:\n"
-                 << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
-                 << "  { j:true } - wait for journal commit if running with --journal\n"
-                 << "  { w:n } - await replication to n servers (including self) before returning\n"
-                 << "  { w:'majority' } - await replication to majority of set\n"
-                 << "  { wtimeout:m} - timeout for w in m milliseconds";
-        }
-        bool run(const string& dbname, BSONObj& _cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            LastError *le = lastError.disableForCommand();
-
-            bool err = false;
-
-            if ( le->nPrev != 1 ) {
-                err = LastError::noError.appendSelf( result , false );
-                le->appendSelfStatus( result );
-            }
-            else {
-                err = le->appendSelf( result , false );
-            }
-
-            Client& c = cc();
-            c.appendLastOp( result );
-
-            result.appendNumber( "connectionId" , c.getConnectionId() ); // for sharding; also useful in general for debugging
-
-            BSONObj cmdObj = _cmdObj;
-            {
-                BSONObj::iterator i(_cmdObj);
-                i.next();
-                if( !i.more() ) {
-                    /* empty, use default */
-                    BSONObj *def = getLastErrorDefault;
-                    if( def )
-                        cmdObj = *def;
-                }
-            }
-
-            return waitForWriteConcern(cmdObj, err, &result, &errmsg);
-        }
-
-    } cmdGetLastError;
-
-    class CmdGetPrevError : public Command {
-    public:
-        virtual LockType locktype() const { return NONE; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual void help( stringstream& help ) const {
-            help << "check for errors since last reseterror commandcal";
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            LastError *le = lastError.disableForCommand();
-            le->appendSelf( result );
-            if ( le->valid )
-                result.append( "nPrev", le->nPrev );
-            else
-                result.append( "nPrev", -1 );
-            return true;
-        }
-    } cmdGetPrevError;
 
     CmdShutdown cmdShutdown;
 
@@ -438,17 +315,6 @@ namespace mongo {
             return true;
         }
     } cmdgetoptime;
-
-    /*
-    class Cmd : public Command {
-    public:
-        Cmd() : Command("") { }
-        bool adminOnly() const { return true; }
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
-            return true;
-        }
-    } cmd;
-    */
 
     class CmdDiagLogging : public Command {
     public:
