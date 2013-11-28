@@ -305,7 +305,6 @@ op_err:			lprintf(cfg, ret, 0,
 		default:
 			goto err;		/* can't happen */
 		}
-			assert(__wt_epoch(NULL, t) == 0);
 
 		/* Gather statistics */
 		if (measure_latency) {
