@@ -113,7 +113,7 @@ DEF_OPT_AS_UINT32(run_time, 0,
     "total workload seconds")
 DEF_OPT_AS_UINT32(sample_interval, 0,
     "performance logging every interval seconds, 0 to disable")
-DEF_OPT_AS_UINT32(sample_rate, 1,
+DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
 DEF_OPT_AS_CONFIG_STRING(table_config,
