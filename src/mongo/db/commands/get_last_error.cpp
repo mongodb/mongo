@@ -94,14 +94,12 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& _cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
 
-            bool err = false;
-
             if ( le->nPrev != 1 ) {
-                err = LastError::noError.appendSelf( result , false );
+                LastError::noError.appendSelf( result , false );
                 le->appendSelfStatus( result );
             }
             else {
-                err = le->appendSelf( result , false );
+                le->appendSelf( result , false );
             }
 
             Client& c = cc();
@@ -121,7 +119,22 @@ namespace mongo {
                 }
             }
 
-            return waitForWriteConcern(cmdObj, err, &result, &errmsg);
+            WriteConcernOptions writeConcern;
+            Status s = writeConcern.parse( cmdObj );
+            if ( !s.isOK() ) {
+                result.append( "badGLE", cmdObj );
+                errmsg = s.toString();
+                return false;
+            }
+
+            WriteConcernResult res;
+            s = waitForWriteConcern( cc(), writeConcern, &res );
+            res.appendTo( &result );
+            if ( !s.isOK() ) {
+                errmsg = s.toString();
+                return false;
+            }
+            return true;
         }
 
     } cmdGetLastError;

@@ -30,15 +30,54 @@
 
 namespace mongo {
 
-    /**
-     * Helper method for commands to call.  Blocks until write concern (as specified in "cmdObj")
-     * is satisfied.  "err" should be set to true if the last operation succeeded, otherwise false.
-     * "result" will be filled with write concern results.  Returns false and sets "errmsg" on
-     * failure.
-     */
-    bool waitForWriteConcern(const BSONObj& cmdObj,
-                             bool err,
-                             BSONObjBuilder* result,
-                             string* errmsg);
+    struct WriteConcernOptions {
+
+        WriteConcernOptions() { reset(); }
+
+        Status parse( const BSONObj& obj );
+
+        void reset() {
+            syncMode = NONE;
+            wNumNodes = 0;
+            wMode = "";
+            wTimeout = 0;
+        }
+
+        enum SyncMode { NONE, FSYNC, JOURNAL } syncMode;
+
+        int wNumNodes;
+        string wMode;
+
+        int wTimeout;
+
+    };
+
+    struct WriteConcernResult {
+        WriteConcernResult() {
+            reset();
+        }
+
+        void reset() {
+            fsyncFiles = -1;
+            wTimedOut = false;
+            wTime = -1;
+            err = "";
+        }
+
+        void appendTo( BSONObjBuilder* result ) const;
+
+        int fsyncFiles;
+
+        bool wTimedOut;
+        int wTime;
+        vector<BSONObj> writtenTo;
+
+        string err; // this is the old err field, should deprecate
+    };
+
+    Status waitForWriteConcern(Client& client,
+                               const WriteConcernOptions& writeConcern,
+                               WriteConcernResult* result );
+
 
 } // namespace mongo

@@ -173,7 +173,10 @@ namespace mongo {
                 return false;
             }
 
-            string wStr = w.String();
+            return opReplicatedEnough( op, w.String() );
+        }
+
+        bool opReplicatedEnough( OpTime op , const string& wStr ) {
             if (wStr == "majority") {
                 // use the entire set, including arbiters, to prevent writing
                 // to a majority of the set but not a majority of voters
@@ -335,6 +338,10 @@ namespace mongo {
 
     bool opReplicatedEnough( OpTime op , int w ) {
         return slaveTracking.replicatedToNum( op , w );
+    }
+
+    bool opReplicatedEnough( OpTime op , const string& w ) {
+        return slaveTracking.opReplicatedEnough( op , w );
     }
 
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait ) {

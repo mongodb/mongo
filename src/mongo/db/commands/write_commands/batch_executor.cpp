@@ -59,27 +59,28 @@ namespace mongo {
         : _defaultWriteConcern(wc), _client( client ), _opCounters( opCounters ), _le( le ) {
     }
 
-    static void maybeBuildWCError( const BSONObj& wcResult,
-                                   const string& wcErrMsg,
+    static void maybeBuildWCError( const Status& wcStatus,
+                                   const WriteConcernResult& wcResult,
                                    BatchedCommandResponse* response ) {
 
         // Error reported is either the errmsg or err from wc
         string errMsg;
-        if ( !wcErrMsg.empty() ) errMsg = wcErrMsg;
-        else if ( wcResult["err"].type() == String ) errMsg = wcResult["err"].String();
+        if ( !wcStatus.isOK() )
+            errMsg = wcStatus.toString();
+        else if ( wcResult.err.size() )
+            errMsg = wcResult.err;
 
-        // Sometimes the jnote/wnote has more error info
-        if ( !errMsg.empty() && wcResult["jnote"].type() == String ) {
-            errMsg = wcResult["jnote"].String();
-        }
-        if ( !errMsg.empty() && wcResult["wnote"].type() == String ) {
-            errMsg = wcResult["wnote"].String();
-        }
+        if ( errMsg.empty() )
+            return;
 
-        if ( errMsg.empty() ) return;
+        if ( wcStatus.isOK() )
+            response->setErrCode( ErrorCodes::WriteConcernFailed );
+        else
+            response->setErrCode( wcStatus.code() );
 
-        response->setErrCode( ErrorCodes::WriteConcernFailed );
-        if ( wcResult["wtimeout"].trueValue() ) response->setErrInfo( BSON( "wtimeout" << true ) );
+        if ( wcResult.wTimedOut )
+            response->setErrInfo( BSON( "wtimeout" << true ) );
+
         response->setErrMessage( errMsg );
     }
 
@@ -170,23 +171,24 @@ namespace mongo {
         // Apply write concern if we had any successful writes
         if ( numItemErrors < numBatchItems ) {
 
-            BSONObj writeConcern;
+            WriteConcernOptions writeConcern;
+            Status s = Status::OK();
             if ( request.isWriteConcernSet() ) {
-                writeConcern = request.getWriteConcern();
+                s = writeConcern.parse( request.getWriteConcern() );
             }
             else {
-                writeConcern = _defaultWriteConcern;
+                s = writeConcern.parse( _defaultWriteConcern );
             }
 
-            string errMsg;
-            BSONObjBuilder wcResultsB;
-            waitForWriteConcern( writeConcern,
-                                 false /* always wait for secondaries since we wrote something */,
-                                 &wcResultsB,
-                                 &errMsg );
-
-            maybeBuildWCError( wcResultsB.obj(), errMsg, response );
-            // TODO: save writtenTo, waitedJournal/waitedRepl stats
+            if ( !s.isOK() ) {
+                response->setErrCode( s.code() );
+                response->setErrMessage( s.toString() );
+            }
+            else {
+                WriteConcernResult res;
+                s = waitForWriteConcern( cc(), writeConcern, &res );
+                maybeBuildWCError( s, res, response );
+            }
         }
 
         // Set the main body of the response. We assume that, if there was an error, the error

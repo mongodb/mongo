@@ -34,6 +34,7 @@
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/write_concern.h"
 
 namespace mongo {
 
@@ -43,159 +44,187 @@ namespace mongo {
     static Counter64 gleWtimeouts;
     static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay( "getLastError.wtimeouts", &gleWtimeouts );
 
-    bool waitForWriteConcern(const BSONObj& cmdObj,
-                             bool err,
-                             BSONObjBuilder* result,
-                             string* errmsg) {
-        Client& c = cc();
+    Status WriteConcernOptions::parse( const BSONObj& obj ) {
+        bool j = obj["j"].trueValue();
+        bool fsync = obj["fsync"].trueValue();
 
-        if ( cmdObj["j"].trueValue() ) {
-            if( !getDur().awaitCommit() ) {
-                // --journal is off
-                result->append("jnote", "journaling not enabled on this server");
-                // Set the err field, if the result document doesn't already have it set.
-                if ( !err ) {
-                    result->append( "err", "nojournal" );
-                }
-                return true;
-            }
-            if( cmdObj["fsync"].trueValue() ) {
-                *errmsg = "fsync and j options cannot be used together";
-                return false;
-            }
+        if ( j & fsync )
+            return Status( ErrorCodes::BadValue, "fsync and j options cannot be used together" );
+
+        if ( j ) {
+            syncMode = JOURNAL;
         }
-        else if ( cmdObj["fsync"].trueValue() ) {
-            Timer t;
-            if( !getDur().awaitCommit() ) {
-                // if get here, not running with --journal
-                log() << "fsync from getlasterror" << endl;
-                result->append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
-            }
-            else {
-                // this perhaps is temp.  how long we wait for the group commit to occur.
-                result->append( "waited", t.millis() );
-            }
+        if ( fsync ) {
+            if ( getDur().isDurable() )
+                syncMode = JOURNAL;
+            else
+                syncMode = FSYNC;
         }
 
-        if ( err ) {
-            // doesn't make sense to wait for replication
-            // if there was an error
-            return true;
+
+        BSONElement e = obj["w"];
+        if ( e.isNumber() ) {
+            wNumNodes = e.numberInt();
+        }
+        else if ( e.type() == String ) {
+            wMode = e.valuestrsafe();
+        }
+        else if ( e.eoo() ||
+                  e.type() == jstNULL ||
+                  e.type() == Undefined ) {
+        }
+        else {
+            return Status( ErrorCodes::BadValue, "w has to be a number or a string" );
         }
 
-        BSONElement e = cmdObj["w"];
-        if ( e.ok() ) {
+        wTimeout = obj["wtimeout"].numberInt();
 
-            if (serverGlobalParams.configsvr && (!e.isNumber() || e.numberInt() > 1)) {
-                // w:1 on config servers should still work, but anything greater than that
-                // should not.
-                result->append( "wnote", "can't use w on config servers" );
-                result->append( "err", "norepl" );
-                return true;
+        return Status::OK();
+    }
+
+    void WriteConcernResult::appendTo( BSONObjBuilder* result ) const {
+        if ( fsyncFiles >= 0 )
+            result->appendNumber( "fsyncFiles", fsyncFiles );
+
+        if ( wTime >= 0 ) {
+            if ( wTimedOut )
+                result->appendNumber( "waited", wTime );
+            else
+                result->appendNumber( "wtime", wTime );
+        }
+
+        if ( wTimedOut )
+            result->appendBool( "wtimeout", true );
+
+        if ( writtenTo.size() )
+            result->append( "writtenTo", writtenTo );
+        else
+            result->appendNull( "writtenTo" );
+
+        if ( err.empty() )
+            result->appendNull( "err" );
+        else
+            result->append( "err", err );
+    }
+
+    Status waitForWriteConcern(Client& client,
+                               const WriteConcernOptions& writeConcern,
+                               WriteConcernResult* result ) {
+        // first handle blocking on disk
+
+        switch( writeConcern.syncMode ) {
+        case WriteConcernOptions::NONE:
+            break;
+        case WriteConcernOptions::JOURNAL:
+            if ( getDur().awaitCommit() ) {
+                // success
+                break;
+            }
+            result->err = "nojournal";
+            return Status( ErrorCodes::BadValue, "journalling not enabled" );
+        case WriteConcernOptions::FSYNC:
+            result->fsyncFiles = MemoryMappedFile::flushAll( true );
+            break;
+        }
+
+        // now wait for replication
+
+        if ( writeConcern.wNumNodes <= 0 &&
+             writeConcern.wMode.empty() ) {
+            // w settings, all done
+            return Status::OK();
+        }
+
+        if ( serverGlobalParams.configsvr ) {
+            // config servers have special rules
+            if ( writeConcern.wNumNodes > 1 ) {
+                result->err = "norepl";
+                return Status( ErrorCodes::BadValue, "cannot use w > 1 with config servers" );
+            }
+            if ( writeConcern.wMode == "majority" ) {
+                return Status::OK();
+            }
+            result->err = "norepl";
+            return Status( ErrorCodes::BadValue, "unknown w mode for config servers" );
+        }
+
+        if ( !anyReplEnabled() ) {
+            // no replication enabled and not a config server
+            // so we handle some simple things, or fail
+
+            if ( writeConcern.wNumNodes > 1 ) {
+                result->err = "norepl";
+                return Status( ErrorCodes::BadValue, "no replication and asked for w > 1" );
+            }
+            if ( !writeConcern.wMode.empty() &&
+                 writeConcern.wMode != "majority" ) {
+                result->err = "norepl";
+                return Status( ErrorCodes::BadValue, "no replication and asked for w with a mode" );
             }
 
-            int timeout = cmdObj["wtimeout"].numberInt();
-            scoped_ptr<TimerHolder> gleTimerHolder;
-            bool doTiming = false;
-            if ( e.isNumber() ) {
-                doTiming = e.numberInt() > 1;
-            }
-            else if ( e.type() == String ) {
-                doTiming = true;
-            }
-            if ( doTiming ) {
-                gleTimerHolder.reset( new TimerHolder( &gleWtimeStats ) );
-            }
-            else {
-                gleTimerHolder.reset( new TimerHolder( NULL ) );
-            }
+            // asked for w <= 1 or w=majority
+            // so we can just say ok
+            return Status::OK();
+        }
 
-            long long passes = 0;
-            char buf[32];
-            OpTime op(c.getLastOp());
+        bool doTiming = writeConcern.wNumNodes > 1 || !writeConcern.wMode.empty();
+        scoped_ptr<TimerHolder> gleTimerHolder( new TimerHolder( doTiming ? &gleWtimeStats : NULL ) );
 
-            if ( op.isNull() ) {
-                if ( anyReplEnabled() ) {
-                    result->append( "wnote" , "no write has been done on this connection" );
-                }
-                else if ( e.isNumber() && e.numberInt() <= 1 ) {
-                    // don't do anything
-                    // w=1 and no repl, so this is fine
-                }
-                else if (e.type() == mongo::String &&
-                         str::equals(e.valuestrsafe(), "majority")) {
-                    // don't do anything
-                    // w=majority and no repl, so this is fine
-                }
-                else {
-                    // w=2 and no repl
-                    stringstream errmsg;
-                    errmsg << "no replication has been enabled, so w=" <<
-                              e.toString(false) << " won't work";
-                    result->append( "wnote" , errmsg.str() );
-                    result->append( "err", "norepl" );
-                    return true;
-                }
+        OpTime op( client.getLastOp() );
 
-                result->appendNull( "err" );
-                return true;
+        if ( op.isNull() ) {
+            // no write happened for this client yet
+            return Status::OK();
+        }
+
+        if ( !writeConcern.wMode.empty() && !theReplSet ) {
+            return Status( ErrorCodes::BadValue, "asked for a w mode with master/slave" );
+        }
+
+        // now that we've done the prep, now we actually wait
+        char buf[32]; // for messages
+        long long passes = 0;
+        while ( 1 ) {
+
+            if ( !_isMaster() ) {
+                // this should be in the while loop in case we step down
+                return Status( DBException::convertExceptionCode(10990), "no longer primary" );
             }
 
-            if ( !theReplSet && !e.isNumber() ) {
-                // For master/slave deployments that receive w:"majority" or some other named
-                // write concern mode, treat it like w:1 and include a note.
-                result->append( "wnote", "cannot use non integer w values for non-replica sets" );
-                result->appendNull( "err" );
-                return true;
-            }
-
-            while ( 1 ) {
-
-                if ( !_isMaster() ) {
-                    // this should be in the while loop in case we step down
-                    *errmsg = "not master";
-                    result->append( "wnote", "no longer primary" );
-                    result->append( "code" , 10990 );
-                    return false;
-                }
-
-                // check this first for w=0 or w=1
-                if ( opReplicatedEnough( op, e ) ) {
+            // check this first for w=0 or w=1
+            if ( writeConcern.wNumNodes > 0 ) {
+                if ( opReplicatedEnough( op, writeConcern.wNumNodes ) ) {
                     break;
                 }
-
-                // if replication isn't enabled (e.g., config servers)
-                if ( ! anyReplEnabled() ) {
-                    result->append( "err", "norepl" );
-                    return true;
-                }
-
-
-                if ( timeout > 0 && gleTimerHolder->millis() >= timeout ) {
-                    gleWtimeouts.increment();
-                    result->append( "wtimeout" , true );
-                    *errmsg = "timed out waiting for slaves";
-                    result->append( "waited" , gleTimerHolder->millis() );
-                    result->append("writtenTo", getHostsWrittenTo(op));
-                    result->append( "err" , "timeout" );
-                    return true;
-                }
-
-                verify( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
-                c.curop()->setMessage( buf );
-                sleepmillis(1);
-                killCurrentOp.checkForInterrupt();
+            }
+            else if ( opReplicatedEnough( op, writeConcern.wMode ) ) {
+                break;
             }
 
-            if ( doTiming ) {
-                result->append("writtenTo", getHostsWrittenTo(op));
-                int myMillis = gleTimerHolder->recordMillis();
-                result->appendNumber( "wtime" , myMillis );
+            if ( writeConcern.wTimeout > 0 &&
+                 gleTimerHolder->millis() >= writeConcern.wTimeout ) {
+                gleWtimeouts.increment();
+                result->wTime = gleTimerHolder->millis();
+                result->writtenTo = getHostsWrittenTo( op );
+                result->err = "timeout";
+                result->wTimedOut = true;
+                // this command returns OK because it worked
+                // so you have to check result to see if there was a real timeout
+                return Status::OK();
             }
+
+            verify( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
+            client.curop()->setMessage( buf );
+            sleepmillis(1);
+            killCurrentOp.checkForInterrupt();
         }
 
-        result->appendNull( "err" );
-        return true;
+        if ( doTiming ) {
+            result->writtenTo = getHostsWrittenTo(op);
+            result->wTime = gleTimerHolder->recordMillis();
+        }
+
+        return Status::OK();
     }
 
 } // namespace mongo

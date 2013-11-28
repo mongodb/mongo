@@ -91,14 +91,7 @@ assert.eq(gle.wtime, null);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-gle = sdb.getLastErrorObj(2, 10);
 print('Trying standalone server with w=2 and 10ms timeout.');
-printjson(gle);
-assert.eq(gle.ok, 1);
-assert.eq(gle.err, "norepl");
-assert.eq(gle.writtenTo, null);
-assert.eq(gle.wtime, null);
-assert.eq(gle.waited, null);
-assert.eq(gle.wtimeout, null);
+assert.throws( function(){ sdb.getLastErrorObj(2, 10); } );
 
 stopMongod(port);
