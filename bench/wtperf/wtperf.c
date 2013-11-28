@@ -44,7 +44,7 @@ static const char * const small_config_str =
     "conn_config=\"cache_size=500MB\","
     "table_config=\"lsm_chunk_size=5MB\","
     "icount=500000,"
-    "data_sz=100,"
+    "value_sz=100,"
     "key_sz=20,"
     "report_interval=5,"
     "run_time=20,"
@@ -55,7 +55,7 @@ static const char * const med_config_str =
     "conn_config=\"cache_size=1GB\","
     "table_config=\"lsm_chunk_size=20MB\","
     "icount=50000000,"
-    "data_sz=100,"
+    "value_sz=100,"
     "key_sz=20,"
     "report_interval=5,"
     "run_time=100,"
@@ -66,7 +66,7 @@ static const char * const large_config_str =
     "conn_config=\"cache_size=2GB\","
     "table_config=\"lsm_chunk_size=50MB\","
     "icount=500000000,"
-    "data_sz=100,"
+    "value_sz=100,"
     "key_sz=20,"
     "report_interval=5,"
     "run_time=600,"
@@ -86,8 +86,8 @@ static uint64_t g_update_ops;		/* update operations */
 static uint64_t g_insert_key;		/* insert key */
 
 static volatile int g_ckpt;		/* checkpoint in progress */
-static volatile int g_error;		/* worker thread error */
-static volatile int g_stop;		/* Notify threads to stop */
+static volatile int g_error;		/* thread error */
+static volatile int g_stop;		/* notify threads to stop */
 
 /*
  * Atomic update where needed.
@@ -180,7 +180,7 @@ worker(CONFIG_THREAD *thread)
 	uint64_t next_val, nsecs;
 	int measure_latency, ret;
 	uint8_t *op, *op_end;
-	char *data_buf, *key_buf, *value;
+	char *value_buf, *key_buf, *value;
 
 	cfg = thread->cfg;
 	conn = cfg->conn;
@@ -198,7 +198,7 @@ worker(CONFIG_THREAD *thread)
 	}
 
 	key_buf = thread->key_buf;
-	data_buf = thread->data_buf;
+	value_buf = thread->value_buf;
 
 	op = thread->schedule;
 	op_end = thread->schedule + sizeof(thread->schedule);
@@ -237,8 +237,7 @@ worker(CONFIG_THREAD *thread)
 				continue;
 			break;
 		default:
-			ret = EINVAL;
-			goto err;
+			goto err;		/* can't happen */
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
@@ -270,19 +269,19 @@ worker(CONFIG_THREAD *thread)
 
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
-			cursor->set_value(cursor, data_buf);
+			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) == 0)
 				break;
 			goto op_err;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
 				assert(cursor->get_value(cursor, &value) == 0);
-				memcpy(data_buf, value, cfg->data_sz);
-				if (data_buf[0] == 'a')
-					data_buf[0] = 'b';
+				memcpy(value_buf, value, cfg->value_sz);
+				if (value_buf[0] == 'a')
+					value_buf[0] = 'b';
 				else
-					data_buf[0] = 'a';
-				cursor->set_value(cursor, data_buf);
+					value_buf[0] = 'a';
+				cursor->set_value(cursor, value_buf);
 				if ((ret = cursor->update(cursor)) == 0)
 					break;
 				goto op_err;
@@ -303,8 +302,7 @@ op_err:			lprintf(cfg, ret, 0,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
 			goto err;
 		default:
-			ret = EINVAL;
-			goto err;
+			goto err;		/* can't happen */
 		}
 			assert(__wt_epoch(NULL, t) == 0);
 
@@ -322,9 +320,10 @@ op_err:			lprintf(cfg, ret, 0,
 			op = thread->schedule;
 	}
 
-	/* To ensure managing thread knows if we exited early. */
-err:	if (ret != 0)
-		g_error = 1;
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		g_error = g_stop = 1;
+	}
 
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
@@ -448,7 +447,7 @@ populate_thread(void *arg)
 	uint32_t opcount;
 	uint64_t op;
 	int intxn, ret;
-	char *data_buf, *key_buf;
+	char *value_buf, *key_buf;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -457,7 +456,7 @@ populate_thread(void *arg)
 	ret = 0;
 
 	key_buf = thread->key_buf;
-	data_buf = thread->data_buf;
+	value_buf = thread->value_buf;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
@@ -480,7 +479,7 @@ populate_thread(void *arg)
 
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 			cursor->set_key(cursor, key_buf);
-			cursor->set_value(cursor, data_buf);
+			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
@@ -500,7 +499,7 @@ populate_thread(void *arg)
 			}
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 			cursor->set_key(cursor, key_buf);
-			cursor->set_value(cursor, data_buf);
+			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
@@ -523,9 +522,11 @@ populate_thread(void *arg)
 			    "Fail committing, transaction was aborted");
 	}
 
-	/* To ensure managing thread knows if we exited early. */
-err:	if (ret != 0)
-		g_error = 1;
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		g_error = g_stop = 1;
+	}
+
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
 	return (NULL);
@@ -582,12 +583,13 @@ monitor(void *arg)
 			if (g_stop)
 				break;
 		}
-		if (g_stop)		/* avoid partial statistics */
+		/* If the workers are done, don't bother with a final call. */
+		if (g_stop)
 			break;
 
 		assert(__wt_epoch(NULL, &t) == 0);
 		tm = localtime_r(&t.tv_sec, &_tm);
-		(void)strftime(buf, sizeof(buf), "%T", tm);
+		(void)strftime(buf, sizeof(buf), "%b %d %H:%M:%S", tm);
 
 		reads = sum_read_ops(cfg);
 		inserts = sum_insert_ops(cfg);
@@ -618,9 +620,11 @@ monitor(void *arg)
 		last_updates = updates;
 	}
 
+	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = 1;
+err:		g_error = g_stop = 1;
 	}
+
 	if (fp != NULL)
 		(void)fclose(fp);
 	free(path);
@@ -658,8 +662,7 @@ checkpoint_worker(void *arg)
 			if (g_stop)
 				break;
 		}
-
-		/* If we're done, no need for a wrapup checkpoint. */
+		/* If the workers are done, don't bother with a final call. */
 		if (g_stop)
 			break;
 
@@ -677,13 +680,13 @@ checkpoint_worker(void *arg)
 		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
 	}
 
+	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = 1;
+err:		g_error = g_stop = 1;
 	}
 
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
-
 	return (NULL);
 }
 
@@ -877,7 +880,10 @@ execute_workload(CONFIG *cfg)
 		last_ckpts = g_ckpt_ops;
 	}
 
-err:	if ((tret = stop_threads(cfg,
+	/* Notify the worker threads they are done. */
+err:	g_stop = 1;
+
+	if ((tret = stop_threads(cfg,
 	    cfg->read_threads + cfg->insert_threads + cfg->update_threads,
 	    cfg->workers)) != 0 && ret == 0)
 		ret = tret;
@@ -1232,6 +1238,8 @@ err:		if (ret == 0)
 		assert(fflush(cfg->logf) == 0);
 		assert(fclose(cfg->logf) == 0);
 	}
+	free(cfg->popthreads);
+	free(cfg->workers);
 	config_free(cfg);
 
 	free(cc_buf);
@@ -1259,9 +1267,9 @@ start_threads(
 		 */
 		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->data_buf = calloc(cfg->data_sz, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
-		memset(thread->data_buf, 'a', cfg->data_sz - 1);
+		memset(thread->value_buf, 'a', cfg->value_sz - 1);
 
 		/*
 		 * Every thread gets tracking information and is initialized
@@ -1291,17 +1299,17 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	if (num == 0 || threads == NULL)
 		return (0);
 
-	/* Notify threads that they are done. */
-	g_stop = 1;
-
-	for (i = 0; i < num; ++i, ++threads)
+	for (i = 0; i < num; ++i, ++threads) {
 		if ((ret = pthread_join(threads->handle, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
 			return (ret);
 		}
 
-	/* Reset the stop flag so the next phase can start. */
-	g_stop = 0;
+		free(threads->key_buf);
+		threads->key_buf = NULL;
+		free(threads->value_buf);
+		threads->value_buf = NULL;
+	}
 
 	/*
 	 * We don't free the thread structures or any memory referenced, or NULL

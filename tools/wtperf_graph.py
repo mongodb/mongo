@@ -28,9 +28,10 @@
 
 import csv, os, zipimport
 from subprocess import call
-
 # Python script to read wtperf monitor output and create a performance
 # graph.
+
+TIMEFMT = "%b %d %H:%M:%S"
 
 # Read the monitor file and figure out when a checkpoint was running.
 in_ckpt = 'N'
@@ -53,14 +54,16 @@ set datafile sep ','
 set grid
 set style data lines
 set terminal png nocrop size 800,600
-set timefmt "%H:%M:%S"
+set timefmt "%(TIMEFMT)s"
 set title "read, insert and update operations per second"
-set format x "%M:%S"
-set xlabel "Time (minutes:seconds)"
+set format x "%(TIMEFMT)s"
+set xlabel "Time"
 set xtics rotate by -45
 set xdata time
 set ylabel "Operations per second (hundreds)"
-set yrange [0:]\n''')
+set yrange [0:]\n''' % {
+    'TIMEFMT' : TIMEFMT
+    })
 it = iter(ckptlist)
 for start, stop in zip(it, it):
     of.write('set object rectangle from first \'' + start +\
@@ -83,22 +86,23 @@ set datafile sep ','
 set grid
 set style data lines
 set terminal png nocrop size 800,600
-set timefmt "%%H:%%M:%%S"
+set timefmt "%(TIMEFMT)s"
 set title "%(NAME)s: average, minimum and maximum latency"
-set format x "%%M:%%S"
-set xlabel "Time (minutes:seconds)"
+set format x "%(TIMEFMT)s"
+set xlabel "Time"
 set xtics rotate by -45
 set xdata time
 set ylabel "Latency (us)"
 set logscale y
 set yrange [1:]\n''' % {
-    'NAME' : name
+    'NAME' : name,
+    'TIMEFMT' : TIMEFMT
     })
     it = iter(ckptlist)
     for start, stop in zip(it, it):
-	of.write('set object rectangle from first \'' + start +\
-	    '\', graph 0 ' + ' to first \'' + stop +\
-	    '\', graph 1 fc rgb "gray" back\n')
+        of.write('set object rectangle from first \'' + start +\
+            '\', graph 0 ' + ' to first \'' + stop +\
+            '\', graph 1 fc rgb "gray" back\n')
     of.write('''
 set output '%(NAME)s.latency1.png'
 plot "monitor" using 1:($%(COL_AVG)d / 1000) title "Average Latency", "monitor" using 1:($%(COL_MIN)d / 1000) title "Minimum Latency", "monitor" using 1:($%(COL_MAX)d / 1000) title "Maximum Latency"\n''' % {
@@ -163,7 +167,7 @@ plot "latency.%(NAME)s" using 1:(($3 * 100)/$4) title "%(NAME)s"\n''' % {
     os.remove("gnuplot.cmd")
 
 
-column = 6		# average, minimum, maximum start in column 6
+column = 6              # average, minimum, maximum start in column 6
 for op in ['read', 'insert', 'update']:
     plot_latency_operation(op, column, column + 1, column + 2)
     column = column + 3

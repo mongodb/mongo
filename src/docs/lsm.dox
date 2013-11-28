@@ -54,7 +54,7 @@ WT_CURSOR *c;
 session->open_cursor(session, "table:bucket", NULL, NULL, &c);
 for(;;) {
     c->set_key("key");
-    c->set_value("data");
+    c->set_value("value");
     c->insert();
 }
 @endcode

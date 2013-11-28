@@ -449,8 +449,8 @@ config_print(CONFIG *cfg)
 		    PRIu32 "reads, %" PRIu32 " inserts, %" PRIu32 " updates\n",
 		    100 - (cfg->run_mix_inserts + cfg->run_mix_updates),
 		    cfg->run_mix_inserts, cfg->run_mix_updates);
-	printf("\tkey size: %" PRIu32 " data size: %" PRIu32 "\n",
-	    cfg->key_sz, cfg->data_sz);
+	printf("\tkey size: %" PRIu32 " value size: %" PRIu32 "\n",
+	    cfg->key_sz, cfg->value_sz);
 	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
 }
 
