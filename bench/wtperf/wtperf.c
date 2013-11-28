@@ -238,9 +238,13 @@ worker(CONFIG_THREAD *thread)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
-		measure_latency = trk->ops % cfg->sample_rate == 0;
-		if (measure_latency)
-			assert(__wt_epoch(NULL, &start) == 0);
+		measure_latency = cfg->sample_interval != 0 && (
+		    trk->ops % cfg->sample_rate == 0);
+		if (measure_latency &&
+		    (ret = __wt_epoch(NULL, &start) != 0)) {
+			lprintf(cfg, ret, 0, "Get time call failed");
+			goto err;
+		}
 
 		cursor->set_key(cursor, key_buf);
 
@@ -272,7 +276,12 @@ worker(CONFIG_THREAD *thread)
 			goto op_err;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
-				assert(cursor->get_value(cursor, &value) == 0);
+				if ((ret = cursor->get_value(
+				    cursor, &value)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "get_value in update.");
+					goto err;
+				}
 				memcpy(value_buf, value, cfg->value_sz);
 				if (value_buf[0] == 'a')
 					value_buf[0] = 'b';
@@ -304,7 +313,10 @@ op_err:			lprintf(cfg, ret, 0,
 
 		/* Gather statistics */
 		if (measure_latency) {
-			assert(__wt_epoch(NULL, &stop) == 0);
+			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+				lprintf(cfg, ret, 0, "Get time call failed");
+				goto err;
+			}
 			nsecs = (uint64_t)(stop.tv_nsec - start.tv_nsec);
 			nsecs += sec_to_ns(
 			    (uint64_t)(stop.tv_sec - start.tv_sec));
@@ -321,8 +333,11 @@ op_err:			lprintf(cfg, ret, 0,
 err:		g_error = g_stop = 1;
 	}
 
-	if (session != NULL)
-		assert(session->close(session, NULL) == 0);
+	if (session != NULL &&
+	    (ret = session->close(session, NULL)) != 0) {
+		g_error = g_stop = 1;
+		lprintf(cfg, ret, 0, "Session close in worker failed");
+	}
 }
 
 /*
@@ -489,8 +504,12 @@ populate_thread(void *arg)
 				break;
 
 			if (!intxn) {
-				assert(session->begin_transaction(
-				    session, cfg->transaction_config) == 0);
+				if ((ret = session->begin_transaction(
+				    session, cfg->transaction_config)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Failed starting transaction.");
+					goto err;
+				}
 				intxn = 1;
 			}
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
@@ -523,8 +542,11 @@ populate_thread(void *arg)
 err:		g_error = g_stop = 1;
 	}
 
-	if (session != NULL)
-		assert(session->close(session, NULL) == 0);
+	if (session != NULL &&
+	    (ret = session->close(session, NULL)) != 0) {
+		lprintf(cfg, ret, 0, "Error closing session in populate");
+		g_error = g_stop = 1;
+	}
 	return (NULL);
 }
 
@@ -535,6 +557,8 @@ monitor(void *arg)
 	struct tm *tm, _tm;
 	CONFIG *cfg;
 	FILE *fp;
+	char buf[64], *path;
+	int ret;
 	uint64_t reads, inserts, updates;
 	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t read_avg, read_min, read_max;
@@ -542,9 +566,9 @@ monitor(void *arg)
 	uint32_t update_avg, update_min, update_max;
 	size_t len;
 	u_int i;
-	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
+	assert(cfg->sample_interval != 0);
 	fp = NULL;
 	path = NULL;
 
@@ -583,7 +607,10 @@ monitor(void *arg)
 		if (g_stop)
 			break;
 
-		assert(__wt_epoch(NULL, &t) == 0);
+		if ((ret = __wt_epoch(NULL, &t)) != 0) {
+			lprintf(cfg, ret, 0, "Get time call failed");
+			goto err;
+		}
 		tm = localtime_r(&t.tv_sec, &_tm);
 		(void)strftime(buf, sizeof(buf), "%b %d %H:%M:%S", tm);
 
@@ -635,7 +662,7 @@ checkpoint_worker(void *arg)
 	CONFIG_THREAD *thread;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	struct timeval e, s;
+	struct timespec e, s;
 	uint64_t ms;
 	uint32_t i;
 	int ret;
@@ -662,7 +689,10 @@ checkpoint_worker(void *arg)
 		if (g_stop)
 			break;
 
-		assert(gettimeofday(&s, NULL) == 0);
+		if ((ret = __wt_epoch(NULL, &s)) != 0) {
+			lprintf(cfg, ret, 0, "Get time failed in checkpoint.");
+			goto err;
+		}
 		g_ckpt = 1;
 		if ((ret = session->checkpoint(session, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
@@ -671,9 +701,12 @@ checkpoint_worker(void *arg)
 		g_ckpt = 0;
 		++thread->ckpt.ops;
 
-		assert(gettimeofday(&e, NULL) == 0);
-		ms = (e.tv_sec * 1000) + (e.tv_usec / 1000.0);
-		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
+		if ((ret = __wt_epoch(NULL, &e)) != 0) {
+			lprintf(cfg, ret, 0, "Get time failed in checkpoint.");
+			goto err;
+		}
+		ms = (e.tv_sec * 1000) + (e.tv_nsec / 1000000.0);
+		ms -= (s.tv_sec * 1000) + (s.tv_nsec / 1000000.0);
 	}
 
 	/* Notify our caller we failed and shut the system down. */
@@ -681,15 +714,19 @@ checkpoint_worker(void *arg)
 err:		g_error = g_stop = 1;
 	}
 
-	if (session != NULL)
-		assert(session->close(session, NULL) == 0);
+	if (session != NULL &&
+	    ((ret = session->close(session, NULL)) != 0)) {
+		lprintf(cfg, ret, 0,
+		    "Error closing session in checkpoint worker.");
+		g_error = g_stop = 1;
+	}
 	return (NULL);
 }
 
 static int
 execute_populate(CONFIG *cfg)
 {
-	struct timeval start, stop;
+	struct timespec start, stop;
 	double secs;
 	uint64_t last_ops;
 	uint32_t interval;
@@ -708,7 +745,10 @@ execute_populate(CONFIG *cfg)
 
 	g_insert_key = 0;
 
-	assert(gettimeofday(&start, NULL) == 0);
+	if ((ret = __wt_epoch(NULL, &start)) != 0) {
+		lprintf(cfg, ret, 0, "Get time failed in populate.");
+		return (ret);
+	}
 	for (elapsed = 0, interval = 0, last_ops = 0;
 	    g_insert_key < cfg->icount && g_error == 0;) {
 		/*
@@ -729,7 +769,10 @@ execute_populate(CONFIG *cfg)
 		    g_insert_ops - last_ops, cfg->report_interval);
 		last_ops = g_insert_ops;
 	}
-	assert(gettimeofday(&stop, NULL) == 0);
+	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+		lprintf(cfg, ret, 0, "Get time failed in populate.");
+		return (ret);
+	}
 
 	if ((ret =
 	    stop_threads(cfg, cfg->populate_threads, cfg->popthreads)) != 0)
@@ -743,8 +786,8 @@ execute_populate(CONFIG *cfg)
 	}
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
-	secs = stop.tv_sec + stop.tv_usec / 1000000.0;
-	secs -= start.tv_sec + start.tv_usec / 1000000.0;
+	secs = stop.tv_sec + stop.tv_nsec / BILLION;
+	secs -= start.tv_sec + start.tv_nsec / BILLION;
 	if (secs == 0)
 		++secs;
 	lprintf(cfg, 0, 1,
@@ -788,7 +831,7 @@ execute_workload(CONFIG *cfg)
 {
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
 	uint32_t interval, run_ops, run_time;
-	int ret, tret;
+	int ret, t_ret;
 
 	g_insert_key = 0;
 	g_insert_ops = g_read_ops = g_update_ops = 0;
@@ -879,10 +922,10 @@ execute_workload(CONFIG *cfg)
 	/* Notify the worker threads they are done. */
 err:	g_stop = 1;
 
-	if ((tret = stop_threads(cfg,
+	if ((t_ret = stop_threads(cfg,
 	    cfg->read_threads + cfg->insert_threads + cfg->update_threads,
 	    cfg->workers)) != 0 && ret == 0)
-		ret = tret;
+		ret = t_ret;
 
 	/* Report if any worker threads didn't finish. */
 	if (g_error != 0) {
@@ -905,7 +948,7 @@ find_table_count(CONFIG *cfg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	char *key;
-	int ret;
+	int ret, t_ret;
 
 	conn = cfg->conn;
 
@@ -925,10 +968,19 @@ find_table_count(CONFIG *cfg)
 		    "cursor prev failed finding existing table count");
 		goto err;
 	}
-	assert(cursor->get_key(cursor, &key) == 0);
+	if ((ret = cursor->get_key(cursor, &key)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "cursor get_key failed finding existing table count");
+		goto err;
+	}
 	cfg->icount = (uint32_t)atoi(key);
 
-err:	assert(session->close(session, NULL) == 0);
+err:	if ((t_ret = session->close(session, NULL)) != 0) {
+		if (ret == 0)
+			ret = t_ret;
+		lprintf(cfg, ret, 0,
+		    "session close failed finding existing table count");
+	}
 	return (ret);
 }
 
@@ -940,7 +992,7 @@ main(int argc, char *argv[])
 	pthread_t monitor_thread;
 	size_t len;
 	uint64_t req_len, total_ops;
-	int ch, monitor_created, ret, tret;
+	int ch, monitor_created, ret, t_ret;
 	const char *opts = "C:O:T:h:o:SML";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
@@ -1138,7 +1190,11 @@ main(int argc, char *argv[])
 			    ret, 0, "Error creating table %s", cfg->uri);
 			goto err;
 		}
-		assert(session->close(session, NULL) == 0);
+		if ((ret = session->close(session, NULL)) != 0) {
+			lprintf(cfg,
+			    ret, 0, "Error closing session");
+			goto err;
+		}
 		session = NULL;
 	}
 					/* Start the monitor thread. */
@@ -1206,23 +1262,23 @@ einval:		ret = EINVAL;
 err:		if (ret == 0)
 			ret = EXIT_FAILURE;
 	}
-	if ((tret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
+	if ((t_ret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
-			ret = tret;
+			ret = t_ret;
 
 	if (monitor_created != 0 &&
-	    (tret = pthread_join(monitor_thread, NULL)) != 0) {
+	    (t_ret = pthread_join(monitor_thread, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error joining monitor thread.");
 		if (ret == 0)
-			ret = tret;
+			ret = t_ret;
 	}
 
 	if (cfg->conn != NULL &&
-	    (tret = cfg->conn->close(cfg->conn, NULL)) != 0) {
+	    (t_ret = cfg->conn->close(cfg->conn, NULL)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "Error closing connection to %s", cfg->home);
 		if (ret == 0)
-			ret = tret;
+			ret = t_ret;
 	}
 
 	if (ret == 0)
@@ -1231,8 +1287,10 @@ err:		if (ret == 0)
 		    cfg->run_time == 0 ? "operations" : "seconds");
 
 	if (cfg->logf != NULL) {
-		assert(fflush(cfg->logf) == 0);
-		assert(fclose(cfg->logf) == 0);
+		if ((t_ret = fflush(cfg->logf)) != 0 && ret == 0)
+			ret = t_ret;
+		if ((t_ret = fclose(cfg->logf)) != 0 && ret == 0)
+			ret = t_ret;
 	}
 	free(cfg->popthreads);
 	free(cfg->workers);
