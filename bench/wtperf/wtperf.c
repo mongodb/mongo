@@ -171,7 +171,7 @@ track_operation(TRACK *trk, uint64_t nsecs)
 static void
 worker(CONFIG_THREAD *thread)
 {
-	struct timespec *last, _last, *t, _t;
+	struct timespec start, stop;
 	CONFIG *cfg;
 	TRACK *trk;
 	WT_CONNECTION *conn;
@@ -202,10 +202,6 @@ worker(CONFIG_THREAD *thread)
 
 	op = thread->schedule;
 	op_end = thread->schedule + sizeof(thread->schedule);
-
-	t = &_t;
-	last = &_last;
-	assert(__wt_epoch(NULL, last) == 0);
 
 	while (!g_stop) {
 		/*
@@ -244,7 +240,7 @@ worker(CONFIG_THREAD *thread)
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		measure_latency = trk->ops % cfg->sample_rate == 0;
 		if (measure_latency)
-			assert(__wt_epoch(NULL, last) == 0);
+			assert(__wt_epoch(NULL, &start) == 0);
 
 		cursor->set_key(cursor, key_buf);
 
@@ -308,10 +304,10 @@ op_err:			lprintf(cfg, ret, 0,
 
 		/* Gather statistics */
 		if (measure_latency) {
-			assert(__wt_epoch(NULL, t) == 0);
-			nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
+			assert(__wt_epoch(NULL, &stop) == 0);
+			nsecs = (uint64_t)(stop.tv_nsec - start.tv_nsec);
 			nsecs += sec_to_ns(
-			    (uint64_t)(t->tv_sec - last->tv_sec));
+			    (uint64_t)(stop.tv_sec - start.tv_sec));
 			track_operation(trk, nsecs);
 		}
 		++trk->ops;		/* increment operation counts */
