@@ -223,6 +223,7 @@ worker(CONFIG_THREAD *thread)
 			break;
 		case WORKER_READ:
 			trk = &thread->read;
+			/* FALLTHROUGH */
 		case WORKER_UPDATE:
 			if (*op == WORKER_UPDATE)
 				trk = &thread->update;
