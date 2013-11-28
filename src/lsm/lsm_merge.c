@@ -57,7 +57,7 @@ __wt_lsm_merge(
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
-	WT_LSM_CHUNK *chunk, *previous, *youngest;
+	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
@@ -122,7 +122,6 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
-		previous = lsm_tree->chunk[start_chunk];
 		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk + 1) - start_chunk;
 
@@ -142,7 +141,8 @@ __wt_lsm_merge(
 		 * in a different generation, stop.
 		 */
 		if (nchunks >= merge_min &&
-		    chunk->generation > previous->generation &&
+		    chunk->generation >
+			lsm_tree->chunk[start_chunk]->generation &&
 		    chunk->generation <= youngest->generation + 1)
 			break;
 
