@@ -130,15 +130,12 @@ get_next_incr(void)
  *	Update an operation's tracking structure with new latency information.
  */
 static inline void
-track_aggregated_update(TRACK *trk, uint64_t nsecs, uint32_t aggregated)
+track_operation(TRACK *trk, uint64_t nsecs)
 {
 	uint64_t v;
 
-	if (trk->aggregated == 0)
-		return;
-
 					/* average nanoseconds per call */
-	v = (uint64_t)nsecs / aggregated;
+	v = (uint64_t)nsecs;
 
 	trk->latency += nsecs;		/* track total latency */
 
@@ -152,40 +149,37 @@ track_aggregated_update(TRACK *trk, uint64_t nsecs, uint32_t aggregated)
 	 * First buckets: usecs from 100us to 1000us at 100us each.
 	 */
 	if (v < us_to_ns(1000))
-		trk->us[ns_to_us(v)] += trk->aggregated;
+		++trk->us[ns_to_us(v)];
 
 	/*
 	 * Second buckets: millseconds from 1ms to 1000ms, at 1ms each.
 	 */
 	else if (v < ms_to_ns(1000))
-		trk->ms[ns_to_ms(v)] += trk->aggregated;
+		++trk->ms[ns_to_ms(v)];
 
 	/*
 	 * Third buckets are seconds from 1s to 100s, at 1s each.
 	 */
 	else if (v < sec_to_ns(100))
-		trk->sec[ns_to_sec(v)] += trk->aggregated;
+		++trk->sec[ns_to_sec(v)];
 
 	/* >100 seconds, accumulate in the biggest bucket. */
 	else
-		trk->sec[ELEMENTS(trk->sec) - 1] += trk->aggregated;
-
-	trk->aggregated = 0;
+		++trk->sec[ELEMENTS(trk->sec) - 1];
 }
 
 static void
 worker(CONFIG_THREAD *thread)
 {
-	struct timespec *last, _last, *t, _t, *tmp;
+	struct timespec *last, _last, *t, _t;
 	CONFIG *cfg;
 	TRACK *trk;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint64_t next_val, nsecs;
-	uint32_t aggregated;
-	int ret;
-	uint8_t last_op, *op, *op_end;
+	int measure_latency, ret;
+	uint8_t *op, *op_end;
 	char *value_buf, *key_buf, *value;
 
 	cfg = thread->cfg;
@@ -213,18 +207,25 @@ worker(CONFIG_THREAD *thread)
 	last = &_last;
 	assert(__wt_epoch(NULL, last) == 0);
 
-	aggregated = 0;
 	while (!g_stop) {
+		/*
+		 * Generate the next key and setup operation specific
+		 * statistics tracking objects.
+		 */
 		switch (*op) {
 		case WORKER_INSERT:
 		case WORKER_INSERT_RMW:
+			trk = &thread->insert;
 			if (cfg->random_range)
 				next_val = wtperf_rand(cfg);
 			else
 				next_val = cfg->icount + get_next_incr();
 			break;
 		case WORKER_READ:
+			trk = &thread->read;
 		case WORKER_UPDATE:
+			if (*op == WORKER_UPDATE)
+				trk = &thread->update;
 			next_val = wtperf_rand(cfg);
 
 			/*
@@ -240,6 +241,10 @@ worker(CONFIG_THREAD *thread)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+		measure_latency = trk->ops % cfg->sample_rate == 0;
+		if (measure_latency)
+			assert(__wt_epoch(NULL, last) == 0);
+
 		cursor->set_key(cursor, key_buf);
 
 		switch (*op) {
@@ -252,10 +257,8 @@ worker(CONFIG_THREAD *thread)
 			 * a random range as a "read".
 			 */
 			ret = cursor->search(cursor);
-			if (ret == 0 || ret == WT_NOTFOUND) {
-				trk = &thread->read;
+			if (ret == 0 || ret == WT_NOTFOUND)
 				break;
-			}
 			goto op_err;
 		case WORKER_INSERT_RMW:
 			if ((ret = cursor->search(cursor)) != WT_NOTFOUND)
@@ -267,10 +270,8 @@ worker(CONFIG_THREAD *thread)
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
 			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) == 0) {
-				trk = &thread->insert;
+			if ((ret = cursor->insert(cursor)) == 0)
 				break;
-			}
 			goto op_err;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
@@ -281,10 +282,8 @@ worker(CONFIG_THREAD *thread)
 				else
 					value_buf[0] = 'a';
 				cursor->set_value(cursor, value_buf);
-				if ((ret = cursor->update(cursor)) == 0) {
-					trk = &thread->update;
+				if ((ret = cursor->update(cursor)) == 0)
 					break;
-				}
 				goto op_err;
 			}
 
@@ -295,10 +294,8 @@ worker(CONFIG_THREAD *thread)
 			 * finished the actual insert.  Count failed search in
 			 * a random range as a "read".
 			 */
-			if (ret == WT_NOTFOUND) {
-				trk = &thread->read;
+			if (ret == WT_NOTFOUND)
 				break;
-			}
 
 op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
@@ -307,36 +304,20 @@ op_err:			lprintf(cfg, ret, 0,
 		default:
 			goto err;		/* can't happen */
 		}
+			assert(__wt_epoch(NULL, t) == 0);
 
+		/* Gather statistics */
+		if (measure_latency) {
+			assert(__wt_epoch(NULL, t) == 0);
+			nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
+			nsecs += sec_to_ns(
+			    (uint64_t)(t->tv_sec - last->tv_sec));
+			track_operation(trk, nsecs);
+		}
 		++trk->ops;		/* increment operation counts */
-		++trk->aggregated;
-		++aggregated;
 
-		last_op = *op;
 		if (++op == op_end)	/* schedule the next operation */
 			op = thread->schedule;
-
-		/*
-		 * Stop aggregation if the operation is going to change or we
-		 * reach the configurable limit.
-		 */
-		if (aggregated < cfg->latency_aggregate && last_op == *op)
-			continue;
-
-					/* calculate how long the calls took */
-		assert(__wt_epoch(NULL, t) == 0);
-		nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
-		nsecs += sec_to_ns((uint64_t)(t->tv_sec - last->tv_sec));
-
-					/* update call latencies */
-		track_aggregated_update(&thread->insert, nsecs, aggregated);
-		track_aggregated_update(&thread->read, nsecs, aggregated);
-		track_aggregated_update(&thread->update, nsecs, aggregated);
-		aggregated = 0;
-
-		tmp = last;		/* swap timers */
-		last = t;
-		t = tmp;
 	}
 
 	/* Notify our caller we failed and shut the system down. */
