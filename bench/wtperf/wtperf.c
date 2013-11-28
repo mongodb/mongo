@@ -178,7 +178,7 @@ worker(CONFIG_THREAD *thread)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint64_t next_val, nsecs;
-	int ret;
+	int measure_latency, ret;
 	uint8_t *op, *op_end;
 	char *data_buf, *key_buf, *value;
 
@@ -242,7 +242,8 @@ worker(CONFIG_THREAD *thread)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
-		if (trk->ops % cfg->sample_rate == 0)
+		measure_latency = trk->ops % cfg->sample_rate == 0;
+		if (measure_latency)
 			assert(__wt_epoch(NULL, last) == 0);
 
 		cursor->set_key(cursor, key_buf);
@@ -308,7 +309,7 @@ op_err:			lprintf(cfg, ret, 0,
 			assert(__wt_epoch(NULL, t) == 0);
 
 		/* Gather statistics */
-		if (trk->ops % cfg->sample_rate == 0) {
+		if (measure_latency) {
 			assert(__wt_epoch(NULL, t) == 0);
 			nsecs = (uint64_t)(t->tv_nsec - last->tv_nsec);
 			nsecs += sec_to_ns(
