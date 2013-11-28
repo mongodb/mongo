@@ -118,12 +118,6 @@ typedef struct {
 	uint32_t max_latency;		/* Maximum latency (NS) */
 
 	/*
-	 * To avoid reading the clock so often, operations of a single type are
-	 * aggregated into a single clock read, and are counted here.
-	 */
-	uint32_t aggregated;		/* Aggregated operations */
-
-	/*
 	 * Latency buckets.
 	 */
 	uint32_t us[1000];		/* < 1us ... 1000us */
