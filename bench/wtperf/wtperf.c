@@ -328,15 +328,14 @@ op_err:			lprintf(cfg, ret, 0,
 			op = thread->schedule;
 	}
 
+	if (session != NULL && (ret = session->close(session, NULL)) != 0) {
+		lprintf(cfg, ret, 0, "Session close in worker failed");
+		goto err;
+	}
+
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
 err:		g_error = g_stop = 1;
-	}
-
-	if (session != NULL &&
-	    (ret = session->close(session, NULL)) != 0) {
-		g_error = g_stop = 1;
-		lprintf(cfg, ret, 0, "Session close in worker failed");
 	}
 }
 
@@ -537,16 +536,17 @@ populate_thread(void *arg)
 			    "Fail committing, transaction was aborted");
 	}
 
+	if (session != NULL &&
+	    (ret = session->close(session, NULL)) != 0) {
+		lprintf(cfg, ret, 0, "Error closing session in populate");
+		goto err;
+	}
+
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
 err:		g_error = g_stop = 1;
 	}
 
-	if (session != NULL &&
-	    (ret = session->close(session, NULL)) != 0) {
-		lprintf(cfg, ret, 0, "Error closing session in populate");
-		g_error = g_stop = 1;
-	}
 	return (NULL);
 }
 
@@ -706,17 +706,18 @@ checkpoint_worker(void *arg)
 		}
 	}
 
+	if (session != NULL &&
+	    ((ret = session->close(session, NULL)) != 0)) {
+		lprintf(cfg, ret, 0,
+		    "Error closing session in checkpoint worker.");
+		goto err;
+	}
+
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
 err:		g_error = g_stop = 1;
 	}
 
-	if (session != NULL &&
-	    ((ret = session->close(session, NULL)) != 0)) {
-		lprintf(cfg, ret, 0,
-		    "Error closing session in checkpoint worker.");
-		g_error = g_stop = 1;
-	}
 	return (NULL);
 }
 
@@ -1259,6 +1260,10 @@ einval:		ret = EINVAL;
 err:		if (ret == 0)
 			ret = EXIT_FAILURE;
 	}
+
+	/* Notify the worker threads they are done. */
+	g_stop = 1;
+
 	if ((t_ret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
 			ret = t_ret;
