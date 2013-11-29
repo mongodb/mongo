@@ -9,8 +9,7 @@
 
 static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
-static int __lsm_tree_set_name(
-	WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
+static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
 
 /*
  * __lsm_tree_discard --
