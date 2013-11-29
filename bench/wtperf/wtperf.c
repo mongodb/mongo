@@ -241,7 +241,7 @@ worker(CONFIG_THREAD *thread)
 		measure_latency = cfg->sample_interval != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start) != 0)) {
+		    (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
