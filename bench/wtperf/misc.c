@@ -63,9 +63,6 @@ int
 setup_log_file(CONFIG *cfg)
 {
 	char *fname;
-	int ret;
-
-	ret = 0;
 
 	if (cfg->verbose < 1)
 		return (0);
@@ -75,15 +72,18 @@ setup_log_file(CONFIG *cfg)
 		return (enomem(cfg));
 
 	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
-	if ((cfg->logf = fopen(fname, "w")) == NULL) {
-		fprintf(stderr, "Statistics failed to open log file.\n");
-		ret = EINVAL;
-	} else {
-		/* Use line buffering for the log file. */
-		(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
-	}
+	cfg->logf = fopen(fname, "w");
 	free(fname);
-	return (ret);
+
+	if (cfg->logf == NULL) {
+		fprintf(stderr,
+		    "Failed to open log file: %s\n", strerror(errno));
+		return (EINVAL);
+	}
+
+	/* Use line buffering for the log file. */
+	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
+	return (0);
 }
 
 /*
