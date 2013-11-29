@@ -663,7 +663,6 @@ checkpoint_worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	struct timespec e, s;
-	uint64_t ms;
 	uint32_t i;
 	int ret;
 
@@ -705,8 +704,6 @@ checkpoint_worker(void *arg)
 			lprintf(cfg, ret, 0, "Get time failed in checkpoint.");
 			goto err;
 		}
-		ms = (e.tv_sec * 1000) + (e.tv_nsec / 1000000.0);
-		ms -= (s.tv_sec * 1000) + (s.tv_nsec / 1000000.0);
 	}
 
 	/* Notify our caller we failed and shut the system down. */
