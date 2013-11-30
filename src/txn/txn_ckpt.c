@@ -608,8 +608,10 @@ __checkpoint_worker(
 				continue;
 			}
 			WT_ERR_MSG(session, EBUSY,
-			    "named checkpoints cannot be created if backup "
-			    "cursors are open");
+			    "checkpoint %s blocked by hot backup: it would "
+			    "delete an existing checkpoint, and checkpoints "
+			    "cannot be deleted during a hot backup",
+			    ckpt->name);
 		}
 
 	/*
