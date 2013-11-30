@@ -227,7 +227,6 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
-	WT_DECL_RET;
 	time_t now;
 
 	/*
@@ -289,7 +288,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
-	time_t now;
 	uint64_t hash;
 	int candidate;
 
