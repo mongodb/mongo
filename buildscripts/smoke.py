@@ -227,8 +227,7 @@ class mongod(object):
             argv += ['--sslMode', "requireSSL",
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
-                     '--sslWeakCertificateValidation',
-                     '--sslAllowInvalidCertificates']
+                     '--sslWeakCertificateValidation']
         if self.kwargs.get('use_x509'):
             argv += ['--clusterAuthMode','x509'];
             self.auth = True
