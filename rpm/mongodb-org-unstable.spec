@@ -172,6 +172,9 @@ fi
 %{_mandir}/man1/mongostat.1*
 
 %changelog
+* Thu Dec 19 2013 Ernie Hershey <ernie.hershey@mongodb.com>
+- Packaging file cleanup
+
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
 

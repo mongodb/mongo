@@ -29,7 +29,7 @@
 # Default-Stop:      0 1 6
 # Short-Description: An object/document-oriented database
 # Description:       MongoDB is a high-performance, open source, schema-free 
-#                    document-oriented  data store that's easy to deploy, manage
+#                    document-oriented data store that's easy to deploy, manage
 #                    and use. It's network accessible, written in C++ and offers
 #                    the following features:
 #                    
@@ -40,7 +40,7 @@
 #                       * Replication and fail-over support
 #                       * Efficient storage of binary data including large 
 #                         objects (e.g. videos)
-#                       * Auto-sharding for cloud-level scalability (Q209)
+#                       * Automatic partitioning for cloud-level scalability
 #                    
 #                    High performance, scalability, and reasonable depth of
 #                    functionality are the goals for the project.

@@ -1,0 +1,137 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+TOOLS=bsondump mongodump mongoexport mongofiles mongoimport mongooplog mongoperf mongorestore mongostat mongotop
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	touch configure-stamp
+
+
+build: build-stamp
+
+build-stamp: configure-stamp  
+	dh_testdir
+
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
+	# scons 
+	#docbook-to-man debian/mongodb.sgml > mongodb.1
+	echo -n > debian/mongodb-enterprise-tools.manpages
+	for binary in ${TOOLS} ; \
+	do \
+	  echo debian/$$binary.1 >> debian/mongodb-enterprise-tools.manpages ; \
+	done
+
+	echo debian/mongo.1 > debian/mongodb-enterprise-shell.manpages
+	echo debian/mongod.1 > debian/mongodb-enterprise-server.manpages
+	echo debian/mongos.1 > debian/mongodb-enterprise-mongos.manpages
+
+	touch $@
+
+clean: 
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+
+	# FIXME: scons freaks out at the presence of target files
+	# under debian/mongodb.
+	#scons -c
+
+	rm -f debian/*.manpages
+
+	rm -rf $(CURDIR)/debian/mongodb-enterprise
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-shell
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-server
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-mongos
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-tools
+	rm -f config.log
+	rm -f mongo
+	rm -f mongod
+	rm -f mongoimportjson
+	rm -f mongoexport
+	rm -f mongorestore
+	rm -f mongodump
+	rm -f mongofiles
+	rm -f .sconsign.dblite
+	rm -f libmongoclient.a
+	rm -rf client/*.o
+	rm -rf tools/*.o
+	rm -rf shell/*.o
+	rm -rf .sconf_temp
+	rm -f buildscripts/*.pyc 
+	rm -f *.pyc
+	rm -f buildinfo.cpp
+	dh_clean debian/files
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# scons --prefix=$(CURDIR)/debian/mongodb/usr install
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
+
+	for binary in ${TOOLS} ; \
+	do \
+	  cp -v $(CURDIR)/BINARIES/usr/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin ; \
+	done
+
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/etc
+	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-enterprise-server/etc/mongod.conf 
+
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-shell/usr/share/lintian/overrides/mongodb-enterprise-shell
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-server/usr/share/lintian/overrides/mongodb-enterprise-server
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/mongodb-enterprise-mongos
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-tools/usr/share/lintian/overrides/mongodb-enterprise-tools
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs 
+	dh_installdocs
+	dh_installexamples
+#	dh_install
+#	dh_installmenu
+#	dh_installdebconf	
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+	dh_installinit -pmongodb-enterprise-server --name=mongod
+#	dh_installinfo
+	dh_installman
+	dh_link
+# Appears to be broken on Ubuntu 11.10...?
+#	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

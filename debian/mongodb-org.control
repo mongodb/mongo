@@ -1,0 +1,127 @@
+Source: mongodb-org
+Section: devel
+Priority: optional
+Maintainer: Ernie Hershey <ernie.hershey@mongodb.com>
+Build-Depends: 
+Standards-Version: 3.8.0
+Homepage: http://www.mongodb.org
+
+Package: mongodb-org
+Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-server, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), mongodb-org-shell, mongodb-org-server, mongodb-org-mongos, mongodb-org-tools
+Description: MongoDB cross-platform document-oriented database system (metapackage)
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Automatic partitioning for cloud-level scalability
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+
+
+Package: mongodb-org-shell
+Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-server, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: MongoDB shell client
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Automatic partitioning for cloud-level scalability
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs the mongo shell.
+
+Package: mongodb-org-server
+Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-server, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: MongoDB database server
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Automatic partitioning for cloud-level scalability
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs the mongod server. 
+
+Package: mongodb-org-mongos
+Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-server, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: MongoDB sharding router
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Automatic partitioning for cloud-level scalability
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs the mongos program. 
+
+Package: mongodb-org-tools
+Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-server, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
+Architecture: any
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1)
+Description: MongoDB tools
+ MongoDB is a high-performance, open source, schema-free 
+ document-oriented data store that's easy to deploy, manage
+ and use. It's network accessible, written in C++ and offers
+ the following features :
+ .
+    * Collection oriented storage - easy storage of object-
+      style data
+    * Full index support, including on inner objects
+    * Query profiling
+    * Replication and fail-over support
+    * Efficient storage of binary data including large 
+      objects (e.g. videos)
+    * Automatic partitioning for cloud-level scalability
+ .
+ High performance, scalability, and reasonable depth of
+ functionality are the goals for the project.
+ .
+ This Debian package installs standard utilities for 
+ interacting with MongoDB.

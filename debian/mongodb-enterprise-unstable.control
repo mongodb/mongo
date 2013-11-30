@@ -1,7 +1,7 @@
 Source: mongodb-enterprise-unstable
 Section: devel
 Priority: optional
-Maintainer: Richard Kreuter <richard@10gen.com>
+Maintainer: Ernie Hershey <ernie.hershey@mongodb.com>
 Build-Depends: 
 Standards-Version: 3.8.0
 Homepage: http://www.mongodb.org
@@ -12,7 +12,7 @@ Architecture: any
 Depends: mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-tools
 Description: MongoDB cross-platform document-oriented database system (enterprise metapackage)
  MongoDB is a high-performance, open source, schema-free 
- document-oriented  data store that's easy to deploy, manage
+ document-oriented data store that's easy to deploy, manage
  and use. It's network accessible, written in C++ and offers
  the following features :
  .
@@ -23,7 +23,7 @@ Description: MongoDB cross-platform document-oriented database system (enterpris
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability (Q209)
+    * Automatic partitioning for cloud-level scalability
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.
@@ -33,9 +33,9 @@ Package: mongodb-enterprise-unstable-shell
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
 Architecture: any
 Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsasl2-2, libssl1.0.0, libkrb5-3
-Description: MongoDB sharding router (enterprise)
+Description: MongoDB shell client (enterprise)
  MongoDB is a high-performance, open source, schema-free 
- document-oriented  data store that's easy to deploy, manage
+ document-oriented data store that's easy to deploy, manage
  and use. It's network accessible, written in C++ and offers
  the following features :
  .
@@ -46,7 +46,7 @@ Description: MongoDB sharding router (enterprise)
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability (Q209)
+    * Automatic partitioning for cloud-level scalability
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.
@@ -59,7 +59,7 @@ Architecture: any
 Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsasl2-2, libssl1.0.0, libkrb5-3, libsnmp15, snmp
 Description: MongoDB database server (enterprise)
  MongoDB is a high-performance, open source, schema-free 
- document-oriented  data store that's easy to deploy, manage
+ document-oriented data store that's easy to deploy, manage
  and use. It's network accessible, written in C++ and offers
  the following features :
  .
@@ -70,7 +70,7 @@ Description: MongoDB database server (enterprise)
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability (Q209)
+    * Automatic partitioning for cloud-level scalability
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.
@@ -81,9 +81,9 @@ Package: mongodb-enterprise-unstable-mongos
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-unstable-server, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen
 Architecture: any
 Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsasl2-2, libssl1.0.0, libkrb5-3
-Description: MongoDB shell client (enterprise)
+Description: MongoDB sharding router (enterprise)
  MongoDB is a high-performance, open source, schema-free 
- document-oriented  data store that's easy to deploy, manage
+ document-oriented data store that's easy to deploy, manage
  and use. It's network accessible, written in C++ and offers
  the following features :
  .
@@ -94,7 +94,7 @@ Description: MongoDB shell client (enterprise)
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability (Q209)
+    * Automatic partitioning for cloud-level scalability
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.
@@ -107,7 +107,7 @@ Architecture: any
 Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsasl2-2, libssl1.0.0, libkrb5-3
 Description: MongoDB tools (enterprise)
  MongoDB is a high-performance, open source, schema-free 
- document-oriented  data store that's easy to deploy, manage
+ document-oriented data store that's easy to deploy, manage
  and use. It's network accessible, written in C++ and offers
  the following features :
  .
@@ -118,7 +118,7 @@ Description: MongoDB tools (enterprise)
     * Replication and fail-over support
     * Efficient storage of binary data including large 
       objects (e.g. videos)
-    * Auto-sharding for cloud-level scalability (Q209)
+    * Automatic partitioning for cloud-level scalability
  .
  High performance, scalability, and reasonable depth of
  functionality are the goals for the project.
