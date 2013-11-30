@@ -552,18 +552,22 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int inuse;
 
 	dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/*
-	 * Decrement the reference count.  If we really are the last reference,
-	 * get an exclusive lock on the handle so that we can close it.
+	 * Decrement the reference count and return if still in use.
 	 */
-	inuse = --dhandle->refcnt > 0;
-	if (!inuse && !locked) {
+	if (--dhandle->refcnt > 0)
+		return (0);
+
+	/*
+	 * If we are the last reference, get an exclusive lock on the handle
+	 * so we can close it.
+	 */
+	if (!locked) {
 		/*
 		 * XXX
 		 * If we fail to get the lock it should be OK (the reference
@@ -574,27 +578,23 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 	}
 
-	if (!inuse) {
-		/*
-		 * We should only close the metadata file when closing the
-		 * last session (i.e., the default session for the connection)
-		 * or at the end of recovery.
-		 */
-		WT_ASSERT(session,
-		    S2BT(session) != session->metafile ||
-		    session == S2C(session)->default_session ||
-		    F_ISSET(session, WT_SESSION_LOGGING_DISABLED));
+	/*
+	 * We should only close the metadata file when closing the last session
+	 * (the default session for the connection) or at the end of recovery.
+	 */
+	WT_ASSERT(session,
+	    S2BT(session) != session->metafile ||
+	    session == S2C(session)->default_session ||
+	    F_ISSET(session, WT_SESSION_LOGGING_DISABLED));
 
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			WT_TRET(__wt_conn_btree_sync_and_close(session));
-			S2C(session)->dhandle_dead++;
-		}
-		if (!locked) {
-			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
-		}
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+		WT_TRET(__wt_conn_btree_sync_and_close(session));
+		S2C(session)->dhandle_dead++;
 	}
-
+	if (!locked) {
+		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
+		WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
+	}
 	return (ret);
 }
 
