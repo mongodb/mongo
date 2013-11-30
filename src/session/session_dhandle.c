@@ -291,6 +291,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	uint64_t hash;
 	int candidate;
 
+	dhandle = NULL;
 	candidate = 0;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
