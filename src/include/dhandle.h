@@ -33,8 +33,11 @@
  */
 struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
-	uint32_t   refcnt;		/* Sessions using this handle */
 	SLIST_ENTRY(__wt_data_handle) l;/* Linked list of handles */
+
+	uint32_t refcnt;		/* Sessions referencing this handle */
+	int32_t	 usecnt;		/* Sessions using this handle */
+	time_t	 timeofdeath;		/* Use count went to 0 */
 
 	uint64_t name_hash;		/* Hash of name */
 	const char *name;		/* Object name as a URI */

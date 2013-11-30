@@ -58,7 +58,12 @@ struct __wt_session_impl {
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
+
+					/* Session handle reference list */
 	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
+#define	WT_DHANDLE_SWEEP_WAIT	60	/* Wait before discarding */
+#define	WT_DHANDLE_SWEEP_PERIOD	20	/* Only sweep every 20 seconds */
+	time_t last_sweep;		/* Last sweep for dead handles */
 
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
