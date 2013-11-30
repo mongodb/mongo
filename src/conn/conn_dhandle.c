@@ -359,6 +359,9 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 
 	conn = S2C(session);
+
+	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
+
 	/*
 	 * Coordinate with eviction or other threads sweeping.  If the lock
 	 * is not free, we're done.  Cleaning up the list is a best effort only.
@@ -413,7 +416,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	if (S2C(session)->dhandle_dead >= CONN_DHANDLE_SWEEP_TRIGGER)
+	if (S2C(session)->dhandle_dead >= WT_DHANDLE_SWEEP_TRIGGER)
 		WT_RET(__conn_dhandle_sweep(session));
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;

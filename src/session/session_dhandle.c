@@ -221,6 +221,8 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
 	WT_DECL_RET;
 
+	WT_STAT_FAST_CONN_INCR(session, dh_session_sweeps);
+
 	dhandle_cache = SLIST_FIRST(&session->dhandles);
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
@@ -248,10 +250,8 @@ __session_open_btree(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 
-	if (dead) {
-		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
+	if (dead)
 		WT_TRET(__session_dhandle_sweep(session));
-	}
 	WT_TRET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
 	return (ret);
 }
