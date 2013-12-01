@@ -132,7 +132,7 @@ class Distro(object):
         layout (as distinct from where that distro's packaging building
         tools place the package files)."""
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/%s/dists/dist/mongodb/binary-%s/" % (self.n, self.archname(arch))
+            return "repo/%s/dists/dist/10gen/binary-%s/" % (self.n, self.archname(arch))
         elif re.search("(redhat|fedora|centos)", self.n):
             return "repo/%s/os/%s/RPMS/" % (self.n, self.archname(arch))
         else:
