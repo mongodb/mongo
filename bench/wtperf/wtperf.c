@@ -784,8 +784,8 @@ execute_populate(CONFIG *cfg)
 	}
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
-	secs = stop.tv_sec + stop.tv_nsec / 1000000000.0;
-	secs -= start.tv_sec + start.tv_nsec / 1000000000.0;
+	secs = stop.tv_sec + stop.tv_nsec / (double)BILLION;
+	secs -= start.tv_sec + start.tv_nsec / (double)BILLION;
 	if (secs == 0)
 		++secs;
 	lprintf(cfg, 0, 1,
