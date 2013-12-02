@@ -204,6 +204,13 @@ namespace mongo {
             return false;
         }
 
+        // If there's a limit on how many keys we can scan, we may be EOF when we hit that.
+        if (0 != _params.maxScan) {
+            if (_specificStats.keysExamined >= _params.maxScan) {
+                return true;
+            }
+        }
+
         return _hitEnd || _indexCursor->isEOF();
     }
 

@@ -227,6 +227,9 @@ namespace mongo {
         bool tailable;
 
         int direction;
+
+        // maxScan option to .find() limits how many docs we look at.
+        int maxScan;
     };
 
     struct AndHashNode : public QuerySolutionNode {
@@ -351,6 +354,9 @@ namespace mongo {
         int limit;
 
         int direction;
+
+        // maxScan option to .find() limits how many docs we look at.
+        int maxScan;
 
         // BIG NOTE:
         // If you use simple bounds, we'll use whatever index access method the keypattern implies.

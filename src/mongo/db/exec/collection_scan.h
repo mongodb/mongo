@@ -46,7 +46,8 @@ namespace mongo {
      */
     class CollectionScan : public PlanStage {
     public:
-        CollectionScan(const CollectionScanParams& params, WorkingSet* workingSet,
+        CollectionScan(const CollectionScanParams& params,
+                       WorkingSet* workingSet,
                        const MatchExpression* filter);
 
         virtual StageState work(WorkingSetID* out);

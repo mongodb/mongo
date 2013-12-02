@@ -40,7 +40,8 @@ namespace mongo {
 
         CollectionScanParams() : start(DiskLoc()),
                                  direction(FORWARD),
-                                 tailable(false) { }
+                                 tailable(false),
+                                 maxScan(0) { }
 
         // What collection?
         string ns;
@@ -53,6 +54,9 @@ namespace mongo {
 
         // Do we want the scan to be 'tailable'?  Only meaningful if the collection is capped.
         bool tailable;
+
+        // If non-zero, how many documents will we look at?
+        size_t maxScan;
     };
 
 }  // namespace mongo

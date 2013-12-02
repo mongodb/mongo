@@ -43,7 +43,10 @@ namespace mongo {
     CollectionScan::CollectionScan(const CollectionScanParams& params,
                                    WorkingSet* workingSet,
                                    const MatchExpression* filter)
-        : _workingSet(workingSet), _filter(filter), _params(params), _nsDropped(false) { }
+        : _workingSet(workingSet),
+          _filter(filter),
+          _params(params),
+          _nsDropped(false) { }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -105,6 +108,9 @@ namespace mongo {
     }
 
     bool CollectionScan::isEOF() {
+        if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
+            return true;
+        }
         if (_nsDropped) { return true; }
         if (NULL == _iter) { return false; }
         return _iter->isEOF();

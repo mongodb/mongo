@@ -127,7 +127,8 @@ namespace mongo {
          * If the node is a geo node, grab the geo data from 'expr' and stuff it into the
          * geo solution node of the appropriate type.
          */
-        static QuerySolutionNode* makeLeafNode(const IndexEntry& index,
+        static QuerySolutionNode* makeLeafNode(const CanonicalQuery& query,
+                                               const IndexEntry& index,
                                                MatchExpression* expr,
                                                IndexBoundsBuilder::BoundsTightness* tightnessOut);
 

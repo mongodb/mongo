@@ -58,6 +58,7 @@ namespace mongo {
             params.tailable = csn->tailable;
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
+            params.maxScan = csn->maxScan;
             return new CollectionScan(params, ws, csn->filter.get());
         }
         else if (STAGE_IXSCAN == root->getType()) {
@@ -87,6 +88,7 @@ namespace mongo {
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.limit = ixn->limit;
+            params.maxScan = ixn->maxScan;
             return new IndexScan(params, ws, ixn->filter.get());
         }
         else if (STAGE_FETCH == root->getType()) {

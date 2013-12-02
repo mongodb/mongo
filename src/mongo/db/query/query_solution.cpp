@@ -77,7 +77,7 @@ namespace mongo {
     // CollectionScanNode
     //
 
-    CollectionScanNode::CollectionScanNode() : tailable(false), direction(1) { }
+    CollectionScanNode::CollectionScanNode() : tailable(false), direction(1), maxScan(0) { }
 
     void CollectionScanNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -307,7 +307,7 @@ namespace mongo {
     //
 
     IndexScanNode::IndexScanNode()
-        : indexIsMultiKey(false), limit(0), direction(1) { }
+        : indexIsMultiKey(false), limit(0), direction(1), maxScan(0) { }
 
     void IndexScanNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);

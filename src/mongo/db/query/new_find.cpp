@@ -115,8 +115,7 @@ namespace mongo {
         const LiteParsedQuery& pq = cq->getParsed();
 
         // We fail to deal well with obscure arguments to .find().
-        if (pq.returnKey() || pq.showDiskLoc() || (0 != pq.getMaxScan()) || !pq.getMin().isEmpty()
-            || !pq.getMax().isEmpty()) {
+        if (pq.returnKey() || pq.showDiskLoc() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty()) {
             QLOG() << "rejecting wacky query args query\n";
             return false;
         }

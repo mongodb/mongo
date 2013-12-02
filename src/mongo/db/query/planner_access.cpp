@@ -51,6 +51,7 @@ namespace mongo {
         csn->name = query.ns();
         csn->filter.reset(query.root()->shallowClone());
         csn->tailable = tailable;
+        csn->maxScan = query.getParsed().getMaxScan();
 
         // If the sort is {$natural: +-1} this changes the direction of the collection scan.
         const BSONObj& sortObj = query.getParsed().getSort();
@@ -74,7 +75,8 @@ namespace mongo {
     }
 
     // static
-    QuerySolutionNode* QueryPlannerAccess::makeLeafNode(const IndexEntry& index,
+    QuerySolutionNode* QueryPlannerAccess::makeLeafNode(const CanonicalQuery& query,
+                                                        const IndexEntry& index,
                                                         MatchExpression* expr,
                                                         IndexBoundsBuilder::BoundsTightness* tightnessOut) {
         // QLOG() << "making leaf node for " << expr->toString() << endl;
@@ -133,6 +135,7 @@ namespace mongo {
             isn->indexKeyPattern = index.keyPattern;
             isn->indexIsMultiKey = index.multikey;
             isn->bounds.fields.resize(index.keyPattern.nFields());
+            isn->maxScan = query.getParsed().getMaxScan();
 
             IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(),
                                           &isn->bounds.fields[0], tightnessOut);
@@ -474,7 +477,7 @@ namespace mongo {
                 currentIndexNumber = ixtag->index;
 
                 IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
-                currentScan.reset(makeLeafNode(indices[currentIndexNumber],
+                currentScan.reset(makeLeafNode(query, indices[currentIndexNumber],
                                                 child, &tightness));
 
                 if (tightness == IndexBoundsBuilder::EXACT && !inArrayOperator) {
@@ -727,7 +730,7 @@ namespace mongo {
                 IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 
                 IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
-                QuerySolutionNode* soln = makeLeafNode(indices[tag->index], root,
+                QuerySolutionNode* soln = makeLeafNode(query, indices[tag->index], root,
                                                        &tightness);
                 verify(NULL != soln);
                 stringstream ss;
@@ -827,6 +830,7 @@ namespace mongo {
         isn->indexKeyPattern = index.keyPattern;
         isn->indexIsMultiKey = index.multikey;
         isn->bounds.fields.resize(index.keyPattern.nFields());
+        isn->maxScan = query.getParsed().getMaxScan();
 
         // TODO: can we use simple bounds with this compound idx?
         BSONObjIterator it(isn->indexKeyPattern);
