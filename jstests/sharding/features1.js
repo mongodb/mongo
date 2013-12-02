@@ -102,15 +102,8 @@ assert.eq(0, result.ok, "eval should not work for sharded collection in cluster"
 assert( s.admin.runCommand( { shardcollection : "test.foo4" , key : { num : 1 } , unique : true } ).ok , "shard with index and unique" );
 s.adminCommand( { split : "test.foo4" , middle : { num : 10 } } );
 
-//movechunk commands are wrapped in assert.soon
-//Sometimes the TO-side shard isn't immediately ready, this
-//causes problems on slow hosts.
-//Remove when SERVER-10232 is fixed
-
-assert.soon( function() {
-    var cmdRes = s.admin.runCommand( { movechunk : "test.foo4" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
-    return cmdRes.ok;
-}, 'move chunk test.foo4', 60000, 1000 );
+s.admin.runCommand({ movechunk: "test.foo4", find: { num: 20 },
+                     to: s.getOther( s.getServer( "test" ) ).name });
 
 db.foo4.save( { num : 5 } );
 db.foo4.save( { num : 15 } );
