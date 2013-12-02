@@ -121,7 +121,7 @@ namespace mongo {
                 break;
             }
             result->err = "nojournal";
-            return Status( ErrorCodes::BadValue, "journalling not enabled" );
+            return Status( ErrorCodes::BadValue, "journaling not enabled" );
         case WriteConcernOptions::FSYNC:
             result->fsyncFiles = MemoryMappedFile::flushAll( true );
             break;
@@ -139,9 +139,12 @@ namespace mongo {
             // config servers have special rules
             if ( writeConcern.wNumNodes > 1 ) {
                 result->err = "norepl";
-                return Status( ErrorCodes::BadValue, "cannot use w > 1 with config servers" );
+                //TODO: would like to switch to return an error, but is a breaking change
+                //return Status( ErrorCodes::BadValue, "cannot use w > 1 with config servers" );
+                return Status::OK();
             }
             if ( writeConcern.wMode == "majority" ) {
+                // majority is ok for single nodes, as 1/1 > .5
                 return Status::OK();
             }
             result->err = "norepl";
@@ -191,7 +194,6 @@ namespace mongo {
                 return Status( DBException::convertExceptionCode(10990), "no longer primary" );
             }
 
-            // check this first for w=0 or w=1
             if ( writeConcern.wNumNodes > 0 ) {
                 if ( opReplicatedEnough( op, writeConcern.wNumNodes ) ) {
                     break;

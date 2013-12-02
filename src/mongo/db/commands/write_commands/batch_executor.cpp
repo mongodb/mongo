@@ -172,22 +172,22 @@ namespace mongo {
         if ( numItemErrors < numBatchItems ) {
 
             WriteConcernOptions writeConcern;
-            Status s = Status::OK();
+            Status status = Status::OK();
             if ( request.isWriteConcernSet() ) {
-                s = writeConcern.parse( request.getWriteConcern() );
+                status = writeConcern.parse( request.getWriteConcern() );
             }
             else {
-                s = writeConcern.parse( _defaultWriteConcern );
+                status = writeConcern.parse( _defaultWriteConcern );
             }
 
-            if ( !s.isOK() ) {
-                response->setErrCode( s.code() );
-                response->setErrMessage( s.toString() );
+            if ( !status.isOK() ) {
+                response->setErrCode( ErrorCodes::WriteConcernFailed );
+                response->setErrMessage( status.toString() );
             }
             else {
                 WriteConcernResult res;
-                s = waitForWriteConcern( cc(), writeConcern, &res );
-                maybeBuildWCError( s, res, response );
+                status = waitForWriteConcern( cc(), writeConcern, &res );
+                maybeBuildWCError( status, res, response );
             }
         }
 

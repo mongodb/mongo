@@ -120,18 +120,18 @@ namespace mongo {
             }
 
             WriteConcernOptions writeConcern;
-            Status s = writeConcern.parse( cmdObj );
-            if ( !s.isOK() ) {
+            Status status = writeConcern.parse( cmdObj );
+            if ( !status.isOK() ) {
                 result.append( "badGLE", cmdObj );
-                errmsg = s.toString();
+                errmsg = status.toString();
                 return false;
             }
 
             WriteConcernResult res;
-            s = waitForWriteConcern( cc(), writeConcern, &res );
+            status = waitForWriteConcern( cc(), writeConcern, &res );
             res.appendTo( &result );
-            if ( !s.isOK() ) {
-                errmsg = s.toString();
+            if ( !status.isOK() ) {
+                errmsg = status.toString();
                 return false;
             }
             return true;
