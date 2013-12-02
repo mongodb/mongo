@@ -193,6 +193,16 @@ namespace mongo {
                     log() << "replSet " << o.toString() << rsLog;
                     throw rsfatal();
                 }
+                else if( cmdname == "collMod" ) {
+                    if ( o.nFields() == 2 &&
+                         o["usePowerOf2Sizes"].type() == Bool ) {
+                        log() << "replSet not rolling back change of usePowerOf2Sizes: " << o;
+                    }
+                    else {
+                        log() << "replSet error cannot rollback a collMod command: " << o;
+                        throw rsfatal();
+                    }
+                }
                 else {
                     log() << "replSet error can't rollback this command yet: " << o.toString() << rsLog;
                     log() << "replSet cmdname=" << cmdname << rsLog;
