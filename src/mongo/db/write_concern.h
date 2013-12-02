@@ -58,6 +58,7 @@ namespace mongo {
         }
 
         void reset() {
+            syncMillis = -1;
             fsyncFiles = -1;
             wTimedOut = false;
             wTime = -1;
@@ -66,6 +67,7 @@ namespace mongo {
 
         void appendTo( BSONObjBuilder* result ) const;
 
+        int syncMillis;
         int fsyncFiles;
 
         bool wTimedOut;

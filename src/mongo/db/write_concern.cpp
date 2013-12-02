@@ -83,6 +83,9 @@ namespace mongo {
     }
 
     void WriteConcernResult::appendTo( BSONObjBuilder* result ) const {
+        if ( syncMillis >= 0 )
+            result->appendNumber( "syncMillis", syncMillis );
+
         if ( fsyncFiles >= 0 )
             result->appendNumber( "fsyncFiles", fsyncFiles );
 
@@ -112,6 +115,7 @@ namespace mongo {
                                WriteConcernResult* result ) {
         // first handle blocking on disk
 
+        Timer syncTimer;
         switch( writeConcern.syncMode ) {
         case WriteConcernOptions::NONE:
             break;
@@ -126,6 +130,7 @@ namespace mongo {
             result->fsyncFiles = MemoryMappedFile::flushAll( true );
             break;
         }
+        result->syncMillis = syncTimer.millis();
 
         // now wait for replication
 
@@ -181,7 +186,12 @@ namespace mongo {
         }
 
         if ( !writeConcern.wMode.empty() && !theReplSet ) {
-            return Status( ErrorCodes::BadValue, "asked for a w mode with master/slave" );
+            // TODO: want to return the status, but is backwards breaking
+            //       only for master/slave, which is deprecated
+            //return Status( ErrorCodes::BadValue,
+            //str::stream() << "asked for a w mode with master/slave ["
+            //<< writeConcern.wMode << "]" );
+            return Status::OK();
         }
 
         // now that we've done the prep, now we actually wait
