@@ -854,7 +854,10 @@ namespace mongo {
                 if ( ! conn->get()->runCommand( "config",
                                                 BSON( "dbhash" << 1 <<
                                                       "collections" << BSON_ARRAY( "chunks" <<
-                                                                                   "databases" ) ),
+                                                                                   "databases" <<
+                                                                                   "collections" <<
+                                                                                   "shards" <<
+                                                                                   "version" )),
                                                 result ) ) {
 
                     // TODO: Make this a helper
@@ -907,20 +910,34 @@ namespace mongo {
             if ( res[i].isEmpty() )
                 continue;
 
-            string c1 = base.getFieldDotted( "collections.chunks" );
-            string c2 = res[i].getFieldDotted( "collections.chunks" );
+            string chunksHash1 = base.getFieldDotted( "collections.chunks" );
+            string chunksHash2 = res[i].getFieldDotted( "collections.chunks" );
 
-            string d1 = base.getFieldDotted( "collections.databases" );
-            string d2 = res[i].getFieldDotted( "collections.databases" );
+            string databaseHash1 = base.getFieldDotted( "collections.databases" );
+            string databaseHash2 = res[i].getFieldDotted( "collections.databases" );
 
-            if ( c1 == c2 && d1 == d2 )
+            string collectionsHash1 = base.getFieldDotted( "collections.collections" );
+            string collectionsHash2 = res[i].getFieldDotted( "collections.collections" );
+
+            string shardHash1 = base.getFieldDotted( "collections.shards" );
+            string shardHash2 = res[i].getFieldDotted( "collections.shards" );
+
+            string versionHash1 = base.getFieldDotted( "collections.version" );
+            string versionHash2 = res[i].getFieldDotted( "collections.version" );
+
+            if ( chunksHash1 == chunksHash2 &&
+                    databaseHash1 == databaseHash2 &&
+                    collectionsHash1 == collectionsHash2 &&
+                    shardHash1 == shardHash2 &&
+                    versionHash1 == versionHash2 ) {
                 continue;
+            }
 
             stringstream ss;
             ss << "config servers " << _config[firstGood] << " and " << _config[i] << " differ";
             warning() << ss.str() << endl;
             if ( tries <= 1 ) {
-                ss << "\n" << c1 << "\t" << c2 << "\n" << d1 << "\t" << d2;
+                ss << ": " << base["collections"].Obj() << " vs " << res[i]["collections"].Obj();
                 errmsg = ss.str();
                 return false;
             }
