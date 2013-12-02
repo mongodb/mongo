@@ -750,7 +750,7 @@ namespace mongo {
                 try {
                     yield.reset();
                 }
-                catch (SendStaleConfigException& e) {
+                catch (SendStaleConfigException&) {
                     log() << "metadata changed during filemd5" << endl;
                     break;
                 }
