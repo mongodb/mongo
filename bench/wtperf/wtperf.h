@@ -58,6 +58,9 @@ struct __config {			/* Configuration struction */
 
 	CONFIG_THREAD *ckptthreads, *popthreads, *workers;
 
+	int64_t worker_threads,		/* Worker thread configuration */
+	    worker_insert, worker_read, worker_update;
+
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
@@ -132,12 +135,6 @@ struct __config_thread {		/* Per-thread structure */
 
 	char *key_buf, *value_buf;	/* Key/value memory */
 
-#define	WORKER_READ		1	/* Read */
-#define	WORKER_INSERT		2	/* Insert */
-#define	WORKER_INSERT_RMW	3	/* Insert with read-modify-write */
-#define	WORKER_UPDATE		4	/* Update */
-	uint8_t	schedule[100];		/* Thread operations */
-
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
@@ -146,9 +143,9 @@ struct __config_thread {		/* Per-thread structure */
 
 int	 config_assign(CONFIG *, const CONFIG *);
 void	 config_free(CONFIG *);
-int	 config_opt_file(CONFIG *, WT_SESSION *, const char *);
-int	 config_opt_line(CONFIG *, WT_SESSION *, const char *);
-int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
+int	 config_opt_file(CONFIG *, const char *);
+int	 config_opt_line(CONFIG *, const char *);
+int	 config_opt_str(CONFIG *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
@@ -156,8 +153,6 @@ void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
-const char *
-	 op_name(uint8_t *);
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 int	 setup_log_file(CONFIG *);

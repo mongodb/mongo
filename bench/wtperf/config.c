@@ -37,6 +37,15 @@ static CONFIG_OPT config_opts[] = {
 static int  config_opt(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
 static void config_opt_usage(void);
 
+/*
+ * STRING_MATCH --
+ *	Return if a string matches a bytestring of a specified length.
+ */
+#undef	STRING_MATCH
+#define	STRING_MATCH(str, bytes, len)					\
+	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
+
 /* Assign the src config to the dest.
  * Any storage allocated in dest is freed as a result.
  */
@@ -85,6 +94,64 @@ config_free(CONFIG *cfg)
 		}
 
 	free(cfg->uri);
+}
+
+/*
+ * config_threads --
+ *	Parse the thread configuration.
+ */
+static int
+config_threads(CONFIG *cfg, const char *orig, size_t olen)
+{
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
+	WT_EXTENSION_API *wt_api;
+	int ret;
+
+	wt_api = cfg->conn->get_extension_api(cfg->conn);
+
+	 if ((ret =
+	     wt_api->config_scan_begin(wt_api, NULL, orig, olen, &scan)) != 0)
+		return (ret);
+
+	while ((ret = wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0) {
+		if (STRING_MATCH("count", k.str, k.len)) {
+			if ((cfg->worker_threads = v.val) <= 0)
+				goto einval;
+			continue;
+		}
+		if (STRING_MATCH("insert", k.str, k.len) ||
+		    STRING_MATCH("inserts", k.str, k.len)) {
+			if ((cfg->worker_insert = v.val) <= 0)
+				goto einval;
+			continue;
+		}
+		if (STRING_MATCH("read", k.str, k.len) ||
+		    STRING_MATCH("reads", k.str, k.len)) {
+			if ((cfg->worker_read = v.val) <= 0)
+				goto einval;
+			continue;
+		}
+		if (STRING_MATCH("update", k.str, k.len) ||
+		    STRING_MATCH("updates", k.str, k.len)) {
+			if ((cfg->worker_update = v.val) <= 0)
+				goto einval;
+			continue;
+		}
+einval:		fprintf(stderr,
+		    "invalid thread configuration: %.*s/%.*s\n",
+		    (int)k.len, k.str, (int)v.len, v.str);
+		return (EINVAL);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0 )
+		return (ret);
+
+	if ((ret = wt_api->config_scan_end(wt_api, scan)) != 0)
+		return (ret);
+
+	return (0);
 }
 
 /*
@@ -183,6 +250,14 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		*strp = newstr;
 		break;
 	case STRING_TYPE:
+		/*
+		 * Thread configuration is the one case where the type isn't a
+		 * "string", it's a "struct".
+		 */
+		if (v->type == WT_CONFIG_ITEM_STRUCT &&
+		    STRING_MATCH("threads", k->str, k->len))
+			return (config_threads(cfg, v->str, v->len));
+
 		if (v->type != WT_CONFIG_ITEM_STRING) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
@@ -205,7 +280,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
  * We recognize comments '#' and continuation via lines ending in '\'.
  */
 int
-config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
+config_opt_file(CONFIG *cfg, const char *filename)
 {
 	FILE *fp;
 	size_t linelen, optionpos;
@@ -256,8 +331,7 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 		if (contline)
 			optionpos += linelen;
 		else {
-			if ((ret = config_opt_line(cfg,
-				    parse_session, option)) != 0) {
+			if ((ret = config_opt_line(cfg, option)) != 0) {
 				fprintf(stderr, "wtperf: %s: %d: parse error\n",
 				    filename, linenum);
 				break;
@@ -279,19 +353,17 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
  * Continued lines have already been joined.
  */
 int
-config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, const char *optstr)
+config_opt_line(CONFIG *cfg, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
-	WT_CONNECTION *conn;
 	WT_EXTENSION_API *wt_api;
 	int ret, t_ret;
 
-	conn = parse_session->connection;
-	wt_api = conn->get_extension_api(conn);
+	wt_api = cfg->conn->get_extension_api(cfg->conn);
 
-	if ((ret = wt_api->config_scan_begin(wt_api, parse_session, optstr,
-	    strlen(optstr), &scan)) != 0) {
+	if ((ret = wt_api->config_scan_begin(
+	    wt_api, NULL, optstr, strlen(optstr), &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
@@ -317,8 +389,7 @@ config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, const char *optstr)
 
 /* Set a single string config option */
 int
-config_opt_str(CONFIG *cfg, WT_SESSION *parse_session,
-    const char *name, const char *value)
+config_opt_str(CONFIG *cfg, const char *name, const char *value)
 {
 	int ret;
 	char *optstr;
@@ -327,7 +398,7 @@ config_opt_str(CONFIG *cfg, WT_SESSION *parse_session,
 	if ((optstr = malloc(strlen(name) + strlen(value) + 4)) == NULL)
 		return (enomem(cfg));
 	sprintf(optstr, "%s=\"%s\"", name, value);
-	ret = config_opt_line(cfg, parse_session, optstr);
+	ret = config_opt_line(cfg, optstr);
 	free(optstr);
 	return (ret);
 }
@@ -405,13 +476,6 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (1);
 	}
-
-	/* Job mix shouldn't be more than 100%. */
-	if (cfg->run_mix_inserts + cfg->run_mix_updates > 100) {
-		fprintf(stderr,
-		    "job mix percentages cannot be more than 100\n");
-		return (1);
-	}
 	return (0);
 }
 
@@ -419,38 +483,32 @@ void
 config_print(CONFIG *cfg)
 {
 	printf("Workload configuration:\n");
-	printf("\thome: %s\n", cfg->home);
-	printf("\ttable_name: %s\n", cfg->table_name);
+	printf("\tHome: %s\n", cfg->home);
+	printf("\tTable name: %s\n", cfg->table_name);
 	printf("\tConnection configuration: %s\n", cfg->conn_config);
-	printf("\tTable configuration: %s (%s)\n",
-	    cfg->table_config, cfg->create ? "creating new" : "using existing");
-	printf("\tWorkload period/operations: %" PRIu32 "/%" PRIu32 "\n",
+
+	printf("\t%s table: %s\n",
+	    cfg->create ? "Creating new" : "Using existing",
+	    cfg->table_config);
+	printf("\tKey size: %" PRIu32 ", value size: %" PRIu32 "\n",
+	    cfg->key_sz, cfg->value_sz);
+	if (cfg->create)
+		printf("\tPopulate threads: %" PRIu32 ", inserting %" PRIu32
+		    " rows\n",
+		    cfg->populate_threads, cfg->icount);
+
+	printf("\tWorkload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
 	    cfg->run_time, cfg->run_ops);
-	printf(
-	    "\tCheckpoint interval: %" PRIu32 "\n", cfg->checkpoint_interval);
+	printf("\tWorkload configuration: %" PRId64 " threads (inserts=%" PRId64
+	    ", reads=%" PRId64 ", updates=%" PRId64 ")\n",
+	    cfg->worker_threads,
+	    cfg->worker_insert, cfg->worker_read, cfg->worker_update);
+
+	printf("\tCheckpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
+	    cfg->checkpoint_threads, cfg->checkpoint_interval);
 	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
 	printf("\tSampling interval: %" PRIu32 "\n", cfg->sample_interval);
-	if (cfg->create) {
-		printf("\tInsert count: %" PRIu32 "\n", cfg->icount);
-		printf("\tNumber populate threads: %" PRIu32 "\n",
-		    cfg->populate_threads);
-	}
-	if (cfg->run_mix_inserts == 0 && cfg->run_mix_updates == 0) {
-		printf("\tNumber read threads: %" PRIu32 "\n",
-		    cfg->read_threads);
-		printf(
-		    "\tNumber insert threads: %" PRIu32 "%s\n",
-		    cfg->insert_threads,
-		    cfg->insert_rmw ? " (inserts are RMW)" : "");
-		printf("\tNumber update threads: %" PRIu32 "\n",
-		    cfg->update_threads);
-	} else
-		printf("\tOperation mix is %"
-		    PRIu32 "reads, %" PRIu32 " inserts, %" PRIu32 " updates\n",
-		    100 - (cfg->run_mix_inserts + cfg->run_mix_updates),
-		    cfg->run_mix_inserts, cfg->run_mix_updates);
-	printf("\tkey size: %" PRIu32 " value size: %" PRIu32 "\n",
-	    cfg->key_sz, cfg->value_sz);
+
 	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
 }
 
