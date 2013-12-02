@@ -1205,6 +1205,104 @@ namespace {
         assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {a: 1}}}}");
     }
 
+    //
+    // Negation
+    //
+
+    TEST_F(IndexAssignmentTest, NegationIndexForSort) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{a: {$ne: 1}}"), fromjson("{a: 1}"), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NegationTopLevel) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{a: {$ne: 1}}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: 1}");
+    }
+
+    TEST_F(IndexAssignmentTest, NegationOr) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{$or: [{a: 1}, {b: {$ne: 1}}]}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: 1}");
+    }
+
+    TEST_F(IndexAssignmentTest, NegationOrNotIn) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{$or: [{a: 1}, {b: {$nin: [1]}}]}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: 1}");
+    }
+
+    TEST_F(IndexAssignmentTest, NegationAndIndexOnEquality) {
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{$and: [{a: 1}, {b: {$ne: 1}}]}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NegationAndIndexOnEqualityAndNegationBranches) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        runQuerySortProj(fromjson("{$and: [{a: 1}, {b: 2}, {b: {$ne: 1}}]}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {a: 1}}}");
+        assertSolutionExists("{fetch: {ixscan: {b: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, NegationAndIndexOnInEquality) {
+        addIndex(BSON("b" << 1));
+        runQuerySortProj(fromjson("{$and: [{a: 1}, {b: {$ne: 1}}]}"), BSONObj(), BSONObj());
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: 1}");
+    }
+
+    //
+    // 2D geo negation
+    // The filter b != 1 is embedded in the geoNear2d node.
+    // Can only do near + old point.
+    //
+    TEST_F(IndexAssignmentTest, Negation2DGeoNear) {
+        addIndex(BSON("a" << "2d"));
+        runQuery(fromjson("{$and: [{a: {$near: [0, 0], $maxDistance: 0.3}}, {b: {$ne: 1}}]}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{geoNear2d: {a: '2d'}}");
+    }
+
+    //
+    // 2DSphere geo negation
+    // Filter is embedded in a separate fetch node.
+    //
+    TEST_F(IndexAssignmentTest, Negation2DSphereGeoNear) {
+        // Can do nearSphere + old point, near + new point.
+        addIndex(BSON("a" << "2dsphere"));
+
+        runQuery(fromjson("{$and: [{a: {$nearSphere: [0,0], $maxDistance: 0.31}}, "
+                          "{b: {$ne: 1}}]}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {geoNear2dsphere: {a: '2dsphere'}}}");
+
+        runQuery(fromjson("{$and: [{a: {$geoNear: {$geometry: {type: 'Point', "
+                                                              "coordinates: [0, 0]},"
+                                                  "$maxDistance: 100}}},"
+                                  "{b: {$ne: 1}}]}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {geoNear2dsphere: {a: '2dsphere'}}}");
+    }
+
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
     //                second is not working (until the machinery is in place)
     //

@@ -45,6 +45,12 @@ namespace mongo {
     void QueryPlannerIXSelect::getFields(MatchExpression* node,
                                          string prefix,
                                          unordered_set<string>* out) {
+        // Do not traverse tree beyond negation node
+        MatchExpression::MatchType exprtype = node->matchType();
+        if (exprtype == MatchExpression::NOT || exprtype == MatchExpression::NOR) {
+            return;
+        }
+
         // Leaf nodes with a path and some array operators.
         if (Indexability::nodeCanUseIndexOnOwnField(node)) {
             out->insert(prefix + node->path().toString());
@@ -181,6 +187,14 @@ namespace mongo {
     void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
                                            string prefix,
                                            const vector<IndexEntry>& indices) {
+        // Do not traverse tree beyond negation node
+        MatchExpression::MatchType exprtype = node->matchType();
+        if (exprtype == MatchExpression::NOT || exprtype == MatchExpression::NOR) {
+            return;
+        }
+
+        // Every indexable node is tagged even when no compatible index is
+        // available.
         if (Indexability::nodeCanUseIndexOnOwnField(node)) {
             string fullPath = prefix + node->path().toString();
             verify(NULL == node->getTag());

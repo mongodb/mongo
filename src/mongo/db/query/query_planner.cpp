@@ -209,27 +209,6 @@ namespace mongo {
             }
         }
 
-        // NOR and NOT we can't handle well with indices.  If we see them here, they weren't
-        // rewritten to remove the negation.  Just output a collscan for those.
-        if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::NOT)
-            || QueryPlannerCommon::hasNode(query.root(), MatchExpression::NOR)) {
-
-            // If there's a near predicate, we can't handle this.
-            // TODO: Should canonicalized query detect this?
-            if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
-                warning() << "Can't handle NOT/NOR with GEO_NEAR";
-                return;
-            }
-            QLOG() << "NOT/NOR in plan, just outtping a collscan\n";
-            if (canTableScan) {
-                QuerySolution* soln = buildCollscanSoln(query, false, params);
-                if (NULL != soln) {
-                    out->push_back(soln);
-                }
-            }
-            return;
-        }
-
         // Figure out what fields we care about.
         unordered_set<string> fields;
         QueryPlannerIXSelect::getFields(query.root(), "", &fields);
