@@ -22,6 +22,10 @@ coll.ensureIndex({ '.': 1 });
 assert( db.getLastError() != null,
         "Expected error, but index on '.' was created successfully." );
 
+coll.ensureIndex({ '': 1 });
+assert( db.getLastError() != null,
+        "Expected error, but index on '' was created successfully." );
+
 coll.ensureIndex({ 'a.b': 1 });
 assert( db.getLastError() == null,
         "Expected no error, but creating index on 'a.b' failed." );

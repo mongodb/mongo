@@ -406,6 +406,16 @@ namespace mongo {
             keyField.parse( keyElement.fieldName() );
 
             const size_t numParts = keyField.numParts();
+            if ( numParts == 0 ) {
+                return Status( ErrorCodes::CannotCreateIndex,
+                               str::stream() << "Index key cannot be an empty field." );
+            }
+            // "$**" is acceptable for a text index.
+            if ( str::equals( keyElement.fieldName(), "$**" ) &&
+                 keyElement.valuestrsafe() == IndexNames::TEXT )
+                continue;
+
+
             for ( size_t i = 0; i != numParts; ++i ) {
                 const StringData part = keyField.getPart(i);
 
@@ -416,10 +426,6 @@ namespace mongo {
                 }
 
                 if ( part[0] != '$' )
-                    continue;
-
-                // This is used for text indexing.
-                if ( part == "$**" )
                     continue;
 
                 // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
