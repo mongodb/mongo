@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "mongo/util/goodies.h"
 #include <boost/noncopyable.hpp>
 
 #include <string>
@@ -31,12 +32,14 @@ namespace mongo {
                       std::string units = "",
                       std::string name = "Progress")
                 : _showTotal(true),
-                  _units(units),
-                  _name(name) {
+                  _units(units) {
+            _name = name.c_str();
             reset( total , secondsBetween , checkInterval );
         }
 
-        ProgressMeter() : _active(0), _showTotal(true), _units(""), _name("Progress") {}
+        ProgressMeter() : _active(0), _showTotal(true), _units("") {
+            _name = "Progress";
+        }
 
         // typically you do ProgressMeterHolder
         void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 );
@@ -53,8 +56,8 @@ namespace mongo {
         void setUnits( const std::string& units ) { _units = units; }
         std::string getUnit() const { return _units; }
 
-        void setName(std::string name) { _name = name; }
-        std::string getName() const { return _name; }
+        void setName(std::string name) { _name = name.c_str(); }
+        std::string getName() const { return _name.toString(); }
 
         void setTotalWhileRunning( unsigned long long total ) {
             _total = total;
@@ -88,7 +91,7 @@ namespace mongo {
         int _lastTime;
 
         std::string _units;
-        std::string _name;
+        ThreadSafeString _name;
     };
 
     // e.g.: 
