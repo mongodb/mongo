@@ -63,6 +63,7 @@ common_defines.add("_DEBUG")
 common_defines.add("V8_TARGET_ARCH_X64")
 common_defines.add("V8_TARGET_ARCH_IA32")
 common_defines.add("NTDDI_VERSION")
+common_defines.add("_WIN32_WINNT")
 
 machine_path = ""
 
