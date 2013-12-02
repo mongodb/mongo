@@ -57,7 +57,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query_optimizer.h"

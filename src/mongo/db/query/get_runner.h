@@ -26,48 +26,38 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <string>
-
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 
     /**
-     * A switch to choose between old Cursor-based code and new Runner-based code.
-     */
-    bool isNewQueryFrameworkEnabled();
-
-    /**
-     * Use the new query framework.  Called from the dbtest initialization.
-     */
-    void enableNewQueryFramework();
-
-    /**
-     * Called from the getMore entry point in ops/query.cpp.
-     */
-    QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
-                            int pass, bool& exhaust, bool* isCursorAuthorized);
-
-    /**
-     * Called from the runQuery entry point in ops/query.cpp.
+     * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
      *
-     * Takes ownership of cq.
+     * If the query is valid and a runner could be created, returns Status::OK()
+     * and populates *out with the Runner.
+     *
+     * If the query cannot be executed, returns a Status indicating why.  Deletes
+     * rawCanonicalQuery.
      */
-    std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result);
+    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions = 0);
 
     /**
-     * Can the new system handle the provided query?
+     * RAII approach to ensuring that runners are deregistered in newRunQuery.
      *
-     * Returns false if not.  cqOut is not modified.
-     * Returns true if so.  Caller owns *cqOut.
+     * While retrieving the first bach of results, newRunQuery manually registers the runner with
+     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
+     * fail to deregister the runner, we will call invalidate/kill on the
+     * still-registered-yet-deleted runner.
+     *
+     * For any subsequent calls to getMore, the runner is already registered with ClientCursor
+     * by virtue of being cached, so this exception-proofing is not required.
      */
-    bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut);
+    struct DeregisterEvenIfUnderlyingCodeThrows {
+        DeregisterEvenIfUnderlyingCodeThrows(Runner* runner) : _runner(runner) { }
+        ~DeregisterEvenIfUnderlyingCodeThrows();
+
+        Runner* _runner;
+    };
 
 }  // namespace mongo

@@ -42,7 +42,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_optimizer.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/range_preserver.h"

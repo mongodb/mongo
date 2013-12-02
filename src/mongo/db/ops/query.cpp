@@ -44,6 +44,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursor.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/oplog.h"

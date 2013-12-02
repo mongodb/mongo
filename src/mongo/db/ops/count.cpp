@@ -33,7 +33,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"   // XXX old sys
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query_optimizer.h"   // XXX old sys
 #include "mongo/db/queryutil.h"   // XXX old sys
 #include "mongo/db/server_options.h"

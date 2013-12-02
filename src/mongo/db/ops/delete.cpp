@@ -29,10 +29,12 @@
 #include "mongo/db/ops/delete.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/query_optimizer.h"   // XXX old sys
 #include "mongo/db/queryutil.h"   // XXX old sys
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_options.h"

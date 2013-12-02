@@ -40,7 +40,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query_optimizer.h"   // XXX old sys
 #include "mongo/db/server_options.h"
