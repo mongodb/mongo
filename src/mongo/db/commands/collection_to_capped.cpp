@@ -35,6 +35,8 @@
 #include "mongo/db/instance.h" // XXX-remove
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/new_find.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/extent.h"
 
 namespace mongo {
@@ -76,41 +78,64 @@ namespace mongo {
                 return false;
             }
 
+            Database* db = cc().database();
+
             string fromNs = dbname + "." + from;
             string toNs = dbname + "." + to;
-            NamespaceDetails *nsd = nsdetails( fromNs );
-            massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
-            long long excessSize = nsd->dataSize() - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-            DiskLoc extent = nsd->firstExtent();
-            for( ; excessSize > extent.ext()->length && extent != nsd->lastExtent(); extent = extent.ext()->xnext ) {
-                excessSize -= extent.ext()->length;
-                LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
-                LOG( 6 ) << "excessSize: " << excessSize << endl;
-            }
-            DiskLoc startLoc = extent.ext()->firstRecord;
 
-            CursorId id;
+            Collection* fromCollection = db->getCollection( fromNs );
+            massert( 10301, "source collection " + fromNs + " does not exist", fromCollection );
+
+            massert( 17287, "to collection already exists", !db->getCollection( toNs ) );
+
+            // create new collection
             {
-                Runner* runner = InternalPlanner::collectionScan(fromNs, InternalPlanner::FORWARD, startLoc);
-                // Takes ownership of runner.  The cc will timeout, eventually...
-                ClientCursor *cc = new ClientCursor(runner);
-                id = cc->cursorid();
+                Client::Context ctx( toNs );
+                BSONObjBuilder spec;
+                spec.appendBool( "capped", true );
+                spec.append( "size", static_cast<double>( size ) );
+                if ( jsobj.hasField("temp") )
+                    spec.append( jsobj["temp"] );
+                if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
+                    return false;
             }
 
-            DBDirectClient client;
-            Client::Context ctx( toNs );
-            BSONObjBuilder spec;
-            spec.appendBool( "capped", true );
-            spec.append( "size", double( size ) );
-            if (jsobj.hasField("temp"))
-                spec.append(jsobj["temp"]);
-            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
-                return false;
+            Runner* rawRunner = NULL;
 
-            auto_ptr< DBClientCursor > c = client.getMore( fromNs, id );
-            while( c->more() ) {
-                BSONObj obj = c->next();
-                theDataFileMgr.insertAndLog( toNs.c_str(), obj, true );
+            {
+                NamespaceDetails* details = fromCollection->details();
+                DiskLoc extent = details->firstExtent();
+
+                // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+                long long excessSize = fromCollection->dataSize() - size * 2;
+
+                // skip ahead some extents since not all the data fits,
+                // so we have to chop a bunch off
+                for( ;
+                     excessSize > extent.ext()->length && extent != details->lastExtent();
+                     extent = extent.ext()->xnext ) {
+
+                    excessSize -= extent.ext()->length;
+                    LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size "
+                             << extent.ext()->length << endl;
+                    LOG( 6 ) << "excessSize: " << excessSize << endl;
+                }
+                DiskLoc startLoc = extent.ext()->firstRecord;
+
+                rawRunner = InternalPlanner::collectionScan(fromNs, InternalPlanner::FORWARD, startLoc);
+            }
+
+            Collection* toCollection = db->getCollection( toNs );
+            verify( toCollection );
+
+            auto_ptr<Runner> runner(rawRunner);
+            runner->setYieldPolicy(Runner::YIELD_AUTO);
+
+            BSONObj obj;
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                toCollection->insertDocument( obj, true );
+                logOp( "i", toNs.c_str(), obj );
                 getDur().commitIfNeeded();
             }
 
