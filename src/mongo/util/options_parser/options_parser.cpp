@@ -66,8 +66,8 @@ namespace optionenvironment {
         // Convert a boost::any to a Value.  See comments at the beginning of this section.
         Status boostAnyToValue(const boost::any& anyValue, Value* value) {
             try {
-                if (anyValue.type() == typeid(std::vector<std::string>)) {
-                    *value = Value(boost::any_cast<std::vector<std::string> >(anyValue));
+                if (anyValue.type() == typeid(StringVector_t)) {
+                    *value = Value(boost::any_cast<StringVector_t>(anyValue));
                 }
                 else if (anyValue.type() == typeid(bool)) {
                     *value = Value(boost::any_cast<bool>(anyValue));
@@ -165,7 +165,7 @@ namespace optionenvironment {
                        << " is of type StringVector, but value in YAML config is not a list type";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
-                std::vector<std::string> stringVector;
+                StringVector_t stringVector;
                 for (YAML::const_iterator it = YAMLNode.begin(); it != YAMLNode.end(); ++it) {
                     if (it->IsSequence()) {
                         StringBuilder sb;
@@ -187,7 +187,7 @@ namespace optionenvironment {
                        << " is of type StringMap, but value in YAML config is not a map type";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
-                std::map<std::string, std::string> stringMap;
+                StringMap_t stringMap;
                 for (YAML::const_iterator it = YAMLNode.begin(); it != YAMLNode.end(); ++it) {
                     if (it->second.IsSequence() || it->second.IsMap()) {
                         StringBuilder sb;
@@ -346,11 +346,13 @@ namespace optionenvironment {
                     // If this is really a StringMap, try to split on "key=value" for each element
                     // in our StringVector
                     if (iterator->_type == StringMap) {
-                        std::vector<std::string> keyValueVector;
+                        StringVector_t keyValueVector;
                         ret = optionValue.get(&keyValueVector);
-                        std::vector<std::string>::iterator keyValueVectorIt;
-                        std::map<std::string, std::string> mapValue;
-                        for (keyValueVectorIt = keyValueVector.begin();
+                        if (!ret.isOK()) {
+                            return ret;
+                        }
+                        StringMap_t mapValue;
+                        for (StringVector_t::iterator keyValueVectorIt = keyValueVector.begin();
                              keyValueVectorIt != keyValueVector.end(); ++keyValueVectorIt) {
                             std::string key;
                             std::string value;
@@ -478,7 +480,7 @@ namespace optionenvironment {
                 }
 
                 if (iterator->_type == StringVector) {
-                    std::vector<std::string> sourceValue;
+                    StringVector_t sourceValue;
                     ret = source.get(iterator->_dottedName, &sourceValue);
                     if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
                         StringBuilder sb;
@@ -488,7 +490,7 @@ namespace optionenvironment {
                     }
                     // Only do something if our source environment has something to add
                     else if (ret.isOK()) {
-                        std::vector<std::string> destValue;
+                        StringVector_t destValue;
                         ret = dest->get(iterator->_dottedName, &destValue);
                         if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
                             StringBuilder sb;
@@ -510,7 +512,7 @@ namespace optionenvironment {
                     }
                 }
                 else if (iterator->_type == StringMap) {
-                    std::map<std::string, std::string> sourceValue;
+                    StringMap_t sourceValue;
                     ret = source.get(iterator->_dottedName, &sourceValue);
                     if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
                         StringBuilder sb;
@@ -520,7 +522,7 @@ namespace optionenvironment {
                     }
                     // Only do something if our source environment has something to add
                     else if (ret.isOK()) {
-                        std::map<std::string, std::string> destValue;
+                        StringMap_t destValue;
                         ret = dest->get(iterator->_dottedName, &destValue);
                         if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
                             StringBuilder sb;
@@ -530,9 +532,8 @@ namespace optionenvironment {
                         }
 
                         // Iterate sourceValue and add elements to destValue
-                        std::map<std::string, std::string>::iterator sourceValueIt;
-                        for (sourceValueIt = sourceValue.begin();
-                                sourceValueIt != sourceValue.end(); sourceValueIt++) {
+                        for (StringMap_t::iterator sourceValueIt = sourceValue.begin();
+                             sourceValueIt != sourceValue.end(); sourceValueIt++) {
                             destValue[sourceValueIt->first] = sourceValueIt->second;
                         }
 

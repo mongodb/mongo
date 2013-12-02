@@ -24,7 +24,7 @@ namespace optionenvironment {
 
     // Value access functions
 
-    Status Value::get(std::vector<std::string>* val) const {
+    Status Value::get(StringVector_t* val) const {
         if (_type != StringVector) {
             StringBuilder sb;
             sb << "Attempting to get Value as type: StringVector, but Value is of type: "
@@ -34,7 +34,7 @@ namespace optionenvironment {
         *val = _stringVectorVal;
         return Status::OK();
     }
-    Status Value::get(std::map<std::string, std::string>* val) const {
+    Status Value::get(StringMap_t* val) const {
         if (_type != StringMap) {
             StringBuilder sb;
             sb << "Attempting to get Value as type: StringMap, but Value is of type: "
@@ -170,9 +170,8 @@ namespace optionenvironment {
                 if (!_stringVectorVal.empty())
                 {
                     // Convert all but the last element to avoid a trailing ","
-                    for (std::vector<std::string>::const_iterator iterator =
-                            _stringVectorVal.begin();
-                        iterator != _stringVectorVal.end() - 1; iterator++) {
+                    for (StringVector_t::const_iterator iterator = _stringVectorVal.begin();
+                         iterator != _stringVectorVal.end() - 1; iterator++) {
                         sb << *iterator << ",";
                     }
 
@@ -185,8 +184,8 @@ namespace optionenvironment {
                 {
                     // Convert all but the last element to avoid a trailing ","
                     if (_stringMapVal.begin() != _stringMapVal.end()) {
-                        std::map<std::string, std::string>::const_iterator iterator;
-                        std::map<std::string, std::string>::const_iterator it_last;
+                        StringMap_t::const_iterator iterator;
+                        StringMap_t::const_iterator it_last;
                         for (iterator = _stringMapVal.begin(), it_last = --_stringMapVal.end();
                              iterator != it_last; ++iterator) {
                             sb << iterator->first << ":" << iterator->second << ",";
@@ -211,8 +210,8 @@ namespace optionenvironment {
     }
     const std::type_info& Value::type() const {
         switch (_type) {
-            case StringVector: return typeid(std::vector<std::string>);
-            case StringMap: return typeid(std::map<std::string, std::string>);
+            case StringVector: return typeid(StringVector_t);
+            case StringMap: return typeid(StringMap_t);
             case Bool: return typeid(bool);
             case Double: return typeid(double);
             case Int: return typeid(int);

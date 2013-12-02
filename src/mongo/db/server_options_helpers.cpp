@@ -180,7 +180,7 @@ namespace {
                 "private key for cluster authentication")
                                   .incompatibleWith("noauth");
 
-        options->addOptionChaining("setParameter", "setParameter", moe::StringVector,
+        options->addOptionChaining("setParameter", "setParameter", moe::StringMap,
                 "Set a configurable parameter")
                                   .composing();
 
@@ -543,34 +543,30 @@ namespace {
         }
 
         if (params.count("setParameter")) {
-            std::vector<std::string> parameters =
-                params["setParameter"].as<std::vector<std::string> >();
-            for (size_t i = 0, length = parameters.size(); i < length; ++i) {
-                std::string name;
-                std::string value;
-                if (!mongoutils::str::splitOn(parameters[i], '=', name, value)) {
-                    StringBuilder sb;
-                    sb << "Illegal option assignment: \"" << parameters[i] << "\"";
-                    return Status(ErrorCodes::BadValue, sb.str());
-                }
+            std::map<std::string, std::string> parameters =
+                params["setParameter"].as<std::map<std::string, std::string> >();
+            for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
+                 parametersIt != parameters.end(); parametersIt++) {
                 ServerParameter* parameter = mapFindWithDefault(
                         ServerParameterSet::getGlobal()->getMap(),
-                        name,
+                        parametersIt->first,
                         static_cast<ServerParameter*>(NULL));
                 if (NULL == parameter) {
                     StringBuilder sb;
-                    sb << "Illegal --setParameter parameter: \"" << name << "\"";
+                    sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
                 if (!parameter->allowedToChangeAtStartup()) {
                     StringBuilder sb;
-                    sb << "Cannot use --setParameter to set \"" << name << "\" at startup";
+                    sb << "Cannot use --setParameter to set \"" << parametersIt->first
+                       << "\" at startup";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
-                Status status = parameter->setFromString(value);
+                Status status = parameter->setFromString(parametersIt->second);
                 if (!status.isOK()) {
                     StringBuilder sb;
-                    sb << "Bad value for parameter \"" << name << "\": " << status.reason();
+                    sb << "Bad value for parameter \"" << parametersIt->first << "\": "
+                       << status.reason();
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
             }

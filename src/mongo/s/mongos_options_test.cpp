@@ -220,7 +220,7 @@ namespace {
             }
             else if (iterator->_dottedName == "setParameter") {
                 ASSERT_EQUALS(iterator->_singleName, "setParameter");
-                ASSERT_EQUALS(iterator->_type, moe::StringVector);
+                ASSERT_EQUALS(iterator->_type, moe::StringMap);
                 ASSERT_EQUALS(iterator->_description, "Set a configurable parameter");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());

@@ -27,6 +27,12 @@ namespace optionenvironment {
     class Constraint;
     class KeyConstraint;
 
+    /**
+     * Helper typedefs for the more complex C++ types supported by this Value class
+     */
+    typedef std::map<std::string, std::string> StringMap_t;
+    typedef std::vector<std::string> StringVector_t;
+
     typedef std::string Key;
 
     /** A simple container interface for storing various C++ values.
@@ -51,9 +57,8 @@ namespace optionenvironment {
         // Constructors
 
         explicit Value() : _type(None) { }
-        explicit Value(std::vector<std::string> val) : _stringVectorVal(val), _type(StringVector) {}
-        explicit Value(std::map<std::string, std::string> val) : _stringMapVal(val),
-                                                                 _type(StringMap) {}
+        explicit Value(StringVector_t val) : _stringVectorVal(val), _type(StringVector) {}
+        explicit Value(StringMap_t val) : _stringMapVal(val), _type(StringMap) {}
         explicit Value(bool val) : _boolVal(val), _type(Bool) { }
         explicit Value(double val) : _doubleVal(val), _type(Double) { }
         explicit Value(int val) : _intVal(val), _type(Int) { }
@@ -65,8 +70,8 @@ namespace optionenvironment {
 
         // Access interface
 
-        Status get(std::vector<std::string>* val) const;
-        Status get(std::map<std::string, std::string>* val) const;
+        Status get(StringVector_t* val) const;
+        Status get(StringMap_t* val) const;
         Status get(bool* val) const;
         Status get(double* val) const;
         Status get(int* val) const;
@@ -118,8 +123,8 @@ namespace optionenvironment {
         const std::type_info& type() const;
 
     private:
-        std::vector<std::string> _stringVectorVal;
-        std::map<std::string, std::string> _stringMapVal;
+        StringVector_t _stringVectorVal;
+        StringMap_t _stringMapVal;
         std::string _stringVal;
         union {
             bool _boolVal;

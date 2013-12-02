@@ -317,8 +317,17 @@ namespace {
                 builder->appendNumber(key, (long long)value.as<unsigned>());
             else if (type == typeid(unsigned long long))
                 builder->appendNumber(key, (long long)value.as<unsigned long long>());
-            else if (type == typeid(vector<string>))
-                builder->append(key, value.as<vector<string> >());
+            else if (type == typeid(StringVector_t))
+                builder->append(key, value.as<StringVector_t>());
+            else if (type == typeid(StringMap_t)) {
+                BSONObjBuilder subBuilder(builder->subobjStart(key));
+                StringMap_t stringMap = value.as<StringMap_t>();
+                for (StringMap_t::iterator stringMapIt = stringMap.begin();
+                     stringMapIt != stringMap.end(); stringMapIt++) {
+                    subBuilder.append(stringMapIt->first, stringMapIt->second);
+                }
+                subBuilder.done();
+            }
             else
                 builder->append(key, "UNKNOWN TYPE: " + demangleName(type));
         }
