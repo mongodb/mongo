@@ -329,10 +329,10 @@ assert.gleError = function(db, msg) {
 
 assert.gleErrorCode = function(db, code, msg) {
     var gle = db.getLastErrorObj();
-    if (gle.err && (gle.code == code)) {
+    if (!gle.err || gle.code != code) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
-        doassert("getLastError not null or missing code( " + code + "): " 
+        doassert("getLastError is null or has code other than \"" + code + "\": "
                  + tojson(gle) + " :" + msg);
     }
 }
