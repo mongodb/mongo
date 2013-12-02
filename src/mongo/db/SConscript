@@ -14,6 +14,7 @@ env.Library(
         'field_ref.cpp',
         'field_ref_set.cpp',
         'field_parser.cpp',
+        'write_concern_options.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',

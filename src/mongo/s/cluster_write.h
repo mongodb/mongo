@@ -78,35 +78,48 @@ namespace mongo {
         scoped_ptr<BatchWriteExecStats> _shardStats;
     };
 
-    const BSONObj DefaultClusterWriteConcern = BSONObj();
-
+    /**
+     * Note: response can NEVER be NULL.
+     */
     void clusterWrite( const BatchedCommandRequest& request,
                        BatchedCommandResponse* response,
                        bool autoSplit );
 
-    void clusterInsert( const std::string& ns,
-                        const BSONObj& doc,
-                        const BSONObj& writeConcern,
-                        BatchedCommandResponse* response );
+    /**
+     * Note: response can be NULL if you don't care about the write statistics.
+     */
+    Status clusterInsert( const std::string& ns,
+                          const BSONObj& doc,
+                          const BSONObj& writeConcern,
+                          BatchedCommandResponse* response );
 
-    void clusterUpdate( const std::string& ns,
-                        const BSONObj& query,
-                        const BSONObj& update,
-                        bool upsert,
-                        bool multi,
-                        const BSONObj& writeConcern,
-                        BatchedCommandResponse* response );
+    /**
+     * Note: response can be NULL if you don't care about the write statistics.
+     */
+    Status clusterUpdate( const std::string& ns,
+                          const BSONObj& query,
+                          const BSONObj& update,
+                          bool upsert,
+                          bool multi,
+                          const BSONObj& writeConcern,
+                          BatchedCommandResponse* response );
 
-    void clusterDelete( const std::string& ns,
-                        const BSONObj& query,
-                        int limit,
-                        const BSONObj& writeConcern,
-                        BatchedCommandResponse* response );
+    /**
+     * Note: response can be NULL if you don't care about the write statistics.
+     */
+    Status clusterDelete( const std::string& ns,
+                          const BSONObj& query,
+                          int limit,
+                          const BSONObj& writeConcern,
+                          BatchedCommandResponse* response );
 
-    void clusterCreateIndex( const std::string& ns,
-                             BSONObj keys,
-                             bool unique,
-                             const BSONObj& writeConcern,
-                             BatchedCommandResponse* response );
+    /**
+     * Note: response can be NULL if you don't care about the write statistics.
+     */
+    Status clusterCreateIndex( const std::string& ns,
+                               BSONObj keys,
+                               bool unique,
+                               const BSONObj& writeConcern,
+                               BatchedCommandResponse* response );
 
 } // namespace mongo

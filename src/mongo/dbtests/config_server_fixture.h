@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/instance.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -37,8 +38,35 @@ namespace mongo {
 
     class CustomDirectClient: public DBDirectClient {
     public:
+        CustomDirectClient() {
+            setWireVersions(minWireVersion, maxWireVersion);
+        }
+
         virtual ConnectionString::ConnectionType type() const {
             return ConnectionString::CUSTOM;
+        }
+
+        virtual bool recv( Message& m ) {
+            // This is tailored to act as a dummy response for write commands.
+
+            BufBuilder bb;
+            bb.skip(sizeof(QueryResult));
+
+            BSONObj cmdResult(BSON("ok" << 1));
+
+            bb.appendBuf(cmdResult.objdata(), cmdResult.objsize());
+
+            QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+            bb.decouple();
+            qr->setResultFlagsToOk();
+            qr->len = bb.len();
+            qr->setOperation(opReply);
+            qr->cursorId = 0;
+            qr->startingFrom = 0;
+            qr->nReturned = 1;
+            m.setData(qr, true);
+
+            return true;
         }
     };
 

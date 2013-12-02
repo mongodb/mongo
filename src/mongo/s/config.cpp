@@ -35,8 +35,10 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -100,7 +102,7 @@ namespace mongo {
         _key = BSONObj();
     }
 
-    void DBConfig::CollectionInfo::save( const string& ns , DBClientBase* conn ) {
+    void DBConfig::CollectionInfo::save( const string& ns ) {
         BSONObj key = BSON( "_id" << ns );
 
         BSONObjBuilder val;
@@ -116,9 +118,18 @@ namespace mongo {
             val.append(CollectionType::DEPRECATED_lastmodEpoch(), ChunkVersion::DROPPED().epoch());
         }
 
-        conn->update(CollectionType::ConfigNS, key, val.obj(), true);
-        string err = conn->getLastError();
-        uassert( 13473 , (string)"failed to save collection (" + ns + "): " + err , err.size() == 0 );
+        Status result = clusterUpdate(CollectionType::ConfigNS,
+                                      key,
+                                      val.obj(),
+                                      true /* upsert */,
+                                      false /* multi */,
+                                      WriteConcernOptions::AllConfigs,
+                                      NULL);
+
+        if ( !result.isOK() ) {
+            uasserted( 13473, str::stream() << "failed to save collection (" << ns
+                                            << "): " <<  result.reason() );
+        }
 
         _dirty = false;
     }
@@ -548,8 +559,6 @@ namespace mongo {
     }
 
     void DBConfig::_save( bool db, bool coll ) {
-        ScopedDbConnection conn(configServer.modelServer(), 30.0);
-
         if( db ){
 
             BSONObj n;
@@ -559,10 +568,19 @@ namespace mongo {
                 n = b.obj();
             }
 
-            conn->update( DatabaseType::ConfigNS , BSON( DatabaseType::name( _name ) ) , n , true );
-            string err = conn->getLastError();
-            uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
+            BatchedCommandResponse response;
+            Status result = clusterUpdate( DatabaseType::ConfigNS,
+                                           BSON( DatabaseType::name( _name )),
+                                           n,
+                                           true, // upsert
+                                           false, // multi
+                                           WriteConcernOptions::AllConfigs,
+                                           &response );
 
+            if ( !result.isOK() ) {
+                uasserted( 13396, str::stream() << "DBConfig save failed: "
+                                                << response.toBSON() );
+            }
         }
 
         if( coll ){
@@ -570,12 +588,10 @@ namespace mongo {
             for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
                 if ( ! i->second.isDirty() )
                     continue;
-                i->second.save( i->first , conn.get() );
+                i->second.save( i->first );
             }
 
         }
-
-        conn.done();
     }
 
     bool DBConfig::reload() {
@@ -621,17 +637,16 @@ namespace mongo {
 
         // 2
         grid.removeDB( _name );
-        {
-            ScopedDbConnection conn(configServer.modelServer(), 30.0);
-            conn->remove( DatabaseType::ConfigNS , BSON( DatabaseType::name( _name ) ) );
-            errmsg = conn->getLastError();
-            if ( ! errmsg.empty() ) {
-                log() << "could not drop '" << _name << "': " << errmsg << endl;
-                conn.done();
-                return false;
-            }
+        Status result = clusterDelete( DatabaseType::ConfigNS,
+                                       BSON( DatabaseType::name( _name )),
+                                       0 /* limit */,
+                                       WriteConcernOptions::AllConfigs,
+                                       NULL );
 
-            conn.done();
+        if ( !result.isOK() ) {
+            errmsg = result.reason();
+            log() << "could not drop '" << _name << "': " << errmsg << endl;
+            return false;
         }
 
         if ( ! configServer.allUp( errmsg ) ) {
@@ -1043,33 +1058,70 @@ namespace mongo {
                     log() << "warning: unknown setting [" << name << "]" << endl;
                 }
             }
-
-            if ( ! got.count( "chunksize" ) ) {
-                conn->insert(SettingsType::ConfigNS,
-                                     BSON(SettingsType::key("chunksize") <<
-                                          SettingsType::chunksize(Chunk::MaxChunkSize /
-                                                                    (1024 * 1024))));
-            }
-
-            // indexes
-            conn->ensureIndex(ChunkType::ConfigNS,
-                                     BSON(ChunkType::ns() << 1 << ChunkType::min() << 1 ), true);
-
-            conn->ensureIndex(ChunkType::ConfigNS,
-                                     BSON(ChunkType::ns() << 1 <<
-                                          ChunkType::shard() << 1 <<
-                                          ChunkType::min() << 1 ), true);
-
-            conn->ensureIndex(ChunkType::ConfigNS,
-                                     BSON(ChunkType::ns() << 1 <<
-                                          ChunkType::DEPRECATED_lastmod() << 1 ), true );
-
-            conn->ensureIndex(ShardType::ConfigNS, BSON(ShardType::host() << 1), true);
-
-            conn.done();
         }
         catch ( DBException& e ) {
-            warning() << "couldn't load settings or create indexes on config db: " << e.what() << endl;
+            warning() << "couldn't load settings on config db: "
+                      << e.what() << endl;
+        }
+
+        if ( ! got.count( "chunksize" ) ) {
+            const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
+            Status result = clusterInsert( SettingsType::ConfigNS,
+                                           BSON( SettingsType::key("chunksize") <<
+                                                 SettingsType::chunksize(chunkSize)),
+                                           WriteConcernOptions::AllConfigs,
+                                           NULL );
+            if ( !result.isOK() ) {
+                warning() << "couldn't set chunkSize on config db: " << result.reason() << endl;
+            }
+        }
+
+        // indexes
+        Status result = clusterCreateIndex( ChunkType::ConfigNS,
+                                            BSON( ChunkType::ns() << 1 << ChunkType::min() << 1 ),
+                                            true, // unique
+                                            WriteConcernOptions::AllConfigs,
+                                            NULL );
+
+        if ( !result.isOK() ) {
+            warning() << "couldn't create ns_1_min_1 index on config db: "
+                      << result.reason() << endl;
+        }
+
+        result = clusterCreateIndex( ChunkType::ConfigNS,
+                                     BSON( ChunkType::ns() << 1 <<
+                                           ChunkType::shard() << 1 <<
+                                           ChunkType::min() << 1 ),
+                                     true, // unique
+                                     WriteConcernOptions::AllConfigs,
+                                     NULL );
+
+        if ( !result.isOK() ) {
+            warning() << "couldn't create ns_1_shard_1_min_1 index on config db: "
+                      << result.reason() << endl;
+        }
+
+        result = clusterCreateIndex( ChunkType::ConfigNS,
+                                     BSON( ChunkType::ns() << 1 <<
+                                           ChunkType::DEPRECATED_lastmod() << 1 ),
+                                     true, // unique
+                                     WriteConcernOptions::AllConfigs,
+                                     NULL );
+
+        if ( !result.isOK() ) {
+            warning() << "couldn't create ns_1_lastmod_1 index on config db: "
+                      << result.reason() << endl;
+        }
+
+        result = clusterCreateIndex( ShardType::ConfigNS,
+                                     BSON( ShardType::host() << 1 ),
+                                     true, // unique
+                                     WriteConcernOptions::AllConfigs,
+                                     NULL );
+
+        if ( !result.isOK() ) {
+            warning() << "couldn't create host_1 index on config db: "
+                      << result.reason() << endl;
         }
     }
 
@@ -1126,10 +1178,17 @@ namespace mongo {
                 createdCapped = true;
             }
 
-            conn->insert( ChangelogType::ConfigNS , msg );
-
             conn.done();
 
+            Status result = clusterInsert( ChangelogType::ConfigNS,
+                                           msg,
+                                           WriteConcernOptions::AllConfigs,
+                                           NULL );
+
+            if ( !result.isOK() ) {
+                log() << "Error encountered while logging config change with ID: " << changeID
+                      << result.reason() << endl;
+            }
         }
 
         catch ( std::exception& e ) {
@@ -1139,21 +1198,25 @@ namespace mongo {
     }
 
     void ConfigServer::replicaSetChange( const ReplicaSetMonitor * monitor ) {
-        try {
-            Shard s = Shard::lookupRSName(monitor->getName());
-            if (s == Shard::EMPTY) {
-                LOG(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
-                return;
-            }
-            ScopedDbConnection conn(configServer.getConnectionString().toString(), 30.0);
-            conn->update(ShardType::ConfigNS,
-                         BSON(ShardType::name(s.getName())),
-                         BSON("$set" << BSON(ShardType::host(monitor->getServerAddress()))));
-            conn.done();
+        Shard s = Shard::lookupRSName(monitor->getName());
+        if (s == Shard::EMPTY) {
+            LOG(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
+            return;
         }
-        catch (DBException& e) {
-            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName()
-                    << " to: " << monitor->getServerAddress() << causedBy(e) << endl;
+
+        Status result = clusterUpdate(ShardType::ConfigNS,
+                BSON(ShardType::name(s.getName())),
+                BSON("$set" << BSON(ShardType::host(monitor->getServerAddress()))),
+                false, // upsert
+                false, // multi
+                WriteConcernOptions::AllConfigs,
+                NULL);
+
+        if ( !result.isOK() ) {
+            error() << "RSChangeWatcher: could not update config db for set: "
+                    << monitor->getName()
+                    << " to: " << monitor->getServerAddress()
+                    << ": " << result.reason() << endl;
         }
     }
 

@@ -46,8 +46,10 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
@@ -665,13 +667,15 @@ namespace mongo {
                 //    receiving shard whenever a migrate occurs.
                 else {
                     // call ensureIndex with cache=false, see SERVER-1691
-                    bool ensureSuccess = conn->ensureIndex( ns ,
-                                                            proposedKey ,
-                                                            careAboutUnique ,
-                                                            "" ,
-                                                            false );
-                    if ( ! ensureSuccess ) {
-                        errmsg = "ensureIndex failed to create index on primary shard";
+                    Status result = clusterCreateIndex( ns,
+                                                        proposedKey,
+                                                        careAboutUnique,
+                                                        WriteConcernOptions::Default,
+                                                        NULL );
+
+                    if ( !result.isOK() ) {
+                        errmsg = str::stream() << "ensureIndex failed to create index on "
+                                               << "primary shard: " << result.reason();
                         conn.done();
                         return false;
                     }
@@ -1298,11 +1302,19 @@ namespace mongo {
 
                     log() << "going to start draining shard: " << s.getName() << endl;
                     BSONObj newStatus = BSON( "$set" << BSON( ShardType::draining(true) ) );
-                    conn->update( ShardType::ConfigNS , searchDoc , newStatus, false /* do no upsert */);
 
-                    errmsg = conn->getLastError();
-                    if ( errmsg.size() ) {
-                        log() << "error starting remove shard: " << s.getName() << " err: " << errmsg << endl;
+                    Status status = clusterUpdate( ShardType::ConfigNS,
+                                                   searchDoc,
+                                                   newStatus,
+                                                   false /* do no upsert */,
+                                                   false /* multi */,
+                                                   WriteConcernOptions::AllConfigs,
+                                                   NULL );
+
+                    if ( !status.isOK() ) {
+                        errmsg = status.reason();
+                        log() << "error starting remove shard: " << s.getName()
+                              << " err: " << errmsg << endl;
                         return false;
                     }
 
@@ -1311,10 +1323,15 @@ namespace mongo {
                     PRINT(primaryLocalDoc);
                     if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
                         log() << "This shard is listed as primary of local db. Removing entry." << endl;
-                        conn->remove(DatabaseType::ConfigNS, BSON(DatabaseType::name("local")));
-                        errmsg = conn->getLastError();
-                        if ( errmsg.size() ) {
-                            log() << "error removing local db: " << errmsg << endl;
+                        Status status = clusterDelete( DatabaseType::ConfigNS,
+                                                       BSON(DatabaseType::name("local")),
+                                                       0 /* limit */,
+                                                       WriteConcernOptions::AllConfigs,
+                                                       NULL );
+
+                        if ( !status.isOK() ) {
+                            log() << "error removing local db: "
+                                  << status.reason() << endl;
                             return false;
                         }
                     }
@@ -1343,11 +1360,16 @@ namespace mongo {
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
                     audit::logRemoveShard(ClientBasic::getCurrent(), s.getName());
-                    conn->remove( ShardType::ConfigNS , searchDoc );
+                    Status status = clusterDelete( ShardType::ConfigNS,
+                                                   searchDoc,
+                                                   0, // limit
+                                                   WriteConcernOptions::AllConfigs,
+                                                   NULL );
 
-                    errmsg = conn->getLastError();
-                    if ( errmsg.size() ) {
-                        log() << "error concluding remove shard: " << s.getName() << " err: " << errmsg << endl;
+                    if ( !status.isOK() ) {
+                        errmsg = status.reason();
+                        log() << "error concluding remove shard: " << s.getName()
+                              << " err: " << errmsg << endl;
                         return false;
                     }
 

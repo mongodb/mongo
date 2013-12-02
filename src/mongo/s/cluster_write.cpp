@@ -148,22 +148,47 @@ namespace mongo {
         if ( configHostOrHosts.type() == ConnectionString::MASTER ) {
             configHosts.push_back( configHostOrHosts );
         }
-        else {
-            dassert( configHostOrHosts.type() == ConnectionString::SYNC );
+        else if ( configHostOrHosts.type() == ConnectionString::SYNC ) {
             vector<HostAndPort> configHPs = configHostOrHosts.getServers();
             for ( vector<HostAndPort>::iterator it = configHPs.begin(); it != configHPs.end();
                 ++it ) {
                 configHosts.push_back( ConnectionString( *it ) );
             }
         }
+        else {
+            // This is only for tests.
+            dassert( configHostOrHosts.type() == ConnectionString::CUSTOM );
+            configHosts.push_back( configHostOrHosts );
+        }
 
         return configHosts;
     }
 
-    void clusterInsert( const string& ns,
-                        const BSONObj& doc,
-                        const BSONObj& writeConcern,
-                        BatchedCommandResponse* response ) {
+    static Status getStatus( const BatchedCommandResponse& response ) {
+        if ( response.getOk() != 1 ) {
+            return Status( static_cast<ErrorCodes::Error>(response.getErrCode()),
+                           response.getErrMessage() );
+        }
+
+        if ( response.isErrDetailsSet() ) {
+            const WriteErrorDetail* errDetail = response.getErrDetails().front();
+            return Status( static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
+                           errDetail->getErrMessage() );
+        }
+
+        if ( response.isWriteConcernErrorSet() ) {
+            const WCErrorDetail* errDetail = response.getWriteConcernError();
+            return Status( static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
+                           errDetail->getErrMessage() );
+        }
+
+        return Status::OK();
+    }
+
+    Status clusterInsert( const string& ns,
+                          const BSONObj& doc,
+                          const BSONObj& writeConcern,
+                          BatchedCommandResponse* response ) {
         auto_ptr<BatchedInsertRequest> insert( new BatchedInsertRequest() );
         insert->addToDocuments( doc );
 
@@ -173,16 +198,23 @@ namespace mongo {
             request.setWriteConcern( writeConcern );
         }
 
+        BatchedCommandResponse dummyResponse;
+
+        if ( response == NULL ) {
+            response = &dummyResponse;
+        }
+
         clusterWrite( request, response, false );
+        return getStatus( *response );
     }
 
-    void clusterUpdate( const string& ns,
-                        const BSONObj& query,
-                        const BSONObj& update,
-                        bool upsert,
-                        bool multi,
-                        const BSONObj& writeConcern,
-                        BatchedCommandResponse* response ) {
+    Status clusterUpdate( const string& ns,
+                          const BSONObj& query,
+                          const BSONObj& update,
+                          bool upsert,
+                          bool multi,
+                          const BSONObj& writeConcern,
+                          BatchedCommandResponse* response ) {
         auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument() );
         updateDoc->setQuery( query );
         updateDoc->setUpdateExpr( update );
@@ -199,14 +231,21 @@ namespace mongo {
         BatchedCommandRequest request( updateRequest.release() );
         request.setNS( ns );
 
+        BatchedCommandResponse dummyResponse;
+
+        if ( response == NULL ) {
+            response = &dummyResponse;
+        }
+
         clusterWrite( request, response, false );
+        return getStatus( *response );
     }
 
-    void clusterDelete( const string& ns,
-                        const BSONObj& query,
-                        int limit,
-                        const BSONObj& writeConcern,
-                        BatchedCommandResponse* response ) {
+    Status clusterDelete( const string& ns,
+                          const BSONObj& query,
+                          int limit,
+                          const BSONObj& writeConcern,
+                          BatchedCommandResponse* response ) {
         auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
         deleteDoc->setQuery( query );
         deleteDoc->setLimit( limit );
@@ -221,18 +260,25 @@ namespace mongo {
         BatchedCommandRequest request( deleteRequest.release() );
         request.setNS( ns );
 
+        BatchedCommandResponse dummyResponse;
+
+        if ( response == NULL ) {
+            response = &dummyResponse;
+        }
+
         clusterWrite( request, response, false );
+        return getStatus( *response );
     }
 
-    void clusterCreateIndex( const string& ns,
-                             BSONObj keys,
-                             bool unique,
-                             const BSONObj& writeConcern,
-                             BatchedCommandResponse* response) {
-        clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
-                       createIndexDoc( ns, keys, unique ),
-                       writeConcern,
-                       response );
+    Status clusterCreateIndex( const string& ns,
+                               BSONObj keys,
+                               bool unique,
+                               const BSONObj& writeConcern,
+                               BatchedCommandResponse* response ) {
+        return clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
+                              createIndexDoc( ns, keys, unique ),
+                              writeConcern,
+                              response );
     }
 
     void clusterWrite( const BatchedCommandRequest& request,

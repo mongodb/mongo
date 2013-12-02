@@ -33,6 +33,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/type_changelog.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"
@@ -369,9 +371,7 @@ namespace mongo {
 
                 createdCapped = true;
             }
-
-            conn->insert(ChangelogType::ConfigNS, changelog.toBSON());
-            _checkGLE(conn);
+            connPtr->done();
         }
         catch (const DBException& e) {
             // if we got here, it means the config change is only in the log,
@@ -380,8 +380,17 @@ namespace mongo {
             return e.toStatus();
         }
 
-        connPtr->done();
-        return Status::OK();
+        Status result = clusterInsert( ChangelogType::ConfigNS,
+                                       changelog.toBSON(),
+                                       WriteConcernOptions::AllConfigs,
+                                       NULL );
+
+        if ( !result.isOK() ) {
+            return Status( result.code(), str::stream() << "failed to write to changelog: "
+                                                        << result.reason() );
+        }
+
+        return result;
     }
 
     // Helper function for safe writes to non-SCC config servers

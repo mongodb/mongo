@@ -239,12 +239,13 @@ namespace mongo {
     static bool areResponsesEqual( const BatchedCommandResponse& responseA,
                                    const BatchedCommandResponse& responseB ) {
 
+        // Note: This needs to also take into account comparing responses from legacy writes
+        // and write commands.
+
         // TODO: Better reporting of why not equal
         if ( responseA.getOk() != responseB.getOk() )
             return false;
         if ( responseA.getN() != responseB.getN() )
-            return false;
-        if ( responseA.isUpsertDetailsSet() != responseB.isUpsertDetailsSet() )
             return false;
 
         if ( responseA.isUpsertDetailsSet() ) {

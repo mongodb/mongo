@@ -31,7 +31,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/timer.h"
 
@@ -414,43 +416,47 @@ namespace mongo {
         setUpgradeIdObj << VersionType::upgradeId(upgradeID);
         setUpgradeIdObj << VersionType::upgradeState(BSONObj());
 
-        try {
-            ScopedDbConnection conn(configServer, 30);
-            conn->update(VersionType::ConfigNS,
-                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                         BSON("$set" << setUpgradeIdObj.done()));
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not initialize version info for upgrade");
-        }
+        Status result = clusterUpdate(VersionType::ConfigNS,
+                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                BSON("$set" << setUpgradeIdObj.done()),
+                false, // upsert
+                false, // multi
+                WriteConcernOptions::AllConfigs,
+                NULL);
 
-        return Status::OK();
+        if ( !result.isOK() ) {
+            return Status( result.code(),
+                           str::stream() << "could not initialize version info"
+                                         << "for upgrade: " << result.reason() );
+        }
+        return result;
     }
 
     Status enterConfigUpgradeCriticalSection(const string& configServer, int currentVersion) {
         BSONObjBuilder setUpgradeStateObj;
         setUpgradeStateObj.append(VersionType::upgradeState(), BSON(inCriticalSectionField(true)));
 
-        try {
-            ScopedDbConnection conn(configServer, 30);
-            conn->update(VersionType::ConfigNS,
-                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                         BSON("$set" << setUpgradeStateObj.done()));
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
-
-            // No cleanup message here since we're not sure if we wrote or not, and
-            // not dangerous either way except to prevent further updates (at which point
-            // the message is printed)
-            return e.toStatus("could not update version info to enter critical update section");
-        }
+        Status result = clusterUpdate(VersionType::ConfigNS,
+                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                BSON("$set" << setUpgradeStateObj.done()),
+                false, // upsert
+                false, // multi
+                WriteConcernOptions::AllConfigs,
+                NULL);
 
         log() << "entered critical section for config upgrade" << endl;
-        return Status::OK();
+
+        // No cleanup message here since we're not sure if we wrote or not, and
+        // not dangerous either way except to prevent further updates (at which point
+        // the message is printed)
+
+        if ( !result.isOK() ) {
+            return Status( result.code(), str::stream() << "could not update version info"
+                                                        << "to enter critical update section: "
+                                                        << result.reason() );
+        }
+
+        return result;
     }
 
 
@@ -471,20 +477,21 @@ namespace mongo {
         unsetObj.append(VersionType::upgradeId(), 1);
         unsetObj.append(VersionType::upgradeState(), 1);
 
-        try {
-            ScopedDbConnection conn(configServer, 30);
-            conn->update(VersionType::ConfigNS,
-                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                         BSON("$set" << setObj.done() << "$unset" << unsetObj.done()));
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not write new version info and "
-                              "exit critical upgrade section");
+        Status result = clusterUpdate(VersionType::ConfigNS,
+                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
+                false, // upsert
+                false, // multi,
+                WriteConcernOptions::AllConfigs,
+                NULL);
+
+        if ( !result.isOK() ) {
+            return Status( result.code(), str::stream() << "could not write new version info "
+                                                        << " and exit critical upgrade section: "
+                                                        << result.reason() );
         }
 
-        return Status::OK();
+        return result;
     }
 
 }

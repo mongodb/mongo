@@ -36,10 +36,12 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
@@ -556,16 +558,17 @@ namespace mongo {
         // at least this mongos won't try and keep moving
         _jumbo = true;
 
-        try {
-            ScopedDbConnection conn(configServer.modelServer(), 30);
+        Status result = clusterUpdate( ChunkType::ConfigNS,
+                                       BSON(ChunkType::name(genID())),
+                                       BSON("$set" << BSON(ChunkType::jumbo(true))),
+                                       false, // upsert
+                                       false, // multi
+                                       WriteConcernOptions::AllConfigs,
+                                       NULL );
 
-            conn->update(ChunkType::ConfigNS,
-                         BSON(ChunkType::name(genID())),
-                         BSON("$set" << BSON(ChunkType::jumbo(true))));
-            conn.done();
-        }
-        catch ( DBException& e ) {
-            warning() << "couldn't set jumbo for chunk: " << genID() << causedBy( e ) << endl;
+        if ( !result.isOK() ) {
+            warning() << "couldn't set jumbo for chunk: "
+                      << genID() << result.reason() << endl;
         }
     }
 
@@ -1035,6 +1038,7 @@ namespace mongo {
 
         uassert( 13449 , str::stream() << "collection " << _ns << " already sharded with "
                                        << existingChunks << " chunks", existingChunks == 0 );
+        conn.done();
 
         for ( unsigned i=0; i<=splitPoints.size(); i++ ) {
             BSONObj min = i == 0 ? _key.globalMin() : splitPoints[i-1];
@@ -1046,23 +1050,23 @@ namespace mongo {
             temp.serialize( chunkBuilder );
             BSONObj chunkObj = chunkBuilder.obj();
 
-            conn->update(ChunkType::ConfigNS,
-                         QUERY(ChunkType::name(temp.genID())),
-                         chunkObj,
-                         true,
-                         false );
+            Status result = clusterUpdate( ChunkType::ConfigNS,
+                                           BSON(ChunkType::name(temp.genID())),
+                                           chunkObj,
+                                           true, // upsert
+                                           false, // multi
+                                           WriteConcernOptions::AllConfigs,
+                                           NULL );
 
             version.incMinor();
-        }
 
-        string errmsg = conn->getLastError();
-        if ( errmsg.size() ) {
-            string ss = str::stream() << "creating first chunks failed. result: " << errmsg;
-            error() << ss << endl;
-            msgasserted( 15903 , ss );
+            if ( !result.isOK() ) {
+                string ss = str::stream() << "creating first chunks failed. result: "
+                                          << result.reason();
+                error() << ss << endl;
+                msgasserted( 15903 , ss );
+            }
         }
-        
-        conn.done();
 
         _version = ChunkVersion( 0, version.epoch() );
     }
@@ -1273,16 +1277,18 @@ namespace mongo {
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;
 
         // remove chunk data
-        ScopedDbConnection conn(configServer.modelServer());
-        conn->remove(ChunkType::ConfigNS, BSON(ChunkType::ns(_ns)));
+        Status result = clusterDelete( ChunkType::ConfigNS,
+                                       BSON(ChunkType::ns(_ns)),
+                                       0 /* limit */,
+                                       WriteConcernOptions::AllConfigs,
+                                       NULL );
         
         // Make sure we're dropped on the config
-        string error = conn->getLastError();
-        uassert( 17001, str::stream() << "could not drop chunks for " << _ns 
-                                      << causedBy( error ), 
-                 error.size() == 0 );
-        
-        conn.done();
+        if ( !result.isOK() ) {
+            uasserted( 17001, str::stream() << "could not drop chunks for " << _ns
+                                            << ": " << result.reason() );
+        }
+
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
 
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {

@@ -110,6 +110,18 @@ namespace mongo {
                 response->addToErrDetails( batchError );
             }
 
+            // Special case for making legacy "n" field result for insert match the write
+            // command result.
+            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert &&
+                    batchError == NULL &&
+                    StringData( request.getNS() ).startsWith( "config." )) {
+                dassert( request.getInsertRequest()->getDocuments().size() == 1 );
+                // n is always 0 for legacy inserts.
+                dassert( lastError.nObjects == 0 );
+
+                lastError.nObjects = 1;
+            }
+
             response->setN( response->getN() + lastError.nObjects );
 
             if ( !lastError.upsertedId.isEmpty() ) {

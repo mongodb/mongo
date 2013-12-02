@@ -38,6 +38,8 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/shard.h"
@@ -411,18 +413,20 @@ namespace mongo {
                 conn.done();
                 return false;
             }
-
-            log() << "going to add shard: " << shardDoc << endl;
-
-            conn->insert(ShardType::ConfigNS , shardDoc);
-            errMsg = conn->getLastError();
-            if ( ! errMsg.empty() ) {
-                log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
-                conn.done();
-                return false;
-            }
-
             conn.done();
+        }
+
+        log() << "going to add shard: " << shardDoc << endl;
+
+        Status result = clusterInsert( ShardType::ConfigNS,
+                                       shardDoc,
+                                       WriteConcernOptions::AllConfigs,
+                                       NULL );
+
+        if ( !result.isOK() ) {
+            errMsg = result.reason();
+            log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
+            return false;
         }
 
         Shard::reloadShardInfo();
