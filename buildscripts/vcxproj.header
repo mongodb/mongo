@@ -127,7 +127,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
-  <!-- RELEASE -->
+ <!-- RELEASE -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Win2008PlusRelease'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
@@ -154,9 +154,24 @@
     </Link>
   </ItemDefinitionGroup>
 
-  <!-- SPECIFICS -->
+  <!-- SRW / Windows2008+ -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Win2008PlusRelease' Or '(Configuration)'=='Win2008PlusDebug'">
+    <ClCompile>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!-- legacy -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Debug'">
+    <ClCompile>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x05020200</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+   <!-- SPECIFICS -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Link>
+      <!-- this is likely unnecessary and should be removed, but was in the old vcxproj: -->
       <IgnoreSpecificDefaultLibraries>msvcrtd;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
