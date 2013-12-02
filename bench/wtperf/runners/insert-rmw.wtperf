@@ -6,6 +6,4 @@ insert_rmw=true
 report_interval=5
 run_time=120
 populate_threads=1
-read_threads=2
-insert_threads=4
-update_threads=0
+threads=(count=6,reads=1,inserts=2)

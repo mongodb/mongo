@@ -71,13 +71,11 @@ sum_ops(CONFIG *cfg, size_t field_offset)
 {
 	CONFIG_THREAD *thread;
 	uint64_t total;
-	u_int i, num;
+	int64_t i;
 
 	total = 0;
-
-	num = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
 	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < num; ++i, ++thread)
+	    thread != NULL && i < cfg->worker_threads; ++i, ++thread)
 		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 
 	return (total);
@@ -110,16 +108,15 @@ latency_op(CONFIG *cfg,
 	CONFIG_THREAD *thread;
 	TRACK *track;
 	uint64_t ops, latency, tmp;
+	int64_t i;
 	uint32_t max, min;
-	u_int i, num;
 
 	ops = latency = 0;
 	max = 0;
 	min = UINT32_MAX;
 
-	num = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
 	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < num; ++i, ++thread) {
+	    thread != NULL && i < cfg->worker_threads; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
 		tmp = track->ops;
 		ops += tmp - track->last_ops;
@@ -217,13 +214,13 @@ sum_latency(CONFIG *cfg, size_t field_offset, TRACK *total)
 {
 	CONFIG_THREAD *thread;
 	TRACK *trk;
-	u_int i, j, num;
+	int64_t i;
+	u_int j;
 
 	memset(total, 0, sizeof(*total));
 
-	num = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
 	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < num; ++i, ++thread) {
+	    thread != NULL && i < cfg->worker_threads; ++i, ++thread) {
 		trk = (TRACK *)((uint8_t *)thread + field_offset);
 
 		for (j = 0; j < ELEMENTS(trk->us); ++j) {

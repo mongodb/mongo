@@ -7,6 +7,4 @@ checkpoint_threads=1
 checkpoint_interval=10
 run_time=120
 populate_threads=1
-read_threads=2
-insert_threads=2
-update_threads=2
+threads=(count=6,inserts=1,reads=1,updates=1)

@@ -87,7 +87,6 @@ DEF_OPT_AS_UINT32(value_sz, 100, "value size")
 DEF_OPT_AS_UINT32(icount, 5000, "number of records to initially populate")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
-DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_INT(merge_sleep, 0,
     "post-populate sleep seconds for LSM merging activity (-1 for load time)")
@@ -100,13 +99,8 @@ DEF_OPT_AS_UINT32(populate_threads, 1,
 DEF_OPT_AS_UINT32(random_range, 0,
     "if non zero choose a value from within this range as the key for "
     "operations")
-DEF_OPT_AS_UINT32(read_threads, 2, "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
     "output throughput information every interval seconds, 0 to disable")
-DEF_OPT_AS_UINT32(run_mix_inserts, 0,
-    "mixed workload percentage of inserts, overrides thread types")
-DEF_OPT_AS_UINT32(run_mix_updates, 0,
-    "mixed workload percentage of updates, overrides thread types")
 DEF_OPT_AS_UINT32(run_ops, 0,
     "total read, insert and update workload operations")
 DEF_OPT_AS_UINT32(run_time, 0,
@@ -120,10 +114,13 @@ DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
     "table configuration string")
+DEF_OPT_AS_STRING(threads, "", "worker thread configuration: the 'count' entry "
+    "is the total number of threads and the 'insert', 'read' and 'update' "
+    "entries are the ratios of insert, read and update operations done by each "
+    "worker thread")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "
     "is nonzero")
-DEF_OPT_AS_UINT32(update_threads, 0, "number of update threads")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 
