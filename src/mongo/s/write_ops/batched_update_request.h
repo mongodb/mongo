@@ -82,6 +82,10 @@ namespace mongo {
         const std::string& getCollName() const;
 
         void setUpdates(const std::vector<BatchedUpdateDocument*>& updates);
+
+        /**
+         * updates ownership is transferred to here.
+         */
         void addToUpdates(BatchedUpdateDocument* updates);
         void unsetUpdates();
         bool isUpdatesSet() const;

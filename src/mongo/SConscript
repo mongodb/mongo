@@ -688,7 +688,8 @@ env.Library('coreshard', ['client/distlock.cpp',
                           's/chunk.cpp',
                           's/shard.cpp',
                           's/shardkey.cpp'],
-            LIBDEPS=['s/base']);
+            LIBDEPS=['s/base',
+                     's/cluster_op_impl']);
     
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",
@@ -719,7 +720,6 @@ env.Library( "mongoscore",
                       'db/query/lite_parsed_query',
                       's/cluster_write_ops',
                       's/cluster_write_op_conversion',
-                      's/cluster_op_impl',
                      ] )
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,

@@ -37,4 +37,25 @@ namespace mongo {
                        BatchedCommandResponse* response,
                        bool autoSplit );
 
+    void clusterInsert( const std::string& ns,
+                        const BSONObj& doc,
+                        BatchedCommandResponse* response );
+
+    void clusterUpdate( const std::string& ns,
+                        const BSONObj& query,
+                        const BSONObj& update,
+                        bool upsert,
+                        bool multi,
+                        BatchedCommandResponse* response );
+
+    void clusterDelete( const std::string& ns,
+                        const BSONObj& query,
+                        int limit,
+                        BatchedCommandResponse* response );
+
+    void clusterCreateIndex( const std::string& ns,
+                             BSONObj keys,
+                             bool unique,
+                             BatchedCommandResponse* response );
+
 } // namespace mongo

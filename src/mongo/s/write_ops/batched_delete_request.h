@@ -82,6 +82,10 @@ namespace mongo {
         const std::string& getCollName() const;
 
         void setDeletes(const std::vector<BatchedDeleteDocument*>& deletes);
+
+        /**
+         * deletes ownership is transferred to here.
+         */
         void addToDeletes(BatchedDeleteDocument* deletes);
         void unsetDeletes();
         bool isDeletesSet() const;

@@ -45,12 +45,23 @@ namespace mongo {
 
         BatchedCommandRequest( BatchType batchType );
 
+        /**
+         * insertReq ownership is transferred to here.
+         */
         BatchedCommandRequest( BatchedInsertRequest* insertReq ) :
                 _batchType( BatchType_Insert ), _insertReq( insertReq ) {
         }
+
+        /**
+         * updateReq ownership is transferred to here.
+         */
         BatchedCommandRequest( BatchedUpdateRequest* updateReq ) :
                 _batchType( BatchType_Update ), _updateReq( updateReq ) {
         }
+
+        /**
+         * deleteReq ownership is transferred to here.
+         */
         BatchedCommandRequest( BatchedDeleteRequest* deleteReq ) :
                 _batchType( BatchType_Delete ), _deleteReq( deleteReq ) {
         }

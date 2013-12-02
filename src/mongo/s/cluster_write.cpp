@@ -49,6 +49,49 @@ namespace mongo {
     using std::vector;
     using std::string;
 
+    namespace {
+        // TODO: consider writing a type for index instead
+        /**
+         * Constructs the BSON specification document for the given namespace, index key
+         * and options.
+         */
+        BSONObj createIndexDoc( const string& ns, const BSONObj& keys, bool unique ) {
+            BSONObjBuilder indexDoc;
+            indexDoc.append( "ns" , ns );
+            indexDoc.append( "key" , keys );
+
+            stringstream indexName;
+
+            bool isFirstKey = true;
+            for ( BSONObjIterator keyIter(keys); keyIter.more(); ) {
+                BSONElement currentKey = keyIter.next();
+
+                if ( isFirstKey ) {
+                    isFirstKey = false;
+                }
+                else {
+                    indexName << "_";
+                }
+
+                indexName << currentKey.fieldName() << "_";
+                if ( currentKey.isNumber() ) {
+                    indexName << currentKey.numberInt();
+                }
+                else {
+                    indexName << currentKey.str(); //this should match up with shell command
+                }
+            }
+
+            indexDoc.append( "name", indexName.str() );
+
+            if ( unique ) {
+                indexDoc.appendBool( "unique", unique );
+            }
+
+            return indexDoc.obj();
+        }
+    }
+
     /**
      * Splits the chunks touched based from the targeter stats if needed.
      */
@@ -211,6 +254,64 @@ namespace mongo {
         else {
             shardWrite( request, response, autoSplit );
         }
+    }
+
+    void clusterInsert( const string& ns,
+                        const BSONObj& doc,
+                        BatchedCommandResponse* response ) {
+        auto_ptr<BatchedInsertRequest> insert( new BatchedInsertRequest() );
+        insert->addToDocuments( doc );
+
+        BatchedCommandRequest request( insert.release() );
+        request.setNS( ns );
+
+        clusterWrite( request, response, false );
+    }
+
+    void clusterUpdate( const string& ns,
+                        const BSONObj& query,
+                        const BSONObj& update,
+                        bool upsert,
+                        bool multi,
+                        BatchedCommandResponse* response ) {
+        auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument() );
+        updateDoc->setQuery( query );
+        updateDoc->setUpdateExpr( update );
+        updateDoc->setUpsert( upsert );
+        updateDoc->setMulti( multi );
+
+        auto_ptr<BatchedUpdateRequest> updateRequest( new BatchedUpdateRequest() );
+        updateRequest->addToUpdates( updateDoc.release() );
+
+        BatchedCommandRequest request( updateRequest.release() );
+        request.setNS( ns );
+
+        clusterWrite( request, response, false );
+    }
+
+    void clusterDelete( const string& ns,
+                        const BSONObj& query,
+                        int limit,
+                        BatchedCommandResponse* response ) {
+        auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
+        deleteDoc->setQuery( query );
+        deleteDoc->setLimit( limit );
+
+        auto_ptr<BatchedDeleteRequest> deleteRequest( new BatchedDeleteRequest() );
+        deleteRequest->addToDeletes( deleteDoc.release() );
+
+        BatchedCommandRequest request( deleteRequest.release() );
+        request.setNS( ns );
+
+        clusterWrite( request, response, false );
+    }
+
+    void clusterCreateIndex( const string& ns,
+                             BSONObj keys,
+                             bool unique,
+                             BatchedCommandResponse* response) {
+        clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
+                       createIndexDoc( ns, keys, unique ), response );
     }
 
 } // namespace mongo
