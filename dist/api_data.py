@@ -119,7 +119,7 @@ lsm_config = [
 	        type='boolean'),
 	    Config('chunk_max', '5GB', r'''
 	        the maximum size a single chunk can be. Chunks larger than this
-		size aren not considered for further merges. This is a soft
+		size are not considered for further merges. This is a soft
 		limit, and chunks larger than this value can be created.  Must
 		be larger than chunk_size''',
 	        min='100MB', max='10TB'),
