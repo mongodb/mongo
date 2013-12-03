@@ -276,7 +276,10 @@ namespace mongo {
                 catch (const std::out_of_range &e) {
                     // attempted to get invalid substr
                 }
-                return; // return with lsb-relase data
+                // return with lsb-release data if we found both the name and version
+                if ( !name.empty() && !version.empty() ) {
+                    return;
+                }
             }
 
             // try known flat-text file locations
@@ -295,6 +298,7 @@ namespace mongo {
             paths.push_back( "/etc/sles-release" );
             paths.push_back( "/etc/debian_release" );
             paths.push_back( "/etc/slackware-version" );
+            paths.push_back( "/etc/centos-release" );
         
             for ( i = paths.begin(); i != paths.end(); ++i ) {
                 // for each path
