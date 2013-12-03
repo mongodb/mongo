@@ -386,8 +386,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	lsm_tree->chunk_size = (uint64_t)cval.val;
 	if (lsm_tree->chunk_size > lsm_tree->chunk_max)
 		WT_ERR_MSG(session, EINVAL,
-		    "Chunk size (lsm_chunk_size) must be smaller than the "
-		    "maximum chunk size (lsm_chunk_max)");
+		    "Chunk size (chunk_size) must be smaller than or equal to "
+		    "the maximum chunk size (chunk_max)");
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_max", &cval));
 	lsm_tree->merge_max = (uint32_t)cval.val;
 	lsm_tree->merge_min = lsm_tree->merge_max / 2;
