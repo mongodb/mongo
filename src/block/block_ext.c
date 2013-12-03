@@ -357,8 +357,7 @@ __wt_block_off_remove_overlap(
 
 	/* If "before" or "after" overlaps, retrieve the overlapping entry. */
 	if (before != NULL && before->off + before->size > off) {
-		WT_RET(
-		    __block_off_remove(session, el, before->off, &ext));
+		WT_RET(__block_off_remove(session, el, before->off, &ext));
 
 		/* Calculate overlapping extents. */
 		a_off = ext->off;
@@ -366,8 +365,7 @@ __wt_block_off_remove_overlap(
 		b_off = off + size;
 		b_size = ext->size - (a_size + size);
 	} else if (after != NULL && off + size > after->off) {
-		WT_RET(
-		    __block_off_remove(session, el, after->off, &ext));
+		WT_RET(__block_off_remove(session, el, after->off, &ext));
 
 		/*
 		 * Calculate overlapping extents.  There's no initial overlap
