@@ -597,8 +597,18 @@ namespace mongo {
         if (root->numChildren() > 0) {
             FetchNode* fetch = new FetchNode();
             verify(NULL != autoRoot.get());
-            // Takes ownership.
-            fetch->filter.reset(autoRoot.release());
+            if (autoRoot->numChildren() == 1) {
+                // An $and of one thing is that thing.
+                MatchExpression* child = autoRoot->getChild(0);
+                autoRoot->getChildVector()->clear();
+                // Takes ownership.
+                fetch->filter.reset(child);
+                // 'autoRoot' will delete the empty $and.
+            }
+            else { // root->numChildren() > 1
+                // Takes ownership.
+                fetch->filter.reset(autoRoot.release());
+            }
             // takes ownership
             fetch->children.push_back(andResult);
             andResult = fetch;
