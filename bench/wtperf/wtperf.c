@@ -1370,6 +1370,8 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 		threads->key_buf = NULL;
 		free(threads->value_buf);
 		threads->value_buf = NULL;
+		free(threads->workload);
+		threads->workload = NULL;
 	}
 
 	/*
