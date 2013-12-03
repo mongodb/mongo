@@ -5,6 +5,5 @@ table_config="lsm=(chunk_size=1M),type=lsm"
 transaction_config="isolation=snapshot"
 icount=10000000
 report_interval=5
-run_time=20
 populate_ops_per_txn=100
 populate_threads=5

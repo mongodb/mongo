@@ -75,15 +75,12 @@ main(int argc, char *argv[])
 	else
 		++g.progname;
 
-	/* Configure the FreeBSD malloc for debugging. */
-	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
-
 	/* Set default configuration values. */
 	g.c_cache = 10;
-	g.c_ops = 100000;
-	g.c_key_max = 1000;
-	g.c_k = 4;
-	g.c_factor = 8;
+	g.c_ops = 1000000;
+	g.c_key_max = 100;
+	g.c_k = 19;
+	g.c_factor = 28;
 	g.c_srand = 3233456;
 
 	/* Set values from the command line. */

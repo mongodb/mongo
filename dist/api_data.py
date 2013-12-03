@@ -138,11 +138,11 @@ lsm_config = [
 # Per-file configuration
 file_config = format_meta + [
 	Config('block_allocation', 'best', r'''
-		configure block allocation. Permitted values are \c "first" or
-		\c "best"; the \c "first" configuration uses a first-available
-		algorithm during block allocation, the \c "best" configuration
-		uses a best-fit algorithm''',
-		choices=['first', 'best',]),
+	    configure block allocation. Permitted values are \c "first" or
+	    \c "best"; the \c "first" configuration uses a first-available
+	    algorithm during block allocation, the \c "best" configuration
+	    uses a best-fit algorithm''',
+	    choices=['first', 'best',]),
 	Config('allocation_size', '4KB', r'''
 	    the file unit allocation size, in bytes, must a power-of-two;
 	    smaller values decrease the file space required by overflow

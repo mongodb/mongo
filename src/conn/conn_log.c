@@ -86,12 +86,14 @@ __log_archive_server(void *arg)
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*
-		 * If archiving is reconfigured and turned off, wait until
-		 * it gets turned back on and check again.
+		 * If archiving is reconfigured and turned off, wait until it
+		 * gets turned back on and check again.  Don't wait forever: if
+		 * a notification gets lost during close, we want to find out
+		 * eventually.
 		 */
 		if (conn->archive == 0) {
 			WT_ERR_TIMEDOUT_OK(
-			    __wt_cond_wait(session, conn->arch_cond, 0));
+			    __wt_cond_wait(session, conn->arch_cond, 1000000));
 			continue;
 		}
 
@@ -134,7 +136,7 @@ __log_archive_server(void *arg)
 
 		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(
-		    __wt_cond_wait(session, conn->arch_cond, 0));
+		    __wt_cond_wait(session, conn->arch_cond, 1000000));
 	}
 
 	if (0) {
