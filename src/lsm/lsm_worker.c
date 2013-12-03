@@ -41,9 +41,8 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	 * increase the size of our current buffer to match.
 	 */
 	if (cookie->chunk_alloc < alloc)
-		WT_ERR(__wt_realloc(
-		    session, &cookie->chunk_alloc, alloc,
-		    &cookie->chunk_array));
+		WT_ERR(__wt_realloc(session,
+		    &cookie->chunk_alloc, alloc, &cookie->chunk_array));
 	if (nchunks > 0)
 		memcpy(cookie->chunk_array,
 		    old_chunks ? lsm_tree->old_chunks : lsm_tree->chunk,
