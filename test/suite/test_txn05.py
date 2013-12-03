@@ -51,10 +51,10 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
-        ('tall', dict(op1=('all', 0))),
-        ('tboth', dict(op1=('both', 2))),
-        ('tstart', dict(op1=('start', 2))),
-        ('tstop', dict(op1=('stop', 2))),
+        ('trunc-all', dict(op1=('all', 0))),
+        ('trunc-both', dict(op1=('both', 2))),
+        ('trunc-start', dict(op1=('start', 2))),
+        ('trunc-stop', dict(op1=('stop', 2))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
 
@@ -137,6 +137,8 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
             try:
                  self.check(backup_conn.open_session(), None, committed)
             finally:
+                 # Let other threads like archive run before closing.
+                 yield
                  backup_conn.close()
             count += 1
         #
@@ -145,7 +147,6 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         # archive because no checkpoint is written due to no modifications.
         #
         cur_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
-        self.assertEqual(True, len(cur_logs) > 1)
         for o in orig_logs:
             if self.archive == 'true':
                 self.assertEqual(False, o in cur_logs)
@@ -161,20 +162,12 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri, self.create_params)
         # Set up the table with entries for 1-5.
         # We then truncate starting or ending in various places.
-        # We use the overwrite config so insert can update as needed.
-        c = self.session.open_cursor(self.uri, None, 'overwrite')
-        c.set_value(1)
-        c.set_key(1)
-        c.insert()
-        c.set_key(2)
-        c.insert()
-        c.set_key(3)
-        c.insert()
-        c.set_key(4)
-        c.insert()
-        c.set_key(5)
-        c.insert()
+        c = self.session.open_cursor(self.uri, None)
         current = {1:1, 2:1, 3:1, 4:1, 5:1}
+        c.set_value(1)
+        for k in current:
+            c.set_key(k)
+            c.insert()
         committed = current.copy()
 
         ops = (self.op1, )
@@ -197,7 +190,7 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
                 kstart = k
                 kstop = len(current)
             elif op == 'both':
-                c2 = self.session.open_cursor(self.uri, None, 'overwrite')
+                c2 = self.session.open_cursor(self.uri, None)
                 # For both, the key given is the start key.  Add 2
                 # for the stop key.
                 kstart = k
@@ -207,7 +200,7 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
                 self.session.truncate(None, c, c2, None)
                 c2.close()
             elif op == 'all':
-                c2 = self.session.open_cursor(self.uri, None, 'overwrite')
+                c2 = self.session.open_cursor(self.uri, None)
                 kstart = 1
                 kstop = len(current)
                 c.set_key(kstart)
