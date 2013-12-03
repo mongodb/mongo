@@ -1300,6 +1300,7 @@ err:		if (ret == 0)
 	}
 	free(cfg->popthreads);
 	free(cfg->workers);
+	free(cfg->workload);
 	config_free(cfg);
 
 	free(cc_buf);
@@ -1370,8 +1371,6 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 		threads->key_buf = NULL;
 		free(threads->value_buf);
 		threads->value_buf = NULL;
-		free(threads->workload);
-		threads->workload = NULL;
 	}
 
 	/*
