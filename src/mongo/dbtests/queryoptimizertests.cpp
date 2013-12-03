@@ -967,12 +967,6 @@ namespace {
                 BSONObj order() { return BSONObj(); }
             };
             
-            class EmptyStringField : public True {
-                BSONObj index() { return BSON( "a" << 1 << "" << 1 ); }
-                BSONObj query() { return fromjson( "{a:4,'':{$in:[0,1]}}" ); }
-                BSONObj order() { return BSONObj(); }                
-            };
-
             class SortedRange : public True {
                 BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
                 BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$gt:5}}" ); }
@@ -1086,7 +1080,6 @@ namespace {
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::InterveningIndexField>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::TailingIndexField>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::EmptySort>();
-            add<QueryPlanTests::QueryBoundsExactOrderSuffix::EmptyStringField>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::SortedRange>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::SortedRangeWrongDirection>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::SortedDoubleRange>();
