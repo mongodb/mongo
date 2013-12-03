@@ -411,8 +411,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(cursor, session, close, NULL);
-
+	session = (WT_SESSION_IMPL *)cursor->session;
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
 
@@ -425,8 +424,6 @@ __wt_cursor_close(WT_CURSOR *cursor)
 
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
-
-err:	API_END(session);
 	return (ret);
 }
 
