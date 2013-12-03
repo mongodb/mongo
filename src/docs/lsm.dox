@@ -79,10 +79,10 @@ hashed a configurable number of times (default 4), and the corresponding
 bits set.  The Bloom filter is used to avoid reading from a chunk if the key
 cannot be present.
 
-With the defaults, the Bloom filter only requires one byte per key, so it
-usually fits in cache.  The Bloom parameters can be configured with
-\c "lsm=(bloom_bit_count)" and \c "lsm_bloom_hash_count" configuration keys
-to WT_SESSION::create.  The Bloom file can be configured with the
+With the defaults, the Bloom filter only requires one byte per key, so
+it usually fits in cache.  The Bloom parameters can be configured with
+\c "lsm=(bloom_bit_count)" and \c "lsm=(bloom_hash_count)" configuration
+keys to WT_SESSION::create.  The Bloom file can be configured with the
 \c "lsm=(bloom_config)" key.
 
 @section lsm_schema Creating tables using LSM trees
