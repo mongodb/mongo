@@ -42,7 +42,7 @@ static const CONFIG default_cfg = {
 
 static const char * const small_config_str =
     "conn_config=\"cache_size=500MB\","
-    "table_config=\"lsm_chunk_size=5MB\","
+    "table_config=\"lsm=(chunk_size=5MB)\","
     "icount=500000,"
     "value_sz=100,"
     "key_sz=20,"
@@ -53,7 +53,7 @@ static const char * const small_config_str =
 
 static const char * const med_config_str =
     "conn_config=\"cache_size=1GB\","
-    "table_config=\"lsm_chunk_size=20MB\","
+    "table_config=\"lsm=(chunk_size=20MB)\","
     "icount=50000000,"
     "value_sz=100,"
     "key_sz=20,"
@@ -64,7 +64,7 @@ static const char * const med_config_str =
 
 static const char * const large_config_str =
     "conn_config=\"cache_size=2GB\","
-    "table_config=\"lsm_chunk_size=50MB\","
+    "table_config=\"lsm=(chunk_size=50MB)\","
     "icount=500000000,"
     "value_sz=100,"
     "key_sz=20,"

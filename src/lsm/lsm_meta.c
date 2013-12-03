@@ -63,27 +63,27 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			WT_ERR(__wt_strndup(session,
 			    cv.str + 1, cv.len - 2, &lsm_tree->file_config));
 		} else if (WT_STRING_MATCH(
-		    "lsm_auto_throttle", ck.str, ck.len)) {
+		    "auto_throttle", ck.str, ck.len)) {
 			if (cv.val)
 				F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
 			else
 				F_CLR(lsm_tree, WT_LSM_TREE_THROTTLE);
-		} else if (WT_STRING_MATCH("lsm_bloom", ck.str, ck.len))
+		} else if (WT_STRING_MATCH("bloom", ck.str, ck.len))
 			lsm_tree->bloom = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH(
-		    "lsm_bloom_bit_count", ck.str, ck.len))
+		    "bloom_bit_count", ck.str, ck.len))
 			lsm_tree->bloom_bit_count = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH(
-		    "lsm_bloom_hash_count", ck.str, ck.len))
+		    "bloom_hash_count", ck.str, ck.len))
 			lsm_tree->bloom_hash_count = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH("lsm_chunk_max", ck.str, ck.len))
+		else if (WT_STRING_MATCH("chunk_max", ck.str, ck.len))
 			lsm_tree->chunk_max = (uint64_t)cv.val;
-		else if (WT_STRING_MATCH("lsm_chunk_size", ck.str, ck.len))
+		else if (WT_STRING_MATCH("chunk_size", ck.str, ck.len))
 			lsm_tree->chunk_size = (uint64_t)cv.val;
-		else if (WT_STRING_MATCH("lsm_merge_max", ck.str, ck.len)) {
+		else if (WT_STRING_MATCH("merge_max", ck.str, ck.len)) {
 			lsm_tree->merge_max = (uint32_t)cv.val;
 			lsm_tree->merge_min = lsm_tree->merge_max / 2;
-		} else if (WT_STRING_MATCH("lsm_merge_threads", ck.str, ck.len))
+		} else if (WT_STRING_MATCH("merge_threads", ck.str, ck.len))
 			lsm_tree->merge_threads = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
 			lsm_tree->last = (u_int)cv.val;
@@ -184,14 +184,14 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    session, buf, ",collator=%s", lsm_tree->collator_name));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32
-	    ",lsm_chunk_max=%" PRIu64
-	    ",lsm_chunk_size=%" PRIu64
-	    ",lsm_auto_throttle=%" PRIu32
-	    ",lsm_merge_max=%" PRIu32
-	    ",lsm_merge_threads=%" PRIu32
-	    ",lsm_bloom=%" PRIu32
-	    ",lsm_bloom_bit_count=%" PRIu32
-	    ",lsm_bloom_hash_count=%" PRIu32,
+	    ",chunk_max=%" PRIu64
+	    ",chunk_size=%" PRIu64
+	    ",auto_throttle=%" PRIu32
+	    ",merge_max=%" PRIu32
+	    ",merge_threads=%" PRIu32
+	    ",bloom=%" PRIu32
+	    ",bloom_bit_count=%" PRIu32
+	    ",bloom_hash_count=%" PRIu32,
 	    lsm_tree->last, lsm_tree->chunk_max, lsm_tree->chunk_size,
 	    F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) ? 1 : 0,
 	    lsm_tree->merge_max, lsm_tree->merge_threads, lsm_tree->bloom,

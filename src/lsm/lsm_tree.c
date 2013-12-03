@@ -350,15 +350,15 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->collator_name));
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_auto_throttle", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.auto_throttle", &cval));
 	if (cval.val)
 		F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
 	else
 		F_CLR(lsm_tree, WT_LSM_TREE_THROTTLE);
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom", &cval));
 	FLD_SET(lsm_tree->bloom,
 	    (cval.val == 0 ? WT_LSM_BLOOM_OFF : WT_LSM_BLOOM_MERGED));
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_oldest", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_oldest", &cval));
 	if (cval.val != 0)
 		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST);
 
@@ -368,7 +368,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		    "Bloom filters can only be created on newest and oldest "
 		    "chunks if bloom filters are enabled");
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_config", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_config", &cval));
 	if (cval.type == WT_CONFIG_ITEM_STRUCT) {
 		cval.str++;
 		cval.len -= 2;
@@ -376,22 +376,22 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->bloom_config));
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_hash_count", &cval));
 	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_max", &cval));
 	lsm_tree->chunk_max = (uint64_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_size", &cval));
 	lsm_tree->chunk_size = (uint64_t)cval.val;
 	if (lsm_tree->chunk_size > lsm_tree->chunk_max)
 		WT_ERR_MSG(session, EINVAL,
 		    "Chunk size (lsm_chunk_size) must be smaller than the "
 		    "maximum chunk size (lsm_chunk_max)");
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_max", &cval));
 	lsm_tree->merge_max = (uint32_t)cval.val;
 	lsm_tree->merge_min = lsm_tree->merge_max / 2;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_threads", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_threads", &cval));
 	lsm_tree->merge_threads = (uint32_t)cval.val;
 	/* Sanity check that api_data.py is in sync with lsm.h */
 	WT_ASSERT(session, lsm_tree->merge_threads <= WT_LSM_MAX_WORKERS);

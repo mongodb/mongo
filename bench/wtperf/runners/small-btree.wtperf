@@ -1,6 +1,6 @@
 # wtperf options file: small btree configuration
 conn_config="cache_size=500MB"
-table_config="lsm_chunk_size=5MB,type=file"
+table_config="type=file"
 icount=500000
 report_interval=5
 run_time=120

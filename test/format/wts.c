@@ -273,7 +273,7 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
 		if (MMRAND(1, 10) <= 2)			/* 20% */
 			p += snprintf(
-			    p, (size_t)(end - p), ",lsm_bloom_oldest=true");
+			    p, (size_t)(end - p), ",lsm=(bloom_oldest=true)");
 	}
 
 	if (DATASOURCE("memrata"))

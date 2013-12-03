@@ -36,22 +36,22 @@ class test_lsm01(wttest.WiredTigerTestCase):
     G = 1024 * M
     uri = "lsm:test_lsm01"
 
-    chunk_size_scenarios = wtscenario.quick_scenarios('s_lsm_chunk_size',
+    chunk_size_scenarios = wtscenario.quick_scenarios('s_chunk_size',
         [1*M,20*M,None], [0.6,0.6,0.6])
-    merge_max_scenarios = wtscenario.quick_scenarios('s_lsm_merge_max',
+    merge_max_scenarios = wtscenario.quick_scenarios('s_merge_max',
         [2,10,20,None], None)
-    bloom_scenarios = wtscenario.quick_scenarios('s_lsm_bloom',
+    bloom_scenarios = wtscenario.quick_scenarios('s_bloom',
         [True,False,None], None)
-    bloom_bit_scenarios = wtscenario.quick_scenarios('s_lsm_bloom_bit_count',
+    bloom_bit_scenarios = wtscenario.quick_scenarios('s_bloom_bit_count',
         [2,8,20,None], None)
-    bloom_hash_scenarios = wtscenario.quick_scenarios('s_lsm_bloom_hash_count',
+    bloom_hash_scenarios = wtscenario.quick_scenarios('s_bloom_hash_count',
         [2,10,20,None], None)
     # Occasionally add a lot of records, so that merges (and bloom) happen.
     record_count_scenarios = wtscenario.quick_scenarios(
         'nrecs', [10, 10000], [0.9, 0.1])
 
-    config_vars = [ 'lsm_chunk_size', 'lsm_merge_max', 'lsm_bloom',
-                    'lsm_bloom_bit_count', 'lsm_bloom_hash_count' ]
+    config_vars = [ 'chunk_size', 'merge_max', 'bloom',
+                    'bloom_bit_count', 'bloom_hash_count' ]
 
     all_scenarios = wtscenario.multiply_scenarios('_',
         chunk_size_scenarios, merge_max_scenarios, bloom_scenarios,
@@ -63,6 +63,7 @@ class test_lsm01(wttest.WiredTigerTestCase):
     # Test drop of an object.
     def test_lsm(self):
         args = 'key_format=S'
+		args += ',lsm=(' # Start the LSM configuration options.
         # add names to args, e.g. args += ',session_max=30'
         for var in self.config_vars:
             value = getattr(self, 's_' + var)
@@ -74,6 +75,7 @@ class test_lsm01(wttest.WiredTigerTestCase):
                 if value == False:
                     value = 'false'
                 args += ',' + var + '=' + str(value)
+		args += ')' # Close the LSM configuration option group
         self.verbose(3,
             'Test LSM with config: ' + args + ' count: ' + str(self.nrecs))
         simple_populate(self, self.uri, args, self.nrecs)

@@ -1,6 +1,7 @@
 # wtperf options file: medium lsm configuration
 conn_config="cache_size=1G"
 table_config="lsm=(chunk_size=100MB,merge_threads=2),type=lsm"
+merge_sleep=-1
 icount=50000000
 report_interval=5
 run_time=120
