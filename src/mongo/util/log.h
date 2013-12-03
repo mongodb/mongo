@@ -130,7 +130,7 @@ namespace logger {
     void rawOut( const StringData &s );
 
     /*
-     * Redirects the output of "rawOut" to "outDestination".  The default is stdout.
+     * Redirects the output of "rawOut" to stderr.  The default is stdout.
      *
      * NOTE: This needs to be here because the tools such as mongoexport and mongodump sometimes
      * send data to stdout and share this code, so they need to be able to redirect output to
@@ -139,7 +139,7 @@ namespace logger {
      *
      * NOTE: This function is not thread safe and should not be called from a multithreaded context.
      */
-    void setRawOutDestination(FILE *outDestination);
+    void setRawOutToStderr();
 
     /**
      * Write the current context (backtrace), along with the optional "msg".

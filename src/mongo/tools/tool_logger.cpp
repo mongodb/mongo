@@ -90,7 +90,7 @@ MONGO_INITIALIZER_GENERAL(ToolLogRedirection,
                     new ConsoleAppender<MessageEventEphemeral, ErrorConsole>(
                         new MessageEventDetailsEncoder)));
 
-        setRawOutDestination(stderr);
+        setRawOutToStderr();
     }
 
     // Only put an appender on our informational messages if we did not use --quiet
