@@ -101,6 +101,7 @@ namespace mongo {
                                                << " (sleeping for " << sleepTime << "ms)" << endl;
 
             static int loops = 0;
+            Date_t lastPingTime = jsTime();
             while( ! inShutdown() && ! shouldKill( addr, process ) ) {
 
                 LOG( DistributedLock::logLvl + 2 ) << "distributed lock pinger '" << pingId << "' about to ping." << endl;
@@ -111,6 +112,14 @@ namespace mongo {
                     ScopedDbConnection conn(addr.toString(), 30.0);
 
                     pingTime = jsTime();
+                    Date_t elapsed(pingTime.millis - lastPingTime.millis);
+                    if (elapsed.millis > 10 * sleepTime) {
+                        warning() << "Lock pinger for addr: " << addr
+                                  << ", proc: " << process
+                                  << " was inactive for " << elapsed.millis << " ms" << endl;
+                    }
+
+                    lastPingTime = pingTime;
 
                     // refresh the entry corresponding to this process in the lockpings collection
                     conn->update( LockpingsType::ConfigNS,
