@@ -2412,9 +2412,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__rec_txn_read(session, r, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
-		__bit_setv_recno(
-		    page, WT_INSERT_RECNO(ins), btree->bitcnt,
-		    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+		__bit_setv_recno(page, WT_INSERT_RECNO(ins),
+		    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 	}
 
 	/* Allocate the memory. */
