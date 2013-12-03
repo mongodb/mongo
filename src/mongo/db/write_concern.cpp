@@ -134,9 +134,9 @@ namespace mongo {
 
         // now wait for replication
 
-        if ( writeConcern.wNumNodes <= 0 &&
+        if ( writeConcern.wNumNodes <= 1 &&
              writeConcern.wMode.empty() ) {
-            // w settings, all done
+            // no desired replication check
             return Status::OK();
         }
 
@@ -153,7 +153,9 @@ namespace mongo {
                 return Status::OK();
             }
             result->err = "norepl";
-            return Status( ErrorCodes::BadValue, "unknown w mode for config servers" );
+            return Status( ErrorCodes::BadValue,
+                           str::stream() << "unknown w mode for config servers "
+                           << "(" << writeConcern.wMode << ")" );
         }
 
         if ( !anyReplEnabled() ) {
@@ -162,12 +164,18 @@ namespace mongo {
 
             if ( writeConcern.wNumNodes > 1 ) {
                 result->err = "norepl";
-                return Status( ErrorCodes::BadValue, "no replication and asked for w > 1" );
+                // TODO
+                //return Status( ErrorCodes::BadValue,
+                //str::stream() << "no replication and asked for w > 1 "
+                //<< "(" << writeConcern.wNumNodes << ")" );
+                return Status::OK();
             }
             if ( !writeConcern.wMode.empty() &&
                  writeConcern.wMode != "majority" ) {
                 result->err = "norepl";
-                return Status( ErrorCodes::BadValue, "no replication and asked for w with a mode" );
+                // TODO
+                //return Status( ErrorCodes::BadValue, "no replication and asked for w with a mode" );
+                return Status::OK();
             }
 
             // asked for w <= 1 or w=majority
