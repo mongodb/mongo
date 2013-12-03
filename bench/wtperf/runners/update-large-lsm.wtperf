@@ -6,6 +6,4 @@ report_interval=5
 merge_sleep=600
 run_time=1200
 populate_threads=10
-read_threads=10
-insert_threads=2
-update_threads=2
+threads=((count=2,inserts=1),(count=10,reads=1),(count=2,updates=1))
