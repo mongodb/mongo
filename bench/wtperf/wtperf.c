@@ -54,7 +54,7 @@ static const char * const small_config_str =
     "report_interval=5,"
     "run_time=20,"
     "populate_threads=1,"
-    "read_threads=8,";
+    "threads=((count=8,read=1)),";
 
 static const char * const med_config_str =
     "conn_config=\"cache_size=1GB\","
@@ -65,7 +65,7 @@ static const char * const med_config_str =
     "report_interval=5,"
     "run_time=100,"
     "populate_threads=1,"
-    "read_threads=16,";
+    "threads=((count=16,read=1)),";
 
 static const char * const large_config_str =
     "conn_config=\"cache_size=2GB\","
@@ -76,7 +76,7 @@ static const char * const large_config_str =
     "report_interval=5,"
     "run_time=600,"
     "populate_threads=1,"
-    "read_threads=16,";
+    "threads=((count=16,read=1)),";
 
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
