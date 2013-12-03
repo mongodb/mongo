@@ -62,19 +62,16 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			/* Don't include the brackets. */
 			WT_ERR(__wt_strndup(session,
 			    cv.str + 1, cv.len - 2, &lsm_tree->file_config));
-		} else if (WT_STRING_MATCH(
-		    "auto_throttle", ck.str, ck.len)) {
+		} else if (WT_STRING_MATCH("auto_throttle", ck.str, ck.len)) {
 			if (cv.val)
 				F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
 			else
 				F_CLR(lsm_tree, WT_LSM_TREE_THROTTLE);
 		} else if (WT_STRING_MATCH("bloom", ck.str, ck.len))
 			lsm_tree->bloom = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH(
-		    "bloom_bit_count", ck.str, ck.len))
+		else if (WT_STRING_MATCH("bloom_bit_count", ck.str, ck.len))
 			lsm_tree->bloom_bit_count = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH(
-		    "bloom_hash_count", ck.str, ck.len))
+		else if (WT_STRING_MATCH("bloom_hash_count", ck.str, ck.len))
 			lsm_tree->bloom_hash_count = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("chunk_max", ck.str, ck.len))
 			lsm_tree->chunk_max = (uint64_t)cv.val;
