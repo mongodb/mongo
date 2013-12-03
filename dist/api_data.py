@@ -114,6 +114,10 @@ lsm_config = [
 	    create a bloom filter on the oldest LSM tree chunk. Only
 	    supported if bloom filters are enabled''',
 	    type='boolean'),
+	Config('lsm_chunk_max', '5GB', r'''
+	    the maximum size a single chunk can be. Must be larger than
+		lsm_chunk_size''',
+	    min='100MB', max='10TB'),
 	Config('lsm_chunk_size', '2MB', r'''
 	    the maximum size of the in-memory chunk of an LSM tree''',
 	    min='512K', max='500MB'),
