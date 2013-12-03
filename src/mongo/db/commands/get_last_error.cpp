@@ -131,6 +131,10 @@ namespace mongo {
             status = waitForWriteConcern( cc(), writeConcern, &res );
             res.appendTo( &result );
             if ( !status.isOK() ) {
+                if ( status.code() == ErrorCodes::WriteConcernLegacyOK ) {
+                    result.append( "wnote", status.toString() );
+                    return true;
+                }
                 errmsg = status.toString();
                 return false;
             }

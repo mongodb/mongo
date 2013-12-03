@@ -144,9 +144,8 @@ namespace mongo {
             // config servers have special rules
             if ( writeConcern.wNumNodes > 1 ) {
                 result->err = "norepl";
-                //TODO: would like to switch to return an error, but is a breaking change
-                //return Status( ErrorCodes::BadValue, "cannot use w > 1 with config servers" );
-                return Status::OK();
+                return Status( ErrorCodes::WriteConcernLegacyOK,
+                               "cannot use w > 1 with config servers" );
             }
             if ( writeConcern.wMode == "majority" ) {
                 // majority is ok for single nodes, as 1/1 > .5
@@ -164,18 +163,15 @@ namespace mongo {
 
             if ( writeConcern.wNumNodes > 1 ) {
                 result->err = "norepl";
-                // TODO
-                //return Status( ErrorCodes::BadValue,
-                //str::stream() << "no replication and asked for w > 1 "
-                //<< "(" << writeConcern.wNumNodes << ")" );
-                return Status::OK();
+                return Status( ErrorCodes::WriteConcernLegacyOK,
+                               str::stream() << "no replication and asked for w > 1 "
+                               << "(" << writeConcern.wNumNodes << ")" );
             }
             if ( !writeConcern.wMode.empty() &&
                  writeConcern.wMode != "majority" ) {
                 result->err = "norepl";
-                // TODO
-                //return Status( ErrorCodes::BadValue, "no replication and asked for w with a mode" );
-                return Status::OK();
+                return Status( ErrorCodes::WriteConcernLegacyOK,
+                               "no replication and asked for w with a mode" );
             }
 
             // asked for w <= 1 or w=majority
@@ -229,9 +225,8 @@ namespace mongo {
                 result->writtenTo = getHostsWrittenTo( op );
                 result->err = "timeout";
                 result->wTimedOut = true;
-                // this command returns OK because it worked
-                // so you have to check result to see if there was a real timeout
-                return Status::OK();
+                return Status( ErrorCodes::WriteConcernLegacyOK,
+                               "waiting for replication timed out" );
             }
 
             verify( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
