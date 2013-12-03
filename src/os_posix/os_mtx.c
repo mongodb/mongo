@@ -131,7 +131,11 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WT_RET(__wt_verbose(
 		    session, "signal %s cond (%p)", cond->name, cond));
 
-	if (cond->waiters != -1 && !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
+	/* Fast path if already signalled. */
+	if (cond->waiters == -1)
+		return (0);
+
+	if (cond->waiters > 0 || !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
 		WT_ERR(pthread_mutex_lock(&cond->mtx));
 		locked = 1;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));
