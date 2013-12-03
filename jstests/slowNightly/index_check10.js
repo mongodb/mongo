@@ -13,7 +13,7 @@ function doIt( indexVersion ) {
         var sort = {};
         for( var i = 0; i < n; ++i ) {
             sort[ fields[ i ] ] = Random.rand() > 0.5 ? 1 : -1;
-        }    
+        }
         return sort;
     }
 
@@ -22,7 +22,7 @@ function doIt( indexVersion ) {
     var idx = sort();
 
     var chars = "abcdefghijklmnopqrstuvwxyz";
-    
+
     function obj() {
         var ret = {};
         for( var i = 0; i < n; ++i ) {
@@ -53,17 +53,17 @@ function doIt( indexVersion ) {
                 if ( bounds[ 0 ] > bounds[ 1 ] ) {
                     bounds.reverse();
                 }
-	        var s = {};
-	        if ( Random.rand() > 0.5 ) {
-		    s[ "$gte" ] = bounds[ 0 ];
-	        } else {
-		    s[ "$gt" ] = bounds[ 0 ];
-	        }
-	        if ( Random.rand() > 0.5 ) {
-		    s[ "$lte" ] = bounds[ 1 ];
-	        } else {
-		    s[ "$lt" ] = bounds[ 1 ];
-	        }
+                var s = {};
+                if ( Random.rand() > 0.5 ) {
+                    s[ "$gte" ] = bounds[ 0 ];
+                } else {
+                    s[ "$gt" ] = bounds[ 0 ];
+                }
+                if ( Random.rand() > 0.5 ) {
+                    s[ "$lte" ] = bounds[ 1 ];
+                } else {
+                    s[ "$lt" ] = bounds[ 1 ];
+                }
                 spec[ fields[ i ] ] = s;
             } else {
                 var vals = []
@@ -76,7 +76,7 @@ function doIt( indexVersion ) {
         s = sort();
         c1 = t.find( spec, { _id:null } ).sort( s ).hint( idx ).toArray();
         try {
-	    c3 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
+            c3 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
         } catch( e ) {
             // may assert if too much data for in memory sort
             print( "retrying check..." );
@@ -85,20 +85,20 @@ function doIt( indexVersion ) {
         }
 
         var j = 0;
-	for( var i = 0; i < c3.length; ++i ) {
+        for( var i = 0; i < c3.length; ++i ) {
             if( friendlyEqual( c1[ j ], c3[ i ] ) ) {
                 ++j;
             } else {
                 var o = c3[ i ];
                 var size = Object.bsonsize( o );
                 for( var f in o ) {
-             	    size -= f.length;
+                     size -= f.length;
                 }
-                
+
                 var max = indexVersion == 0 ? 819 : 818;
-                
+
                 if ( size <= max /* KeyMax */ ) {
-	            assert.eq( c1, c3 , "size: " + size );
+                    assert.eq( c1, c3 , "size: " + size );
                 }
             }
         }
@@ -107,7 +107,7 @@ function doIt( indexVersion ) {
     for( var i = 0; i < 10000; ++i ) {
         t.save( obj() );
     }
-    
+
     t.ensureIndex( idx , { v : indexVersion } );
     check();
 
