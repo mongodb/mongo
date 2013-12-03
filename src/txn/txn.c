@@ -272,8 +272,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	do {
 		txn_state->id = txn->id = txn_global->current;
-	} while (
-	    !WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
+	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
 
 	/*
 	 * If we have used 64-bits of transaction IDs, there is nothing
