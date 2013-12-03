@@ -153,8 +153,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 		 */
 		break;
 	case WT_ST_REMOVE:	/* Remove trk.a */
-		if ((tret = __wt_metadata_remove(
-		    session, trk->a)) != 0) {
+		if ((tret = __wt_metadata_remove(session, trk->a)) != 0) {
 			__wt_err(session, tret,
 			    "metadata unroll remove: %s",
 			    trk->a);
