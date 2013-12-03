@@ -23,7 +23,7 @@
 #include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 

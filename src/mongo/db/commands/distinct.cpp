@@ -42,14 +42,9 @@
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/type_explain.h"
-#include "mongo/db/query_optimizer.h"  // XXX old sys
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-    MONGO_EXPORT_SERVER_PARAMETER(newDistinct, bool, true);
 
     class DistinctCommand : public Command {
     public:
@@ -105,145 +100,54 @@ namespace mongo {
                 return true;
             }
 
-            if (newDistinct) {
-                CanonicalQuery* cq;
-                // XXX: project out just the field we're distinct-ing.  May be covered.
-                if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
-                    uasserted(17215, "Can't canonicalize query " + query.toString());
-                    return 0;
-                }
+            CanonicalQuery* cq;
+            // XXX: project out just the field we're distinct-ing.  May be covered...
+            if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
+                uasserted(17215, "Can't canonicalize query " + query.toString());
+                return 0;
+            }
 
-                Runner* rawRunner;
-                if (!getRunner(cq, &rawRunner).isOK()) {
-                    uasserted(17216, "Can't get runner for query " + query.toString());
-                    return 0;
-                }
+            Runner* rawRunner;
+            if (!getRunner(cq, &rawRunner).isOK()) {
+                uasserted(17216, "Can't get runner for query " + query.toString());
+                return 0;
+            }
 
-                auto_ptr<Runner> runner(rawRunner);
-                auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-                ClientCursor::registerRunner(runner.get());
-                runner->setYieldPolicy(Runner::YIELD_AUTO);
-                safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+            auto_ptr<Runner> runner(rawRunner);
+            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+            ClientCursor::registerRunner(runner.get());
+            runner->setYieldPolicy(Runner::YIELD_AUTO);
+            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
-                BSONObj obj;
-                Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
-                    BSONElementSet elts;
-                    obj.getFieldsDotted(key, elts);
+            BSONObj obj;
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                BSONElementSet elts;
+                obj.getFieldsDotted(key, elts);
 
-                    for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
-                        BSONElement elt = *it;
-                        if (values.count(elt)) { continue; }
-                        int currentBufPos = bb.len();
+                for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
+                    BSONElement elt = *it;
+                    if (values.count(elt)) { continue; }
+                    int currentBufPos = bb.len();
 
-                        uassert(17217, "distinct too big, 16mb cap",
-                                (currentBufPos + elt.size() + 1024) < bufSize);
+                    uassert(17217, "distinct too big, 16mb cap",
+                            (currentBufPos + elt.size() + 1024) < bufSize);
 
-                        arr.append(elt);
-                        BSONElement x(start + currentBufPos);
-                        values.insert(x);
-                    }
-                }
-                TypeExplain* bareExplain;
-                Status res = runner->getExplainPlan(&bareExplain);
-                if (res.isOK()) {
-                    auto_ptr<TypeExplain> explain(bareExplain);
-                    if (explain->isCursorSet()) {
-                        cursorName = explain->getCursor();
-                    }
-                    n = explain->getN();
-                    nscanned = explain->getNScanned();
-                    nscannedObjects = explain->getNScannedObjects();
+                    arr.append(elt);
+                    BSONElement x(start + currentBufPos);
+                    values.insert(x);
                 }
             }
-            else {
-                shared_ptr<Cursor> cursor;
-                if ( ! query.isEmpty() ) {
-                    cursor = getOptimizedCursor( ns.c_str(), query, BSONObj() );
+            TypeExplain* bareExplain;
+            Status res = runner->getExplainPlan(&bareExplain);
+            if (res.isOK()) {
+                auto_ptr<TypeExplain> explain(bareExplain);
+                if (explain->isCursorSet()) {
+                    cursorName = explain->getCursor();
                 }
-                else {
-                    // query is empty, so lets see if we can find an index
-                    // with the key so we don't have to hit the raw data
-                    NamespaceDetails::IndexIterator ii = d->ii();
-                    while ( ii.more() ) {
-                        IndexDetails& idx = ii.next();
-                        if ( d->isMultikey( ii.pos() - 1 ) )
-                            continue;
-
-                        if ( idx.inKeyPattern( key ) ) {
-                            cursor = getBestGuessCursor( ns.c_str(), BSONObj(), idx.keyPattern() );
-                            if( cursor.get() ) break;
-                        }
-                    }
-                    if ( ! cursor.get() )
-                        cursor = getOptimizedCursor(ns.c_str() , query , BSONObj() );
-                }
-            
-                verify( cursor );
-                cursorName = cursor->toString();
-
-                auto_ptr<ClientCursor> cc(
-                    new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
-
-                // map from indexed field to offset in key object
-                map<string, int> indexedFields;  
-                if (!cursor->modifiedKeys()) {
-                    // store index information so we can decide if we can
-                    // get something out of the index key rather than full object
-
-                    int x = 0;
-                    BSONObjIterator i( cursor->indexKeyPattern() );
-                    while ( i.more() ) {
-                        BSONElement e = i.next();
-                        if ( e.isNumber() ) {
-                            // only want basic index fields, not "2d" etc
-                            indexedFields[e.fieldName()] = x;
-                        }
-                        x++;
-                    }
-                }
-
-                while ( cursor->ok() ) {
-                    nscanned++;
-                    bool loadedRecord = false;
-                    MatchDetails md;
-
-                    if (cursor->currentMatches( &md ) && !cursor->getsetdup( cursor->currLoc() ) ) {
-                        n++;
-
-                        BSONObj holder;
-                        BSONElementSet temp;
-                        // Try to get the record from the key fields.
-                        loadedRecord = !getFieldsDotted(indexedFields, cursor, key, temp, holder);
-
-                        for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
-                            BSONElement e = *i;
-                            if ( values.count( e ) )
-                                continue;
-
-                            int now = bb.len();
-
-                            uassert(10044, "distinct too big, 16mb cap",
-                                    ( now + e.size() + 1024 ) < bufSize );
-
-                            arr.append( e );
-                            BSONElement x( start + now );
-                            values.insert( x );
-                        }
-                    }
-
-                    if ( loadedRecord || md.hasLoadedRecord() )
-                        nscannedObjects++;
-
-                    cursor->advance();
-
-                    if (!cc->yieldSometimes( ClientCursor::MaybeCovered )) {
-                        cc.release();
-                        break;
-                    }
-
-                    RARELY killCurrentOp.checkForInterrupt();
-                }
+                n = explain->getN();
+                nscanned = explain->getNScanned();
+                nscannedObjects = explain->getNScannedObjects();
             }
 
             verify( start == bb.buf() );
@@ -262,31 +166,6 @@ namespace mongo {
 
             return true;
         }
-    private:
-        /**
-         * Tries to get the fields from the key first, then the object if the keys don't have it.
-         */
-        bool getFieldsDotted(const map<string, int>& indexedFields, shared_ptr<Cursor> cursor,
-                             const string& name, BSONElementSet &ret, BSONObj& holder) {
-            map<string,int>::const_iterator i = indexedFields.find( name );
-            if ( i == indexedFields.end() ) {
-                cursor->current().getFieldsDotted( name , ret );
-                return false;
-            }
-
-            int x = i->second;
-
-            holder = cursor->currKey();
-            BSONObjIterator it( holder );
-            while ( x && it.more() ) {
-                it.next();
-                x--;
-            }
-            verify( x == 0 );
-            ret.insert( it.next() );
-            return true;
-        }
-
     } distinctCmd;
 
-}
+}  // namespace mongo

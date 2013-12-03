@@ -1,7 +1,7 @@
 // count.h
 
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,14 +28,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
     
     /**
+     * 'ns' is the namespace we're counting on.
+     *
      * { count: "collectionname"[, query: <query>] }
-     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the match count.
+     *
+     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
+     * match count.
      */
     long long runCount(const char *ns, const BSONObj& cmd, string& err, int& errCode );
     
