@@ -32,7 +32,7 @@ function doIt( indexVersion ) {
     }
 
     function r() {
-        var len = Random.randInt( 1000 / n );
+        var len = Random.randInt( 700 / n );
         buf = "";
         for( var i = 0; i < len; ++i ) {
             buf += chars.charAt( Random.randInt( chars.length ) );
