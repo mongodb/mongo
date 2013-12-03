@@ -321,7 +321,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_ERR(__wt_lsm_tree_set_chunk_size(session, lsm_tree, chunk));
+	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 

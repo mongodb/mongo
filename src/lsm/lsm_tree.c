@@ -190,16 +190,16 @@ __wt_lsm_tree_chunk_name(
  */
 int
 __wt_lsm_tree_set_chunk_size(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
+    WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
 {
-	WT_ITEM buf;
 	off_t size;
+	const char *filename;
 
-	WT_CLEAR(buf);
-	WT_RET(__wt_buf_fmt(session, &buf, "%s-%06" PRIu32 ".lsm",
-	    lsm_tree->filename, chunk->id));
-	WT_RET(__wt_filesize_name(session, buf.mem, &size));
-	__wt_buf_free(session, &buf);
+	filename = chunk->uri;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET_MSG(session, EINVAL,
+		    "Expected a 'file:' URI: %s", chunk->uri);
+	WT_RET(__wt_filesize_name(session, filename, &size));
 
 	chunk->size = (uint64_t)size;
 

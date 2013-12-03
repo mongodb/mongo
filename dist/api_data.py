@@ -115,8 +115,10 @@ lsm_config = [
 	    supported if bloom filters are enabled''',
 	    type='boolean'),
 	Config('lsm_chunk_max', '5GB', r'''
-	    the maximum size a single chunk can be. Must be larger than
-		lsm_chunk_size''',
+	    the maximum size a single chunk can be. Chunks larger than this size
+		will not be considered for further merges. This is a soft limit - 
+		chunks somewhat larger than this value can be created. Must be
+		larger than lsm_chunk_size''',
 	    min='100MB', max='10TB'),
 	Config('lsm_chunk_size', '2MB', r'''
 	    the maximum size of the in-memory chunk of an LSM tree''',
