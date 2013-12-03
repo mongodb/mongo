@@ -46,8 +46,10 @@ static void config_opt_usage(void);
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 
-/* Assign the src config to the dest.
- * Any storage allocated in dest is freed as a result.
+/*
+ * config_assign --
+ *	Assign the src config to the dest, any storage allocated in dest is
+ * freed as a result.
  */
 int
 config_assign(CONFIG *dest, const CONFIG *src)
@@ -74,7 +76,9 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	return (0);
 }
 
-/* Free any storage allocated in the config struct.
+/*
+ * config_free --
+ *	Free any storage allocated in the config struct.
  */
 void
 config_free(CONFIG *cfg)
@@ -195,9 +199,10 @@ err:	fprintf(stderr,
 }
 
 /*
- * Check a single key=value returned by the config parser
- * against our table of valid keys, along with the expected type.
- * If everything is okay, set the value.
+ * config_opt --
+ *	Check a single key=value returned by the config parser against our table
+ * of valid keys, along with the expected type.  If everything is okay, set the
+ * value.
  */
 static int
 config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
@@ -316,8 +321,10 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	return (0);
 }
 
-/* Parse a configuration file.
- * We recognize comments '#' and continuation via lines ending in '\'.
+/*
+ * config_opt_file --
+ *	Parse a configuration file.  We recognize comments '#' and continuation
+ * via lines ending in '\'.
  */
 int
 config_opt_file(CONFIG *cfg, const char *filename)
@@ -389,8 +396,10 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	return (ret);
 }
 
-/* Parse a single line of config options.
- * Continued lines have already been joined.
+/*
+ * config_opt_line --
+ *	Parse a single line of config options.  Continued lines have already
+ * been joined.
  */
 int
 config_opt_line(CONFIG *cfg, const char *optstr)
@@ -427,7 +436,10 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	return (ret);
 }
 
-/* Set a single string config option */
+/*
+ * config_opt_str --
+ *	Set a single string config option.
+ */
 int
 config_opt_str(CONFIG *cfg, const char *name, const char *value)
 {
@@ -443,6 +455,74 @@ config_opt_str(CONFIG *cfg, const char *name, const char *value)
 	return (ret);
 }
 
+/*
+ * config_sanity --
+ *	Configuration sanity checks.
+ */
+int
+config_sanity(CONFIG *cfg)
+{
+	/* Various intervals should be less than the run-time. */
+	if (cfg->run_time > 0 &&
+	    ((cfg->checkpoint_threads != 0 &&
+	    cfg->checkpoint_interval > cfg->run_time) ||
+	    cfg->report_interval > cfg->run_time ||
+	    cfg->sample_interval > cfg->run_time)) {
+		fprintf(stderr, "interval value longer than the run-time\n");
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * config_print --
+ *	Print out the configuration in verbose mode.
+ */
+void
+config_print(CONFIG *cfg)
+{
+	WORKLOAD *workp;
+	u_int i;
+
+	printf("Workload configuration:\n");
+	printf("\tHome: %s\n", cfg->home);
+	printf("\tTable name: %s\n", cfg->table_name);
+	printf("\tConnection configuration: %s\n", cfg->conn_config);
+
+	printf("\t%s table: %s\n",
+	    cfg->create ? "Creating new" : "Using existing",
+	    cfg->table_config);
+	printf("\tKey size: %" PRIu32 ", value size: %" PRIu32 "\n",
+	    cfg->key_sz, cfg->value_sz);
+	if (cfg->create)
+		printf("\tPopulate threads: %" PRIu32 ", inserting %" PRIu32
+		    " rows\n",
+		    cfg->populate_threads, cfg->icount);
+
+	printf("\tWorkload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
+	    cfg->run_time, cfg->run_ops);
+	if (cfg->workload != NULL) {
+		printf("\tWorkload configuration(s):\n");
+		for (i = 0, workp = cfg->workload;
+		    i < cfg->workload_cnt; ++i, ++workp)
+			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
+			    ", reads=%" PRId64 ", updates=%" PRId64 ")\n",
+			    workp->threads,
+			    workp->insert, workp->read, workp->update);
+	}
+
+	printf("\tCheckpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
+	    cfg->checkpoint_threads, cfg->checkpoint_interval);
+	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
+	printf("\tSampling interval: %" PRIu32 "\n", cfg->sample_interval);
+
+	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
+}
+
+/*
+ * pretty_print --
+ *	Print out lines of text for a 80 character window.
+ */
 static void
 pretty_print(const char *p, const char *indent)
 {
@@ -462,6 +542,10 @@ pretty_print(const char *p, const char *indent)
 		printf("%s%s\n", indent == NULL ? "" : indent, p);
 }
 
+/*
+ * config_opt_usage --
+ *	Configuration usage error message.
+ */
 static void
 config_opt_usage(void)
 {
@@ -504,62 +588,10 @@ config_opt_usage(void)
 	}
 }
 
-int
-config_sanity(CONFIG *cfg)
-{
-	/* Various intervals should be less than the run-time. */
-	if (cfg->run_time > 0 &&
-	    ((cfg->checkpoint_threads != 0 &&
-	    cfg->checkpoint_interval > cfg->run_time) ||
-	    cfg->report_interval > cfg->run_time ||
-	    cfg->sample_interval > cfg->run_time)) {
-		fprintf(stderr, "interval value longer than the run-time\n");
-		return (1);
-	}
-	return (0);
-}
-
-void
-config_print(CONFIG *cfg)
-{
-	WORKLOAD *workp;
-	u_int i;
-
-	printf("Workload configuration:\n");
-	printf("\tHome: %s\n", cfg->home);
-	printf("\tTable name: %s\n", cfg->table_name);
-	printf("\tConnection configuration: %s\n", cfg->conn_config);
-
-	printf("\t%s table: %s\n",
-	    cfg->create ? "Creating new" : "Using existing",
-	    cfg->table_config);
-	printf("\tKey size: %" PRIu32 ", value size: %" PRIu32 "\n",
-	    cfg->key_sz, cfg->value_sz);
-	if (cfg->create)
-		printf("\tPopulate threads: %" PRIu32 ", inserting %" PRIu32
-		    " rows\n",
-		    cfg->populate_threads, cfg->icount);
-
-	printf("\tWorkload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
-	    cfg->run_time, cfg->run_ops);
-	if (cfg->workload != NULL) {
-		printf("\tWorkload configuration(s):\n");
-		for (i = 0, workp = cfg->workload;
-		    i < cfg->workload_cnt; ++i, ++workp)
-			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
-			    ", reads=%" PRId64 ", updates=%" PRId64 ")\n",
-			    workp->threads,
-			    workp->insert, workp->read, workp->update);
-	}
-
-	printf("\tCheckpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
-	    cfg->checkpoint_threads, cfg->checkpoint_interval);
-	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
-	printf("\tSampling interval: %" PRIu32 "\n", cfg->sample_interval);
-
-	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
-}
-
+/*
+ * usage --
+ *	wtperf usage print, no error.
+ */
 void
 usage(void)
 {
