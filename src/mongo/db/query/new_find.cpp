@@ -108,14 +108,17 @@ namespace mongo {
 
         CanonicalQuery* cq;
         Status status = CanonicalQuery::canonicalize(qm, &cq);
-        if (!status.isOK()) { return false; }
+        if (!status.isOK()) {
+            QLOG() << "Can't canonicalize query: " << status.toString() << endl;
+            return false;
+        }
         verify(cq);
         auto_ptr<CanonicalQuery> scopedCq(cq);
 
         const LiteParsedQuery& pq = cq->getParsed();
 
         // We fail to deal well with obscure arguments to .find().
-        if (pq.returnKey() || pq.showDiskLoc() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty()) {
+        if (pq.returnKey() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty()) {
             QLOG() << "rejecting wacky query args query\n";
             return false;
         }

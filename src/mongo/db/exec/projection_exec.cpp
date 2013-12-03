@@ -121,6 +121,9 @@ namespace mongo {
                     if (mongoutils::str::equals(e2.valuestr(), "text")) {
                         _meta[e.fieldName()] = META_TEXT;
                     }
+                    else if (mongoutils::str::equals(e2.valuestr(), "diskloc")) {
+                        _meta[e.fieldName()] = META_DISKLOC;
+                    }
                     else {
                         // This shouldn't happen, should be caught by parsing.
                         verify(0);
@@ -271,6 +274,9 @@ namespace mongo {
                 else {
                     bob.append(it->first, 0.0);
                 }
+            }
+            else if (META_DISKLOC == it->second) {
+                bob.append(it->first, member->loc.toBSONObj());
             }
         }
 

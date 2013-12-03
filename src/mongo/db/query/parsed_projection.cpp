@@ -135,8 +135,10 @@ namespace mongo {
                         return Status(ErrorCodes::BadValue, "unexpected argument to $meta in proj");
                     }
 
-                    if (!mongoutils::str::equals(e2.valuestr(), "text")) {
-                        return Status(ErrorCodes::BadValue, "unsupported $meta operator: " + e2.str());
+                    if (!mongoutils::str::equals(e2.valuestr(), "text")
+                        && !mongoutils::str::equals(e2.valuestr(), "diskloc")) {
+                        return Status(ErrorCodes::BadValue,
+                                      "unsupported $meta operator: " + e2.str());
                     }
                 }
                 else {

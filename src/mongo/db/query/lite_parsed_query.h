@@ -69,6 +69,12 @@ namespace mongo {
         static bool isTextMeta(BSONElement elt);
 
         /**
+         * Helper function to identify diskLoc projection
+         * Example: {a: {$meta: "diskloc"}}.
+         */
+        static bool isDiskLocMeta(BSONElement elt);
+
+        /**
          * Helper function to validate a sort object.
          * Returns true if each element satisfies one of:
          * 1. a number with value 1

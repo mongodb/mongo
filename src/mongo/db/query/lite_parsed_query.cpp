@@ -116,6 +116,35 @@ namespace mongo {
     }
 
     // static
+    bool LiteParsedQuery::isDiskLocMeta(BSONElement elt) {
+        // elt must be foo: {$meta: "diskloc"}
+        if (mongo::Object != elt.type()) {
+            return false;
+        }
+        BSONObj metaObj = elt.Obj();
+        BSONObjIterator metaIt(metaObj);
+        // must have exactly 1 element
+        if (!metaIt.more()) {
+            return false;
+        }
+        BSONElement metaElt = metaIt.next();
+        if (!mongoutils::str::equals("$meta", metaElt.fieldName())) {
+            return false;
+        }
+        if (mongo::String != metaElt.type()) {
+            return false;
+        }
+        if (!mongoutils::str::equals("diskloc", metaElt.valuestr())) {
+            return false;
+        }
+        // must have exactly 1 element
+        if (metaIt.more()) {
+            return false;
+        }
+        return true;
+    }
+
+    // static
     bool LiteParsedQuery::isValidSortOrder(const BSONObj& sortObj) {
         BSONObjIterator i(sortObj);
         while (i.more()) {
@@ -288,7 +317,13 @@ namespace mongo {
                 }
                 else if (str::equals("showDiskLoc", name)) {
                     // Won't throw.
-                    _showDiskLoc = e.trueValue();
+                    if (e.trueValue()) {
+                        BSONObjBuilder projBob;
+                        projBob.appendElements(_proj);
+                        BSONObj metaDiskLoc = BSON("$diskLoc" << BSON("$meta" << "diskloc"));
+                        projBob.append(metaDiskLoc.firstElement());
+                        _proj = projBob.obj();
+                    }
                 }
                 else if (str::equals("maxTimeMS", name)) {
                     StatusWith<int> maxTimeMS = parseMaxTimeMS(e);
