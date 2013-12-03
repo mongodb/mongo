@@ -41,6 +41,89 @@
 
 namespace mongo {
 
+    Status cloneCollectionAsCapped( Database* db,
+                                    const string& shortFrom,
+                                    const string& shortTo,
+                                    double size,
+                                    bool temp ) {
+
+        string fromNs = db->name() + "." + shortFrom;
+        string toNs = db->name() + "." + shortTo;
+
+        Collection* fromCollection = db->getCollection( fromNs );
+        if ( !fromCollection )
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "source collection " << fromNs <<  " does not exist" );
+
+        if ( db->getCollection( toNs ) )
+            return Status( ErrorCodes::NamespaceExists, "to collection already exists" );
+
+        // create new collection
+        {
+            Client::Context ctx( toNs );
+            BSONObjBuilder spec;
+            spec.appendBool( "capped", true );
+            spec.append( "size", size );
+            if ( temp )
+                spec.appendBool( "temp", true );
+
+            string errmsg;
+            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
+                return Status( ErrorCodes::InternalError, errmsg );
+        }
+
+        auto_ptr<Runner> runner;
+
+        {
+            NamespaceDetails* details = fromCollection->details();
+            DiskLoc extent = details->firstExtent();
+
+            // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+            long long excessSize = fromCollection->dataSize() - size * 2;
+
+            // skip ahead some extents since not all the data fits,
+            // so we have to chop a bunch off
+            for( ;
+                 excessSize > extent.ext()->length && extent != details->lastExtent();
+                 extent = extent.ext()->xnext ) {
+
+                excessSize -= extent.ext()->length;
+                LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size "
+                         << extent.ext()->length << endl;
+                LOG( 6 ) << "excessSize: " << excessSize << endl;
+            }
+            DiskLoc startLoc = extent.ext()->firstRecord;
+
+            runner.reset( InternalPlanner::collectionScan(fromNs,
+                                                          InternalPlanner::FORWARD,
+                                                          startLoc) );
+        }
+
+        Collection* toCollection = db->getCollection( toNs );
+        verify( toCollection );
+
+        while ( true ) {
+            BSONObj obj;
+            Runner::RunnerState state = runner->getNext(&obj, NULL);
+
+            switch( state ) {
+            case Runner::RUNNER_EOF:
+                return Status::OK();
+            case Runner::RUNNER_DEAD:
+                db->dropCollection( toNs );
+                return Status( ErrorCodes::InternalError, "runner turned dead while iterating" );
+            case Runner::RUNNER_ERROR:
+                return Status( ErrorCodes::InternalError, "runner error while iterating" );
+            case Runner::RUNNER_ADVANCED:
+                toCollection->insertDocument( obj, true );
+                logOp( "i", toNs.c_str(), obj );
+                getDur().commitIfNeeded();
+            }
+        }
+
+        verify( false ); // unreachable
+    }
+
     /* convertToCapped seems to use this */
     class CmdCloneCollectionAsCapped : public Command {
     public:
@@ -71,87 +154,16 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string from = jsobj.getStringField( "cloneCollectionAsCapped" );
             string to = jsobj.getStringField( "toCollection" );
-            long long size = (long long)jsobj.getField( "size" ).number();
+            double size = jsobj.getField( "size" ).number();
+            bool temp = jsobj.getField( "temp" ).trueValue();
 
             if ( from.empty() || to.empty() || size == 0 ) {
                 errmsg = "invalid command spec";
                 return false;
             }
 
-            Database* db = cc().database();
-
-            string fromNs = dbname + "." + from;
-            string toNs = dbname + "." + to;
-
-            Collection* fromCollection = db->getCollection( fromNs );
-            massert( 10301, "source collection " + fromNs + " does not exist", fromCollection );
-
-            massert( 17287, "to collection already exists", !db->getCollection( toNs ) );
-
-            // create new collection
-            {
-                Client::Context ctx( toNs );
-                BSONObjBuilder spec;
-                spec.appendBool( "capped", true );
-                spec.append( "size", static_cast<double>( size ) );
-                if ( jsobj.hasField("temp") )
-                    spec.append( jsobj["temp"] );
-                if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
-                    return false;
-            }
-
-            auto_ptr<Runner> runner;
-
-            {
-                NamespaceDetails* details = fromCollection->details();
-                DiskLoc extent = details->firstExtent();
-
-                // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-                long long excessSize = fromCollection->dataSize() - size * 2;
-
-                // skip ahead some extents since not all the data fits,
-                // so we have to chop a bunch off
-                for( ;
-                     excessSize > extent.ext()->length && extent != details->lastExtent();
-                     extent = extent.ext()->xnext ) {
-
-                    excessSize -= extent.ext()->length;
-                    LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size "
-                             << extent.ext()->length << endl;
-                    LOG( 6 ) << "excessSize: " << excessSize << endl;
-                }
-                DiskLoc startLoc = extent.ext()->firstRecord;
-
-                runner.reset( InternalPlanner::collectionScan(fromNs,
-                                                              InternalPlanner::FORWARD,
-                                                              startLoc) );
-            }
-
-            Collection* toCollection = db->getCollection( toNs );
-            verify( toCollection );
-
-            while ( true ) {
-                BSONObj obj;
-                Runner::RunnerState state = runner->getNext(&obj, NULL);
-
-                switch( state ) {
-                case Runner::RUNNER_EOF:
-                    return true;
-                case Runner::RUNNER_DEAD:
-                    db->dropCollection( toNs );
-                    errmsg = "runner turned dead while iterating";
-                    return false;
-                case Runner::RUNNER_ERROR:
-                    errmsg = "runner error while iterating";
-                    return false;
-                case Runner::RUNNER_ADVANCED:
-                    toCollection->insertDocument( obj, true );
-                    logOp( "i", toNs.c_str(), obj );
-                    getDur().commitIfNeeded();
-                }
-            }
-
-            return true;
+            Status status = cloneCollectionAsCapped( cc().database(), from, to, size, temp );
+            return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
 
@@ -180,44 +192,39 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             BackgroundOperation::assertNoBgOpInProgForDb(dbname.c_str());
 
-            string from = jsobj.getStringField( "convertToCapped" );
-            long long size = (long long)jsobj.getField( "size" ).number();
+            string shortSource = jsobj.getStringField( "convertToCapped" );
+            string longSource = dbname + "." + shortSource;
+            double size = jsobj.getField( "size" ).number();
 
-            if ( from.empty() || size == 0 ) {
+            if ( shortSource.empty() || size == 0 ) {
                 errmsg = "invalid command spec";
                 return false;
             }
 
-            string shortTmpName = str::stream() << "tmp.convertToCapped." << from;
+            string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
 
-            DBDirectClient client;
-            client.dropCollection( longTmpName );
+            Database* db = cc().database();
 
-            BSONObj info;
-            if ( !client.runCommand( dbname ,
-                                     BSON( "cloneCollectionAsCapped" << from << "toCollection" << shortTmpName << "size" << double( size ) << "temp" << true ),
-                                     info ) ) {
-                errmsg = "cloneCollectionAsCapped failed: " + info.toString();
-                return false;
+            if ( db->getCollection( longTmpName ) ) {
+                Status status = db->dropCollection( longTmpName );
+                if ( !status.isOK() )
+                    return appendCommandStatus( result, status );
             }
 
-            if ( !client.dropCollection( dbname + "." + from ) ) {
-                errmsg = "failed to drop original collection";
-                return false;
-            }
+            Status status = cloneCollectionAsCapped( db, shortSource, shortTmpName, size, true );
 
-            if ( !client.runCommand( "admin",
-                                     BSON( "renameCollection" << longTmpName <<
-                                           "to" << ( dbname + "." + from ) <<
-                                           "stayTemp" << false // explicit
-                                           ),
-                                     info ) ) {
-                errmsg = "renameCollection failed: " + info.toString();
-                return false;
-            }
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status );
 
-            return true;
+            verify( db->getCollection( longTmpName ) );
+
+            status = db->dropCollection( longSource );
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status );
+
+            status = db->renameCollection( longTmpName, longSource, false );
+            return appendCommandStatus( result, status );
         }
     } cmdConvertToCapped;
 
