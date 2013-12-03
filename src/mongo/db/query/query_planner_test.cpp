@@ -635,8 +635,8 @@ namespace {
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
                                 "{ixscan: {filter: null, pattern: {a: 1}}}, "
-                                "{fetch: {filter: {$and: [{b: 7}]}, "
-                                         "node: {ixscan: {filter: null, pattern: {a: 1}}}}}]}}}}");
+                                "{fetch: {filter: {b: 7}, node: {ixscan: "
+                                "{filter: null, pattern: {a: 1}}}}}]}}}}");
     }
 
     TEST_F(IndexAssignmentTest, AndWithUnindexedOrChild) {
@@ -645,8 +645,8 @@ namespace {
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {filter: {$and: [{$or: [{b: 1}, {c: 7}]}]}, "
-                                "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {filter: {$or: [{b: 1}, {c: 7}]}, node: "
+                                "{ixscan: {filter: null, pattern: {a: 1}}}}}");
     }
 
 
@@ -657,7 +657,7 @@ namespace {
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {filter: {$and: [{$or: [{b: 1}, {c: 7}]}]}, "
+        assertSolutionExists("{fetch: {filter: {$or: [{b: 1}, {c: 7}]}, "
                                 "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
     }
 
@@ -818,7 +818,7 @@ namespace {
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {filter: {$and: [{z: 10}]}, node: "
+        assertSolutionExists("{fetch: {filter: {z: 10}, node: "
                                 "{ixscan: {filter: null, pattern: {x: 1, y: 1, z: 1}}}}}");
     }
 
