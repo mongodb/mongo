@@ -866,7 +866,6 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     uint32_t id,
     WT_ITEM *buf);
 extern int __wt_lsm_tree_set_chunk_size( WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree,
     WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
