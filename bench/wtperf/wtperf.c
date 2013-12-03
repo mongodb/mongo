@@ -1298,9 +1298,6 @@ err:		if (ret == 0)
 		if ((t_ret = fclose(cfg->logf)) != 0 && ret == 0)
 			ret = t_ret;
 	}
-	free(cfg->popthreads);
-	free(cfg->workers);
-	free(cfg->workload);
 	config_free(cfg);
 
 	free(cc_buf);
