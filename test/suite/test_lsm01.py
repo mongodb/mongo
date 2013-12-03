@@ -63,7 +63,7 @@ class test_lsm01(wttest.WiredTigerTestCase):
     # Test drop of an object.
     def test_lsm(self):
         args = 'key_format=S'
-		args += ',lsm=(' # Start the LSM configuration options.
+        args += ',lsm=(' # Start the LSM configuration options.
         # add names to args, e.g. args += ',session_max=30'
         for var in self.config_vars:
             value = getattr(self, 's_' + var)
@@ -75,7 +75,7 @@ class test_lsm01(wttest.WiredTigerTestCase):
                 if value == False:
                     value = 'false'
                 args += ',' + var + '=' + str(value)
-		args += ')' # Close the LSM configuration option group
+        args += ')' # Close the LSM configuration option group
         self.verbose(3,
             'Test LSM with config: ' + args + ' count: ' + str(self.nrecs))
         simple_populate(self, self.uri, args, self.nrecs)
