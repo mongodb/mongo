@@ -5,4 +5,4 @@ icount=5000000
 report_interval=5
 run_time=120
 populate_threads=1
-threads=((count=6,inserts=1,reads=1,updates=1))
+threads=((count=2,inserts=1),(count=2,reads=1),(count=2,updates=1))
