@@ -867,6 +867,7 @@ namespace mongo {
     }
 
     // static
+
     void QueryPlannerAccess::_addFilterToSolutionNode(QuerySolutionNode* node,
                                                       MatchExpression* match,
                                                       MatchExpression::MatchType type) {
@@ -898,6 +899,44 @@ namespace mongo {
             listFilter->add(match);
             node->filter.reset(listFilter);
         }
+    }
+
+    QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
+                                                         const CanonicalQuery& query,
+                                                         const QueryPlannerParams& params,
+                                                         const BSONObj& startKey,
+                                                         const BSONObj& endKey) {
+        QuerySolutionNode* solnRoot = NULL;
+
+        // Build an ixscan over the id index, use it, and return it.
+        IndexScanNode* isn = new IndexScanNode();
+        isn->indexKeyPattern = index.keyPattern;
+        isn->indexIsMultiKey = index.multikey;
+        isn->direction = 1;
+        isn->maxScan = query.getParsed().getMaxScan();
+        isn->bounds.isSimpleRange = true;
+        isn->bounds.startKey = startKey;
+        isn->bounds.endKey = endKey;
+        isn->bounds.endKeyInclusive = false;
+
+        MatchExpression* filter = query.root()->shallowClone();
+
+        // If it's find({}) remove the no-op root.
+        if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
+            // XXX wasteful fix
+            delete filter;
+            solnRoot = isn;
+        }
+        else {
+            // TODO: We may not need to do the fetch if the predicates in root are covered.  But
+            // for now it's safe (though *maybe* slower).
+            FetchNode* fetch = new FetchNode();
+            fetch->filter.reset(filter);
+            fetch->children.push_back(isn);
+            solnRoot = fetch;
+        }
+
+        return solnRoot;
     }
 
 }  // namespace mongo

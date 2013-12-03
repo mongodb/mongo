@@ -55,6 +55,15 @@ namespace mongo {
                                                  const QueryPlannerParams& params,
                                                  int direction = 1);
 
+        /**
+         * Return a plan that scans the provided index from [startKey to endKey).
+         */
+        static QuerySolutionNode* makeIndexScan(const IndexEntry& index,
+                                                const CanonicalQuery& query,
+                                                const QueryPlannerParams& params,
+                                                const BSONObj& startKey,
+                                                const BSONObj& endKey);
+
         //
         // Indexed Data Access methods.
         //

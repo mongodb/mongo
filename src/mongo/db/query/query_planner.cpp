@@ -94,6 +94,39 @@ namespace mongo {
         return query.extractFieldsUnDotted(keyPattern);
     }
 
+    static bool indexCompatibleMaxMin(const BSONObj& obj, const BSONObj& keyPattern) {
+        BSONObjIterator kpIt(keyPattern);
+        BSONObjIterator objIt(obj);
+
+        for (;;) {
+            // Every element up to this point has matched so the KP matches
+            if (!kpIt.more() && !objIt.more()) {
+                return true;
+            }
+
+            // If only one iterator is done, it's not a match.
+            if (!kpIt.more() || !objIt.more()) {
+                return false;
+            }
+
+            // Field names must match and be in the same order.
+            BSONElement kpElt = kpIt.next();
+            BSONElement objElt = objIt.next();
+            if (!mongoutils::str::equals(kpElt.fieldName(), objElt.fieldName())) {
+                return false;
+            }
+        }
+    }
+
+    static BSONObj stripFieldNames(const BSONObj& obj) {
+        BSONObjIterator it(obj);
+        BSONObjBuilder bob;
+        while (it.more()) {
+            bob.appendAs(it.next(), "");
+        }
+        return bob.obj();
+    }
+
     QuerySolution* buildCollscanSoln(const CanonicalQuery& query,
                                      bool tailable,
                                      const QueryPlannerParams& params) {
@@ -164,7 +197,9 @@ namespace mongo {
             BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
             if (!natural.eoo()) {
                 QLOG() << "forcing a table scan due to hinted $natural\n";
-                if (canTableScan) {
+                // min/max are incompatible with $natural.
+                if (canTableScan && query.getParsed().getMin().isEmpty()
+                                 && query.getParsed().getMax().isEmpty()) {
                     QuerySolution* soln = buildCollscanSoln(query, false, params);
                     if (NULL != soln) {
                         out->push_back(soln);
@@ -223,7 +258,10 @@ namespace mongo {
 
         size_t hintIndexNumber = numeric_limits<size_t>::max();
 
-        if (!hintIndex.isEmpty()) {
+        if (hintIndex.isEmpty()) {
+            QueryPlannerIXSelect::findRelevantIndices(fields, params.indices, &relevantIndices);
+        }
+        else {
             // Sigh.  If the hint is specified it might be using the index name.
             BSONElement firstHintElt = hintIndex.firstElement();
             if (str::equals("$hint", firstHintElt.fieldName()) && String == firstHintElt.type()) {
@@ -259,9 +297,91 @@ namespace mongo {
                 return;
             }
         }
-        else {
-            QLOG() << "Finding relevant indices\n";
-            QueryPlannerIXSelect::findRelevantIndices(fields, params.indices, &relevantIndices);
+
+        // Deal with the .min() and .max() query options.  If either exist we can only use an index
+        // that matches the object inside.
+        if (!query.getParsed().getMin().isEmpty() || !query.getParsed().getMax().isEmpty()) {
+            BSONObj minObj = query.getParsed().getMin();
+            BSONObj maxObj = query.getParsed().getMax();
+
+            // If min and max are both specified they must have the same field names.
+            if (!minObj.isEmpty() && !maxObj.isEmpty()) {
+                if (!minObj.isFieldNamePrefixOf(maxObj) || (minObj.nFields() != maxObj.nFields())) {
+                    QLOG() << "minObj (" << minObj.toString()
+                           << ") and maxObj(" << maxObj.toString() << ") don't match.";
+                    return;
+                }
+            }
+
+            // This is the index into params.indices[...] that we use.
+            size_t idxNo = numeric_limits<size_t>::max();
+
+            // If there's an index hinted we need to be able to use it.
+            if (!hintIndex.isEmpty()) {
+                if (!minObj.isEmpty() && !indexCompatibleMaxMin(minObj, hintIndex)) {
+                    QLOG() << "minobj doesnt work w hint";
+                    return;
+                }
+
+                if (!maxObj.isEmpty() && !indexCompatibleMaxMin(maxObj, hintIndex)) {
+                    QLOG() << "maxobj doesnt work w hint";
+                    return;
+                }
+
+                idxNo = hintIndexNumber;
+            }
+            else {
+                // No hinted index, look for one that is compatible (has same field names and
+                // ordering thereof).
+                for (size_t i = 0; i < params.indices.size(); ++i) {
+                    const BSONObj& kp = params.indices[i].keyPattern;
+
+                    BSONObj toUse = minObj.isEmpty() ? maxObj : minObj;
+                    if (indexCompatibleMaxMin(toUse, kp)) {
+                        idxNo = i;
+                        break;
+                    }
+                }
+            }
+            
+            if (idxNo == numeric_limits<size_t>::max()) {
+                QLOG() << "Can't find relevant index to use for max/min query";
+                // Can't find an index to use, bail out.
+                return;
+            }
+
+            // maxObj can be empty; the index scan just goes until the end.  minObj can't be empty
+            // though, so if it is, we make a minKey object.
+            if (minObj.isEmpty()) {
+                BSONObjBuilder bob;
+                bob.appendMinKey("");
+                minObj = bob.obj();
+            }
+            else {
+                // Must strip off the field names to make an index key.
+                minObj = stripFieldNames(minObj);
+            }
+
+            if (!maxObj.isEmpty()) {
+                // Must strip off the field names to make an index key.
+                maxObj = stripFieldNames(maxObj);
+            }
+
+            QLOG() << "max/min query using index " << params.indices[idxNo].toString() << endl;
+
+            // Make our scan and output.
+            QuerySolutionNode* solnRoot = QueryPlannerAccess::makeIndexScan(params.indices[idxNo],
+                                                                            query,
+                                                                            params,
+                                                                            minObj,
+                                                                            maxObj);
+
+            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+            if (NULL != soln) {
+                out->push_back(soln);
+            }
+
+            return;
         }
 
         for (size_t i = 0; i < relevantIndices.size(); ++i) {
