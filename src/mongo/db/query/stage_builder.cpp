@@ -228,7 +228,7 @@ namespace mongo {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
             PlanStage* childStage = buildStages(ns, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            return new ShardFilterStage(ns, ws, childStage);
+            return new ShardFilterStage(shardingState.getCollectionMetadata(ns), ws, childStage);
         }
         else {
             stringstream ss;

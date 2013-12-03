@@ -32,8 +32,10 @@
 
 namespace mongo {
 
-    ShardFilterStage::ShardFilterStage(const string& ns, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _ns(ns), _initted(false) { }
+    ShardFilterStage::ShardFilterStage(const CollectionMetadataPtr& metadata,
+                                       WorkingSet* ws,
+                                       PlanStage* child)
+        : _ws(ws), _child(child), _metadata(metadata) { }
 
     ShardFilterStage::~ShardFilterStage() { }
 
@@ -41,10 +43,6 @@ namespace mongo {
 
     PlanStage::StageState ShardFilterStage::work(WorkingSetID* out) {
         ++_commonStats.works;
-        if (!_initted) {
-            _metadata = shardingState.getCollectionMetadata(_ns);
-            _initted = true;
-        }
 
         // If we've returned as many results as we're limited to, isEOF will be true.
         if (isEOF()) { return PlanStage::IS_EOF; }
