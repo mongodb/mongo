@@ -75,7 +75,7 @@ sum_ops(CONFIG *cfg, size_t field_offset)
 
 	total = 0;
 	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < cfg->worker_threads; ++i, ++thread)
+	    thread != NULL && i < cfg->workers_cnt; ++i, ++thread)
 		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 
 	return (total);
@@ -116,7 +116,7 @@ latency_op(CONFIG *cfg,
 	min = UINT32_MAX;
 
 	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < cfg->worker_threads; ++i, ++thread) {
+	    thread != NULL && i < cfg->workers_cnt; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
 		tmp = track->ops;
 		ops += tmp - track->last_ops;
@@ -220,7 +220,7 @@ sum_latency(CONFIG *cfg, size_t field_offset, TRACK *total)
 	memset(total, 0, sizeof(*total));
 
 	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < cfg->worker_threads; ++i, ++thread) {
+	    thread != NULL && i < cfg->workers_cnt; ++i, ++thread) {
 		trk = (TRACK *)((uint8_t *)thread + field_offset);
 
 		for (j = 0; j < ELEMENTS(trk->us); ++j) {

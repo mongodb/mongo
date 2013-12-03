@@ -101,57 +101,97 @@ config_free(CONFIG *cfg)
  *	Parse the thread configuration.
  */
 static int
-config_threads(CONFIG *cfg, const char *orig, size_t olen)
+config_threads(CONFIG *cfg, const char *config, size_t len)
 {
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
+	WORKLOAD *workp;
+	WT_CONFIG_ITEM groupk, groupv, k, v;
+	WT_CONFIG_SCAN *group, *scan;
 	WT_EXTENSION_API *wt_api;
 	int ret;
 
 	wt_api = cfg->conn->get_extension_api(cfg->conn);
 
-	 if ((ret =
-	     wt_api->config_scan_begin(wt_api, NULL, orig, olen, &scan)) != 0)
-		return (ret);
+	/* Allocate the workload array. */
+	if ((cfg->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD))) == NULL)
+		return (enomem(cfg));
+	cfg->workload_cnt = 0;
 
-	while ((ret = wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0) {
-		if (STRING_MATCH("count", k.str, k.len)) {
-			if ((cfg->worker_threads = v.val) <= 0)
-				goto einval;
-			continue;
+	/*
+	 * The thread configuration may be in multiple groups, that is, we have
+	 * to handle configurations like:
+	 *	threads=((count=2,reads=1),(count=8,inserts=2,updates=1))
+	 *
+	 * Start a scan on the original string, then do scans on each string
+	 * returned from the original string.
+	 */
+	if ((ret =
+	    wt_api->config_scan_begin(wt_api, NULL, config, len, &group)) != 0)
+		goto err;
+	while ((ret =
+	    wt_api->config_scan_next(wt_api, group, &groupk, &groupv)) == 0) {
+		if ((ret = wt_api-> config_scan_begin(
+		    wt_api, NULL, groupk.str, groupk.len, &scan)) != 0)
+			goto err;
+		
+		/* Move to the next workload slot. */
+		if (cfg->workload_cnt == WORKLOAD_MAX) {
+			fprintf(stderr,
+			    "too many workloads configured, only %d workloads "
+			    "supported\n",
+			    WORKLOAD_MAX);
+			return (EINVAL);
 		}
-		if (STRING_MATCH("insert", k.str, k.len) ||
-		    STRING_MATCH("inserts", k.str, k.len)) {
-			if ((cfg->worker_insert = v.val) <= 0)
-				goto einval;
-			continue;
+		workp = &cfg->workload[cfg->workload_cnt++];
+
+		while ((ret =
+		    wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0) {
+			if (STRING_MATCH("count", k.str, k.len)) {
+				if ((workp->threads = v.val) <= 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("insert", k.str, k.len) ||
+			    STRING_MATCH("inserts", k.str, k.len)) {
+				if ((workp->insert = v.val) < 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("read", k.str, k.len) ||
+			    STRING_MATCH("reads", k.str, k.len)) {
+				if ((workp->read = v.val) < 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("update", k.str, k.len) ||
+			    STRING_MATCH("updates", k.str, k.len)) {
+				if ((workp->update = v.val) < 0)
+					goto err;
+				continue;
+			}
+			goto err;
 		}
-		if (STRING_MATCH("read", k.str, k.len) ||
-		    STRING_MATCH("reads", k.str, k.len)) {
-			if ((cfg->worker_read = v.val) <= 0)
-				goto einval;
-			continue;
-		}
-		if (STRING_MATCH("update", k.str, k.len) ||
-		    STRING_MATCH("updates", k.str, k.len)) {
-			if ((cfg->worker_update = v.val) <= 0)
-				goto einval;
-			continue;
-		}
-einval:		fprintf(stderr,
-		    "invalid thread configuration: %.*s/%.*s\n",
-		    (int)k.len, k.str, (int)v.len, v.str);
-		return (EINVAL);
+		if (ret == WT_NOTFOUND)
+			ret = 0;
+		if (ret != 0 )
+			goto err;
+		if ((ret = wt_api->config_scan_end(wt_api, scan)) != 0)
+			goto err;
+
+		if (workp->insert == 0 &&
+		    workp->read == 0 && workp->update == 0)
+			goto err;
+		cfg->workers_cnt += (u_int)workp->threads;
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	if (ret != 0 )
-		return (ret);
 
-	if ((ret = wt_api->config_scan_end(wt_api, scan)) != 0)
-		return (ret);
+	if ((ret = wt_api->config_scan_end(wt_api, group)) != 0)
+		goto err;
 
 	return (0);
+
+err:	fprintf(stderr,
+	    "invalid thread configuration or scan error: %.*s\n",
+	    (int)len, config);
+	return (EINVAL);
 }
 
 /*
@@ -482,6 +522,9 @@ config_sanity(CONFIG *cfg)
 void
 config_print(CONFIG *cfg)
 {
+	WORKLOAD *workp;
+	u_int i;
+
 	printf("Workload configuration:\n");
 	printf("\tHome: %s\n", cfg->home);
 	printf("\tTable name: %s\n", cfg->table_name);
@@ -499,10 +542,15 @@ config_print(CONFIG *cfg)
 
 	printf("\tWorkload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
 	    cfg->run_time, cfg->run_ops);
-	printf("\tWorkload configuration: %" PRId64 " threads (inserts=%" PRId64
-	    ", reads=%" PRId64 ", updates=%" PRId64 ")\n",
-	    cfg->worker_threads,
-	    cfg->worker_insert, cfg->worker_read, cfg->worker_update);
+	if (cfg->workload != NULL) {
+		printf("\tWorkload configuration(s):\n");
+		for (i = 0, workp = cfg->workload;
+		    i < cfg->workload_cnt; ++i, ++workp)
+			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
+			    ", reads=%" PRId64 ", updates=%" PRId64 ")\n",
+			    workp->threads,
+			    workp->insert, workp->read, workp->update);
+	}
 
 	printf("\tCheckpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
 	    cfg->checkpoint_threads, cfg->checkpoint_interval);

@@ -48,6 +48,19 @@
 typedef struct __config CONFIG;
 typedef struct __config_thread CONFIG_THREAD;
 
+typedef struct {
+	int64_t threads;		/* Thread count */
+	int64_t insert;			/* Insert ratio */
+	int64_t read;			/* Read ratio */
+	int64_t update;			/* Update ratio */
+
+#define	WORKER_INSERT		1	/* Insert */
+#define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
+#define	WORKER_READ		3	/* Read */
+#define	WORKER_UPDATE		4	/* Update */
+	uint8_t ops[100];		/* Operation schedule */
+} WORKLOAD;
+
 struct __config {			/* Configuration struction */
 	const char *home;		/* WiredTiger home */
 	char *uri;			/* Object URI */
@@ -56,10 +69,14 @@ struct __config {			/* Configuration struction */
 
 	FILE *logf;			/* Logging handle */
 
-	CONFIG_THREAD *ckptthreads, *popthreads, *workers;
+	CONFIG_THREAD *ckptthreads, *popthreads;
 
-	int64_t worker_threads,		/* Worker thread configuration */
-	    worker_insert, worker_read, worker_update;
+#define	WORKLOAD_MAX	50
+	CONFIG_THREAD	*workers;		/* Worker threads */
+	u_int		 workers_cnt;
+
+	WORKLOAD	*workload;		/* Workloads */
+	u_int		 workload_cnt;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
@@ -134,6 +151,8 @@ struct __config_thread {		/* Per-thread structure */
 	pthread_t handle;		/* Handle */
 
 	char *key_buf, *value_buf;	/* Key/value memory */
+
+	WORKLOAD *workload;		/* Workload */
 
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
