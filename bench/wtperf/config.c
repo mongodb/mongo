@@ -97,7 +97,10 @@ config_free(CONFIG *cfg)
 			}
 		}
 
+	free(cfg->popthreads);
 	free(cfg->uri);
+	free(cfg->workers);
+	free(cfg->workload);
 }
 
 /*
