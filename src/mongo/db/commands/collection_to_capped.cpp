@@ -100,7 +100,7 @@ namespace mongo {
                     return false;
             }
 
-            Runner* rawRunner = NULL;
+            auto_ptr<Runner> runner;
 
             {
                 NamespaceDetails* details = fromCollection->details();
@@ -122,21 +122,33 @@ namespace mongo {
                 }
                 DiskLoc startLoc = extent.ext()->firstRecord;
 
-                rawRunner = InternalPlanner::collectionScan(fromNs, InternalPlanner::FORWARD, startLoc);
+                runner.reset( InternalPlanner::collectionScan(fromNs,
+                                                              InternalPlanner::FORWARD,
+                                                              startLoc) );
             }
 
             Collection* toCollection = db->getCollection( toNs );
             verify( toCollection );
 
-            auto_ptr<Runner> runner(rawRunner);
-            runner->setYieldPolicy(Runner::YIELD_AUTO);
+            while ( true ) {
+                BSONObj obj;
+                Runner::RunnerState state = runner->getNext(&obj, NULL);
 
-            BSONObj obj;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
-                toCollection->insertDocument( obj, true );
-                logOp( "i", toNs.c_str(), obj );
-                getDur().commitIfNeeded();
+                switch( state ) {
+                case Runner::RUNNER_EOF:
+                    return true;
+                case Runner::RUNNER_DEAD:
+                    db->dropCollection( toNs );
+                    errmsg = "runner turned dead while iterating";
+                    return false;
+                case Runner::RUNNER_ERROR:
+                    errmsg = "runner error while iterating";
+                    return false;
+                case Runner::RUNNER_ADVANCED:
+                    toCollection->insertDocument( obj, true );
+                    logOp( "i", toNs.c_str(), obj );
+                    getDur().commitIfNeeded();
+                }
             }
 
             return true;
