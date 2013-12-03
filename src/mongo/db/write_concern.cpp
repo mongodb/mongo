@@ -194,12 +194,13 @@ namespace mongo {
         }
 
         if ( !writeConcern.wMode.empty() && !theReplSet ) {
-            // TODO: want to return the status, but is backwards breaking
-            //       only for master/slave, which is deprecated
-            //return Status( ErrorCodes::BadValue,
-            //str::stream() << "asked for a w mode with master/slave ["
-            //<< writeConcern.wMode << "]" );
-            return Status::OK();
+            if ( writeConcern.wMode == "majority" ) {
+                // with master/slave, majority is equivilant to w=1
+                return Status::OK();
+            }
+            return Status( ErrorCodes::BadValue,
+                           str::stream() << "asked for a w mode with master/slave "
+                           << "[" << writeConcern.wMode << "]" );
         }
 
         // now that we've done the prep, now we actually wait
