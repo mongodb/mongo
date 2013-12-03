@@ -114,10 +114,14 @@ DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
     "table configuration string")
-DEF_OPT_AS_STRING(threads, "", "worker thread configuration: the 'count' entry "
-    "is the total number of threads and the 'insert', 'read' and 'update' "
-    "entries are the ratios of insert, read and update operations done by each "
-    "worker thread")
+DEF_OPT_AS_STRING(threads, "", "worker thread configuration: each 'count' "
+    "entry is the total number of threads, and the 'insert', 'read' and "
+    "'update' entries are the ratios of insert, read and update operations "
+    "done by each worker thread; multiple workload configurations may be "
+    "specified; for example, a more complex threads configuration might be "
+    "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
+    "which would create 2 threads doing nothing but reads and 8 threads "
+    "each doing 50% inserts and 25% reads and updates")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "
     "is nonzero")

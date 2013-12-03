@@ -33,9 +33,12 @@ static const CONFIG default_cfg = {
 	NULL,				/* uri */
 	NULL,				/* conn */
 	NULL,				/* logf */
-	NULL, NULL, NULL,		/* threads */
+	NULL, NULL,			/* populate, checkpoint threads */
 
-	0, 0, 0, 0,			/* worker thread configuration */
+	NULL,				/* worker threads */
+	0,				/* worker thread count */
+	NULL,				/* workloads */
+	0,				/* workload count */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -78,12 +81,6 @@ static const char * const large_config_str =
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
-#define	WORKER_READ		1	/* Read */
-#define	WORKER_INSERT		2	/* Insert */
-#define	WORKER_INSERT_RMW	3	/* Insert with read-modify-write */
-#define	WORKER_UPDATE		4	/* Update */
-static uint8_t g_run_mix_ops[100];	/* run-mix operation schedule */
-
 static uint64_t g_ckpt_ops;		/* checkpoint operations */
 static uint64_t g_insert_ops;		/* insert operations */
 static uint64_t g_read_ops;		/* read operations */
@@ -110,8 +107,8 @@ static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
-static int	 start_threads(
-		    CONFIG *, CONFIG_THREAD *, u_int, void *(*)(void *));
+static int	 start_threads(CONFIG *,
+		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*worker(void *);
 static uint64_t	 wtperf_rand(CONFIG *);
@@ -223,8 +220,8 @@ worker(void *arg)
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
 
-	op = g_run_mix_ops;
-	op_end = g_run_mix_ops + sizeof(g_run_mix_ops);
+	op = thread->workload->ops;
+	op_end = op + sizeof(thread->workload->ops);
 
 	while (!g_stop) {
 		/*
@@ -348,7 +345,7 @@ op_err:			lprintf(cfg, ret, 0,
 		++trk->ops;		/* increment operation counts */
 
 		if (++op == op_end)	/* schedule the next operation */
-			op = g_run_mix_ops;
+			op = thread->workload->ops;
 	}
 
 	if (session != NULL && (ret = session->close(session, NULL)) != 0) {
@@ -370,7 +367,7 @@ err:		g_error = g_stop = 1;
  * percentage.
  */
 static void
-run_mix_schedule_op(int op, int64_t op_cnt)
+run_mix_schedule_op(WORKLOAD *workp, int op, int64_t op_cnt)
 {
 	int jump, pass;
 	uint8_t *p, *end;
@@ -382,24 +379,24 @@ run_mix_schedule_op(int op, int64_t op_cnt)
 	 * Find a read operation and replace it with another operation.  This
 	 * is roughly n-squared, but it's an N of 100, leave it.
 	 */
-	p = g_run_mix_ops;
-	end = g_run_mix_ops + sizeof(g_run_mix_ops);
+	p = workp->ops;
+	end = workp->ops + sizeof(workp->ops);
 	while (op_cnt-- > 0) {
 		for (pass = 0; *p != WORKER_READ; ++p)
 			if (p == end) {
 				/*
-				 * Are passed a percentage of total operations,
-				 * so there should always be a read operation
-				 * to replace, but don't allow infinite loops.
+				 * Passed a percentage of total operations and
+				 * should always be a read operation to replace,
+				 * but don't allow infinite loops.
 				 */
 				if (++pass > 1)
 					return;
-				p = g_run_mix_ops;
+				p = workp->ops;
 			}
 		*p = (uint8_t)op;
 
 		if (end - jump < p)
-			p = g_run_mix_ops;
+			p = workp->ops;
 		else
 			p += jump;
 	}
@@ -410,9 +407,25 @@ run_mix_schedule_op(int op, int64_t op_cnt)
  *	Schedule the mixed-run operations.
  */
 static void
-run_mix_schedule(CONFIG *cfg)
+run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 {
 	int64_t pct;
+
+	/*
+	 * Check for a simple case where the thread is only doing insert or
+	 * update operations (because the default operation for a job-mix is
+	 * read, the subsequent code works fine if only reads are specified).
+	 */
+	if (workp->insert != 0 && workp->read == 0 && workp->update == 0) {
+		memset(workp->ops,
+		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
+		    sizeof(workp->ops));
+		return;
+	}
+	if (workp->insert == 0 && workp->read == 0 && workp->update != 0) {
+		memset(workp->ops, WORKER_UPDATE, sizeof(workp->ops));
+		return;
+	}
 
 	/*
 	 * The worker thread configuration is done as ratios of operations.  If
@@ -429,19 +442,19 @@ run_mix_schedule(CONFIG *cfg)
 	 * read, which means any fractional results from percentage conversion
 	 * will be reads, implying read operations in some cases where reads
 	 * weren't configured.  We should be fine if the application configures
-	 * a rational set of ratios.
+	 * something approaching a rational set of ratios.
 	 */
-	memset(g_run_mix_ops, WORKER_READ, sizeof(g_run_mix_ops));
+	memset(workp->ops, WORKER_READ, sizeof(workp->ops));
 
-	pct = (cfg->worker_insert * 100) / 
-	    (cfg->worker_insert + cfg->worker_read + cfg->worker_update);
+	pct = (workp->insert * 100) /
+	    (workp->insert + workp->read + workp->update);
 	if (pct != 0)
-		run_mix_schedule_op(
+		run_mix_schedule_op(workp,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT, pct);
-	pct = (cfg->worker_update * 100) / 
-	    (cfg->worker_insert + cfg->worker_read + cfg->worker_update);
+	pct = (workp->update * 100) /
+	    (workp->insert + workp->read + workp->update);
 	if (pct != 0)
-		run_mix_schedule_op(WORKER_UPDATE, pct);
+		run_mix_schedule_op(workp, WORKER_UPDATE, pct);
 }
 
 static void *
@@ -735,7 +748,7 @@ execute_populate(CONFIG *cfg)
 	if ((cfg->popthreads =
 	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
-	if ((ret = start_threads(cfg,
+	if ((ret = start_threads(cfg, NULL,
 	    cfg->popthreads, cfg->populate_threads, populate_thread)) != 0)
 		return (ret);
 
@@ -825,8 +838,11 @@ execute_populate(CONFIG *cfg)
 static int
 execute_workload(CONFIG *cfg)
 {
+	CONFIG_THREAD *threads;
+	WORKLOAD *workp;
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
 	uint32_t interval, run_ops, run_time;
+	u_int i;
 	int ret, t_ret;
 
 	g_insert_key = 0;
@@ -834,25 +850,32 @@ execute_workload(CONFIG *cfg)
 
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
-
-	/* Schedule run-mix operations. */
-	run_mix_schedule(cfg);
-
-	lprintf(cfg, 0, 1,
-	    "Starting %" PRId64 " worker threads: inserts=%" PRId64
-	    ", reads=%" PRId64 ", updates=%" PRId64 "\n",
-	    cfg->worker_threads,
-	    cfg->worker_insert, cfg->worker_read, cfg->worker_update);
 	
-	/* Start the worker threads. */
-	if ((cfg->workers = calloc((size_t)
-	    cfg->worker_threads, sizeof(CONFIG_THREAD))) == NULL) {
+	/* Allocate memory for the worker threads. */
+	if ((cfg->workers =
+	    calloc((size_t)cfg->workers_cnt, sizeof(CONFIG_THREAD))) == NULL) {
 		ret = enomem(cfg);
 		goto err;
 	}
-	if ((ret = start_threads(
-	    cfg, cfg->workers, (u_int)cfg->worker_threads, worker)) != 0)
-		goto err;
+
+	/* Start each workload. */
+	for (threads = cfg->workers, i = 0,
+	    workp = cfg->workload; i < cfg->workload_cnt; ++i, ++workp) {
+		lprintf(cfg, 0, 1,
+		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
+		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64,
+		    i + 1,
+		    workp->threads, workp->insert, workp->read, workp->update);
+
+		/* Figure out the workload's schedule. */
+		run_mix_schedule(cfg, workp);
+
+		/* Start the workload's threads. */
+		if ((ret = start_threads(
+		    cfg, workp, threads, (u_int)workp->threads, worker)) != 0)
+			goto err;
+		threads += workp->threads;
+	}
 
 	for (interval = cfg->report_interval,
 	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
@@ -903,7 +926,7 @@ execute_workload(CONFIG *cfg)
 err:	g_stop = 1;
 
 	if ((t_ret = stop_threads(
-	    cfg, (u_int)cfg->worker_threads, cfg->workers)) != 0 && ret == 0)
+	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
 		ret = t_ret;
 
 	/* Report if any worker threads didn't finish. */
@@ -1201,7 +1224,7 @@ main(int argc, char *argv[])
 				ret = enomem(cfg);
 				goto err;
 			}
-			if (start_threads(cfg, cfg->ckptthreads, 
+			if (start_threads(cfg, NULL, cfg->ckptthreads,
 			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
 		}
@@ -1288,14 +1311,15 @@ err:		if (ret == 0)
 }
 
 static int
-start_threads(
-    CONFIG *cfg, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
+start_threads(CONFIG *cfg,
+    WORKLOAD *workp, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
 {
 	u_int i;
 	int ret;
 
 	for (i = 0; i < num; ++i, ++thread) {
 		thread->cfg = cfg;
+		thread->workload = workp;
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -1362,9 +1386,8 @@ wtperf_value_range(CONFIG *cfg)
 {
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
-	else
-		return (cfg->icount +
-		    g_insert_key - (u_int)(cfg->worker_threads + 1));
+
+	return (cfg->icount + g_insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 
 static uint64_t
