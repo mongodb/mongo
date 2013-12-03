@@ -110,7 +110,7 @@ __wt_lsm_merge(
 	 * Give up immediately if there aren't enough on disk chunks in the
 	 * tree for a merge.
 	 */
-	if (end_chunk < merge_min) {
+	if (end_chunk < merge_min - 1) {
 		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
 		return (WT_NOTFOUND);
 	}
