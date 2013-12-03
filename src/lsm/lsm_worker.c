@@ -372,6 +372,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 			}
 
+			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 			/*
 			 * Clear the "cache resident" flag so the primary can
 			 * be evicted and eventually closed.  Only do this once

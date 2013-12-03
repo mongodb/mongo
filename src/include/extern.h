@@ -865,6 +865,8 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     uint32_t id,
     WT_ITEM *buf);
+extern int __wt_lsm_tree_set_chunk_size( WT_SESSION_IMPL *session,
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     WT_LSM_CHUNK *chunk);
@@ -1025,6 +1027,9 @@ extern int __wt_fallocate(WT_SESSION_IMPL *session,
     off_t offset,
     off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
+extern int __wt_filesize_name( WT_SESSION_IMPL *session,
+    const char *filename,
+    off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);

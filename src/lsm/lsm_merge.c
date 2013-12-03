@@ -59,7 +59,7 @@ __wt_lsm_merge(
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
-	uint64_t insert_count, record_count;
+	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
 	int create_bloom;
 	const char *cfg[3];
@@ -67,6 +67,7 @@ __wt_lsm_merge(
 	bloom = NULL;
 	create_bloom = 0;
 	dest = src = NULL;
+	chunk_size = 0;
 	start_id = 0;
 
 	/*
@@ -106,6 +107,15 @@ __wt_lsm_merge(
 		--end_chunk;
 
 	/*
+	 * Give up immediately if there aren't enough on disk chunks in the
+	 * tree for a merge.
+	 */
+	if (end_chunk < lsm_tree->merge_min) {
+		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+		return (WT_NOTFOUND);
+	}
+
+	/*
 	 * Look for the most efficient merge we can do.  We define efficiency
 	 * as collapsing as many levels as possible while processing the
 	 * smallest number of rows.
@@ -134,6 +144,13 @@ __wt_lsm_merge(
 		 * should stay in low levels until we get more aggressive.
 		 */
 		if (chunk->generation > id + aggressive)
+			break;
+
+		/*
+		 * If the size of the chunks selected so far exceeds the
+		 * configured maximum chunk size, stop.
+		 */
+		if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
 			break;
 
 		/*
@@ -303,6 +320,8 @@ __wt_lsm_merge(
 	WT_TRET(dest->close(dest));
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
+
+	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 

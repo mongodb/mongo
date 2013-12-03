@@ -184,6 +184,29 @@ __wt_lsm_tree_chunk_name(
 }
 
 /*
+ * __wt_lsm_tree_set_chunk_size --
+ *	Set the size of the chunk. Should only be called for chunks that are
+ *	on disk, or about to become on disk.
+ */
+int
+__wt_lsm_tree_set_chunk_size(
+    WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
+{
+	off_t size;
+	const char *filename;
+
+	filename = chunk->uri;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET_MSG(session, EINVAL,
+		    "Expected a 'file:' URI: %s", chunk->uri);
+	WT_RET(__wt_filesize_name(session, filename, &size));
+
+	chunk->size = (uint64_t)size;
+
+	return (0);
+}
+
+/*
  * __wt_lsm_tree_setup_chunk --
  *	Initialize a chunk of an LSM tree.
  */
@@ -357,8 +380,14 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));
 	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_max", &cval));
+	lsm_tree->chunk_max = (uint64_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
-	lsm_tree->chunk_size = (uint32_t)cval.val;
+	lsm_tree->chunk_size = (uint64_t)cval.val;
+	if (lsm_tree->chunk_size > lsm_tree->chunk_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "Chunk size (lsm_chunk_size) must be smaller than the "
+		    "maximum chunk size (lsm_chunk_max)");
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_max", &cval));
 	lsm_tree->merge_max = (uint32_t)cval.val;
 	lsm_tree->merge_min = lsm_tree->merge_max / 2;
@@ -532,8 +561,8 @@ void
 __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
-	uint64_t cache_sz, cache_used, record_count;
-	uint32_t i, in_memory;
+	uint64_t cache_sz, cache_used, in_memory, record_count;
+	uint32_t i;
 
 	cache_sz = S2C(session)->cache_size;
 
@@ -585,7 +614,7 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * There is nothing particularly special about the chosen
 		 * multipliers.
 		 */
-		cache_used = (uint64_t)in_memory * lsm_tree->chunk_size * 2;
+		cache_used = in_memory * lsm_tree->chunk_size * 2;
 		if (cache_used > cache_sz * 0.8)
 			lsm_tree->throttle_sleep *= 5;
 	}
