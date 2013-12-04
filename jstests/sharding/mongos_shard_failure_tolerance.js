@@ -1,7 +1,6 @@
 //
 // Tests mongos's failure tolerance for single-node shards
 //
-//
 // Sets up a cluster with three shards, the first shard of which has an unsharded collection and
 // half a sharded collection.  The second shard has the second half of the sharded collection, and
 // the third shard has nothing.  Progressively shuts down each shard to see the impact on the
@@ -25,11 +24,12 @@ assert.commandWorked( admin.runCommand({ setParameter : 1, traceExceptions : tru
 var collSharded = mongos.getCollection( "fooSharded.barSharded" );
 var collUnsharded = mongos.getCollection( "fooUnsharded.barUnsharded" );
 
-assert.commandWorked( admin.runCommand({ enableSharding : collSharded.getDB() + "" }) );
-printjson( admin.runCommand({ movePrimary : collSharded.getDB() + "", to : shards[0]._id }) );
-assert.commandWorked( admin.runCommand({ shardCollection : collSharded + "", key : { _id : 1 } }) );
-assert.commandWorked( admin.runCommand({ split : collSharded + "", middle : { _id : 0 } }) );
-assert.commandWorked( admin.runCommand({ moveChunk : collSharded + "",
+assert.commandWorked( admin.runCommand({ enableSharding : collSharded.getDB().toString() }) );
+printjson( admin.runCommand({ movePrimary : collSharded.getDB().toString(), to : shards[0]._id }) );
+assert.commandWorked( admin.runCommand({ shardCollection : collSharded.toString(),
+                                         key : { _id : 1 } }) );
+assert.commandWorked( admin.runCommand({ split : collSharded.toString(), middle : { _id : 0 } }) );
+assert.commandWorked( admin.runCommand({ moveChunk : collSharded.toString(),
                                          find : { _id : 0 },
                                          to : shards[1]._id }) );
 
@@ -38,7 +38,7 @@ collUnsharded.insert({ some : "doc" });
 assert.eq( null, collUnsharded.getDB().getLastError() );
 collUnsharded.remove({});
 assert.eq( null, collUnsharded.getDB().getLastError() );
-printjson( admin.runCommand({ movePrimary : collUnsharded.getDB() + "", to : shards[0]._id }) );
+printjson( admin.runCommand({ movePrimary : collUnsharded.getDB().toString(), to : shards[0]._id }) );
 
 st.printShardingStatus();
 
@@ -67,12 +67,12 @@ var mongosConnActive = new Mongo( mongos.host );
 var mongosConnIdle = null;
 var mongosConnNew = null;
 
-mongosConnActive.getCollection( collSharded + "" ).insert({ _id : -1 });
-mongosConnActive.getCollection( collSharded + "" ).insert({ _id : 1 });
-assert.eq(null, mongosConnActive.getCollection( collSharded + "" ).getDB().getLastError());
+mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : -1 });
+mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : 1 });
+assert.eq(null, mongosConnActive.getCollection( collSharded.toString() ).getDB().getLastError());
 
-mongosConnActive.getCollection( collUnsharded + "" ).insert({ _id : 1 });
-assert.eq(null, mongosConnActive.getCollection( collUnsharded + "" ).getDB().getLastError());
+mongosConnActive.getCollection( collUnsharded.toString() ).insert({ _id : 1 });
+assert.eq(null, mongosConnActive.getCollection( collUnsharded.toString() ).getDB().getLastError());
 
 jsTest.log("Stopping third shard...");
 
@@ -82,48 +82,48 @@ MongoRunner.stopMongod( st.shard2 );
 
 jsTest.log("Testing active connection...");
 
-assert.neq(null, mongosConnActive.getCollection( collSharded + "" ).findOne({ _id : -1 }));
-assert.neq(null, mongosConnActive.getCollection( collSharded + "" ).findOne({ _id : 1 }));
-assert.neq(null, mongosConnActive.getCollection( collUnsharded + "" ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
-mongosConnActive.getCollection( collSharded + "" ).insert({ _id : -2 });
-assert.gleSuccess(mongosConnActive.getCollection( collSharded + "" ).getDB());
-mongosConnActive.getCollection( collSharded + "" ).insert({ _id : 2 });
-assert.gleSuccess(mongosConnActive.getCollection( collSharded + "" ).getDB());
-mongosConnActive.getCollection( collUnsharded + "" ).insert({ _id : 2 });
-assert.gleSuccess(mongosConnActive.getCollection( collUnsharded + "" ).getDB());
+mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : -2 });
+assert.gleSuccess(mongosConnActive.getCollection( collSharded.toString() ).getDB());
+mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : 2 });
+assert.gleSuccess(mongosConnActive.getCollection( collSharded.toString() ).getDB());
+mongosConnActive.getCollection( collUnsharded.toString() ).insert({ _id : 2 });
+assert.gleSuccess(mongosConnActive.getCollection( collUnsharded.toString() ).getDB());
 
 jsTest.log("Testing idle connection...");
 
-mongosConnIdle.getCollection( collSharded + "" ).insert({ _id : -3 });
-assert.gleSuccess(mongosConnIdle.getCollection( collSharded + "" ).getDB());
-mongosConnIdle.getCollection( collSharded + "" ).insert({ _id : 3 });
-assert.gleSuccess(mongosConnIdle.getCollection( collSharded + "" ).getDB());
-mongosConnIdle.getCollection( collUnsharded + "" ).insert({ _id : 3 });
-assert.gleSuccess(mongosConnIdle.getCollection( collUnsharded + "" ).getDB());
+mongosConnIdle.getCollection( collSharded.toString() ).insert({ _id : -3 });
+assert.gleSuccess(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
+mongosConnIdle.getCollection( collSharded.toString() ).insert({ _id : 3 });
+assert.gleSuccess(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
+mongosConnIdle.getCollection( collUnsharded.toString() ).insert({ _id : 3 });
+assert.gleSuccess(mongosConnIdle.getCollection( collUnsharded.toString() ).getDB());
 
-assert.neq(null, mongosConnIdle.getCollection( collSharded + "" ).findOne({ _id : -1 }) );
-assert.neq(null, mongosConnIdle.getCollection( collSharded + "" ).findOne({ _id : 1 }) );
-assert.neq(null, mongosConnIdle.getCollection( collUnsharded + "" ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
 jsTest.log("Testing new connections...");
 
 mongosConnNew = new Mongo( mongos.host );
-assert.neq(null, mongosConnNew.getCollection( collSharded + "" ).findOne({ _id : -1 }) );
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
 mongosConnNew = new Mongo( mongos.host );
-assert.neq(null, mongosConnNew.getCollection( collSharded + "" ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 }) );
 mongosConnNew = new Mongo( mongos.host );
-assert.neq(null, mongosConnNew.getCollection( collUnsharded + "" ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
 mongosConnNew = new Mongo( mongos.host );
-mongosConnNew.getCollection( collSharded + "" ).insert({ _id : -4 });
-assert.gleSuccess(mongosConnNew.getCollection( collSharded + "" ).getDB());
+mongosConnNew.getCollection( collSharded.toString() ).insert({ _id : -4 });
+assert.gleSuccess(mongosConnNew.getCollection( collSharded.toString() ).getDB());
 mongosConnNew = new Mongo( mongos.host );
-mongosConnNew.getCollection( collSharded + "" ).insert({ _id : 4 });
-assert.gleSuccess(mongosConnNew.getCollection( collSharded + "" ).getDB());
+mongosConnNew.getCollection( collSharded.toString() ).insert({ _id : 4 });
+assert.gleSuccess(mongosConnNew.getCollection( collSharded.toString() ).getDB());
 mongosConnNew = new Mongo( mongos.host );
-mongosConnNew.getCollection( collUnsharded + "" ).insert({ _id : 4 });
-assert.gleSuccess(mongosConnNew.getCollection( collUnsharded + "" ).getDB());
+mongosConnNew.getCollection( collUnsharded.toString() ).insert({ _id : 4 });
+assert.gleSuccess(mongosConnNew.getCollection( collUnsharded.toString() ).getDB());
 
 gc(); // Clean up new connections
 
@@ -135,44 +135,44 @@ MongoRunner.stopMongod( st.shard1 );
 
 jsTest.log("Testing active connection...");
 
-assert.neq(null, mongosConnActive.getCollection( collSharded + "" ).findOne({ _id : -1 }) );
-assert.neq(null, mongosConnActive.getCollection( collUnsharded + "" ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
-mongosConnActive.getCollection( collSharded + "" ).insert({ _id : -5 });
-assert.gleSuccess(mongosConnActive.getCollection( collSharded + "" ).getDB());
-mongosConnActive.getCollection( collSharded + "" ).insert({ _id : 5 });
-gleErrorOrThrow(mongosConnActive.getCollection( collSharded + "" ).getDB());
-mongosConnActive.getCollection( collUnsharded + "" ).insert({ _id : 5 });
-assert.gleSuccess(mongosConnActive.getCollection( collUnsharded + "" ).getDB());
+mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : -5 });
+assert.gleSuccess(mongosConnActive.getCollection( collSharded.toString() ).getDB());
+mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : 5 });
+gleErrorOrThrow(mongosConnActive.getCollection( collSharded.toString() ).getDB());
+mongosConnActive.getCollection( collUnsharded.toString() ).insert({ _id : 5 });
+assert.gleSuccess(mongosConnActive.getCollection( collUnsharded.toString() ).getDB());
 
 jsTest.log("Testing idle connection...");
 
-mongosConnIdle.getCollection( collSharded + "" ).insert({ _id : -6 });
-assert.gleSuccess(mongosConnIdle.getCollection( collSharded + "" ).getDB());
-mongosConnIdle.getCollection( collSharded + "" ).insert({ _id : 6 });
-gleErrorOrThrow(mongosConnIdle.getCollection( collSharded + "" ).getDB());
-mongosConnIdle.getCollection( collUnsharded + "" ).insert({ _id : 6 });
-assert.gleSuccess(mongosConnIdle.getCollection( collUnsharded + "" ).getDB());
+mongosConnIdle.getCollection( collSharded.toString() ).insert({ _id : -6 });
+assert.gleSuccess(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
+mongosConnIdle.getCollection( collSharded.toString() ).insert({ _id : 6 });
+gleErrorOrThrow(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
+mongosConnIdle.getCollection( collUnsharded.toString() ).insert({ _id : 6 });
+assert.gleSuccess(mongosConnIdle.getCollection( collUnsharded.toString() ).getDB());
 
-assert.neq(null, mongosConnIdle.getCollection( collSharded + "" ).findOne({ _id : -1 }) );
-assert.neq(null, mongosConnIdle.getCollection( collUnsharded + "" ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
 jsTest.log("Testing new connections...");
 
 mongosConnNew = new Mongo( mongos.host );
-assert.neq(null, mongosConnNew.getCollection( collSharded + "" ).findOne({ _id : -1 }) );
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
 mongosConnNew = new Mongo( mongos.host );
-assert.neq(null, mongosConnNew.getCollection( collUnsharded + "" ).findOne({ _id : 1 }) );
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
 mongosConnNew = new Mongo( mongos.host );
-mongosConnNew.getCollection( collSharded + "" ).insert({ _id : -7 });
-assert.gleSuccess(mongosConnNew.getCollection( collSharded + "" ).getDB());
+mongosConnNew.getCollection( collSharded.toString() ).insert({ _id : -7 });
+assert.gleSuccess(mongosConnNew.getCollection( collSharded.toString() ).getDB());
 mongosConnNew = new Mongo( mongos.host );
-mongosConnNew.getCollection( collSharded + "" ).insert({ _id : 7 });
-gleErrorOrThrow(mongosConnNew.getCollection( collSharded + "" ).getDB());
+mongosConnNew.getCollection( collSharded.toString() ).insert({ _id : 7 });
+gleErrorOrThrow(mongosConnNew.getCollection( collSharded.toString() ).getDB());
 mongosConnNew = new Mongo( mongos.host );
-mongosConnNew.getCollection( collUnsharded + "" ).insert({ _id : 7 });
-assert.gleSuccess(mongosConnNew.getCollection( collUnsharded + "" ).getDB());
+mongosConnNew.getCollection( collUnsharded.toString() ).insert({ _id : 7 });
+assert.gleSuccess(mongosConnNew.getCollection( collUnsharded.toString() ).getDB());
 
 gc(); // Clean up new connections
 
