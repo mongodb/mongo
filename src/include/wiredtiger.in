@@ -816,31 +816,41 @@ struct __wt_session {
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
 	 * 1MB.}
-	 * @config{lsm_auto_throttle, Throttle inserts into LSM trees if
-	 * flushing to disk isn't keeping up., a boolean flag; default \c true.}
-	 * @config{lsm_bloom, create bloom filters on LSM tree chunks as they
-	 * are merged., a boolean flag; default \c true.}
-	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM
-	 * bloom filters., an integer between 2 and 1000; default \c 8.}
-	 * @config{lsm_bloom_config, config string used when creating Bloom
-	 * filter files\, passed to WT_SESSION::create., a string; default
-	 * empty.}
-	 * @config{lsm_bloom_hash_count, the number of hash values per item used
-	 * for LSM bloom filters., an integer between 2 and 100; default \c 4.}
-	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
-	 * tree chunk.  Only supported if bloom filters are enabled., a boolean
-	 * flag; default \c false.}
-	 * @config{lsm_chunk_max, the maximum size a single chunk can be.
-	 * Chunks larger than this size will not be considered for further
-	 * merges.  This is a soft limit - chunks somewhat larger than this
-	 * value can be created.  Must be larger than lsm_chunk_size., an
-	 * integer between 100MB and 10TB; default \c 5GB.}
-	 * @config{lsm_chunk_size, the maximum size of the in-memory chunk of an
-	 * LSM tree., an integer between 512K and 500MB; default \c 2MB.}
-	 * @config{lsm_merge_max, the maximum number of chunks to include in a
-	 * merge operation., an integer between 2 and 100; default \c 15.}
-	 * @config{lsm_merge_threads, the number of thread to perform merge
-	 * operations., an integer between 1 and 10; default \c 1.}
+	 * @config{lsm = (, options only relevant for LSM data sources., a set
+	 * of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
+	 * LSM trees if flushing to disk isn't keeping up., a boolean flag;
+	 * default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom, create bloom
+	 * filters on LSM tree chunks as they are merged., a boolean flag;
+	 * default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_config,
+	 * config string used when creating Bloom filter files\, passed to
+	 * WT_SESSION::create., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count, the number of bits
+	 * used per item for LSM bloom filters., an integer between 2 and 1000;
+	 * default \c 8.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the
+	 * number of hash values per item used for LSM bloom filters., an
+	 * integer between 2 and 100; default \c 4.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest, create a bloom filter
+	 * on the oldest LSM tree chunk.  Only supported if bloom filters are
+	 * enabled., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum size a single
+	 * chunk can be.  Chunks larger than this size are not considered for
+	 * further merges.  This is a soft limit\, and chunks larger than this
+	 * value can be created.  Must be larger than chunk_size., an integer
+	 * between 100MB and 10TB; default \c 5GB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
+	 * in-memory chunk of an LSM tree., an integer between 512K and 500MB;
+	 * default \c 2MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the
+	 * maximum number of chunks to include in a merge operation., an integer
+	 * between 2 and 100; default \c 15.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of thread
+	 * to perform merge operations., an integer between 1 and 10; default \c
+	 * 1.}
+	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
 	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>. This

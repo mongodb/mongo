@@ -54,7 +54,7 @@ main(int argc, char *argv[])
 		{ "file:__wt",	NULL, NULL },
 		{ "table:__wt",	NULL, NULL },
 /* Configure for a modest cache size. */
-#define	LSM_CONFIG	"lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=4k"
+#define	LSM_CONFIG	"lsm=(chunk_size=1m,merge_max=2),leaf_page_max=4k"
 		{ "lsm:__wt",	NULL, LSM_CONFIG },
 		{ "table:__wt",	" [lsm]", "type=lsm," LSM_CONFIG },
 		{ NULL,		NULL, NULL }

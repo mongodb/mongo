@@ -1,6 +1,6 @@
 # wtperf options file: Test the insert-rmw functionality
 conn_config="cache_size=500MB"
-table_config="lsm_chunk_size=5MB,type=lsm"
+table_config="lsm=(chunk_size=5MB),type=lsm"
 icount=500000
 insert_rmw=true
 report_interval=5

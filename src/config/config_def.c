@@ -115,6 +115,20 @@ static const WT_CONFIG_CHECK confchk_session_checkpoint[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_lsm_subconfigs[] = {
+	{ "auto_throttle", "boolean", NULL, NULL },
+	{ "bloom", "boolean", NULL, NULL },
+	{ "bloom_bit_count", "int", "min=2,max=1000", NULL },
+	{ "bloom_config", "string", NULL, NULL },
+	{ "bloom_hash_count", "int", "min=2,max=100", NULL },
+	{ "bloom_oldest", "boolean", NULL, NULL },
+	{ "chunk_max", "int", "min=100MB,max=10TB", NULL },
+	{ "chunk_size", "int", "min=512K,max=500MB", NULL },
+	{ "merge_max", "int", "min=2,max=100", NULL },
+	{ "merge_threads", "int", "min=1,max=10", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "allocation_size", "int", "min=512B,max=128MB", NULL},
 	{ "block_allocation", "string",
@@ -140,16 +154,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "key_gap", "int", "min=0", NULL},
 	{ "leaf_item_max", "int", "min=0", NULL},
 	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "lsm_auto_throttle", "boolean", NULL, NULL},
-	{ "lsm_bloom", "boolean", NULL, NULL},
-	{ "lsm_bloom_bit_count", "int", "min=2,max=1000", NULL},
-	{ "lsm_bloom_config", "string", NULL, NULL},
-	{ "lsm_bloom_hash_count", "int", "min=2,max=100", NULL},
-	{ "lsm_bloom_oldest", "boolean", NULL, NULL},
-	{ "lsm_chunk_max", "int", "min=100MB,max=10TB", NULL},
-	{ "lsm_chunk_size", "int", "min=512K,max=500MB", NULL},
-	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
-	{ "lsm_merge_threads", "int", "min=1,max=10", NULL},
+	{ "lsm", "category", NULL, confchk_lsm_subconfigs},
 	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
 	{ "os_cache_dirty_max", "int", "min=0", NULL},
 	{ "os_cache_max", "int", "min=0", NULL},
@@ -359,11 +364,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "columns=,dictionary=0,exclusive=0,format=btree,huffman_key=,"
 	  "huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	  "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	  "leaf_page_max=1MB,lsm_auto_throttle=,lsm_bloom=,"
-	  "lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
-	  "lsm_bloom_oldest=0,lsm_chunk_max=5GB,lsm_chunk_size=2MB,"
-	  "lsm_merge_max=15,lsm_merge_threads=1,memory_page_max=5MB,"
-	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
+	  "leaf_page_max=1MB,lsm=(auto_throttle=,bloom=,bloom_bit_count=8,"
+	  "bloom_config=,bloom_hash_count=4,bloom_oldest=0,chunk_max=5GB,"
+	  "chunk_size=2MB,merge_max=15,merge_threads=1),memory_page_max=5MB"
+	  ",os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
 	  "prefix_compression_min=4,source=,split_pct=75,type=file,"
 	  "value_format=u",
 	  confchk_session_create

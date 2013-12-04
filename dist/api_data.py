@@ -93,42 +93,46 @@ format_meta = column_meta + [
 ]
 
 lsm_config = [
-	Config('lsm_auto_throttle', 'true', r'''
-	    Throttle inserts into LSM trees if flushing to disk isn't
-	    keeping up''',
-	    type='boolean'),
-	Config('lsm_bloom', 'true', r'''
-	    create bloom filters on LSM tree chunks as they are merged''',
-	    type='boolean'),
-	Config('lsm_bloom_config', '', r'''
-	    config string used when creating Bloom filter files, passed
-	    to WT_SESSION::create'''),
-	Config('lsm_bloom_bit_count', '8', r'''
-	    the number of bits used per item for LSM bloom filters''',
-	    min='2', max='1000'),
-	Config('lsm_bloom_hash_count', '4', r'''
-	    the number of hash values per item used for LSM bloom
-	    filters''',
-	    min='2', max='100'),
-	Config('lsm_bloom_oldest', 'false', r'''
-	    create a bloom filter on the oldest LSM tree chunk. Only
-	    supported if bloom filters are enabled''',
-	    type='boolean'),
-	Config('lsm_chunk_max', '5GB', r'''
-	    the maximum size a single chunk can be. Chunks larger than this size
-	    will not be considered for further merges. This is a soft limit -
-	    chunks somewhat larger than this value can be created. Must be
-	    larger than lsm_chunk_size''',
-	    min='100MB', max='10TB'),
-	Config('lsm_chunk_size', '2MB', r'''
-	    the maximum size of the in-memory chunk of an LSM tree''',
-	    min='512K', max='500MB'),
-	Config('lsm_merge_max', '15', r'''
-	    the maximum number of chunks to include in a merge operation''',
-	    min='2', max='100'),
-	Config('lsm_merge_threads', '1', r'''
-	    the number of thread to perform merge operations''',
-	    min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
+	Config('lsm', '', r'''
+	    options only relevant for LSM data sources''',
+	    type='category', subconfig=[
+	    Config('auto_throttle', 'true', r'''
+	        Throttle inserts into LSM trees if flushing to disk isn't
+	        keeping up''',
+	        type='boolean'),
+	    Config('bloom', 'true', r'''
+	        create bloom filters on LSM tree chunks as they are merged''',
+	        type='boolean'),
+	    Config('bloom_config', '', r'''
+	        config string used when creating Bloom filter files, passed
+	        to WT_SESSION::create'''),
+	    Config('bloom_bit_count', '8', r'''
+	        the number of bits used per item for LSM bloom filters''',
+	        min='2', max='1000'),
+	    Config('bloom_hash_count', '4', r'''
+	        the number of hash values per item used for LSM bloom
+	        filters''',
+	        min='2', max='100'),
+	    Config('bloom_oldest', 'false', r'''
+	        create a bloom filter on the oldest LSM tree chunk. Only
+	        supported if bloom filters are enabled''',
+	        type='boolean'),
+	    Config('chunk_max', '5GB', r'''
+	        the maximum size a single chunk can be. Chunks larger than this
+		size are not considered for further merges. This is a soft
+		limit, and chunks larger than this value can be created.  Must
+		be larger than chunk_size''',
+	        min='100MB', max='10TB'),
+	    Config('chunk_size', '2MB', r'''
+	        the maximum size of the in-memory chunk of an LSM tree''',
+	        min='512K', max='500MB'),
+	    Config('merge_max', '15', r'''
+	        the maximum number of chunks to include in a merge operation''',
+	        min='2', max='100'),
+	    Config('merge_threads', '1', r'''
+	        the number of thread to perform merge operations''',
+	        min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
+	]),
 ]
 
 # Per-file configuration

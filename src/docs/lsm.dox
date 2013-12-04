@@ -25,7 +25,7 @@ http://www.cs.umb.edu/~poneil/lsmtree.pdf
 A logical tree is split into several physical pieces so that the
 most-recently-updated portion of data is in a tree that fits entirely in
 memory.  The size of the in-memory chunk can be configured with the
-\c "lsm_chunk_size" configuration key to WT_SESSION::create.
+\c "lsm=(chunk_size)" configuration key to WT_SESSION::create.
 
 Once the in-memory tree reaches a threshold size, a new in-memory tree is
 created and the old tree synced to disk. Once written to disk, trees are
@@ -79,11 +79,11 @@ hashed a configurable number of times (default 4), and the corresponding
 bits set.  The Bloom filter is used to avoid reading from a chunk if the key
 cannot be present.
 
-With the defaults, the Bloom filter only requires one byte per key, so it
-usually fits in cache.  The Bloom parameters can be configured with
-\c "lsm_bloom_bit_count" and \c "lsm_bloom_hash_count" configuration keys
-to WT_SESSION::create.  The Bloom file can be configured with the
-\c "lsm_bloom_config" key.
+With the defaults, the Bloom filter only requires one byte per key, so
+it usually fits in cache.  The Bloom parameters can be configured with
+\c "lsm=(bloom_bit_count)" and \c "lsm=(bloom_hash_count)" configuration
+keys to WT_SESSION::create.  The Bloom file can be configured with the
+\c "lsm=(bloom_config)" key.
 
 @section lsm_schema Creating tables using LSM trees
 
