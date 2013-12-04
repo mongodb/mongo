@@ -18,6 +18,7 @@
 
 #include <memory>
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -25,10 +26,8 @@ namespace {
     using std::auto_ptr;
     using std::string;
     using std::vector;
-    using mongo::BSONObj;
-    using mongo::ParsedProjection;
-    using mongo::Status;
-    using mongo::fromjson;
+
+    using namespace mongo;
 
     //
     // creation function
@@ -37,11 +36,29 @@ namespace {
     ParsedProjection* createParsedProjection(const char* queryStr, const char* projStr) {
         BSONObj query = fromjson(queryStr);
         BSONObj projObj = fromjson(projStr);
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
+        ASSERT(swme.isOK());
+        MatchExpression* queryMatchExpr = swme.getValue();
         ParsedProjection* out = NULL;
-        Status status = ParsedProjection::make(projObj, query, &out);
+        Status status = ParsedProjection::make(projObj, queryMatchExpr, &out);
         ASSERT(status.isOK());
         ASSERT(out);
         return out;
+    }
+
+    //
+    // Failure to create a parsed projection is expected
+    //
+
+    void assertInvalidProjection(const char* queryStr, const char* projStr) {
+        BSONObj query = fromjson(queryStr);
+        BSONObj projObj = fromjson(projStr);
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
+        ASSERT(swme.isOK());
+        MatchExpression* queryMatchExpr = swme.getValue();
+        ParsedProjection* out = NULL;
+        Status status = ParsedProjection::make(projObj, queryMatchExpr, &out);
+        ASSERT(!status.isOK());
     }
 
     // canonical_query.cpp will invoke ParsedProjection::make only when
@@ -90,6 +107,38 @@ namespace {
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 1U);
         ASSERT_EQUALS(fields[0], "a");
+    }
+
+    //
+    // Positional operator validation
+    //
+
+    TEST(ParsedProjectionTest, InvalidPositionalOperatorProjections) {
+        assertInvalidProjection("{}", "{'a.$': 1}");
+        assertInvalidProjection("{a: 1}", "{'b.$': 1}");
+        assertInvalidProjection("{a: 1}", "{'a.$': 0}");
+        assertInvalidProjection("{a: 1}", "{'a.$.d.$': 1}");
+        assertInvalidProjection("{a: 1}", "{'a.$.$': 1}");
+        assertInvalidProjection("{a: 1}", "{'a.$.$': 1}");
+        assertInvalidProjection("{a: 1, b: 1, c: 1}", "{'abc.$': 1}");
+        assertInvalidProjection("{$or: [{a: 1}, {$or: [{b: 1}, {c: 1}]}]}", "{'d.$': 1}");
+    }
+
+    TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
+        createParsedProjection("{a: 1}", "{'a.$': 1}");
+        createParsedProjection("{a: 1}", "{'a.foo.bar.$': 1}");
+        createParsedProjection("{a: 1}", "{'a.foo.bar.$.x.y': 1}");
+        createParsedProjection("{'a.b.c': 1}", "{'a.b.c.$': 1}");
+        createParsedProjection("{'a.b.c': 1}", "{'a.e.f.$': 1}");
+        createParsedProjection("{a: {b: 1}}", "{'a.$': 1}");
+        createParsedProjection("{a: 1, b: 1}}", "{'a.$': 1}");
+        createParsedProjection("{a: 1, b: 1}}", "{'b.$': 1}");
+        createParsedProjection("{$and: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
+        createParsedProjection("{$and: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
+        createParsedProjection("{$or: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
+        createParsedProjection("{$or: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
+        createParsedProjection("{$and: [{$or: [{a: 1}, {$and: [{b: 1}, {c: 1}]}]}]}",
+                               "{'c.d.f.$': 1}");
     }
 
 } // unnamed namespace

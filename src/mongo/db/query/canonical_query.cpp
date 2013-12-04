@@ -245,7 +245,7 @@ namespace mongo {
         // Validate the projection if there is one.
         if (!_pq->getProj().isEmpty()) {
             ParsedProjection* pp;
-            Status projStatus = ParsedProjection::make(_pq->getProj(), _pq->getFilter(), &pp);
+            Status projStatus = ParsedProjection::make(_pq->getProj(), root, &pp);
             if (!projStatus.isOK()) {
                 return projStatus;
             }

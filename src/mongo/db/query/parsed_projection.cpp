@@ -34,11 +34,14 @@ namespace mongo {
      * Parses the projection 'spec' and checks its validity with respect to the query 'query'.
      * Puts covering information into 'out'.
      *
+     * Does not take ownership of 'query'.
+     *
      * Returns Status::OK() if it's a valid spec.
      * Returns a Status indicating how it's invalid otherwise.
      */
     // static
-    Status ParsedProjection::make(const BSONObj& spec, const BSONObj& query, ParsedProjection** out) {
+    Status ParsedProjection::make(const BSONObj& spec, const MatchExpression* const query,
+                                  ParsedProjection** out) {
         // Are we including or excluding fields?  Values:
         // -1 when we haven't initialized it.
         // 1 when we're including
@@ -193,6 +196,22 @@ namespace mongo {
                                   "Cannot specify positional operator and $elemMatch.");
                 }
 
+                std::string after = mongoutils::str::after(e.fieldName(), ".$");
+                if (mongoutils::str::contains(after, ".$")) {
+                    std::stringstream ss;
+                    ss << "Positional projection '" << e.fieldName() << "' contains "
+                       << "the positional operator more than once.";
+                    return Status(ErrorCodes::BadValue, ss.str());
+                }
+
+                std::string matchfield = mongoutils::str::before(e.fieldName(), '.');
+                if (!_hasPositionalOperatorMatch(query, matchfield)) {
+                    std::stringstream ss;
+                    ss << "Positional projection '" << e.fieldName() << "' does not "
+                       << "match the query document.";
+                    return Status(ErrorCodes::BadValue, ss.str());
+                }
+
                 arrayOpType = ARRAY_OP_POSITIONAL;
             }
         }
@@ -234,42 +253,24 @@ namespace mongo {
             }
         }
 
-        if (ARRAY_OP_POSITIONAL != arrayOpType) {
-            *out = pp.release();
-            return Status::OK();
-        }
+        *out = pp.release();
+        return Status::OK();
+    }
 
-        // Validates positional operator ($) projections.
-        //
-        // XXX: This is copied from how it was validated before.  It should probably walk the
-        // expression tree...but we maintain this for now.
-        // TODO: Remove this and/or make better.
-        BSONObjIterator querySpecIter(query);
-        while (querySpecIter.more()) {
-            BSONElement queryElement = querySpecIter.next();
-            if (mongoutils::str::equals(queryElement.fieldName(), "$and")) {
-                // don't check $and to avoid deep comparison of the arguments.
-                // TODO: can be replaced with Matcher::FieldSink when complete (SERVER-4644)
-                *out = pp.release();
-                return Status::OK();
-            }
-
-            BSONObjIterator projectionSpecIter(spec);
-            while (projectionSpecIter.more()) {
-                // for each projection element
-                BSONElement projectionElement = projectionSpecIter.next();
-                if (mongoutils::str::contains(projectionElement.fieldName(), ".$")
-                    && (mongoutils::str::before(queryElement.fieldName(), '.') ==
-                        mongoutils::str::before(projectionElement.fieldName(), "."))) {
-                    *out = pp.release();
-                    return Status::OK();
+    // static
+    bool ParsedProjection::_hasPositionalOperatorMatch(const MatchExpression* const query,
+                                                       const std::string& matchfield) {
+        if (query->isLogical()) {
+            for (unsigned int i = 0; i < query->numChildren(); ++i) {
+                if (_hasPositionalOperatorMatch(query->getChild(i), matchfield)) {
+                    return true;
                 }
             }
         }
-
-        // auto_ptr cleans up.
-        return Status(ErrorCodes::BadValue,
-                      "Positional operator does not match the query specifier.");
+        else {
+            return mongoutils::str::before(query->path().rawData(), '.') == matchfield;
+        }
+        return false;
     }
 
 }  // namespace mongo
