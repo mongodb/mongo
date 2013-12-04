@@ -49,7 +49,8 @@ namespace mongo {
          * Returns Status::OK() if it's a valid spec.
          * Returns a Status indicating how it's invalid otherwise.
          */
-        static Status make(const BSONObj& spec, const BSONObj& query, ParsedProjection** out);
+        static Status make(const BSONObj& spec, const MatchExpression* const query,
+                           ParsedProjection** out);
 
         /**
          * Is the full document required to compute this projection?
@@ -76,6 +77,18 @@ namespace mongo {
          * Must go through ::make
          */
         ParsedProjection() : _requiresDocument(true) { }
+
+        /**
+         * Returns true if the MatchExpression 'query' queries against
+         * the field named by 'matchfield'. This deeply traverses logical
+         * nodes in the matchfield and returns true if any of the children
+         * have the field (so if 'query' is {$and: [{a: 1}, {b: 1}]} and
+         * 'matchfield' is "b", the return value is true).
+         *
+         * Does not take ownership of 'query'.
+         */
+        static bool _hasPositionalOperatorMatch(const MatchExpression* const query,
+                                                const std::string& matchfield);
 
         // XXX stringdata?
         vector<string> _requiredFields;
