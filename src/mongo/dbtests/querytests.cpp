@@ -144,10 +144,18 @@ namespace QueryTests {
             // an empty object (one might be allowed inside a reserved namespace at some point).
             Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.querytests" );
-            // Set up security so godinsert command can run.
+
+            Database* db = ctx.db();
+            if ( db->getCollection( ns() ) )
+                db->dropCollection( ns() );
+            BSONObj options = BSON("autoIndexId" << 0 );
+            ASSERT( db->createCollection( ns(), false, &options ) );
+
             DBDirectClient cl;
             BSONObj info;
-            ASSERT( cl.runCommand( "unittests", BSON( "godinsert" << "querytests" << "obj" << BSONObj() ), info ) );
+            bool ok = cl.runCommand( "unittests", BSON( "godinsert" << "querytests" << "obj" << BSONObj() ), info );
+            ASSERT( ok );
+
             insert( BSONObj() );
             BSONObj query;
             BSONObj ret;

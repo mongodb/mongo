@@ -35,6 +35,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -59,12 +60,20 @@ namespace mongo {
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
-            {
-                Lock::DBWrite lk(ns);
-                Client::Context ctx( ns );
-                theDataFileMgr.insertWithObjMod( ns.c_str(), obj, false, true );
+
+            Lock::DBWrite lk(ns);
+            Client::Context ctx( ns );
+            Database* db = ctx.db();
+            Collection* collection = db->getCollection( ns );
+            if ( !collection ) {
+                collection = db->createCollection( ns );
+                if ( !collection ) {
+                    errmsg = "could not create collection";
+                    return false;
+                }
             }
-            return true;
+            StatusWith<DiskLoc> res = collection->insertDocument( obj, false );
+            return appendCommandStatus( result, res.getStatus() );
         }
     };
 
