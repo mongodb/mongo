@@ -106,10 +106,10 @@ lsm_config = [
 	    Config('bloom_config', '', r'''
 	        config string used when creating Bloom filter files, passed
 	        to WT_SESSION::create'''),
-	    Config('bloom_bit_count', '8', r'''
+	    Config('bloom_bit_count', '16', r'''
 	        the number of bits used per item for LSM bloom filters''',
 	        min='2', max='1000'),
-	    Config('bloom_hash_count', '4', r'''
+	    Config('bloom_hash_count', '8', r'''
 	        the number of hash values per item used for LSM bloom
 	        filters''',
 	        min='2', max='100'),
