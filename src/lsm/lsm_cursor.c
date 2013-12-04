@@ -801,12 +801,9 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 	u_int i;
 	int have_hash;
 
-	have_hash = 0;
 	cursor = &clsm->iface;
+	have_hash = 0;
 	session = (WT_SESSION_IMPL *)cursor->session;
-
-	/* Reset any positioned cursor(s) to release pinned resources. */
-	WT_ERR(__clsm_reset_cursors(clsm, NULL));
 
 	WT_FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
@@ -831,7 +828,6 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 		if ((ret = c->search(c)) == 0) {
 			WT_ERR(c->get_key(c, &cursor->key));
 			WT_ERR(c->get_value(c, &cursor->value));
-			clsm->current = c;
 			if (__clsm_deleted(clsm, &cursor->value))
 				ret = WT_NOTFOUND;
 			goto done;
@@ -848,13 +844,14 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 	}
 	ret = WT_NOTFOUND;
 
-done:
+done:	WT_TRET(__clsm_reset_cursors(clsm, c));
 err:	if (ret == 0) {
+		clsm->current = c;
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else {
+		WT_TRET(__clsm_reset_cursors(clsm, NULL));
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-		clsm->current = NULL;
 	}
 
 	return (ret);
