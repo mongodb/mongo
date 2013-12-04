@@ -801,6 +801,7 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 	u_int i;
 	int have_hash;
 
+	c = NULL;
 	cursor = &clsm->iface;
 	have_hash = 0;
 	session = (WT_SESSION_IMPL *)cursor->session;
@@ -842,7 +843,7 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 			WT_STAT_FAST_INCR(session,
 			    &clsm->lsm_tree->stats, lsm_lookup_no_bloom);
 	}
-	ret = WT_NOTFOUND;
+	WT_ERR(WT_NOTFOUND);
 
 done:	WT_TRET(__clsm_reset_cursors(clsm, c));
 err:	if (ret == 0) {
