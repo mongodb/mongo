@@ -79,7 +79,8 @@ namespace mongo {
             DiskLoc extent = details->firstExtent();
 
             // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-            long long excessSize = fromCollection->dataSize() - size * 2;
+            long long excessSize =
+                static_cast<long long>( fromCollection->dataSize() - size * 2 );
 
             // skip ahead some extents since not all the data fits,
             // so we have to chop a bunch off
