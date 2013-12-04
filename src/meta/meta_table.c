@@ -66,12 +66,12 @@ __wt_metadata_cursor(
 
 	WT_SET_BTREE_IN_SESSION(session, session->metafile);
 
-	/*
-	 * XXX: why not call __wt_session_get_btree()?
-	 * Increment the data-source use count.
+	/* 
+	 * We use the metadata a lot, so we have a handle cached; lock it and
+	 * increment the in-use counter.
 	 */
 	WT_ERR(__wt_session_lock_btree(session, 0));
-	(void)WT_ATOMIC_ADD(session->dhandle->session_inuse, 1);
+	__wt_session_dhandle_incr_use(session);
 
 	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
 
