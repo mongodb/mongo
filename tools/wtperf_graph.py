@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import csv, os, zipimport
+import csv, os
 from subprocess import call
 # Python script to read wtperf monitor output and create a performance
 # graph.
