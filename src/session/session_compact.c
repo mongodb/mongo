@@ -79,7 +79,6 @@
  * After each 10% compaction, we checkpoint two more times (seriously, twice).
  * The second and third checkpoints are because the block manager checkpoints
  * in two steps: blocks made available for reuse during a checkpoint are put on
- *
  * a special checkpoint-available list and only moved to the real available
  * list after the metadata has been updated with the new checkpoint's
  * information.  (Otherwise it is possible to allocate a rewritten block, crash
@@ -88,13 +87,12 @@
  * blocks made available by the checkpoint.
  *
  * To say it another way, the second checkpoint puts the blocks from the end of
- * the file that were made available by compaction onto the
- * checkpoint-available list, but then potentially writes the checkpoint itself
- * at the end of the file, which would prevent any file truncation.  When the
- * metadata is updated for the second checkpoint, the blocks freed by
- * compaction become available for the third checkpoint, so the third
- * checkpoint's blocks are written towards the beginning of the file, and then
- * the file can be truncated.
+ * the file that were made available by compaction onto the checkpoint-available
+ * list, but then potentially writes the checkpoint itself at the end of the
+ * file, which would prevent any file truncation.  When the metadata is updated
+ * for the second checkpoint, the blocks freed by compaction become available
+ * for the third checkpoint, so the third checkpoint's blocks are written
+ * towards the beginning of the file, and then the file can be truncated.
  */
 
 /*

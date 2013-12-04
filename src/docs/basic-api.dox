@@ -78,9 +78,9 @@ Here, the string @c "table:access" specifies that we are opening the
 cursor on the table named @c "access".
 
 Then we insert a new row into the table.  The WT_CURSOR::set_key and
-WT_CURSOR::set_value calls put the application's value into the cursor.
-The WT_CURSOR::insert call creates a record containing that value and
-inserts it into the table.
+WT_CURSOR::set_value calls put the application's key and value into
+the cursor, respectively.  The WT_CURSOR::insert call creates a
+record containing that value and inserts it into the table.
 
 @snippet ex_access.c access example cursor insert
 

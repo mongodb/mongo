@@ -38,3 +38,4 @@ skip	src/support/stat.c
 skip	test/packing/intpack-test2.c
 skip	test/packing/intpack-test.c
 skip	test/packing/packing-test.c
+skip	tools/stat_data.py

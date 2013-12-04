@@ -1,6 +1,6 @@
 # wtperf options file: lsm with inserts/updates, in memory
 conn_config="cache_size=2G"
-table_config="lsm_chunk_size=50MB,type=lsm,lsm_merge_threads=3"
+table_config="lsm=(chunk_size=50MB,merge_threads=3),type=lsm"
 icount=200000000
 report_interval=5
 merge_sleep=600

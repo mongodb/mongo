@@ -170,6 +170,7 @@ __wt_lsm_merge(
 		if (nchunks == lsm_tree->merge_max) {
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
 			record_count -= youngest->count;
+			chunk_size -= youngest->size;
 			--end_chunk;
 		}
 	}
