@@ -523,7 +523,8 @@ namespace mongo {
         bg.go();
         if ( bg.wait(5000) ) {
             if ( bg.inError() ) {
-                warning() << "Failed to connect to " << _remote.getAddr()
+                warning() << "Failed to connect to "
+                          << _remote.getAddr() << ":" << _remote.getPort()
                           << ", reason: " << bg.getErrnoWithDescription() << endl;
                 close();
                 return false;
