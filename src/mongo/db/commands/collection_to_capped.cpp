@@ -45,7 +45,8 @@ namespace mongo {
                                     const string& shortFrom,
                                     const string& shortTo,
                                     double size,
-                                    bool temp ) {
+                                    bool temp,
+                                    bool logForReplication ) {
 
         string fromNs = db->name() + "." + shortFrom;
         string toNs = db->name() + "." + shortTo;
@@ -68,7 +69,7 @@ namespace mongo {
                 spec.appendBool( "temp", true );
 
             string errmsg;
-            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
+            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, logForReplication ) )
                 return Status( ErrorCodes::InternalError, errmsg );
         }
 
@@ -117,7 +118,8 @@ namespace mongo {
                 return Status( ErrorCodes::InternalError, "runner error while iterating" );
             case Runner::RUNNER_ADVANCED:
                 toCollection->insertDocument( obj, true );
-                logOp( "i", toNs.c_str(), obj );
+                if ( logForReplication )
+                    logOp( "i", toNs.c_str(), obj );
                 getDur().commitIfNeeded();
             }
         }
@@ -163,7 +165,7 @@ namespace mongo {
                 return false;
             }
 
-            Status status = cloneCollectionAsCapped( cc().database(), from, to, size, temp );
+            Status status = cloneCollectionAsCapped( cc().database(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -180,6 +182,10 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         // calls renamecollection which does a global lock, so we must too:
         virtual bool lockGlobally() const { return true; }
+        virtual bool logTheOp() {
+            // see CmdRenameCollection::logTheOp as to why this is best
+            return true;
+        }
         virtual void help( stringstream &help ) const {
             help << "{ convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
         }
@@ -213,7 +219,7 @@ namespace mongo {
                     return appendCommandStatus( result, status );
             }
 
-            Status status = cloneCollectionAsCapped( db, shortSource, shortTmpName, size, true );
+            Status status = cloneCollectionAsCapped( db, shortSource, shortTmpName, size, true, false );
 
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
