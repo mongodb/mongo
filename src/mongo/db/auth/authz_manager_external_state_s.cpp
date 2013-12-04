@@ -205,15 +205,17 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMongos::findOne(
             const NamespaceString& collectionName,
-            const BSONObj& query,
+            const BSONObj& queryDoc,
             BSONObj* result) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            Query query(queryDoc);
+            query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
             *result = conn->get()->findOne(collectionName, query).getOwned();
             conn->done();
             if (result->isEmpty()) {
                 return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
-                              "No document in " << collectionName.ns() << " matches " << query);
+                              "No document in " << collectionName.ns() << " matches " << queryDoc);
             }
             return Status::OK();
         } catch (const DBException& e) {
@@ -223,11 +225,13 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMongos::query(
             const NamespaceString& collectionName,
-            const BSONObj& query,
+            const BSONObj& queryDoc,
             const BSONObj& projection,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            Query query(queryDoc);
+            query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
             conn->get()->query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
