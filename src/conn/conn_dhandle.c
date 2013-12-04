@@ -103,7 +103,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			WT_RET(__conn_dhandle_open_lock(
 			    session, dhandle, flags));
-			++dhandle->refcnt;
+			++dhandle->session_ref;
 			session->dhandle = dhandle;
 			return (0);
 		}
@@ -116,7 +116,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
 
 	WT_ERR(__wt_rwlock_alloc(session, "btree handle", &dhandle->rwlock));
-	dhandle->refcnt = 1;
+	dhandle->session_ref = 1;
 
 	dhandle->name_hash = hash;
 	WT_ERR(__wt_strdup(session, name, &dhandle->name));
@@ -379,7 +379,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	while (dhandle != NULL) {
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    dhandle->refcnt == 0) {
+		    dhandle->session_ref == 0) {
 			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 			SLIST_INSERT_HEAD(&sweeplh, dhandle, l);
@@ -563,7 +563,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	/*
 	 * Decrement the reference count and return if still in use.
 	 */
-	if (--dhandle->refcnt > 0)
+	if (--dhandle->session_ref > 0)
 		return (0);
 
 	/*

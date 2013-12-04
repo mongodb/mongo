@@ -116,8 +116,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * Decrement the in-use count on the underlying data-source -- if we're
 	 * the last reference, set the time-of-death timestamp.
 	 */
-	WT_ASSERT(session, dhandle->usecnt > 0);
-	if (WT_ATOMIC_SUB(dhandle->usecnt, 1) == 0)
+	WT_ASSERT(session, dhandle->session_inuse > 0);
+	if (WT_ATOMIC_SUB(dhandle->session_inuse, 1) == 0)
 		WT_TRET(__wt_seconds(session, &dhandle->timeofdeath));
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
@@ -251,7 +251,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
-		if (dhandle->usecnt == 0 &&
+		if (dhandle->session_inuse == 0 &&
 		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			WT_RET(
@@ -339,7 +339,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	}
 
 	/* Increment the data-source use count. */
-	(void)WT_ATOMIC_ADD(session->dhandle->usecnt, 1);
+	(void)WT_ATOMIC_ADD(session->dhandle->session_inuse, 1);
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
 	    F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE));

@@ -35,8 +35,13 @@ struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
 	SLIST_ENTRY(__wt_data_handle) l;/* Linked list of handles */
 
-	uint32_t refcnt;		/* Sessions referencing this handle */
-	int32_t	 usecnt;		/* Sessions using this handle */
+	/*
+	 * Sessions caching a connection's data handle will have a non-zero
+	 * reference count; sessions using a connection's data handle will
+	 * have a non-zero in-use count.
+	 */
+	uint32_t session_ref;		/* Sessions referencing this handle */
+	int32_t	 session_inuse;		/* Sessions using this handle */
 	time_t	 timeofdeath;		/* Use count went to 0 */
 
 	uint64_t name_hash;		/* Hash of name */

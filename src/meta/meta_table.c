@@ -71,7 +71,7 @@ __wt_metadata_cursor(
 	 * Increment the data-source use count.
 	 */
 	WT_ERR(__wt_session_lock_btree(session, 0));
-	(void)WT_ATOMIC_ADD(session->dhandle->usecnt, 1);
+	(void)WT_ATOMIC_ADD(session->dhandle->session_inuse, 1);
 
 	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
 
