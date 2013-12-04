@@ -829,10 +829,10 @@ struct __wt_session {
 	 * WT_SESSION::create., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count, the number of bits
 	 * used per item for LSM bloom filters., an integer between 2 and 1000;
-	 * default \c 8.}
+	 * default \c 16.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the
 	 * number of hash values per item used for LSM bloom filters., an
-	 * integer between 2 and 100; default \c 4.}
+	 * integer between 2 and 100; default \c 8.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest, create a bloom filter
 	 * on the oldest LSM tree chunk.  Only supported if bloom filters are
 	 * enabled., a boolean flag; default \c false.}
