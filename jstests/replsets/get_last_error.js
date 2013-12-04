@@ -16,8 +16,8 @@ mdb.foo.insert({ _id: "2" });
 var gle = master.getDB("test").runCommand({getLastError : 1, j : true});
 print('Trying j=true');
 printjson(gle);
-assert.eq(gle.ok, 1);
 if (gle.err === null) {
+    assert.eq(gle.ok, 1);
     assert.eq(gle.writtenTo, null);
     assert.eq(gle.waited, null);
     assert.eq(gle.wtime, null);
@@ -26,6 +26,7 @@ if (gle.err === null) {
 else {
     // "nojournal" is a permissible error here, if journaling is disabled.
     assert.eq(gle.err, "nojournal");
+    assert.eq(gle.code, 2);
 }
 
 gle = mdb.getLastErrorObj(1, 10);
