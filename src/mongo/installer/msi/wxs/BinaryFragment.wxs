@@ -143,7 +143,9 @@
                   DiskId="1" KeyPath="yes" />
           </Component>
         <?endif ?>
-        <Directory Id="Header" Name="include" />
+        <Directory Id="Include" Name="include">
+          <Directory Id="Header" Name="mongo" />
+        </Directory>
       </Directory>
     </DirectoryRef>
 
