@@ -1310,8 +1310,13 @@ namespace mongo {
 
     ChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
         ShardVersionMap::const_iterator i = _shardVersions.find( shard );
-        if ( i == _shardVersions.end() )
-            return ChunkVersion( 0, OID() );
+        if ( i == _shardVersions.end() ) {
+            // Shards without explicitly tracked shard versions (meaning they have
+            // no chunks) always have a version of (0, 0, epoch).  Note this is
+            // *different* from the dropped chunk version of (0, 0, OID(000...)).
+            // See s/chunk_version.h.
+            return ChunkVersion( 0, 0, _version.epoch() );
+        }
         return i->second;
     }
 
