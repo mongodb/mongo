@@ -78,5 +78,6 @@ error_code("WriteConcernLegacyOK", 75)
 
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)
+error_code("NotMaster", 10107) #this comes from assert_util.h
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

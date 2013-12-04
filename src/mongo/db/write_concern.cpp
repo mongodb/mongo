@@ -206,7 +206,7 @@ namespace mongo {
 
             if ( !_isMaster() ) {
                 // this should be in the while loop in case we step down
-                return Status( DBException::convertExceptionCode(10990), "no longer primary" );
+                return Status( ErrorCodes::NotMaster, "no longer primary" );
             }
 
             if ( writeConcern.wNumNodes > 0 ) {
