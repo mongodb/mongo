@@ -89,6 +89,7 @@ namespace mongo {
             params.direction = ixn->direction;
             params.limit = ixn->limit;
             params.maxScan = ixn->maxScan;
+            params.addKeyMetadata = ixn->addKeyMetadata;
             return new IndexScan(params, ws, ixn->filter.get());
         }
         else if (STAGE_FETCH == root->getType()) {

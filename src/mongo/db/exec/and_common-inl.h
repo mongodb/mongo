@@ -52,12 +52,11 @@ namespace mongo {
             }
 
             // Merge computed data.
-            if (!dest->hasComputed(WSM_COMPUTED_TEXT_SCORE) && src->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-                dest->addComputed(src->getComputed(WSM_COMPUTED_TEXT_SCORE)->clone());
-            }
-
-            if (!dest->hasComputed(WSM_COMPUTED_GEO_DISTANCE) && src->hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
-                dest->addComputed(src->getComputed(WSM_COMPUTED_GEO_DISTANCE)->clone());
+            typedef WorkingSetComputedDataType WSCD;
+            for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
+                if (!dest->hasComputed(i) && src->hasComputed(i)) {
+                    dest->addComputed(src->getComputed(i)->clone());
+                }
             }
         }
     };

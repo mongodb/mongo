@@ -44,7 +44,9 @@ namespace mongo {
           _arrayOpType(ARRAY_OP_NORMAL),
           _hasNonSimple(false),
           _hasDottedField(false),
-          _queryExpression(NULL) { }
+          _queryExpression(NULL),
+          _hasReturnKey(false) { }
+
 
     ProjectionExec::ProjectionExec(const BSONObj& spec, const MatchExpression* queryExpression)
         : _include(true),
@@ -56,7 +58,8 @@ namespace mongo {
           _arrayOpType(ARRAY_OP_NORMAL),
           _hasNonSimple(false),
           _hasDottedField(false),
-          _queryExpression(queryExpression) {
+          _queryExpression(queryExpression),
+          _hasReturnKey(false) {
 
         // Are we including or excluding fields?
         // -1 when we haven't initialized it.
@@ -123,6 +126,11 @@ namespace mongo {
                     }
                     else if (mongoutils::str::equals(e2.valuestr(), "diskloc")) {
                         _meta[e.fieldName()] = META_DISKLOC;
+                    }
+                    else if (mongoutils::str::equals(e2.valuestr(), "indexKey")) {
+                        _hasReturnKey = true;
+                        // The index key clobbers everything so just stop parsing here.
+                        return;
                     }
                     else {
                         // This shouldn't happen, should be caught by parsing.
@@ -218,8 +226,23 @@ namespace mongo {
     //
 
     Status ProjectionExec::transform(WorkingSetMember* member) const {
-        BSONObjBuilder bob;
+        if (_hasReturnKey) {
+            BSONObj keyObj;
 
+            if (member->hasComputed(WSM_INDEX_KEY)) {
+                const IndexKeyComputedData* key
+                    = static_cast<const IndexKeyComputedData*>(member->getComputed(WSM_INDEX_KEY));
+                keyObj = key->getKey();
+            }
+
+            member->state = WorkingSetMember::OWNED_OBJ;
+            member->obj = keyObj;
+            member->keyData.clear();
+            member->loc = DiskLoc();
+            return Status::OK();
+        }
+
+        BSONObjBuilder bob;
         if (!requiresDocument()) {
             // Go field by field.
             if (_includeID) {

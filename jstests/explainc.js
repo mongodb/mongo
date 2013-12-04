@@ -64,7 +64,7 @@ assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1, scanAndOrder:true }
                            .hint( { a:1, b:1 } ) );
 
 // In memory sort $returnKey query.
-assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:0, scanAndOrder:true },
+assertUnhintedExplain( { n:1, nscanned:1, scanAndOrder:true },
                        t.find( { a:{ $gt:0 } } )._addSpecial( "$returnKey", true ).sort( { b:1 } )
                            .hint( { a:1, b:1 } ) );
 
@@ -155,27 +155,14 @@ assertUnhintedExplain( { // cursor:'BtreeCursor b_1',
                         },
                        t.find( { b:1 }, { _id:0, b:1 } ).sort( { a:1 } ).skip( 1 ) );
 
-// Ordered plan chosen, $returnKey specified.
-assertUnhintedExplain( { cursor:'BtreeCursor a_1_b_1', n:30, nscanned:30, nscannedObjects:0,
-                         scanAndOrder:false },
-                       t.find( { b:{ $gte:0 } }, { _id:0, b:1 } ).sort( { a:1 } )
-                           ._addSpecial( "$returnKey", true ) );
-
-// Ordered plan chosen, $returnKey specified, matching requires loading document.
-assertUnhintedExplain( { cursor:'BtreeCursor a_1_b_1', n:30, nscanned:30, nscannedObjects:30,
-                         scanAndOrder:false },
-                       t.find( { b:{ $gte:0 }, c:null }, { _id:0, b:1 } ).sort( { a:1 } )
-                           ._addSpecial( "$returnKey", true ) );
-
 // Unordered plan chosen, $returnKey specified.
-assertUnhintedExplain( { cursor:'BtreeCursor b_1', n:1, nscanned:1, nscannedObjects:0,
-                         nscannedObjectsAllPlans:1, scanAndOrder:true },
+assertUnhintedExplain( { cursor:'BtreeCursor b_1', n:1, nscanned:1, scanAndOrder:true },
                        t.find( { b:1 }, { _id:0, b:1 } ).sort( { a:1 } )
                            ._addSpecial( "$returnKey", true ) );
 
 // Unordered plan chosen, $returnKey specified, matching requires loading document.
 assertUnhintedExplain( { cursor:'BtreeCursor b_1', n:1, nscanned:1, nscannedObjects:1,
-                         nscannedObjectsAllPlans:2, scanAndOrder:true },
+                         scanAndOrder:true },
                        t.find( { b:1, c:null }, { _id:0, b:1 } ).sort( { a:1 } )
                            ._addSpecial( "$returnKey", true ) );
 

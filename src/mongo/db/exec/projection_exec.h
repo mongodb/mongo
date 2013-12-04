@@ -182,6 +182,10 @@ namespace mongo {
 
         // Projections that aren't sourced from the document or index keys.
         MetaMap _meta;
+
+        // Do we have a returnKey projection?  If so we *only* output the index key metadata.  If
+        // it's not found we output nothing.
+        bool _hasReturnKey;
     };
 
 }  // namespace mongo

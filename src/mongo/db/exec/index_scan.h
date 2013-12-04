@@ -50,7 +50,8 @@ namespace mongo {
                             limit(0),
                             forceBtreeAccessMethod(false),
                             doNotDedup(false),
-                            maxScan(0) { }
+                            maxScan(0),
+                            addKeyMetadata(false) { }
 
         IndexDescriptor* descriptor;
 
@@ -68,6 +69,9 @@ namespace mongo {
 
         // How many keys will we look at?
         size_t maxScan;
+
+        // Do we want to add the key as metadata?
+        bool addKeyMetadata;
     };
 
     /**

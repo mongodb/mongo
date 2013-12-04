@@ -136,6 +136,7 @@ namespace mongo {
             isn->indexIsMultiKey = index.multikey;
             isn->bounds.fields.resize(index.keyPattern.nFields());
             isn->maxScan = query.getParsed().getMaxScan();
+            isn->addKeyMetadata = query.getParsed().returnKey();
 
             IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(),
                                           &isn->bounds.fields[0], tightnessOut);
@@ -841,6 +842,7 @@ namespace mongo {
         isn->indexIsMultiKey = index.multikey;
         isn->bounds.fields.resize(index.keyPattern.nFields());
         isn->maxScan = query.getParsed().getMaxScan();
+        isn->addKeyMetadata = query.getParsed().returnKey();
 
         // TODO: can we use simple bounds with this compound idx?
         BSONObjIterator it(isn->indexKeyPattern);
@@ -924,6 +926,7 @@ namespace mongo {
         isn->indexIsMultiKey = index.multikey;
         isn->direction = 1;
         isn->maxScan = query.getParsed().getMaxScan();
+        isn->addKeyMetadata = query.getParsed().returnKey();
         isn->bounds.isSimpleRange = true;
         isn->bounds.startKey = startKey;
         isn->bounds.endKey = endKey;

@@ -52,6 +52,8 @@ namespace mongo {
 
         bool includeID = true;
 
+        bool hasIndexKeyProjection = false;
+
         // Until we see a positional or elemMatch operator we're normal.
         ArrayOpType arrayOpType = ARRAY_OP_NORMAL;
 
@@ -136,9 +138,14 @@ namespace mongo {
                     }
 
                     if (!mongoutils::str::equals(e2.valuestr(), "text")
-                        && !mongoutils::str::equals(e2.valuestr(), "diskloc")) {
+                        && !mongoutils::str::equals(e2.valuestr(), "diskloc")
+                        && !mongoutils::str::equals(e2.valuestr(), "indexKey")) {
                         return Status(ErrorCodes::BadValue,
                                       "unsupported $meta operator: " + e2.str());
+                    }
+
+                    if (mongoutils::str::equals(e2.valuestr(), "indexKey")) {
+                        hasIndexKeyProjection = true;
                     }
                 }
                 else {
@@ -196,6 +203,13 @@ namespace mongo {
         // Save the raw spec.  It should be owned by the LiteParsedQuery.
         verify(spec.isOwned());
         pp->_source = spec;
+
+        // returnKey clobbers everything.
+        if (hasIndexKeyProjection) {
+            pp->_requiresDocument = false;
+            *out = pp.release();
+            return Status::OK();
+        }
 
         // Dotted fields aren't covered, non-simple require match details, and as for include, "if
         // we default to including then we can't use an index because we don't know what we're

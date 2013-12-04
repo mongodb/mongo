@@ -309,7 +309,15 @@ namespace mongo {
                 }
                 else if (str::equals("returnKey", name)) {
                     // Won't throw.
-                    _returnKey = e.trueValue();
+                    if (e.trueValue()) {
+                        _returnKey = true;
+                        BSONObjBuilder projBob;
+                        projBob.appendElements(_proj);
+                        // XXX: what's the syntax here?
+                        BSONObj indexKey = BSON("$$" << BSON("$meta" << "indexKey"));
+                        projBob.append(indexKey.firstElement());
+                        _proj = projBob.obj();
+                    }
                 }
                 else if (str::equals("maxScan", name)) {
                     // Won't throw.

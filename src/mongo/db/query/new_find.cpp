@@ -100,6 +100,7 @@ namespace mongo {
     void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
 
     // Do we use the old or the new?  I call this the spigot.
+    // XXX: remove this
     bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut) {
         // This is a read lock.  We require this because if we're parsing a $where, the
         // where-specific parsing code assumes we have a lock and creates execution machinery that
@@ -114,15 +115,6 @@ namespace mongo {
         }
         verify(cq);
         auto_ptr<CanonicalQuery> scopedCq(cq);
-
-        const LiteParsedQuery& pq = cq->getParsed();
-
-        // We fail to deal well with obscure arguments to .find().
-        if (pq.returnKey()) {
-            QLOG() << "rejecting wacky query args query\n";
-            return false;
-        }
-
         *cqOut = scopedCq.release();
         return true;
     }

@@ -358,6 +358,9 @@ namespace mongo {
         // maxScan option to .find() limits how many docs we look at.
         int maxScan;
 
+        // If there's a 'returnKey' projection we add key metadata.
+        bool addKeyMetadata;
+
         // BIG NOTE:
         // If you use simple bounds, we'll use whatever index access method the keypattern implies.
         // If you use the complex bounds, we force Btree access.

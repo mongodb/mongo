@@ -55,12 +55,12 @@ namespace mongo {
         dest->keyData = src.keyData;
         dest->state = src.state;
 
-        if (src.hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-            dest->addComputed(src.getComputed(WSM_COMPUTED_TEXT_SCORE)->clone());
-        }
-
-        if (src.hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
-            dest->addComputed(src.getComputed(WSM_COMPUTED_GEO_DISTANCE)->clone());
+        // Merge computed data.
+        typedef WorkingSetComputedDataType WSCD;
+        for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
+            if (src.hasComputed(i)) {
+                dest->addComputed(src.getComputed(i)->clone());
+            }
         }
     }
 

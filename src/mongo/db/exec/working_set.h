@@ -147,6 +147,7 @@ namespace mongo {
     enum WorkingSetComputedDataType {
         WSM_COMPUTED_TEXT_SCORE = 0,
         WSM_COMPUTED_GEO_DISTANCE = 1,
+        WSM_INDEX_KEY = 2,
         WSM_COMPUTED_NUM_TYPES,
     };
 

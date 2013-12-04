@@ -64,4 +64,20 @@ namespace mongo {
         double _score;
     };
 
+    class IndexKeyComputedData : public WorkingSetComputedData {
+    public:
+        IndexKeyComputedData(BSONObj key)
+            : WorkingSetComputedData(WSM_INDEX_KEY),
+              _key(key) { }
+
+        BSONObj getKey() const { return _key; }
+
+        virtual IndexKeyComputedData* clone() const {
+            return new IndexKeyComputedData(_key);
+        }
+
+    private:
+        BSONObj _key;
+    };
+
 }  // namespace mongo
