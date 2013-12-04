@@ -539,6 +539,26 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
     }
 
+    TEST_F(IndexAssignmentTest, ExistsTrueSparseIndex) {
+        addIndex(BSON("x" << 1), false, true);
+
+        runQuery(fromjson("{x: 1, y: {$exists: true}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, ExistsFalseSparseIndex) {
+        addIndex(BSON("x" << 1), false, true);
+
+        runQuery(fromjson("{x: 1, y: {$exists: false}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
+    }
+
     //
     // skip and limit
     //
