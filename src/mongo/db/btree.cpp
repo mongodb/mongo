@@ -1716,9 +1716,9 @@ namespace mongo {
     int BtreeBucket<V>::_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
                              const Key& key, const Ordering &order, bool dupsAllowed,
                              const DiskLoc lChild, const DiskLoc rChild, IndexDetails& idx) const {
-        if ( key.dataSize() > this->KeyMax ) {
+        if ( key.dataSize() > getKeyMax() ) {
             string msg = str::stream() << "ERROR: key too large len:" << key.dataSize()
-                                       << " max:" << this->KeyMax << ' ' << key.dataSize()
+                                       << " max:" << getKeyMax() << ' ' << key.dataSize()
                                        << ' ' << idx.indexNamespace();
             problem() << msg << endl;
             if ( isMaster( NULL ) ) {
@@ -1803,7 +1803,7 @@ namespace mongo {
 
         dassert(toplevel);
         if ( toplevel ) {
-            if ( key.dataSize() > this->KeyMax ) {
+            if ( key.dataSize() > getKeyMax() ) {
                 string msg = str::stream() << "Btree::insert: key too large to index, failing "
                                            << idx.indexNamespace() << ' ' << key.dataSize() << ' '
                                            << key.toString();
