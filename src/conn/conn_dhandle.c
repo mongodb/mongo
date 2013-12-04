@@ -621,9 +621,13 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 	 * Make sure the caller's handle is tracked, so it will be unlocked
 	 * even if we failed to get all of the remaining handles we need.
 	 */
-	if ((saved_dhandle = session->dhandle) != NULL &&
-	    WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_handle_lock(session, 0));
+	if ((saved_dhandle = session->dhandle) != NULL) {
+		WT_ASSERT(session,
+		    F_ISSET(saved_dhandle, WT_DHANDLE_EXCLUSIVE));
+
+		if (WT_META_TRACKING(session))
+			WT_ERR(__wt_meta_track_handle_lock(session, 0));
+	}
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (strcmp(dhandle->name, name) != 0)
@@ -632,23 +636,20 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 		session->dhandle = dhandle;
 
 		/*
-		 * The caller may have this tree locked to prevent
-		 * concurrent schema operations.
+		 * The caller may have this tree locked to prevent concurrent
+		 * schema operations.
 		 */
-		if (dhandle == saved_dhandle)
-			WT_ASSERT(session,
-			    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		else {
-			WT_ERR(__wt_try_writelock(session, dhandle->rwlock));
-			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
+		if (dhandle != saved_dhandle) {
+			WT_ERR(__wt_session_get_btree(session,
+			    dhandle->name, dhandle->checkpoint,
+			    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 			if (WT_META_TRACKING(session))
 				WT_ERR(__wt_meta_track_handle_lock(session, 0));
 		}
 
 		/*
-		 * We have an exclusive lock, which means there are no
-		 * cursors open at this point.  Close the handle, if
-		 * necessary.
+		 * We have an exclusive lock, which means there are no cursors
+		 * open at this point.  Close the handle, if necessary.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			ret = __wt_meta_track_sub_on(session);
@@ -656,15 +657,19 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 				ret = __wt_conn_btree_sync_and_close(session);
 
 			/*
-			 * If the close succeeded, drop any locks it
-			 * acquired.  If there was a failure, this
-			 * function will fail and the whole transaction
-			 * will be rolled back.
+			 * If the close succeeded, drop any locks it acquired.
+			 * If there was a failure, this function will fail and
+			 * the whole transaction will be rolled back.
 			 */
 			if (ret == 0)
 				ret = __wt_meta_track_sub_off(session);
 		}
 
+		/*
+		 * Note the test is different than above where we ignored the
+		 * handle passed in by our caller: we're releasing all of the
+		 * handles, including any passed in by our caller.
+		 */
 		if (!WT_META_TRACKING(session))
 			WT_TRET(__wt_session_release_btree(session));
 
