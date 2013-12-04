@@ -106,7 +106,7 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "oplog mode is only supported on full dumps");
             }
         }
-        mongoDumpGlobalParams.outputFile = getParam("out");
+        mongoDumpGlobalParams.outputDirectory = getParam("out");
         mongoDumpGlobalParams.snapShotQuery = false;
         if (!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) {
             mongoDumpGlobalParams.snapShotQuery = true;
@@ -117,7 +117,7 @@ namespace mongo {
             toolGlobalParams.db = "";
         }
 
-        if (mongoDumpGlobalParams.outputFile == "-") {
+        if (mongoDumpGlobalParams.outputDirectory == "-") {
             // write output to standard error to avoid mangling output
             // must happen early to avoid sending junk to stdout
             toolGlobalParams.canUseStdout = false;

@@ -26,7 +26,7 @@
 namespace mongo {
 
     struct MongoDumpGlobalParams {
-        std::string outputFile;
+        std::string outputDirectory;
         std::string query;
         bool useOplog;
         bool repair;

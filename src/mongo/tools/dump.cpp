@@ -303,6 +303,10 @@ public:
         return forward ? e->xnext : e->xprev;
     }
 
+    /*
+     * NOTE: The "outfile" parameter passed in should actually represent a directory, but it is
+     * called "outfile" because we append the filename and use it as our output file.
+     */
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
         Collection* collection = db->getCollection( ns );
         const NamespaceDetails * nsd = collection->details();
@@ -369,7 +373,7 @@ public:
         list<string> namespaces;
         db->namespaceIndex().getNamespaces( namespaces );
 
-        boost::filesystem::path root = mongoDumpGlobalParams.outputFile;
+        boost::filesystem::path root = mongoDumpGlobalParams.outputDirectory;
         root /= dbname;
         boost::filesystem::create_directories( root );
 
@@ -445,7 +449,7 @@ public:
         }
 
         // check if we're outputting to stdout
-        if (mongoDumpGlobalParams.outputFile == "-") {
+        if (mongoDumpGlobalParams.outputDirectory == "-") {
             if (toolGlobalParams.db != "" && toolGlobalParams.coll != "") {
                 writeCollectionStdout(toolGlobalParams.db + "." + toolGlobalParams.coll);
                 return 0;
@@ -459,7 +463,7 @@ public:
 
         _usingMongos = isMongos();
 
-        boost::filesystem::path root(mongoDumpGlobalParams.outputFile);
+        boost::filesystem::path root(mongoDumpGlobalParams.outputDirectory);
 
         if (toolGlobalParams.db == "") {
             if (toolGlobalParams.coll != "") {
