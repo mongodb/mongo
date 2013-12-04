@@ -166,7 +166,6 @@ jsTest.log("Testing idle connection with second primary down...");
 
 mongosConnIdle.getCollection( collSharded + "" ).insert({ _id : -6 });
 assert.gleSuccess(mongosConnIdle.getCollection( collSharded + "" ).getDB());
-assert.commandWorked(admin.runCommand({ setParameter : 1, logLevel : 5 }));
 mongosConnIdle.getCollection( collSharded + "" ).insert({ _id : 6 });
 gleErrorOrThrow(mongosConnIdle.getCollection( collSharded + "" ).getDB());
 mongosConnIdle.getCollection( collUnsharded + "" ).insert({ _id : 6 });
