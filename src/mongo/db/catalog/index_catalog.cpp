@@ -851,7 +851,7 @@ namespace mongo {
 
         if (IndexNames::HASHED == type ||
             IndexNames::GEO_2DSPHERE == type ||
-            IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type ||
+            IndexNames::TEXT == type ||
             IndexNames::GEO_HAYSTACK == type ||
             "" == type ||
             IndexNames::GEO_2D == type ) {
@@ -883,7 +883,7 @@ namespace mongo {
         else if (IndexNames::GEO_2DSPHERE == type) {
             newlyCreated = new S2AccessMethod(desc);
         }
-        else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
+        else if (IndexNames::TEXT == type) {
             newlyCreated = new FTSAccessMethod(desc);
         }
         else if (IndexNames::GEO_HAYSTACK == type) {

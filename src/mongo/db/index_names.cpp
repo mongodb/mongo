@@ -35,7 +35,6 @@ namespace mongo {
     const string IndexNames::GEO_HAYSTACK = "geoHaystack";
     const string IndexNames::GEO_2DSPHERE = "2dsphere";
     const string IndexNames::TEXT = "text";
-    const string IndexNames::TEXT_INTERNAL = "_fts";
     const string IndexNames::HASHED = "hashed";
 
     // static

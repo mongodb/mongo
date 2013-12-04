@@ -170,7 +170,7 @@ namespace mongo {
                 }
             }
             return USELESS;
-        } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
+        } else if (IndexNames::TEXT == type) {
             return USELESS;
         } else if (IndexNames::GEO_HAYSTACK == type) {
             return USELESS;

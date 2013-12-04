@@ -117,7 +117,7 @@ namespace mongo {
                 return new HashAccessMethod(desc);
             } else if (IndexNames::GEO_2DSPHERE == type) {
                 return new S2AccessMethod(desc);
-            } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
+            } else if (IndexNames::TEXT == type) {
                 return new FTSAccessMethod(desc);
             } else if (IndexNames::GEO_HAYSTACK == type) {
                 return new HaystackAccessMethod(desc);
@@ -139,7 +139,7 @@ namespace mongo {
                 return new HashAccessMethod(desc);
             } else if (IndexNames::GEO_2DSPHERE == type) {
                 return new S2AccessMethod(desc);
-            } else if (IndexNames::TEXT == type || IndexNames::TEXT_INTERNAL == type) {
+            } else if (IndexNames::TEXT == type) {
                 return new FTSAccessMethod(desc);
             } else if (IndexNames::GEO_HAYSTACK == type) {
                 return new HaystackAccessMethod(desc);
