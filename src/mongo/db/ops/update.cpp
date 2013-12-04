@@ -355,6 +355,60 @@ namespace mongo {
             return Status::OK();
         }
 
+        Status recoverFromYield(const UpdateLifecycle* lifecycle,
+                                UpdateDriver* driver,
+                                Collection* collection,
+                                const NamespaceString& nsString) {
+            // We yielded and recovered OK, and our cursor is still good. Details about
+            // our namespace may have changed while we were yielded, so we re-acquire
+            // them here. If we can't do so, escape the update loop. Otherwise, refresh
+            // the driver so that it knows about what is currently indexed.
+            Collection* oldCollection = collection;
+            collection = cc().database()->getCollection(nsString.ns());
+
+            // We should not get a new pointer to the same collection...
+            if (oldCollection && (oldCollection != collection))
+                return Status(ErrorCodes::IllegalOperation,
+                              str::stream() << "Collection changed during the Update: ok?"
+                                            << " old: " << oldCollection->ok()
+                                            << " new:" << collection->ok());
+
+            if (!collection)
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "collection pointer NULL.");
+
+            if (!collection->ok())
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "collection not ok().");
+
+            IndexCatalog* idxCatalog = collection->getIndexCatalog();
+            if (!idxCatalog)
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "IndexCatalog pointer NULL.");
+
+            if (!idxCatalog->ok())
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "IndexCatalog not ok().");
+
+            if (lifecycle) {
+                if (!lifecycle->canContinue()) {
+                    return Status(ErrorCodes::IllegalOperation,
+                                  "Update aborted due to invalid state transitions after yield.",
+                                  17270);
+                }
+
+                IndexPathSet indexes;
+                lifecycle->getIndexKeys(&indexes);
+                driver->refreshIndexKeys(indexes);
+            }
+
+            return Status::OK();
+        }
+
     } // namespace
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug) {
@@ -385,21 +439,22 @@ namespace mongo {
     }
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver) {
-
         LOG(3) << "processing update : " << request;
+
         const NamespaceString& nsString = request.getNamespaceString();
+        const UpdateLifecycle* lifecycle = request.getLifecycle();
+        const CurOp* curOp = cc().curop();
+        Collection* collection = cc().database()->getCollection(nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
-        const CurOp* curOp = cc().curop();
-        Collection* collection = cc().database()->getCollection(nsString.ns());
 
         // TODO: This seems a bit circuitious.
         opDebug->updateobj = request.getUpdates();
 
-        if (request.getLifecycle()) {
+        if (lifecycle) {
             IndexPathSet indexes;
-            request.getLifecycle()->getIndexKeys(&indexes);
+            lifecycle->getIndexKeys(&indexes);
             driver->refreshIndexKeys(indexes);
         }
 
@@ -440,6 +495,8 @@ namespace mongo {
         driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
 
         int numMatched = 0;
+
+        // NOTE: We only store the locs of moved docs, since the runner will keep track of the rest
         unordered_set<DiskLoc, DiskLoc::Hasher> updatedLocs;
 
         // Reset these counters on each call. We might re-enter this function to retry this
@@ -454,15 +511,57 @@ namespace mongo {
 
         // Used during iteration of docs
         BSONObj oldObj;
-        DiskLoc loc;
+
+        // Keep track if we have done a write in isolation mode, which will indicate we can't yield
+        bool isolationModeWriteOccured = false;
 
         // Get first doc, and location
-        Runner::RunnerState state = runner->getNext(&oldObj, &loc);
-        while (Runner::RUNNER_ADVANCED == state) {
+        Runner::RunnerState state = Runner::RUNNER_ADVANCED;
 
-            // We fill this with the new locs of updates so we don't double-update anything.
-            if (updatedLocs.count(loc)) {
-                state = runner->getNext(&oldObj, &loc);
+        // Keep track of yield count so we can see if one happens on the getNext() calls below
+        int oldYieldCount = curOp->numYields();
+
+        while (true) {
+            const int numChanged = numMatched - opDebug->nupdateNoops;
+
+            // See if we have a write in isolation mode
+            isolationModeWriteOccured = isolated && (numChanged > 0);
+
+            // Change to manual yielding (no yielding) if we have written in isolation mode
+            if (isolationModeWriteOccured) {
+                runner->setYieldPolicy(Runner::YIELD_MANUAL);
+            }
+
+            // keep track of the yield count before calling getNext (which might yield).
+            oldYieldCount = curOp->numYields();
+
+            // Get next doc, and location
+            DiskLoc loc;
+            state = runner->getNext(&oldObj, &loc);
+            const bool didYield = (oldYieldCount != curOp->numYields());
+
+            if (state != Runner::RUNNER_ADVANCED) {
+                if (state == Runner::RUNNER_EOF) {
+                    if (didYield)
+                        uassertStatusOK(recoverFromYield(lifecycle, driver, collection, nsString));
+
+                    // We have reached the logical end of the loop, so do yielding recovery
+                    break;
+                }
+                else {
+                    uassertStatusOK(Status(ErrorCodes::InternalError,
+                                           str::stream() << " Update query failed -- "
+                                                         << Runner::statestr(state)));
+                }
+            }
+
+            // Refresh things after a yield.
+            if (didYield)
+                uassertStatusOK(recoverFromYield(lifecycle, driver, collection, nsString));
+
+            // We fill this with the new locs of moved doc so we don't double-update.
+            // NOTE: The runner will de-dup non-moved things.
+            if (updatedLocs.count(loc) > 0) {
                 continue;
             }
 
@@ -500,7 +599,6 @@ namespace mongo {
                 uasserted(16837, status.reason());
             }
 
-            dassert(collection->details());
             const bool idRequired = collection->details()->haveIdIndex();
 
             // Move _id as first element
@@ -533,7 +631,7 @@ namespace mongo {
             if ((!inPlace || !damages.empty()) ) {
                 if (!(request.isFromReplication() || request.isFromMigration())) {
                     const std::vector<FieldRef*>* immutableFields = NULL;
-                    if (const UpdateLifecycle* lifecycle = request.getLifecycle())
+                    if (lifecycle)
                         immutableFields = lifecycle->getImmutableFields();
 
                     uassertStatusOK(validate(idRequired,
@@ -584,11 +682,8 @@ namespace mongo {
 
                 // If we've moved this object to a new location, make sure we don't apply
                 // that update again if our traversal picks the object again.
-                //
-                // We also take note that the diskloc if the updates are affecting indices.
-                // Chances are that we're traversing one of them and they may be multi key and
-                // therefore duplicate disklocs.
-                if (newLoc != loc || driver->modsAffectIndices()) {
+                // NOTE: The runner takes care of deduping non-moved docs.
+                if (newLoc != loc) {
                     updatedLocs.insert(newLoc);
                 }
 
@@ -619,45 +714,6 @@ namespace mongo {
 
             // Opportunity for journaling to write during the update.
             getDur().commitIfNeeded();
-
-            // Disable yielding if isolate with write done
-            const int numChanged = numMatched - opDebug->nupdateNoops;
-
-            // See if we have a write in isolation mode
-            const bool isolationModeWriteOccured = isolated && (numChanged > 0);
-
-            // Change to manual yielding (no yielding) if we have written in isolation mode
-            if (isolationModeWriteOccured) {
-                runner->setYieldPolicy(Runner::YIELD_MANUAL);
-            }
-
-            // Keep track of yield count so we can see if one happens on the getNext() call
-            const int oldYieldCount = curOp->numYields();
-
-            // Get next doc, and location
-            state = runner->getNext(&oldObj, &loc);
-
-            // Refresh things after a yield.
-            const bool didYield = (oldYieldCount != curOp->numYields());
-            if (!isolationModeWriteOccured && didYield) {
-
-                // We yielded and recovered OK, and our cursor is still good. Details about
-                // our namespace may have changed while we were yielded, so we re-acquire
-                // them here. If we can't do so, escape the update loop. Otherwise, refresh
-                // the driver so that it knows about what is currently indexed.
-                const UpdateLifecycle* lifecycle = request.getLifecycle();
-                collection = cc().database()->getCollection(nsString.ns());
-                if (!collection || (lifecycle && !lifecycle->canContinue())) {
-                    uasserted(17270,
-                              "Update aborted due to invalid state transitions after yield.");
-                }
-
-                if (lifecycle && lifecycle->canContinue()) {
-                    IndexPathSet indexes;
-                    lifecycle->getIndexKeys(&indexes);
-                    driver->refreshIndexKeys(indexes);
-                }
-            }
         }
 
         // TODO: Can this be simplified?
@@ -724,7 +780,6 @@ namespace mongo {
         else {
             // Create _id if an _id is required but the document does not currently have one.
             if (idRequired) {
-                // TODO: don't search for _id again, get it from above somewhere
                 idElem = doc.makeElementNewOID(idFieldName);
                 if (!idElem.ok())
                     uasserted(17268, "Could not create new _id ObjectId element.");
@@ -739,7 +794,7 @@ namespace mongo {
         // that contains all the immutable keys and can be stored.
         if (!(request.isFromReplication() || request.isFromMigration())){
             const std::vector<FieldRef*>* immutableFields = NULL;
-            if (const UpdateLifecycle* lifecycle = request.getLifecycle())
+            if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
 
             uassertStatusOK(validate(idRequired,

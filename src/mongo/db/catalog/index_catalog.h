@@ -55,6 +55,8 @@ namespace mongo {
         IndexCatalog( Collection* collection, NamespaceDetails* details );
         ~IndexCatalog();
 
+        bool ok() const;
+
         // ---- accessors -----
 
         int numIndexesTotal() const;

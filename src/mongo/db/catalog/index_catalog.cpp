@@ -84,12 +84,16 @@ namespace mongo {
 
     }
 
+    bool IndexCatalog::ok() const {
+        return ( _magic == INDEX_CATALOG_MAGIC );
+    }
+
     void IndexCatalog::_checkMagic() const {
         dassert( _descriptorCache.capacity() == NamespaceDetails::NIndexesMax );
         dassert( _accessMethodCache.capacity() == NamespaceDetails::NIndexesMax );
         dassert( _forcedBtreeAccessMethodCache.capacity() == NamespaceDetails::NIndexesMax );
 
-        if ( _magic == INDEX_CATALOG_MAGIC )
+        if ( ok() )
             return;
         log() << "IndexCatalog::_magic wrong, is : " << _magic;
         fassertFailed(17198);
