@@ -63,8 +63,6 @@ namespace mongo {
                                 bool& exhaust,
                                 bool* isCursorAuthorized);
 
-    string runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
-
     /** Exception indicating that a query should be retried from the beginning. */
     class QueryRetryException : public DBException {
     public:

@@ -93,29 +93,22 @@ namespace {
 
 namespace mongo {
 
-    // Server parameter
-    MONGO_EXPORT_SERVER_PARAMETER(newQueryFrameworkEnabled, bool, true);
-
-    bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
-    void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
-
-    // Do we use the old or the new?  I call this the spigot.
-    // XXX: remove this
-    bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut) {
-        // This is a read lock.  We require this because if we're parsing a $where, the
-        // where-specific parsing code assumes we have a lock and creates execution machinery that
-        // requires it.
-        Client::ReadContext ctx(qm.ns);
-
-        CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(qm, &cq);
-        if (!status.isOK()) {
-            QLOG() << "Can't canonicalize query: " << status.toString() << endl;
-            return false;
+    // XXX clean up
+    static bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+        try {
+            return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
-        verify(cq);
-        auto_ptr<CanonicalQuery> scopedCq(cq);
-        *cqOut = scopedCq.release();
+        catch( SendStaleConfigException& ){
+            throw;
+        }
+        catch ( AssertionException& e ) {
+            verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
+
+            Command::appendCommandStatus(anObjBuilder, e.toStatus());
+            curop.debug().exceptionInfo = e.getInfo();
+        }
+        BSONObj x = anObjBuilder.done();
+        b.appendBuf((void*) x.objdata(), x.objsize());
         return true;
     }
 
@@ -332,14 +325,68 @@ namespace mongo {
         return Status::OK();
     }
 
-    /**
-     * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
-     */
-    std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result) {
-        QLOG() << "Running query on new system: " << cq->toString();
+    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+        // Validate the namespace.
+        const char *ns = q.ns;
+        uassert(16332, "can't have an empty ns", ns[0]);
 
-        // This is a read lock.
-        Client::ReadContext ctx(cq->ns(), storageGlobalParams.dbpath);
+        const NamespaceString nsString(ns);
+        uassert(16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid());
+
+        // Set curop information.
+        curop.debug().ns = ns;
+        curop.debug().ntoreturn = q.ntoreturn;
+        curop.debug().query = q.query;
+        curop.setQuery(q.query);
+
+        // If the query is really a command, run it.
+        if (nsString.isCommand()) {
+            int nToReturn = q.ntoreturn;
+            uassert(16979, str::stream() << "bad numberToReturn (" << nToReturn
+                                         << ") for $cmd type ns - can only be 1 or -1",
+                    nToReturn == 1 || nToReturn == -1);
+
+            curop.markCommand();
+
+            BufBuilder bb;
+            bb.skip(sizeof(QueryResult));
+
+            BSONObjBuilder cmdResBuf;
+            if (!runCommands(ns, q.query, curop, bb, cmdResBuf, false, q.queryOptions)) {
+                uasserted(13530, "bad or malformed command request?");
+            }
+
+            curop.debug().iscommand = true;
+            // TODO: Does this get overwritten/do we really need to set this twice?
+            curop.debug().query = q.query;
+
+            QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+            bb.decouple();
+            qr->setResultFlagsToOk();
+            qr->len = bb.len();
+            curop.debug().responseLength = bb.len();
+            qr->setOperation(opReply);
+            qr->cursorId = 0;
+            qr->startingFrom = 0;
+            qr->nReturned = 1;
+            result.setData(qr, true);
+            return "";
+        }
+
+        // This is a read lock.  We require this because if we're parsing a $where, the
+        // where-specific parsing code assumes we have a lock and creates execution machinery that
+        // requires it.
+        Client::ReadContext ctx(q.ns);
+
+        // Parse the qm into a CanonicalQuery.
+        CanonicalQuery* cq;
+        Status canonStatus = CanonicalQuery::canonicalize(q, &cq);
+        if (!canonStatus.isOK()) {
+            uasserted(17287, str::stream() << "Can't canonicalize query: " << canonStatus.toString());
+        }
+        verify(cq);
+
+        QLOG() << "Running query on new system: " << cq->toString();
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
         Runner* rawRunner = NULL;

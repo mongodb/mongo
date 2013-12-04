@@ -27,6 +27,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/query.h"
 #include "mongo/db/parsed_query.h"
+#include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/scanandorder.h"
 #include "mongo/db/structure/collection.h"
@@ -1390,7 +1391,7 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            string exhaust = runQuery( message, queryMessage, *cc().curop(), result );
+            string exhaust = newRunQuery( message, queryMessage, *cc().curop(), result );
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }

@@ -124,25 +124,21 @@ namespace mongo {
                                 bool& exhaust,
                                 bool* isCursorAuthorized ) {
 
-        if (isNewQueryFrameworkEnabled()) {
-            bool useNewSystem = false;
+        bool hasRunner = false;
 
-            // Scoped to kill the pin after seeing if the runner's there.
-            {
-                // See if there's a runner.  We do this because some CCs may be cursors and some may
-                // be runners until we're done implementing all new functionality in the new
-                // system...
-                ClientCursorPin p(cursorid);
-                ClientCursor *cc = p.c();
-                if (NULL != cc && NULL != cc->getRunner()) {
-                    useNewSystem = true;
-                }
+        // Scoped to kill the pin after seeing if the runner's there.
+        {
+            // See if there's a runner.  We do this until agg. is behind a Runner instead of a CC.
+            ClientCursorPin p(cursorid);
+            ClientCursor *cc = p.c();
+            if (NULL != cc && NULL != cc->getRunner()) {
+                hasRunner = true;
             }
+        }
 
-            if (useNewSystem) {
-                return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust,
-                                  isCursorAuthorized);
-            }
+        if (hasRunner) {
+            return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust,
+                              isCursorAuthorized);
         }
 
         exhaust = false;
@@ -1020,161 +1016,6 @@ namespace mongo {
 
         result.setData( qr.release(), true );
         return true;
-    }
-    
-    /**
-     * Run a query -- includes checking for and running a Command.
-     * @return points to ns if exhaust mode. 0=normal mode
-     * @locks the db mutex for reading (and potentially for writing temporarily to create a new db).
-     * @yields the db mutex periodically after acquiring it.
-     * @asserts on scan and order memory exhaustion and other cases.
-     */
-    string runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
-        BSONObj jsobj = q.query;
-        int queryOptions = q.queryOptions;
-        const char *ns = q.ns;
-        uassert( 16332 , "can't have an empty ns" , ns[0] );
-
-        const NamespaceString nsString( ns );
-        uassert( 16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
-
-        LOG(2) << "runQuery called " << ns << " " << jsobj << endl;
-
-        curop.debug().ns = ns;
-        curop.debug().ntoreturn = q.ntoreturn;
-        curop.debug().query = jsobj;
-        curop.setQuery(jsobj);
-
-        // Run a command.
-        if ( nsString.isCommand() ) {
-            int nToReturn = q.ntoreturn;
-            uassert( 16979, str::stream() << "bad numberToReturn (" << nToReturn
-                                          << ") for $cmd type ns - can only be 1 or -1",
-                     nToReturn == 1 || nToReturn == -1 );
-
-            curop.markCommand();
-            BufBuilder bb;
-            bb.skip(sizeof(QueryResult));
-            BSONObjBuilder cmdResBuf;
-            if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                curop.debug().iscommand = true;
-                curop.debug().query = jsobj;
-
-                auto_ptr< QueryResult > qr;
-                qr.reset( (QueryResult *) bb.buf() );
-                bb.decouple();
-                qr->setResultFlagsToOk();
-                qr->len = bb.len();
-                curop.debug().responseLength = bb.len();
-                qr->setOperation(opReply);
-                qr->cursorId = 0;
-                qr->startingFrom = 0;
-                qr->nReturned = 1;
-                result.setData( qr.release(), true );
-            }
-            else {
-                uasserted(13530, "bad or malformed command request?");
-            }
-            return "";
-        }
-
-        if (isNewQueryFrameworkEnabled()) {
-            CanonicalQuery* cq = NULL;
-            if (canUseNewSystem(q, &cq)) {
-                return newRunQuery(cq, curop, result);
-            }
-        }
-
-        shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
-        ParsedQuery& pq( *pq_shared );
-
-        bool explain = pq.isExplain();
-        BSONObj order = pq.getOrder();
-        BSONObj query = pq.getFilter();
-
-        /* The ElemIter will not be happy if this isn't really an object. So throw exception
-           here when that is true.
-           (Which may indicate bad data from client.)
-        */
-        if ( query.objsize() == 0 ) {
-            out() << "Bad query object?\n  jsobj:";
-            out() << jsobj.toString() << "\n  query:";
-            out() << query.toString() << endl;
-            uassert( 10110 , "bad query object", false);
-        }
-
-        // Handle query option $maxTimeMS (not used with commands).
-        curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
-        killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
-
-        // Run a simple id query.
-        if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
-            if ( queryIdHack( ns, query, pq, curop, result ) ) {
-                return "";
-            }
-        }
-
-        // sanity check the query and projection
-        if ( pq.getFields() != NULL )
-            pq.getFields()->validateQuery( query );
-
-        // these now may stored in a ClientCursor or somewhere else,
-        // so make sure we use a real copy
-        jsobj = jsobj.getOwned();
-        query = query.getOwned();
-        order = order.getOwned();
-
-        bool hasRetried = false;
-        scoped_ptr<PageFaultRetryableSection> pgfs;
-        scoped_ptr<NoPageFaultsAllowed> npfe;
-        while ( 1 ) {
-
-            if ( ! cc().getPageFaultRetryableSection() ) {
-                verify( ! pgfs );
-                pgfs.reset( new PageFaultRetryableSection() );
-            }
-                
-            try {
-                Client::ReadContext ctx(ns, storageGlobalParams.dbpath); // read locks
-                const ChunkVersion shardingVersionAtStart = shardingState.getVersion( ns );
-                
-                replVerifyReadsOk(&pq);
-                
-                if ( pq.hasOption( QueryOption_CursorTailable ) ) {
-                    NamespaceDetails *d = nsdetails( ns );
-                    uassert( 13051, "tailable cursor requested on non capped collection", d && d->isCapped() );
-                    const BSONObj nat1 = BSON( "$natural" << 1 );
-                    if ( order.isEmpty() ) {
-                        order = nat1;
-                    }
-                    else {
-                        uassert( 13052, "only {$natural:1} order allowed for tailable cursor", order == nat1 );
-                    }
-                }
-                
-                
-                // Run a regular query.
-                
-                BSONObj oldPlan;
-                if ( ! hasRetried && explain && ! pq.hasIndexSpecifier() ) {
-                    scoped_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order ) );
-                    oldPlan = mps->cachedPlanExplainSummary();
-                }
-             
-   
-                return queryWithQueryOptimizer( queryOptions, ns, jsobj, curop, query, order,
-                                                pq_shared, oldPlan, shardingVersionAtStart, 
-                                                pgfs, npfe, result );
-            }
-            catch ( PageFaultException& e ) {
-                e.touch();
-            }
-            catch ( const QueryRetryException & ) {
-                // In some cases the query may be retried if there is an in memory sort size assertion.
-                verify( ! hasRetried );
-                hasRetried = true;
-            }
-        }
     }
 
 } // namespace mongo

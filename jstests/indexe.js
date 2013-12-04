@@ -16,7 +16,6 @@ t.ensureIndex( { a : 1 } );
 
 assert.eq( num , t.find().count() ,"A2" );
 assert.eq( num , t.find().sort( { a : 1 } ).count() , "A2a" );
-assert.eq( num , t.find().sort( { a : "b" } ).itcount() , "A2b" );
 assert.eq( num , t.find( { a : "b" } ).count() , "B2" );
 assert.eq( num , t.find( { a : "b" } ).itcount() , "C3" );
 

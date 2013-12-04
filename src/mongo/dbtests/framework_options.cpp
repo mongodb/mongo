@@ -53,9 +53,6 @@ namespace mongo {
 
         options->addOptionChaining("verbose", "verbose,v", moe::Switch, "verbose");
 
-        options->addOptionChaining("useNewQueryFramework", "useNewQueryFramework", moe::Switch,
-                "use the new query framework");
-
         options->addOptionChaining("dur", "dur", moe::Switch,
                 "enable journaling (currently the default)");
 
@@ -110,10 +107,6 @@ namespace mongo {
 
     Status storeTestFrameworkOptions(const moe::Environment& params,
                                      const std::vector<std::string>& args) {
-
-        if (params.count("useNewQueryFramework")) {
-            mongo::enableNewQueryFramework();
-        }
 
         if (params.count("dbpath")) {
             frameworkGlobalParams.dbpathSpec = params["dbpath"].as<string>();

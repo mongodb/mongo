@@ -24,6 +24,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/query.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/db/query/new_find.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
@@ -231,7 +232,9 @@ namespace {
                 DbMessage d(m);
                 QueryMessage q(d);
                 Message ret;
-                runQuery( m, q, ret );
+                CurOp op(&cc());
+                op.ensureStarted();
+                newRunQuery( m, q, op, ret );
                 ASSERT_EQUALS( 0, ((QueryResult*)ret.header())->nReturned );
             }
 

@@ -40,34 +40,14 @@
 namespace mongo {
 
     /**
-     * A switch to choose between old Cursor-based code and new Runner-based code.
-     */
-    bool isNewQueryFrameworkEnabled();
-
-    /**
-     * Use the new query framework.  Called from the dbtest initialization.
-     */
-    void enableNewQueryFramework();
-
-    /**
      * Called from the getMore entry point in ops/query.cpp.
      */
     QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
                             int pass, bool& exhaust, bool* isCursorAuthorized);
 
     /**
-     * Called from the runQuery entry point in ops/query.cpp.
-     *
-     * Takes ownership of cq.
+     * Run the query 'q' and place the result in 'result'.
      */
-    std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result);
-
-    /**
-     * Can the new system handle the provided query?
-     *
-     * Returns false if not.  cqOut is not modified.
-     * Returns true if so.  Caller owns *cqOut.
-     */
-    bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut);
+    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
 }  // namespace mongo

@@ -68,7 +68,7 @@ namespace mongo {
     public:
         IndexKeyComputedData(BSONObj key)
             : WorkingSetComputedData(WSM_INDEX_KEY),
-              _key(key) { }
+              _key(key.getOwned()) { }
 
         BSONObj getKey() const { return _key; }
 

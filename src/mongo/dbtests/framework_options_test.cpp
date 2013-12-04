@@ -127,18 +127,6 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "useNewQueryFramework") {
-                ASSERT_EQUALS(iterator->_singleName, "useNewQueryFramework");
-                ASSERT_EQUALS(iterator->_type, moe::Switch);
-                ASSERT_EQUALS(iterator->_description, "use the new query framework");
-                ASSERT_EQUALS(iterator->_isVisible, true);
-                ASSERT_TRUE(iterator->_default.isEmpty());
-                ASSERT_TRUE(iterator->_implicit.isEmpty());
-                ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
-                ASSERT_EQUALS(iterator->_positionalStart, -1);
-                ASSERT_EQUALS(iterator->_positionalEnd, -1);
-            }
             else if (iterator->_dottedName == "dur") {
                 ASSERT_EQUALS(iterator->_singleName, "dur");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
