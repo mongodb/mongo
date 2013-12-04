@@ -127,20 +127,8 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
-        void setShardName(const StringData& shardName);
-        void unsetShardName();
-        bool isShardNameSet() const;
-        const std::string& getShardName() const;
-
-        void setShardVersion( const ChunkVersion& shardVersion );
-        void unsetShardVersion();
-        bool isShardVersionSet() const;
-        const ChunkVersion& getShardVersion() const;
-
-        void setSession( long long session );
-        void unsetSession();
-        bool isSessionSet() const;
-        long long getSession() const;
+        BatchedRequestMetadata* getMetadata() const;
+        void setMetadata(BatchedRequestMetadata* metadata);
 
         //
         // Helpers for auth pre-parsing

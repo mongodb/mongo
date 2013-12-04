@@ -297,52 +297,12 @@ namespace mongo {
         INVOKE( getOrdered );
     }
 
-    void BatchedCommandRequest::setShardName( const StringData& shardName ) {
-        INVOKE( setShardName, shardName );
+    BatchedRequestMetadata* BatchedCommandRequest::getMetadata() const {
+        INVOKE( getMetadata );
     }
 
-    void BatchedCommandRequest::unsetShardName() {
-        INVOKE( unsetShardName );
-    }
-
-    bool BatchedCommandRequest::isShardNameSet() const {
-        INVOKE( isShardNameSet );
-    }
-
-    const string& BatchedCommandRequest::getShardName() const {
-        INVOKE( getShardName );
-    }
-
-    void BatchedCommandRequest::setShardVersion( const ChunkVersion& shardVersion ) {
-        INVOKE( setShardVersion, shardVersion );
-    }
-
-    void BatchedCommandRequest::unsetShardVersion() {
-        INVOKE( unsetShardVersion );
-    }
-
-    bool BatchedCommandRequest::isShardVersionSet() const {
-        INVOKE( isShardVersionSet );
-    }
-
-    const ChunkVersion& BatchedCommandRequest::getShardVersion() const {
-        INVOKE( getShardVersion );
-    }
-
-    void BatchedCommandRequest::setSession( long long sessionId ) {
-        INVOKE( setSession, sessionId );
-    }
-
-    void BatchedCommandRequest::unsetSession() {
-        INVOKE( unsetSession );
-    }
-
-    bool BatchedCommandRequest::isSessionSet() const {
-        INVOKE( isSessionSet );
-    }
-
-    long long BatchedCommandRequest::getSession() const {
-        INVOKE( getSession );
+    void BatchedCommandRequest::setMetadata(BatchedRequestMetadata* metadata) {
+        INVOKE( setMetadata, metadata );
     }
 
     bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {

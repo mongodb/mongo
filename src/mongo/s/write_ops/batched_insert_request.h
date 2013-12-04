@@ -24,6 +24,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/write_ops/batched_request_metadata.h"
 
 namespace mongo {
 
@@ -47,9 +48,7 @@ namespace mongo {
         static const BSONField<std::vector<BSONObj> > documents;
         static const BSONField<BSONObj> writeConcern;
         static const BSONField<bool> ordered;
-        static const BSONField<string> shardName;
-        static const BSONField<ChunkVersion> shardVersion;
-        static const BSONField<long long> session;
+        static const BSONField<BSONObj> metadata;
 
         //
         // construction / destruction
@@ -98,20 +97,11 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
-        void setShardName(const StringData& shardName);
-        void unsetShardName();
-        bool isShardNameSet() const;
-        const std::string& getShardName() const;
-
-        void setShardVersion(const ChunkVersion& shardVersion);
-        void unsetShardVersion();
-        bool isShardVersionSet() const;
-        const ChunkVersion& getShardVersion() const;
-
-        void setSession(long long session);
-        void unsetSession();
-        bool isSessionSet() const;
-        long long getSession() const;
+        /*
+         * metadata ownership will be transferred to this.
+         */
+        void setMetadata(BatchedRequestMetadata* metadata);
+        BatchedRequestMetadata* getMetadata() const;
 
     private:
         // Convention: (M)andatory, (O)ptional
@@ -132,16 +122,8 @@ namespace mongo {
         bool _ordered;
         bool _isOrderedSet;
 
-        // (O)  shard name we're sending this batch to
-        std::string _shardName;
-        bool _isShardNameSet;
-
-        // (O)  version for this collection on a given shard
-        boost::scoped_ptr<ChunkVersion> _shardVersion;
-
-        // (O)  session number the inserts belong to
-        long long _session;
-        bool _isSessionSet;
+        // (O)  metadata associated with this request for internal use.
+        scoped_ptr<BatchedRequestMetadata> _metadata;
     };
 
 } // namespace mongo

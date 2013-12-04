@@ -28,9 +28,7 @@ namespace mongo {
     const BSONField<std::vector<BSONObj> > BatchedInsertRequest::documents("documents");
     const BSONField<BSONObj> BatchedInsertRequest::writeConcern("writeConcern");
     const BSONField<bool> BatchedInsertRequest::ordered("ordered", true);
-    const BSONField<string> BatchedInsertRequest::shardName("shardName");
-    const BSONField<ChunkVersion> BatchedInsertRequest::shardVersion("shardVersion");
-    const BSONField<long long> BatchedInsertRequest::session("session");
+    const BSONField<BSONObj> BatchedInsertRequest::metadata("metadata");
 
     BatchedInsertRequest::BatchedInsertRequest() {
         clear();
@@ -78,14 +76,7 @@ namespace mongo {
 
         if (_isOrderedSet) builder.append(ordered(), _ordered);
 
-        if (_isShardNameSet) builder.append(shardName(), _shardName);
-
-        if (_shardVersion.get()) {
-            // ChunkVersion wants to be an array.
-            builder.append(shardVersion(), static_cast<BSONArray>(_shardVersion->toBSON()));
-        }
-
-        if (_isSessionSet) builder.append(session(), _session);
+        if (_metadata) builder.append(metadata(), _metadata->toBSON());
 
         return builder.obj();
     }
@@ -113,18 +104,16 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isOrderedSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, shardName, &_shardName, errMsg);
+        BSONObj metadataObj;
+        fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isShardNameSet = fieldState == FieldParser::FIELD_SET;
 
-        ChunkVersion* tempChunkVersion = NULL;
-        fieldState = FieldParser::extract(source, shardVersion, &tempChunkVersion, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) _shardVersion.reset(tempChunkVersion);
-
-        fieldState = FieldParser::extract(source, session, &_session, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isSessionSet = fieldState == FieldParser::FIELD_SET;
+        if (!metadataObj.isEmpty()) {
+            _metadata.reset(new BatchedRequestMetadata());
+            if (!_metadata->parseBSON(metadataObj, errMsg)) {
+                return false;
+            }
+        }
 
         return true;
     }
@@ -142,14 +131,7 @@ namespace mongo {
         _ordered = false;
         _isOrderedSet = false;
 
-        _shardName.clear();
-        _isShardNameSet = false;
-
-        _shardVersion.reset();
-
-        _session = 0;
-        _isSessionSet = false;
-
+        _metadata.reset();
     }
 
     void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
@@ -171,13 +153,10 @@ namespace mongo {
         other->_ordered = _ordered;
         other->_isOrderedSet = _isOrderedSet;
 
-        other->_shardName = _shardName;
-        other->_isShardNameSet = _isShardNameSet;
-
-        if (other->_shardVersion.get()) _shardVersion->cloneTo(other->_shardVersion.get());
-
-        other->_session = _session;
-        other->_isSessionSet = _isSessionSet;
+        if (_metadata) {
+            other->_metadata.reset(new BatchedRequestMetadata());
+            _metadata->cloneTo(other->_metadata.get());
+        }
     }
 
     std::string BatchedInsertRequest::toString() const {
@@ -280,60 +259,12 @@ namespace mongo {
         }
     }
 
-    void BatchedInsertRequest::setShardName( const StringData& shardName ) {
-        _shardName = shardName.toString();
-        _isShardNameSet = true;
+    void BatchedInsertRequest::setMetadata(BatchedRequestMetadata* metadata) {
+        _metadata.reset(metadata);
     }
 
-    void BatchedInsertRequest::unsetShardName() {
-        _isShardNameSet = false;
-    }
-
-    bool BatchedInsertRequest::isShardNameSet() const {
-        return _isShardNameSet;
-    }
-
-    const string& BatchedInsertRequest::getShardName() const {
-        dassert( _isShardNameSet );
-        return _shardName;
-    }
-
-
-    void BatchedInsertRequest::setShardVersion(const ChunkVersion& shardVersion) {
-        auto_ptr<ChunkVersion> temp(new ChunkVersion);
-        shardVersion.cloneTo(temp.get());
-        _shardVersion.reset(temp.release());
-    }
-
-    void BatchedInsertRequest::unsetShardVersion() {
-        _shardVersion.reset();
-     }
-
-    bool BatchedInsertRequest::isShardVersionSet() const {
-        return _shardVersion.get() != NULL;
-    }
-
-    const ChunkVersion& BatchedInsertRequest::getShardVersion() const {
-        dassert(_shardVersion.get());
-        return *_shardVersion;
-    }
-
-    void BatchedInsertRequest::setSession(long long session) {
-        _session = session;
-        _isSessionSet = true;
-    }
-
-    void BatchedInsertRequest::unsetSession() {
-         _isSessionSet = false;
-     }
-
-    bool BatchedInsertRequest::isSessionSet() const {
-         return _isSessionSet;
-    }
-
-    long long BatchedInsertRequest::getSession() const {
-        dassert(_isSessionSet);
-        return _session;
+    BatchedRequestMetadata* BatchedInsertRequest::getMetadata() const {
+        return _metadata.get();
     }
 
 } // namespace mongo

@@ -14,53 +14,40 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/s/write_ops/batched_insert_request.h"
+#include "mongo/s/write_ops/batched_request_metadata.h"
 
 #include <string>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using mongo::BSONArray;
-    using mongo::BSONObj;
-    using mongo::BatchedInsertRequest;
-    using mongo::BatchedRequestMetadata;
     using mongo::BSONArrayBuilder;
+    using mongo::BSONObj;
+    using mongo::BatchedRequestMetadata;
     using mongo::OID;
     using mongo::OpTime;
     using std::string;
 
-
     TEST(RoundTrip, Normal) {
-        BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
-
-        BSONObj writeConcernObj = BSON("w" << 1);
-
         // The BSON_ARRAY macro doesn't support Timestamps.
         BSONArrayBuilder arrBuilder;
         arrBuilder.appendTimestamp(OpTime(1,1).asDate());
         arrBuilder.append(OID::gen());
         BSONArray shardVersionArray = arrBuilder.arr();
 
-        BSONObj origInsertRequestObj =
-            BSON(BatchedInsertRequest::collName("test") <<
-                 BatchedInsertRequest::documents() << insertArray <<
-                 BatchedInsertRequest::writeConcern(writeConcernObj) <<
-                 BatchedInsertRequest::ordered(true) <<
-                 BatchedInsertRequest::metadata() << BSON(
-                     BatchedRequestMetadata::shardName("shard0000") <<
-                     BatchedRequestMetadata::shardVersion() << shardVersionArray <<
-                     BatchedRequestMetadata::session(0)));
+        BSONObj metadataObj(BSON(BatchedRequestMetadata::shardName("shard0000") <<
+                BatchedRequestMetadata::shardVersion() << shardVersionArray <<
+                BatchedRequestMetadata::session(100)));
 
         string errMsg;
-        BatchedInsertRequest request;
-        bool ok = request.parseBSON(origInsertRequestObj, &errMsg);
+        BatchedRequestMetadata metadata;
+        bool ok = metadata.parseBSON(metadataObj, &errMsg);
         ASSERT_TRUE(ok);
 
-        BSONObj genInsertRequestObj = request.toBSON();
-        ASSERT_EQUALS(0, genInsertRequestObj.woCompare(origInsertRequestObj));
+        BSONObj genMetadataObj = metadata.toBSON();
+        ASSERT_EQUALS(0, genMetadataObj.woCompare(metadataObj));
     }
 
 } // unnamed namespace

@@ -27,6 +27,7 @@ namespace {
     using std::string;
     using mongo::BatchedUpdateDocument;
     using mongo::BatchedUpdateRequest;
+    using mongo::BatchedRequestMetadata;
     using mongo::BSONArray;
     using mongo::BSONArrayBuilder;
     using mongo::BSONObj;
@@ -61,8 +62,10 @@ namespace {
                  BatchedUpdateRequest::updates() << updateArray <<
                  BatchedUpdateRequest::writeConcern(writeConcernObj) <<
                  BatchedUpdateRequest::ordered(true) <<
-                 BatchedUpdateRequest::shardVersion() << shardVersionArray <<
-                 BatchedUpdateRequest::session(0));
+                 BatchedUpdateRequest::metadata() << BSON(
+                      BatchedRequestMetadata::shardName("shard0000") <<
+                      BatchedRequestMetadata::shardVersion() << shardVersionArray <<
+                      BatchedRequestMetadata::session(0)));
 
         string errMsg;
         BatchedUpdateRequest request;

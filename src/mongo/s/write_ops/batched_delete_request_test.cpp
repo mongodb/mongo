@@ -28,6 +28,7 @@ namespace {
     using mongo::BSONObj;
     using mongo::BatchedDeleteRequest;
     using mongo::BatchedDeleteDocument;
+    using mongo::BatchedRequestMetadata;
     using mongo::BSONArrayBuilder;
     using mongo::OID;
     using mongo::OpTime;
@@ -58,8 +59,10 @@ namespace {
                  BatchedDeleteRequest::deletes() << deleteArray <<
                  BatchedDeleteRequest::writeConcern(writeConcernObj) <<
                  BatchedDeleteRequest::ordered(true) <<
-                 BatchedDeleteRequest::shardVersion() << shardVersionArray <<
-                 BatchedDeleteRequest::session(0));
+                 BatchedDeleteRequest::metadata() <<
+                     BSON(BatchedRequestMetadata::shardName("shard000") <<
+                          BatchedRequestMetadata::shardVersion() << shardVersionArray <<
+                          BatchedRequestMetadata::session(0)));
 
         string errMsg;
         BatchedDeleteRequest request;

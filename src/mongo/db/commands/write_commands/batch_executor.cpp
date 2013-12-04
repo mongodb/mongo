@@ -205,12 +205,15 @@ namespace mongo {
         // data
         if ( staleBatch ) {
 
+            const BatchedRequestMetadata* requestMetadata = request.getMetadata();
+            dassert( requestMetadata );
+
             // Make sure our shard name is set or is the same as what was set previously
-            if ( !shardingState.setShardName( request.getShardName() ) ) {
+            if ( !shardingState.setShardName( requestMetadata->getShardName() ) ) {
 
                 // If our shard name is stale, our version must have been stale as well
                 dassert( numItemErrors == numBatchItems );
-                warning() << "shard name " << request.getShardName()
+                warning() << "shard name " << requestMetadata->getShardName()
                           << " in batch does not match previously-set shard name "
                           << shardingState.getShardName() << ", not reloading metadata" << endl;
             }
@@ -218,7 +221,7 @@ namespace mongo {
                 // Refresh our shard version
                 ChunkVersion latestShardVersion;
                 shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
-                                                       request.getShardVersion(),
+                                                       requestMetadata->getShardVersion(),
                                                        &latestShardVersion );
             }
         }
@@ -368,16 +371,19 @@ namespace mongo {
             Lock::assertWriteLocked( targetingNS );
             metadata = shardingState.getCollectionMetadata( targetingNS );
 
-            if ( request.isShardVersionSet()
-                 && !ChunkVersion::isIgnoredVersion( request.getShardVersion() ) ) {
+            const BatchedRequestMetadata* requestMetadata = request.getMetadata();
+
+            if ( requestMetadata &&
+                    requestMetadata->isShardVersionSet() &&
+                    !ChunkVersion::isIgnoredVersion( requestMetadata->getShardVersion() ) ) {
 
                 ChunkVersion shardVersion =
                     metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
-                if ( !request.getShardVersion() //
+                if ( !requestMetadata->getShardVersion() //
                     .isWriteCompatibleWith( shardVersion ) ) {
 
-                    buildStaleError( request.getShardVersion(), shardVersion, error );
+                    buildStaleError( requestMetadata->getShardVersion(), shardVersion, error );
                     return false;
                 }
             }

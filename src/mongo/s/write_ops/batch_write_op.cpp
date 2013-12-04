@@ -217,8 +217,6 @@ namespace mongo {
                                           BatchedCommandRequest* request ) const {
 
         request->setNS( _clientRequest->getNS() );
-        request->setShardName( targetedBatch.getEndpoint().shardName );
-        request->setShardVersion( targetedBatch.getEndpoint().shardVersion );
 
         const vector<TargetedWrite*>& targetedWrites = targetedBatch.getWrites();
 
@@ -263,7 +261,12 @@ namespace mongo {
         if ( !request->isOrderedSet() ) {
             request->setOrdered( _clientRequest->getOrdered() );
         }
-        request->setSession( 0 );
+
+        auto_ptr<BatchedRequestMetadata> requestMetadata( new BatchedRequestMetadata() );
+        requestMetadata->setShardName( targetedBatch.getEndpoint().shardName );
+        requestMetadata->setShardVersion( targetedBatch.getEndpoint().shardVersion );
+        requestMetadata->setSession( 0 );
+        request->setMetadata( requestMetadata.release() );
     }
 
     //
