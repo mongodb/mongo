@@ -48,7 +48,7 @@ REPOPATH="/var/www/repo"
 ARCHES=["x86_64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["debian-sysvinit", "ubuntu-upstart", "redhat"]
+DISTROS=["ubuntu-upstart", "redhat"]
 
 # When we're preparing a directory containing packaging tool inputs
 # and our binaries, use this relative subdirectory for placing the
@@ -126,7 +126,7 @@ class Distro(object):
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def repodir(self, arch):
+    def repodir(self, arch, build_os):
         """Return the directory where we'll place the package files for
         (distro, distro_version) in that distro's preferred repository
         layout (as distinct from where that distro's packaging building
@@ -134,15 +134,15 @@ class Distro(object):
         if re.search("^(debian|ubuntu)", self.n):
             return "repo/%s/dists/dist/10gen/binary-%s/" % (self.n, self.archname(arch))
         elif re.search("(redhat|fedora|centos)", self.n):
-            return "repo/%s/os/%s/RPMS/" % (self.n, self.archname(arch))
+            return "repo/%s/os/%s/%s/RPMS/" % (self.n, build_os, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
     
-    def make_pkg(self, arch, spec, srcdir):
+    def make_pkg(self, build_os, arch, spec, srcdir):
         if re.search("^(debian|ubuntu)", self.n):
-            return make_deb(self, arch, spec, srcdir)
+            return make_deb(self, build_os, arch, spec, srcdir)
         elif re.search("^(centos|redhat|fedora)", self.n):
-            return make_rpm(self, arch, spec, srcdir)
+            return make_rpm(self, build_os, arch, spec, srcdir)
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -151,9 +151,9 @@ class Distro(object):
         for redhat, "ubuntu1204" for Ubuntu and Debian)"""
 
         if re.search("^(debian|ubuntu)", self.n):
-            return "ubuntu1204"
+            return [ "ubuntu1204" ]
         elif re.search("(redhat|fedora|centos)", self.n):
-            return "rhel62"
+            return [ "rhel57", "rhel62" ]
         else:
             raise Exception("BUG: unsupported platform?")
 def main(argv):
@@ -181,9 +181,11 @@ def main(argv):
         # accumulate the repository-layout directories.
         for (distro, spec, arch) in crossproduct(distros, specs, ARCHES):
 
-          httpget(urlfmt % (arch, distro.build_os(), spec.version()), ensure_dir(tarfile(distro, arch, spec)))
+          for build_os in distro.build_os():
 
-          repos.append(make_package(distro, arch, spec, srcdir))
+            httpget(urlfmt % (arch, build_os, spec.version()), ensure_dir(tarfile(build_os, arch, spec)))
+
+            repos.append(make_package(distro, build_os, arch, spec, srcdir))
     
         # Build the repos' metadatas.
         for repo in set(repos):
@@ -273,21 +275,22 @@ def ensure_dir(filename):
     return filename
 
 
-def tarfile(distro, arch, spec):
+def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for
-    (arch, spec)"""
-    return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), distro.build_os(), arch)
+    this package"""
+    return "dl/mongodb-linux-%s-subscription-%s-%s.tar.gz" % (spec.version(), build_os, arch)
 
-def setupdir(distro, arch, spec):
+def setupdir(distro, build_os, arch, spec):
     # The setupdir will be a directory containing all inputs to the
     # distro's packaging tools (e.g., package metadata files, init
     # scripts, etc), along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
-    # would be dst/x86_64/debian-sysvinit/mongodb-org-unstable/
-    return "dst/%s/%s/%s%s-%s/" % (arch, distro.name(), distro.pkgbase(), spec.suffix(), spec.pversion(distro))
+    # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
+    # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
+    return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(), spec.suffix(), spec.pversion(distro))
 
-def unpack_binaries_into(distro, arch, spec, where):
-    """Unpack the tarfile for (distro, arch, spec) into directory where."""
+def unpack_binaries_into(build_os, arch, spec, where):
+    """Unpack the tarfile for (build_os, arch, spec) into directory where."""
     rootdir=os.getcwd()
     ensure_dir(where)
     # Note: POSIX tar doesn't require support for gtar's "-C" option,
@@ -296,21 +299,21 @@ def unpack_binaries_into(distro, arch, spec, where):
     # thing and chdir into where and run tar there.
     os.chdir(where)
     try:
-        sysassert(["tar", "xvzf", rootdir+"/"+tarfile(distro, arch, spec), "mongodb-linux-%s-enterprise-%s-%s/bin" % (arch, distro.build_os(), spec.version())])
-        os.rename("mongodb-linux-%s-enterprise-%s-%s/bin" % (arch, distro.build_os(), spec.version()), "bin")
-        os.rmdir("mongodb-linux-%s-enterprise-%s-%s" % (arch, distro.build_os(), spec.version()))
+        sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec), "mongodb-linux-%s-subscription-%s-%s/bin" % (arch, build_os, spec.version())])
+        os.rename("mongodb-linux-%s-subscription-%s-%s/bin" % (arch, build_os, spec.version()), "bin")
+        os.rmdir("mongodb-linux-%s-subscription-%s-%s" % (arch, build_os, spec.version()))
     except Exception:
         exc=sys.exc_value
         os.chdir(rootdir)
         raise exc
     os.chdir(rootdir)
 
-def make_package(distro, arch, spec, srcdir):
+def make_package(distro, build_os, arch, spec, srcdir):
     """Construct the package for (arch, distro, spec), getting
     packaging files from srcdir and any user-specified suffix from
     suffixes"""
 
-    sdir=setupdir(distro, arch, spec)
+    sdir=setupdir(distro, build_os, arch, spec)
     ensure_dir(sdir)
     # Note that the RPM packages get their man pages from the debian
     # directory, so the debian directory is needed in all cases (and
@@ -322,13 +325,13 @@ def make_package(distro, arch, spec, srcdir):
     # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the binaries to wherever they
     # need to go.  
-    unpack_binaries_into(distro, arch, spec, sdir+("%s/usr/"%BINARYDIR))
+    unpack_binaries_into(build_os, arch, spec, sdir+("%s/usr/"%BINARYDIR))
     # Remove the mongosniff binary due to libpcap dynamic
     # linkage.  FIXME: this removal should go away
     # eventually.
     if os.path.exists(sdir+("%s/usr/bin/mongosniff"%BINARYDIR)):
       os.unlink(sdir+("%s/usr/bin/mongosniff"%BINARYDIR))
-    return distro.make_pkg(arch, spec, srcdir)
+    return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir):
     if re.search("(debian|ubuntu)", repodir):
@@ -338,13 +341,13 @@ def make_repo(repodir):
     else:
         raise Exception("BUG: unsupported platform?")
 
-def make_deb(distro, arch, spec, srcdir):
+def make_deb(distro, build_os, arch, spec, srcdir):
     # I can't remember the details anymore, but the initscript/upstart
     # job files' names must match the package name in some way; and
     # see also the --name flag to dh_installinit in the generated
     # debian/rules file.
     suffix=spec.suffix()
-    sdir=setupdir(distro, arch, spec)
+    sdir=setupdir(distro, build_os, arch, spec)
     if re.search("sysvinit", distro.name()):
         os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/mongod.upstart")
@@ -376,7 +379,7 @@ def make_deb(distro, arch, spec, srcdir):
         sysassert(["dpkg-buildpackage", "-a"+distro_arch, "-k Richard Kreuter <richard@10gen.com>"])
     finally:
         os.chdir(oldcwd)
-    r=distro.repodir(arch)
+    r=distro.repodir(arch, build_os)
     ensure_dir(r)
     # FIXME: see if shutil.copyfile or something can do this without
     # much pain.
@@ -541,10 +544,10 @@ def write_debian_changelog(path, spec, srcdir):
     finally:
         f.close()
 
-def make_rpm(distro, arch, spec, srcdir):
+def make_rpm(distro, build_os, arch, spec, srcdir):
     # Create the specfile.
     suffix=spec.suffix()
-    sdir=setupdir(distro, arch, spec)
+    sdir=setupdir(distro, build_os, arch, spec)
     specfile=srcdir+"rpm/mongodb%s.spec" % suffix
     topdir=ensure_dir(os.getcwd()+'/rpmbuild/')
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
@@ -592,7 +595,7 @@ def make_rpm(distro, arch, spec, srcdir):
         os.chdir(oldcwd)
     # Do the build.
     sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongodb%s.spec" % (topdir, suffix)])
-    r=distro.repodir(arch)
+    r=distro.repodir(arch, build_os)
     ensure_dir(r)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob
     # can do this without shelling out.
