@@ -57,7 +57,7 @@
   </ItemGroup>
   <Import Project="$(WixTargetsPath)" />
   <PropertyGroup>
-    <PreBuildEvent>"%WIX%\bin\heat.exe" dir $(ClientHeaderSource) -gg -g1 -frag -cg cg_DriverHeaders -nologo -directoryid -out DriverInclude.wxs -dr Header -srd -var var.ClientHeaderSource</PreBuildEvent>
+    <PreBuildEvent>"%WIX%\bin\heat.exe" dir "$(ClientHeaderSource)" -gg -g1 -frag -cg cg_DriverHeaders -nologo -directoryid -out DriverInclude.wxs -dr Header -srd -var var.ClientHeaderSource</PreBuildEvent>
   </PropertyGroup>
   <!--
 	To modify your build process, add your task inside one of the targets below and uncomment it.

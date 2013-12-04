@@ -4,8 +4,12 @@
     
     <DirectoryRef Id="INSTALLLOCATION">
       <?if $(var.Edition) = Enterprise ?>
-        <Component Id="c_EnterpriseLicense" Guid="C0EF85E2-95F8-468B-BA95-2F739C63D2D7">
-          <File Id="f_EnterpriseLicense" Name="LICENSE.txt" Source="$(var.EnterpriseBase)\distsrc\LICENSE.txt"
+        <Component Id="c_License" Guid="C0EF85E2-95F8-468B-BA95-2F739C63D2D7">
+          <File Id="f_License" Name="LICENSE.txt" Source="$(var.EnterpriseBase)\distsrc\LICENSE.txt"
+                DiskId ="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_Thirdparty" Guid="C45662A7-5C18-4A53-8D14-7C92DB38F13E">
+          <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.EnterpriseBase)\distsrc\THIRD-PARTY-NOTICES.windows"
                 DiskId ="1" KeyPath="yes" />
         </Component>
       <?else?>
@@ -13,13 +17,13 @@
           <File Id="f_GnuLicense" Name="GNU-AGPL-3.0" Source="$(var.LicenseSource)\GNU-AGPL-3.0"
                 DiskId ="1" KeyPath="yes" />
         </Component>
+        <Component Id="c_Thirdparty" Guid="D6098364-6DE8-48EA-A955-7D1060752132">
+          <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.LicenseSource)\THIRD-PARTY-NOTICES"
+                DiskId ="1" />
+        </Component>
       <?endif?>
       <Component Id="c_Readme" Guid="12C17EA1-075C-4A1D-9554-F3B5A2A94874">
         <File Id="f_Readme" Name="README" Source="$(var.LicenseSource)\README"
-              DiskId ="1" />
-      </Component>
-        <Component Id="c_Thirdparty" Guid="D6098364-6DE8-48EA-A955-7D1060752132">
-        <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.LicenseSource)\THIRD-PARTY-NOTICES"
               DiskId ="1" />
       </Component>
     </DirectoryRef>
@@ -27,11 +31,7 @@
     <ComponentGroup Id="cg_License">
       <ComponentRef Id="c_Readme"/>
       <ComponentRef Id="c_Thirdparty"/>
-      <?if $(var.Edition) = Enterprise ?>
-        <ComponentRef Id="c_EnterpriseLicense"/>
-      <?else?>
-        <ComponentRef Id="c_License"/>
-      <?endif?>
+      <ComponentRef Id="c_License"/>
     </ComponentGroup>
 
     <?if $(var.Edition) = Enterprise ?>
