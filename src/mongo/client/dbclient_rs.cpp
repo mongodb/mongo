@@ -1652,7 +1652,7 @@ namespace mongo {
         }
     }
 
-    static bool isAuthException( const DBException& ex ) {
+    static bool isAuthenticationException( const DBException& ex ) {
         return ex.getCode() == ErrorCodes::AuthenticationFailed;
     }
 
@@ -1700,8 +1700,7 @@ namespace mongo {
             catch ( const DBException &ex ) {
 
                 // We care if we can't authenticate (i.e. bad password) in credential params.
-                // We shouldn't be unauthorized since we aren't doing anything yet.
-                if ( isAuthException( ex ) ) {
+                if ( isAuthenticationException( ex ) ) {
                     throw;
                 }
 
