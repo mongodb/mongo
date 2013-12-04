@@ -316,14 +316,17 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
-	/* Fast path some common cases. */
+	/* Fast path some common cases: single strings, byte arrays and bits. */
 	if (strcmp(fmt, "S") == 0)
 		*va_arg(ap, const char **) = cursor->value.data;
 	else if (strcmp(fmt, "u") == 0) {
 		value = va_arg(ap, WT_ITEM *);
 		value->data = cursor->value.data;
 		value->size = cursor->value.size;
-	} else
+	} else if (strcmp(fmt, "t") == 0 ||
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0))
+		*va_arg(ap, uint8_t *) = *(uint8_t *)cursor->value.data;
+	else
 		ret = __wt_struct_unpackv(session,
 		    cursor->value.data, cursor->value.size, fmt, ap);
 
