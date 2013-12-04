@@ -457,6 +457,30 @@ namespace {
     }
 
     //
+    // Exists
+    //
+
+    TEST_F(IndexAssignmentTest, ExistsTrue) {
+        addIndex(BSON("x" << 1));
+
+        runQuery(fromjson("{x: 1, y: {$exists: true}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, ExistsFalse) {
+        addIndex(BSON("x" << 1));
+
+        runQuery(fromjson("{x: 1, y: {$exists: false}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: 1}");
+        assertSolutionExists("{fetch: {ixscan: {x: 1}}}");
+    }
+
+    //
     // skip and limit
     //
 
