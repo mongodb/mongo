@@ -339,9 +339,7 @@ namespace mongo {
                         addedFtsStuff = true;
                         b.append( e );
                     }
-                    else if ( e.type() == String &&
-                              ( str::equals( "fts", e.valuestr() ) ||
-                                str::equals( "text", e.valuestr() ) ) ) {
+                    else if ( e.type() == String && INDEX_NAME == e.valuestr() ) {
 
                         if ( !addedFtsStuff ) {
                             _addFTSStuff( &b );

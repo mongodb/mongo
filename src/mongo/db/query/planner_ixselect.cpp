@@ -170,7 +170,7 @@ namespace mongo {
             }
             return false;
         }
-        else if ("text" == ixtype || "fts" == ixtype) {
+        else if ("text" == ixtype) {
             return (exprtype == MatchExpression::TEXT);
         }
         else if ("geoHaystack" == ixtype) {

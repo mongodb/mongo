@@ -40,7 +40,7 @@ namespace mongo {
             FTSQuery q;
             q.parse( "foo -bar", "english" );
             FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "fts" ) ) ) ) );
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
 
             ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
             ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
@@ -50,7 +50,7 @@ namespace mongo {
             FTSQuery q;
             q.parse( "foo \"table top\"", "english" );
             FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "fts" ) ) ) ) );
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
             
             ASSERT( m.phraseMatch( "table top", BSON( "x" << "table top" ) ) );
             ASSERT( m.phraseMatch( "table top", BSON( "x" << " asd table top asd" ) ) );
@@ -66,7 +66,7 @@ namespace mongo {
             FTSQuery q;
             q.parse( "foo \"table top\"", "english" );
             FTSMatcher m( q,
-                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "fts" ) ) ) ) );
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
             ASSERT( m.phraseMatch( "table top",
                                    BSON( "x" << BSON_ARRAY( "table top" ) ) ) );
         }

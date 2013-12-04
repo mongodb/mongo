@@ -38,8 +38,8 @@ namespace mongo {
     namespace fts {
 
         TEST( FTSSpec, Fix1 ) {
-            BSONObj user = BSON( "key" << BSON( "title" << "fts" <<
-                                                "text" << "fts" ) <<
+            BSONObj user = BSON( "key" << BSON( "title" << "text" <<
+                                                "text" << "text" ) <<
                                  "weights" << BSON( "title" << 10 ) );
 
             BSONObj fixed = FTSSpec::fixSpec( user );
@@ -48,7 +48,7 @@ namespace mongo {
         }
 
         TEST( FTSSpec, DefaultLanguage1 ) {
-            BSONObj user = BSON( "key" << BSON( "text" << "fts" ) <<
+            BSONObj user = BSON( "key" << BSON( "text" << "text" ) <<
                                  "default_language" << "spanish" );
 
             try {
@@ -60,7 +60,7 @@ namespace mongo {
         }
 
         TEST( FTSSpec, DefaultLanguage2 ) {
-            BSONObj user = BSON( "key" << BSON( "text" << "fts" ) <<
+            BSONObj user = BSON( "key" << BSON( "text" << "text" ) <<
                                  "default_language" << "spanglish" );
 
             try {
@@ -71,8 +71,8 @@ namespace mongo {
         }
 
         TEST( FTSSpec, ScoreSingleField1 ) {
-            BSONObj user = BSON( "key" << BSON( "title" << "fts" <<
-                                                "text" << "fts" ) <<
+            BSONObj user = BSON( "key" << BSON( "title" << "text" <<
+                                                "text" << "text" ) <<
                                  "weights" << BSON( "title" << 10 ) );
 
             FTSSpec spec( FTSSpec::fixSpec( user ) );
@@ -90,8 +90,8 @@ namespace mongo {
         }
 
         TEST( FTSSpec, ScoreMultipleField1 ) {
-            BSONObj user = BSON( "key" << BSON( "title" << "fts" <<
-                                                "text" << "fts" ) <<
+            BSONObj user = BSON( "key" << BSON( "title" << "text" <<
+                                                "text" << "text" ) <<
                                  "weights" << BSON( "title" << 10 ) );
 
             FTSSpec spec( FTSSpec::fixSpec( user ) );
@@ -115,8 +115,8 @@ namespace mongo {
 
 
         TEST( FTSSpec, ScoreRepeatWord ) {
-            BSONObj user = BSON( "key" << BSON( "title" << "fts" <<
-                                                "text" << "fts" ) <<
+            BSONObj user = BSON( "key" << BSON( "title" << "text" <<
+                                                "text" << "text" ) <<
                                  "weights" << BSON( "title" << 10 ) );
 
             FTSSpec spec( FTSSpec::fixSpec( user ) );
@@ -135,14 +135,14 @@ namespace mongo {
         }
 
         TEST( FTSSpec, Extra1 ) {
-            BSONObj user = BSON( "key" << BSON( "data" << "fts" ) );
+            BSONObj user = BSON( "key" << BSON( "data" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( user ) );
             ASSERT_EQUALS( 0U, spec.numExtraBefore() );
             ASSERT_EQUALS( 0U, spec.numExtraAfter() );
         }
 
         TEST( FTSSpec, Extra2 ) {
-            BSONObj user = BSON( "key" << BSON( "data" << "fts" << "x" << 1 ) );
+            BSONObj user = BSON( "key" << BSON( "data" << "text" << "x" << 1 ) );
             BSONObj fixed = FTSSpec::fixSpec( user );
             FTSSpec spec( fixed );
             ASSERT_EQUALS( 0U, spec.numExtraBefore() );
@@ -154,7 +154,7 @@ namespace mongo {
         }
 
         TEST( FTSSpec, Extra3 ) {
-            BSONObj user = BSON( "key" << BSON( "x" << 1 << "data" << "fts" ) );
+            BSONObj user = BSON( "key" << BSON( "x" << 1 << "data" << "text" ) );
             BSONObj fixed = FTSSpec::fixSpec( user );
 
             ASSERT_EQUALS( BSON( "x" << 1 <<
@@ -189,7 +189,7 @@ namespace mongo {
         // indirectly nested).
 
         TEST( FTSSpec, NestedArraysPos1 ) {
-            BSONObj user = BSON( "key" << BSON( "a.b" << "fts" ) );
+            BSONObj user = BSON( "key" << BSON( "a.b" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             // The following document matches {"a.b": {$type: 2}}, so "term" should be indexed.
@@ -204,7 +204,7 @@ namespace mongo {
         }
 
         TEST( FTSSpec, NestedArraysPos2 ) {
-            BSONObj user = BSON( "key" << BSON( "$**" << "fts" ) );
+            BSONObj user = BSON( "key" << BSON( "$**" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             // The wildcard spec implies a full recursive traversal, so "term" should be indexed.
@@ -219,7 +219,7 @@ namespace mongo {
         }
 
         TEST( FTSSpec, NestedArraysNeg1 ) {
-            BSONObj user = BSON( "key" << BSON( "a.b" << "fts" ) );
+            BSONObj user = BSON( "key" << BSON( "a.b" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             // The following document does not match {"a.b": {$type: 2}}, so "term" should not be
@@ -236,7 +236,7 @@ namespace mongo {
 
         // Multi-language test_1: test independent stemming per sub-document
         TEST( FTSSpec, NestedLanguages_PerArrayItemStemming ) {
-            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "fts" ) );
+            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
             TermFrequencyMap tfm;
 
@@ -269,7 +269,7 @@ namespace mongo {
 
         // Multi-language test_2: test nested stemming per sub-document
         TEST( FTSSpec, NestedLanguages_PerSubdocStemming ) {
-            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "fts" ) );
+            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
             TermFrequencyMap tfm;
 
@@ -304,7 +304,7 @@ namespace mongo {
 
         // Multi-language test_3: test nested arrays
         TEST( FTSSpec, NestedLanguages_NestedArrays ) {
-            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "fts" ) );
+            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
             TermFrequencyMap tfm;
 
@@ -339,7 +339,7 @@ namespace mongo {
 
         // Multi-language test_4: test pruning
         TEST( FTSSpec, NestedLanguages_PathPruning ) {
-            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "fts" ) );
+            BSONObj indexSpec = BSON( "key" << BSON( "a.b.c" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
             TermFrequencyMap tfm;
 
@@ -376,7 +376,7 @@ namespace mongo {
 
         // Multi-language test_5: test wildcard spec
         TEST( FTSSpec, NestedLanguages_Wildcard ) {
-            BSONObj indexSpec = BSON( "key" << BSON( "$**" << "fts" ) );
+            BSONObj indexSpec = BSON( "key" << BSON( "$**" << "text" ) );
             FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
             TermFrequencyMap tfm;
 
@@ -414,7 +414,7 @@ namespace mongo {
 
         // Multi-language test_6: test wildcard spec with override
         TEST( FTSSpec, NestedLanguages_WildcardOverride ) {
-            BSONObj indexSpec = BSON( "key" << BSON( "$**" << "fts" ) <<
+            BSONObj indexSpec = BSON( "key" << BSON( "$**" << "text" ) <<
                                       "weights" << BSON( "d.e.f" << 20 ) );
             FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
             TermFrequencyMap tfm;
