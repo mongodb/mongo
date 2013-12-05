@@ -1090,6 +1090,7 @@ extern int __wt_thread_create(WT_SESSION_IMPL *session,
     void *(*func)(void *),
     void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid);
+extern int __wt_seconds(WT_SESSION_IMPL *session, time_t *timep);
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);
 extern int __wt_ext_struct_pack(WT_EXTENSION_API *wt_api,
@@ -1282,8 +1283,8 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
 extern int __wt_session_compact( WT_SESSION *wt_session,
     const char *uri,
     const char *config);
-extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
-    WT_DATA_HANDLE_CACHE **dhandle_cachep);
+extern void __wt_session_dhandle_incr_use(WT_SESSION_IMPL *session);
+extern int __wt_session_dhandle_decr_use(WT_SESSION_IMPL *session);
 extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,

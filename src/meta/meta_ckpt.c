@@ -367,10 +367,10 @@ int
 __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
     const char *fname, WT_CKPT *ckptbase, WT_LSN *ckptlsn)
 {
-	struct timespec ts;
 	WT_CKPT *ckpt;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
+	time_t secs;
 	int64_t maxorder;
 	const char *sep;
 
@@ -416,8 +416,14 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			if (F_ISSET(ckpt, WT_CKPT_ADD))
 				ckpt->order = ++maxorder;
 
-			WT_ERR(__wt_epoch(session, &ts));
-			ckpt->sec = (uintmax_t)ts.tv_sec;
+			/*
+			 * XXX
+			 * Assumes a time_t fits into a uintmax_t, which isn't
+			 * guaranteed, a time_t has to be an arithmetic type,
+			 * but not an integral type.
+			 */
+			WT_ERR(__wt_seconds(session, &secs));
+			ckpt->sec = (uintmax_t)secs;
 		}
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,

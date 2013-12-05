@@ -103,7 +103,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			WT_RET(__conn_dhandle_open_lock(
 			    session, dhandle, flags));
-			++dhandle->refcnt;
+			++dhandle->session_ref;
 			session->dhandle = dhandle;
 			return (0);
 		}
@@ -116,7 +116,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
 
 	WT_ERR(__wt_rwlock_alloc(session, "btree handle", &dhandle->rwlock));
-	dhandle->refcnt = 1;
+	dhandle->session_ref = 1;
 
 	dhandle->name_hash = hash;
 	WT_ERR(__wt_strdup(session, name, &dhandle->name));
@@ -379,7 +379,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	while (dhandle != NULL) {
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    dhandle->refcnt == 0) {
+		    dhandle->session_ref == 0) {
 			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 			SLIST_INSERT_HEAD(&sweeplh, dhandle, l);
@@ -416,8 +416,18 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	if (S2C(session)->dhandle_dead >= WT_DHANDLE_SWEEP_TRIGGER)
+	/*
+	 * If enough handles have been closed recently, sweep for dead handles.
+	 *
+	 * Don't do this if WT_DHANDLE_LOCK_ONLY is set: as well as avoiding
+	 * sweeping in what should be a fast path, this also avoids sweeping
+	 * during __wt_conn_dhandle_close_all, because it sets
+	 * WT_DHANDLE_LOCK_ONLY.
+	 */
+	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
+	    S2C(session)->dhandle_dead >= WT_DHANDLE_SWEEP_TRIGGER)
 		WT_RET(__conn_dhandle_sweep(session));
+
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
@@ -563,7 +573,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	/*
 	 * Decrement the reference count and return if still in use.
 	 */
-	if (--dhandle->refcnt > 0)
+	if (--dhandle->session_ref > 0)
 		return (0);
 
 	/*
@@ -610,20 +620,13 @@ int
 __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
 	conn = S2C(session);
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
-	/*
-	 * Make sure the caller's handle is tracked, so it will be unlocked
-	 * even if we failed to get all of the remaining handles we need.
-	 */
-	if ((saved_dhandle = session->dhandle) != NULL &&
-	    WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_handle_lock(session, 0));
+	WT_ASSERT(session, session->dhandle == NULL);
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (strcmp(dhandle->name, name) != 0)
@@ -631,24 +634,16 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 
 		session->dhandle = dhandle;
 
-		/*
-		 * The caller may have this tree locked to prevent
-		 * concurrent schema operations.
-		 */
-		if (dhandle == saved_dhandle)
-			WT_ASSERT(session,
-			    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		else {
-			WT_ERR(__wt_try_writelock(session, dhandle->rwlock));
-			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
-			if (WT_META_TRACKING(session))
-				WT_ERR(__wt_meta_track_handle_lock(session, 0));
-		}
+		/* Lock the handle exclusively. */
+		WT_ERR(__wt_session_get_btree(session,
+		    dhandle->name, dhandle->checkpoint,
+		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+		if (WT_META_TRACKING(session))
+			WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 		/*
-		 * We have an exclusive lock, which means there are no
-		 * cursors open at this point.  Close the handle, if
-		 * necessary.
+		 * We have an exclusive lock, which means there are no cursors
+		 * open at this point.  Close the handle, if necessary.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			ret = __wt_meta_track_sub_on(session);
@@ -656,15 +651,19 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 				ret = __wt_conn_btree_sync_and_close(session);
 
 			/*
-			 * If the close succeeded, drop any locks it
-			 * acquired.  If there was a failure, this
-			 * function will fail and the whole transaction
-			 * will be rolled back.
+			 * If the close succeeded, drop any locks it acquired.
+			 * If there was a failure, this function will fail and
+			 * the whole transaction will be rolled back.
 			 */
 			if (ret == 0)
 				ret = __wt_meta_track_sub_off(session);
 		}
 
+		/*
+		 * Note the test is different than above where we ignored the
+		 * handle passed in by our caller: we're releasing all of the
+		 * handles, including any passed in by our caller.
+		 */
 		if (!WT_META_TRACKING(session))
 			WT_TRET(__wt_session_release_btree(session));
 

@@ -8,11 +8,47 @@
 #include "wt_internal.h"
 
 /*
- * __wt_session_add_btree --
- *	Add a handle to the session's cache.
+ * __wt_session_dhandle_incr_use --
+ *	Increment the session data source's in-use counter.
+ */
+void
+__wt_session_dhandle_incr_use(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+
+	dhandle = session->dhandle;
+
+	(void)WT_ATOMIC_ADD(dhandle->session_inuse, 1);
+}
+
+/*
+ * __wt_session_dhandle_decr_use --
+ *	Decrement the session data source's in-use counter.
  */
 int
-__wt_session_add_btree(
+__wt_session_dhandle_decr_use(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+
+	dhandle = session->dhandle;
+
+	/*
+	 * Decrement the in-use count on the underlying data-source -- if we're
+	 * the last reference, set the time-of-death timestamp.
+	 */
+	WT_ASSERT(session, dhandle->session_inuse > 0);
+	if (WT_ATOMIC_SUB(dhandle->session_inuse, 1) == 0)
+		WT_TRET(__wt_seconds(session, &dhandle->timeofdeath));
+	return (0);
+}
+
+/*
+ * __session_add_btree --
+ *	Add a handle to the session's cache.
+ */
+static int
+__session_add_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
@@ -111,6 +147,9 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
+
+	/* Decrement the data-source's in-use counter. */
+	WT_ERR(__wt_session_dhandle_decr_use(session));
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
 		/*
@@ -215,11 +254,27 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
  *	Discard any session dhandles that are not open.
  */
 static int
-__session_dhandle_sweep(WT_SESSION_IMPL *session)
+__session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
-	WT_DECL_RET;
+	time_t now;
+
+	/*
+	 * Check the local flag WT_DHANDLE_LOCK_ONLY; a common caller with that
+	 * flag is in the path to discard the handle, don't sweep in that case.
+	 */
+	if (LF_ISSET(WT_DHANDLE_LOCK_ONLY))
+		return (0);
+
+	/*
+	 * Periodically sweep for dead handles; if we've swept recently, don't
+	 * do it again.
+	 */
+	WT_RET(__wt_seconds(session, &now));
+	if (now - session->last_sweep < WT_DHANDLE_SWEEP_PERIOD)
+		return (0);
+	session->last_sweep = now;
 
 	WT_STAT_FAST_CONN_INCR(session, dh_session_sweeps);
 
@@ -227,33 +282,30 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
-		if (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN)) {
+		if (dhandle->session_inuse == 0 &&
+		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
-			WT_TRET(__wt_session_discard_btree(
-			    session, dhandle_cache));
+			WT_RET(
+			    __wt_session_discard_btree(session, dhandle_cache));
 		}
 		dhandle_cache = dhandle_cache_next;
 	}
-	return (ret);
+	return (0);
 }
 
 /*
  * __session_open_btree --
- *	Wrapper function to first sweep the session and then get the btree.
- *	Sweeping is only called when a session notices it has dead dhandles on
- *	its session dhandle list.  Must be called with schema lock.
+ *	Wrapper function to first sweep the session handles and then get the
+ * btree handle; must be called with schema lock.
  */
 static int
 __session_open_btree(WT_SESSION_IMPL *session,
-    const char *name, const char *ckpt, const char *op_cfg[],
-    int dead, uint32_t flags)
+    const char *name, const char *ckpt, const char *op_cfg[], uint32_t flags)
 {
-	WT_DECL_RET;
+	WT_RET(__session_dhandle_sweep(session, flags));
+	WT_RET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
 
-	if (dead)
-		WT_TRET(__session_dhandle_sweep(session));
-	WT_TRET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
-	return (ret);
+	return (0);
 }
 
 /*
@@ -268,23 +320,14 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	uint64_t hash;
-	int candidate, dead;
+	int candidate;
 
 	dhandle = NULL;
-	candidate = dead = 0;
+	candidate = 0;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	SLIST_FOREACH(dhandle_cache, &session->dhandles, l) {
 		dhandle = dhandle_cache->dhandle;
-		/*
-		 * We check the local flag WT_DHANDLE_LOCK_ONLY in addition
-		 * to the dhandle flags.  A common caller with the flag
-		 * is from the path to discard the handle, so we ignore the
-		 * optimization to sweep in that case.
-		 */
-		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
-		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN))
-			dead = 1;
 		if (hash != dhandle->name_hash ||
 		    strcmp(uri, dhandle->name) != 0)
 			continue;
@@ -300,8 +343,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		session->dhandle = dhandle;
 
 		/*
-		 * Try to lock the file; if we succeed, our "exclusive"
-		 * state must match.
+		 * Try to lock the file; if we succeed, our "exclusive" state
+		 * must match.
 		 */
 		ret = __wt_session_lock_btree(session, flags);
 		if (ret == WT_NOTFOUND)
@@ -314,19 +357,20 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		/*
 		 * If we don't already hold the schema lock, get it now so that
 		 * we can find and/or open the handle.  We call a wrapper
-		 * function that will optionally sweep the handle list to
-		 * remove any dead handles.
+		 * function to sweep the handle list to remove any dead handles.
 		 */
 		WT_WITH_SCHEMA_LOCK(session, ret =
-		    __session_open_btree(
-		    session, uri, checkpoint, cfg, dead, flags));
+		    __session_open_btree(session, uri, checkpoint, cfg, flags));
 		WT_RET(ret);
 
 		if (!candidate)
-			WT_RET(__wt_session_add_btree(session, NULL));
+			WT_RET(__session_add_btree(session, NULL));
 		WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 		    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
 	}
+
+	/* Increment the data-source's in-use counter. */
+	__wt_session_dhandle_incr_use(session);
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
 	    F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE));
