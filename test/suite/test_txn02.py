@@ -40,6 +40,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_txn02'
     uri = 'table:' + tablename
     archive_list = ['true', 'false']
+    conn_list = ['reopen', 'stay_open']
     sync_list = ['dsync', 'fsync', 'none']
 
     types = [
@@ -195,15 +196,22 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         current = {1:1, 2:1, 10:1, 11:1}
         committed = current.copy()
 
+        reopen = self.conn_list[
+            self.scenario_number % len(self.conn_list)]
         ops = (self.op1, self.op2, self.op3, self.op4)
         txns = (self.txn1, self.txn2, self.txn3, self.txn4)
         # for ok, txn in zip(ops, txns):
         # print ', '.join('%s(%d)[%s]' % (ok[0], ok[1], txn)
         for i, ot in enumerate(zip(ops, txns)):
-            self.session.begin_transaction()
             ok, txn = ot
             op, k = ok
             
+            # Close and reopen the connection and cursor.
+            if reopen == 'reopen':
+                self.reopen_conn()
+                c = self.session.open_cursor(self.uri, None, 'overwrite')
+
+            self.session.begin_transaction()
             # Test multiple operations per transaction by always
             # doing the same operation on key k + 1.
             k1 = k + 1
