@@ -96,12 +96,13 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& _cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
 
+            bool errorOccured = false;
             if ( le->nPrev != 1 ) {
-                LastError::noError.appendSelf( result , false );
+                errorOccured = LastError::noError.appendSelf( result , false );
                 le->appendSelfStatus( result );
             }
             else {
-                le->appendSelf( result , false );
+                errorOccured = le->appendSelf( result , false );
             }
 
             Client& c = cc();
@@ -143,7 +144,15 @@ namespace mongo {
 
             WriteConcernResult res;
             status = waitForWriteConcern( writeConcern, wOpTime, &res );
-            res.appendTo( &result );
+
+            if ( !errorOccured ) {
+                // Error information fields from write concern can clash with the error from the
+                // actual write, so don't append if an error occurred on the previous operation.
+                // Note: In v2.4, the server only waits for the journal commmit or fsync and does
+                // not wait for replication when an error occurred on the previous operation.
+                res.appendTo( &result );
+            }
+
             if ( status.code() == ErrorCodes::WriteConcernLegacyOK ) {
                 result.append( "wnote", status.toString() );
                 return true;
