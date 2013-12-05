@@ -178,9 +178,9 @@ namespace mongo {
                 }
             }
 
-            if ( err ) {
+            if ( err && cmdObj["wOpTime"].eoo() ) {
                 // doesn't make sense to wait for replication
-                // if there was an error
+                // if there was an error and we aren't explicitly waiting for another wOpTime
                 return true;
             }
 
@@ -200,7 +200,14 @@ namespace mongo {
 
                 long long passes = 0;
                 char buf[32];
-                OpTime op(c.getLastOp());
+
+                OpTime op;
+                if ( cmdObj["wOpTime"].type() == Timestamp ) {
+                    op = OpTime( cmdObj["wOpTime"].date() );
+                }
+                else {
+                    op = c.getLastOp();
+                }
 
                 if ( op.isNull() ) {
                     if ( anyReplEnabled() ) {
