@@ -97,7 +97,7 @@ namespace mongo {
 
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false
-            if ( nsd->isCapped() ){
+            if ( collection->isCapped() ){
                 result.append("capped", nsd->isCapped());
                 result.appendNumber("max", nsd->maxCappedDocs());
             }

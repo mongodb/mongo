@@ -370,6 +370,10 @@ namespace mongo {
         return storageGlobalParams.quotaFiles;
     }
 
+    bool Collection::isCapped() const {
+        return _details->isCapped();
+    }
+
     uint64_t Collection::numRecords() const {
         return _details->numRecords();
     }

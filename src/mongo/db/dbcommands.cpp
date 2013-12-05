@@ -970,7 +970,7 @@ namespace mongo {
                 return false;
             }
 
-            NamespaceDetails* nsd = collection->details();
+            const NamespaceDetails* nsd = collection->details();
 
             result.append( "ns" , ns.c_str() );
 

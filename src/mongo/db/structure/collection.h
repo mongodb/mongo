@@ -124,6 +124,8 @@ namespace mongo {
         // Stats
         //
 
+        bool isCapped() const;
+
         uint64_t numRecords() const;
 
         uint64_t dataSize() const;

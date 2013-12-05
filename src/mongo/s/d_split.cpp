@@ -283,7 +283,7 @@ namespace mongo {
                     return false;
                 }
 
-                NamespaceDetails* d = collection->details();
+                const NamespaceDetails* d = collection->details();
 
                 IndexDescriptor *idx =
                     collection->getIndexCatalog()->findIndexByPrefix( keyPattern,

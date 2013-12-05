@@ -115,19 +115,16 @@ namespace mongo {
             *out = new EOFRunner(canonicalQuery.release(), ns);
             return Status::OK();
         }
-        verify( collection );
-
-        NamespaceDetails* nsd = collection->details();
 
         // If we have an _id index we can use the idhack runner.
-        if (canUseIDHack(*canonicalQuery) && (-1 != nsd->findIdIndex())) {
+        if (canUseIDHack(*canonicalQuery) && collection->getIndexCatalog()->findIdIndex()) {
             *out = new IDHackRunner(collection, canonicalQuery.release());
             return Status::OK();
         }
 
         // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
         QueryPlannerParams plannerParams;
-        for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
+        for (int i = 0; i < collection->getIndexCatalog()->numIndexesReady(); ++i) {
             IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor( i );
             plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
                                                        desc->isMultikey(),
@@ -137,7 +134,7 @@ namespace mongo {
 
         // Tailable: If the query requests tailable the collection must be capped.
         if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
-            if (!nsd->isCapped()) {
+            if (!collection->isCapped()) {
                 return Status(ErrorCodes::BadValue,
                               "tailable cursor requested on non capped collection");
             }

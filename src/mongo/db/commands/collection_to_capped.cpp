@@ -76,7 +76,7 @@ namespace mongo {
         auto_ptr<Runner> runner;
 
         {
-            NamespaceDetails* details = fromCollection->details();
+            const NamespaceDetails* details = fromCollection->details();
             DiskLoc extent = details->firstExtent();
 
             // datasize and extentSize can't be compared exactly, so add some padding to 'size'
