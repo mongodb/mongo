@@ -201,6 +201,18 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 }
 
 /*
+ * wts_rand_init --
+ *	Initialize the random number generator.
+ */
+void
+wts_rand_init(void)
+{
+	/* Seed the random number generator. */
+	if (!g.replay)
+		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+}
+
+/*
  * wts_rand --
  *	Return a random number.
  */
@@ -243,12 +255,6 @@ wts_rand(void)
 			if ((g.rand_log = fopen("RUNDIR/rand", "w")) == NULL)
 				die(errno, "fopen: RUNDIR/rand");
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-
-			/*
-			 * Seed the random number generator for each new run (we
-			 * know it's a new run when we re-open the log file).
-			 */
-			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 		}
 		r = (uint32_t)rand();
 		fprintf(g.rand_log, "%" PRIu32 "\n", r);
