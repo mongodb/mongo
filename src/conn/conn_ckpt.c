@@ -55,7 +55,6 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 static void *
 __ckpt_server(void *arg)
 {
-	struct timespec ts;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -66,9 +65,6 @@ __ckpt_server(void *arg)
 	wt_session = (WT_SESSION *)session;
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
-		/* Get the current local time of day. */
-		WT_ERR(__wt_epoch(session, &ts));
-
 		/* Checkpoint the database. */
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 

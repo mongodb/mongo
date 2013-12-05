@@ -86,8 +86,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 		WT_ERR(__wt_epoch(session, &ts));
 		ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
 		ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
-		ret = pthread_cond_timedwait(
-		    &cond->cond, &cond->mtx, &ts);
+		ret = pthread_cond_timedwait(&cond->cond, &cond->mtx, &ts);
 	} else
 		ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 
@@ -131,7 +130,11 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WT_RET(__wt_verbose(
 		    session, "signal %s cond (%p)", cond->name, cond));
 
-	if (cond->waiters != -1 && !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
+	/* Fast path if already signalled. */
+	if (cond->waiters == -1)
+		return (0);
+
+	if (cond->waiters > 0 || !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
 		WT_ERR(pthread_mutex_lock(&cond->mtx));
 		locked = 1;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));

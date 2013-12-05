@@ -865,6 +865,8 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     uint32_t id,
     WT_ITEM *buf);
+extern int __wt_lsm_tree_set_chunk_size( WT_SESSION_IMPL *session,
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     WT_LSM_CHUNK *chunk);
@@ -1025,6 +1027,9 @@ extern int __wt_fallocate(WT_SESSION_IMPL *session,
     off_t offset,
     off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
+extern int __wt_filesize_name( WT_SESSION_IMPL *session,
+    const char *filename,
+    off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
@@ -1085,6 +1090,7 @@ extern int __wt_thread_create(WT_SESSION_IMPL *session,
     void *(*func)(void *),
     void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid);
+extern int __wt_seconds(WT_SESSION_IMPL *session, time_t *timep);
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);
 extern int __wt_ext_struct_pack(WT_EXTENSION_API *wt_api,
@@ -1277,8 +1283,8 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
 extern int __wt_session_compact( WT_SESSION *wt_session,
     const char *uri,
     const char *config);
-extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
-    WT_DATA_HANDLE_CACHE **dhandle_cachep);
+extern void __wt_session_dhandle_incr_use(WT_SESSION_IMPL *session);
+extern int __wt_session_dhandle_decr_use(WT_SESSION_IMPL *session);
 extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,

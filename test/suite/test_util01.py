@@ -46,7 +46,10 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     stringclass = ''.__class__
 
     def compare_config(self, expected_cfg, actual_cfg):
-        da = dict(kv.split('=') for kv in actual_cfg.strip().split(','))
+        # Replace '(' characters so configuration groups don't break parsing.
+        # If we ever want to look for config groups this will need to change.
+        da = dict(kv.split('=') for kv in
+            actual_cfg.strip().replace('(',',').split(','))
         de = da.copy()
         de.update(kv.split('=') for kv in expected_cfg.strip().split(','))
         return da == de

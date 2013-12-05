@@ -65,7 +65,14 @@ __wt_metadata_cursor(
 	WT_ERR(__wt_metadata_open(session));
 
 	WT_SET_BTREE_IN_SESSION(session, session->metafile);
+
+	/* 
+	 * We use the metadata a lot, so we have a handle cached; lock it and
+	 * increment the in-use counter.
+	 */
 	WT_ERR(__wt_session_lock_btree(session, 0));
+	__wt_session_dhandle_incr_use(session);
+
 	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
 
 	/* Restore the caller's btree. */

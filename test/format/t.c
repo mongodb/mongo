@@ -125,6 +125,13 @@ main(int argc, char *argv[])
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
+	/*
+	 * Initialize the random number generator (don't reinitialize on each
+	 * new run, reinitializing won't be more random than continuing on from
+	 * the current state).
+	 */
+	wts_rand_init();
+
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		startup();			/* Start a run */

@@ -75,8 +75,7 @@ __wt_collator_config(
 
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncoll, &conn->collqh, q)
-			if (WT_STRING_MATCH(
-			    ncoll->name, cval.str, cval.len)) {
+			if (WT_STRING_MATCH(ncoll->name, cval.str, cval.len)) {
 				*collatorp = ncoll->collator;
 				return (0);
 			}

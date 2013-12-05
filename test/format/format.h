@@ -136,6 +136,7 @@ typedef struct {
 
 	u_int c_bitcnt;				/* Config values */
 	u_int c_cache;
+	u_int c_compact;
 	char *c_compression;
 	char *c_config_open;
 	u_int c_data_extend;
@@ -224,6 +225,7 @@ void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
 uint32_t wts_rand(void);
+void	 wts_rand_init(void);
 void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);

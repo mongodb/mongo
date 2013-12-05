@@ -54,6 +54,7 @@ struct __wt_lsm_chunk {
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 	uint32_t refcnt;		/* Number of worker thread references */
 	uint32_t bloom_busy;		/* Number of worker thread references */
+	uint64_t size;			/* Final chunk size */
 
 	uint64_t txnid_max;		/* Newest transactional update */
 
@@ -93,7 +94,8 @@ struct __wt_lsm_tree {
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
-	uint32_t chunk_size;
+	uint64_t chunk_size;
+	uint64_t chunk_max;
 	u_int merge_min, merge_max;
 	u_int merge_threads;
 
@@ -114,6 +116,7 @@ struct __wt_lsm_tree {
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	u_int nchunks;			/* Number of active chunks */
 	uint32_t last;			/* Last allocated ID */
+	int modified;			/* Have there been updates? */
 
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */

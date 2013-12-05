@@ -158,9 +158,10 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS dh_conn_handles;
+	WT_STATS dh_conn_sweeps;
 	WT_STATS dh_session_handles;
+	WT_STATS dh_session_sweeps;
 	WT_STATS dh_sweep_evict;
-	WT_STATS dh_sweeps;
 	WT_STATS file_open;
 	WT_STATS log_buffer_grow;
 	WT_STATS log_buffer_size;

@@ -179,8 +179,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         # a named checkpoint, but does not stop a default checkpoint.
         cursor = self.session.open_cursor('backup:', None, None)
         self.session.checkpoint()
-        msg =\
-            '/named checkpoints cannot be created if backup cursors are open/'
+        msg = '/checkpoints cannot be deleted during a hot backup/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()

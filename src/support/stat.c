@@ -327,9 +327,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
 	stats->cache_eviction_force.desc =
-	    "cache: pages evicted because they exceeded the in memory maximum";
+	    "cache: pages evicted because they exceeded the in-memory maximum";
 	stats->cache_eviction_force_fail.desc =
-	    "cache: failed eviction of pages that exceeded the in memory maximum";
+	    "cache: failed eviction of pages that exceeded the in-memory maximum";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
@@ -361,9 +361,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
 	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
+	stats->dh_conn_sweeps.desc = "dhandle: connection sweep attempts";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
+	stats->dh_session_sweeps.desc = "dhandle: session sweep attempts";
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
-	stats->dh_sweeps.desc = "dhandle: sweep attempts";
 	stats->file_open.desc = "files currently open";
 	stats->log_buffer_grow.desc = "log: log buffer size increases";
 	stats->log_buffer_size.desc = "log: total log buffer size";
@@ -461,9 +462,10 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
 	stats->dh_conn_handles.v = 0;
+	stats->dh_conn_sweeps.v = 0;
 	stats->dh_session_handles.v = 0;
+	stats->dh_session_sweeps.v = 0;
 	stats->dh_sweep_evict.v = 0;
-	stats->dh_sweeps.v = 0;
 	stats->log_buffer_grow.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;

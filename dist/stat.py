@@ -169,17 +169,8 @@ for l in sorted(dsrc_stats):
 scale_info += ']\n'
 
 tmp_file = '__tmp'
-tfile = open(tmp_file, 'w')
-skip = 0
-for line in open('../tools/statlog.py', 'r'):
-	if skip:
-		if line.count('no scale-per-second list section: END'):
-			tfile.write(line)
-			skip = 0
-	else:
-		tfile.write(line)
-	if line.count('no scale-per-second list section: BEGIN'):
-		skip = 1
-		tfile.write(scale_info)
-tfile.close()
-compare_srcfile(tmp_file, '../tools/statlog.py')
+f = open(tmp_file, 'w')
+f.write('# DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
+f.write(scale_info)
+f.close()
+compare_srcfile(tmp_file, '../tools/stat_data.py')

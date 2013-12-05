@@ -21,8 +21,14 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
+	/* Open and lock the file. */
+	WT_RET(__wt_session_get_btree(
+	    session, name, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+
 	/* Get the allocation size. */
 	allocsize = S2BT(session)->allocsize;
+
+	WT_RET(__wt_session_release_btree(session));
 
 	/* Close any btree handles in the file. */
 	WT_RET(__wt_conn_dhandle_close_all(session, name));
@@ -97,12 +103,9 @@ __wt_schema_truncate(
 	WT_DECL_RET;
 	const char *tablename;
 
-	WT_UNUSED(cfg);
 	tablename = uri;
 
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_RET(__wt_session_get_btree(
-		    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 		ret = __truncate_file(session, uri);
 	} else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_truncate(session, uri, cfg);

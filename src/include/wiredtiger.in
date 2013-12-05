@@ -816,26 +816,41 @@ struct __wt_session {
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
 	 * 1MB.}
-	 * @config{lsm_auto_throttle, Throttle inserts into LSM trees if
-	 * flushing to disk isn't keeping up., a boolean flag; default \c true.}
-	 * @config{lsm_bloom, create bloom filters on LSM tree chunks as they
-	 * are merged., a boolean flag; default \c true.}
-	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM
-	 * bloom filters., an integer between 2 and 1000; default \c 8.}
-	 * @config{lsm_bloom_config, config string used when creating Bloom
-	 * filter files\, passed to WT_SESSION::create., a string; default
-	 * empty.}
-	 * @config{lsm_bloom_hash_count, the number of hash values per item used
-	 * for LSM bloom filters., an integer between 2 and 100; default \c 4.}
-	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
-	 * tree chunk.  Only supported if bloom filters are enabled., a boolean
-	 * flag; default \c false.}
-	 * @config{lsm_chunk_size, the maximum size of the in-memory chunk of an
-	 * LSM tree., an integer between 512K and 500MB; default \c 2MB.}
-	 * @config{lsm_merge_max, the maximum number of chunks to include in a
-	 * merge operation., an integer between 2 and 100; default \c 15.}
-	 * @config{lsm_merge_threads, the number of thread to perform merge
-	 * operations., an integer between 1 and 10; default \c 1.}
+	 * @config{lsm = (, options only relevant for LSM data sources., a set
+	 * of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
+	 * LSM trees if flushing to disk isn't keeping up., a boolean flag;
+	 * default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom, create bloom
+	 * filters on LSM tree chunks as they are merged., a boolean flag;
+	 * default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_config,
+	 * config string used when creating Bloom filter files\, passed to
+	 * WT_SESSION::create., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count, the number of bits
+	 * used per item for LSM bloom filters., an integer between 2 and 1000;
+	 * default \c 16.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the
+	 * number of hash values per item used for LSM bloom filters., an
+	 * integer between 2 and 100; default \c 8.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest, create a bloom filter
+	 * on the oldest LSM tree chunk.  Only supported if bloom filters are
+	 * enabled., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum size a single
+	 * chunk can be.  Chunks larger than this size are not considered for
+	 * further merges.  This is a soft limit\, and chunks larger than this
+	 * value can be created.  Must be larger than chunk_size., an integer
+	 * between 100MB and 10TB; default \c 5GB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
+	 * in-memory chunk of an LSM tree., an integer between 512K and 500MB;
+	 * default \c 2MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the
+	 * maximum number of chunks to include in a merge operation., an integer
+	 * between 2 and 100; default \c 15.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of thread
+	 * to perform merge operations., an integer between 1 and 10; default \c
+	 * 1.}
+	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
 	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>. This
@@ -2445,9 +2460,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1014
 /*! cache: pages selected for eviction unable to be evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_FAIL		1015
-/*! cache: pages evicted because they exceeded the in memory maximum */
+/*! cache: pages evicted because they exceeded the in-memory maximum */
 #define	WT_STAT_CONN_CACHE_EVICTION_FORCE		1016
-/*! cache: failed eviction of pages that exceeded the in memory maximum */
+/*! cache: failed eviction of pages that exceeded the in-memory maximum */
 #define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL		1017
 /*! cache: hazard pointer blocked page eviction */
 #define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		1018
@@ -2495,92 +2510,94 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_UPDATE			1039
 /*! dhandle: connection dhandles swept */
 #define	WT_STAT_CONN_DH_CONN_HANDLES			1040
+/*! dhandle: connection sweep attempts */
+#define	WT_STAT_CONN_DH_CONN_SWEEPS			1041
 /*! dhandle: session dhandles swept */
-#define	WT_STAT_CONN_DH_SESSION_HANDLES			1041
+#define	WT_STAT_CONN_DH_SESSION_HANDLES			1042
+/*! dhandle: session sweep attempts */
+#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1043
 /*! dhandle: sweeps conflicting with evict */
-#define	WT_STAT_CONN_DH_SWEEP_EVICT			1042
-/*! dhandle: sweep attempts */
-#define	WT_STAT_CONN_DH_SWEEPS				1043
+#define	WT_STAT_CONN_DH_SWEEP_EVICT			1044
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				1044
+#define	WT_STAT_CONN_FILE_OPEN				1045
 /*! log: log buffer size increases */
-#define	WT_STAT_CONN_LOG_BUFFER_GROW			1045
+#define	WT_STAT_CONN_LOG_BUFFER_GROW			1046
 /*! log: total log buffer size */
-#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1046
+#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1047
 /*! log: user provided log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_USER			1047
+#define	WT_STAT_CONN_LOG_BYTES_USER			1048
 /*! log: log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1048
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1049
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1049
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1050
 /*! log: log read operations */
-#define	WT_STAT_CONN_LOG_READS				1050
+#define	WT_STAT_CONN_LOG_READS				1051
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1051
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1052
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1052
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1053
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1053
+#define	WT_STAT_CONN_LOG_SCANS				1054
 /*! log: consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1054
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1055
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1055
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1056
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1056
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1057
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1057
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1058
 /*! log: log slot ready wait timeouts */
-#define	WT_STAT_CONN_LOG_SLOT_READY_WAIT_TIMEOUT	1058
+#define	WT_STAT_CONN_LOG_SLOT_READY_WAIT_TIMEOUT	1059
 /*! log: log slot release wait timeouts */
-#define	WT_STAT_CONN_LOG_SLOT_RELEASE_WAIT_TIMEOUT	1059
+#define	WT_STAT_CONN_LOG_SLOT_RELEASE_WAIT_TIMEOUT	1060
 /*! log: slots selected for switching that were unavailable */
-#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1060
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1061
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1061
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1062
 /*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1062
+#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1063
 /*! log: consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1063
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1064
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				1064
+#define	WT_STAT_CONN_LOG_SYNC				1065
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				1065
+#define	WT_STAT_CONN_LOG_WRITES				1066
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1066
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1067
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1067
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1068
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1068
+#define	WT_STAT_CONN_MEMORY_FREE			1069
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1069
+#define	WT_STAT_CONN_MEMORY_GROW			1070
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1070
+#define	WT_STAT_CONN_READ_IO				1071
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1071
+#define	WT_STAT_CONN_REC_PAGES				1072
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1072
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1073
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1073
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1074
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1074
+#define	WT_STAT_CONN_RWLOCK_READ			1075
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1075
+#define	WT_STAT_CONN_RWLOCK_WRITE			1076
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1076
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1077
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1077
+#define	WT_STAT_CONN_TXN_BEGIN				1078
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1078
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1079
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1079
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1080
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1080
+#define	WT_STAT_CONN_TXN_COMMIT				1081
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1081
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1082
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1082
+#define	WT_STAT_CONN_TXN_ROLLBACK			1083
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1083
+#define	WT_STAT_CONN_WRITE_IO				1084
 
 /*!
  * @}

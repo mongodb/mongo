@@ -69,10 +69,10 @@ connection_stats = [
 	Stat('cache_eviction_fail',
 	    'cache: pages selected for eviction unable to be evicted'),
 	Stat('cache_eviction_force',
-	    'cache: pages evicted because they exceeded the in memory maximum'),
+	    'cache: pages evicted because they exceeded the in-memory maximum'),
 	Stat('cache_eviction_force_fail',
 	    'cache: failed eviction of pages that exceeded the ' +
-	    'in memory maximum'),
+	    'in-memory maximum'),
 	Stat('cache_eviction_hazard',
 	    'cache: hazard pointer blocked page eviction'),
 	Stat('cache_eviction_internal', 'cache: internal pages evicted'),
@@ -97,9 +97,10 @@ connection_stats = [
 	# Dhandle statistics
 	##########################################
 	Stat('dh_conn_handles', 'dhandle: connection dhandles swept'),
+	Stat('dh_conn_sweeps', 'dhandle: connection sweep attempts'),
 	Stat('dh_session_handles', 'dhandle: session dhandles swept'),
+	Stat('dh_session_sweeps', 'dhandle: session sweep attempts'),
 	Stat('dh_sweep_evict', 'dhandle: sweeps conflicting with evict'),
-	Stat('dh_sweeps', 'dhandle: sweep attempts'),
 
 	##########################################
 	# Logging statistics

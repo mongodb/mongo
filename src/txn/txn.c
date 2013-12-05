@@ -101,6 +101,22 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
+	prev_oldest_id = txn_global->oldest_id;
+	current_id = snap_min = txn_global->current;
+
+	/* For pure read-only workloads, use the last cached snapshot. */
+	if (get_snapshot &&
+	    txn->id == max_id &&
+	    txn->snapshot_count == 0 &&
+	    txn->snap_min == snap_min &&
+	    TXNID_LE(prev_oldest_id, snap_min)) {
+		/* If nothing has changed since last time, we're done. */
+		txn_state->snap_min = txn->snap_min;
+		if (txn_global->scan_count == 0 &&
+		    txn_global->oldest_id == prev_oldest_id)
+			return;
+	}
+
 	/*
 	 * We're going to scan.  Increment the count of scanners to prevent the
 	 * oldest ID from moving forwards.  Spin if the count is negative,
@@ -115,18 +131,6 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
 	current_id = snap_min = txn_global->current;
-
-	/* For pure read-only workloads, use the last cached snapshot. */
-	if (get_snapshot &&
-	    txn->id == max_id &&
-	    txn->snapshot_count == 0 &&
-	    txn->snap_min == snap_min &&
-	    TXNID_LE(prev_oldest_id, snap_min)) {
-		/* If nothing has changed since last time, we're done. */
-		txn_state->snap_min = txn->snap_min;
-		(void)WT_ATOMIC_SUB(txn_global->scan_count, 1);
-		return;
-	}
 
 	/* If the maximum ID is constrained, so is the oldest. */
 	oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
@@ -268,8 +272,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	do {
 		txn_state->id = txn->id = txn_global->current;
-	} while (
-	    !WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
+	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
 
 	/*
 	 * If we have used 64-bits of transaction IDs, there is nothing

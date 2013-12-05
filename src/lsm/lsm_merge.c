@@ -59,15 +59,25 @@ __wt_lsm_merge(
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
 	uint32_t generation, start_id;
-	uint64_t insert_count, record_count;
+	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
 	int create_bloom;
 	const char *cfg[3];
 
 	bloom = NULL;
+	chunk_size = 0;
 	create_bloom = 0;
 	dest = src = NULL;
 	start_id = 0;
+
+	/*
+	 * If the tree is open read-only, be very aggressive.  Otherwise, we
+	 * can spend a long time waiting for merges to start in read-only
+	 * applications.
+	 */
+	if (!lsm_tree->modified)
+		aggressive = 10;
+	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -75,7 +85,7 @@ __wt_lsm_merge(
 	 * should assume there is no work to do: if there are unwritten chunks,
 	 * the worker should write them immediately.
 	 */
-	if (lsm_tree->nchunks <= 1)
+	if (lsm_tree->nchunks <= merge_min)
 		return (WT_NOTFOUND);
 
 	/*
@@ -86,24 +96,23 @@ __wt_lsm_merge(
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
-	 * If the tree is open read-only, be very aggressive.  Otherwise, we
-	 * can spend a long time waiting for merges to start in read-only
-	 * applications.
-	 */
-	if (F_ISSET(
-	    lsm_tree->chunk[lsm_tree->nchunks - 1], WT_LSM_CHUNK_ONDISK))
-		aggressive = 100;
-	merge_min = aggressive ? 2 : lsm_tree->merge_min;
-
-	/*
-	 * Only include chunks that are stable on disk and not involved in a
-	 * merge.
+	 * Only include chunks that already have a Bloom filter and not
+	 * involved in a merge.
 	 */
 	end_chunk = lsm_tree->nchunks - 1;
 	while (end_chunk > 0 &&
-	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK) ||
+	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_BLOOM) ||
 	    F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_MERGING)))
 		--end_chunk;
+
+	/*
+	 * Give up immediately if there aren't enough on disk chunks in the
+	 * tree for a merge.
+	 */
+	if (end_chunk < merge_min - 1) {
+		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+		return (WT_NOTFOUND);
+	}
 
 	/*
 	 * Look for the most efficient merge we can do.  We define efficiency
@@ -122,7 +131,6 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
-		previous = lsm_tree->chunk[start_chunk];
 		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk + 1) - start_chunk;
 
@@ -138,13 +146,22 @@ __wt_lsm_merge(
 			break;
 
 		/*
+		 * If the size of the chunks selected so far exceeds the
+		 * configured maximum chunk size, stop.
+		 */
+		if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
+			break;
+
+		/*
 		 * If we have enough chunks for a merge and the next chunk is
 		 * in a different generation, stop.
 		 */
-		if (nchunks >= merge_min &&
-		    chunk->generation > previous->generation &&
-		    chunk->generation <= youngest->generation + 1)
-			break;
+		if (nchunks >= merge_min) {
+			previous = lsm_tree->chunk[start_chunk];
+			if (chunk->generation > previous->generation &&
+			    previous->generation <= youngest->generation + 1)
+				break;
+		}
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
 		record_count += chunk->count;
@@ -153,6 +170,7 @@ __wt_lsm_merge(
 		if (nchunks == lsm_tree->merge_max) {
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
 			record_count -= youngest->count;
+			chunk_size -= youngest->size;
 			--end_chunk;
 		}
 	}
@@ -263,7 +281,7 @@ __wt_lsm_merge(
 	    record_count, insert_count);
 
 	/*
-	 * We've successfully created the new chunk.  Now install it. We need
+	 * We've successfully created the new chunk.  Now install it.  We need
 	 * to ensure that the NO_CACHE flag is cleared and the bloom filter
 	 * is closed (even if a step fails), so track errors but don't return
 	 * until we've cleaned up.
@@ -271,6 +289,8 @@ __wt_lsm_merge(
 	WT_TRET(src->close(src));
 	WT_TRET(dest->close(dest));
 	src = dest = NULL;
+
+	F_CLR(session, WT_SESSION_NO_CACHE);
 
 	if (create_bloom) {
 		if (ret == 0)
@@ -290,7 +310,6 @@ __wt_lsm_merge(
 		WT_TRET(__wt_bloom_close(bloom));
 		bloom = NULL;
 	}
-	F_CLR(session, WT_SESSION_NO_CACHE);
 	WT_ERR(ret);
 
 	/*
@@ -304,6 +323,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
+	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*

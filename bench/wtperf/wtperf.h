@@ -48,6 +48,19 @@
 typedef struct __config CONFIG;
 typedef struct __config_thread CONFIG_THREAD;
 
+typedef struct {
+	int64_t threads;		/* Thread count */
+	int64_t insert;			/* Insert ratio */
+	int64_t read;			/* Read ratio */
+	int64_t update;			/* Update ratio */
+
+#define	WORKER_INSERT		1	/* Insert */
+#define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
+#define	WORKER_READ		3	/* Read */
+#define	WORKER_UPDATE		4	/* Update */
+	uint8_t ops[100];		/* Operation schedule */
+} WORKLOAD;
+
 struct __config {			/* Configuration struction */
 	const char *home;		/* WiredTiger home */
 	char *uri;			/* Object URI */
@@ -56,7 +69,14 @@ struct __config {			/* Configuration struction */
 
 	FILE *logf;			/* Logging handle */
 
-	CONFIG_THREAD *ckptthreads, *popthreads, *workers;
+	CONFIG_THREAD *ckptthreads, *popthreads;
+
+#define	WORKLOAD_MAX	50
+	CONFIG_THREAD	*workers;		/* Worker threads */
+	u_int		 workers_cnt;
+
+	WORKLOAD	*workload;		/* Workloads */
+	u_int		 workload_cnt;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
@@ -118,12 +138,6 @@ typedef struct {
 	uint32_t max_latency;		/* Maximum latency (NS) */
 
 	/*
-	 * To avoid reading the clock so often, operations of a single type are
-	 * aggregated into a single clock read, and are counted here.
-	 */
-	uint32_t aggregated;		/* Aggregated operations */
-
-	/*
 	 * Latency buckets.
 	 */
 	uint32_t us[1000];		/* < 1us ... 1000us */
@@ -136,13 +150,9 @@ struct __config_thread {		/* Per-thread structure */
 
 	pthread_t handle;		/* Handle */
 
-	char *key_buf, *data_buf;	/* Key/data memory */
+	char *key_buf, *value_buf;	/* Key/value memory */
 
-#define	WORKER_READ		1	/* Read */
-#define	WORKER_INSERT		2	/* Insert */
-#define	WORKER_INSERT_RMW	3	/* Insert with read-modify-write */
-#define	WORKER_UPDATE		4	/* Update */
-	uint8_t	schedule[100];		/* Thread operations */
+	WORKLOAD *workload;		/* Workload */
 
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
@@ -152,9 +162,9 @@ struct __config_thread {		/* Per-thread structure */
 
 int	 config_assign(CONFIG *, const CONFIG *);
 void	 config_free(CONFIG *);
-int	 config_opt_file(CONFIG *, WT_SESSION *, const char *);
-int	 config_opt_line(CONFIG *, WT_SESSION *, const char *);
-int	 config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
+int	 config_opt_file(CONFIG *, const char *);
+int	 config_opt_line(CONFIG *, const char *);
+int	 config_opt_str(CONFIG *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
@@ -162,8 +172,6 @@ void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
-const char *
-	 op_name(uint8_t *);
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 int	 setup_log_file(CONFIG *);

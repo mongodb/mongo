@@ -476,7 +476,7 @@ __checkpoint_worker(
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
-		WT_ASSERT(session, session->dhandle->refcnt == 0);
+		WT_ASSERT(session, session->dhandle->session_ref == 0);
 		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	}
@@ -608,8 +608,10 @@ __checkpoint_worker(
 				continue;
 			}
 			WT_ERR_MSG(session, EBUSY,
-			    "named checkpoints cannot be created if backup "
-			    "cursors are open");
+			    "checkpoint %s blocked by hot backup: it would "
+			    "delete an existing checkpoint, and checkpoints "
+			    "cannot be deleted during a hot backup",
+			    ckpt->name);
 		}
 
 	/*
