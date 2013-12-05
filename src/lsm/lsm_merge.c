@@ -85,7 +85,7 @@ __wt_lsm_merge(
 	 * should assume there is no work to do: if there are unwritten chunks,
 	 * the worker should write them immediately.
 	 */
-	if (lsm_tree->nchunks <= merge_min)
+	if (lsm_tree->nchunks < merge_min)
 		return (WT_NOTFOUND);
 
 	/*
