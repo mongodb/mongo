@@ -416,8 +416,18 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	if (S2C(session)->dhandle_dead >= WT_DHANDLE_SWEEP_TRIGGER)
+	/*
+	 * If enough handles have been closed recently, sweep for dead handles.
+	 *
+	 * Don't do this if WT_DHANDLE_LOCK_ONLY is set: as well as avoiding
+	 * sweeping in what should be a fast path, this also avoids sweeping
+	 * during __wt_conn_dhandle_close_all, because it sets
+	 * WT_DHANDLE_LOCK_ONLY.
+	 */
+	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
+	    S2C(session)->dhandle_dead >= WT_DHANDLE_SWEEP_TRIGGER)
 		WT_RET(__conn_dhandle_sweep(session));
+
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
@@ -610,24 +620,13 @@ int
 __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
 	conn = S2C(session);
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
-	/*
-	 * Make sure the caller's handle is tracked, so it will be unlocked
-	 * even if we failed to get all of the remaining handles we need.
-	 */
-	if ((saved_dhandle = session->dhandle) != NULL) {
-		WT_ASSERT(session,
-		    F_ISSET(saved_dhandle, WT_DHANDLE_EXCLUSIVE));
-
-		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session, 0));
-	}
+	WT_ASSERT(session, session->dhandle == NULL);
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (strcmp(dhandle->name, name) != 0)
@@ -635,17 +634,12 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 
 		session->dhandle = dhandle;
 
-		/*
-		 * The caller may have this tree locked to prevent concurrent
-		 * schema operations.
-		 */
-		if (dhandle != saved_dhandle) {
-			WT_ERR(__wt_session_get_btree(session,
-			    dhandle->name, dhandle->checkpoint,
-			    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
-			if (WT_META_TRACKING(session))
-				WT_ERR(__wt_meta_track_handle_lock(session, 0));
-		}
+		/* Lock the handle exclusively. */
+		WT_ERR(__wt_session_get_btree(session,
+		    dhandle->name, dhandle->checkpoint,
+		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+		if (WT_META_TRACKING(session))
+			WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 		/*
 		 * We have an exclusive lock, which means there are no cursors
