@@ -52,7 +52,7 @@ namespace mongo {
 
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait );
 
-    std::vector<BSONObj> getHostsWrittenTo(OpTime& op);
+    std::vector<BSONObj> getHostsWrittenTo( const OpTime& op );
 
     void resetSlaveCache();
     unsigned getSlaveCount();

@@ -185,8 +185,11 @@ namespace mongo {
                 response->setErrMessage( status.toString() );
             }
             else {
+
+                _client->curop()->setMessage( "waiting for write concern" );
+
                 WriteConcernResult res;
-                status = waitForWriteConcern( cc(), writeConcern, &res );
+                status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
                 maybeBuildWCError( status, res, response );
             }
         }

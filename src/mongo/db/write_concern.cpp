@@ -28,7 +28,6 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/replication_server_status.h"
@@ -110,9 +109,10 @@ namespace mongo {
             result->append( "err", err );
     }
 
-    Status waitForWriteConcern(Client& client,
-                               const WriteConcernOptions& writeConcern,
-                               WriteConcernResult* result ) {
+    Status waitForWriteConcern( const WriteConcernOptions& writeConcern,
+                                const OpTime& replOpTime,
+                                WriteConcernResult* result ) {
+
         // first handle blocking on disk
 
         Timer syncTimer;
@@ -182,9 +182,7 @@ namespace mongo {
         bool doTiming = writeConcern.wNumNodes > 1 || !writeConcern.wMode.empty();
         scoped_ptr<TimerHolder> gleTimerHolder( new TimerHolder( doTiming ? &gleWtimeStats : NULL ) );
 
-        OpTime op( client.getLastOp() );
-
-        if ( op.isNull() ) {
+        if ( replOpTime.isNull() ) {
             // no write happened for this client yet
             return Status::OK();
         }
@@ -200,8 +198,6 @@ namespace mongo {
         }
 
         // now that we've done the prep, now we actually wait
-        char buf[32]; // for messages
-        long long passes = 0;
         while ( 1 ) {
 
             if ( !_isMaster() ) {
@@ -210,11 +206,11 @@ namespace mongo {
             }
 
             if ( writeConcern.wNumNodes > 0 ) {
-                if ( opReplicatedEnough( op, writeConcern.wNumNodes ) ) {
+                if ( opReplicatedEnough( replOpTime, writeConcern.wNumNodes ) ) {
                     break;
                 }
             }
-            else if ( opReplicatedEnough( op, writeConcern.wMode ) ) {
+            else if ( opReplicatedEnough( replOpTime, writeConcern.wMode ) ) {
                 break;
             }
 
@@ -222,21 +218,19 @@ namespace mongo {
                  gleTimerHolder->millis() >= writeConcern.wTimeout ) {
                 gleWtimeouts.increment();
                 result->wTime = gleTimerHolder->millis();
-                result->writtenTo = getHostsWrittenTo( op );
+                result->writtenTo = getHostsWrittenTo( replOpTime );
                 result->err = "timeout";
                 result->wTimedOut = true;
                 return Status( ErrorCodes::WriteConcernLegacyOK,
                                "waiting for replication timed out" );
             }
 
-            verify( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
-            client.curop()->setMessage( buf );
             sleepmillis(1);
             killCurrentOp.checkForInterrupt();
         }
 
         if ( doTiming ) {
-            result->writtenTo = getHostsWrittenTo(op);
+            result->writtenTo = getHostsWrittenTo( replOpTime );
             result->wTime = gleTimerHolder->recordMillis();
         }
 

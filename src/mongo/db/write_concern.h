@@ -49,7 +49,6 @@ namespace mongo {
         string wMode;
 
         int wTimeout;
-
     };
 
     struct WriteConcernResult {
@@ -77,9 +76,21 @@ namespace mongo {
         string err; // this is the old err field, should deprecate
     };
 
-    Status waitForWriteConcern(Client& client,
-                               const WriteConcernOptions& writeConcern,
-                               WriteConcernResult* result );
+    /**
+     * Blocks until the database is sure the specified user write concern has been fulfilled, or
+     * returns an error status if the write concern fails.
+     *
+     * Takes a user write concern as well as the replication opTime the write concern applies to -
+     * if this opTime.isNull() no replication-related write concern options will be enforced.
+     *
+     * Returns result of the write concern if successful.
+     * Returns !OK if anything goes wrong.
+     * Returns WriteConcernLegacyOK if the write concern could not be applied but legacy GLE should
+     * not report an error.
+     */
+    Status waitForWriteConcern( const WriteConcernOptions& writeConcern,
+                                const OpTime& replOpTime,
+                                WriteConcernResult* result );
 
 
 } // namespace mongo

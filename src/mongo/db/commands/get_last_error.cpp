@@ -29,6 +29,7 @@
 */
 
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern.h"
@@ -128,8 +129,20 @@ namespace mongo {
                 return false;
             }
 
+            // Get the wOpTime from the GLE if it exists
+            OpTime wOpTime;
+            if ( cmdObj["wOpTime"].type() == Timestamp ) {
+                wOpTime = OpTime( cmdObj["wOpTime"].date() );
+            }
+            if ( wOpTime.isNull() ) {
+                // Use the client opTime if no wOpTime is specified
+                wOpTime = cc().getLastOp();
+            }
+
+            cc().curop()->setMessage( "waiting for write concern" );
+
             WriteConcernResult res;
-            status = waitForWriteConcern( cc(), writeConcern, &res );
+            status = waitForWriteConcern( writeConcern, wOpTime, &res );
             res.appendTo( &result );
             if ( status.code() == ErrorCodes::WriteConcernLegacyOK ) {
                 result.append( "wnote", status.toString() );
