@@ -61,3 +61,19 @@ env.Library(
         "$BUILD_DIR/mongo/bson",
     ],
 )
+
+env.CppUnitTest(
+    target = "sort_test",
+    source = [
+        "sort_test.cpp",
+    ],
+    LIBDEPS = [
+        "exec",
+        "mock_stage",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/mocklib",
+    ],
+    NO_CRUTCH = True,
+)

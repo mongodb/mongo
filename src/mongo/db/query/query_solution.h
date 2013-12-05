@@ -414,7 +414,7 @@ namespace mongo {
     };
 
     struct SortNode : public QuerySolutionNode {
-        SortNode() { }
+        SortNode() : limit(0) { }
         virtual ~SortNode() { }
 
         virtual StageType getType() const { return STAGE_SORT; }
@@ -440,6 +440,9 @@ namespace mongo {
         BSONObj pattern;
 
         BSONObj query;
+
+        // Sum of both limit and skip count in the parsed query.
+        int limit;
     };
 
     struct LimitNode : public QuerySolutionNode {

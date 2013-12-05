@@ -483,6 +483,8 @@ namespace mongo {
         *ss << "pattern = " << pattern.toString() << endl;
         addIndent(ss, indent + 1);
         *ss << "query for bounds = " << query.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "limit = " << limit << endl;
         addCommon(ss, indent);
         *ss << "Child:" << endl;
         children[0]->appendToString(ss, indent + 2);

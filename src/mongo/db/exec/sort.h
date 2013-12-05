@@ -30,6 +30,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <vector>
+#include <set>
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
@@ -46,7 +47,7 @@ namespace mongo {
     // Parameters that must be provided to a SortStage
     class SortStageParams {
     public:
-        SortStageParams() { }
+        SortStageParams() : limit(0) { }
 
         // How we're sorting.
         BSONObj pattern;
@@ -54,9 +55,8 @@ namespace mongo {
         // The query.  Used to create the IndexBounds for the sorting.
         BSONObj query;
 
-        // TODO: Implement this.
         // Must be >= 0.  Equal to 0 for no limit.
-        // int limit;
+        int limit;
     };
 
     /**
@@ -164,6 +164,9 @@ namespace mongo {
         // The raw query as expressed by the user
         BSONObj _query;
 
+        // Must be >= 0.  Equal to 0 for no limit.
+        int _limit;
+
         //
         // Sort key generation
         //
@@ -172,8 +175,6 @@ namespace mongo {
         //
         // Data storage
         //
-
-        struct WorkingSetComparator;
 
         // Have we sorted our data? If so, we can access _resultIterator. If not,
         // we're still populating _data.
@@ -189,8 +190,46 @@ namespace mongo {
             DiskLoc loc;
         };
 
+        // Comparison object for data buffers (vector and set).
+        // Items are compared on (sortKey, loc). This is also how the items are
+        // ordered in the indices.
+        // Keys are compared using BSONObj::woCompare() with DiskLoc as a tie-breaker.
+        struct WorkingSetComparator {
+            explicit WorkingSetComparator(BSONObj p);
+
+            bool operator()(const SortableDataItem& lhs, const SortableDataItem& rhs) const;
+
+            BSONObj pattern;
+        };
+
+        /**
+         * Inserts one item into data buffer (vector or set).
+         * If limit is exceeded, remove item with lowest key.
+         */
+        void addToBuffer(const SortableDataItem& item);
+
+        /**
+         * Sorts data buffer.
+         * Assumes no more items will be added to buffer.
+         * If data is stored in set, copy set
+         * contents to vector and clear set.
+         */
+        void sortBuffer();
+
+        // Comparator for data buffer
+        // Initialization follows sort key generator
+        scoped_ptr<WorkingSetComparator> _sortKeyComparator;
+
         // The data we buffer and sort.
+        // _data will contain sorted data when all data is gathered
+        // and sorted.
+        // When _limit is greater than 1 and not all data has been gathered from child stage,
+        // _dataSet is used instead to maintain an ordered set of the incomplete data set.
+        // When the data set is complete, we copy the items from _dataSet to _data which will
+        // be used to provide the results of this stage through _resultIterator.
         vector<SortableDataItem> _data;
+        typedef std::set<SortableDataItem, WorkingSetComparator> SortableDataItemSet;
+        scoped_ptr<SortableDataItemSet> _dataSet;
 
         // Iterates through _data post-sort returning it.
         vector<SortableDataItem>::iterator _resultIterator;

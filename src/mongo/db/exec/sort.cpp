@@ -36,7 +36,27 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner.h"
 
+namespace {
+
+    using mongo::DiskLoc;
+    using mongo::WorkingSet;
+    using mongo::WorkingSetID;
+    using mongo::WorkingSetMember;
+
+    /**
+     * Returns expected memory usage of working set member
+     */
+    size_t getMemUsage(WorkingSet* ws, WorkingSetID wsid) {
+        WorkingSetMember* member = ws->get(wsid);
+        size_t memUsage = sizeof(DiskLoc) + member->obj.objsize();
+        return memUsage;
+    }
+
+} // namespace
+
 namespace mongo {
+
+    using std::vector;
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
 
@@ -238,30 +258,29 @@ namespace mongo {
         }
     }
 
-    struct SortStage::WorkingSetComparator {
-        explicit WorkingSetComparator(BSONObj p) : pattern(p) { }
+    SortStage::WorkingSetComparator::WorkingSetComparator(BSONObj p) : pattern(p) { }
 
-        bool operator()(const SortableDataItem& lhs, const SortableDataItem& rhs) const {
-            // False means ignore field names.
-            int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false);
-            if (0 != result) {
-                return result < 0;
-            }
-            // Indices use DiskLoc as an additional sort key so we must as well.
-            return lhs.loc < rhs.loc;
+    bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs, const SortableDataItem& rhs) const {
+        // False means ignore field names.
+        int result = lhs.sortKey.woCompare(rhs.sortKey, pattern, false);
+        if (0 != result) {
+            return result < 0;
         }
-
-        BSONObj pattern;
-    };
+        // Indices use DiskLoc as an additional sort key so we must as well.
+        return lhs.loc < rhs.loc;
+    }
 
     SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
         : _ws(ws),
           _child(child),
           _pattern(params.pattern),
           _query(params.query),
+          _limit(params.limit),
           _sorted(false),
           _resultIterator(_data.end()),
-          _memUsage(0) { }
+          _memUsage(0) {
+        dassert(_limit >= 0);
+    }
 
     SortStage::~SortStage() { }
 
@@ -277,6 +296,13 @@ namespace mongo {
         if (NULL == _sortKeyGen) {
             // This is heavy and should be done as part of work().
             _sortKeyGen.reset(new SortStageKeyGenerator(_pattern, _query));
+            _sortKeyComparator.reset(new WorkingSetComparator(_sortKeyGen->getSortComparator()));
+            // If limit > 1, we need to initialize _dataSet here to maintain ordered
+            // set of data items while fetching from the child stage.
+            if (_limit > 1) {
+                const WorkingSetComparator& cmp = *_sortKeyComparator;
+                _dataSet.reset(new SortableDataItemSet(cmp));
+            }
             return PlanStage::NEED_TIME;
         }
 
@@ -305,8 +331,6 @@ namespace mongo {
                     _wsidByDiskLoc[member->loc] = id;
                 }
 
-                // Do some accounting to make sure we're not using too much memory.
-                _memUsage += sizeof(DiskLoc) + member->obj.objsize();
 
                 // The data remains in the WorkingSet and we wrap the WSID with the sort key.
                 SortableDataItem item;
@@ -316,7 +340,8 @@ namespace mongo {
                     // The DiskLoc breaks ties when sorting two WSMs with the same sort key.
                     item.loc = member->loc;
                 }
-                _data.push_back(item);
+
+                addToBuffer(item);
 
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
@@ -324,8 +349,7 @@ namespace mongo {
             else if (PlanStage::IS_EOF == code) {
                 // TODO: We don't need the lock for this.  We could ask for a yield and do this work
                 // unlocked.  Also, this is performing a lot of work for one call to work(...)
-                WorkingSetComparator cmp(_sortKeyGen->getSortComparator());
-                std::sort(_data.begin(), _data.end(), cmp);
+                sortBuffer();
                 _resultIterator = _data.begin();
                 _sorted = true;
                 ++_commonStats.needTime;
@@ -409,6 +433,96 @@ namespace mongo {
         ret->specific.reset(new SortStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();
+    }
+
+    /**
+     * addToBuffer() and sortBuffer() work differently based on the
+     * configured limit. addToBuffer() is also responsible for
+     * performing some accounting on the overall memory usage to
+     * make sure we're not using too much memory.
+     *
+     * limit == 0:
+     *     addToBuffer() - Adds item to vector.
+     *     sortBuffer() - Sorts vector.
+     * limit == 1:
+     *     addToBuffer() - Replaces first item in vector with max of
+     *                     current and new item.
+     *                     Updates memory usage if item was replaced.
+     *     sortBuffer() - Does nothing.
+     * limit > 1:
+     *     addToBuffer() - Does not update vector. Adds item to set.
+     *                     If size of set exceeds limit, remove item from set
+     *                     with lowest key. Updates memory usage accordingly.
+     *     sortBuffer() - Copies items from set to vectors.
+     */
+    void SortStage::addToBuffer(const SortableDataItem& item) {
+        if (_limit == 0) {
+            _data.push_back(item);
+            _memUsage += getMemUsage(_ws, item.wsid);
+        }
+        else if (_limit == 1) {
+            if (_data.empty()) {
+                _data.push_back(item);
+                _memUsage = getMemUsage(_ws, item.wsid);
+                return;
+            }
+            WorkingSetID wsidToFree = item.wsid;
+            const WorkingSetComparator& cmp = *_sortKeyComparator;
+            // Compare new item with existing item in vector.
+            if (cmp(item, _data[0])) {
+                wsidToFree = _data[0].wsid;
+                _data[0] = item;
+                _memUsage = getMemUsage(_ws, item.wsid);
+            }
+            _ws->free(wsidToFree);
+        }
+        else {
+            // Update data item set instead of vector
+            // Limit not reached - insert and return
+            vector<SortableDataItem>::size_type limit(_limit);
+            if (_dataSet->size() < limit) {
+                _dataSet->insert(item);
+                _memUsage += getMemUsage(_ws, item.wsid);
+                return;
+            }
+            // Limit will be exceeded - compare with item with lowest key
+            // If new item does not have a lower key value than last item,
+            // do nothing.
+            WorkingSetID wsidToFree = item.wsid;
+            SortableDataItemSet::const_iterator lastItemIt = --(_dataSet->end());
+            const SortableDataItem& lastItem = *lastItemIt;
+            const WorkingSetComparator& cmp = *_sortKeyComparator;
+            if (cmp(item, lastItem)) {
+                _memUsage += getMemUsage(_ws, item.wsid) - getMemUsage(_ws, lastItem.wsid);
+                wsidToFree = lastItem.wsid;
+                // According to std::set iterator validity rules,
+                // it does not matter which of erase()/insert() happens first.
+                // Here, we choose to erase first to release potential resources
+                // used by the last item and to keep the scope of the iterator to a minimum.
+                _dataSet->erase(lastItemIt);
+                _dataSet->insert(item);
+            }
+            _ws->free(wsidToFree);
+        }
+    }
+
+    void SortStage::sortBuffer() {
+        if (_limit == 0) {
+            const WorkingSetComparator& cmp = *_sortKeyComparator;
+            std::sort(_data.begin(), _data.end(), cmp);
+        }
+        else if (_limit == 1) {
+            // Buffer contains either 0 or 1 item so it is already in a sorted state.
+            return;
+        }
+        else {
+            // Set already contains items in sorted order, so we simply copy the items
+            // from the set to the vector.
+            // Release the memory for the set after the copy.
+            vector<SortableDataItem> newData(_dataSet->begin(), _dataSet->end());
+            _data.swap(newData);
+            _dataSet.reset();
+        }
     }
 
 }  // namespace mongo

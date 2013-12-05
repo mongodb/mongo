@@ -109,6 +109,16 @@ namespace mongo {
                         SortNode* sort = new SortNode();
                         sort->pattern = sortObj;
                         sort->query = query.getParsed().getFilter();
+                        // When setting the limit on the sort, we need to consider both
+                        // the limit N and skip count M. The sort should return an ordered list
+                        // N + M items so that the skip stage can discard the first M results.
+                        if (0 != query.getParsed().getNumToReturn()) {
+                            sort->limit = query.getParsed().getNumToReturn() +
+                                          query.getParsed().getSkip();
+                        }
+                        else {
+                            sort->limit = 0;
+                        }
                         sort->children.push_back(solnRoot);
                         solnRoot = sort;
                         blockingSort = true;
@@ -175,8 +185,13 @@ namespace mongo {
             solnRoot = skip;
         }
 
+        // When there is both a blocking sort and a limit, the limit will
+        // be enforced by the blocking sort.
+        // Otherwise, we need to limit the results in the case of a hard limit
+        // (ie. limit in raw query is negative)
         if (0 != query.getParsed().getNumToReturn() &&
-            (blockingSort || !query.getParsed().wantMore())) {
+            !blockingSort &&
+            !query.getParsed().wantMore()) {
 
             LimitNode* limit = new LimitNode();
             limit->limit = query.getParsed().getNumToReturn();

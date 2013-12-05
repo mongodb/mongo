@@ -105,6 +105,7 @@ namespace mongo {
             SortStageParams params;
             params.pattern = sn->pattern;
             params.query = sn->query;
+            params.limit = sn->limit;
             return new SortStage(params, ws, childStage);
         }
         else if (STAGE_PROJECTION == root->getType()) {

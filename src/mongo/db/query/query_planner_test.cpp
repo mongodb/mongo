@@ -342,10 +342,13 @@ namespace {
 
                 BSONElement patternEl = sortObj["pattern"];
                 if (patternEl.eoo() || !patternEl.isABSONObj()) { return false; }
+                BSONElement limitEl = sortObj["limit"];
+                if (!limitEl.isNumber()) { return false; }
                 BSONElement child = sortObj["node"];
                 if (child.eoo() || !child.isABSONObj()) { return false; }
 
                 return (patternEl.Obj() == sn->pattern)
+                       && (limitEl.numberInt() == sn->limit)
                        && solutionMatches(child.Obj(), sn->children[0]);
             }
             else if (STAGE_SORT_MERGE == trueSoln->getType()) {
@@ -592,6 +595,15 @@ namespace {
         assertSolutionExists("{limit: {n: 3, node: {cscan: {dir: 1, filter: {x: 5}}}}}");
     }
 
+    TEST_F(IndexAssignmentTest, BasicSoftLimitNoIndex) {
+        addIndex(BSON("a" << 1));
+
+        runQuerySkipLimit(BSON("x" << 5), 0, 3);
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {x: 5}}}");
+    }
+
     TEST_F(IndexAssignmentTest, BasicLimitWithIndex) {
         addIndex(BSON("a" << 1 << "b" << 1));
 
@@ -603,6 +615,17 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {a: 1, b: 1}}}}}}}");
     }
 
+    TEST_F(IndexAssignmentTest, BasicSoftLimitWithIndex) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuerySkipLimit(BSON("a" << 5), 0, 5);
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {a: 5}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                "{ixscan: {filter: null, pattern: {a: 1, b: 1}}}}}");
+    }
+
     TEST_F(IndexAssignmentTest, SkipAndLimit) {
         addIndex(BSON("x" << 1));
 
@@ -612,7 +635,21 @@ namespace {
         assertSolutionExists("{limit: {n: 2, node: {skip: {n: 7, node: "
                                 "{cscan: {dir: 1, filter: {x: {$lte: 4}}}}}}}}");
         assertSolutionExists("{limit: {n: 2, node: {skip: {n: 7, node: {fetch: "
-                                "{filter: null, node: {ixscan: {filter: null, pattern: {x: 1}}}}}}}}}");
+                                "{filter: null, node: {ixscan: "
+                                "{filter: null, pattern: {x: 1}}}}}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SkipAndSoftLimit) {
+        addIndex(BSON("x" << 1));
+
+        runQuerySkipLimit(BSON("x" << BSON("$lte" << 4)), 7, 2);
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{skip: {n: 7, node: "
+                                "{cscan: {dir: 1, filter: {x: {$lte: 4}}}}}}");
+        assertSolutionExists("{skip: {n: 7, node: {fetch: "
+                                "{filter: null, node: {ixscan: "
+                                "{filter: null, pattern: {x: 1}}}}}}}");
     }
 
     //
@@ -777,8 +814,10 @@ namespace {
         runQuerySortProj(fromjson("{ a : 5 }"), BSON("b" << 1), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 3U);
-        assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: {dir: 1, filter: {a: 5}}}}}");
-        assertSolutionExists("{sort: {pattern: {b: 1}, node: {fetch: {filter: null, node: "
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {a: 5}}}}}");
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, "
+                                "node: {fetch: {filter: null, node: "
                                 "{ixscan: {filter: null, pattern: {a: 1}}}}}}}");
         assertSolutionExists("{fetch: {filter: {a: 5}, node: {ixscan: "
                                 "{filter: null, pattern: {b: 1}}}}}");
@@ -789,9 +828,55 @@ namespace {
         runQuerySortProj(fromjson("{ a : 5 }"), BSON("a" << 1), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: {dir: 1, filter: {a: 5}}}}}");
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {a: 5}}}}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
                                 "{filter: null, pattern: {a: true}}}}}");
+    }
+
+    //
+    // Sort with limit and/or skip
+    //
+
+    TEST_F(IndexAssignmentTest, SortLimit) {
+        // Negative limit indicates hard limit - see lite_parsed_query.cpp
+        runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, -3);
+        assertNumSolutions(1U);
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 3, "
+                                "node: {cscan: {dir: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SortSkip) {
+        runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, 0);
+        assertNumSolutions(1U);
+        // If only skip is provided, do not limit sort.
+        assertSolutionExists("{skip: {n: 2, node: "
+                                "{sort: {pattern: {a: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1}}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SortSkipLimit) {
+        runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, -3);
+        assertNumSolutions(1U);
+        // Limit in sort node should be adjusted by skip count
+        assertSolutionExists("{skip: {n: 2, node: "
+                                "{sort: {pattern: {a: 1}, limit: 5, "
+                                "node: {cscan: {dir: 1}}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SortSoftLimit) {
+        runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 3);
+        assertNumSolutions(1U);
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 3, "
+                                "node: {cscan: {dir: 1}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, SortSkipSoftLimit) {
+        runQuerySortProjSkipLimit(BSONObj(), fromjson("{a: 1}"), BSONObj(), 2, 3);
+        assertNumSolutions(1U);
+        assertSolutionExists("{skip: {n: 2, node: "
+                                "{sort: {pattern: {a: 1}, limit: 5, "
+                                "node: {cscan: {dir: 1}}}}}}");
     }
 
     //
@@ -804,7 +889,8 @@ namespace {
         runQuerySortProj(fromjson("{ x : {$gt: 1}}"), fromjson("{x: 1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {x: 1}, node: {cscan: {dir: 1, filter: {x: {$gt: 1}}}}}}");
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {x: {$gt: 1}}}}}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {x: 1}}}}}");
     }
 
@@ -813,7 +899,8 @@ namespace {
         runQuerySortProj(fromjson("{ a : 5 }"), BSON("b" << 1), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: {dir: 1, filter: {a: 5}}}}}");
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {a: 5}}}}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
                                 "{filter: null, pattern: {a: 1, b: 1}}}}}");
     }
@@ -1093,7 +1180,8 @@ namespace {
         runQuerySortProjSkipLimit(fromjson("{a: {$in: [3, 1, 8]}}"),
                                   BSON("b" << 1), BSONObj(), 0, 1);
 
-        assertSolutionExists("{limit: {n: 1, node: {sort: {pattern: {b: 1}, node: {cscan: {dir: 1}}}}}}");
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 1, "
+                             "node: {cscan: {dir: 1}}}}");
         // TODO SERVER-1205 there should be a mergeSort solution
     }
 
@@ -1143,7 +1231,7 @@ namespace {
         runQuerySortProj(fromjson("{$or: [{a:1}, {b:1}]}"), fromjson("{c:1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {c: 1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {c: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {node: {mergeSort: {nodes: "
                                 "[{ixscan: {pattern: {a: 1, c: 1}}}, {ixscan: {pattern: {b: 1, c: 1}}}]}}}}");
     }
@@ -1169,7 +1257,8 @@ namespace {
         runQuerySortProj(query, sort, BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {timestamp: -1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {timestamp: -1}, limit: 0, "
+                                "node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {timestamp: -1, position: '2dsphere'}}}}}");
     }
 
@@ -1180,7 +1269,8 @@ namespace {
                          fromjson("{creationDate: 1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {creationDate: 1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {creationDate: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}");
     }
 
@@ -1190,7 +1280,7 @@ namespace {
         runQuerySortProj(fromjson("{$or: [{a:1}, {a:7}]}"), fromjson("{b:1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {b: 1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
         // TODO the second solution should be mergeSort rather than just sort
     }
 
@@ -1199,7 +1289,7 @@ namespace {
         runQuerySortProj(BSONObj(), fromjson("{_id: -1}"), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
-        assertSolutionExists("{sort: {pattern: {_id: -1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {_id: -1}, limit: 0, node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
                                 "{filter: null, pattern: {_id: 1}}}}}");
     }
@@ -1214,7 +1304,7 @@ namespace {
         runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
 
         assertNumSolutions(1U);
-        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
     }
 
     TEST_F(IndexAssignmentTest, SparseIndexHintForSort) {
@@ -1232,7 +1322,7 @@ namespace {
         runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
 
         assertNumSolutions(2U);
-        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
                                 "{filter: null, pattern: {a: 1, b: 1}}}}}");
     }
@@ -1384,7 +1474,7 @@ namespace {
         runQuerySortProj(fromjson("{a: {$ne: 1}}"), fromjson("{a: 1}"), BSONObj());
 
         assertNumSolutions(2U);
-        assertSolutionExists("{sort: {pattern: {a: 1}, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
     }
 
