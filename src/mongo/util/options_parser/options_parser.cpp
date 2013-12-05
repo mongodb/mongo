@@ -361,7 +361,8 @@ namespace optionenvironment {
                                 sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
                                 return Status(ErrorCodes::BadValue, sb.str());
                             }
-                            if (mapValue.count(key) > 0) {
+                            // Make sure we aren't setting an option to two different values
+                            if (mapValue.count(key) > 0 && mapValue[key] != value) {
                                 StringBuilder sb;
                                 sb << "Key Value Option: " << iterator->_dottedName
                                    << " has a duplicate key from the same source: " << key;
