@@ -53,6 +53,7 @@
 
 #include "mongo/client/redef_macros.h"
 
+#include "mongo/client/export_macros.h"
 #include "mongo/util/exit_code.h"
 
 namespace mongo {
@@ -67,8 +68,8 @@ namespace mongo {
        you should either use dbexit to shutdown cleanly, or ::exit to tell the system to quit
        if you use this, you'll get a link error since mongo::exit isn't defined
      */
-    void exit( ExitCode returnCode );
-    bool inShutdown();
+    MONGO_CLIENT_API void exit( ExitCode returnCode );
+    MONGO_CLIENT_API bool inShutdown();
 
 }
 

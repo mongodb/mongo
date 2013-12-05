@@ -182,6 +182,34 @@ namespace mongo {
         throw MsgAssertionException(msgid, msg);
     }
 
+    void msgassertedNoTrace(int msgid, const std::string& msg) {
+        msgassertedNoTrace(msgid, msg.c_str());
+    }
+
+    std::string causedBy( const char* e ) {
+        return std::string(" :: caused by :: ") + e;
+    }
+
+    std::string causedBy( const DBException& e ){
+        return causedBy( e.toString() );
+    }
+
+    std::string causedBy( const std::exception& e ) {
+        return causedBy( e.what() );
+    }
+
+    std::string causedBy( const std::string& e ){
+        return causedBy( e.c_str() );
+    }
+
+    std::string causedBy( const std::string* e ) {
+        return (e && *e != "") ? causedBy(*e) : "";
+    }
+
+    std::string causedBy( const Status& e ){
+        return causedBy( e.reason() );
+    }
+
     NOINLINE_DECL void streamNotGood( int code , const std::string& msg , std::ios& myios ) {
         stringstream ss;
         // errno might not work on all systems for streams
