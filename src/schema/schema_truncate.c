@@ -103,7 +103,6 @@ __wt_schema_truncate(
 	WT_DECL_RET;
 	const char *tablename;
 
-	WT_UNUSED(cfg);
 	tablename = uri;
 
 	if (WT_PREFIX_MATCH(uri, "file:")) {
