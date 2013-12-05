@@ -8,14 +8,16 @@
 # config: /etc/mongod.conf
 # pidfile: /var/run/mongodb/mongod.pid
 
+
 . /etc/rc.d/init.d/functions
 
 # things from mongod.conf get there by mongod reading it
 
+BASENAME=`basename $0`
 
 # NOTE: if you change any OPTIONS here, you get what you pay for:
 # this script assumes all options are in the config file.
-CONFIGFILE="/etc/mongod.conf"
+CONFIGFILE="/etc/$BASENAME.conf"
 OPTIONS=" -f $CONFIGFILE"
 SYSCONFIG="/etc/sysconfig/mongod"
 
@@ -55,20 +57,25 @@ start()
   ulimit -m unlimited
   ulimit -u 32000
 
-  echo -n $"Starting mongod: "
+  echo -n $"Starting $BASENAME: "
   daemon --user "$MONGO_USER" $NUMACTL $mongod $OPTIONS
   RETVAL=$?
   echo
-  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod
+  [ $RETVAL -eq 0 ] && touch "/var/lock/subsys/$BASENAME"
 }
 
 stop()
 {
-  echo -n $"Stopping mongod: "
-  killproc -p "$PIDFILE" -d 300 /usr/bin/mongod
+  echo -n $"Stopping $BASENAME: "
+  kill -15 `cat $PIDFILE`
   RETVAL=$?
   echo
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
+  if [ $RETVAL -eq 0 ]; then
+      rm -f "/var/lock/subsys/$BASENAME"
+      rm -f $PIDFILE
+  else
+    echo "$RETVAL"
+  fi
 }
 
 restart () {
@@ -76,7 +83,7 @@ restart () {
 	start
 }
 
-
+ulimit -n 12000
 RETVAL=0
 
 case "$1" in
@@ -90,10 +97,10 @@ case "$1" in
     restart
     ;;
   condrestart)
-    [ -f /var/lock/subsys/mongod ] && restart || :
+    [ -f "/var/lock/subsys/$BASENAME" ] && restart || :
     ;;
   status)
-    status $mongod
+    status -p $PIDFILE $mongod
     RETVAL=$?
     ;;
   *)
