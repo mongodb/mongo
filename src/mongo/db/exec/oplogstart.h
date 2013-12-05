@@ -71,6 +71,11 @@ namespace mongo {
 
         // PS. don't call this.
         virtual PlanStageStats* getStats() { return NULL; }
+
+        // For testing only.
+        void setBackwardsScanTime(int newTime) { _backwardsScanTime = newTime; }
+        bool isExtentHopping() { return _extentHopping; }
+        bool isBackwardsScanning() { return _backwardsScanning; }
     private:
         // Copied verbatim.
         static DiskLoc prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec);
@@ -111,6 +116,8 @@ namespace mongo {
         string _ns;
         
         MatchExpression* _filter;
+
+        static int _backwardsScanTime;
     };
 
 }  // namespace mongo

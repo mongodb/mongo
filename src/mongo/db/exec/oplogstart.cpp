@@ -58,13 +58,16 @@ namespace mongo {
             _timer.reset();
         }
 
-        // How long will we look record by record backwards?
-        static const int backwardsScanTime = 5;
+        // If we don't have a _curloc yet, then we'll have
+        // to backwards scan this time in order to initialize it.
+        if (_curloc.isNull() && !_extentHopping) {
+            return workBackwardsScan(out);
+        }
 
         // If we're reading backwards, try again.
         if (_backwardsScanning) {
             // Still have time to succeed with reading backwards.
-            if (_timer.seconds() < backwardsScanTime) {
+            if (_timer.seconds() < _backwardsScanTime) {
                 return workBackwardsScan(out);
             }
             switchToExtentHopping();
@@ -210,5 +213,7 @@ namespace mongo {
             }
         }
     }
+
+    int OplogStart::_backwardsScanTime = 5;
 
 }  // namespace mongo
