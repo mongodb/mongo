@@ -57,7 +57,7 @@ __wt_lsm_merge(
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
-	WT_LSM_CHUNK *chunk, *youngest;
+	WT_LSM_CHUNK *chunk, *previous, *youngest;
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
@@ -65,10 +65,19 @@ __wt_lsm_merge(
 	const char *cfg[3];
 
 	bloom = NULL;
+	chunk_size = 0;
 	create_bloom = 0;
 	dest = src = NULL;
-	chunk_size = 0;
 	start_id = 0;
+
+	/*
+	 * If the tree is open read-only, be very aggressive.  Otherwise, we
+	 * can spend a long time waiting for merges to start in read-only
+	 * applications.
+	 */
+	if (!lsm_tree->modified)
+		aggressive = 10;
+	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -76,7 +85,7 @@ __wt_lsm_merge(
 	 * should assume there is no work to do: if there are unwritten chunks,
 	 * the worker should write them immediately.
 	 */
-	if (lsm_tree->nchunks <= 1)
+	if (lsm_tree->nchunks <= merge_min)
 		return (WT_NOTFOUND);
 
 	/*
@@ -87,22 +96,12 @@ __wt_lsm_merge(
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
-	 * If the tree is open read-only, be very aggressive.  Otherwise, we
-	 * can spend a long time waiting for merges to start in read-only
-	 * applications.
-	 */
-	if (F_ISSET(
-	    lsm_tree->chunk[lsm_tree->nchunks - 1], WT_LSM_CHUNK_ONDISK))
-		aggressive = 100;
-	merge_min = aggressive ? 2 : lsm_tree->merge_min;
-
-	/*
-	 * Only include chunks that are stable on disk and not involved in a
-	 * merge.
+	 * Only include chunks that already have a Bloom filter and not
+	 * involved in a merge.
 	 */
 	end_chunk = lsm_tree->nchunks - 1;
 	while (end_chunk > 0 &&
-	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK) ||
+	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_BLOOM) ||
 	    F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_MERGING)))
 		--end_chunk;
 
@@ -157,11 +156,12 @@ __wt_lsm_merge(
 		 * If we have enough chunks for a merge and the next chunk is
 		 * in a different generation, stop.
 		 */
-		if (nchunks >= merge_min &&
-		    chunk->generation >
-			lsm_tree->chunk[start_chunk]->generation &&
-		    chunk->generation <= youngest->generation + 1)
-			break;
+		if (nchunks >= merge_min) {
+			previous = lsm_tree->chunk[start_chunk];
+			if (chunk->generation > previous->generation &&
+			    previous->generation <= youngest->generation + 1)
+				break;
+		}
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
 		record_count += chunk->count;

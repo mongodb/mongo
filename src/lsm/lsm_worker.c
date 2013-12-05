@@ -95,9 +95,8 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	uint64_t saved_gen;
 	u_int aggressive, chunk_wait, id, old_aggressive, stallms;
-	int progress, try_bloom;
+	int progress;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
@@ -105,9 +104,7 @@ __wt_lsm_merge_worker(void *vargs)
 	session = lsm_tree->worker_sessions[id];
 	__wt_free(session, args);
 
-	saved_gen = lsm_tree->dsk_gen;
 	aggressive = stallms = 0;
-	try_bloom = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		/*
@@ -125,18 +122,18 @@ __wt_lsm_merge_worker(void *vargs)
 		/* Clear any state from previous worker thread iterations. */
 		session->dhandle = NULL;
 
-		if (__wt_lsm_merge(session, lsm_tree, id, aggressive) == 0) {
+		/* Try to create a Bloom filter. */
+		if (__lsm_bloom_work(session, lsm_tree) == 0)
 			progress = 1;
-			try_bloom = 0;
+
+		/* If we didn't create a Bloom filter, try to merge. */
+		if (progress == 0 &&
+		    __wt_lsm_merge(session, lsm_tree, id, aggressive) == 0) {
+			progress = 1;
 		}
 
 		/* Clear any state from previous worker thread iterations. */
 		WT_CLEAR_BTREE_IN_SESSION(session);
-
-		/* Try to create a Bloom filter if no merge was possible. */
-		if (progress == 0 && try_bloom &&
-		    __lsm_bloom_work(session, lsm_tree) == 0)
-			progress = 1;
 
 		/*
 		 * Only have one thread freeing old chunks, and only if there
@@ -146,42 +143,25 @@ __wt_lsm_merge_worker(void *vargs)
 		    __lsm_free_chunks(session, lsm_tree) == 0)
 			progress = 1;
 
-		if (progress || saved_gen != lsm_tree->dsk_gen) {
-			aggressive = 0;
+		if (progress)
 			stallms = 0;
-			saved_gen = lsm_tree->dsk_gen;
-		} else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
+		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			/*
-			 * The "main" thread polls 10 times per second,
-			 * secondary threads once per second.
-			 */
+			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-			    session, lsm_tree->work_cond,
-			    id == 0 ? 100000 : 1000000));
-			stallms += (id == 0) ? 100 : 1000;
-
-			/*
-			 * Start creating Bloom filters once enough time has
-			 * passed that we should have filled a chunk (or 1
-			 * second if we don't have an estimate).
-			 */
-			try_bloom = (stallms > (lsm_tree->chunk_fill_ms == 0 ?
-			    1000 : lsm_tree->chunk_fill_ms));
+			    session, lsm_tree->work_cond, 100000));
+			stallms += 100;
 
 			/*
 			 * Get aggressive if more than enough chunks for a
 			 * merge should have been created while we waited.
-			 * Use 30 seconds as a default if we don't have an
+			 * Use 10 seconds as a default if we don't have an
 			 * estimate.
 			 */
 			chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
-			    30000 : lsm_tree->chunk_fill_ms);
+			    10000 : lsm_tree->chunk_fill_ms);
 			old_aggressive = aggressive;
-			for (aggressive = 0, chunk_wait /= lsm_tree->merge_min;
-			    chunk_wait > 0;
-			    ++aggressive, chunk_wait /= lsm_tree->merge_min)
-				;
+			aggressive = chunk_wait / lsm_tree->merge_min;
 
 			if (aggressive > old_aggressive)
 				WT_VERBOSE_ERR(session, lsm,
@@ -209,7 +189,7 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
-	int i;
+	u_int i;
 
 	WT_CLEAR(cookie);
 	/* If no work is done, tell our caller by returning WT_NOTFOUND. */
@@ -218,7 +198,7 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
 	/* Create bloom filters in all checkpointed chunks. */
-	for (i = (int)cookie.nchunks - 1; i >= 0; i--) {
+	for (i = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
 
 		/*
