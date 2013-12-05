@@ -128,9 +128,8 @@ __wt_lsm_merge_worker(void *vargs)
 
 		/* If we didn't create a Bloom filter, try to merge. */
 		if (progress == 0 &&
-		    __wt_lsm_merge(session, lsm_tree, id, aggressive) == 0) {
+		    __wt_lsm_merge(session, lsm_tree, id, aggressive) == 0)
 			progress = 1;
-		}
 
 		/* Clear any state from previous worker thread iterations. */
 		WT_CLEAR_BTREE_IN_SESSION(session);

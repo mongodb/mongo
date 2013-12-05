@@ -119,11 +119,11 @@ lsm_config = [
 	        type='boolean'),
 	    Config('chunk_max', '5GB', r'''
 	        the maximum size a single chunk can be. Chunks larger than this
-		size are not considered for further merges. This is a soft
-		limit, and chunks larger than this value can be created.  Must
-		be larger than chunk_size''',
+	        size are not considered for further merges. This is a soft
+	        limit, and chunks larger than this value can be created.  Must
+	        be larger than chunk_size''',
 	        min='100MB', max='10TB'),
-	    Config('chunk_size', '2MB', r'''
+	    Config('chunk_size', '10MB', r'''
 	        the maximum size of the in-memory chunk of an LSM tree''',
 	        min='512K', max='500MB'),
 	    Config('merge_max', '15', r'''
@@ -180,11 +180,11 @@ file_config = format_meta + [
 	Config('huffman_key', '', r'''
 	    configure Huffman encoding for keys.  Permitted values
 	    are empty (off), \c "english", \c "utf8<file>" or \c
-	    "utf16<file>".	See @ref huffman for more information'''),
+	    "utf16<file>".  See @ref huffman for more information'''),
 	Config('huffman_value', '', r'''
-	    configure Huffman encoding for values.	Permitted values
+	    configure Huffman encoding for values.  Permitted values
 	    are empty (off), \c "english", \c "utf8<file>" or \c
-	    "utf16<file>".	See @ref huffman for more information'''),
+	    "utf16<file>".  See @ref huffman for more information'''),
 	Config('internal_key_truncate', 'true', r'''
 	    configure internal key truncation, discarding unnecessary
 	    trailing bytes on internal keys (ignored for custom
@@ -238,7 +238,7 @@ file_config = format_meta + [
 	    from this object are read or written into the buffer cache''',
 	    min=0),
 	Config('os_cache_dirty_max', '0', r'''
-	    maximum dirty system buffer cache usage, in bytes.	If non-zero,
+	    maximum dirty system buffer cache usage, in bytes.  If non-zero,
 	    schedule writes for dirty blocks belonging to this object in the
 	    system buffer cache after that many bytes from this object are
 	    written into the buffer cache''',
@@ -393,7 +393,7 @@ methods = {
 'session.create' :
 	    Method(table_only_meta + file_config + lsm_config + source_meta + [
 	Config('exclusive', 'false', r'''
-	    fail if the object exists.	When false (the default), if the
+	    fail if the object exists.  When false (the default), if the
 	    object exists, check that its settings match the specified
 	    configuration''',
 	    type='boolean'),
@@ -564,7 +564,7 @@ methods = {
 	    must match ::wiredtiger_extension_init'''),
 	Config('terminate', 'wiredtiger_extension_terminate', r'''
 	    an optional function in the extension that is called before
-	    the extension is unloaded during WT_CONNECTION::close.	The
+	    the extension is unloaded during WT_CONNECTION::close.  The
 	    signature of the function must match
 	    ::wiredtiger_extension_terminate'''),
 ]),
@@ -612,7 +612,7 @@ methods = {
 	Config('file_extend', '', r'''
 	    file extension configuration.  If set, extend files of the set
 	    type in allocations of the set size, instead of a block at a
-	    time as each new block is written.	For example,
+	    time as each new block is written.  For example,
 	    <code>file_extend=(data=16MB)</code>''',
 	    type='list', choices=['data', 'log']),
 	Config('hazard_max', '1000', r'''
@@ -653,7 +653,7 @@ methods = {
 	    min='1'),
 	Config('statistics_log', '', r'''
 	    log any statistics the database is configured to maintain,
-	    to a file.	See @ref statistics for more information''',
+	    to a file.  See @ref statistics for more information''',
 	    type='category', subconfig=[
 	    Config('path', '"WiredTigerStat.%H"', r'''
 	        the pathname to a file into which the log records are written,

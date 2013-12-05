@@ -1,7 +1,7 @@
 # wtperf options file: Run populate thread multi-threaded and with groups
 # of operations in each transaction.
 conn_config="cache_size=200MB"
-table_config="lsm=(chunk_size=1M),type=lsm"
+table_config="lsm=(merge_threads=2),type=lsm"
 transaction_config="isolation=snapshot"
 icount=10000000
 report_interval=5
