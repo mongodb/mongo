@@ -27,7 +27,7 @@
  *   Instructs the compiler that the decorated function will not return through the normal return
  *   path.
  *
- *   Correct: void MONGO_COMPILER_NORETURN myAbortFunction();
+ *   Correct: MONGO_COMPILER_NORETURN void myAbortFunction();
  *
  *
  * MONGO_COMPILER_VARIABLE_UNUSED
@@ -71,6 +71,40 @@
  *
  *   Incorrect:
  *     int MONGO_COMPILER_ALIGN_VARIABLE(16) a, b;
+ *
+ *
+ * MONGO_COMPILER_API_EXPORT
+ *
+ *   Instructs the compiler to label the given type, variable or function as part of the
+ *   exported interface of the library object under construction.
+ *
+ *   Correct:
+ *       MONGO_COMPILER_API_EXPORT int globalSwitch;
+ *       class MONGO_COMPILER_API_EXPORT ExportedType { ... };
+ *       MONGO_COMPILER_API_EXPORT SomeType exportedFunction(...);
+ *
+ *   NOTE: Rather than using this macro directly, one typically declares another macro named for the
+ *   library, which is conditionally defined to either MONGO_COMIPLER_API_EXPORT or
+ *   MONGO_COMPILER_API_IMPORT based on whether the compiler is currently building the library or
+ *   building an object that depends on the library, respectively.  For example, MONGO_CLIENT_API
+ *   might be defined to MONGO_COMPILER_API_EXPORT when building the MongoDB shared library, and to
+ *   MONGO_COMPILER_API_IMPORT when building an application that links against the shared library.
+ *
+ *
+ * MONGO_COMPILER_API_IMPORT
+ *
+ *   Instructs the compiler to label the given type, variable or function as imported
+ *   from another library, and not part of the library object under construction.
+ *
+ *   Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
+ *
+ *
+ * MONGO_COMPILER_API_CALLING_CONVENTION
+ *
+ *    Explicitly decorates a function declaration the api calling convention used for
+ *    shared libraries.
+ *
+ *    Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
  */
 
 #if defined(_MSC_VER)

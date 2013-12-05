@@ -29,3 +29,23 @@
 #define MONGO_COMPILER_ALIGN_TYPE(ALIGNMENT) __attribute__(( __aligned__(ALIGNMENT) ))
 
 #define MONGO_COMPILER_ALIGN_VARIABLE(ALIGNMENT) __attribute__(( __aligned__(ALIGNMENT) ))
+
+// NOTE(schwerin): These visibility and calling-convention macro definitions assume we're not using
+// GCC/CLANG to target native Windows. If/when we decide to do such targeting, we'll need to change
+// compiler flags on Windows to make sure we use an appropriate calling convention, and configure
+// MONGO_COMPILER_API_EXPORT, MONGO_COMPILER_API_IMPORT and MONGO_COMPILER_API_CALLING_CONVENTION
+// correctly.  I believe "correctly" is the following:
+//
+// #ifdef _WIN32
+// #define MONGO_COMIPLER_API_EXPORT __attribute__(( __dllexport__ ))
+// #define MONGO_COMPILER_API_IMPORT __attribute__(( __dllimport__ ))
+// #ifdef _M_IX86
+// #define MONGO_COMPILER_API_CALLING_CONVENTION __attribute__((__cdecl__))
+// #else
+// #define MONGO_COMPILER_API_CALLING_CONVENTION
+// #endif
+// #else ... fall through to the definitions below.
+
+#define MONGO_COMPILER_API_EXPORT __attribute__(( __visibility__("default") ))
+#define MONGO_COMPILER_API_IMPORT
+#define MONGO_COMPILER_API_CALLING_CONVENTION

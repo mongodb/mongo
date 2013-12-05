@@ -29,3 +29,15 @@
 #define MONGO_COMPILER_ALIGN_TYPE(ALIGNMENT) __declspec( align( ALIGNMENT ) )
 
 #define MONGO_COMPILER_ALIGN_VARIABLE(ALIGNMENT) __declspec( align( ALIGNMENT ) )
+
+#define MONGO_COMPILER_API_EXPORT __declspec(dllexport)
+#define MONGO_COMPILER_API_IMPORT __declspec(dllimport)
+
+#ifdef _M_IX86
+// 32-bit x86 supports multiple of calling conventions.  We build supporting the cdecl convention
+// (most common).  By labeling our exported and imported functions as such, we do a small favor to
+// 32-bit Windows developers.
+#define MONGO_COMPILER_API_CALLING_CONVENTION __cdecl
+#else
+#define MONGO_COMPILER_API_CALLING_CONVENTION
+#endif
