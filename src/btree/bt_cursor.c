@@ -67,12 +67,9 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	page = cbt->page;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/* If we found an item on an insert list, check there. */
-	if (ins != NULL) {
-		if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
-			return (1);
+	/* If we found an insert list entry with a visible update, use it. */
+	if (ins != NULL && (upd = __wt_txn_read(session, ins->upd)) != NULL)
 		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
-	}
 
 	/* The page may be empty, the search routine doesn't check. */
 	if (page->entries == 0)
