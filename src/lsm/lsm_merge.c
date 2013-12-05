@@ -281,7 +281,7 @@ __wt_lsm_merge(
 	    record_count, insert_count);
 
 	/*
-	 * We've successfully created the new chunk.  Now install it. We need
+	 * We've successfully created the new chunk.  Now install it.  We need
 	 * to ensure that the NO_CACHE flag is cleared and the bloom filter
 	 * is closed (even if a step fails), so track errors but don't return
 	 * until we've cleaned up.
@@ -289,6 +289,8 @@ __wt_lsm_merge(
 	WT_TRET(src->close(src));
 	WT_TRET(dest->close(dest));
 	src = dest = NULL;
+
+	F_CLR(session, WT_SESSION_NO_CACHE);
 
 	if (create_bloom) {
 		if (ret == 0)
@@ -308,7 +310,6 @@ __wt_lsm_merge(
 		WT_TRET(__wt_bloom_close(bloom));
 		bloom = NULL;
 	}
-	F_CLR(session, WT_SESSION_NO_CACHE);
 	WT_ERR(ret);
 
 	/*
@@ -323,7 +324,6 @@ __wt_lsm_merge(
 	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
-
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
