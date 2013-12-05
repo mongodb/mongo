@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/record_store.h"
+#include "mongo/db/structure/record_store.h"
 
 #include "mongo/db/storage/extent.h"
 
