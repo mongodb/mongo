@@ -659,15 +659,9 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 				ret = __wt_meta_track_sub_off(session);
 		}
 
-		/*
-		 * Note the test is different than above where we ignored the
-		 * handle passed in by our caller: we're releasing all of the
-		 * handles, including any passed in by our caller.
-		 */
 		if (!WT_META_TRACKING(session))
 			WT_TRET(__wt_session_release_btree(session));
 
-		session->dhandle = NULL;
 		WT_ERR(ret);
 	}
 
