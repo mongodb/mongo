@@ -128,23 +128,12 @@ typedef struct {
 
 	char *uri;				/* Object name */
 
-#define	FIX		1			/* File types */
-#define	ROW		2
-#define	VAR		3
-	u_int   type;				/* File type */
-
-#define	COMPRESS_NONE	1
-#define	COMPRESS_BZIP	2
-#define	COMPRESS_LZO	3
-#define	COMPRESS_RAW	4
-#define	COMPRESS_SNAPPY	5
-	u_int compression;			/* Compression type */
-
 	char *config_open;			/* Command-line configuration */
 
 	u_int c_bitcnt;				/* Config values */
 	u_int c_cache;
 	u_int c_compact;
+	char *c_checksum;
 	char *c_compression;
 	char *c_config_open;
 	u_int c_data_extend;
@@ -175,6 +164,24 @@ typedef struct {
 	u_int c_value_max;
 	u_int c_value_min;
 	u_int c_write_pct;
+
+
+#define	FIX			1	
+#define	ROW			2
+#define	VAR			3
+	u_int type;				/* File type's flag value */
+
+#define	CHECKSUM_OFF		1
+#define	CHECKSUM_ON		2
+#define	CHECKSUM_UNCOMPRESSED	3
+	u_int c_checksum_flag;			/* Checksum flag value */
+
+#define	COMPRESS_NONE		1
+#define	COMPRESS_BZIP		2
+#define	COMPRESS_LZO		3
+#define	COMPRESS_RAW		4
+#define	COMPRESS_SNAPPY		5
+	u_int c_compression_flag;		/* Compression flag value */
 
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */

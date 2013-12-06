@@ -83,6 +83,10 @@ static CONFIG c[] = {
 	  "size of the cache in MB",
 	  0x0, 0x0, 1, 100, 1024, &g.c_cache, NULL },
 
+	{ "checksum",
+	  "type of checksums (on | off | uncompressed)",
+	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_checksum },
+
 	{ "compaction",
 	  "if compaction is running",			/* 10% */
 	  0x0, C_BOOL, 10, 0, 0, &g.c_compact, NULL },

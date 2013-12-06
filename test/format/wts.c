@@ -217,22 +217,22 @@ wts_create(void)
 		break;
 	}
 
-	/* Configure checksums (not configurable from the command line). */
-	switch MMRAND(1, 10) {
-	case 1:						/* 10% */
-		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
-		break;
-	case 2:						/* 10% */
+	/* Configure checksums. */
+	switch (g.c_checksum_flag) {
+	case CHECKSUM_OFF:
 		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
 		break;
-	default:					/* 80% */
+	case CHECKSUM_ON:
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		break;
+	case CHECKSUM_UNCOMPRESSED:
 		p += snprintf(
 		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
 		break;
 	}
 
 	/* Configure compression. */
-	switch (g.compression) {
+	switch (g.c_compression_flag) {
 	case COMPRESS_NONE:
 		break;
 	case COMPRESS_BZIP:
