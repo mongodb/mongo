@@ -150,7 +150,8 @@ namespace mongo {
         }
 
         if (elem.type() == String) {
-            *out = elem.valuestr();
+            // Extract everything, including embedded null characters.
+            *out = string(elem.valuestr(), elem.valuestrsize() - 1);
             return FIELD_SET;
         }
 

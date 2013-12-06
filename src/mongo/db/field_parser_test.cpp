@@ -422,4 +422,23 @@ namespace {
         ASSERT_NOT_EQUALS(errMsg, "");
     }
 
+    TEST(EdgeCases, EmbeddedNullStrings) {
+
+        // Test extraction of string values with embedded nulls.
+        BSONField<string> field("testStr");
+
+        const char* str = "a\0c";
+        const size_t strSize = 4;
+        BSONObjBuilder doc;
+        doc.append(field(), str, strSize);
+        BSONObj obj(doc.obj());
+
+        string parsed;
+        string errMsg;
+        ASSERT(FieldParser::extract(obj, field, &parsed, &errMsg));
+
+        ASSERT_EQUALS(0, memcmp(parsed.data(), str, strSize));
+        ASSERT_EQUALS(errMsg, "");
+    }
+
 } // unnamed namespace
