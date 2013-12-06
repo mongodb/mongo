@@ -483,6 +483,7 @@ populate_thread(void *arg)
 		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
 		goto err;
 	}
+
 	/* Do a bulk load if populate is single-threaded. */
 	if ((ret = session->open_cursor(session, cfg->uri, NULL,
 	    cfg->populate_threads == 1 ? "bulk" : NULL, &cursor)) != 0) {
@@ -547,8 +548,7 @@ populate_thread(void *arg)
 			    "Fail committing, transaction was aborted");
 	}
 
-	if (session != NULL &&
-	    (ret = session->close(session, NULL)) != 0) {
+	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session in populate");
 		goto err;
 	}
