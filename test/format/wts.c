@@ -112,8 +112,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (strstr(config, "direct_io") != NULL)
 		g.c_hot_backups = 0;
 
-	if ((ret =
-	    wiredtiger_open(home, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open: %s", home);
 
 	if (set_api)
@@ -302,8 +301,9 @@ wts_close(void)
 void
 wts_dump(const char *tag, int dump_bdb)
 {
-	int offset, ret;
-	char cmd[256];
+	size_t len;
+	int ret;
+	char *cmd;
 
 	/* Data-sources that don't support dump through the wt utility. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
@@ -311,19 +311,21 @@ wts_dump(const char *tag, int dump_bdb)
 
 	track("dump files and compare", 0ULL, NULL);
 
-	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
-	if (dump_bdb)
-		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -b %s", BERKELEY_DB_PATH);
-	if (g.type == FIX || g.type == VAR)
-		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -c");
+	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
+	if ((cmd = malloc(len)) == NULL)
+		syserr("malloc");
+	(void)snprintf(cmd, len,
+	    "sh s_dumpcmp -h %s %s %s %s %s %s",
+	    g.home,
+	    dump_bdb ? "-b " : "",
+	    dump_bdb ? BERKELEY_DB_PATH : "",
+	    g.type == FIX || g.type == VAR ? "-c" : "",
+	    g.uri == NULL ? "" : "-n",
+	    g.uri == NULL ? "" : g.uri);
 
-	if (g.uri != NULL)
-		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -n %s", g.uri);
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
+	free(cmd);
 }
 
 void
@@ -350,11 +352,7 @@ wts_salvage(void)
 	 * Save a copy of the interesting files so we can replay the salvage
 	 * step as necessary.
 	 */
-	if ((ret = system(
-	    "cd RUNDIR && "
-	    "rm -rf slvg.copy && "
-	    "mkdir slvg.copy && "
-	    "cp WiredTiger* wt* slvg.copy/")) != 0)
+	if ((ret = system(g.home_salvage_copy)) != 0)
 		die(ret, "salvage copy step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -429,8 +427,8 @@ wts_stats(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
-	if ((fp = fopen("RUNDIR/stats", "w")) == NULL)
-		die(errno, "fopen: RUNDIR/stats");
+	if ((fp = fopen(g.home_stats, "w")) == NULL)
+		die(errno, "fopen: %s", g.home_stats);
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");

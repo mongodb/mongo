@@ -68,7 +68,7 @@ bdb_open(void)
 		assert(db->set_bt_compare(db, bdb_compare_reverse) == 0);
 
 	assert(db->open(
-	    db, NULL, "RUNDIR/bdb", NULL, DB_BTREE, DB_CREATE, 0) == 0);
+	    db, NULL, g.home_bdb, NULL, DB_BTREE, DB_CREATE, 0) == 0);
 	g.bdb = db;
 	assert(db->cursor(db, NULL, &dbc, 0) == 0);
 	g.dbc = dbc;

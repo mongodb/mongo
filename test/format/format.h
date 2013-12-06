@@ -76,15 +76,23 @@ extern WT_EXTENSION_API *wt_api;
 
 #define	WT_NAME	"wt"				/* Object name */
 
-#define	RUNDIR		"RUNDIR"		/* Run home */
-#define	RUNDIR_BACKUP	"RUNDIR/BACKUP"		/* Hot-backup directory */
-#define	RUNDIR_KVS	"RUNDIR/KVS"		/* Run home for data-source */
-
 #define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
 
 typedef struct {
 	char *progname;				/* Program name */
+
+	char *home;				/* Home directory */
+	char *home_init;			/* Initialize home command */
+	char *home_backup;			/* Hot-backup directory */
+	char *home_backup_init;			/* Initialize backup command */
+	char *home_bdb;				/* BDB directory */
+	char *home_kvs;				/* KVS directory */
+	char *home_log;				/* Operation log file path */
+	char *home_rand;			/* RNG log file path */
+	char *home_run;				/* Run file path */
+	char *home_stats;			/* Statistics file path */
+	char *home_salvage_copy;		/* Salvage copy command */
 
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
@@ -214,6 +222,7 @@ void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 path_setup(const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);

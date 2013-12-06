@@ -37,7 +37,7 @@ int
 main(int argc, char *argv[])
 {
 	int ch, reps, ret;
-	const char *config;
+	const char *config, *home;
 
 	config = NULL;
 
@@ -59,7 +59,8 @@ main(int argc, char *argv[])
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
+	home = NULL;
+	while ((ch = getopt(argc, argv, "1C:c:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -69,6 +70,9 @@ main(int argc, char *argv[])
 			break;
 		case 'c':			/* Configuration from a file */
 			config = optarg;
+			break;
+		case 'h':
+			home = optarg;
 			break;
 		case 'L':			/* Re-direct output to a log */
 			/*
@@ -132,6 +136,9 @@ main(int argc, char *argv[])
 	 */
 	wts_rand_init();
 
+	/* Set up paths. */
+	path_setup(home);
+
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		startup();			/* Start a run */
@@ -143,7 +150,7 @@ main(int argc, char *argv[])
 		track("starting up", 0ULL, NULL);
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
-		wts_open(RUNDIR, 1, &g.wts_conn);
+		wts_open(g.home, 1, &g.wts_conn);
 		wts_create();
 
 		wts_load();			/* Load initial records */
@@ -199,7 +206,7 @@ main(int argc, char *argv[])
 		 * against the Berkeley DB data set again, if possible).
 		 */
 		if (g.c_delete_pct == 0) {
-			wts_open(RUNDIR, 1, &g.wts_conn);
+			wts_open(g.home, 1, &g.wts_conn);
 			wts_salvage();
 			wts_verify("post-salvage verify");
 			wts_close();
@@ -239,6 +246,8 @@ main(int argc, char *argv[])
 static void
 startup(void)
 {
+	int ret;
+
 	/* Close the logging file. */
 	if (g.logfp != NULL) {
 		(void)fclose(g.logfp);
@@ -251,21 +260,22 @@ startup(void)
 		g.rand_log = NULL;
 	}
 
-	/* Create RUNDIR if it doesn't yet exist. */
-	if (access(RUNDIR, X_OK) != 0 && mkdir(RUNDIR, 0777) != 0)
-		die(errno, "mkdir: %s", RUNDIR);
+	/* Create home if it doesn't yet exist. */
+	if (access(g.home, X_OK) != 0 && mkdir(g.home, 0777) != 0)
+		die(errno, "mkdir: %s", g.home);
 
 	/* Remove the run's files except for rand. */
-	WT_UNUSED_RET(system("cd RUNDIR && rm -rf `ls | sed /rand/d`"));
+	if ((ret = system(g.home_init)) != 0)
+		die(ret, "home directory initialization failed");
 
 	/* Create the data-source directory. */
-	if (mkdir(RUNDIR_KVS, 0777) != 0)
-		die(errno, "mkdir: %s", RUNDIR_KVS);
+	if (mkdir(g.home_kvs, 0777) != 0)
+		die(errno, "mkdir: %s", g.home_kvs);
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0) {
-		if ((g.logfp = fopen("RUNDIR/log", "w")) == NULL)
-			die(errno, "fopen: RUNDIR/log");
+		if ((g.logfp = fopen(g.home_log, "w")) == NULL)
+			die(errno, "fopen: %s", g.home_log);
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
 }
@@ -277,10 +287,13 @@ startup(void)
 static void
 onint(int signo)
 {
+	int ret;
+
 	WT_UNUSED(signo);
 
 	/* Remove the run's files except for rand. */
-	WT_UNUSED_RET(system("cd RUNDIR && rm -rf `ls | sed /rand/d`"));
+	if ((ret = system(g.home_init)) != 0)
+		die(ret, "home directory initialization failed");
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
@@ -337,13 +350,14 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s [-1Llqr]\n    "
-	    "[-C wiredtiger-config] [-c config-file] "
+	    "[-C wiredtiger-config] [-c config-file] [-h home] "
 	    "[name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-c read test program configuration from a file\n"
+	    "\t-h home (default 'RUNDIR')\n"
 	    "\t-L output to a log file\n"
 	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"
