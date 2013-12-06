@@ -406,10 +406,16 @@ run_mix_schedule_op(WORKLOAD *workp, int op, int64_t op_cnt)
  * run_mix_schedule --
  *	Schedule the mixed-run operations.
  */
-static void
+static int
 run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 {
 	int64_t pct;
+
+	/* Confirm reads, inserts and updates cannot all be zero. */
+	if (workp->insert == 0 && workp->read == 0 && workp->update == 0) {
+		lprintf(cfg, EINVAL, 0, "no operations scheduled");
+		return (EINVAL);
+	}
 
 	/*
 	 * Check for a simple case where the thread is only doing insert or
@@ -420,11 +426,11 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 		memset(workp->ops,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
 		    sizeof(workp->ops));
-		return;
+		return (0);
 	}
 	if (workp->insert == 0 && workp->read == 0 && workp->update != 0) {
 		memset(workp->ops, WORKER_UPDATE, sizeof(workp->ops));
-		return;
+		return (0);
 	}
 
 	/*
@@ -455,6 +461,7 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	    (workp->insert + workp->read + workp->update);
 	if (pct != 0)
 		run_mix_schedule_op(workp, WORKER_UPDATE, pct);
+	return (0);
 }
 
 static void *
@@ -868,7 +875,8 @@ execute_workload(CONFIG *cfg)
 		    workp->threads, workp->insert, workp->read, workp->update);
 
 		/* Figure out the workload's schedule. */
-		run_mix_schedule(cfg, workp);
+		if ((ret = run_mix_schedule(cfg, workp)) != 0)
+			goto err;
 
 		/* Start the workload's threads. */
 		if ((ret = start_threads(
