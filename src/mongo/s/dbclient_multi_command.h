@@ -56,6 +56,8 @@ namespace mongo {
 
         Status recvAny( ConnectionString* endpoint, BSONSerializable* response );
 
+        void setTimeoutMillis( int milliSecs );
+
     private:
 
         // All info associated with an pre- or in-flight command
@@ -79,6 +81,7 @@ namespace mongo {
 
         typedef std::deque<PendingCommand*> PendingQueue;
         PendingQueue _pendingCommands;
+        int _timeoutMillis;
     };
 
 }

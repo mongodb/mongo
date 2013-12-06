@@ -49,6 +49,8 @@ namespace mongo {
     using std::vector;
     using std::string;
 
+    const int ConfigOpTimeoutMillis = 30 * 1000;
+
     namespace {
         // TODO: consider writing a type for index instead
         /**
@@ -187,6 +189,7 @@ namespace mongo {
                              bool fsyncCheck ) {
 
         DBClientMultiCommand dispatcher;
+        dispatcher.setTimeoutMillis( ConfigOpTimeoutMillis );
         ConfigCoordinator exec( &dispatcher, getConfigHosts() );
         exec.executeBatch( request, response, fsyncCheck );
     }
