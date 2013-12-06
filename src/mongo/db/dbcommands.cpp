@@ -1135,7 +1135,6 @@ namespace mongo {
                     }
 
                     if ( oldPaddingSize != newPaddingSize ) {
-                    	// change userFlags
                         result.append( "PaddingSize_old", oldPaddingSize );
                         nsd->setPaddingFactor( newPaddingSize );
                         if (nsd->paddingFactor() == newPaddingSize){
