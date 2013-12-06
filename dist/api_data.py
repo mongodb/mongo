@@ -130,7 +130,7 @@ lsm_config = [
 	        the maximum number of chunks to include in a merge operation''',
 	        min='2', max='100'),
 	    Config('merge_threads', '1', r'''
-	        the number of thread to perform merge operations''',
+	        the number of threads to perform merge operations''',
 	        min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
 	]),
 ]
