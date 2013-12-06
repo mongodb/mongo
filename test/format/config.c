@@ -55,35 +55,35 @@ config_setup(void)
 	 * them.
 	 */
 	if (!config_find_is_perm("data_source", strlen("data_source")))
-		switch (MMRAND(0, 2)) {
-		case 0:
+		switch (MMRAND(1, 3)) {
+		case 1:
 			config_single("data_source=file", 0);
 			break;
-		case 1:
+		case 2:
 #if 0
 			config_single("data_source=lsm", 0);
 			break;
 #endif
-		case 2:
+		case 3:
 			config_single("data_source=table", 0);
 			break;
 		}
 
 	if (!config_find_is_perm("file_type", strlen("file_type")))
-		switch (MMRAND(0, 2)) {
-		case 0:
+		switch (MMRAND(1, 3)) {
+		case 1:
 			if (!DATASOURCE("lsm")) {
 				config_single("file_type=fix", 0);
 				break;
 			}
 			/* FALLTHROUGH */
-		case 1:
+		case 2:
 			if (!DATASOURCE("lsm")) {
 				config_single("file_type=var", 0);
 				break;
 			}
 			/* FALLTHROUGH */
-		case 2:
+		case 3:
 			config_single("file_type=row", 0);
 			break;
 		}
@@ -115,7 +115,7 @@ config_setup(void)
 	/* Default single-threaded 10% of the time. */
 	cp = config_find("threads", strlen("threads"));
 	if (!(cp->flags & C_PERM))
-		*cp->v = MMRAND(0, 100) < 10 ? 1: CONF_RAND(cp);
+		*cp->v = MMRAND(1, 100) < 10 ? 1: CONF_RAND(cp);
 
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
@@ -191,11 +191,11 @@ config_checksum(void)
 	/* Choose a checksum mode if nothing was specified. */
 	cp = config_find("checksum", strlen("checksum"));
 	if (!(cp->flags & C_PERM))
-		switch (MMRAND(0, 9)) {
-		case 0:					/* 10% */
+		switch (MMRAND(1, 10)) {
+		case 1:					/* 10% */
 			config_single("checksum=on", 0);
 			break;
-		case 1:					/* 10% */
+		case 2:					/* 10% */
 			config_single("checksum=off", 0);
 			break;
 		default:				/* 80% */
@@ -223,18 +223,18 @@ config_compression(void)
 	cp = config_find("compression", strlen("compression"));
 	if (!(cp->flags & C_PERM)) {
 		cstr = "compression=none";
-		switch (MMRAND(0, 9)) {
-		case 0:					/* 10% */
+		switch (MMRAND(1, 10)) {
+		case 1:					/* 10% */
 			break;
-		case 1: case 2: case 3: case 4:		/* 40% */
+		case 2: case 3: case 4: case 5:		/* 40% */
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=bzip";
 			break;
-		case 5:					/* 10% */
+		case 6:					/* 10% */
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=raw";
 			break;
-		case 6: case 7: case 8: case 9:		/* 40% */
+		case 7: case 8: case 9: case 10:	/* 40% */
 			if (access(SNAPPY_PATH, R_OK) == 0)
 				cstr = "compression=snappy";
 			break;

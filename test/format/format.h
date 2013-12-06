@@ -165,7 +165,6 @@ typedef struct {
 	u_int c_value_min;
 	u_int c_write_pct;
 
-
 #define	FIX			1	
 #define	ROW			2
 #define	VAR			3
