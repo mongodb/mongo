@@ -153,7 +153,7 @@ namespace mongo {
         if (it != _variables.end())
             return it->second;
 
-        uassert(17276, str::stream() << "Use of undefinded variable: " << name,
+        uassert(17276, str::stream() << "Use of undefined variable: " << name,
                 name == "ROOT" || name == "CURRENT");
 
         return Variables::ROOT_ID;
