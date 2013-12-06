@@ -83,6 +83,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual void help( stringstream& help ) const {
+            lastError.disableForCommand(); // SERVER-11492
             help << "return error status of the last operation on this connection\n"
                  << "options:\n"
                  << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
