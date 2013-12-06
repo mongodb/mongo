@@ -128,7 +128,7 @@ namespace mongo {
                 Token t = i.next();
                 if ( t.type != Token::TEXT )
                     continue;
-                string word = tolowerString( _stemmer.stem( t.data ) );
+                string word = _stemmer.stem( tolowerString( t.data ) );
                 if ( _query.getNegatedTerms().count( word ) > 0 )
                     return true;
             }

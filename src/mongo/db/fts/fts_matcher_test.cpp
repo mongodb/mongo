@@ -46,6 +46,17 @@ namespace mongo {
             ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "bar" ) ) ) );
         }
 
+        // Regression test for SERVER-11994.
+        TEST( FTSMatcher, NegWild2 ) {
+            FTSQuery q;
+            q.parse( "pizza -restaurant", "english" );
+            FTSMatcher m( q,
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
+
+            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "pizza restaurant" ) ) ) );
+            ASSERT( m.hasNegativeTerm( BSON( "x" << BSON( "y" << "PIZZA RESTAURANT" ) ) ) );
+        }
+
         TEST( FTSMatcher, Phrase1 ) {
             FTSQuery q;
             q.parse( "foo \"table top\"", "english" );
