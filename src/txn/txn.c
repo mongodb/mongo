@@ -104,14 +104,20 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	prev_oldest_id = txn_global->oldest_id;
 	current_id = snap_min = txn_global->current;
 
-	/* For pure read-only workloads, use the last cached snapshot. */
-	if (get_snapshot &&
-	    txn->id == max_id &&
+	/* For pure read-only workloads, avoid contenting for shared state. */
+	if (!get_snapshot) {
+		/*
+		 * If we are trying to update the oldest ID and it is already
+		 * equal to the current ID, there is no point scanning.
+		 */
+		if (txn_global->oldest_id == txn_global->current)
+			return;
+	} else if (txn->id == max_id &&
 	    txn->snapshot_count == 0 &&
 	    txn->snap_min == snap_min &&
 	    TXNID_LE(prev_oldest_id, snap_min)) {
-		/* If nothing has changed since last time, we're done. */
 		txn_state->snap_min = txn->snap_min;
+		/* If nothing has changed in the meantime, we're done. */
 		if (txn_global->scan_count == 0 &&
 		    txn_global->oldest_id == prev_oldest_id)
 			return;
