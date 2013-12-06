@@ -39,6 +39,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details-inl.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/db/commands.h"
 
