@@ -183,7 +183,7 @@ ops(void *arg)
 	cursor = cursor_insert = NULL;
 	for (intxn = 0, cnt = 0; cnt < thread_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
-			track("read/write ops", 0ULL, tinfo);
+			track("ops", 0ULL, tinfo);
 
 		/*
 		 * We can't checkpoint or swap sessions/cursors while in a
