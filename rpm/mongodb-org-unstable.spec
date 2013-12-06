@@ -6,7 +6,7 @@ Summary: MongoDB cross-platform document-oriented database system (metapackage)
 License: AGPL 3.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-mongos, mongodb-org-unstable-tools
+Requires: mongodb-org-unstable-server = %{version}, mongodb-org-unstable-shell = %{version}, mongodb-org-unstable-mongos = %{version}, mongodb-org-unstable-tools = %{version}
 
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root

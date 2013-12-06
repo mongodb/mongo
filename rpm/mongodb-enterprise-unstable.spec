@@ -7,7 +7,7 @@ Summary: MongoDB cross-platform document-oriented database system (enterprise me
 License: AGPL 3.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-tools
+Requires: mongodb-enterprise-unstable-server = %{version}, mongodb-enterprise-unstable-shell = %{version}, mongodb-enterprise-unstable-mongos = %{version}, mongodb-enterprise-unstable-tools = %{version}
 
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
