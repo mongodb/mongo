@@ -348,7 +348,7 @@ op_err:			lprintf(cfg, ret, 0,
 			op = thread->workload->ops;
 	}
 
-	if (session != NULL && (ret = session->close(session, NULL)) != 0) {
+	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Session close in worker failed");
 		goto err;
 	}
