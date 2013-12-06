@@ -101,10 +101,13 @@ main(int argc, char *argv[])
 	/*
 	 * If we weren't given a configuration file, set values from "CONFIG",
 	 * if it exists.
+	 *
+	 * Small hack to ignore any CONFIG file named ".", that just makes it
+	 * possible to ignore any local CONFIG file, used when running checks.
 	 */
 	if (config == NULL && access("CONFIG", R_OK) == 0)
 		config = "CONFIG";
-	if (config != NULL)
+	if (config != NULL && strcmp(config, ".") != 0)
 		config_file(config);
 
 	/*
