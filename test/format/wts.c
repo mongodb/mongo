@@ -270,7 +270,7 @@ wts_create(void)
 
 	if (DATASOURCE("lsm")) {
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
-		if (MMRAND(1, 10) < 3)			/* 20% */
+		if (g.c_bloom_oldest)
 			p += snprintf(
 			    p, (size_t)(end - p), ",lsm=(bloom_oldest=true)");
 	}

@@ -131,6 +131,7 @@ typedef struct {
 	char *config_open;			/* Command-line configuration */
 
 	u_int c_bitcnt;				/* Config values */
+	u_int c_bloom_oldest;
 	u_int c_cache;
 	u_int c_compact;
 	char *c_checksum;

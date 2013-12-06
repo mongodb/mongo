@@ -79,6 +79,10 @@ static CONFIG c[] = {
 	  "number of bits for fixed-length column-store files",
 	  C_FIX, 0x0, 1, 8, 8, &g.c_bitcnt, NULL },
 
+	{ "bloom_oldest",
+	  "if bloom_oldest=true",			/* 10% */
+	  0x0, C_BOOL, 10, 0, 0, &g.c_bloom_oldest, NULL },
+
 	{ "cache",
 	  "size of the cache in MB",
 	  0x0, 0x0, 1, 100, 1024, &g.c_cache, NULL },
