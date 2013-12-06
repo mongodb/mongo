@@ -660,6 +660,13 @@ namespace mongo {
         if (args.Length() == 0) {
             oid.init();
         }
+        else if (args[0]->IsDate() || args[0]->IsNumber()) {
+            // TODO: Make signed support, please check this: 
+            //   https://github.com/mongodb/mongo/blob/master/src/mongo/util/time_support.h#L32
+            unsigned long long m = (unsigned long long) args[0]->NumberValue();
+            Date_t d = Date_t(m);
+            oid.init(d, true);
+        }
         else {
             string s = toSTLString(args[0]);
             try {
