@@ -1139,12 +1139,12 @@ namespace mongo {
                         result.append( "PaddingSize_old", oldPaddingSize );
                         nsd->setPaddingFactor( newPaddingSize );
                         if (nsd->paddingFactor() == newPaddingSize){
-			    result.append( "PaddingSize_new", newPaddingSize );
+			                result.append( "PaddingSize_new", newPaddingSize );
                             ok=true;
-                       }
-		       else{
-		           ok=false;
-		      }
+                        }
+		                else{
+		                   ok=false;
+		                }
                     }
                 }
                 else {
