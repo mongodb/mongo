@@ -425,7 +425,7 @@ config_single(const char *s, int perm)
 			    g.progname, s);
 			exit(EXIT_FAILURE);
 		}
-	} else if (v < (int)cp->min || v > (int)cp->maxset) {
+	} else if (v < 0 || (u_int)v < cp->min || (u_int)v > cp->maxset) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
 		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
 		    g.progname, s, *cp->v, cp->min, cp->maxset);
