@@ -404,17 +404,14 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		 */
 		if (intxn)
 			switch (MMRAND(1, 10)) {
-			case 1:
-			case 2:
-			case 3:
-			case 4:
+			case 1: case 2: case 3: case 4:		/* 40% */
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
 					die(ret, "session.commit_transaction");
 				++tinfo->commit;
 				intxn = 0;
 				break;
-			case 5:
+			case 5:					/* 10% */
 				if (0) {
 deadlock:				++tinfo->deadlock;
 				}
