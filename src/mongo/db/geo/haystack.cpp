@@ -31,22 +31,15 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/index_details.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/btreecursor.h"
-#include "mongo/db/curop-inl.h"
-#include "mongo/db/matcher.h"
-#include "mongo/db/geo/core.h"
-#include "mongo/db/geo/hash.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/util/timer.h"
 
 /**
  * Examines all documents in a given radius of a given point.
@@ -65,6 +58,7 @@ namespace mongo {
         virtual LockType locktype() const { return READ; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
+
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -72,6 +66,7 @@ namespace mongo {
             actions.addAction(ActionType::find);
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
+
         bool run(const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
