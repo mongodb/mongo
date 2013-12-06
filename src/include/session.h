@@ -65,6 +65,7 @@ struct __wt_session_impl {
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
 	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
+	WT_COMPACT	 *compact;	/* Compact state */
 
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */

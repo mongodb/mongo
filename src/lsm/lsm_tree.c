@@ -909,6 +909,43 @@ __wt_lsm_tree_unlock(
 }
 
 /*
+ * __wt_lsm_compact --
+ *	Compact an LSM tree called via __wt_schema_worker.
+ */
+int
+__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
+	struct timespec begin, end;
+	uint64_t last_merge_progressing;
+
+	/* Ignore non LSM names. */
+	if (!WT_PREFIX_MATCH(name, "lsm:"))
+		return (0);
+
+	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
+
+	WT_RET(__wt_epoch(session, &begin));
+
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+	/* Wait for merge activity to stop. */
+	do {
+		last_merge_progressing = lsm_tree->merge_progressing;
+		__wt_sleep(10, 0);
+		WT_RET(__wt_epoch(session, &end));
+		if (session->compact->max_time > 0 &&
+		    session->compact->max_time <
+		     WT_TIMEDIFF(end, begin) / WT_BILLION)
+			WT_ERR(ETIMEDOUT);
+	} while (lsm_tree->merge_progressing != last_merge_progressing);
+
+err:	F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+
+	return (ret);
+}
+
+/*
  * __wt_lsm_tree_worker --
  *	Run a schema worker operation on each level of a LSM tree.
  */

@@ -465,7 +465,11 @@ __lsm_bloom_create(
 		WT_RET(wt_session->drop(wt_session, chunk->bloom_uri, "force"));
 
 	bloom = NULL;
-
+	/*
+	 * This is merge-like activity, and we don't want compacts to give up
+	 * because we are creating a bunch of bloom filters before merging.
+	 */
+	++lsm_tree->merge_progressing;
 	WT_RET(__wt_bloom_create(session, chunk->bloom_uri,
 	    lsm_tree->bloom_config, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));

@@ -61,6 +61,7 @@ __wt_lsm_merge(
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
+	u_int max_generation_gap;
 	int create_bloom;
 	const char *cfg[3];
 
@@ -91,10 +92,11 @@ __wt_lsm_merge(
 	 * can spend a long time waiting for merges to start in read-only
 	 * applications.
 	 */
-	if (F_ISSET(
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) || F_ISSET(
 	    lsm_tree->chunk[lsm_tree->nchunks - 1], WT_LSM_CHUNK_ONDISK))
 		aggressive = 100;
 	merge_min = aggressive ? 2 : lsm_tree->merge_min;
+	max_generation_gap = aggressive > 10 ? 3 : 1;
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a
@@ -188,7 +190,8 @@ __wt_lsm_merge(
 		 * generations.
 		 */
 		if (nchunks < merge_min ||
-		    chunk->generation > youngest->generation + 1) {
+		    chunk->generation >
+		    youngest->generation + max_generation_gap) {
 			for (i = 0; i < nchunks; i++)
 				F_CLR(lsm_tree->chunk[start_chunk + i],
 				    WT_LSM_CHUNK_MERGING);
@@ -262,6 +265,7 @@ __wt_lsm_merge(
 				WT_ERR(EINTR);
 			WT_STAT_FAST_CONN_INCRV(session,
 			    lsm_rows_merged, LSM_MERGE_CHECK_INTERVAL);
+			++lsm_tree->merge_progressing;
 		}
 
 		WT_ERR(src->get_key(src, &key));
@@ -276,6 +280,7 @@ __wt_lsm_merge(
 
 	WT_STAT_FAST_CONN_INCRV(session,
 	    lsm_rows_merged, insert_count % LSM_MERGE_CHECK_INTERVAL);
+	++lsm_tree->merge_progressing;
 	WT_VERBOSE_ERR(session, lsm,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
