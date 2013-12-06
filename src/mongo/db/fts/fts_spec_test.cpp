@@ -37,37 +37,136 @@
 namespace mongo {
     namespace fts {
 
-        TEST( FTSSpec, Fix1 ) {
-            BSONObj user = BSON( "key" << BSON( "title" << "text" <<
-                                                "text" << "text" ) <<
-                                 "weights" << BSON( "title" << 10 ) );
-
-            BSONObj fixed = FTSSpec::fixSpec( user );
-            BSONObj fixed2 = FTSSpec::fixSpec( fixed );
-            ASSERT_EQUALS( fixed, fixed2 );
-        }
-
-        TEST( FTSSpec, DefaultLanguage1 ) {
-            BSONObj user = BSON( "key" << BSON( "text" << "text" ) <<
-                                 "default_language" << "spanish" );
+        /**
+         * Assert that fixSpec() accepts the provided text index spec.
+         */
+        void assertFixSuccess( const std::string& s ) {
+            BSONObj user = fromjson( s );
 
             try {
+                // fixSpec() should not throw on a valid spec.
+                BSONObj fixed = FTSSpec::fixSpec( user );
+
+                // fixSpec() on an already-fixed spec shouldn't change it.
+                BSONObj fixed2 = FTSSpec::fixSpec( fixed );
+                ASSERT_EQUALS( fixed, fixed2 );
+            }
+            catch ( UserException& e ) {
+                ASSERT( false );
+            }
+        }
+
+        /**
+         * Assert that fixSpec() rejects the provided text index spec.
+         */
+        void assertFixFailure( const std::string& s ) {
+            BSONObj user = fromjson( s );
+
+            try {
+                // fixSpec() on an invalid spec should uassert.
                 BSONObj fixed = FTSSpec::fixSpec( user );
             }
             catch ( UserException& e ) {
-                ASSERT(false);
+                return;
             }
+            ASSERT( false );
         }
 
-        TEST( FTSSpec, DefaultLanguage2 ) {
-            BSONObj user = BSON( "key" << BSON( "text" << "text" ) <<
-                                 "default_language" << "spanglish" );
+        TEST( FTSSpec, FixNormalKey1 ) {
+            assertFixSuccess("{key: {a: 'text'}}");
+            assertFixSuccess("{key: {a: 'text', b: 'text'}}");
+            assertFixSuccess("{key: {a: 'text', b: 'text', c: 'text'}}");
 
-            try {
-                BSONObj fixed = FTSSpec::fixSpec( user );
-                ASSERT(false);
-            }
-            catch ( UserException& e ) {}
+            assertFixFailure("{key: {_fts: 'text'}}"); // not allowed to index reserved field
+            assertFixFailure("{key: {_ftsx: 'text'}}");
+        }
+
+        TEST( FTSSpec, FixCompoundKey1 ) {
+            assertFixSuccess("{key: {a: 'text', b: 1.0}}");
+            assertFixSuccess("{key: {a: 'text', b: NumberInt(1)}}");
+            assertFixSuccess("{key: {a: 'text', b: NumberLong(1)}}");
+            assertFixSuccess("{key: {a: 1.0, b: 'text'}}");
+            assertFixSuccess("{key: {a: NumberInt(1), b: 'text'}}");
+            assertFixSuccess("{key: {a: NumberLong(1), b: 'text'}}");
+            assertFixSuccess("{key: {a: -1, b: 'text'}}");
+            assertFixSuccess("{key: {a: 1, b: 1, c: 'text'}}");
+            assertFixSuccess("{key: {a: 1, b: -1, c: 'text'}}");
+            assertFixSuccess("{key: {a: -1, b: 1, c: 'text'}}");
+            assertFixSuccess("{key: {a: 1, b: 'text', c: 1}}");
+            assertFixSuccess("{key: {a: 'text', b: 1, c: 1}}");
+            assertFixSuccess("{key: {a: 'text', b: 'text', c: 1}}");
+            assertFixSuccess("{key: {a: 1, b: 'text', c: 'text'}}");
+
+            assertFixFailure("{key: {a: 'text', b: 0}}");
+            assertFixFailure("{key: {a: 'text', b: '2d'}}"); // not allowed to mix special indexes
+            assertFixFailure("{key: {a: 'text', b: '1'}}");
+            assertFixFailure("{key: {a: 'text', b: -1}}"); // -1 not allowed in suffix
+            assertFixFailure("{key: {a: 'text', _fts: 1}}");
+            assertFixFailure("{key: {a: 'text', _fts: 'text'}}");
+            assertFixFailure("{key: {a: 'text', _ftsx: 1}}");
+            assertFixFailure("{key: {a: 'text', _ftsx: 'text'}}");
+            assertFixFailure("{key: {a: 'text', b: 1, c: -1}}");
+            assertFixFailure("{key: {a: 'text', b: 1, c: 'text'}}"); // 'text' must all be adjacent
+            assertFixFailure("{key: {a: 'text', b: 1, c: 'text', d: 1}}");
+            assertFixFailure("{key: {a: 1, b: 'text', c: 1, d: 'text', e: 1}}");
+        }
+
+        TEST( FTSSpec, FixDefaultLanguage1 ) {
+            assertFixSuccess("{key: {a: 'text'}, default_language: 'english'}");
+            assertFixSuccess("{key: {a: 'text'}, default_language: 'engLISH'}");
+            assertFixSuccess("{key: {a: 'text'}, default_language: 'en'}");
+            assertFixSuccess("{key: {a: 'text'}, default_language: 'eN'}");
+            assertFixSuccess("{key: {a: 'text'}, default_language: 'spanish'}");
+            assertFixSuccess("{key: {a: 'text'}, default_language: 'none'}");
+
+            assertFixFailure("{key: {a: 'text'}, default_language: 'engrish'}");
+            assertFixFailure("{key: {a: 'text'}, default_language: ' english'}");
+            assertFixFailure("{key: {a: 'text'}, default_language: ''}");
+        }
+
+        TEST( FTSSpec, FixWeights1 ) {
+            assertFixSuccess("{key: {a: 'text'}, weights: {}}");
+            assertFixSuccess("{key: {a: 'text'}, weights: {a: 1.0}}");
+            assertFixSuccess("{key: {a: 'text'}, weights: {a: NumberInt(1)}}");
+            assertFixSuccess("{key: {a: 'text'}, weights: {a: NumberLong(1)}}");
+            assertFixSuccess("{key: {a: 'text'}, weights: {a: 99999}}");
+            assertFixSuccess("{key: {'$**': 'text'}, weights: {'a.b': 2}}");
+            assertFixSuccess("{key: {'$**': 'text'}, weights: {a: 2, b: 2}}");
+            assertFixSuccess("{key: {'$**': 'text'}, weights: {'$**': 2}}");
+
+            assertFixFailure("{key: {a: 'text'}, weights: 0}");
+            assertFixFailure("{key: {a: 'text'}, weights: []}");
+            assertFixFailure("{key: {a: 'text'}, weights: 'x'}");
+            assertFixFailure("{key: {a: 'text'}, weights: {a: 0}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {a: -1}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {a: 100000}}"); // above max weight
+            assertFixFailure("{key: {a: 'text'}, weights: {a: '1'}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {'': 1}}"); // "invalid" path
+            assertFixFailure("{key: {a: 'text'}, weights: {'a.': 1}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {'.a': 1}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {'a..a': 1}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {$a: 1}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {'a.$a': 1}}");
+            assertFixFailure("{key: {a: 'text'}, weights: {'a.$**': 1}}");
+        }
+
+        TEST( FTSSpec, FixLanguageOverride1 ) {
+            assertFixSuccess("{key: {a: 'text'}, language_override: 'foo'}");
+            assertFixSuccess("{key: {a: 'text'}, language_override: 'foo$bar'}");
+
+            assertFixFailure("{key: {a: 'text'}, language_override: 'foo.bar'}"); // can't have '.'
+            assertFixFailure("{key: {a: 'text'}, language_override: ''}");
+            assertFixFailure("{key: {a: 'text'}, language_override: '$foo'}");
+        }
+
+        TEST( FTSSpec, FixTextIndexVersion1 ) {
+            assertFixSuccess("{key: {a: 'text'}, textIndexVersion: 2.0}}");
+            assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberInt(2)}}");
+            assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberLong(2)}}");
+
+            assertFixFailure("{key: {a: 'text'}, textIndexVersion: 3}");
+            assertFixFailure("{key: {a: 'text'}, textIndexVersion: '2'}");
+            assertFixFailure("{key: {a: 'text'}, textIndexVersion: {}}");
         }
 
         TEST( FTSSpec, ScoreSingleField1 ) {

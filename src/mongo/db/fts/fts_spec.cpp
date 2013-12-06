@@ -30,6 +30,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -48,6 +49,15 @@ namespace mongo {
         namespace {
             // Default language.  Used for new indexes.
             const std::string moduleDefaultLanguage( "english" );
+
+            /** Validate the given language override string. */
+            bool validateOverride( const string& override ) {
+                // The override field can't be empty, can't be prefixed with a dollar sign, and
+                // can't contain a dot.
+                return !override.empty() &&
+                       override[0] != '$' &&
+                       override.find('.') == std::string::npos;
+            }
         }
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
@@ -58,8 +68,7 @@ namespace mongo {
             verify( status.isOK() );
 
             _languageOverrideField = indexInfo["language_override"].valuestrsafe();
-            if ( _languageOverrideField.size() == 0 )
-                _languageOverrideField = "language";
+            verify( validateOverride( _languageOverrideField ) );
 
             _wildcard = false;
 
@@ -329,45 +338,119 @@ namespace mongo {
             BSONObj keyPattern;
             {
                 BSONObjBuilder b;
-                bool addedFtsStuff = false;
 
-                BSONObjIterator i( spec["key"].Obj() );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( str::equals( e.fieldName(), "_fts" ) ||
-                         str::equals( e.fieldName(), "_ftsx" ) ) {
-                        addedFtsStuff = true;
-                        b.append( e );
-                    }
-                    else if ( e.type() == String && INDEX_NAME == e.valuestr() ) {
-
-                        if ( !addedFtsStuff ) {
-                            _addFTSStuff( &b );
+                // Populate m and keyPattern.
+                {
+                    bool addedFtsStuff = false;
+                    BSONObjIterator i( spec["key"].Obj() );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        if ( str::equals( e.fieldName(), "_fts" ) ) {
+                            uassert( 17271,
+                                     "expecting _fts:\"text\"",
+                                     INDEX_NAME == e.valuestrsafe() );
                             addedFtsStuff = true;
+                            b.append( e );
                         }
+                        else if ( str::equals( e.fieldName(), "_ftsx" ) ) {
+                            uassert( 17272, "expecting _ftsx:1", e.numberInt() == 1 );
+                            b.append( e );
+                        }
+                        else if ( e.type() == String && INDEX_NAME == e.valuestr() ) {
 
-                        m[e.fieldName()] = 1;
+                            if ( !addedFtsStuff ) {
+                                _addFTSStuff( &b );
+                                addedFtsStuff = true;
+                            }
+
+                            m[e.fieldName()] = 1;
+                        }
+                        else {
+                            uassert( 17273,
+                                     "expected value 1 or -1 for non-text key in compound index",
+                                     e.numberInt() == 1 || e.numberInt() == -1 );
+                            b.append( e );
+                        }
+                    }
+                    verify( addedFtsStuff );
+                }
+                keyPattern = b.obj();
+
+                // Verify that index key is in the correct format: extraBefore fields, then text
+                // fields, then extraAfter fields.
+                {
+                    BSONObjIterator i( spec["key"].Obj() );
+                    BSONElement e;
+
+                    // extraBefore fields
+                    do {
+                        verify( i.more() );
+                        e = i.next();
+                    } while ( INDEX_NAME != e.valuestrsafe() );
+
+                    // text fields
+                    bool alreadyFixed = str::equals( e.fieldName(), "_fts" );
+                    if ( alreadyFixed ) {
+                        uassert( 17288, "expected _ftsx after _fts", i.more() );
+                        e = i.next();
+                        uassert( 17274,
+                                 "expected _ftsx after _fts",
+                                 str::equals( e.fieldName(), "_ftsx" ) );
+                        e = i.next();
                     }
                     else {
-                        b.append( e );
+                        do {
+                            uassert( 17289,
+                                     "text index with reserved fields _fts/ftsx not allowed",
+                                     !str::equals( e.fieldName(), "_fts" ) &&
+                                         !str::equals( e.fieldName(), "_ftsx" ) );
+                            e = i.next();
+                        } while ( !e.eoo() && INDEX_NAME == e.valuestrsafe() );
+                    }
+
+                    // extraAfterFields
+                    while ( !e.eoo() ) {
+                        uassert( 17290,
+                                 "compound text index key suffix fields must have value 1",
+                                 e.numberInt() == 1 && !str::equals( "_ftsx", e.fieldName() ) );
+                        e = i.next();
                     }
                 }
 
-                if ( !addedFtsStuff )
-                    _addFTSStuff( &b );
-
-                keyPattern = b.obj();
             }
 
-            if ( spec["weights"].isABSONObj() ) {
+            if ( spec["weights"].type() == Object ) {
                 BSONObjIterator i( spec["weights"].Obj() );
                 while ( i.more() ) {
                     BSONElement e = i.next();
+                    uassert( 17283,
+                             "weight for text index needs numeric type",
+                             e.isNumber() );
                     m[e.fieldName()] = e.numberInt();
+
+                    // Verify weight refers to a valid field.
+                    if ( str::equals( e.fieldName(), "$**" ) ) {
+                        continue;
+                    }
+                    FieldRef keyField;
+                    keyField.parse( e.fieldName() );
+                    uassert( 17294,
+                             "weight cannot be on an empty field",
+                             keyField.numParts() != 0 );
+                    for ( size_t i = 0; i < keyField.numParts(); i++ ) {
+                        StringData part = keyField.getPart(i);
+                        uassert( 17291, "weight cannot have empty path component", !part.empty() );
+                        uassert( 17292,
+                                 "weight cannot have path component with $ prefix",
+                                 !part.startsWith( "$" ) );
+                    }
                 }
             }
             else if ( spec["weights"].str() == WILDCARD ) {
                 m[WILDCARD] = 1;
+            }
+            else if ( !spec["weights"].eoo() ) {
+                uasserted( 17284, "text index option 'weights' must be an object" );
             }
 
             BSONObj weights;
@@ -395,9 +478,17 @@ namespace mongo {
                      "default_language is not valid",
                      FTSLanguage::makeFTSLanguage( default_language ).getStatus().isOK() );
 
-            string language_override(spec.getStringField("language_override"));
-            if ( language_override.empty() )
+            BSONElement language_override_elt = spec["language_override"];
+            string language_override( language_override_elt.str() );
+            if ( language_override_elt.eoo() ) {
                 language_override = "language";
+            }
+            else {
+                uassert( 17136,
+                         "language_override is not valid",
+                         language_override_elt.type() == String
+                             && validateOverride( language_override ) );
+            }
 
             int version = -1;
             int textIndexVersion = 2;
@@ -425,6 +516,9 @@ namespace mongo {
                     version = e.numberInt();
                 }
                 else if ( str::equals( e.fieldName(), "textIndexVersion" ) ) {
+                    uassert( 17293,
+                             "text index option 'textIndexVersion' must be a number",
+                             e.isNumber() );
                     textIndexVersion = e.numberInt();
                     uassert( 16730,
                              str::stream() << "bad textIndexVersion: " << textIndexVersion,
