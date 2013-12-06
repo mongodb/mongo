@@ -393,8 +393,8 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * chunk instead.
 		 */
 		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
-			ret = __wt_open_cursor(session, chunk->uri, c,
-			    NULL, cp);
+			ret = __wt_open_cursor(
+			    session, chunk->uri, c, NULL, cp);
 			if (ret == 0)
 				F_SET(chunk, WT_LSM_CHUNK_EMPTY);
 		}
@@ -808,6 +808,7 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 
 	WT_FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
+		bloom = NULL;
 		if ((bloom = clsm->blooms[i]) != NULL) {
 			if (!have_hash) {
 				WT_ERR(__wt_bloom_hash(

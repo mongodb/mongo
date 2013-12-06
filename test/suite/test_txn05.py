@@ -25,8 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn02.py
-#   Transactions: commits and rollbacks
+# test_txn05.py
+# Transactions: commits and rollbacks
 #
 
 import fnmatch, os, shutil
@@ -35,12 +35,11 @@ from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
-class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
+class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
-    tablename = 'test_txn02'
+    tablename = 'test_txn05'
     uri = 'table:' + tablename
     archive_list = ['true', 'false']
-    conn_list = ['reopen', 'stay_open']
     sync_list = ['dsync', 'fsync', 'none']
 
     types = [
@@ -52,34 +51,15 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
-        ('i4', dict(op1=('insert', 4))),
-        ('r1', dict(op1=('remove', 1))),
-        ('u10', dict(op1=('update', 10))),
-    ]
-    op2s = [
-        ('i6', dict(op2=('insert', 6))),
-        ('r4', dict(op2=('remove', 4))),
-        ('u4', dict(op2=('update', 4))),
-    ]
-    op3s = [
-        ('i12', dict(op3=('insert', 12))),
-        ('r4', dict(op3=('remove', 4))),
-        ('u4', dict(op3=('update', 4))),
-    ]
-    op4s = [
-        ('i14', dict(op4=('insert', 14))),
-        ('r12', dict(op4=('remove', 12))),
-        ('u12', dict(op4=('update', 12))),
+        ('trunc-all', dict(op1=('all', 0))),
+        ('trunc-both', dict(op1=('both', 2))),
+        ('trunc-start', dict(op1=('start', 2))),
+        ('trunc-stop', dict(op1=('stop', 2))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
-    txn2s = [('t2c', dict(txn2='commit')), ('t2r', dict(txn2='rollback'))]
-    txn3s = [('t3c', dict(txn3='commit')), ('t3r', dict(txn3='rollback'))]
-    txn4s = [('t4c', dict(txn4='commit')), ('t4r', dict(txn4='rollback'))]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types,
-            op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s))
-    # scenarios = number_scenarios(multiply_scenarios('.', types,
-    # op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)) [:3]
+    scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s))
+    # scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s))[:3]
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
@@ -155,12 +135,11 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         while count < endcount:
             backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
             try:
-                self.check(backup_conn.open_session(), None, committed)
+                 self.check(backup_conn.open_session(), None, committed)
             finally:
-                # Yield so that the archive thread gets a chance to run
-                # before we close the connection.
-                yield
-                backup_conn.close()
+                 # Let other threads like archive run before closing.
+                 yield
+                 backup_conn.close()
             count += 1
         #
         # Check logs after repeated openings. The first log should
@@ -181,58 +160,57 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     def test_ops(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         self.session.create(self.uri, self.create_params)
-        # Set up the table with entries for 1, 2, 10 and 11.
-        # We use the overwrite config so insert can update as needed.
-        c = self.session.open_cursor(self.uri, None, 'overwrite')
+        # Set up the table with entries for 1-5.
+        # We then truncate starting or ending in various places.
+        c = self.session.open_cursor(self.uri, None)
+        current = {1:1, 2:1, 3:1, 4:1, 5:1}
         c.set_value(1)
-        c.set_key(1)
-        c.insert()
-        c.set_key(2)
-        c.insert()
-        c.set_key(10)
-        c.insert()
-        c.set_key(11)
-        c.insert()
-        current = {1:1, 2:1, 10:1, 11:1}
+        for k in current:
+            c.set_key(k)
+            c.insert()
         committed = current.copy()
 
-        reopen = self.conn_list[
-            self.scenario_number % len(self.conn_list)]
-        ops = (self.op1, self.op2, self.op3, self.op4)
-        txns = (self.txn1, self.txn2, self.txn3, self.txn4)
-        # for ok, txn in zip(ops, txns):
-        # print ', '.join('%s(%d)[%s]' % (ok[0], ok[1], txn)
+        ops = (self.op1, )
+        txns = (self.txn1, )
         for i, ot in enumerate(zip(ops, txns)):
+            self.session.begin_transaction()
             ok, txn = ot
+            # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
             op, k = ok
             
-            # Close and reopen the connection and cursor.
-            if reopen == 'reopen':
-                self.reopen_conn()
-                c = self.session.open_cursor(self.uri, None, 'overwrite')
-
-            self.session.begin_transaction()
-            # Test multiple operations per transaction by always
-            # doing the same operation on key k + 1.
-            k1 = k + 1
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
-            if op == 'insert' or op == 'update':
-                c.set_value(i + 2)
+            if op == 'stop':
                 c.set_key(k)
-                c.insert()
-                c.set_key(k1)
-                c.insert()
-                current[k] = i + 2
-                current[k1] = i + 2
-            elif op == 'remove':
+                self.session.truncate(None, None, c, None)
+                kstart = 1
+                kstop = k
+            elif op == 'start':
                 c.set_key(k)
-                c.remove()
-                c.set_key(k1)
-                c.remove()
-                if k in current:
-                    del current[k]
-                if k1 in current:
-                    del current[k1]
+                self.session.truncate(None, c, None, None)
+                kstart = k
+                kstop = len(current)
+            elif op == 'both':
+                c2 = self.session.open_cursor(self.uri, None)
+                # For both, the key given is the start key.  Add 2
+                # for the stop key.
+                kstart = k
+                kstop = k + 2
+                c.set_key(kstart)
+                c2.set_key(kstop)
+                self.session.truncate(None, c, c2, None)
+                c2.close()
+            elif op == 'all':
+                c2 = self.session.open_cursor(self.uri, None)
+                kstart = 1
+                kstop = len(current)
+                c.set_key(kstart)
+                c2.set_key(kstop)
+                self.session.truncate(None, c, c2, None)
+                c2.close()
+
+            while (kstart <= kstop):
+                del current[kstart]
+                kstart += 1
 
             # print current
             # Check the state after each operation.

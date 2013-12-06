@@ -866,6 +866,7 @@ typedef
 uB
 uid
 uint
+uintmax
 unbare
 uncompressing
 uncompresssed

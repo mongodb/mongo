@@ -49,7 +49,8 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 /*
  * __cursor_invalid --
  *	Return if the cursor references an invalid K/V pair (either the pair
- * doesn't exist at all because the tree is empty, or the pair was deleted).
+ *	doesn't exist at all because the tree is empty, or the pair was
+ *	deleted).
  */
 static inline int
 __cursor_invalid(WT_CURSOR_BTREE *cbt)
@@ -68,8 +69,23 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* If we found an insert list entry with a visible update, use it. */
-	if (ins != NULL && (upd = __wt_txn_read(session, ins->upd)) != NULL)
-		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+	if (ins != NULL) {
+		if ((upd = __wt_txn_read(session, ins->upd)) != NULL)
+			return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+
+		/* Do we have a position on the page? */
+		switch (btree->type) {
+		case BTREE_COL_FIX:
+			if (cbt->recno >= page->u.col_fix.recno + page->entries)
+				return (1);
+			break;
+		case BTREE_COL_VAR:
+		case BTREE_ROW:
+			if (cbt->slot > page->entries)
+				return (1);
+			break;
+		}
+	}
 
 	/* The page may be empty, the search routine doesn't check. */
 	if (page->entries == 0)
@@ -81,9 +97,8 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 		break;
 	case BTREE_COL_VAR:
 		cip = &page->u.col_var.d[cbt->slot];
-		if ((cell = WT_COL_PTR(page, cip)) == NULL)
-			return (WT_NOTFOUND);
-		if (__wt_cell_type(cell) == WT_CELL_DEL)
+		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
+		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (1);
 		break;
 	case BTREE_ROW:

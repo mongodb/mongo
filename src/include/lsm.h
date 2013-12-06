@@ -117,6 +117,7 @@ struct __wt_lsm_tree {
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	u_int nchunks;			/* Number of active chunks */
 	uint32_t last;			/* Last allocated ID */
+	int modified;			/* Have there been updates? */
 
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */

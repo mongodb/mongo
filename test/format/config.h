@@ -72,8 +72,8 @@ typedef struct {
 
 static CONFIG c[] = {
 	{ "firstfit",
-	  "if allocation is firstfit",			/* 20% */
-	  0x0, C_BOOL, 20, 0, 0, &g.c_firstfit, NULL },
+	  "if allocation is firstfit",			/* 10% */
+	  0x0, C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
@@ -82,6 +82,10 @@ static CONFIG c[] = {
 	{ "cache",
 	  "size of the cache in MB",
 	  0x0, 0x0, 1, 100, 1024, &g.c_cache, NULL },
+
+	{ "compaction",
+	  "if compaction is running",			/* 10% */
+	  0x0, C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
 	  "type of compression (none | bzip | lzo | raw | snappy)",

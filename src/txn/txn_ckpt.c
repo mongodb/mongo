@@ -476,7 +476,7 @@ __checkpoint_worker(
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
-		WT_ASSERT(session, session->dhandle->refcnt == 0);
+		WT_ASSERT(session, session->dhandle->session_ref == 0);
 		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	}

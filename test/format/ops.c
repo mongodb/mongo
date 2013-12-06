@@ -91,7 +91,7 @@ wts_ops(void)
 		if ((ret =
 		    pthread_create(&backup_tid, NULL, hot_backup, NULL)) != 0)
 			die(ret, "pthread_create");
-		if ((ret =
+		if (g.c_compact && (ret =
 		    pthread_create(&compact_tid, NULL, compact, NULL)) != 0)
 			die(ret, "pthread_create");
 
@@ -130,7 +130,8 @@ wts_ops(void)
 		/* Wait for the backup, compaction thread. */
 		g.threads_finished = 1;
 		(void)pthread_join(backup_tid, NULL);
-		(void)pthread_join(compact_tid, NULL);
+		if (g.c_compact)
+			(void)pthread_join(compact_tid, NULL);
 	}
 
 	if (g.logging != 0) {
