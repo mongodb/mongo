@@ -71,16 +71,36 @@ typedef struct {
 #define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
 
 static CONFIG c[] = {
+	{ "auto_throttle",
+	  "if LSM inserts are throttled",			/* 90% */
+	  0x0, C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
+
 	{ "firstfit",
-	  "if allocation is firstfit",			/* 10% */
+	  "if allocation is firstfit",				/* 10% */
 	  0x0, C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
 	  C_FIX, 0x0, 1, 8, 8, &g.c_bitcnt, NULL },
 
+	{ "bloom",
+	  "if bloom filters are configured",			/* 95% */
+	  0x0, C_BOOL, 95, 0, 0, &g.c_bloom, NULL },
+
 	{ "bloom_oldest",
-	  "if bloom_oldest=true",			/* 10% */
+	  "if bloom_oldest=true",				/* 10% */
+	  0x0, C_BOOL, 10, 0, 0, &g.c_bloom_oldest, NULL },
+
+	{ "bloom_bit_count",
+	  "number of bits per item for LSM bloom filters",
+	  0x0, 0x0, 4, 32, 1000, &g.c_bloom_bit_count, NULL },
+
+	{ "bloom_hash_count",
+	  "number of hash values per item for LSM bloom filters",
+	  0x0, 0x0, 4, 16, 100, &g.c_bloom_hash_count, NULL },
+
+	{ "bloom_oldest",
+	  "if bloom_oldest=true",				/* 10% */
 	  0x0, C_BOOL, 10, 0, 0, &g.c_bloom_oldest, NULL },
 
 	{ "cache",
@@ -92,7 +112,7 @@ static CONFIG c[] = {
 	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_checksum },
 
 	{ "compaction",
-	  "if compaction is running",			/* 10% */
+	  "if compaction is running",				/* 10% */
 	  0x0, C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
@@ -100,7 +120,7 @@ static CONFIG c[] = {
 	  0x0, C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
 
 	{ "data_extend",
-	  "if data files are extended",			/* 5% */
+	  "if data files are extended",				/* 5% */
 	  0x0, C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
@@ -112,7 +132,7 @@ static CONFIG c[] = {
 	  0x0, C_OPS, 0, 45, 90, &g.c_delete_pct, NULL },
 
 	{ "dictionary",
-	  "if values are dictionary compressed",	/* 20% */
+	  "if values are dictionary compressed",		/* 20% */
 	  C_ROW | C_VAR, C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
 	{ "file_type",
@@ -120,15 +140,15 @@ static CONFIG c[] = {
 	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },
 
 	{ "hot_backups",
-	  "if hot backups are enabled",			/* 5% */
+	  "if hot backups are enabled",				/* 5% */
 	  0x0, C_BOOL, 5, 0, 0, &g.c_hot_backups, NULL },
 
 	{ "huffman_key",
-	  "if keys are huffman encoded",		/* 20% */
+	  "if keys are huffman encoded",			/* 20% */
 	  C_ROW, C_BOOL, 20, 0, 0, &g.c_huffman_key, NULL },
 
 	{ "huffman_value",
-	 "if values are huffman encoded",		/* 20% */
+	 "if values are huffman encoded",			/* 20% */
 	 C_ROW|C_VAR, C_BOOL, 20, 0, 0, &g.c_huffman_value, NULL },
 
 	{ "insert_pct",
@@ -136,7 +156,7 @@ static CONFIG c[] = {
 	  0x0, C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
 
 	{ "internal_key_truncation",
-	 "if values are huffman encoded",		/* 2% */
+	 "if values are huffman encoded",			/* 2% */
 	 0x0, C_BOOL, 2, 0, 0, &g.c_internal_key_truncation, NULL },
 
 	{ "internal_page_max",
@@ -159,20 +179,32 @@ static CONFIG c[] = {
 	  "maximum size of Btree leaf nodes",
 	  0x0, 0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
 
+	{ "merge_max",
+	  "the maximum number of chunks to include in a merge operation",
+	  0x0, 0x0, 2, 100, 100, &g.c_merge_max, NULL },
+
+	{ "merge_threads",
+	  "the number of threads to perform merge operations",
+	  0x0, 0x0, 1, 10, 10, &g.c_merge_threads, NULL },
+
 	{ "ops",
 	  "the number of modification operations done per run",
 	  0x0, 0x0, 0, M(2), M(100), &g.c_ops, NULL },
 
-	{ "prefix",
-	  "if keys are prefix compressed",		/* 80% */
-	  C_ROW, C_BOOL, 80, 0, 0, &g.c_prefix, NULL },
+	{ "prefix_compression",
+	  "if keys are prefix compressed",			/* 80% */
+	  C_ROW, C_BOOL, 80, 0, 0, &g.c_prefix_compression, NULL },
+
+	{ "prefix_compression_min",
+	  "minimum gain before prefix compression is used",
+	  C_ROW, 0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
 
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or variable-length column-stores",
 	  C_ROW|C_VAR, 0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
 
 	{ "reverse",
-	  "collate in reverse order",			/* 10% */
+	  "collate in reverse order",				/* 10% */
 	  0x0, C_BOOL, 10, 0, 0, &g.c_reverse, NULL },
 
 	{ "rows",
@@ -188,7 +220,7 @@ static CONFIG c[] = {
 	  0x0, 0x0, 40, 85, 85, &g.c_split_pct, NULL },
 
 	{ "statistics",
-	  "maintain statistics",			/* 20% */
+	  "maintain statistics",				/* 20% */
 	  0x0, C_BOOL, 20, 0, 0, &g.c_statistics, NULL },
 
 	{ "threads",

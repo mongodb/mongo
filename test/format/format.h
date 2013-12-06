@@ -130,7 +130,11 @@ typedef struct {
 
 	char *config_open;			/* Command-line configuration */
 
-	u_int c_bitcnt;				/* Config values */
+	u_int c_auto_throttle;			/* Config values */
+	u_int c_bitcnt;
+	u_int c_bloom;
+	u_int c_bloom_bit_count;
+	u_int c_bloom_hash_count;
 	u_int c_bloom_oldest;
 	u_int c_cache;
 	u_int c_compact;
@@ -153,8 +157,11 @@ typedef struct {
 	u_int c_key_max;
 	u_int c_key_min;
 	u_int c_leaf_page_max;
+	u_int c_merge_max;
+	u_int c_merge_threads;
 	u_int c_ops;
-	u_int c_prefix;
+	u_int c_prefix_compression;
+	u_int c_prefix_compression_min;
 	u_int c_repeat_data_pct;
 	u_int c_reverse;
 	u_int c_rows;

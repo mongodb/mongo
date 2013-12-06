@@ -145,7 +145,7 @@ wts_create(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	char config[2048], *end, *p;
+	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
 
@@ -200,7 +200,11 @@ wts_create(void)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
-		if (!g.c_prefix)
+		if (g.c_prefix_compression)
+			p += snprintf(p, (size_t)(end - p),
+			    ",prefix_compression_min=%u",
+			    g.c_prefix_compression_min);
+		else
 			p += snprintf(p, (size_t)(end - p),
 			    ",prefix_compression=false");
 		if (g.c_reverse)
@@ -269,10 +273,24 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
 
 	if (DATASOURCE("lsm")) {
-		p += snprintf(p, (size_t)(end - p), ",type=lsm");
-		if (g.c_bloom_oldest)
-			p += snprintf(
-			    p, (size_t)(end - p), ",lsm=(bloom_oldest=true)");
+		p += snprintf(p, (size_t)(end - p), ",type=lsm,lsm=(");
+#if 0
+		p += snprintf(p, (size_t)(end - p),
+		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom=%s,", g.c_bloom? "true" : "false");
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom_bit_count=%u,", g.c_bloom_bit_count);
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom_hash_count=%u,", g.c_bloom_hash_count);
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
+		p += snprintf(p, (size_t)(end - p),
+		    "merge_max=%u,", g.c_merge_max);
+		p += snprintf(p, (size_t)(end - p),
+		    "merge_threads=%u,", g.c_merge_threads);
+#endif
+		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 
 	if (DATASOURCE("memrata"))
