@@ -1033,7 +1033,7 @@ namespace mongo {
             help << 
                 "Sets collection options.\n"
                 "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
-		        "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
+                "Example: { collMod: 'foo', paddingFactor : 1.3  }\n" 
                 "Example: { collMod: 'foo', index: {keyPattern: {a: 1}, expireAfterSeconds: 600} }";
         }
         virtual void addRequiredPrivileges(const std::string& dbname,
