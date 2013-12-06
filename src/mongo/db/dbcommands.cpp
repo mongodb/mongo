@@ -1033,6 +1033,7 @@ namespace mongo {
             help << 
                 "Sets collection options.\n"
                 "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
+		"Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
                 "Example: { collMod: 'foo', index: {keyPattern: {a: 1}, expireAfterSeconds: 600} }";
         }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -1123,6 +1124,27 @@ namespace mongo {
                         result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
                         nsd->updateTTLIndex( idxNo , newExpireSecs );
                         result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
+                    }
+                }
+                else if ( str::equals( "paddingFactor", e.fieldName() ) ) {
+                    double oldPaddingSize = nsd->paddingFactor();
+                    double newPaddingSize = *(double *)e.value();
+                    if (newPaddingSize > 2.0 or newPaddingSize < 0.1 ){
+                        errmsg= str::stream() << "paddingSize must be between 0.1 and 2.0, we detected: " << e.value();
+                        ok=false;
+                    }
+
+                    if ( oldPaddingSize != newPaddingSize ) {
+                    	// change userFlags
+                        result.append( "PaddingSize_old", oldPaddingSize );
+                        nsd->setPaddingFactor( newPaddingSize );
+                        if (nsd->paddingFactor() == newPaddingSize){
+			    result.append( "PaddingSize_new", newPaddingSize );
+                            ok=true;
+                       }
+		       else{
+		           ok=false;
+		      }
                     }
                 }
                 else {
