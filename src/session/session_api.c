@@ -681,11 +681,11 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL(session, checkpoint, config, cfg);
 
 	txn = &session->txn;
 
 	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint);
+	SESSION_API_CALL(session, checkpoint, config, cfg);
 
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent

@@ -98,7 +98,6 @@ __wt_lsm_merge(
 	 */
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
-
 	/*
 	 * Only include chunks that already have a Bloom filter and not
 	 * involved in a merge.
