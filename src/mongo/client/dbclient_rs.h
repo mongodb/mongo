@@ -561,6 +561,20 @@ namespace mongo {
                       string& errmsg,
                       bool digestPassword );
 
+        /*
+         * Returns whether a query or command can be sent to secondaries based on the query object
+         * and options.
+         *
+         * @param ns the namespace of the query.
+         * @param queryObj the query object to check.
+         * @param queryOptions the query options
+         *
+         * @return true if the query/cmd could potentially be sent to a secondary, false otherwise
+         */
+        static bool isSecondaryQuery( const string& ns,
+                                      const BSONObj& queryObj,
+                                      int queryOptions );
+
     protected:
 
         virtual void _auth(const BSONObj& params);

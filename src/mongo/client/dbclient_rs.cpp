@@ -126,54 +126,6 @@ namespace mongo {
     } _populateReadPrefSecOkCmdList;
 
     /**
-     * @param ns the namespace of the query.
-     * @param queryOptionFlags the flags for the query.
-     * @param queryObj the query object to check.
-     *
-     * @return true if the given query can be sent to a secondary node without taking the
-     *     slaveOk flag into account.
-     */
-    bool _isQueryOkToSecondary(const string& ns, int queryOptionFlags, const BSONObj& queryObj) {
-        if (queryOptionFlags & QueryOption_SlaveOk) {
-            return true;
-        }
-
-        if (!Query::hasReadPreference(queryObj)) {
-            return false;
-        }
-
-        if (ns.find(".$cmd") == string::npos) {
-            return true;
-        }
-
-        BSONObj actualQueryObj;
-        if (strcmp(queryObj.firstElement().fieldName(), "query") == 0) {
-            actualQueryObj = queryObj["query"].embeddedObject();
-        }
-        else {
-            actualQueryObj = queryObj;
-        }
-
-        const string cmdName = actualQueryObj.firstElementFieldName();
-        if (_secOkCmdList.count(cmdName) == 1) {
-            return true;
-        }
-
-        if (cmdName == "mapReduce" || cmdName == "mapreduce") {
-            if (!actualQueryObj.hasField("out")) {
-                return false;
-            }
-
-            BSONElement outElem(actualQueryObj["out"]);
-            if (outElem.isABSONObj() && outElem["inline"].trueValue()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Selects the right node given the nodes to pick from and the preference.
      * This method does strict tag matching, and will not implicitly fallback
      * to matching anything.
@@ -275,15 +227,18 @@ namespace mongo {
      *
      * @param query the raw query document
      *
-     * @return the read preference setting. If the tags field was not present, it will contain one
-     *      empty tag document {} which matches any tag.
+     * @return the read preference setting if a read preference exists, otherwise the default read
+     *         preference of Primary_Only. If the tags field was not present, it will contain one
+     *         empty tag document {} which matches any tag.
      *
      * @throws AssertionException if the read preference object is malformed
      */
-    ReadPreferenceSetting* _extractReadPref(const BSONObj& query) {
-        ReadPreference pref = mongo::ReadPreference_SecondaryPreferred;
+    ReadPreferenceSetting* _extractReadPref(const BSONObj& query, int queryOptions) {
 
         if (Query::hasReadPreference(query)) {
+
+            ReadPreference pref = mongo::ReadPreference_SecondaryPreferred;
+
             BSONElement readPrefElement;
 
             if (query.hasField(Query::ReadPrefField.name())) {
@@ -334,9 +289,17 @@ namespace mongo {
 
                 return new ReadPreferenceSetting(pref, tags);
             }
+            else {
+                TagSet tags(BSON_ARRAY(BSONObj()));
+                return new ReadPreferenceSetting(pref, tags);
+            }
         }
 
+        // Default read pref is primary only or secondary preferred with slaveOK
         TagSet tags(BSON_ARRAY(BSONObj()));
+        ReadPreference pref =
+            queryOptions & QueryOption_SlaveOk ?
+                mongo::ReadPreference_SecondaryPreferred : mongo::ReadPreference_PrimaryOnly;
         return new ReadPreferenceSetting(pref, tags);
     }
 
@@ -1501,6 +1464,55 @@ namespace mongo {
         return rsm->getServerAddress();
     }
 
+    // Internal implementation of isSecondaryQuery, takes previously-parsed read preference
+    static bool _isSecondaryQuery( const string& ns,
+                                   const BSONObj& queryObj,
+                                   const ReadPreferenceSetting& readPref ) {
+
+        // If the read pref is primary only, this is not a secondary query
+        if (readPref.pref == ReadPreference_PrimaryOnly) return false;
+
+        if (ns.find(".$cmd") == string::npos) {
+            return true;
+        }
+
+        // This is a command with secondary-possible read pref
+        // Only certain commands are supported for secondary operation.
+
+        BSONObj actualQueryObj;
+        if (strcmp(queryObj.firstElement().fieldName(), "query") == 0) {
+            actualQueryObj = queryObj["query"].embeddedObject();
+        }
+        else {
+            actualQueryObj = queryObj;
+        }
+
+        const string cmdName = actualQueryObj.firstElementFieldName();
+        if (_secOkCmdList.count(cmdName) == 1) {
+            return true;
+        }
+
+        if (cmdName == "mapReduce" || cmdName == "mapreduce") {
+            if (!actualQueryObj.hasField("out")) {
+                return false;
+            }
+
+            BSONElement outElem(actualQueryObj["out"]);
+            if (outElem.isABSONObj() && outElem["inline"].trueValue()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool DBClientReplicaSet::isSecondaryQuery( const string& ns,
+                                               const BSONObj& queryObj,
+                                               int queryOptions ) {
+        auto_ptr<ReadPreferenceSetting> readPref( _extractReadPref( queryObj, queryOptions ) );
+        return _isSecondaryQuery( ns, queryObj, *readPref );
+    }
+
     DBClientConnection * DBClientReplicaSet::checkMaster() {
         ReplicaSetMonitorPtr monitor = _getMonitor();
         HostAndPort h = monitor->getMaster();
@@ -1772,9 +1784,8 @@ namespace mongo {
                                                        int queryOptions,
                                                        int batchSize) {
 
-        if ( _isQueryOkToSecondary( ns, queryOptions, query.obj ) ) {
-
-            shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj));
+        shared_ptr<ReadPreferenceSetting> readPref( _extractReadPref( query.obj, queryOptions ) );
+        if ( _isSecondaryQuery( ns, query.obj, *readPref ) ) {
 
             LOG( 3 ) << "dbclient_rs query using secondary or tagged node selection in "
                                 << _getMonitor()->getName() << ", read pref is "
@@ -1822,9 +1833,9 @@ namespace mongo {
                                         const Query& query,
                                         const BSONObj *fieldsToReturn,
                                         int queryOptions) {
-        if (_isQueryOkToSecondary(ns, queryOptions, query.obj)) {
 
-            shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj));
+        shared_ptr<ReadPreferenceSetting> readPref( _extractReadPref( query.obj, queryOptions ) );
+        if ( _isSecondaryQuery( ns, query.obj, *readPref ) ) {
 
             LOG( 3 ) << "dbclient_rs findOne using secondary or tagged node selection in "
                                 << _getMonitor()->getName() << ", read pref is "
@@ -1984,9 +1995,9 @@ namespace mongo {
             QueryMessage qm(dm);
 
             const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
-            if (_isQueryOkToSecondary(qm.ns, qm.queryOptions, qm.query)) {
-
-                shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query));
+            shared_ptr<ReadPreferenceSetting> readPref( _extractReadPref( qm.query,
+                                                                          qm.queryOptions ) );
+            if ( _isSecondaryQuery( qm.ns, qm.query, *readPref ) ) {
 
                 LOG( 3 ) << "dbclient_rs say using secondary or tagged node selection in "
                                     << _getMonitor()->getName() << ", read pref is "
@@ -2140,9 +2151,9 @@ namespace mongo {
             QueryMessage qm(dm);
             ns = qm.ns;
 
-            if (_isQueryOkToSecondary(ns, qm.queryOptions, qm.query)) {
-
-                shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query));
+            shared_ptr<ReadPreferenceSetting> readPref( _extractReadPref( qm.query,
+                                                                          qm.queryOptions ) );
+            if ( _isSecondaryQuery( ns, qm.query, *readPref ) ) {
 
                 LOG( 3 ) << "dbclient_rs call using secondary or tagged node selection in "
                                     << _getMonitor()->getName() << ", read pref is "
