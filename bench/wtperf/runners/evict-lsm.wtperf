@@ -1,6 +1,6 @@
 # wtperf options file: evict lsm configuration
 conn_config="cache_size=50M"
-table_config="lsm=(merge_thread=2),type=lsm"
+table_config="lsm=(merge_threads=2),type=lsm"
 icount=10000000
 report_interval=5
 run_time=120
