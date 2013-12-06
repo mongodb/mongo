@@ -716,8 +716,9 @@ namespace mongo {
         }
 
         const DBClientBase* rawConn = state->conn->getRawConn();
-        bool allowShardVersionFailure = ( _options & QueryOption_SlaveOk )
-                                        && rawConn->type() == ConnectionString::SET;
+        bool allowShardVersionFailure =
+            rawConn->type() == ConnectionString::SET &&
+            DBClientReplicaSet::isSecondaryQuery( _qSpec.ns(), _qSpec.query(), _qSpec.options() );
 
         if ( allowShardVersionFailure && rawConn->isFailed() ) {
 

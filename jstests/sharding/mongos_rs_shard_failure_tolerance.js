@@ -1,5 +1,5 @@
 //
-// Tests mongos's failure tolerance for replica set shards and slaveOk queries
+// Tests mongos's failure tolerance for replica set shards and read preference queries
 //
 // Sets up a cluster with three shards, the first shard of which has an unsharded collection and
 // half a sharded collection.  The second shard has the second half of the sharded collection, and
@@ -132,13 +132,9 @@ assert.gleSuccess(mongosConnNew.getCollection( collUnsharded.toString() ).getDB(
 
 gc(); // Clean up new connections
 
-mongosConnIdle = new Mongo( mongos.host );
-
 jsTest.log("Stopping primary of second shard...");
 
-mongosConnActive.setSlaveOk();
 mongosConnIdle = new Mongo( mongos.host );
-mongosConnIdle.setSlaveOk();
 
 // Need to save this node for later
 var rs1Secondary = st.rs1.getSecondary();
@@ -147,10 +143,51 @@ st.rs1.stop(st.rs1.getPrimary(), true /* wait for stop */);
 
 jsTest.log("Testing active connection with second primary down...");
 
+// Reads with read prefs
+mongosConnActive.setSlaveOk();
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+mongosConnActive.setSlaveOk(false);
+
+mongosConnActive.setReadPref("primary");
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.throws(function() {
+    mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 });
+});
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+//Ensure read prefs override slaveOK
+mongosConnActive.setSlaveOk();
+mongosConnActive.setReadPref("primary");
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.throws(function() {
+    mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 });
+});
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+mongosConnActive.setSlaveOk(false);
+
+mongosConnActive.setReadPref("secondary");
 assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
 assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
 assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
+mongosConnActive.setReadPref("primaryPreferred");
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnActive.setReadPref("secondaryPreferred");
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnActive.setReadPref("nearest");
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+// Writes
 mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : -5 });
 assert.gleSuccess(mongosConnActive.getCollection( collSharded.toString() ).getDB());
 mongosConnActive.getCollection( collSharded.toString() ).insert({ _id : 5 });
@@ -160,6 +197,7 @@ assert.gleSuccess(mongosConnActive.getCollection( collUnsharded.toString() ).get
 
 jsTest.log("Testing idle connection with second primary down...");
 
+// Writes
 mongosConnIdle.getCollection( collSharded.toString() ).insert({ _id : -6 });
 assert.gleSuccess(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
 mongosConnIdle.getCollection( collSharded.toString() ).insert({ _id : 6 });
@@ -167,12 +205,53 @@ gleErrorOrThrow(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
 mongosConnIdle.getCollection( collUnsharded.toString() ).insert({ _id : 6 });
 assert.gleSuccess(mongosConnIdle.getCollection( collUnsharded.toString() ).getDB());
 
+// Reads with read prefs
+mongosConnIdle.setSlaveOk();
 assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
 assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }) );
 assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
+mongosConnIdle.setSlaveOk(false);
+
+mongosConnIdle.setReadPref("primary");
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.throws(function() {
+    mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 });
+});
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+// Ensure read prefs override slaveOK
+mongosConnIdle.setSlaveOk();
+mongosConnIdle.setReadPref("primary");
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.throws(function() {
+    mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 });
+});
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+mongosConnIdle.setSlaveOk(false);
+
+mongosConnIdle.setReadPref("secondary");
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnIdle.setReadPref("primaryPreferred");
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnIdle.setReadPref("secondaryPreferred");
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnIdle.setReadPref("nearest");
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
 jsTest.log("Testing new connections with second primary down...");
 
+// Reads with read prefs
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setSlaveOk();
 assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
@@ -183,6 +262,75 @@ mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setSlaveOk();
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("primary");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("primary");
+assert.throws(function() {
+    mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 });
+});
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("primary");
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+// Ensure read prefs override slaveok
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setSlaveOk();
+mongosConnNew.setReadPref("primary");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setSlaveOk();
+mongosConnNew.setReadPref("primary");
+assert.throws(function() {
+    mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 });
+});
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setSlaveOk();
+mongosConnNew.setReadPref("primary");
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("secondary");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("secondary");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("secondary");
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("primaryPreferred");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("primaryPreferred");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("primaryPreferred");
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("secondaryPreferred");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("secondaryPreferred");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("secondaryPreferred");
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("nearest");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("nearest");
+assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
+mongosConnNew = new Mongo( mongos.host );
+mongosConnNew.setReadPref("nearest");
+assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+// Writes
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.getCollection( collSharded.toString() ).insert({ _id : -7 });
 assert.gleSuccess(mongosConnNew.getCollection( collSharded.toString() ).getDB());
@@ -197,14 +345,13 @@ gc(); // Clean up new connections
 
 jsTest.log("Stopping primary of first shard...");
 
-mongosConnActive.setSlaveOk();
 mongosConnIdle = new Mongo( mongos.host );
-mongosConnIdle.setSlaveOk();
 
 st.rs0.stop(st.rs0.getPrimary(), true /*wait for stop*/ );
 
 jsTest.log("Testing active connection with first primary down...");
 
+mongosConnActive.setSlaveOk();
 assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
 assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : 1 }));
 assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
@@ -225,6 +372,7 @@ gleErrorOrThrow(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
 mongosConnIdle.getCollection( collUnsharded.toString() ).insert({ _id : 9 });
 gleErrorOrThrow(mongosConnIdle.getCollection( collUnsharded.toString() ).getDB());
 
+mongosConnIdle.setSlaveOk();
 assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
 assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : 1 }) );
 assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
@@ -255,14 +403,13 @@ gc(); // Clean up new connections
 
 jsTest.log("Stopping second shard...");
 
-mongosConnActive.setSlaveOk();
 mongosConnIdle = new Mongo( mongos.host );
-mongosConnIdle.setSlaveOk();
 
 st.rs1.stop(rs1Secondary, true /* wait for stop */);
 
 jsTest.log("Testing active connection with second shard down...");
 
+mongosConnActive.setSlaveOk();
 assert.neq(null, mongosConnActive.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
 assert.neq(null, mongosConnActive.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
@@ -282,6 +429,7 @@ gleErrorOrThrow(mongosConnIdle.getCollection( collSharded.toString() ).getDB());
 mongosConnIdle.getCollection( collUnsharded.toString() ).insert({ _id : 12 });
 gleErrorOrThrow(mongosConnIdle.getCollection( collUnsharded.toString() ).getDB());
 
+mongosConnIdle.setSlaveOk();
 assert.neq(null, mongosConnIdle.getCollection( collSharded.toString() ).findOne({ _id : -1 }) );
 assert.neq(null, mongosConnIdle.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
