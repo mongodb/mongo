@@ -235,8 +235,8 @@ class WiredTigerTestCase(unittest.TestCase):
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
-        self.__class__.wt_ntests += 1
         self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.className() + '.' + str(self.__class__.wt_ntests))
+        self.__class__.wt_ntests += 1
         if WiredTigerTestCase._verbose > 2:
             self.prhead('started in ' + self.testdir, True)
         self.origcwd = os.getcwd()
