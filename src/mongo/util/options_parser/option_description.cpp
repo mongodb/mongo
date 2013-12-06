@@ -225,5 +225,19 @@ namespace optionenvironment {
         return addConstraint(new RequiresOtherKeyConstraint(_dottedName, otherDottedName));
     }
 
+    OptionDescription& OptionDescription::format(const std::string& regexFormat,
+                                                 const std::string& displayFormat) {
+        if (_type != String) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << _dottedName << "\": "
+               << "only options registered as a string type can have a required format, "
+               << "but option has type: " << _type;
+            throw DBException(sb.str(), ErrorCodes::InternalError);
+        }
+
+        return addConstraint(new StringFormatKeyConstraint(_dottedName, regexFormat,
+                                                           displayFormat));
+    }
+
 } // namespace optionenvironment
 } // namespace mongo

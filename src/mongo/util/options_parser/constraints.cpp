@@ -15,6 +15,8 @@
 
 #include "mongo/util/options_parser/constraints.h"
 
+#include <pcrecpp.h>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 
@@ -39,14 +41,14 @@ namespace optionenvironment {
                 sb << "Error: Attempting to set " << _key << " to value: " <<
                     intVal << " which is out of range: (" <<
                     _min << "," << _max << ")";
-                return Status(ErrorCodes::InternalError, sb.str());
+                return Status(ErrorCodes::BadValue, sb.str());
             }
         }
         else {
             StringBuilder sb;
             sb << "Error: " << _key << " is of type: " << val.typeToString() <<
                 " but must be of a numeric type.";
-            return Status(ErrorCodes::InternalError, sb.str());
+            return Status(ErrorCodes::BadValue, sb.str());
         }
         return Status::OK();
     }
@@ -62,7 +64,7 @@ namespace optionenvironment {
                 if (!_value.equal(env_value)) {
                     StringBuilder sb;
                     sb << "Error: " << _key << " is immutable once set";
-                    return Status(ErrorCodes::InternalError, sb.str());
+                    return Status(ErrorCodes::BadValue, sb.str());
                 }
             }
         }
@@ -78,7 +80,7 @@ namespace optionenvironment {
             if (ret.isOK()) {
                 StringBuilder sb;
                 sb << _otherKey << " is not allowed when " << _key << " is specified";
-                return Status(ErrorCodes::InternalError, sb.str());
+                return Status(ErrorCodes::BadValue, sb.str());
             }
         }
 
@@ -93,7 +95,30 @@ namespace optionenvironment {
             if (!ret.isOK()) {
                 StringBuilder sb;
                 sb << _otherKey << " is required when " << _key << " is specified";
-                return Status(ErrorCodes::InternalError, sb.str());
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+        }
+
+        return Status::OK();
+    }
+
+    Status StringFormatKeyConstraint::check(const Environment& env) {
+        Value value;
+        Status ret = env.get(_key, &value);
+        if (ret.isOK()) {
+            std::string stringVal;
+            ret = value.get(&stringVal);
+            if (!ret.isOK()) {
+                StringBuilder sb;
+                sb << _key << " could not be read as a string: " << ret.reason();
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+
+            pcrecpp::RE re(_regexFormat);
+            if (!re.FullMatch(stringVal)) {
+                StringBuilder sb;
+                sb << _key << " must be a string of the format: " << _displayFormat;
+                return Status(ErrorCodes::BadValue, sb.str());
             }
         }
 

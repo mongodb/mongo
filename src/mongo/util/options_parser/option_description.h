@@ -179,6 +179,13 @@ namespace optionenvironment {
         OptionDescription& requires(const std::string& otherDottedName);
 
         /**
+         * Specifies that this option is required to match the given format, specified as a regular
+         * expression.  The displayFormat argument is what gets printed to the user in the case
+         * where this constraint is not satisfied.  This is only allowed on String options.
+         */
+        OptionDescription& format(const std::string& regexFormat, const std::string& displayFormat);
+
+        /**
          * Adds a constraint for this option.  During parsing, this Constraint will be added to the
          * result Environment, ensuring that it will get checked when the environment is validated.
          * See the documentation on the Constraint and Environment classes for more details.

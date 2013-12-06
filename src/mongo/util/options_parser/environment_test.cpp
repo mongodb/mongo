@@ -93,6 +93,20 @@ namespace {
         ASSERT_OK(environment.validate());
     }
 
+    TEST(Environment, StringFormat) {
+        moe::Environment environment;
+        environment.addKeyConstraint(new moe::StringFormatKeyConstraint(moe::Key("key"), "[0-9]",
+                                                                        "[0-9]"));
+        ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
+        ASSERT_NOT_OK(environment.validate());
+        ASSERT_OK(environment.set(moe::Key("key"), moe::Value(std::string("a"))));
+        ASSERT_NOT_OK(environment.validate());
+        ASSERT_OK(environment.set(moe::Key("key"), moe::Value(std::string("11"))));
+        ASSERT_NOT_OK(environment.validate());
+        ASSERT_OK(environment.set(moe::Key("key"), moe::Value(std::string("1"))));
+        ASSERT_OK(environment.validate());
+    }
+
     TEST(Environment, DirectTypeAccess) {
         moe::Environment environment;
         ASSERT_OK(environment.set(moe::Key("number"), moe::Value(5)));

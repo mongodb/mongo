@@ -228,6 +228,17 @@ namespace {
         }
     }
 
+    TEST(Registration, StringFormatConstraint) {
+        moe::OptionSection testOpts;
+        try {
+            testOpts.addOptionChaining("port", "port", moe::Int, "Port")
+                                      .format("[0-9]*", "[0-9]*");
+            FAIL("Was able to register non string option with constraint on format");
+        }
+        catch (::mongo::DBException &e) {
+        }
+    }
+
     TEST(Parsing, Good) {
         moe::OptionsParser parser;
         moe::Environment environment;
@@ -3027,6 +3038,49 @@ namespace {
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
         ASSERT_OK(environment.validate());;
         ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
+    }
+
+    TEST(Constraints, StringFormatConstraint) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("option", "option", moe::String, "Option")
+                                  .format("[a-z][0-9]", "[character][number]");
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option");
+        argv.push_back("aa");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(environment.validate());;
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option");
+        argv.push_back("11");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(environment.validate());;
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option");
+        argv.push_back("a1");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());
+        ASSERT_OK(environment.get(moe::Key("option"), &value));
+        std::string option;
+        ASSERT_OK(value.get(&option));
+        ASSERT_EQUALS(option, "a1");
     }
 
     TEST(YAMLConfigFile, Basic) {

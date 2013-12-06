@@ -114,6 +114,24 @@ namespace optionenvironment {
         Key _otherKey;
     };
 
+    /** Implementation of a Constraint that enforces a specific format on a string value.  Fails if
+     *  the value of the key is not a string or does not match the given regex.
+     */
+    class StringFormatKeyConstraint : public KeyConstraint {
+    public:
+        StringFormatKeyConstraint(const Key& key,
+                                  const std::string& regexFormat,
+                                  const std::string& displayFormat) : KeyConstraint(key),
+                                                                      _regexFormat(regexFormat),
+                                                                      _displayFormat(displayFormat)
+    { }
+        virtual ~StringFormatKeyConstraint() {}
+    private:
+        virtual Status check(const Environment& env);
+        std::string _regexFormat;
+        std::string _displayFormat;
+    };
+
     /** Implementation of a Constraint on the type of a Value.  Fails if we cannot extract the given
      *  type from our Value, which means the implementation of the access functions of Value
      *  controls which types are "compatible"
