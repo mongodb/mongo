@@ -418,9 +418,9 @@ namespace mongo {
     void Record::touch( bool entireRecrd ) const {
         if ( _lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
             const char * addr = _data;
-            const char * end = _data + _netLength();
-            for ( ; addr <= end ; addr += 2048 ) {
-                __record_touch_dummy += addr[0];
+            const int length = _netLength();
+            for ( int i = 0 ; i <= length ; i += 2048 ) {
+                __record_touch_dummy += addr[i];
 
                 break; // TODO: remove this, pending SERVER-3711
                 
