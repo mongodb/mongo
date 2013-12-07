@@ -156,8 +156,8 @@ static CONFIG c[] = {
 	  0x0, C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
 
 	{ "internal_key_truncation",
-	 "if values are huffman encoded",			/* 2% */
-	 0x0, C_BOOL, 2, 0, 0, &g.c_internal_key_truncation, NULL },
+	 "if internal keys are truncated",			/* 95% */
+	 0x0, C_BOOL, 95, 0, 0, &g.c_internal_key_truncation, NULL },
 
 	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
@@ -200,7 +200,7 @@ static CONFIG c[] = {
 	  C_ROW, 0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
 
 	{ "repeat_data_pct",
-	  "percent duplicate values in row- or variable-length column-stores",
+	  "percent duplicate values in row- or var-length column-stores",
 	  C_ROW|C_VAR, 0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
 
 	{ "reverse",
@@ -216,7 +216,7 @@ static CONFIG c[] = {
 	  0x0, C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
 
 	{ "split_pct",
-	  "Btree page split size as a percentage of the maximum page size",
+	  "page split size as a percentage of the maximum page size",
 	  0x0, 0x0, 40, 85, 85, &g.c_split_pct, NULL },
 
 	{ "statistics",

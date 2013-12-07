@@ -266,21 +266,16 @@ void
 config_error(void)
 {
 	CONFIG *cp;
-	FILE *fp;
 
 	/* Display configuration names. */
+	fprintf(stderr, "\n");
 	fprintf(stderr, "Configuration names:\n");
 	for (cp = c; cp->name != NULL; ++cp)
-		fprintf(stderr, "%16s : %s\n", cp->name, cp->desc);
-
-	fprintf(stderr, "\n");
-	if ((fp = fopen("CONFIG.example", "w")) != NULL) {
-		fprintf(stderr, "Re-creating CONFIG.example file... ");
-		for (cp = c; cp->name != NULL; ++cp)
-			fprintf(fp, "#%s\n#\t%s\n\n", cp->name, cp->desc);
-		(void)fclose(fp);
-		fprintf(stderr, "done\n");
-	}
+		if (strlen(cp->name) > 17)
+			fprintf(stderr,
+			    "%s\n%17s: %s\n", cp->name, " ", cp->desc);
+		else
+			fprintf(stderr, "%17s: %s\n", cp->name, cp->desc);
 }
 
 /*
