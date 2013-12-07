@@ -104,7 +104,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	prev_oldest_id = txn_global->oldest_id;
 	current_id = snap_min = txn_global->current;
 
-	/* For pure read-only workloads, avoid contenting for shared state. */
+	/* For pure read-only workloads, avoid updates to shared state. */
 	if (!get_snapshot) {
 		/*
 		 * If we are trying to update the oldest ID and it is already
