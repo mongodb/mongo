@@ -56,6 +56,13 @@ wts_ops(void)
 
 	conn = g.wts_conn;
 
+	/*
+	 * We support replay of threaded runs, but don't log random numbers
+	 * after threaded operations start, there's no point.
+	 */
+	if (!SINGLETHREADED)
+		g.rand_log_stop = 1;
+
 	/* Initialize the table extension code. */
 	table_append_init();
 
@@ -303,7 +310,7 @@ ops(void *arg)
 		 * of deletes will mean fewer inserts and writes.  Modifications
 		 * are always followed by a read to confirm it worked.
 		 */
-		op = (uint32_t)(wts_rand() % 100);
+		op = (uint32_t)(rng() % 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
 			switch (g.type) {
@@ -465,7 +472,7 @@ wts_read_scan(void)
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
-		cnt += wts_rand() % 17 + 1;
+		cnt += rng() % 17 + 1;
 		if (cnt > g.rows)
 			cnt = g.rows;
 		if (cnt - last_cnt > 1000) {

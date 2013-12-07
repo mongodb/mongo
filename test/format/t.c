@@ -90,7 +90,6 @@ main(int argc, char *argv[])
 			break;
 		case 'r':			/* Replay a run */
 			g.replay = 1;
-			g.c_runs = 1;
 			break;
 		default:
 			usage();
@@ -117,6 +116,21 @@ main(int argc, char *argv[])
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
 
+	/*
+	 * Multithreaded runs can be replayed: it's useful and we'll get the
+	 * configuration correct.  Obviously the order of operations changes,
+	 * warn the user.
+	 */
+	if (g.replay && !SINGLETHREADED)
+		printf("Warning: replaying a threaded run\n");
+
+	/*
+	 * Single-threaded runs historically exited after a single replay, which
+	 * makes sense when you're debugging, leave that semantic in place.
+	 */
+	if (g.replay && SINGLETHREADED)
+		g.c_runs = 1;
+
 	/* Use line buffering on stdout so status updates aren't buffered. */
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
@@ -132,12 +146,8 @@ main(int argc, char *argv[])
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
-	/*
-	 * Initialize the random number generator (don't reinitialize on each
-	 * new run, reinitializing won't be more random than continuing on from
-	 * the current state).
-	 */
-	wts_rand_init();
+	/* Seed the random number generator. */
+	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
 	/* Set up paths. */
 	path_setup(home);
@@ -257,7 +267,7 @@ startup(void)
 		g.logfp = NULL;
 	}
 
-	/* Close the random number file. */
+	/* Close the random number logging file. */
 	if (g.rand_log != NULL) {
 		(void)fclose(g.rand_log);
 		g.rand_log = NULL;
@@ -275,12 +285,23 @@ startup(void)
 	if (mkdir(g.home_kvs, 0777) != 0)
 		die(errno, "mkdir: %s", g.home_kvs);
 
-	/* Open/truncate the logging file. */
+	/*
+	 * Open/truncate the logging file; line buffer so we see up-to-date
+	 * information on error.
+	 */
 	if (g.logging != 0) {
 		if ((g.logfp = fopen(g.home_log, "w")) == NULL)
 			die(errno, "fopen: %s", g.home_log);
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
+
+	/*
+	 * Open/truncate the random number logging file; line buffer so we see
+	 * up-to-date information on error.
+	 */
+	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
+		die(errno, "%s", g.home_rand);
+	(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
 }
 
 /*

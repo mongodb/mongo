@@ -158,6 +158,7 @@ Memrata
 Metadata
 Mewhort
 Multi
+Multithreaded
 Mutex
 Mutexes
 NEEDKEY
@@ -728,6 +729,7 @@ ret
 retp
 rf
 rle
+rng
 rpc
 rref
 run's

@@ -290,44 +290,31 @@ path_setup(const char *home)
 }
 
 /*
- * wts_rand_init --
- *	Initialize the random number generator.
- */
-void
-wts_rand_init(void)
-{
-	/* Seed the random number generator. */
-	if (!g.replay)
-		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-}
-
-/*
- * wts_rand --
+ * rng --
  *	Return a random number.
  */
 uint32_t
-wts_rand(void)
+rng(void)
 {
 	char buf[64];
 	uint32_t r;
-
-	/* If we're threaded, it's not repeatable, ignore the log. */
-	if (!SINGLETHREADED)
-		return ((uint32_t)rand());
 
 	/*
 	 * We can entirely reproduce a run based on the random numbers used
 	 * in the initial run, plus the configuration files.  It would be
 	 * nice to just log the initial RNG seed, rather than logging every
-	 * random number generated, but we can't -- Berkeley DB calls rand()
-	 * internally, and so that messes up the pattern of random numbers
-	 * (and WT might call rand() in the future, who knows?)
+	 * random number generated, but we'd have to include our own RNG,
+	 * Berkeley DB calls rand() internally, and that messes up the pattern
+	 * of random numbers.
+	 *
+	 * Check g.replay and g.rand_log_stop: multithreaded runs log/replay
+	 * until they get to the operations phase, then turn off log/replay,
+	 * threaded operation order can't be replayed.
 	 */
-	if (g.replay) {
-		if (g.rand_log == NULL &&
-		   (g.rand_log = fopen(g.home_rand, "r")) == NULL)
-			die(errno, "fopen: %s", g.home_rand);
+	if (g.rand_log_stop)
+		return ((uint32_t)rand());
 
+	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
 			if (feof(g.rand_log)) {
 				fprintf(stderr,
@@ -335,18 +322,13 @@ wts_rand(void)
 				    "exiting\n");
 				exit(EXIT_SUCCESS);
 			}
-			die(errno, "feof: random number log");
+			die(errno, "random number log");
 		}
 
-		r = (uint32_t)strtoul(buf, NULL, 10);
-	} else {
-		if (g.rand_log == NULL) {
-			if ((g.rand_log = fopen(g.home_rand, "w")) == NULL)
-				die(errno, "fopen: %s", g.home_rand);
-			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-		}
-		r = (uint32_t)rand();
-		fprintf(g.rand_log, "%" PRIu32 "\n", r);
+		return ((uint32_t)strtoul(buf, NULL, 10));
 	}
+
+	r = (uint32_t)rand();
+	fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	return (r);
 }

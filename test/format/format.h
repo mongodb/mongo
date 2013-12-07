@@ -72,7 +72,7 @@ extern WT_EXTENSION_API *wt_api;
 #define	M(v)		((v) * 1000000)		/* Million */
 
 /* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
+#define	MMRAND(min, max)	(rng() % (((max) + 1) - (min)) + (min))
 
 #define	WT_NAME	"wt"				/* Object name */
 
@@ -100,6 +100,7 @@ typedef struct {
 	WT_CONNECTION	 *wts_conn;
 	WT_EXTENSION_API *wt_api;
 
+	int   rand_log_stop;			/* Logging turned off */
 	FILE *rand_log;				/* Random number log */
 
 	uint32_t run_cnt;			/* Run counter */
@@ -237,6 +238,8 @@ void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
 void	 path_setup(const char *);
+uint32_t rng(void);
+void	 rng_init(void);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
@@ -247,8 +250,6 @@ void	 wts_dump(const char *, int);
 void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
-uint32_t wts_rand(void);
-void	 wts_rand_init(void);
 void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
