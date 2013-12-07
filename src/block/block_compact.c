@@ -18,9 +18,15 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_UNUSED(session);
 
-	/* Save the current allocation plan, switch to first-fit allocation. */
+	/*
+	 * Save the current allocation plan, switch to first-fit allocation.
+	 * We don't need the lock, but it's not a performance question and
+	 * might avoid bugs in the future.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
 	block->allocfirst_save = block->allocfirst;
 	block->allocfirst = 1;
+	__wt_spin_unlock(session, &block->live_lock);
 
 	return (0);
 }
@@ -34,8 +40,14 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_UNUSED(session);
 
-	/* Restore the previous allocation plan. */
+	/*
+	 * Restore the previous allocation plan.
+	 * We don't need the lock, but it's not a performance question and
+	 * might avoid bugs in the future.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
 	block->allocfirst = block->allocfirst_save;
+	__wt_spin_unlock(session, &block->live_lock);
 
 	return (0);
 }
