@@ -75,6 +75,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
+
 		/*
 		 * Signal all threads to wake them up, then wait for them to
 		 * exit.
@@ -87,15 +88,17 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 */
 		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 			for (i = 0; i < lsm_tree->merge_threads; i++) {
-				F_SET(lsm_tree->worker_sessions[i],
-				    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+				if ((s = lsm_tree->worker_sessions[i]) == NULL)
+					continue;
+				if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+					s->skip_schema_lock = 1;
 				WT_TRET(__wt_cond_signal(
 				    session, lsm_tree->work_cond));
 				WT_TRET(__wt_thread_join(
 				    session, lsm_tree->worker_tids[i]));
 			}
-		F_SET(lsm_tree->ckpt_session,
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+		if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+			lsm_tree->ckpt_session->skip_schema_lock = 1;
 		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
 	}

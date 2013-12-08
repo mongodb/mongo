@@ -113,6 +113,8 @@ struct __wt_session_impl {
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
 	int compaction;			/* Compaction did some work */
+	int skip_schema_lock;		/* Another thread holds the schema lock
+					 * on our behalf */
 
 	uint32_t flags;
 
