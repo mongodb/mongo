@@ -390,7 +390,7 @@ namespace mongo {
         bool success = false;
         BSONObj result;
         string errMsg;
-        long long delay;
+        long long delay = 0;
 
         scoped_ptr<ScopedDbConnection> connPtr;
         try {
