@@ -19,17 +19,51 @@ env['MERGEMODULESBASEPATH'] = os.environ.get('MERGEMODULESBASEPATH')
 
 sources = [ "wxs/BinaryFragment.wxs",
             "wxs/FeatureFragment.wxs",
-            "wxs/LicensingFragment.wxs",
-            "wxs/Installer_64.wxs"
+            "wxs/LicensingFragment.wxs"
             ]
 objects = [ "$BUILD_DIR/msi/BinaryFragment.wixobj",
             "$BUILD_DIR/msi/FeatureFragment.wixobj",
             "$BUILD_DIR/msi/LicensingFragment.wixobj",
-            "$BUILD_DIR/msi/Installer_64.wixobj"
            ]
 
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = Dir(env["BUILD_DIR"]).path
+
+enterprisebase = 'src\mongo\db\modules\enterprise'
+
+# Set up parameters to pass to wix - 
+#
+# msi_edition - "Enterprise" or "Standard"
+# msi_platform - "x64" or "x86"
+# msi_flavor - "2008R2Plus" or "" 
+#
+
+
+
+# Enterprise
+if 'enterprise' in env['MONGO_MODULES']:
+  msi_edition = 'Enterprise'
+  msi_flavor = '2008R2Plus'
+  msi_platform = 'x64'
+# Community
+else:
+  msi_edition = 'Standard'
+  if env['PROCESSOR_ARCHITECTURE'] == 'i386':
+    msi_platform = 'x86'
+    msi_flavor = ''
+  else:
+    msi_platform = 'x64'
+    if env.get('WIN_VERSION_MIN') == 'ws08r2':
+      msi_flavor = '2008R2Plus'
+    else:
+      msi_flavor = 'Legacy'
+
+if msi_platform == 'x64':
+  sources.append("wxs/Installer_64.wxs")
+  objects.append("$BUILD_DIR/msi/Installer_64.wixobj")
+else:
+  sources.append("wxs/Installer.wxs")
+  objects.append("$BUILD_DIR/msi/Installer.wixobj")
 
 # candle: compile .wxs files into .wixobjs
 env.Command(objects, 
@@ -39,18 +73,18 @@ env.Command(objects,
             # we should choose a fourth version number that reflects pre-ness.
             ' -dMongoDBVersion=' + mongoCodeVersion.partition('-')[0] +
             ' -dLicenseSource=distsrc'
-            r' -dEnterpriseBase=src\mongo\db\modules\enterprise\\'
+            r' -dEnterpriseBase=' + enterprisebase + '\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
-            ' -dEdition=Enterprise'
+            ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'
             ' -dUpgradeCode=FCF901F6-E963-40B1-9A17-978242068587'
             ' -dClientSource=' + buildDir + r'\client_build'
             r' -dClientHeaderSource=${INSTALL_DIR}\include\mongo'
             ' -dConfiguration=Release'
             ' -dOutDir=' + buildDir + r'\msi'
-            ' -dPlatform=x64'
-            ' -dFlavor=2008R2Plus'
+            ' -dPlatform=' + msi_platform +
+            ' -dFlavor=' + msi_flavor +
             r' -dProjectDir=buildscripts\packaging\msi\\'
             ' -dProjectName=MongoDB'
             ' -dTargetDir=' + buildDir + r'\msi'
@@ -60,7 +94,7 @@ env.Command(objects,
             r' -dSnmpSource=c:\snmp\bin'
             r' -dSslSource=c:\openssl\bin'
             ' -out ' + buildDir + r'\msi\\'
-            ' -arch x64'
+            ' -arch ' + msi_platform +
             ' -ext "$WIXUIEXT"'
             ' $SOURCES')
 

@@ -20,10 +20,10 @@
     </Directory>
     
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
-    <WixVariable Id="WixUIDialogBmp" Value="Dialog.bmp" />
-    <WixVariable Id="WixUIBannerBmp" Value="Banner.bmp" />
-    <WixVariable Id="WixUIInfoIco" Value="Installer_Icon_32x32.ico" />
-    <WixVariable Id="WixUIExclamationIco" Value="Installer_Icon_32x32.ico" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.ProjectDir)Dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.ProjectDir)Banner.bmp" />
+    <WixVariable Id="WixUIInfoIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+    <WixVariable Id="WixUIExclamationIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
     <!--
     <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
     <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />

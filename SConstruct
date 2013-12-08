@@ -1074,6 +1074,7 @@ def doConfigure(myenv):
                     win_version_min = default_32_bit_min
                 conf.Finish();
 
+        env['WIN_VERSION_MIN'] = win_version_min
         win_version_min = win_version_min_choices[win_version_min]
         env.Append( CPPDEFINES=[("_WIN32_WINNT", "0x" + win_version_min[0])] )
         env.Append( CPPDEFINES=[("NTDDI_VERSION", "0x" + win_version_min[0] + win_version_min[1])] )
