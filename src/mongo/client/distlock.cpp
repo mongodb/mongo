@@ -385,40 +385,56 @@ namespace mongo {
     Date_t DistributedLock::remoteTime( const ConnectionString& cluster, unsigned long long maxNetSkew ) {
 
         ConnectionString server( *cluster.getServers().begin() );
-        ScopedDbConnection conn(server.toString());
 
+        // Get result and delay if successful, errMsg if not
+        bool success = false;
         BSONObj result;
+        string errMsg;
         long long delay;
 
+        scoped_ptr<ScopedDbConnection> connPtr;
         try {
+            connPtr.reset( new ScopedDbConnection( server.toString() ) );
+            ScopedDbConnection& conn = *connPtr;
+
             Date_t then = jsTime();
-            bool success = conn->runCommand( string("admin"),
-                                             BSON( "serverStatus" << 1 ),
-                                             result );
+            success = conn->runCommand( string( "admin" ), BSON( "serverStatus" << 1 ), result );
             delay = jsTime() - then;
 
-            if( !success )
-                throw TimeNotFoundException( str::stream() << "could not get status from server "
-                                             << server.toString() << " in cluster " << cluster.toString()
-                                             << " to check time", 13647 );
-
-            // Make sure that our delay is not more than 2x our maximum network skew, since this is the max our remote
-            // time value can be off by if we assume a response in the middle of the delay.
-            if( delay > (long long) (maxNetSkew * 2) )
-                throw TimeNotFoundException( str::stream() << "server " << server.toString()
-                                             << " in cluster " << cluster.toString()
-                                             << " did not respond within max network delay of "
-                                             << maxNetSkew << "ms", 13648 );
-        }
-        catch(...) {
+            if ( !success ) errMsg = result.toString();
             conn.done();
-            throw;
+        }
+        catch ( const DBException& ex ) {
+
+            if ( connPtr && connPtr->get()->isFailed() ) {
+                // Return to the pool so the pool knows about the failure
+                connPtr->done();
+            }
+
+            success = false;
+            errMsg = ex.toString();
+        }
+        
+        if( !success ) {
+            throw TimeNotFoundException( str::stream() << "could not get status from server "
+                                                       << server.toString() << " in cluster "
+                                                       << cluster.toString() << " to check time"
+                                                       << causedBy( errMsg ),
+                                         13647 );
         }
 
-        conn.done();
+        // Make sure that our delay is not more than 2x our maximum network skew, since this is the max our remote
+        // time value can be off by if we assume a response in the middle of the delay.
+        if ( delay > (long long) ( maxNetSkew * 2 ) ) {
+            throw TimeNotFoundException( str::stream()
+                                             << "server " << server.toString() << " in cluster "
+                                             << cluster.toString()
+                                             << " did not respond within max network delay of "
+                                             << maxNetSkew << "ms",
+                                         13648 );
+        }
 
         return result["localTime"].Date() - (delay / 2);
-
     }
 
     bool DistributedLock::checkSkew( const ConnectionString& cluster, unsigned skewChecks, unsigned long long maxClockSkew, unsigned long long maxNetSkew ) {

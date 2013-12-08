@@ -83,18 +83,23 @@ namespace mongo {
                                            std::vector<Privilege>* out) {}
         static void runThread() {
             while (keepGoing) {
-                if (current->lock_try( "test" )) {
-                    count++;
-                    int before = count;
-                    sleepmillis(3);
-                    int after = count;
+                try {
+                    if (current->lock_try( "test" )) {
+                        count++;
+                        int before = count;
+                        sleepmillis(3);
+                        int after = count;
 
-                    if (after != before) {
-                        error() << " before: " << before << " after: " << after
-                                << endl;
+                        if (after != before) {
+                            error() << " before: " << before << " after: " << after
+                                    << endl;
+                        }
+
+                        current->unlock();
                     }
-
-                    current->unlock();
+                }
+                catch ( const LockException& ex ) {
+                    log() << "*** !Could not try distributed lock." << causedBy( ex ) << endl;
                 }
             }
         }
@@ -294,8 +299,8 @@ namespace mongo {
                     }
 
                 }
-                catch( LockException& e ) {
-                    log() << "*** !Could not try distributed lock." << causedBy( e ) << endl;
+                catch( const LockException& ex ) {
+                    log() << "*** !Could not try distributed lock." << causedBy( ex ) << endl;
                     break;
                 }
 
