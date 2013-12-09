@@ -110,7 +110,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		 * If we are trying to update the oldest ID and it is already
 		 * equal to the current ID, there is no point scanning.
 		 */
-		if (txn_global->oldest_id == txn_global->current)
+		if (prev_oldest_id == current_id)
 			return;
 	} else if (txn->id == max_id &&
 	    txn->snapshot_count == 0 &&
