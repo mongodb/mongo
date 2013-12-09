@@ -53,6 +53,14 @@ namespace QueryUtilTests {
         };
     } // namespace FieldIntervalTests
     
+    //
+    // TODO: Test cases inside namespace FieldRangeTests are testing
+    // code that will soon be fully deprecated and should eventually
+    // be deleted.
+    //
+    // Analogous tests for the new query system can be found in the
+    // index bounds builder test (db/query/index_bounds_builder_test.cpp).
+    //
     namespace FieldRangeTests {
         class ToString {
         public:
