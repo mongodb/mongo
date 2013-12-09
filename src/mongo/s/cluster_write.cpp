@@ -247,7 +247,7 @@ namespace mongo {
 
         // App-level validation of a create index insert
         if ( request.isInsertIndexRequest() ) {
-            if ( request.sizeWriteOps() != 1 || request.isWriteConcernSet() ) {
+            if ( request.sizeWriteOps() != 1 ) {
 
                 // Invalid request to create index
                 response->setOk( false );
