@@ -1328,4 +1328,3 @@ DBCollection.prototype.getQueryOptions = function() {
     if (this.getSlaveOk()) options |= 4;
     return options;
 }
-
