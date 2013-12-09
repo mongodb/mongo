@@ -12,13 +12,19 @@ buildShared = False
 if has_option("sharedclient"):
     buildShared = True
 
-env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
-            ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
-            '$PYTHON $SOURCES $TARGETS')
+clientEnv = env.Clone()
+libEnv = env.Clone()
+del env
+clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
+libEnv.Append(CPPDEFINES='LIBMONGOCLIENT_BUILDING')
 
-env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
-            ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
-            '$PYTHON $SOURCES $TARGETS')
+libEnv.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
+               ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
+               '$PYTHON $SOURCES $TARGETS')
+
+libEnv.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
+               ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
+               '$PYTHON $SOURCES $TARGETS')
 
 clientSourceBasic = [
     'mongo/base/error_codes.cpp',
@@ -125,16 +131,16 @@ clientSourceProcessInfo = [
 
 clientSourceAll = clientSourceBasic + clientSourceSasl + clientSourceProcessInfo
 
-usingSasl = env['MONGO_BUILD_SASL_CLIENT']
+usingSasl = libEnv['MONGO_BUILD_SASL_CLIENT']
 
 clientSource = list(clientSourceBasic)
 if usingSasl:
     clientSource += clientSourceSasl
 
-processInfoPlatformFile = env.File( "mongo/util/processinfo_${PYSYSPLATFORM}.cpp" )
+processInfoPlatformFile = libEnv.File( "mongo/util/processinfo_${PYSYSPLATFORM}.cpp" )
 # NOTE: See comment about similar code in src/mongo/SConscript
 if not os.path.exists( str( processInfoPlatformFile ) ):
-    processInfoPlatformFile = env.File( "mongo/util/processinfo_none.cpp" )
+    processInfoPlatformFile = libEnv.File( "mongo/util/processinfo_none.cpp" )
 clientSource += [processInfoPlatformFile]
 
 exampleSourceMap = [
@@ -179,7 +185,7 @@ for path in clientHeaderDirectories:
 
 # This relies on static and shared objects being the same, since we will link these object
 # files twice: once into a .a, and another time into a .so
-clientObjects = [env.Object(source) for source in clientSource]
+clientObjects = [libEnv.Object(source) for source in clientSource]
 
 mongoClientLibs = []
 mongoClientLibDeps = ['$BUILD_DIR/third_party/shim_boost']
@@ -191,7 +197,7 @@ if usingSasl:
 mongoClientInstalls = []
 mongoClientPrefixInstalls = []
 
-staticLibEnv = env.Clone()
+staticLibEnv = libEnv.Clone()
 staticLibEnv.AppendUnique(
     LIBDEPS=mongoClientLibDeps,
     SYSLIBDEPS=mongoClientSysLibDeps)
@@ -210,7 +216,7 @@ mongoClientStaticLib = staticLibEnv.StaticLibrary(
 mongoClientInstalls.append(staticLibEnv.Install('#/', mongoClientStaticLib))
 
 if installSetup.libraries:
-    mongoClientPrefixInstalls.append(env.Install("$INSTALL_DIR/lib", mongoClientStaticLib))
+    mongoClientPrefixInstalls.append(libEnv.Install("$INSTALL_DIR/lib", mongoClientStaticLib))
 
 mongoClientSharedLib = None
 
@@ -221,7 +227,7 @@ if buildShared:
     # 'Install' calls in this block to 'InstallVersionedLibrary'. SHLIBVERSION and
     # InstallVersionedLibrary support is only stable in SCons > 2.3.0, so if you add support
     # here, be sure to add an EnsuredSconsVersion here as well.
-    sharedLibEnv = env.Clone()
+    sharedLibEnv = libEnv.Clone()
     sharedLibEnv.AppendUnique(LIBS=mongoClientSysLibDeps)
 
     # On windows, we always want to attach the shim, since independently of whether we are
@@ -240,9 +246,9 @@ if buildShared:
     if windows:
         # Ignore warning LNK4102, which complains about exposing deleting destructors.
         sharedLibEnv.AppendUnique(SHLINKFLAGS=["/IGNORE:4102"])
-        env.Command(['mongoclient.def'],
-                    ['#buildscripts/generate_def.py', mongoClientStaticLib],
-            '$PYTHON ${SOURCES[0]} $TARGETS ${SOURCES[1:]}')
+        libEnv.Command(['mongoclient.def'],
+                       ['#buildscripts/generate_def.py', mongoClientStaticLib],
+                       '$PYTHON ${SOURCES[0]} $TARGETS ${SOURCES[1:]}')
         # SCons automatically looks for this file in the source list and passes the proper
         # parameter to MS-LINK automatically.
         clientObjects.append('mongoclient.def')
@@ -275,55 +281,53 @@ if buildShared:
                 ))
         mongoClientPrefixInstalls.append(mongoClientSharedLibPrefixInstall)
 
-env.Alias('mongoclient', mongoClientInstalls)
+libEnv.Alias('mongoclient', mongoClientInstalls)
 
 if installSetup.headers:
     for x in clientHeaderDirectories:
-        inst = env.Install("$INSTALL_DIR/include/mongo/" + x,
-                           [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
-        env.AddPostAction(inst, Chmod('$TARGET', 0644))
+        inst = libEnv.Install("$INSTALL_DIR/include/mongo/" + x,
+                              [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
+        libEnv.AddPostAction(inst, Chmod('$TARGET', 0644))
         mongoClientPrefixInstalls.append(inst)
 
 if installSetup.headers or installSetup.libraries:
-    installAlias = env.Alias('install-mongoclient', mongoClientPrefixInstalls)
+    installAlias = libEnv.Alias('install-mongoclient', mongoClientPrefixInstalls)
 
     # Build some simple mainlines that include the dbclient.h and bson.h headers
     # with things set up to include from the installation directory.
 
     # Remove anything that says $BUILD_DIR from the CPPPATH, except for things in third party,
     # so we have a source for boost, etc if we aren't getting them from the system.
-    limit_cpppath=[p for p in env['CPPPATH'] if not ('$BUILD_DIR' in p and not 'third_party' in p)]
+    limit_cpppath=[p for p in libEnv['CPPPATH']
+                   if not ('$BUILD_DIR' in p and not 'third_party' in p)]
 
     # Create an environment where include files and libraries come from the installation directory.
-    installationTestEnv = env.Clone(
+    installationTestEnv = libEnv.Clone(
         CPPPATH=["$INSTALL_DIR/include"] + limit_cpppath,
         LIBPATH=["$INSTALL_DIR/lib"],
         CPPDEFINES=[],
     )
 
     include_dbclienth_test_file = 'mongo/client/include_dbclienth_test.cpp'
-    env.Depends(include_dbclienth_test_file, installAlias)
+    libEnv.Depends(include_dbclienth_test_file, installAlias)
     include_dbclienth_test = installationTestEnv.Object(
         target='include_dbclienth_test',
         source=[include_dbclienth_test_file])
-    env.AlwaysBuild(include_dbclienth_test)
-    env.NoCache(include_dbclienth_test)
+    libEnv.AlwaysBuild(include_dbclienth_test)
+    libEnv.NoCache(include_dbclienth_test)
 
     include_bsonh_test_file = 'mongo/client/include_bsonh_test.cpp'
-    env.Depends(include_bsonh_test_file, installAlias)
+    libEnv.Depends(include_bsonh_test_file, installAlias)
     include_bsonh_test = installationTestEnv.Object(
         target='include_bsonh_test',
         source=[include_bsonh_test_file])
-    env.AlwaysBuild(include_bsonh_test)
-    env.NoCache(include_bsonh_test)
+    libEnv.AlwaysBuild(include_bsonh_test)
+    libEnv.NoCache(include_bsonh_test)
 
-    env.Alias('check-install-mongoclient', [
+    libEnv.Alias('check-install-mongoclient', [
         include_dbclienth_test,
         include_bsonh_test,
     ])
-
-clientEnv = env.Clone()
-clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
 
 # Compile the example files to .o so that we can link them twice: once statically, once shared.
 exampleObjMap = [(target, clientEnv.Object(source)) for (target, source) in exampleSourceMap]
@@ -360,7 +364,7 @@ if buildShared:
 
     sharedClientPrograms = [
         sharedClientEnv.Program("sharedclient/" + target, obj) for (target, obj) in exampleObjMap]
-    env.Depends(sharedClientPrograms, mongoClientInstalls)
+    libEnv.Depends(sharedClientPrograms, mongoClientInstalls)
 
     sharedClientProgramInstalls = sharedClientEnv.Install("#/sharedclient", sharedClientPrograms)
     clientTests.append(sharedClientProgramInstalls)
