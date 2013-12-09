@@ -45,7 +45,7 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     # file.
     types = [
         ('file', dict(type='file:', pop=simple_populate, maxpages=5)),
-        ('table', dict(type='table:', pop=complex_populate, maxpages=30))
+        ('table', dict(type='table:', pop=complex_populate, maxpages=50))
         ]
     compact = [
         ('method', dict(utility=0,reopen=0)),
@@ -54,10 +54,11 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     scenarios = number_scenarios(multiply_scenarios('.', types, compact))
 
-    # Override WiredTigerTestCase, we have extensions.
+    # Override WiredTigerTestCase, we want a large cache so that eviction
+    # doesn't happen (which could skew our compaction results).
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir,
-            'create,cache_size=100MB,statistics=(all),' +
+            'create,cache_size=250MB,statistics=(all),' +
             'error_prefix="%s: "' % self.shortid())
         return conn
 
