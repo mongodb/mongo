@@ -55,6 +55,30 @@ namespace {
         ASSERT_NOT_OK(result);
     }
 
+    TEST(LiteParsedQueryTest, GetFilter) {
+        LiteParsedQuery* lpq = NULL;
+        Status result = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
+                                              BSONObj(), BSONObj(), &lpq);
+        ASSERT_OK(result);
+        ASSERT_EQUALS(BSON("x" << 5 ), lpq->getFilter());
+    }
+
+    TEST(LiteParsedQueryTest, NumToReturn) {
+        LiteParsedQuery* lpq = NULL;
+        Status result = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
+                                              BSONObj(), BSONObj(), &lpq);
+        ASSERT_OK(result);
+        ASSERT_EQUALS(6, lpq->getNumToReturn());
+        ASSERT(lpq->wantMore());
+
+        lpq = NULL;
+        result = LiteParsedQuery::make("testns", 5, -6, 9, BSON( "x" << 5 ), BSONObj(),
+                                       BSONObj(), BSONObj(), &lpq);
+        ASSERT_OK(result);
+        ASSERT_EQUALS(6, lpq->getNumToReturn());
+        ASSERT(!lpq->wantMore());
+    }
+
     //
     // Text meta BSON element validation
     //

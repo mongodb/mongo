@@ -28,6 +28,7 @@
 #include "mongo/db/ops/query.h"
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/query/new_find.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/scanandorder.h"
 #include "mongo/db/structure/collection.h"
@@ -132,9 +133,9 @@ namespace QueryTests {
 
             addIndex( BSON( "b" << 1 ) );
             // Check findOne() returning object, requiring indexed scan with index.
-            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            ASSERT( Helpers::findOne( ns(), query, ret, true ) );
             // Check findOne() returning location, requiring indexed scan with index.
-            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, true ).obj() );
         }
     };
     
@@ -1253,19 +1254,6 @@ namespace QueryTests {
         }
     };
 
-    class ZeroFindingStartTimeout {
-    public:
-        ZeroFindingStartTimeout() :
-            _old( FindingStartCursor::getInitialTimeout() ) {
-            FindingStartCursor::setInitialTimeout( 0 );
-        }
-        ~ZeroFindingStartTimeout() {
-            FindingStartCursor::setInitialTimeout( _old );
-        }
-    private:
-        int _old;
-    };
-
     class FindingStart : public CollectionBase {
     public:
         FindingStart() : CollectionBase( "findingstart" ) {
@@ -1293,9 +1281,6 @@ namespace QueryTests {
                 //cout << k << endl;
             }
         }
-
-    private:
-        ZeroFindingStartTimeout _zeroTimeout;
     };
 
     class FindingStartPartiallyFull : public CollectionBase {
@@ -1326,9 +1311,6 @@ namespace QueryTests {
 
             ASSERT_EQUALS( startNumCursors, ClientCursor::numCursors() );
         }
-
-    private:
-        ZeroFindingStartTimeout _zeroTimeout;
     };
     
     /**
@@ -1472,32 +1454,6 @@ namespace QueryTests {
         }
     };
 
-    namespace parsedtests {
-        class basic1 {
-        public:
-            void _test( const BSONObj& in ) {
-                ParsedQuery q( "a.b" , 5 , 6 , 9 , in , BSONObj() );
-                ASSERT_EQUALS( BSON( "x" << 5 ) , q.getFilter() );
-            }
-            void run() {
-                _test( BSON( "x" << 5 ) );
-                _test( BSON( "query" << BSON( "x" << 5 ) ) );
-                _test( BSON( "$query" << BSON( "x" << 5 ) ) );
-
-                {
-                    ParsedQuery q( "a.b" , 5 , 6 , 9 , BSON( "x" << 5 ) , BSONObj() );
-                    ASSERT_EQUALS( 6 , q.getNumToReturn() );
-                    ASSERT( q.wantMore() );
-                }
-                {
-                    ParsedQuery q( "a.b" , 5 , -6 , 9 , BSON( "x" << 5 ) , BSONObj() );
-                    ASSERT_EQUALS( 6 , q.getNumToReturn() );
-                    ASSERT( ! q.wantMore() );
-                }
-            }
-        };
-    };
-
     namespace queryobjecttests {
         class names1 {
         public:
@@ -1536,162 +1492,7 @@ namespace QueryTests {
 
         }
     };
-
-    namespace proj { // Projection tests
-
-        class T1 {
-        public:
-            void run() {
-
-                Projection m;
-                m.init( BSON( "a" << 1 ) );
-                ASSERT_EQUALS( BSON( "a" << 5 ) , m.transform( BSON( "x" << 1 << "a" << 5 ) ) );
-            }
-        };
-
-        class K1 {
-        public:
-            void run() {
-
-                Projection m;
-                m.init( BSON( "a" << 1 ) );
-
-                scoped_ptr<Projection::KeyOnly> x( m.checkKey( BSON( "a" << 1 ) ) );
-                ASSERT( ! x );
-
-                x.reset( m.checkKey( BSON( "a" << 1  << "_id" << 1 ) ) );
-                ASSERT( x );
-
-                ASSERT_EQUALS( BSON( "a" << 5 << "_id" << 17 ) ,
-                               x->hydrate( BSON( "" << 5 << "" << 17 ) ) );
-
-                x.reset( m.checkKey( BSON( "a" << 1 << "x" << 1 << "_id" << 1 ) ) );
-                ASSERT( x );
-
-                ASSERT_EQUALS( BSON( "a" << 5 << "_id" << 17 ) ,
-                               x->hydrate( BSON( "" << 5 << "" << 123 << "" << 17 ) ) );
-
-            }
-        };
-
-        class K2 {
-        public:
-            void run() {
-
-                Projection m;
-                m.init( BSON( "a" << 1 << "_id" << 0 ) );
-
-                scoped_ptr<Projection::KeyOnly> x( m.checkKey( BSON( "a" << 1 ) ) );
-                ASSERT( x );
-
-                ASSERT_EQUALS( BSON( "a" << 17 ) ,
-                               x->hydrate( BSON( "" << 17 ) ) );
-
-                x.reset( m.checkKey( BSON( "x" << 1 << "a" << 1 << "_id" << 1 ) ) );
-                ASSERT( x );
-
-                ASSERT_EQUALS( BSON( "a" << 123 ) ,
-                               x->hydrate( BSON( "" << 5 << "" << 123 << "" << 17 ) ) );
-
-            }
-        };
-
-
-        class K3 {
-        public:
-            void run() {
-
-                {
-                    Projection m;
-                    m.init( BSON( "a" << 1 << "_id" << 0 ) );
-
-                    scoped_ptr<Projection::KeyOnly> x( m.checkKey( BSON( "a" << 1 << "x.a" << 1 ) ) );
-                    ASSERT( x );
-                }
-
-
-                {
-                    // TODO: this is temporary SERVER-2104
-                    Projection m;
-                    m.init( BSON( "x.a" << 1 << "_id" << 0 ) );
-
-                    scoped_ptr<Projection::KeyOnly> x( m.checkKey( BSON( "a" << 1 << "x.a" << 1 ) ) );
-                    ASSERT( ! x );
-                }
-
-            }
-        };
-
-
-    }
     
-    namespace ScanAndOrderTests {
-        
-        class TestableScanAndOrder : public ScanAndOrder {
-        public:
-            TestableScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs)
-            : ScanAndOrder( startFrom, limit, order, frs ) {
-            }
-            unsigned approxSize() const { return ScanAndOrder::approxSize(); }
-        };
-        typedef TestableScanAndOrder Testable;
-        
-        class Base {
-        protected:
-            void assertNumFilled( int expected, const Testable &t ) {
-                ASSERT_EQUALS( expected, t.size() );
-                BufBuilder bb;
-                int nout;
-                t.fill( bb, 0, nout );
-                ASSERT_EQUALS( expected, nout );                
-            }
-        };
-        
-        class Unlimited : public Base {
-        public:
-            void run() {
-                FieldRangeSet frs( "n/a", BSONObj(), true, true );
-                Testable t( 0, 0, BSON( "a" << 1 ), frs );
-                ASSERT_EQUALS( 0U, t.approxSize() );
-                BSONObj o = BSON( "a" << 1 );
-                t.add( o, 0 );
-                ASSERT( (int)t.approxSize() > o.objsize() );
-
-                t.add( o, 0 );
-                ASSERT( (int)t.approxSize() > 2 * o.objsize() );
-
-                assertNumFilled( 2, t );
-            }
-        };
-
-        class LimitOne : public Base {
-        public:
-            void run() {
-                runWithDiskLoc( 0 );
-                DiskLoc loc;
-                runWithDiskLoc( &loc );
-            }
-        private:
-            void runWithDiskLoc( const DiskLoc *loc ) {
-                FieldRangeSet frs( "n/a", BSONObj(), true, true );
-                Testable t( 0, 1, BSON( "a" << 1 ), frs );
-                ASSERT_EQUALS( 0U, t.approxSize() );
-                t.add( BSON( "a" << 3 ), loc );
-                unsigned smallSize = t.approxSize();
-
-                t.add( BSON( "a" << 2 << "extra" << "read all about it" ), loc );
-                unsigned largeSize = t.approxSize();
-                ASSERT( largeSize > smallSize );
-
-                t.add( BSON( "a" << 1 ), loc );
-                ASSERT_EQUALS( smallSize, t.approxSize() );
-
-                assertNumFilled( 1, t );
-            }
-        };
-        
-    } // namespace ScanAndOrderTests
-
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -1750,19 +1551,9 @@ namespace QueryTests {
             add< QueryReadsAll >();
             add< KillPinnedCursor >();
 
-            add< parsedtests::basic1 >();
-
             add< queryobjecttests::names1 >();
 
             add< OrderingTest >();
-
-            add< proj::T1 >();
-            add< proj::K1 >();
-            add< proj::K2 >();
-            add< proj::K3 >();
-            
-            add< ScanAndOrderTests::Unlimited >();
-            add< ScanAndOrderTests::LimitOne >();
         }
     } myall;
 
