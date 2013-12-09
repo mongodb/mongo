@@ -111,7 +111,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
     # Backup a set of chosen tables/files using the wt backup command.
     def backup_table(self, l):
         # Remove any previous backup directories.
-        shutil.rmtree(self.dir, True)
+        shutil.rmtree(self.dir, ignore_errors=True)
         os.mkdir(self.dir)
 
         # Build a command line of objects to back up and run wt.

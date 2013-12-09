@@ -29,7 +29,7 @@
 #   Transactions: hot backup and recovery
 #
 
-import os
+import shutil, os
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
@@ -110,7 +110,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         if backup_uri != None:
             cmd += '-t ' + backup_uri + ' '
         else:
-            wttest.removeAll(self.backup_dir)
+            shutil.rmtree(self.backup_dir, ignore_errors=True)
             os.mkdir(self.backup_dir)
 
         cmd += self.backup_dir

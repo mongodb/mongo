@@ -125,8 +125,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Opening a clone of the database home directory should run
         # recovery and see the committed results.
-        wttest.removeAll(self.backup_dir)
-        shutil.copytree(self.home, self.backup_dir)
+        self.backup(self.backup_dir)
         backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
         backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
         try:
@@ -135,8 +134,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             backup_conn.close()
 
     def check_log(self, committed):
-        wttest.removeAll(self.backup_dir)
-        shutil.copytree(self.home, self.backup_dir)
+        self.backup(self.backup_dir)
         #
         # Open and close the backup connection a few times to force
         # repeated recovery and log archiving even if later recoveries
