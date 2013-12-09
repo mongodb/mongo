@@ -42,6 +42,7 @@ namespace mongo {
 namespace QueryTests {
 
     class Base {
+    protected:
         Lock::GlobalWrite lk;
         Client::Context _context;
         Database* _database;
@@ -146,10 +147,13 @@ namespace QueryTests {
             Client::Context ctx( "unittests.querytests" );
 
             Database* db = ctx.db();
-            if ( db->getCollection( ns() ) )
+            if ( db->getCollection( ns() ) ) {
+                _collection = NULL;
                 db->dropCollection( ns() );
+            }
             BSONObj options = BSON("autoIndexId" << 0 );
-            ASSERT( db->createCollection( ns(), false, &options ) );
+            _collection = db->createCollection( ns(), false, &options );
+            ASSERT( _collection );
 
             DBDirectClient cl;
             BSONObj info;
