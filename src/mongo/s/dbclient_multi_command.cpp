@@ -151,7 +151,7 @@ namespace mongo {
                 // TODO: Figure out how to handle repl sets, configs
                 dassert( command->endpoint.type() == ConnectionString::MASTER ||
                     command->endpoint.type() == ConnectionString::CUSTOM );
-                command->conn = shardConnectionPool.get( command->endpoint, _timeoutMillis );
+                command->conn = shardConnectionPool.get( command->endpoint, _timeoutMillis / 1000 );
 
                 if ( hasBatchWriteFeature( command->conn )
                      || !isBatchWriteCommand( command->cmdObj ) ) {
