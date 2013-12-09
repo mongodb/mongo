@@ -249,6 +249,7 @@ namespace mongo {
         extern const JSFile utils;
         extern const JSFile utils_sh;
         extern const JSFile writes;
+        extern const JSFile batch_api;
     }
 
     void Scope::execCoreFiles() {
@@ -259,6 +260,7 @@ namespace mongo {
         execSetup(JSFiles::mr);
         execSetup(JSFiles::query);
         execSetup(JSFiles::writes);
+        execSetup(JSFiles::batch_api);
         execSetup(JSFiles::collection);
     }
 
