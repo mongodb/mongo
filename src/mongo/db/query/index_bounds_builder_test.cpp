@@ -240,6 +240,24 @@ namespace {
     }
 
     //
+    // $mod
+    //
+
+    TEST(IndexBoundsBuilderTest, TranslateMod) {
+        BSONObj obj = fromjson("{a: {$mod: [2, 0]}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(BSON("" << numberMin << "" << numberMax), true, true)));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+    }
+
+    //
     // Test simpleRegex
     //
 

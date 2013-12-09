@@ -372,7 +372,7 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
         }
         else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
             const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
