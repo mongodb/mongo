@@ -275,7 +275,6 @@ namespace mongo {
                     c->help( help );
                     temp.append( "help" , help.str() );
                 }
-                temp.append( "lockType" , c->locktype() );
                 temp.append( "slaveOk" , c->slaveOk() );
                 temp.append( "adminOnly" , c->adminOnly() );
                 //optionally indicates that the command can be forced to run on a slave/secondary

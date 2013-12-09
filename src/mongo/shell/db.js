@@ -789,14 +789,7 @@ DB.prototype.listCommands = function(){
         var c = x.commands[name];
 
         var s = name + ": ";
-        
-        switch ( c.lockType ){
-        case -1: s += "read-lock"; break;
-        case  0: s += "no-lock"; break;
-        case  1: s += "write-lock"; break;
-        default: s += c.lockType;
-        }
-        
+
         if (c.adminOnly) s += " adminOnly ";
         if (c.adminOnly) s += " slaveOk ";
 
