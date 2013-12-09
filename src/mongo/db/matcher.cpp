@@ -432,6 +432,8 @@ namespace mongo {
         uassert( 10066 , "$where may only appear once in query", _where == 0 );
         uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
         massert( 13089 , "no current client needed for $where" , haveClient() );
+        uassert( 17126 , "no valid context found for $where", cc().getContext());
+
         _where = new Where( cc().ns() );
 
         if ( e.type() == CodeWScope ) {
