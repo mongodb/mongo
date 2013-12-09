@@ -93,11 +93,11 @@ static CONFIG c[] = {
 
 	{ "bloom_bit_count",
 	  "number of bits per item for LSM bloom filters",
-	  0x0, 0x0, 4, 32, 1000, &g.c_bloom_bit_count, NULL },
+	  0x0, 0x0, 4, 64, 1000, &g.c_bloom_bit_count, NULL },
 
 	{ "bloom_hash_count",
 	  "number of hash values per item for LSM bloom filters",
-	  0x0, 0x0, 4, 16, 100, &g.c_bloom_hash_count, NULL },
+	  0x0, 0x0, 4, 32, 100, &g.c_bloom_hash_count, NULL },
 
 	{ "bloom_oldest",
 	  "if bloom_oldest=true",				/* 10% */
@@ -181,11 +181,11 @@ static CONFIG c[] = {
 
 	{ "merge_max",
 	  "the maximum number of chunks to include in a merge operation",
-	  0x0, 0x0, 2, 100, 100, &g.c_merge_max, NULL },
+	  0x0, 0x0, 4, 20, 100, &g.c_merge_max, NULL },
 
 	{ "merge_threads",
 	  "the number of threads to perform merge operations",
-	  0x0, 0x0, 1, 10, 10, &g.c_merge_threads, NULL },
+	  0x0, 0x0, 1, 4, 10, &g.c_merge_threads, NULL },
 
 	{ "ops",
 	  "the number of modification operations done per run",

@@ -274,7 +274,6 @@ wts_create(void)
 
 	if (DATASOURCE("lsm")) {
 		p += snprintf(p, (size_t)(end - p), ",type=lsm,lsm=(");
-#if 0
 		p += snprintf(p, (size_t)(end - p),
 		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
@@ -289,7 +288,6 @@ wts_create(void)
 		    "merge_max=%u,", g.c_merge_max);
 		p += snprintf(p, (size_t)(end - p),
 		    "merge_threads=%u,", g.c_merge_threads);
-#endif
 		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 
