@@ -68,8 +68,9 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         self.txn_sync = self.sync_list[
             self.scenario_number % len(self.sync_list)]
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        conn_params = 'create,log=(enabled,file_max=%s),' % self.logmax + \
-                'error_prefix="%s: ",' % self.shortid() + \
+        conn_params = \
+                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+                'create,error_prefix="%s: ",' % self.shortid() + \
                 'transaction_sync="%s",' % self.txn_sync
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         conn = wiredtiger_open(dir, conn_params)
