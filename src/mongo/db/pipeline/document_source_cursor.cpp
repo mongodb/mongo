@@ -97,9 +97,12 @@ namespace mongo {
         BSONObj obj;
         Runner::RunnerState state;
         while ((state = runner->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
-            // TODO SERVER-11831: consider using documentFromBsonWithDeps(obj, _dependencies)
-
-            _currentBatch.push_back(Document(obj));
+            if (_haveDeps) {
+                _currentBatch.push_back(documentFromBsonWithDeps(obj, _dependencies));
+            }
+            else {
+                _currentBatch.push_back(Document(obj));
+            }
 
             if (_limit) {
                 if (++_docsAddedToBatches == _limit->getLimit()) {
@@ -178,8 +181,10 @@ namespace {
         if (info->isScanAndOrderSet())
             out[TypeExplain::scanAndOrder()] = Value(info->getScanAndOrder());
 
+#if 0 // Disabled pending SERVER-12015 since until then no aggs will be index only.
         if (info->isIndexOnlySet())
             out[TypeExplain::indexOnly()] = Value(info->getIndexOnly());
+#endif
 
         if (info->isIndexBoundsSet())
             out[TypeExplain::indexBounds()] = Value(info->getIndexBounds());
@@ -250,6 +255,7 @@ namespace {
                                                CursorId cursorId,
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
+        , _haveDeps(false)
         , _docsAddedToBatches(0)
         , _ns(ns)
         , _cursorId(cursorId)
@@ -265,5 +271,6 @@ namespace {
     void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
         _projection = projection;
         _dependencies = deps;
+        _haveDeps = true;
     }
 }

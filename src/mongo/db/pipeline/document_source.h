@@ -422,6 +422,7 @@ namespace mongo {
         BSONObj _query;
         BSONObj _sort;
         BSONObj _projection;
+        bool _haveDeps;
         ParsedDeps _dependencies;
         intrusive_ptr<DocumentSourceLimit> _limit;
         long long _docsAddedToBatches; // for _limit enforcement
