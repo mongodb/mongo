@@ -776,7 +776,7 @@ execute_populate(CONFIG *cfg)
 		g_insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
-		    PRIu64 ") in %" PRIu32 " secs",
+		    PRIu32 ") in %" PRIu32 " secs",
 		    g_insert_ops - last_ops, g_insert_ops,
 		    cfg->icount, cfg->report_interval);
 		last_ops = g_insert_ops;
