@@ -77,3 +77,18 @@ env.CppUnitTest(
     ],
     NO_CRUTCH = True,
 )
+
+env.CppUnitTest(
+    target = "projection_exec_test",
+    source = [
+        "projection_exec_test.cpp",
+    ],
+    LIBDEPS = [
+        "exec",
+        "mock_stage",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+    ],
+    NO_CRUTCH = True,
+)

@@ -343,7 +343,10 @@ namespace mongo {
             // Case 2: no array projection for this field.
             Matchers::const_iterator matcher = _matchers.find(elt.fieldName());
             if (_matchers.end() == matcher) {
-                append(bob, elt, details, arrayOpType);
+                Status s = append(bob, elt, details, arrayOpType);
+                if (!s.isOK()) {
+                    return s;
+                }
                 continue;
             }
 
