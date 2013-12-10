@@ -3454,22 +3454,19 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				/*
 				 * Overflow keys referencing discarded values
-				 * are no longer useful, schedule the discard
-				 * of the backing blocks.  Don't worry about
-				 * reuse, reusing the key in this reconciliation
-				 * is unlikely.
+				 * are no longer useful, discard the backing
+				 * blocks.  Don't worry about reuse, reusing
+				 * keys from a row-store page reconciliation
+				 * seems unlikely enough to ignore.
 				 *
 				 * Keys are part of the name-space though, we
 				 * can't remove them from the in-memory tree;
-				 * if an overflow key was never instantiated,
-				 * do it now.
+				 * assert the key was instantiated, otherwise
+				 * we might try and look it up.
 				 */
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
-					if (ikey == NULL)
-						WT_ERR(__wt_row_leaf_key_work(
-						    session,
-						    page, rip, NULL, 1));
+					WT_ASSERT(session, ikey != NULL);
 
 					/*
 					 * Acquire the overflow lock to avoid
