@@ -334,6 +334,29 @@ class WiredTigerTestCase(unittest.TestCase):
             with self.expectedStderr(message):
                 self.assertRaises(exceptionType, expr)
             
+    def exceptionToStderr(self, expr):
+        """
+        Used by assertRaisesHavingMessage to convert an expression
+        that throws an error to an expression that throws the
+        same error but also has the exception string on stderr.
+        """
+        try:
+            expr()
+        except BaseException, err:
+            sys.stderr.write('Exception: ' + str(err))
+            raise
+
+    def assertRaisesHavingMessage(self, exceptionType, expr, message):
+        """
+        Like TestCase.assertRaises(), but also checks to see
+        that the assert exception, when string-ified, includes a message.
+        If message starts and ends with a slash, it is considered a pattern that
+        must appear (it need not encompass the entire message).
+        Otherwise, the message must match verbatim.
+        """
+        self.assertRaisesWithMessage(
+            exceptionType, lambda: self.exceptionToStderr(expr), message)
+
     @staticmethod
     def printOnce(msg):
         # There's a race condition with multiple threads,
