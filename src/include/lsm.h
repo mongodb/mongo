@@ -30,14 +30,15 @@ struct __wt_cursor_lsm {
 	uint64_t *txnid_max;		/* Maximum txn for each chunk */
 	size_t txnid_alloc;
 
-#define	WT_CLSM_ITERATE_NEXT    0x01    /* Forward iteration */
-#define	WT_CLSM_ITERATE_PREV    0x02    /* Backward iteration */
-#define	WT_CLSM_MERGE           0x04    /* Merge cursor, don't update */
-#define	WT_CLSM_MINOR_MERGE	0x08    /* Minor merge, include tombstones */
-#define	WT_CLSM_MULTIPLE        0x10    /* Multiple cursors have values for the
+#define	WT_CLSM_ACTIVE		0x01    /* Incremented the session count */
+#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration */
+#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration */
+#define	WT_CLSM_MERGE           0x08    /* Merge cursor, don't update */
+#define	WT_CLSM_MINOR_MERGE	0x10    /* Minor merge, include tombstones */
+#define	WT_CLSM_MULTIPLE        0x20    /* Multiple cursors have values for the
 					   current key */
-#define	WT_CLSM_OPEN_READ	0x20    /* Open for reads */
-#define	WT_CLSM_OPEN_SNAPSHOT	0x40    /* Open for snapshot isolation */
+#define	WT_CLSM_OPEN_READ	0x40    /* Open for reads */
+#define	WT_CLSM_OPEN_SNAPSHOT	0x80    /* Open for snapshot isolation */
 	uint32_t flags;
 };
 

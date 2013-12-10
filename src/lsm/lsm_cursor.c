@@ -20,22 +20,20 @@
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
-	WT_ERR(__clsm_enter(clsm, 0));					\
-	WT_ERR(__cursor_enter(session))
+	WT_ERR(__clsm_enter(clsm, 0))
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
-	WT_ERR(__clsm_enter(clsm, 1));					\
-	WT_ERR(__cursor_enter(session))
+	WT_ERR(__clsm_enter(clsm, 1))
 
 #define	WT_LSM_LEAVE(session)						\
 	API_END(session);						\
-	WT_TRET(__cursor_leave(session))
+	WT_TRET(__clsm_leave(clsm))
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
 	CURSOR_UPDATE_API_END(session, ret);				\
-	WT_TRET(__cursor_leave(session))
+	WT_TRET(__clsm_leave(clsm))
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_lookup(WT_CURSOR_LSM *);
@@ -121,6 +119,30 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 open:		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __clsm_open_cursors(clsm, update, 0, 0));
 		WT_RET(ret);
+	}
+
+	if (!F_ISSET(clsm, WT_CLSM_ACTIVE)) {
+		WT_RET(__cursor_enter(session));
+		F_SET(clsm, WT_CLSM_ACTIVE);
+	}
+
+	return (0);
+}
+
+/*
+ * __clsm_leave --
+ *	Finish an operation on an LSM cursor.
+ */
+static int
+__clsm_leave(WT_CURSOR_LSM *clsm)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
+
+	if (F_ISSET(clsm, WT_CLSM_ACTIVE)) {
+		WT_RET(__cursor_leave(session));
+		F_CLR(clsm, WT_CLSM_ACTIVE);
 	}
 
 	return (0);
@@ -782,6 +804,9 @@ __clsm_reset(WT_CURSOR *cursor)
 	ret = __clsm_reset_cursors(clsm, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
+	/* In case we were somehow left positioned, clear that. */
+	WT_TRET(__clsm_leave(clsm));
+
 err:	API_END(session);
 	return (ret);
 }
@@ -1246,6 +1271,9 @@ __clsm_close(WT_CURSOR *cursor)
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	__wt_free(session, clsm->txnid_max);
+
+	/* In case we were somehow left positioned, clear that. */
+	WT_TRET(__clsm_leave(clsm));
 
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
