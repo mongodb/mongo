@@ -2,6 +2,7 @@
 // This tests runs through the 8 possible combinations of sslMode values
 // and SSL-enabled and disabled shell respectively. For each combination
 // expected behavior is verified. 
+
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
 var CLIENT_CERT = "jstests/libs/client.pem"
@@ -16,6 +17,7 @@ function testCombination(sslMode, sslShell, shouldSucceed) {
     else {
         MongoRunner.runMongod({port: port,
                                sslMode: sslMode, 
+                               sslAllowInvalidCertificates: "",
                                sslPEMKeyFile: SERVER_CERT,
                                sslCAFile: CA_CERT});
     }
