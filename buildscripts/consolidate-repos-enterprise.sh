@@ -4,25 +4,37 @@
 #
 # Create new repo directory under /var/www-enterprise/repo.consolidated
 # containing every deb and every rpm under /var/www-enterprise/ with proper
-# repo metadata for apt and yum 
+# repo metadata for apt and yum
 #
 
 source_dir=/var/www-enterprise/
 
 repodir=/var/www-enterprise/repo.consolidated
 
-gpg_recip='<richard@10gen.com>' 
+gpg_recip='<richard@10gen.com>'
+
+stable_branch="2.4"
+unstable_branch="2.5"
 
 echo "Using directory: $repodir"
 
 # set up repo dirs if they don't exist
 #
-for distro in debian-sysvinit redhat ubuntu-upstart
-do
-  mkdir -p "$repodir/$distro"
-done
+mkdir -p "$repodir/apt/ubuntu"
+mkdir -p "$repodir/apt/debian"
+mkdir -p "$repodir/yum/redhat"
 
-mkdir -p "$repodir"
+# to support different $releasever values in yum repo configurations
+#
+if [ ! -e "$repodir/yum/redhat/6Server" ]
+then
+  ln -s 6 "$repodir/yum/redhat/6Server"
+fi
+
+if [ ! -e "$repodir/yum/redhat/5Server" ]
+then
+  ln -s 5 "$repodir/yum/redhat/5Server"
+fi
 
 echo "Scanning and copying package files from $source_dir"
 echo ". = skipping existing file, @ = copying file"
@@ -34,15 +46,15 @@ do
   if echo "$new_package_location" | grep -q /repo/
   then
     continue
-  fi  
+  fi
 
   # skip if not enterprise package
   #
   if ! echo "$new_package_location" | grep -q enterprise
   then
     continue
-  fi 
-  # skip if it's already there 
+  fi
+  # skip if it's already there
   #
   if [ -e "$new_package_location" -a "$(basename "$package")" != "Release" ]
   then
@@ -57,36 +69,70 @@ echo
 
 # packages are in place, now create metadata
 #
-for debian_dir in "$repodir"/ubuntu-* "$repodir"/debian-* 
+for debian_dir in "$repodir"/apt/ubuntu "$repodir"/apt/debian
 do
-  cd "$debian_dir" 
-  for arch_dir in dists/dist/10gen/{binary-i386,binary-amd64}
+  cd "$debian_dir"
+  for section_dir in $(find dists -type d -name multiverse)
   do
-    echo "Generating Packages file under $debian_dir/$arch_dir"
-    if [ ! -d $arch_dir ]
-    then
-      mkdir $arch_dir
-    fi
-    dpkg-scanpackages --multiversion "$arch_dir"   > "$arch_dir"/Packages
-    gzip -9c  "$arch_dir"/Packages >  "$arch_dir"/Packages.gz
+    for arch_dir in "$section_dir"/{binary-i386,binary-amd64}
+    do
+      echo "Generating Packages file under $debian_dir/$arch_dir"
+      if [ ! -d $arch_dir ]
+      then
+        mkdir $arch_dir
+      fi
+      dpkg-scanpackages --multiversion "$arch_dir"   > "$arch_dir"/Packages
+      gzip -9c  "$arch_dir"/Packages >  "$arch_dir"/Packages.gz
+    done
   done
 
-  release_dir="$debian_dir"/dists/dist
-  echo "Generating Release file under $release_dir"
-  cd $release_dir
-  tempfile=$(mktemp /tmp/ReleaseXXXXXX)
-  tempfile2=$(mktemp /tmp/ReleaseXXXXXX)
-  mv Release $tempfile
-  head -9 $tempfile > $tempfile2
-  apt-ftparchive release . >> $tempfile2
-  cp $tempfile2 Release
-  chmod 644 Release
-  rm Release.gpg
-  echo "Signing Release file"
-  gpg -r "$gpg_recip" --no-secmem-warning -abs --output Release.gpg  Release
+  for release_file in $(find "$debian_dir" -name Release)
+  do
+    release_dir=$(dirname "$release_file")
+    echo "Generating Release file under $release_dir"
+    cd $release_dir
+    tempfile=$(mktemp /tmp/ReleaseXXXXXX)
+    tempfile2=$(mktemp /tmp/ReleaseXXXXXX)
+    mv Release $tempfile
+    head -7 $tempfile > $tempfile2
+    apt-ftparchive release . >> $tempfile2
+    cp $tempfile2 Release
+    chmod 644 Release
+    rm Release.gpg
+    echo "Signing Release file"
+    gpg -r "$gpg_recip" --no-secmem-warning -abs --output Release.gpg  Release
+  done
 done
 
-for redhat_dir in $(find "$repodir"/redhat -type d -name x86_64 -o -name i386)
+# Create symlinks for stable and unstable branches
+#
+# Examples:
+#
+# /var/www-enterprise/repo.consolidated/yum/redhat/5/mongodb-enterprise/unstable -> 2.5
+# /var/www-enterprise/repo.consolidated/yum/redhat/6/mongodb-enterprise/unstable -> 2.5
+# /var/www-enterprise/repo.consolidated/apt/ubuntu/dists/precise/mongodb-enterprise/unstable -> 2.5
+#
+for unstable_branch_dir in "$repodir"/yum/redhat/*/*/$unstable_branch "$repodir"/apt/debian/dists/*/*/$unstable_branch "$repodir"/apt/ubuntu/dists/*/*/$unstable_branch
+do
+  full_unstable_path=$(dirname "$unstable_branch_dir")/unstable
+  if [ -e "$unstable_branch_dir" -a ! -e "$full_unstable_path" ]
+  then
+    echo "Linking unstable branch directory $unstable_branch_dir to $full_unstable_path"
+    ln -s $unstable_branch $full_unstable_path
+  fi
+done
+
+for stable_branch_dir in "$repodir"/yum/redhat/*/*/$stable_branch "$repodir"/apt/debian/dists/*/*/$stable_branch "$repodir"/apt/ubuntu/dists/*/*/$stable_branch
+do
+  full_stable_path=$(dirname "$stable_branch_dir")/stable
+  if [ -e "$stable_branch_dir" -a ! -e "$full_stable_path" ]
+  then
+    echo "Linking stable branch directory $stable_branch_dir to $full_stable_path"
+    ln -s $stable_branch $full_stable_path
+  fi
+done
+
+for redhat_dir in $(find "$repodir"/yum/redhat -type d -name x86_64 -o -name i386)
 do
   echo "Generating redhat repo metadata under $redhat_dir"
   cd "$redhat_dir"

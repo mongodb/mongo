@@ -97,6 +97,7 @@ mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
 touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
 
 
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
