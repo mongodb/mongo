@@ -183,7 +183,10 @@ namespace mongo {
         }
 
         vector<QuerySolution*> solutions;
-        QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
+        Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
+        if (!status.isOK()) {
+            return status;
+        }
 
         /*
         for (size_t i = 0; i < solutions.size(); ++i) {

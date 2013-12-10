@@ -46,9 +46,9 @@ namespace mongo {
          *
          * Caller owns pointers in *out.
          */
-        static void plan(const CanonicalQuery& query,
-                         const QueryPlannerParams& params,
-                         vector<QuerySolution*>* out);
+        static Status plan(const CanonicalQuery& query,
+                           const QueryPlannerParams& params,
+                           std::vector<QuerySolution*>* out);
     };
 
 }  // namespace mongo

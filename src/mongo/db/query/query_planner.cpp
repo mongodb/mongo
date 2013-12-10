@@ -161,9 +161,9 @@ namespace mongo {
     }
 
     // static
-    void QueryPlanner::plan(const CanonicalQuery& query,
-                            const QueryPlannerParams& params,
-                            vector<QuerySolution*>* out) {
+    Status QueryPlanner::plan(const CanonicalQuery& query,
+                              const QueryPlannerParams& params,
+                              std::vector<QuerySolution*>* out) {
         QLOG() << "=============================\n"
                << "Beginning planning, options = " << optionString(params.options) << endl
                << "Canonical query:\n" << query.toString() << endl
@@ -188,7 +188,7 @@ namespace mongo {
                     out->push_back(soln);
                 }
             }
-            return;
+            return Status::OK();
         }
 
         // The hint can be $natural: 1.  If this happens, output a collscan.  It's a weird way of
@@ -205,7 +205,7 @@ namespace mongo {
                         out->push_back(soln);
                     }
                 }
-                return;
+                return Status::OK();
             }
         }
 
@@ -273,7 +273,7 @@ namespace mongo {
             if (hintIndexNumber == numeric_limits<size_t>::max()) {
                 // This is supposed to be an error.
                 warning() << "Can't find hint for " << hintIndex.toString();
-                return;
+                return Status(ErrorCodes::BadValue, "bad hint");
             }
         }
 
@@ -283,15 +283,6 @@ namespace mongo {
             BSONObj minObj = query.getParsed().getMin();
             BSONObj maxObj = query.getParsed().getMax();
 
-            // If min and max are both specified they must have the same field names.
-            if (!minObj.isEmpty() && !maxObj.isEmpty()) {
-                if (!minObj.isFieldNamePrefixOf(maxObj) || (minObj.nFields() != maxObj.nFields())) {
-                    QLOG() << "minObj (" << minObj.toString()
-                           << ") and maxObj(" << maxObj.toString() << ") don't match.";
-                    return;
-                }
-            }
-
             // This is the index into params.indices[...] that we use.
             size_t idxNo = numeric_limits<size_t>::max();
 
@@ -299,12 +290,14 @@ namespace mongo {
             if (!hintIndex.isEmpty()) {
                 if (!minObj.isEmpty() && !indexCompatibleMaxMin(minObj, hintIndex)) {
                     QLOG() << "minobj doesnt work w hint";
-                    return;
+                    return Status(ErrorCodes::BadValue,
+                                  "hint provided does not work with min query");
                 }
 
                 if (!maxObj.isEmpty() && !indexCompatibleMaxMin(maxObj, hintIndex)) {
                     QLOG() << "maxobj doesnt work w hint";
-                    return;
+                    return Status(ErrorCodes::BadValue,
+                                  "hint provided does not work with max query");
                 }
 
                 idxNo = hintIndexNumber;
@@ -326,7 +319,8 @@ namespace mongo {
             if (idxNo == numeric_limits<size_t>::max()) {
                 QLOG() << "Can't find relevant index to use for max/min query";
                 // Can't find an index to use, bail out.
-                return;
+                return Status(ErrorCodes::BadValue,
+                              "unable to find relevant index for max/min query");
             }
 
             // maxObj can be empty; the index scan just goes until the end.  minObj can't be empty
@@ -360,7 +354,7 @@ namespace mongo {
                 out->push_back(soln);
             }
 
-            return;
+            return Status::OK();
         }
 
         for (size_t i = 0; i < relevantIndices.size(); ++i) {
@@ -381,7 +375,8 @@ namespace mongo {
             // No index for GEO_NEAR?  No query.
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                return;
+                QLOG() << "unable to find index for $geoNear query" << endl;
+                return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
             }
 
             GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(gnNode);
@@ -446,7 +441,7 @@ namespace mongo {
             tag->first.swap(newFirst);
 
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                return;
+                return Status::OK();
             }
         }
 
@@ -455,7 +450,7 @@ namespace mongo {
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                return;
+                return Status::OK();
             }
         }
 
@@ -495,13 +490,12 @@ namespace mongo {
                 QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
                 out->push_back(soln);
             }
-            return;
+            return Status::OK();
         }
 
         // If a sort order is requested, there may be an index that provides it, even if that
         // index is not over any predicates in the query.
         //
-        // XXX XXX: Can we do this even if the index is sparse?  Might we miss things?
         if (!query.getParsed().getSort().isEmpty()
             && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
             && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
@@ -558,6 +552,8 @@ namespace mongo {
                 QLOG() << collscan->toString() << endl;
             }
         }
+
+        return Status::OK();
     }
 
 }  // namespace mongo

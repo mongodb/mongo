@@ -40,10 +40,13 @@ namespace mongo {
     Status LiteParsedQuery::make(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
                                  const BSONObj& query, const BSONObj& proj, const BSONObj& sort,
                                  const BSONObj& hint,
+                                 const BSONObj& minObj, const BSONObj& maxObj,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort;
         pq->_hint = hint;
+        pq->_min = minObj;
+        pq->_max = maxObj;
 
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (status.isOK()) { *out = pq.release(); }
@@ -225,6 +228,13 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "bad sort specification");
         }
         _sort = normalizeSortOrder(_sort);
+
+        // Min and Max objects must have the same fields.
+        if (!_min.isEmpty() && !_max.isEmpty()) {
+            if (!_min.isFieldNamePrefixOf(_max) || (_min.nFields() != _max.nFields())) {
+                return Status(ErrorCodes::BadValue, "min and max must have the same field names");
+            }
+        }
 
         return Status::OK();
     }

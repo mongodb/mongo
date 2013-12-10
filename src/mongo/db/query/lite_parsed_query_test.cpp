@@ -44,21 +44,27 @@ namespace {
     TEST(LiteParsedQueryTest, InitSortOrder) {
         LiteParsedQuery* lpq = NULL;
         Status result = LiteParsedQuery::make("testns", 0, 1, 0, BSONObj(), BSONObj(),
-                                              fromjson("{a: 1}"), BSONObj(), &lpq);
+                                              fromjson("{a: 1}"), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              &lpq);
         ASSERT_OK(result);
     }
 
     TEST(LiteParsedQueryTest, InitSortOrderString) {
         LiteParsedQuery* lpq = NULL;
         Status result = LiteParsedQuery::make("testns", 0, 1, 0, BSONObj(), BSONObj(),
-                                              fromjson("{a: \"\"}"), BSONObj(), &lpq);
+                                              fromjson("{a: \"\"}"), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              &lpq);
         ASSERT_NOT_OK(result);
     }
 
     TEST(LiteParsedQueryTest, GetFilter) {
         LiteParsedQuery* lpq = NULL;
         Status result = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
-                                              BSONObj(), BSONObj(), &lpq);
+                                              BSONObj(), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(BSON("x" << 5 ), lpq->getFilter());
     }
@@ -66,17 +72,48 @@ namespace {
     TEST(LiteParsedQueryTest, NumToReturn) {
         LiteParsedQuery* lpq = NULL;
         Status result = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
-                                              BSONObj(), BSONObj(), &lpq);
+                                              BSONObj(), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(6, lpq->getNumToReturn());
         ASSERT(lpq->wantMore());
 
         lpq = NULL;
         result = LiteParsedQuery::make("testns", 5, -6, 9, BSON( "x" << 5 ), BSONObj(),
-                                       BSONObj(), BSONObj(), &lpq);
+                                       BSONObj(), BSONObj(),
+                                       BSONObj(), BSONObj(),
+                                       &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(6, lpq->getNumToReturn());
         ASSERT(!lpq->wantMore());
+    }
+
+    TEST(LiteParsedQueryTest, MinFieldsNotPrefixOfMax) {
+        LiteParsedQuery* lpq = NULL;
+        Status result = LiteParsedQuery::make("testns", 0, 0, 0, BSONObj(), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              fromjson("{a: 1}"), fromjson("{b: 1}"),
+                                              &lpq);
+        ASSERT_NOT_OK(result);
+    }
+
+    TEST(LiteParsedQueryTest, MinFieldsMoreThanMax) {
+        LiteParsedQuery* lpq = NULL;
+        Status result = LiteParsedQuery::make("testns", 0, 0, 0, BSONObj(), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              fromjson("{a: 1, b: 1}"), fromjson("{a: 1}"),
+                                              &lpq);
+        ASSERT_NOT_OK(result);
+    }
+
+    TEST(LiteParsedQueryTest, MinFieldsLessThanMax) {
+        LiteParsedQuery* lpq = NULL;
+        Status result = LiteParsedQuery::make("testns", 0, 0, 0, BSONObj(), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              fromjson("{a: 1}"), fromjson("{a: 1, b: 1}"),
+                                              &lpq);
+        ASSERT_NOT_OK(result);
     }
 
     //

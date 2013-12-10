@@ -48,6 +48,8 @@ namespace mongo {
                            const BSONObj& proj,
                            const BSONObj& sort,
                            const BSONObj& hint,
+                           const BSONObj& minObj,
+                           const BSONObj& maxObj,
                            LiteParsedQuery** out);
 
         /**

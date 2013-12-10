@@ -429,7 +429,8 @@ namespace mongo {
         }
 
         if (!status.isOK()) {
-            uasserted(17007, "Couldn't get runner for query because: " + status.reason() + " query is " + cqStr);
+            uasserted(17007, "Unable to execute query. Reason: " + status.reason() +
+                      ". Query: " + cqStr);
         }
 
         verify(NULL != rawRunner);
