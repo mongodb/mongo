@@ -81,49 +81,15 @@ namespace mongo {
         ~AtomicIntrinsics();
     };
 
-    /**
-     * Instantiation of AtomicIntrinsics<> for 64-bit word sizes.
-     */
-    template <typename T>
-    class AtomicIntrinsics<T, typename boost::enable_if_c<sizeof(T) == sizeof(LONGLONG)>::type> {
-    public:
 
-#if defined(NTDDI_VERSION) && defined(NTDDI_WS03SP2) && (NTDDI_VERSION >= NTDDI_WS03SP2)
-        static const bool kHaveInterlocked64 = true;
-#else
-        static const bool kHaveInterlocked64 = false;
-#endif
+    namespace details {
 
-        static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            return InterlockedImpl<kHaveInterlocked64>::compareAndSwap(dest, expected, newValue);
-        }
-
-        static T swap(volatile T* dest, T newValue) {
-            return InterlockedImpl<kHaveInterlocked64>::swap(dest, newValue);
-        }
-
-        static T load(volatile const T* value) {
-            return LoadStoreImpl<T>::load(value);
-        }
-
-        static void store(volatile T* dest, T newValue) {
-            LoadStoreImpl<T>::store(dest, newValue);
-        }
-
-        static T fetchAndAdd(volatile T* dest, T increment) {
-            return InterlockedImpl<kHaveInterlocked64>::fetchAndAdd(dest, increment);
-        }
-
-    private:
-        AtomicIntrinsics();
-        ~AtomicIntrinsics();
-
-        template <bool>
-        struct InterlockedImpl;
+        template <typename T, bool HaveInterlocked64Ops>
+        struct InterlockedImpl64;
 
         // Implementation of 64-bit Interlocked operations via Windows API calls.
-        template<>
-        struct InterlockedImpl<true> {
+        template<typename T>
+        struct InterlockedImpl64<T, true> {
             static T compareAndSwap(volatile T* dest, T expected, T newValue) {
                 return InterlockedCompareExchange64(
                     reinterpret_cast<volatile LONGLONG*>(dest),
@@ -146,8 +112,8 @@ namespace mongo {
 
         // Implementation of 64-bit Interlocked operations for systems where the API does not
         // yet provide the Interlocked...64 operations.
-        template<>
-        struct InterlockedImpl<false> {
+        template<typename T>
+        struct InterlockedImpl64<T, false> {
             static T compareAndSwap(volatile T* dest, T expected, T newValue) {
                 // NOTE: We must use the compiler intrinsic here: WinXP does not offer
                 // InterlockedCompareExchange64 as an API call.
@@ -192,12 +158,11 @@ namespace mongo {
         // implementation.  The LoadStoreImpl type represents the abstract implementation of
         // loading and storing 64-bit values.
         template <typename U, typename _IsTTooBig=void>
-        class LoadStoreImpl{};
+        struct LoadStoreImpl;
 
         // Implementation on 64-bit systems.
         template <typename U>
-        class LoadStoreImpl<U, typename boost::enable_if_c<sizeof(U) <= sizeof(void*)>::type> {
-        public:
+        struct LoadStoreImpl<U, typename boost::enable_if_c<sizeof(U) <= sizeof(void*)>::type> {
             static U load(volatile const U* value) {
                 MemoryBarrier();
                 U result = *value;
@@ -215,18 +180,72 @@ namespace mongo {
 
         // Implementation on 32-bit systems.
         template <typename U>
-        class LoadStoreImpl<U, typename boost::disable_if_c<sizeof(U) <= sizeof(void*)>::type> {
-        public:
-            static U load(volatile const U* value) {
-                return AtomicIntrinsics<U>::compareAndSwap(const_cast<volatile U*>(value),
-                                                           U(0),
-                                                           U(0));
-            }
-
-            static void store(volatile U* dest, U newValue) {
-                AtomicIntrinsics<U>::swap(dest, newValue);
-            }
+        struct LoadStoreImpl<U, typename boost::disable_if_c<sizeof(U) <= sizeof(void*)>::type> {
+            // NOTE: Implemented out-of-line below since the implementation relies on
+            // AtomicIntrinsics.
+            static U load(volatile const U* value);
+            static void store(volatile U* dest, U newValue);
         };
+
+    } // namespace details
+
+    /**
+     * Instantiation of AtomicIntrinsics<> for 64-bit word sizes.
+     */
+    template <typename T>
+    class AtomicIntrinsics<T, typename boost::enable_if_c<sizeof(T) == sizeof(LONGLONG)>::type> {
+    public:
+
+#if defined(NTDDI_VERSION) && defined(NTDDI_WS03SP2) && (NTDDI_VERSION >= NTDDI_WS03SP2)
+        static const bool kHaveInterlocked64 = true;
+#else
+        static const bool kHaveInterlocked64 = false;
+#endif
+
+        typedef details::InterlockedImpl64<T, kHaveInterlocked64> InterlockedImpl;
+        typedef details::LoadStoreImpl<T> LoadStoreImpl;
+
+        static T compareAndSwap(volatile T* dest, T expected, T newValue) {
+            return InterlockedImpl::compareAndSwap(dest, expected, newValue);
+        }
+
+        static T swap(volatile T* dest, T newValue) {
+            return InterlockedImpl::swap(dest, newValue);
+        }
+
+        static T load(volatile const T* value) {
+            return LoadStoreImpl::load(value);
+        }
+
+        static void store(volatile T* dest, T newValue) {
+            LoadStoreImpl::store(dest, newValue);
+        }
+
+        static T fetchAndAdd(volatile T* dest, T increment) {
+            return InterlockedImpl::fetchAndAdd(dest, increment);
+        }
+
+    private:
+        AtomicIntrinsics();
+        ~AtomicIntrinsics();
     };
+
+    namespace details {
+
+        template <typename U>
+        U LoadStoreImpl<U, typename boost::disable_if_c<sizeof(U) <= sizeof(void*)>::type>
+        ::load(volatile const U* value) {
+            return AtomicIntrinsics<U>::compareAndSwap(const_cast<volatile U*>(value),
+                                                       U(0),
+                                                       U(0));
+        }
+
+        template<typename U>
+        void LoadStoreImpl<U, typename boost::disable_if_c<sizeof(U) <= sizeof(void*)>::type>
+        ::store(volatile U* dest, U newValue) {
+            AtomicIntrinsics<U>::swap(dest, newValue);
+        }
+
+    } // namespace details
 
 }  // namespace mongo
