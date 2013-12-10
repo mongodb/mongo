@@ -22,6 +22,8 @@
 #include <boost/thread/xtime.hpp>
 #include <boost/version.hpp>
 
+#include "base/status_with.h"
+
 namespace mongo {
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
@@ -77,6 +79,16 @@ namespace mongo {
      * Sample format: "Wed Oct 31 13:34:47.996"
      */
     std::string dateToCtimeString(Date_t date);
+
+    /**
+     * Parses a Date_t from an ISO 8601 string representation.
+     *
+     * Sample formats: "2013-07-23T18:42:14.072-05:00"
+     *                 "2013-07-23T18:42:14.072Z"
+     *
+     * Local times are currently not supported.
+     */
+    StatusWith<Date_t> dateFromISOString(const StringData& dateString);
 
     boost::gregorian::date currentDate();
 
