@@ -50,12 +50,6 @@ ARCHES=["x86_64"]
 # Made up names for the flavors of distribution we package for.
 DISTROS=["ubuntu-upstart", "redhat"]
 
-# When we're preparing a directory containing packaging tool inputs
-# and our binaries, use this relative subdirectory for placing the
-# binaries.
-BINARYDIR="BINARIES"
-
-sys.stderr.write("BINARYDIR: %s, REPOPATH: %s\n" % (BINARYDIR, REPOPATH))
 
 class Spec(object):
     def __init__(self, specstr):
@@ -305,8 +299,9 @@ def unpack_binaries_into(build_os, arch, spec, where):
     # thing and chdir into where and run tar there.
     os.chdir(where)
     try:
-        sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec), "mongodb-linux-%s-enterprise-%s-%s/bin" % (arch, build_os, spec.version())])
-        os.rename("mongodb-linux-%s-enterprise-%s-%s/bin" % (arch, build_os, spec.version()), "bin")
+        sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec), "mongodb-linux-%s-enterprise-%s-%s/" % (arch, build_os, spec.version())])
+        for releasefile in "bin", "snmp", "LICENSE.txt", "README", "THIRD-PARTY-NOTICES":
+          os.rename("mongodb-linux-%s-enterprise-%s-%s/%s" % (arch, build_os, spec.version(), releasefile), releasefile)
         os.rmdir("mongodb-linux-%s-enterprise-%s-%s" % (arch, build_os, spec.version()))
     except Exception:
         exc=sys.exc_value
@@ -328,15 +323,15 @@ def make_package(distro, build_os, arch, spec, srcdir):
         print "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert(["sh", "-c", "(cd \"%s\" && git archive r%s %s/ ) | (cd \"%s\" && tar xvf -)" % (srcdir, spec.version(), pkgdir, sdir)])
-    # Splat the binaries under sdir.  The "build" stages of the
-    # packaging infrastructure will move the binaries to wherever they
+    # Splat the binaries and snmp files under sdir.  The "build" stages of the
+    # packaging infrastructure will move the files to wherever they
     # need to go.  
-    unpack_binaries_into(build_os, arch, spec, sdir+("%s/usr/"%BINARYDIR))
+    unpack_binaries_into(build_os, arch, spec, sdir)
     # Remove the mongosniff binary due to libpcap dynamic
     # linkage.  FIXME: this removal should go away
     # eventually.
-    if os.path.exists(sdir+("%s/usr/bin/mongosniff"%BINARYDIR)):
-      os.unlink(sdir+("%s/usr/bin/mongosniff"%BINARYDIR))
+    if os.path.exists(sdir + "bin/mongosniff"):
+      os.unlink(sdir + "bin/mongosniff")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir):

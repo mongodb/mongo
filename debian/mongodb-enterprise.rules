@@ -80,13 +80,13 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
+	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-shell/usr/bin
+	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-server/usr/bin
+	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-mongos/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/BINARIES/usr/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-enterprise-tools/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-server/etc

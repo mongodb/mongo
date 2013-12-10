@@ -77,7 +77,7 @@ to develop mongo client software.
 
 %install
 mkdir -p $RPM_BUILD_ROOT/usr
-cp -rv BINARIES/usr/bin $RPM_BUILD_ROOT/usr
+cp -rv bin $RPM_BUILD_ROOT/usr
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 # FIXME: remove this rm when mongosniff is back in the package
@@ -93,6 +93,14 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
 touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
+%doc snmp/MONGOD-MIB.txt
+%doc snmp/MONGODBINC-MIB.txt
+%doc snmp/mongod.conf.master
+%doc snmp/mongod.conf.subagent
+%doc snmp/README-snmp.txt
+%doc LICENSE.txt
+%doc README
+%doc THIRD-PARTY-NOTICES
 
 %clean
 rm -rf $RPM_BUILD_ROOT
