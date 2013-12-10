@@ -155,7 +155,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * use the same data value all the time.
 	 */
 	if ((g.type == ROW || g.type == VAR) &&
-	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) > g.c_repeat_data_pct) {
+	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) < g.c_repeat_data_pct) {
 		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
