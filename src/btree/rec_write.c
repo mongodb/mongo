@@ -3470,6 +3470,19 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
 						    page, rip, NULL, 1));
+
+					/*
+					 * Acquire the overflow lock to avoid
+					 * racing with a thread instantiating
+					 * the key.  Reader threads hold read
+					 * locks on the overflow lock when
+					 * checking for key instantiation.
+					 */
+					WT_ERR(__wt_writelock(session,
+					    S2BT(session)->val_ovfl_lock));
+					WT_ERR(__wt_rwunlock(session,
+					    S2BT(session)->val_ovfl_lock));
+
 					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    unpack->data, unpack->size));
