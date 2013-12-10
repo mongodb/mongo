@@ -27,11 +27,8 @@
 */
 
 #include "mongo/db/btree.h"
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/hash_access_method.h"
-#include "mongo/db/index/hash_index_cursor.h"
-#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
@@ -80,8 +77,7 @@ namespace mongo {
     }
 
     Status HashAccessMethod::newCursor(IndexCursor** out) {
-        *out = new HashIndexCursor(_hashedField, _seed, _hashVersion, _descriptor);
-        return Status::OK();
+        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on hash");
     }
 
     void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {

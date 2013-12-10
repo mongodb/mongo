@@ -35,6 +35,7 @@
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/qlog.h"
@@ -51,12 +52,12 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/mongoutils/str.h"
 
-namespace {
+namespace mongo {
+    // The .h for this in find_constants.h.
+    const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+}  // namespace mongo
 
-    // Copied from db/ops/query.cpp.  Quote:
-    // We cut off further objects once we cross this threshold; thus, you might get
-    // a little bit more than this, it is a threshold rather than a limit.
-    static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+namespace {
 
     // TODO: Remove this or use it.
     bool hasIndexSpecifier(const mongo::LiteParsedQuery& pq) {
@@ -76,7 +77,7 @@ namespace {
         if (0 == pq.getNumToReturn()) {
             return (len > 1024 * 1024) || n >= 101;
         }
-        return n >= pq.getNumToReturn() || len > MaxBytesToReturnToClientAtOnce;
+        return n >= pq.getNumToReturn() || len > mongo::MaxBytesToReturnToClientAtOnce;
     }
 
     bool enough(const mongo::LiteParsedQuery& pq, int n) {

@@ -21,8 +21,8 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/projection.h"
-#include "mongo/db/ops/query.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/find_constants.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

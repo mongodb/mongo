@@ -32,8 +32,8 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/ops/query.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/query/find_constants.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException

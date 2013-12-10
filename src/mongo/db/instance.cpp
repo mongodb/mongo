@@ -63,7 +63,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/query.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
@@ -760,13 +759,13 @@ namespace mongo {
                     }
                 }
 
-                msgdata = processGetMore(ns,
-                                         ntoreturn,
-                                         cursorid,
-                                         curop,
-                                         pass,
-                                         exhaust,
-                                         &isCursorAuthorized);
+                msgdata = newGetMore(ns,
+                                     ntoreturn,
+                                     cursorid,
+                                     curop,
+                                     pass,
+                                     exhaust,
+                                     &isCursorAuthorized);
             }
             catch ( AssertionException& e ) {
                 if ( isCursorAuthorized ) {

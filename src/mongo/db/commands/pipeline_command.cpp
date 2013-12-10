@@ -42,12 +42,13 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/ops/query.h"
+#include "mongo/db/query/find_constants.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
 
 namespace {
+
     /**
      * This is a Runner implementation backed by an aggregation pipeline.
      */

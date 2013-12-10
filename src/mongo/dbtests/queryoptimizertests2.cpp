@@ -34,7 +34,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/query.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/queryutil.h"
