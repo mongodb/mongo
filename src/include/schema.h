@@ -68,8 +68,7 @@ struct __wt_table {
 #define	WT_COLGROUPS(t)	WT_MAX((t)->ncolgroups, 1)
 
 #define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
-	int schema_locked = 0, waited = 0;				\
-	struct timespec __start, __now;					\
+	int schema_locked = 0;						\
 	WT_ASSERT(session,						\
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
 	    !F_ISSET(session, WT_SESSION_NO_SCHEMA_LOCK));		\
@@ -78,15 +77,8 @@ struct __wt_table {
 		    session, &S2C(session)->schema_lock) == 0) {	\
 			F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
 			schema_locked = 1;				\
-		} else {						\
-			(void)__wt_epoch(session, &__now);		\
-			if (!waited) {					\
-				__start = __now;			\
-				waited = 1;				\
-			} else if (WT_TIMEDIFF(__now, __start) > WT_BILLION / 2)\
-				abort();				\
+		} else							\
 			__wt_yield();					\
-		}							\
 	(op);								\
 	if (schema_locked) {						\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
