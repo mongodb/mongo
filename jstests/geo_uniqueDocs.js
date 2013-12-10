@@ -15,12 +15,12 @@ assert.eq(4, db.runCommand({geoNear:collName, near:[0,0], uniqueDocs:false}).res
 assert.eq(2, db.runCommand({geoNear:collName, near:[0,0], uniqueDocs:true}).results.length)
 results = db.runCommand({geoNear:collName, near:[0,0], num:2}).results
 assert.eq(2, results.length)
-assert.eq(2, results[0].dis)
-assert.eq(5, results[1].dis)
+assert.close(2, results[0].dis)
+assert.close(5, results[1].dis)
 results = db.runCommand({geoNear:collName, near:[0,0], num:2, uniqueDocs:true}).results
 assert.eq(2, results.length)
-assert.eq(2, results[0].dis)
-assert.eq(10, results[1].dis)
+assert.close(2, results[0].dis)
+assert.close(10, results[1].dis)
 
 // $within tests
 

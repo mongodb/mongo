@@ -72,6 +72,17 @@ namespace mongo {
             return _source;
         }
 
+        /**
+         * Does the projection want geoNear metadata?  If so any geoNear stage should include them.
+         */
+        bool wantGeoNearDistance() const {
+            return _wantGeoNearDistance;
+        }
+
+        bool wantGeoNearPoint() const {
+            return _wantGeoNearPoint;
+        }
+
     private:
         /**
          * Must go through ::make
@@ -96,6 +107,10 @@ namespace mongo {
         bool _requiresDocument;
 
         BSONObj _source;
+
+        bool _wantGeoNearDistance;
+
+        bool _wantGeoNearPoint;
     };
 
 }  // namespace mongo

@@ -105,16 +105,17 @@ namespace mongo {
         NearQuery()
             : minDistance(0),
               maxDistance(std::numeric_limits<double>::max()),
-              isNearSphere(false) { }
+              isNearSphere(false),
+              uniqueDocs(false) { }
 
         NearQuery(const string& f)
             : field(f),
               minDistance(0),
               maxDistance(std::numeric_limits<double>::max()),
-              isNearSphere(false) { }
+              isNearSphere(false),
+              uniqueDocs(false) { }
 
         bool parseFrom(const BSONObj &obj);
-        bool parseFromGeoNear(const BSONObj &obj, double radius);
 
         // The name of the field that contains the geometry.
         string field;
@@ -131,6 +132,8 @@ namespace mongo {
 
         // It's either $near or $nearSphere.
         bool isNearSphere;
+
+        bool uniqueDocs;
 
         string toString() const {
             stringstream ss;

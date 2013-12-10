@@ -402,6 +402,10 @@ namespace mongo {
 
                 GeoNear2DNode* solnRoot = new GeoNear2DNode();
                 solnRoot->nq = gnme->getData();
+                if (NULL != query.getProj()) {
+                    solnRoot->addPointMeta = query.getProj()->wantGeoNearPoint();
+                    solnRoot->addDistMeta = query.getProj()->wantGeoNearDistance();
+                }
 
                 if (MatchExpression::GEO_NEAR != query.root()->matchType()) {
                     // root is an AND, clone and delete the GEO_NEAR child.

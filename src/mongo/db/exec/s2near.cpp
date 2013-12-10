@@ -31,6 +31,7 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/expression_index.h"
@@ -38,40 +39,34 @@
 
 namespace mongo {
 
-    S2NearStage::S2NearStage(const string& ns, const BSONObj& indexKeyPattern,
-                             const NearQuery& nearQuery, const IndexBounds& baseBounds,
-                             MatchExpression* filter, WorkingSet* ws) {
-        _ns = ns;
+    S2NearStage::S2NearStage(const S2NearParams& params, WorkingSet* ws) {
+        _params = params;
         _ws = ws;
-        _indexKeyPattern = indexKeyPattern;
-        _nearQuery = nearQuery;
-        _baseBounds = baseBounds;
-        _filter = filter;
         _worked = false;
         _failed = false;
 
         // The field we're near-ing from is the n-th field.  Figure out what that 'n' is.  We
         // put the cover for the search annulus in this spot in the bounds.
         _nearFieldIndex = 0;
-        BSONObjIterator specIt(_indexKeyPattern);
+        BSONObjIterator specIt(_params.indexKeyPattern);
         while (specIt.more()) {
-             if (specIt.next().fieldName() == _nearQuery.field) {
+             if (specIt.next().fieldName() == _params.nearQuery.field) {
                  break;
              }
             ++_nearFieldIndex;
         }
 
-        verify(_nearFieldIndex < _indexKeyPattern.nFields());
+        verify(_nearFieldIndex < _params.indexKeyPattern.nFields());
 
         // FLAT implies the distances are in radians.  Convert to meters.
-        if (FLAT == _nearQuery.centroid.crs) {
-            _nearQuery.minDistance *= kRadiusOfEarthInMeters;
-            _nearQuery.maxDistance *= kRadiusOfEarthInMeters;
+        if (FLAT == _params.nearQuery.centroid.crs) {
+            _params.nearQuery.minDistance *= kRadiusOfEarthInMeters;
+            _params.nearQuery.maxDistance *= kRadiusOfEarthInMeters;
         }
 
         // Make sure distances are sane.  Possibly redundant given the checking during parsing.
-        _minDistance = max(0.0, _nearQuery.minDistance);
-        _maxDistance = min(M_PI * kRadiusOfEarthInMeters, _nearQuery.maxDistance);
+        _minDistance = max(0.0, _params.nearQuery.minDistance);
+        _maxDistance = min(M_PI * kRadiusOfEarthInMeters, _params.nearQuery.maxDistance);
         _minDistance = min(_minDistance, _maxDistance);
 
         // We grow _outerRadius in nextAnnulus() below.
@@ -152,9 +147,9 @@ namespace mongo {
         if (isEOF()) { return; }
 
         // Step 2: Fill out bounds for the ixscan we use.
-        _innerCap = S2Cap::FromAxisAngle(_nearQuery.centroid.point,
+        _innerCap = S2Cap::FromAxisAngle(_params.nearQuery.centroid.point,
                                          S1Angle::Radians(_innerRadius / kRadiusOfEarthInMeters));
-        _outerCap = S2Cap::FromAxisAngle(_nearQuery.centroid.point,
+        _outerCap = S2Cap::FromAxisAngle(_params.nearQuery.centroid.point,
                                          S1Angle::Radians(_outerRadius / kRadiusOfEarthInMeters));
         _innerCap = _innerCap.Complement();
 
@@ -165,8 +160,8 @@ namespace mongo {
         _annulus.Release(NULL);
         _annulus.Init(&regions);
 
-        _baseBounds.fields[_nearFieldIndex].intervals.clear();
-        ExpressionMapping::cover2dsphere(_annulus, &_baseBounds.fields[_nearFieldIndex]);
+        _params.baseBounds.fields[_nearFieldIndex].intervals.clear();
+        ExpressionMapping::cover2dsphere(_annulus, &_params.baseBounds.fields[_nearFieldIndex]);
 
         // Step 3: Actually create the ixscan.
         // TODO: Cache params.
@@ -177,24 +172,26 @@ namespace mongo {
             return;
         }
 
-        Collection* collection = db->getCollection( _ns );
+        Collection* collection = db->getCollection( _params.ns );
         if ( !collection ) {
             _failed = true;
             return;
         }
 
         IndexScanParams params;
-        params.descriptor = collection->getIndexCatalog()->findIndexByKeyPattern( _indexKeyPattern );
+        params.descriptor =
+            collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern );
+
         if ( !params.descriptor ) {
             _failed = true;
             return;
         }
-        params.bounds = _baseBounds;
+        params.bounds = _params.baseBounds;
         params.direction = 1;
         IndexScan* scan = new IndexScan(params, _ws, NULL);
 
         // Owns 'scan'.
-        _child.reset(new FetchStage(_ws, scan, _filter));
+        _child.reset(new FetchStage(_ws, scan, _params.filter));
     }
 
     PlanStage::StageState S2NearStage::addResultToQueue(WorkingSetID* out) {
@@ -234,28 +231,39 @@ namespace mongo {
 
         // Get all the fields with that name from the document.
         BSONElementSet geom;
-        member->obj.getFieldsDotted(_nearQuery.field, geom, false);
+        member->obj.getFieldsDotted(_params.nearQuery.field, geom, false);
         if (geom.empty()) {return PlanStage::NEED_TIME; }
 
         // Some value that any distance we can calculate will be less than.
         double minDistance = numeric_limits<double>::max();
+        BSONObj minDistanceObj;
         for (BSONElementSet::iterator git = geom.begin(); git != geom.end(); ++git) {
             if (!git->isABSONObj()) { return PlanStage::FAILURE; }
             BSONObj obj = git->Obj();
 
             double distToObj;
-            if (S2SearchUtil::distanceBetween(_nearQuery.centroid.point, obj, &distToObj)) {
-                minDistance = min(distToObj, minDistance);
+            if (S2SearchUtil::distanceBetween(_params.nearQuery.centroid.point, obj, &distToObj)) {
+                if (distToObj < minDistance) {
+                    minDistance = distToObj;
+                    minDistanceObj = obj;
+                }
             }
             else {
                 warning() << "unknown geometry: " << obj.toString();
             }
         }
 
-        // If the distance to the doc satisfies our distance criteria,
+        // If the distance to the doc satisfies our distance criteria, add it to our buffered
+        // results.
         if (minDistance >= _innerRadius &&
             (_outerRadiusInclusive ? minDistance <= _outerRadius : minDistance < _outerRadius)) {
             _results.push(Result(*out, minDistance));
+            if (_params.addDistMeta) {
+                member->addComputed(new GeoDistanceComputedData(minDistance));
+            }
+            if (_params.addPointMeta) {
+                member->addComputed(new GeoNearPointComputedData(minDistanceObj));
+            }
             if (member->hasLoc()) {
                 _invalidationMap[member->loc] = *out;
             }

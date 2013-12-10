@@ -50,18 +50,18 @@ namespace mongo {
 
     class GeoDistanceComputedData : public WorkingSetComputedData {
     public:
-        GeoDistanceComputedData(double score)
+        GeoDistanceComputedData(double dist)
             : WorkingSetComputedData(WSM_COMPUTED_GEO_DISTANCE),
-              _score(score) { }
+              _dist(dist) { }
 
-        double getScore() const { return _score; }
+        double getDist() const { return _dist; }
 
         virtual GeoDistanceComputedData* clone() const {
-            return new GeoDistanceComputedData(_score);
+            return new GeoDistanceComputedData(_dist);
         }
 
     private:
-        double _score;
+        double _dist;
     };
 
     class IndexKeyComputedData : public WorkingSetComputedData {
@@ -78,6 +78,22 @@ namespace mongo {
 
     private:
         BSONObj _key;
+    };
+
+    class GeoNearPointComputedData : public WorkingSetComputedData {
+    public:
+        GeoNearPointComputedData(BSONObj point)
+            : WorkingSetComputedData(WSM_GEO_NEAR_POINT),
+              _point(point.getOwned()) { }
+
+        BSONObj getPoint() const { return _point; }
+
+        virtual GeoNearPointComputedData* clone() const {
+            return new GeoNearPointComputedData(_point);
+        }
+
+    private:
+        BSONObj _point;
     };
 
 }  // namespace mongo

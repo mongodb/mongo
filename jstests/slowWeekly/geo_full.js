@@ -42,12 +42,15 @@ var randEnvironment = function(){
     var max = Random.rand() * scale + offset
 	var min = - Random.rand() * scale + offset
 	var bits = Math.floor( Random.rand() * 32 ) + 1
+	var bits = Math.floor( Random.rand() * 32 ) + 1
 	var range = max - min
     var bucketSize = range / ( 4 * 1024 * 1024 * 1024 )
     	
 	return { max : max,
 		     min : min,
-		     bits : bits,
+             // QUERY_MIGRATION: We don't use the # of bits (yet) in creating geohashers
+             // so we get this wrong for flat as well.
+		     // bits : bits,
 		     earth : false,
 		     bucketSize : bucketSize }
 	

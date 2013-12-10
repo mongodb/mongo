@@ -127,6 +127,12 @@ namespace mongo {
                     else if (mongoutils::str::equals(e2.valuestr(), "diskloc")) {
                         _meta[e.fieldName()] = META_DISKLOC;
                     }
+                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearPoint")) {
+                        _meta[e.fieldName()] = META_GEONEAR_POINT;
+                    }
+                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearDistance")) {
+                        _meta[e.fieldName()] = META_GEONEAR_DIST;
+                    }
                     else if (mongoutils::str::equals(e2.valuestr(), "indexKey")) {
                         _hasReturnKey = true;
                         // The index key clobbers everything so just stop parsing here.
@@ -287,7 +293,37 @@ namespace mongo {
         }
 
         for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
-            if (META_TEXT == it->second) {
+            if (META_GEONEAR_DIST == it->second) {
+                if (member->hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
+                    const GeoDistanceComputedData* dist
+                        = static_cast<const GeoDistanceComputedData*>(
+                                member->getComputed(WSM_COMPUTED_GEO_DISTANCE));
+                    bob.append(it->first, dist->getDist());
+                }
+                else {
+                    return Status(ErrorCodes::InternalError,
+                                  "near loc dist requested but no data available");
+                }
+            }
+            else if (META_GEONEAR_POINT == it->second) {
+                if (member->hasComputed(WSM_GEO_NEAR_POINT)) {
+                    const GeoNearPointComputedData* point
+                        = static_cast<const GeoNearPointComputedData*>(
+                                member->getComputed(WSM_GEO_NEAR_POINT));
+                    BSONObj ptObj = point->getPoint();
+                    if (ptObj.couldBeArray()) {
+                        bob.appendArray(it->first, ptObj);
+                    }
+                    else {
+                        bob.append(it->first, ptObj);
+                    }
+                }
+                else {
+                    return Status(ErrorCodes::InternalError,
+                                  "near loc proj requested but no data available");
+                }
+            }
+            else if (META_TEXT == it->second) {
                 if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
                     const TextScoreComputedData* score
                         = static_cast<const TextScoreComputedData*>(

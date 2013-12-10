@@ -27,10 +27,71 @@
  */
 
 #include "mongo/db/exec/2dcommon.h"
+
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/query/index_bounds_builder.h"
 
 namespace mongo {
 namespace twod_exec {
+
+    //
+    // A MatchableDocument that will load the doc if need be but records if it does.
+    //
+
+    class GeoMatchableDocument : public MatchableDocument {
+    public:
+        GeoMatchableDocument(const BSONObj& keyPattern, const BSONObj& key, DiskLoc loc, bool *fetched)
+            : _keyPattern(keyPattern),
+              _key(key),
+              _loc(loc),
+              _fetched(fetched) { }
+
+        BSONObj toBSON() const {
+            *_fetched = true;
+            return _loc.obj();
+        }
+
+        virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+            BSONObjIterator keyPatternIt(_keyPattern);
+            BSONObjIterator keyDataIt(_key);
+
+            // Skip the "2d"-indexed stuff.  We might have a diff. predicate over that field
+            // and those can't be covered.
+            keyPatternIt.next();
+            keyDataIt.next();
+
+            // Look in the key.
+            while (keyPatternIt.more()) {
+                BSONElement keyPatternElt = keyPatternIt.next();
+                verify(keyDataIt.more());
+                BSONElement keyDataElt = keyDataIt.next();
+
+                if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                    if (Array == keyDataElt.type()) {
+                        return new SimpleArrayElementIterator(keyDataElt, true);
+                    }
+                    else {
+                        return new SingleElementElementIterator(keyDataElt);
+                    }
+                }
+            }
+
+            // All else fails, fetch.
+            *_fetched = true;
+            return new BSONElementIterator(path, _loc.obj());
+        }
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            delete iterator;
+        }
+
+    private:
+        BSONObj _keyPattern;
+        BSONObj _key;
+        DiskLoc _loc;
+        bool* _fetched;
+    };
+
 
     //
     // GeoAccumulator
@@ -65,22 +126,30 @@ namespace twod_exec {
 
         //cout << "newDoc: " << newDoc << endl;
         if(newDoc) {
+            bool fetched = false;
+
             if (NULL != _filter) {
-                // XXX: use key information to match...shove in WSM, try loc_and_idx, then fetch obj
-                // and try that.
-                BSONObj obj = node.recordLoc.obj();
-                bool good = _filter->matchesBSON(obj, NULL);
+                GeoMatchableDocument md(_accessMethod->getDescriptor()->keyPattern(),
+                                        node._key,
+                                        node.recordLoc,
+                                        &fetched);
+                bool good = _filter->matches(&md);
+
                 _matchesPerfd++;
 
-                //if (details.hasLoadedRecord())
-                //_objectsLoaded++;
+                if (fetched) {
+                    _objectsLoaded++;
+                }
 
                 if (! good) {
                     _matched[ node.recordLoc ] = false;
                     return;
                 }
             }
-            _matched[ node.recordLoc ] = true;
+            // Don't double-count.
+            if (!fetched) {
+                _objectsLoaded++;
+            }
         } else if(!((*match).second)) {
             return;
         }

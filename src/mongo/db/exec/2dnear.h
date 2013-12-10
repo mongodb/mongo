@@ -45,7 +45,8 @@ namespace mongo {
         BSONObj indexKeyPattern;
         MatchExpression* filter;
         int numWanted;
-        bool uniqueDocs;
+        bool addPointMeta;
+        bool addDistMeta;
     };
 
     struct Result {
@@ -57,6 +58,7 @@ namespace mongo {
         }
 
         WorkingSetID id;
+
         double distance;
     };
 
@@ -77,10 +79,9 @@ namespace mongo {
     private:
         WorkingSet* _workingSet;
 
-        MatchExpression* _filter;
-
         // Stats
         CommonStats _commonStats;
+        TwoDNearStats _specificStats;
 
         // We compute an annulus of results and cache it here.
         priority_queue<Result> _results;

@@ -34,7 +34,6 @@
 #include "mongo/db/geo/core.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/2d_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 
@@ -191,8 +190,7 @@ namespace mongo {
     }
 
     Status TwoDAccessMethod::newCursor(IndexCursor** out) {
-        *out = new TwoDIndexCursor(this);
-        return Status::OK();
+        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2");
     }
 
 }  // namespace mongo

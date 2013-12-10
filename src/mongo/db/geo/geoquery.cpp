@@ -34,31 +34,6 @@ namespace mongo {
 
     using mongoutils::str::equals;
 
-    bool NearQuery::parseFromGeoNear(const BSONObj &obj, double radius) {
-        if (obj["near"].eoo()) { return false; }
-        BSONObj nearObj = obj["near"].embeddedObject();
-
-        if (!GeoParser::isPoint(nearObj) || !GeoParser::parsePoint(nearObj, &centroid)) {
-            return false;
-        }
-
-        if (!obj["minDistance"].eoo()) {
-            uassert(17035, "minDistance must be a number", obj["minDistance"].isNumber());
-            double distArg = obj["minDistance"].number();
-            uassert(16901, "minDistance must be non-negative", distArg >= 0.0);
-            minDistance = distArg;
-        }
-
-        if (!obj["maxDistance"].eoo()) {
-            uassert(17036, "maxDistance must be a number", obj["maxDistance"].isNumber());
-            double distArg = obj["maxDistance"].number();
-            uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
-            maxDistance = distArg;
-        }
-
-        return true;
-    }
-
     bool NearQuery::parseLegacyQuery(const BSONObj &obj) {
         bool hasGeometry = false;
 
@@ -88,6 +63,8 @@ namespace mongo {
                 uassert(16895, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
+            } else if (equals(e.fieldName(), "$uniqueDocs")) {
+                uniqueDocs = e.trueValue();
             }
         }
 

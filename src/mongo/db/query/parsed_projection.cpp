@@ -57,6 +57,9 @@ namespace mongo {
 
         bool hasIndexKeyProjection = false;
 
+        bool wantGeoNearPoint = false;
+        bool wantGeoNearDistance = false;
+
         // Until we see a positional or elemMatch operator we're normal.
         ArrayOpType arrayOpType = ARRAY_OP_NORMAL;
 
@@ -142,13 +145,22 @@ namespace mongo {
 
                     if (!mongoutils::str::equals(e2.valuestr(), "text")
                         && !mongoutils::str::equals(e2.valuestr(), "diskloc")
-                        && !mongoutils::str::equals(e2.valuestr(), "indexKey")) {
+                        && !mongoutils::str::equals(e2.valuestr(), "indexKey")
+                        && !mongoutils::str::equals(e2.valuestr(), "geoNearDistance")
+                        && !mongoutils::str::equals(e2.valuestr(), "geoNearPoint")) {
                         return Status(ErrorCodes::BadValue,
                                       "unsupported $meta operator: " + e2.str());
                     }
 
+                    // This clobbers everything else.
                     if (mongoutils::str::equals(e2.valuestr(), "indexKey")) {
                         hasIndexKeyProjection = true;
+                    }
+                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearDistance")) {
+                        wantGeoNearDistance = true;
+                    }
+                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearPoint")) {
+                        wantGeoNearPoint = true;
                     }
                 }
                 else {
@@ -234,6 +246,10 @@ namespace mongo {
         // we default to including then we can't use an index because we don't know what we're
         // missing."
         pp->_requiresDocument = include || hasNonSimple || hasDottedField;
+
+        // Add geoNear projections.
+        pp->_wantGeoNearPoint = wantGeoNearPoint;
+        pp->_wantGeoNearDistance = wantGeoNearDistance;
 
         // If it's possible to compute the projection in a covered fashion, populate _requiredFields
         // so the planner can perform projection analysis.

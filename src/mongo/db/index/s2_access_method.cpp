@@ -35,7 +35,6 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/s2_index_cursor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -85,8 +84,7 @@ namespace mongo {
     }
 
     Status S2AccessMethod::newCursor(IndexCursor** out) {
-        *out = new S2IndexCursor(_params, _descriptor);
-        return Status::OK();
+        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2");
     }
 
     void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {

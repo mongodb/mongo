@@ -28,7 +28,6 @@
 
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/geo/core.h"
-#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/pdfile.h"

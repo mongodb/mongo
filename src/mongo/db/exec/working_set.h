@@ -145,9 +145,20 @@ namespace mongo {
      * What types of computed data can we have?
      */
     enum WorkingSetComputedDataType {
+        // What's the score of the document retrieved from a $text query?
         WSM_COMPUTED_TEXT_SCORE = 0,
+
+        // What's the distance from a geoNear query point to the document?
         WSM_COMPUTED_GEO_DISTANCE = 1,
+
+        // The index key used to retrieve the document, for $returnKey query option.
         WSM_INDEX_KEY = 2,
+
+        // What point (of several possible points) was used to compute the distance to the document
+        // via geoNear?
+        WSM_GEO_NEAR_POINT = 3,
+
+        // Must be last.
         WSM_COMPUTED_NUM_TYPES,
     };
 

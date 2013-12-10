@@ -29,6 +29,7 @@
 #include "mongo/db/exec/2dnear.h"
 
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/structure/collection.h"
 
@@ -73,11 +74,13 @@ namespace mongo {
                                            _params.nearQuery.maxDistance,
                                            _params.nearQuery.isNearSphere ? twod_exec::GEO_SPHERE
                                                                           : twod_exec::GEO_PLANE,
-                                           _params.uniqueDocs,
+                                           _params.nearQuery.uniqueDocs,
                                            false));
 
             // This is where all the work is done.  :(
             search->exec();
+            _specificStats.objectsLoaded = search->_objectsLoaded;
+            _specificStats.nscanned = search->_nscanned;
 
             for (twod_exec::GeoHopper::Holder::iterator it = search->_points.begin();
                  it != search->_points.end(); it++) {
@@ -86,8 +89,13 @@ namespace mongo {
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = it->_loc;
                 member->obj = member->loc.obj();
-                //cout << "points: " << member->obj.toString() << endl;
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                if (_params.addDistMeta) {
+                    member->addComputed(new GeoDistanceComputedData(it->_distance));
+                }
+                if (_params.addPointMeta) {
+                    member->addComputed(new GeoNearPointComputedData(it->_pt));
+                }
                 _results.push(Result(id, it->_distance));
                 _invalidationMap.insert(pair<DiskLoc, WorkingSetID>(it->_loc, id));
             }
@@ -140,7 +148,9 @@ namespace mongo {
 
     PlanStageStats* TwoDNear::getStats() {
         _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2D);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2D));
+        ret->specific.reset(new TwoDNearStats(_specificStats));
+        return ret.release();
     }
 
 }  // namespace mongo

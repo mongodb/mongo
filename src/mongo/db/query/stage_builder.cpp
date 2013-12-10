@@ -186,15 +186,21 @@ namespace mongo {
             params.indexKeyPattern = node->indexKeyPattern;
             params.filter = node->filter.get();
             params.numWanted = node->numWanted;
-            // XXX XXX where do we grab this from??  the near query...modify geo parser... :(
-            params.uniqueDocs = false;
-            // XXX XXX where do we grab this from??  the near query...modify geo parser... :(
+            params.addPointMeta = node->addPointMeta;
+            params.addDistMeta = node->addDistMeta;
             return new TwoDNear(params, ws);
         }
         else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
-            return new S2NearStage(ns, node->indexKeyPattern, node->nq, node->baseBounds,
-                                   node->filter.get(), ws);
+            S2NearParams params;
+            params.ns = ns;
+            params.indexKeyPattern = node->indexKeyPattern;
+            params.nearQuery = node->nq;
+            params.baseBounds = node->baseBounds;
+            params.filter = node->filter.get();
+            params.addPointMeta = node->addPointMeta;
+            params.addDistMeta = node->addDistMeta;
+            return new S2NearStage(params, ws);
         }
         else if (STAGE_TEXT == root->getType()) {
             const TextNode* node = static_cast<const TextNode*>(root);

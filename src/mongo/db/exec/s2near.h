@@ -42,6 +42,16 @@
 
 namespace mongo {
 
+    struct S2NearParams {
+        string ns;
+        BSONObj indexKeyPattern;
+        NearQuery nearQuery;
+        IndexBounds baseBounds;
+        MatchExpression* filter;
+        bool addPointMeta;
+        bool addDistMeta;
+    };
+
     /**
      * Executes a geoNear search.  Is a leaf node.  Output type is LOC_AND_UNOWNED_OBJ.
      */
@@ -51,9 +61,7 @@ namespace mongo {
          * Takes: index to scan over, MatchExpression with near point, other MatchExpressions for
          * covered data,
          */
-        S2NearStage(const string& ns, const BSONObj& indexKeyPattern,
-                    const NearQuery& nearQuery, const IndexBounds& baseBounds,
-                    MatchExpression* filter, WorkingSet* ws);
+        S2NearStage(const S2NearParams& params, WorkingSet* ws);
 
         virtual ~S2NearStage();
 
@@ -72,25 +80,16 @@ namespace mongo {
 
         bool _worked;
 
+        S2NearParams _params;
+
         WorkingSet* _ws;
-
-        string _ns;
-
-        BSONObj _indexKeyPattern;
 
         // This is the "array index" of the key field that is the near field.  We use this to do
         // cheap is-this-doc-in-the-annulus testing.  We also need to know where to stuff the index
         // bounds for the various annuluses/annuli.
         int _nearFieldIndex;
 
-        NearQuery _nearQuery;
-
-        IndexBounds _baseBounds;
-
         scoped_ptr<PlanStage> _child;
-
-        // We don't check this ourselves; we let the sub-fetch deal w/it.
-        MatchExpression* _filter;
 
         // The S2 machinery that represents the search annulus.  We keep this around after bounds
         // generation to check for intersection.

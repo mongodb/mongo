@@ -265,4 +265,14 @@ namespace mongo {
         uint64_t chunkSkips;
     };
 
+    struct TwoDNearStats : public SpecificStats {
+        TwoDNearStats() : objectsLoaded(0), nscanned(0) { }
+
+        uint64_t objectsLoaded;
+
+        // Since 2d's near does all its work in one go we can't divine the real nscanned from
+        // anything else.
+        uint64_t nscanned;
+    };
+
 }  // namespace mongo

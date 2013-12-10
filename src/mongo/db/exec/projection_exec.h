@@ -53,7 +53,8 @@ namespace mongo {
          */
         enum MetaProjection {
             META_TEXT,
-            META_GEO,
+            META_GEONEAR_DIST,
+            META_GEONEAR_POINT,
             META_DISKLOC,
             META_IX_KEY,
         };

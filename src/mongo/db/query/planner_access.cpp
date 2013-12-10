@@ -103,6 +103,10 @@ namespace mongo {
             ret->indexKeyPattern = index.keyPattern;
             ret->nq = nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
+            if (NULL != query.getProj()) {
+                ret->addPointMeta = query.getProj()->wantGeoNearPoint();
+                ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+            }
             return ret;
         }
         else if (indexIs2D) {
