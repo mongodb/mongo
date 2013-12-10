@@ -278,8 +278,14 @@ wts_create(void)
 		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
 		    "chunk_size=%" PRIu32 "MB,", g.c_chunk_size);
+		/*
+		 * We can't set bloom_oldest without bloom, and we want to test
+		 * with Bloom filters on most of the time anyway.
+		 */
+		if (g.c_bloom_oldest)
+			g.c_bloom = 1;
 		p += snprintf(p, (size_t)(end - p),
-		    "bloom=%s,", g.c_bloom? "true" : "false");
+		    "bloom=%s,", g.c_bloom ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
 		    "bloom_bit_count=%u,", g.c_bloom_bit_count);
 		p += snprintf(p, (size_t)(end - p),

@@ -87,10 +87,6 @@ static CONFIG c[] = {
 	  "if bloom filters are configured",			/* 95% */
 	  0x0, C_BOOL, 95, 0, 0, &g.c_bloom, NULL },
 
-	{ "bloom_oldest",
-	  "if bloom_oldest=true",				/* 10% */
-	  0x0, C_BOOL, 10, 0, 0, &g.c_bloom_oldest, NULL },
-
 	{ "bloom_bit_count",
 	  "number of bits per item for LSM bloom filters",
 	  0x0, 0x0, 4, 64, 1000, &g.c_bloom_bit_count, NULL },
