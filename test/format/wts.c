@@ -277,6 +277,8 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
+		    "chunk_size=%" PRIu32 "MB,", g.c_chunk_size);
+		p += snprintf(p, (size_t)(end - p),
 		    "bloom=%s,", g.c_bloom? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
 		    "bloom_bit_count=%u,", g.c_bloom_bit_count);

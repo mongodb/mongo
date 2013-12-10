@@ -140,6 +140,7 @@ typedef struct {
 	u_int c_cache;
 	u_int c_compact;
 	char *c_checksum;
+	u_int c_chunk_size;
 	char *c_compression;
 	char *c_config_open;
 	u_int c_data_extend;

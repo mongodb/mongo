@@ -111,6 +111,10 @@ static CONFIG c[] = {
 	  "type of checksums (on | off | uncompressed)",
 	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_checksum },
 
+	{ "chunk_size",
+	  "LSM chunk size in MB",
+	  0x0, 0x0, 1, 10, 100, &g.c_chunk_size, NULL },
+
 	{ "compaction",
 	  "if compaction is running",				/* 10% */
 	  0x0, C_BOOL, 10, 0, 0, &g.c_compact, NULL },
