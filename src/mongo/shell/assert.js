@@ -246,6 +246,15 @@ assert.commandFailed = function(res, msg){
     doassert("command worked when it should have failed: " + tojson(res) + " : " + msg);
 }
 
+assert.commandFailedWithCode = function(res, code, msg){
+    if (assert._debug && msg) print("in assert for: " + msg);
+
+    assert(!res.ok, "Command result indicates success, but expected failure with code " + code +
+          ": " + tojson(res));
+    assert.eq(res.code, code, "Expected failure code did not match actual in command result: " +
+              tojson(res));
+}
+
 assert.isnull = function(what, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
 
