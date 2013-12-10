@@ -3458,15 +3458,21 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * blocks.  Don't worry about reuse, reusing
 				 * keys from a row-store page reconciliation
 				 * seems unlikely enough to ignore.
-				 *
-				 * Keys are part of the name-space though, we
-				 * can't remove them from the in-memory tree;
-				 * assert the key was instantiated, otherwise
-				 * we might try and look it up.
 				 */
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
-					WT_ASSERT(session, ikey != NULL);
+					/*
+					 * Keys are part of the name-space, we
+					 * can't remove them from the in-memory
+					 * tree; if an overflow key was deleted
+					 * without being instantiated (for
+					 * example, cursor-based trunction, do
+					 * it now.
+					 */
+					if (ikey == NULL)
+						WT_ERR(__wt_row_leaf_key_work(
+						    session,
+						    page, rip, NULL, 1));
 
 					/*
 					 * Acquire the overflow lock to avoid
