@@ -432,9 +432,8 @@ namespace {
         testTranslateAndUnion(toUnion, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
-        // SERVER-12026 upper bound should be inclusive
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
-            Interval(fromjson("{'': -Infinity, '': Infinity}"), true, false)));
+            Interval(fromjson("{'': -Infinity, '': Infinity}"), true, true)));
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
