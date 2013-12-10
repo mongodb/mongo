@@ -62,6 +62,9 @@ namespace mongo {
         // And not something like { _id : { $gt : ...
         if (elt.isSimpleType()) { return true; }
 
+        // BinData is OK too.
+        if (BinData == elt.type()) { return true; }
+
         // And if the value is an object...
         if (elt.type() == Object) {
             // Can't do this.
