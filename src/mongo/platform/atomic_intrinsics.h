@@ -43,7 +43,11 @@
 #if defined(_WIN32)
 #include "mongo/platform/atomic_intrinsics_win32.h"
 #elif defined(__GNUC__)
-#include "mongo/platform/atomic_intrinsics_gcc.h"
+#if defined(__i386__) || defined(__x86_64__)
+#include "mongo/platform/atomic_intrinsics_gcc_intel.h"
+#else
+#include "mongo/platform/atomic_intrinsics_gcc_generic.h"
+#endif
 #else
 #error "Unsupported os/compiler family"
 #endif
