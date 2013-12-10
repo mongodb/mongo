@@ -557,7 +557,7 @@ namespace mongo {
                 bob.appendAs(iv[i + 1].end, "");
                 BSONObj data = bob.obj();
                 bool startInclusive = iv[i].startInclusive;
-                bool endInclusive = iv[i + i].endInclusive;
+                bool endInclusive = iv[i + 1].endInclusive;
                 iv.erase(iv.begin() + i);
                 // iv[i] is now the former iv[i + 1]
                 iv[i] = makeRangeInterval(data, startInclusive, endInclusive);
