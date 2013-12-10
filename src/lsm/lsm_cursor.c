@@ -21,21 +21,21 @@
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
 	WT_ERR(__clsm_enter(clsm, 0));					\
-	F_SET(session, WT_SESSION_CACHE_BUSY)
+	WT_ERR(__cursor_enter(session))
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 1));					\
-	F_SET(session, WT_SESSION_CACHE_BUSY)
+	WT_ERR(__cursor_enter(session))
 
 #define	WT_LSM_LEAVE(session)						\
 	API_END(session);						\
-	F_CLR(session, WT_SESSION_CACHE_BUSY);				\
+	WT_TRET(__cursor_leave(session))
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
 	CURSOR_UPDATE_API_END(session, ret);				\
-	F_CLR(session, WT_SESSION_CACHE_BUSY)
+	WT_TRET(__cursor_leave(session))
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_lookup(WT_CURSOR_LSM *);

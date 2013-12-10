@@ -126,7 +126,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_reset);
 	WT_STAT_FAST_DATA_INCR(session, cursor_reset);
 
-	ret = __cursor_leave(cbt);
+	ret = __curfile_leave(cbt);
 	__cursor_search_clear(cbt);
 
 	return (ret);
@@ -337,7 +337,7 @@ err:	if (ret == WT_RESTART)
 		goto retry;
 	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0)
-		WT_TRET(__cursor_leave(cbt));
+		WT_TRET(__curfile_leave(cbt));
 	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
@@ -760,7 +760,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	ret = __cursor_leave(cbt);
+	ret = __curfile_leave(cbt);
 	__wt_buf_free(session, &cbt->tmp);
 
 	return (ret);

@@ -63,8 +63,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 */
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
-	busy = F_ISSET(session, WT_SESSION_CACHE_BUSY) ||
-	    txn_state->id != WT_TXN_NONE ||
+	busy = txn_state->id != WT_TXN_NONE ||
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&
 	    txn_global->current != txn_global->oldest_id);
