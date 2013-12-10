@@ -384,25 +384,22 @@ namespace mongo {
                 MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
             }
 
-            NamespaceDetails *d = nsdetails(nsToDrop);
-            if ( d == 0 ) {
-                errmsg = "ns not found";
-                return false;
-            }
-
-            int numIndexes = d->getTotalIndexCount();
-
             if ( nsToDrop.find( '$' ) != string::npos ) {
                 errmsg = "can't drop collection with reserved $ character in name";
                 return false;
             }
 
+            Collection* coll = cc().database()->getCollection( nsToDrop );
+            // If collection does not exist, short circuit and return.
+            if ( !coll )
+                return true;
+
+            int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
+
             stopIndexBuilds(dbname, cmdObj);
 
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );
-
-            d = NULL;
 
             Status s = cc().database()->dropCollection( nsToDrop );
 
@@ -920,25 +917,31 @@ namespace mongo {
     namespace {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ) {
             Lock::assertAtLeastReadLocked(ns);
+            Client::Context ctx( ns );
 
-            NamespaceDetails * nsd = nsdetails( ns );
-            if ( ! nsd )
+            Collection* coll = ctx.db()->getCollection( ns );
+            if ( !coll )
                 return 0;
+
+            IndexCatalog::IndexIterator ii =
+                coll->getIndexCatalog()->getIndexIterator( true /*includeUnfinishedIndexes*/ );
 
             long long totalSize = 0;
 
-            NamespaceDetails::IndexIterator ii = nsd->ii();
             while ( ii.more() ) {
-                IndexDetails& d = ii.next();
-                string collNS = d.indexNamespace();
-                NamespaceDetails * mine = nsdetails( collNS );
-                if ( ! mine ) {
-                    log() << "error: have index ["  << collNS << "] but no NamespaceDetails" << endl;
+                IndexDescriptor* d = ii.next();
+                string indNS = d->indexNamespace();
+                Collection* indColl = ctx.db()->getCollection( indNS );
+                if ( ! indColl ) {
+                    log() << "error: have index descriptor ["  << indNS
+                          << "] but no entry in the index collection." << endl;
                     continue;
                 }
-                totalSize += mine->dataSize();
-                if ( details )
-                    details->appendNumber( d.indexName() , mine->dataSize() / scale );
+                totalSize += indColl->dataSize();
+                if ( details ) {
+                    long long const indexSize = indColl->dataSize() / scale;
+                    details->appendNumber( d->indexName() , indexSize );
+                }
             }
             return totalSize;
         }
@@ -965,11 +968,9 @@ namespace mongo {
             Client::Context cx( ns );
             Collection* collection = cx.db()->getCollection( ns );
             if ( !collection ) {
-                errmsg = "ns not found";
+                errmsg = "Collection [" + ns + "] not found.";
                 return false;
             }
-
-            const NamespaceDetails* nsd = collection->details();
 
             result.append( "ns" , ns.c_str() );
 
@@ -988,19 +989,21 @@ namespace mongo {
 
             bool verbose = jsobj["verbose"].trueValue();
 
-            long long size = nsd->dataSize() / scale;
-            result.appendNumber( "count" , nsd->numRecords() );
+            long long size = collection->dataSize() / scale;
+            long long numRecords = collection->numRecords();
+            result.appendNumber( "count" , numRecords );
             result.appendNumber( "size" , size );
-            if( nsd->numRecords() )
-                result.append      ( "avgObjSize" , double(size) / double(nsd->numRecords()) );
+            if( numRecords )
+                result.append( "avgObjSize" , collection->averageObjectSize() );
 
             int numExtents;
             BSONArrayBuilder extents;
-
             result.appendNumber( "storageSize",
                                  static_cast<long long>( collection->storageSize( &numExtents , verbose ? &extents : 0  ) / scale ) );
             result.append( "numExtents" , numExtents );
-            result.append( "nindexes" , nsd->getCompletedIndexCount() );
+            result.append( "nindexes" , collection->getIndexCatalog()->numIndexesReady() );
+
+            NamespaceDetails* nsd = collection->details();
             result.append( "lastExtentSize" , nsd->lastExtentSize() / scale );
             result.append( "paddingFactor" , nsd->paddingFactor() );
             result.append( "systemFlags" , nsd->systemFlags() );
@@ -1010,8 +1013,8 @@ namespace mongo {
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
 
-            if ( nsd->isCapped() ) {
-                result.append( "capped" , nsd->isCapped() );
+            if ( collection->isCapped() ) {
+                result.append( "capped" , collection->isCapped() );
                 result.appendNumber( "max" , nsd->maxCappedDocs() );
             }
 
@@ -1045,6 +1048,7 @@ namespace mongo {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::Context ctx( ns );
             NamespaceDetails* nsd = nsdetails( ns );
+            Collection* coll = ctx.db()->getCollection( ns );
             if ( ! nsd ) {
                 errmsg = "ns does not exist";
                 return false;
@@ -1104,8 +1108,8 @@ namespace mongo {
                         continue;
                     }
 
-                    IndexDetails idx = nsd->idx( idxNo );
-                    BSONElement oldExpireSecs = idx.info.obj().getField("expireAfterSeconds");
+                    IndexDescriptor* idx = coll->getIndexCatalog()->getDescriptor( idxNo );
+                    BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
                     if( oldExpireSecs.eoo() ){
                         errmsg = "no expireAfterSeconds field to update";
                         ok = false;

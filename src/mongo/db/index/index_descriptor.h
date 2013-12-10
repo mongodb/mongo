@@ -76,7 +76,7 @@ namespace mongo {
               _dropDups(infoObj["dropDups"].trueValue()),
               _unique( _isIdIndex || infoObj["unique"].trueValue() )
         {
-            _indexNamespace = _parentNS + ".$" + _indexNamespace;
+            _indexNamespace = _parentNS + ".$" + _indexName;
 
             _version = 0;
             BSONElement e = _infoObj["v"];
