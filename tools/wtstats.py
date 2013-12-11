@@ -41,7 +41,7 @@ except ImportError:
 try:
     from nvd3 import lineChart, lineWithFocusChart
 except ImportError:
-    print >>sys.stderr, "Could not import nvd3.  Please install it *from source* from https://github.com/areski/python-nvd3.git (other versions may be missing features that we rely on)"
+    print >>sys.stderr, "Could not import nvd3.  Please install it *from source* (other versions may be missing features that we rely on).  Run these commands: git clone https://github.com/areski/python-nvd3.git ; cd python-nvd3 ; sudo python setup.py install"
     sys.exit(-1)
 
 TIMEFMT = "%b %d %H:%M:%S"
@@ -61,8 +61,8 @@ def munge(title, values):
         t1, v1 = values[1]
         seconds = (parsetime(t1) - start_time).seconds
         ylabel += ' per second'
-	if seconds == 0:
-		seconds = 1
+        if seconds == 0:
+            seconds = 1
 
     # Write the raw data into a file for processing.
     yvalues = []
