@@ -1413,6 +1413,7 @@ extern int __wt_huffman_decode(WT_SESSION_IMPL *session,
     const uint8_t *from_arg,
     uint32_t from_len,
     WT_ITEM *to_buf);
+extern void __wt_spin_lock_stat_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_spin_lock_register(WT_SESSION_IMPL *session,
     WT_SPINLOCK *t,
     const char *file,

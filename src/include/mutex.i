@@ -153,7 +153,7 @@ __wt_spin_lock_func(WT_SESSION_IMPL *session,
 	 */
 	if (pthread_mutex_trylock(&t->lock)) {
 		if (*idp >= 0 && t->id >= 0)
-			++S2C(session)->spinlock_stats[*idp].blocked[t->id];
+			++S2C(session)->spinlock_block[*idp].blocked[t->id];
 		pthread_mutex_lock(&t->lock);
 	}
 
