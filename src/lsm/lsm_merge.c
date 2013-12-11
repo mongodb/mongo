@@ -72,15 +72,15 @@ __wt_lsm_merge(
 	start_id = 0;
 
 	/*
-	 * If the tree is open read-only, be very aggressive.  Otherwise, we
-	 * can spend a long time waiting for merges to start in read-only
-	 * applications.
+	 * If the tree is open read-only or we are compacting, be very
+	 * aggressive.  Otherwise, we can spend a long time waiting for merges
+	 * to start in read-only applications.
 	 */
 	if (!lsm_tree->modified ||
 	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		aggressive = 10;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
-	max_generation_gap = aggressive > 10 ? 3 : 1;
+	max_generation_gap = 1 + aggressive / 5;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -156,13 +156,16 @@ __wt_lsm_merge(
 			break;
 
 		/*
-		 * If we have enough chunks for a merge and the next chunk is
-		 * in a different generation, stop.
+		 * In normal operation, if we have enough chunks for a merge
+		 * and the next chunk is in a different generation, stop.
+		 * In aggressive mode, look for the biggest merge we can do.
 		 */
 		if (nchunks >= merge_min) {
 			previous = lsm_tree->chunk[start_chunk];
-			if (chunk->generation > previous->generation &&
-			    previous->generation <= youngest->generation + 1)
+			if (previous->generation <=
+				youngest->generation + max_generation_gap &&
+			    chunk->generation >
+				previous->generation + max_generation_gap - 1)
 				break;
 		}
 

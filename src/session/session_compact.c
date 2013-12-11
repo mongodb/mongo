@@ -118,7 +118,7 @@ __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri)
 
 /*
  * __session_compact_check_timeout --
- *
+ *	Check if the timeout has been exceeded.
  */
 static int
 __session_compact_check_timeout(
@@ -150,8 +150,8 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	int i;
 	struct timespec start_time;
 
-	wt_session = (WT_SESSION *)session;
 	txn = &session->txn;
+	wt_session = &session->iface;
 
 	/*
 	 * File compaction requires checkpoints, which will fail in a
@@ -174,12 +174,10 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/*
 	 * We compact 10% of the file on each pass, try 10 times (which is
 	 * probably overkill), and quit if we make no progress. Check for a
-	 * timeout between each operation, to be as responsive to the user
-	 * as is practical.
+	 * timeout each time through the loop.
 	 */
 	for (i = 0; i < 10; ++i) {
 		WT_ERR(wt_session->checkpoint(wt_session, t->data));
-		WT_ERR(__session_compact_check_timeout(session, start_time));
 
 		session->compaction = 0;
 		WT_WITH_SCHEMA_LOCK(session,
@@ -188,10 +186,8 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		WT_ERR(ret);
 		if (!session->compaction)
 			break;
-		WT_ERR(__session_compact_check_timeout(session, start_time));
 
 		WT_ERR(wt_session->checkpoint(wt_session, t->data));
-		WT_ERR(__session_compact_check_timeout(session, start_time));
 		WT_ERR(wt_session->checkpoint(wt_session, t->data));
 		WT_ERR(__session_compact_check_timeout(session, start_time));
 	}
@@ -214,32 +210,20 @@ __wt_session_compact(
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-
 	SESSION_API_CALL(session, compact, config, cfg);
 
 	/* Setup the structure in the session handle */
 	memset(&compact, 0, sizeof(WT_COMPACT));
 	session->compact = &compact;
 
-	/*
-	 * Find what types of data sources are being compacted.
-	 */
-	WT_ERR(__wt_schema_worker(
-	    session, uri, NULL, __wt_compact_uri_analyze, cfg, 0));
-
-	/* We are done if there aren't any files we can compact. */
-	if (session->compact->lsm_count == 0 &&
-	    session->compact->file_count == 0)
-		goto err;
-
 	WT_ERR(__wt_config_gets(session, cfg, "timeout", &cval));
 	session->compact->max_time = (uint64_t)cval.val;
 
-	/*
-	 * TODO: We can't hold the schema lock here - LSM acquires the
-	 * schema lock when completing merges. We probably do want to stop
-	 * "external" schema changes while we are compacting though.
-	 */
+	/* Find the types of data sources are being compacted. */
+	WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(
+	    session, uri, NULL, __wt_compact_uri_analyze, cfg, 0));
+	WT_ERR(ret);
+
 	if (session->compact->lsm_count != 0)
 		WT_ERR(__wt_schema_worker(
 		    session, uri, NULL, __wt_lsm_compact, cfg, 0));
