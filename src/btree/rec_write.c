@@ -3482,9 +3482,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					 * checking for key instantiation.
 					 */
 					WT_ERR(__wt_writelock(session,
-					    S2BT(session)->val_ovfl_lock));
+					    S2BT(session)->ovfl_lock));
 					WT_ERR(__wt_rwunlock(session,
-					    S2BT(session)->val_ovfl_lock));
+					    S2BT(session)->ovfl_lock));
 
 					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
