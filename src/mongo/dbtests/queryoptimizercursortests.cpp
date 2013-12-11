@@ -3633,45 +3633,6 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
-        class Geo : public Base {
-        public:
-            Geo() {
-                _cli.insert( ns(), BSON( "_id" << 44 << "loc" << BSON_ARRAY( 44 << 45 ) ) );
-                _cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
-            }
-            string expectedType() const { return "GeoSearchCursor"; }
-            BSONObj query() const { return fromjson( "{ loc : { $near : [50,50] } }" ); }
-            void check( const shared_ptr<Cursor> &c ) {
-                ASSERT( c->ok() );
-                ASSERT( c->matcher() );
-                ASSERT( c->matcher()->matchesCurrent( c.get() ) );
-                ASSERT_EQUALS( 44, c->current().getIntField( "_id" ) );
-                ASSERT( !c->advance() );
-            }
-        };
-        
-        class GeoNumWanted : public Base {
-        public:
-            GeoNumWanted() {
-                _cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
-                for( int i = 0; i < 140; ++i ) {
-                    _cli.insert( ns(), BSON( "loc" << BSON_ARRAY( 44 << 45 ) ) );
-                }
-            }
-            string expectedType() const { return "GeoSearchCursor"; }
-            BSONObj query() const { return fromjson( "{ loc : { $near : [50,50] } }" ); }
-            void check( const shared_ptr<Cursor> &c ) {
-                int count = 0;
-                while( c->ok() ) {
-                    ++count;
-                    c->advance();
-                }
-                ASSERT_EQUALS( 130, count );
-            }
-            int skip() const { return 27; }
-            int limit() const { return 103; }
-        };
-        
         class PreventOutOfOrderPlan : public QueryOptimizerCursorTests::Base {
         public:
             void run() {
@@ -4961,8 +4922,6 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();
             add<GetCursor::SimpleKeyMatch>();
-            add<GetCursor::Geo>();
-            add<GetCursor::GeoNumWanted>();
             add<GetCursor::PreventOutOfOrderPlan>();
             add<GetCursor::AllowOutOfOrderPlan>();
             add<GetCursor::BestSavedOutOfOrder>();
