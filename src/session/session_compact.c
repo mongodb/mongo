@@ -102,15 +102,17 @@
  *	Called via the schema_worker function.
  */
 int
-__wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri)
+__wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip)
 {
 	/*
 	 * Add references to schema URI objects to the list of objects to be
-	 * compacted.
+	 * compacted.  Don't recurse into LSM trees or we will get false
+	 * positives on the "file:" URIs for the chunks.
 	 */
-	if (WT_PREFIX_MATCH(uri, "lsm:"))
+	if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		session->compact->lsm_count++;
-	else if (WT_PREFIX_MATCH(uri, "file:"))
+		*skip = 1;
+	} else if (WT_PREFIX_MATCH(uri, "file:"))
 		session->compact->file_count++;
 
 	return (0);

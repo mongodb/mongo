@@ -931,16 +931,22 @@ __wt_lsm_tree_unlock(
  *	Compact an LSM tree called via __wt_schema_worker.
  */
 int
-__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name)
+__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 {
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	uint64_t last_merge_progressing;
 	time_t begin, end;
 
-	/* Ignore non LSM names. */
+	/*
+	 * This function is applied to all matching sources: ignore anything
+	 * that is not an LSM tree.
+	 */
 	if (!WT_PREFIX_MATCH(name, "lsm:"))
 		return (0);
+
+	/* Tell __wt_schema_worker not to look inside the LSM tree. */
+	*skip = 1;
 
 	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
 
@@ -980,7 +986,7 @@ int
 __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
    const char *uri,
    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
-   int (*name_func)(WT_SESSION_IMPL *, const char *),
+   int (*name_func)(WT_SESSION_IMPL *, const char *, int *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_DECL_RET;
@@ -990,6 +996,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_lsm_tree_get(session, uri,
 	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
+
 	/*
 	 * We mark that we're busy using the tree to coordinate
 	 * with merges so that merging doesn't change the chunk

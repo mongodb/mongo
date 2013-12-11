@@ -605,8 +605,9 @@ extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_backup_list_uri_append(WT_SESSION_IMPL *session,
-    const char *name);
+extern int __wt_backup_list_uri_append( WT_SESSION_IMPL *session,
+    const char *name,
+    int *skip);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
@@ -899,13 +900,16 @@ extern int __wt_lsm_tree_lock( WT_SESSION_IMPL *session,
     int exclusive);
 extern int __wt_lsm_tree_unlock( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
-extern int __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_lsm_compact(WT_SESSION_IMPL *session,
+    const char *name,
+    int *skip);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
     int (*file_func)(WT_SESSION_IMPL *,
     const char *[]),
     int (*name_func)(WT_SESSION_IMPL *,
-    const char *),
+    const char *,
+    int *),
     const char *cfg[],
     uint32_t open_flags);
 extern void *__wt_lsm_merge_worker(void *vargs);
@@ -1264,7 +1268,8 @@ extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     int (*file_func)(WT_SESSION_IMPL *,
     const char *[]),
     int (*name_func)(WT_SESSION_IMPL *,
-    const char *),
+    const char *,
+    int *),
     const char *cfg[],
     uint32_t open_flags);
 extern int __wt_open_cursor(WT_SESSION_IMPL *session,
@@ -1281,7 +1286,9 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
     WT_SESSION_IMPL **sessionp);
-extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri);
+extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session,
+    const char *uri,
+    int *skip);
 extern int __wt_session_compact( WT_SESSION *wt_session,
     const char *uri,
     const char *config);
