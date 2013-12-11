@@ -92,7 +92,7 @@ struct __wt_btree {
 	u_int prefix_compression_min;	/* Reconcile: prefix compression min */
 	int   split_pct;		/* Reconcile: split page percent */
 	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
-	WT_RWLOCK *val_ovfl_lock;	/* Reconcile: overflow value lock */
+	WT_RWLOCK *ovfl_lock;		/* Reconcile: overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 

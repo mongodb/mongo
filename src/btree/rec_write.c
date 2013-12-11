@@ -3454,22 +3454,38 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				/*
 				 * Overflow keys referencing discarded values
-				 * are no longer useful, schedule the discard
-				 * of the backing blocks.  Don't worry about
-				 * reuse, reusing the key in this reconciliation
-				 * is unlikely.
-				 *
-				 * Keys are part of the name-space though, we
-				 * can't remove them from the in-memory tree;
-				 * if an overflow key was never instantiated,
-				 * do it now.
+				 * are no longer useful, discard the backing
+				 * blocks.  Don't worry about reuse, reusing
+				 * keys from a row-store page reconciliation
+				 * seems unlikely enough to ignore.
 				 */
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
+					/*
+					 * Keys are part of the name-space, we
+					 * can't remove them from the in-memory
+					 * tree; if an overflow key was deleted
+					 * without being instantiated (for
+					 * example, cursor-based truncation, do
+					 * it now.
+					 */
 					if (ikey == NULL)
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
 						    page, rip, NULL, 1));
+
+					/*
+					 * Acquire the overflow lock to avoid
+					 * racing with a thread instantiating
+					 * the key.  Reader threads hold read
+					 * locks on the overflow lock when
+					 * checking for key instantiation.
+					 */
+					WT_ERR(__wt_writelock(session,
+					    S2BT(session)->ovfl_lock));
+					WT_ERR(__wt_rwunlock(session,
+					    S2BT(session)->ovfl_lock));
+
 					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    unpack->data, unpack->size));
