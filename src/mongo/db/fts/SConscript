@@ -48,7 +48,6 @@ env.Library( 'server_common', [
 
 env.Library('ftsmongod', [
         'fts_command_mongod.cpp',
-        'fts_search.cpp',
         ], LIBDEPS=["base","server_common"])
 
 

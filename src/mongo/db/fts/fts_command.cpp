@@ -33,7 +33,6 @@
 
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_enabled.h"
-#include "mongo/db/fts/fts_search.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"

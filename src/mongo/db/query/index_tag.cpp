@@ -79,6 +79,14 @@ namespace mongo {
             return false;
         }
 
+        // Ditto text.
+        if (MatchExpression::TEXT == lhs->matchType()) {
+            return true;
+        }
+        else if (MatchExpression::TEXT == rhs->matchType()) {
+            return false;
+        }
+
         // Next, order so that the first field of a compound index appears first.
         if (lhsPos != rhsPos) {
             return lhsPos < rhsPos;

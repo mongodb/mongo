@@ -33,9 +33,9 @@
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query.h"
-#include "mongo/db/fts/fts_search.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/platform/unordered_map.h"
@@ -133,6 +133,7 @@ namespace mongo {
 
         // Stats.
         CommonStats _commonStats;
+        TextStats _specificStats;
 
         // State bit for work().  True if results have been buffered.
         bool _filledOutResults;

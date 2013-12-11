@@ -28,17 +28,13 @@
 *    it in the license file.
 */
 
-#include <algorithm>
 #include <string>
-#include <vector>
 
 #include "mongo/db/fts/fts_command.h"
-#include "mongo/db/fts/fts_search.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/index/catalog_hack.h"
-#include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/projection.h"
+#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/type_explain.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
@@ -74,106 +70,96 @@ namespace mongo {
 
             Timer comm;
 
-            scoped_ptr<Projection> pr;
-            if ( !projection.isEmpty() ) {
-                pr.reset( new Projection() );
-                pr->init( projection );
+            // Rewrite the cmd as a normal query.
+            BSONObjBuilder queryBob;
+            queryBob.appendElements(filter);
+
+            BSONObjBuilder textBob;
+            textBob.append("$search", searchString);
+            if (!language.empty()) {
+                textBob.append("$language", language);
             }
+            queryBob.append("$text", textBob.obj());
 
-            // priority queue for results
-            Results results;
+            // This is the query we exec.
+            BSONObj queryObj = queryBob.obj();
 
-            Database* db = cc().database();
-            Collection* collection = db->getCollection( ns );
+            // We sort by the score.
+            BSONObj sortSpec = BSON("$s" << BSON("$meta" << "text"));
 
-            if ( !collection ) {
-                errmsg = "can't find ns";
+            // We also project the score into the document and strip it out later during the reformatting
+            // of the results.
+            BSONObjBuilder projBob;
+            projBob.appendElements(projection);
+            projBob.appendElements(sortSpec);
+            BSONObj projObj = projBob.obj();
+
+            CanonicalQuery* cq;
+            if (!CanonicalQuery::canonicalize(ns, queryObj, sortSpec, projObj, 0, limit, BSONObj(), &cq).isOK()) {
+                errmsg = "Can't parse filter / create query";
                 return false;
             }
 
-            vector<int> idxMatches;
-            collection->details()->findIndexByType( INDEX_NAME, idxMatches );
-            if ( idxMatches.size() == 0 ) {
-                errmsg = str::stream() << "no text index for: " << ns;
-                return false;
-            }
-            if ( idxMatches.size() > 1 ) {
-                errmsg = str::stream() << "too many text indexes for: " << ns;
+            Runner* rawRunner;
+            if (!getRunner(cq, &rawRunner, 0).isOK()) {
+                errmsg = "can't get query runner";
                 return false;
             }
 
-            BSONObj indexPrefix;
+            auto_ptr<Runner> runner(rawRunner);
 
-            IndexDescriptor* descriptor = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
-            auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(descriptor));
-            if ( language == "" ) {
-                language = fam->getSpec().defaultLanguage().str();
-            }
-            Status s = fam->getSpec().getIndexPrefix( filter, &indexPrefix );
-            if ( !s.isOK() ) {
-                errmsg = s.toString();
-                return false;
-            }
+            BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
+            // Quoth: "leave a mb for other things"
+            int resultSize = 1024 * 1024;
 
-            FTSQuery query;
-            if ( !query.parse( searchString, language ).isOK() ) {
-                errmsg = "can't parse search";
-                return false;
-            }
-            result.append( "queryDebugString", query.debugString() );
-            result.append( "language", language );
+            int numReturned = 0;
 
-            FTSSearch search(descriptor, fam->getSpec(), indexPrefix, query, filter );
-            search.go( &results, limit );
-
-            // grab underlying container inside priority queue
-            vector<ScoredLocation> r( results.dangerous() );
-
-            // sort results by score (not always in correct order, especially w.r.t. multiterm)
-            sort( r.begin(), r.end() );
-
-            // build the results bson array shown to user
-            BSONArrayBuilder a( result.subarrayStart( "results" ) );
-
-            int tempSize = 1024 * 1024; // leave a mb for other things
-            long long numReturned = 0;
-
-            for ( unsigned n = 0; n < r.size(); n++ ) {
-                BSONObj obj = BSONObj::make(r[n].rec);
-                BSONObj toSendBack = obj;
-
-                if ( pr ) {
-                    toSendBack = pr->transform(obj);
-                }
-
-                if ( ( tempSize + toSendBack.objsize() ) >= BSONObjMaxUserSize ) {
+            BSONObj obj;
+            while (Runner::RUNNER_ADVANCED == runner->getNext(&obj, NULL)) {
+                if ((resultSize + obj.objsize()) >= BSONObjMaxUserSize) {
                     break;
                 }
+                // We return an array of results.  Add another element.
+                BSONObjBuilder oneResultBuilder(resultBuilder.subobjStart());
+                oneResultBuilder.append("score", obj["$s"].number());
 
-                BSONObjBuilder x( a.subobjStart() );
-                x.append( "score" , r[n].score );
-                x.append( "obj", toSendBack );
-
-                BSONObj xobj = x.done();
-                tempSize += xobj.objsize();
-
+                // Strip out the score from the returned obj.
+                BSONObjIterator resIt(obj);
+                BSONObjBuilder resBob;
+                while (resIt.more()) {
+                    BSONElement elt = resIt.next();
+                    if (!mongoutils::str::equals("$s", elt.fieldName())) {
+                        resBob.append(elt);
+                    }
+                }
+                oneResultBuilder.append("obj", resBob.obj());
+                BSONObj addedArrayObj = oneResultBuilder.done();
+                resultSize += addedArrayObj.objsize();
                 numReturned++;
             }
 
-            a.done();
+            resultBuilder.done();
 
             // returns some stats to the user
-            BSONObjBuilder bb( result.subobjStart( "stats" ) );
-            bb.appendNumber( "nscanned" , search.getKeysLookedAt() );
-            bb.appendNumber( "nscannedObjects" , search.getObjLookedAt() );
-            bb.appendNumber( "n" , numReturned );
-            bb.appendNumber( "nfound" , r.size() );
-            bb.append( "timeMicros", (int)comm.micros() );
-            bb.done();
+            BSONObjBuilder stats(result.subobjStart("stats"));
+
+            // Fill in nscanned from the explain.
+            TypeExplain* bareExplain;
+            Status res = runner->getExplainPlan(&bareExplain);
+            if (res.isOK()) {
+                auto_ptr<TypeExplain> explain(bareExplain);
+                stats.append("nscanned", explain->getNScanned());
+                stats.append("nscannedObjects", explain->getNScannedObjects());
+            }
+
+            stats.appendNumber( "n" , numReturned );
+            stats.append( "timeMicros", (int)comm.micros() );
+            stats.done();
 
             return true;
         }
-    }
 
-}
+    }  // namespace fts
+
+}  // namespace mongo

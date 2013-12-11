@@ -275,4 +275,12 @@ namespace mongo {
         uint64_t nscanned;
     };
 
+    struct TextStats : public SpecificStats {
+        TextStats() : keysExamined(0), fetches(0) { }
+
+        uint64_t keysExamined;
+
+        uint64_t fetches;
+    };
+
 }  // namespace mongo

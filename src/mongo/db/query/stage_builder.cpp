@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-    PlanStage* buildStages(const string& ns, const QuerySolutionNode* root, WorkingSet* ws) {
+    PlanStage* buildStages(const QuerySolution& qsol, const QuerySolutionNode* root, WorkingSet* ws) {
         if (STAGE_COLLSCAN == root->getType()) {
             const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
             CollectionScanParams params;
@@ -71,16 +71,16 @@ namespace mongo {
             // XXX XXX
             //
             Database* db = cc().database();
-            Collection* collection = db ? db->getCollection( ns ) : NULL;
+            Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
             if (NULL == collection) {
-                warning() << "Can't ixscan null ns " << ns << endl;
+                warning() << "Can't ixscan null ns " << qsol.ns << endl;
                 return NULL;
             }
             NamespaceDetails* nsd = collection->details();
             int idxNo = nsd->findIndexByKeyPattern(ixn->indexKeyPattern);
             if (-1 == idxNo) {
                 warning() << "Can't find idx " << ixn->indexKeyPattern.toString()
-                          << "in ns " << ns << endl;
+                          << "in ns " << qsol.ns << endl;
                 return NULL;
             }
             IndexScanParams params;
@@ -94,13 +94,13 @@ namespace mongo {
         }
         else if (STAGE_FETCH == root->getType()) {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
-            PlanStage* childStage = buildStages(ns, fn->children[0], ws);
+            PlanStage* childStage = buildStages(qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new FetchStage(ws, childStage, fn->filter.get());
         }
         else if (STAGE_SORT == root->getType()) {
             const SortNode* sn = static_cast<const SortNode*>(root);
-            PlanStage* childStage = buildStages(ns, sn->children[0], ws);
+            PlanStage* childStage = buildStages(qsol, sn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             SortStageParams params;
             params.pattern = sn->pattern;
@@ -110,19 +110,19 @@ namespace mongo {
         }
         else if (STAGE_PROJECTION == root->getType()) {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
-            PlanStage* childStage = buildStages(ns, pn->children[0], ws);
+            PlanStage* childStage = buildStages(qsol, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new ProjectionStage(pn->projection, pn->fullExpression, ws, childStage);
         }
         else if (STAGE_LIMIT == root->getType()) {
             const LimitNode* ln = static_cast<const LimitNode*>(root);
-            PlanStage* childStage = buildStages(ns, ln->children[0], ws);
+            PlanStage* childStage = buildStages(qsol, ln->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new LimitStage(ln->limit, ws, childStage);
         }
         else if (STAGE_SKIP == root->getType()) {
             const SkipNode* sn = static_cast<const SkipNode*>(root);
-            PlanStage* childStage = buildStages(ns, sn->children[0], ws);
+            PlanStage* childStage = buildStages(qsol, sn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new SkipStage(sn->skip, ws, childStage);
         }
@@ -130,7 +130,7 @@ namespace mongo {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
             auto_ptr<AndHashStage> ret(new AndHashStage(ws, ahn->filter.get()));
             for (size_t i = 0; i < ahn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(ns, ahn->children[i], ws);
+                PlanStage* childStage = buildStages(qsol, ahn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -140,7 +140,7 @@ namespace mongo {
             const OrNode * orn = static_cast<const OrNode*>(root);
             auto_ptr<OrStage> ret(new OrStage(ws, orn->dedup, orn->filter.get()));
             for (size_t i = 0; i < orn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(ns, orn->children[i], ws);
+                PlanStage* childStage = buildStages(qsol, orn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -150,7 +150,7 @@ namespace mongo {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
             auto_ptr<AndSortedStage> ret(new AndSortedStage(ws, asn->filter.get()));
             for (size_t i = 0; i < asn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(ns, asn->children[i], ws);
+                PlanStage* childStage = buildStages(qsol, asn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -163,7 +163,7 @@ namespace mongo {
             params.pattern = msn->sort;
             auto_ptr<MergeSortStage> ret(new MergeSortStage(params, ws));
             for (size_t i = 0; i < msn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(ns, msn->children[i], ws);
+                PlanStage* childStage = buildStages(qsol, msn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -175,14 +175,14 @@ namespace mongo {
             params.gq = node->gq;
             params.filter = node->filter.get();
             params.indexKeyPattern = node->indexKeyPattern;
-            params.ns = ns;
+            params.ns = qsol.ns;
             return new TwoD(params, ws);
         }
         else if (STAGE_GEO_NEAR_2D == root->getType()) {
             const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(root);
             TwoDNearParams params;
             params.nearQuery = node->nq;
-            params.ns = ns;
+            params.ns = qsol.ns;
             params.indexKeyPattern = node->indexKeyPattern;
             params.filter = node->filter.get();
             params.numWanted = node->numWanted;
@@ -193,7 +193,7 @@ namespace mongo {
         else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
             S2NearParams params;
-            params.ns = ns;
+            params.ns = qsol.ns;
             params.indexKeyPattern = node->indexKeyPattern;
             params.nearQuery = node->nq;
             params.baseBounds = node->baseBounds;
@@ -206,20 +206,30 @@ namespace mongo {
             const TextNode* node = static_cast<const TextNode*>(root);
 
             Database* db = cc().database();
-            Collection* collection = db ? db->getCollection( ns ) : NULL;
-            if (NULL == collection) { return NULL; }
+            Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
+            if (NULL == collection) {
+                warning() << "null collection for text?";
+                return NULL;
+            }
             vector<int> idxMatches;
             collection->details()->findIndexByType("text", idxMatches);
-            if (1 != idxMatches.size()) { return NULL; }
+            if (1 != idxMatches.size()) {
+                warning() << "more than one text idx?";
+                return NULL;
+            }
             IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
             auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
             TextStageParams params(fam->getSpec());
 
-            params.ns = ns;
+            params.ns = qsol.ns;
             params.index = index;
             params.spec = fam->getSpec();
-            Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
-            if (!s.isOK()) { return NULL; }
+            // XXX change getIndexPrefix to not look at BSONObj
+            Status s = fam->getSpec().getIndexPrefix(qsol.filterData, &params.indexPrefix);
+            if (!s.isOK()) {
+                warning() << "can't get text index prefix??";
+                return NULL;
+            }
 
             string language = ("" == node->_language
                                ? fam->getSpec().defaultLanguage().str()
@@ -227,16 +237,19 @@ namespace mongo {
 
             FTSQuery ftsq;
             Status parseStatus = ftsq.parse(node->_query, language);
-            if (!parseStatus.isOK()) { return NULL; }
+            if (!parseStatus.isOK()) {
+                warning() << "cant parse fts query";
+                return NULL;
+            }
             params.query = ftsq;
 
             return new TextStage(params, ws, node->filter.get());
         }
         else if (STAGE_SHARDING_FILTER == root->getType()) {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
-            PlanStage* childStage = buildStages(ns, fn->children[0], ws);
+            PlanStage* childStage = buildStages(qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            return new ShardFilterStage(shardingState.getCollectionMetadata(ns), ws, childStage);
+            return new ShardFilterStage(shardingState.getCollectionMetadata(qsol.ns), ws, childStage);
         }
         else {
             stringstream ss;
@@ -253,7 +266,7 @@ namespace mongo {
         if (NULL == root) { return false; }
 
         auto_ptr<WorkingSet> ws(new WorkingSet());
-        PlanStage* stageRoot = buildStages(solution.ns, root, ws.get());
+        PlanStage* stageRoot = buildStages(solution, root, ws.get());
 
         if (NULL != stageRoot) {
             *rootOut = stageRoot;

@@ -107,7 +107,9 @@ namespace mongo {
 
     PlanStageStats* TextStage::getStats() {
         _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_TEXT);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
+        ret->specific.reset(new TextStats(_specificStats));
+        return ret.release();
     }
 
     PlanStage::StageState TextStage::fillOutResults() {
@@ -189,11 +191,11 @@ namespace mongo {
 
             // Filter for phrases and negated terms
             if (_params.query.hasNonTermPieces()) {
-                Record* rec_p = loc.rec();
-                if (!_ftsMatcher.matchesNonTerm(BSONObj::make(rec_p))) {
+                if (!_ftsMatcher.matchesNonTerm(loc.obj())) {
                     continue;
                 }
             }
+
             _results.push_back(ScoredLocation(loc, score));
         }
 
@@ -205,7 +207,58 @@ namespace mongo {
         return PlanStage::NEED_TIME;
     }
 
+    class TextMatchableDocument : public MatchableDocument {
+    public:
+        TextMatchableDocument(const BSONObj& keyPattern, const BSONObj& key, DiskLoc loc, bool *fetched)
+            : _keyPattern(keyPattern),
+              _key(key),
+              _loc(loc),
+              _fetched(fetched) { }
+
+        BSONObj toBSON() const {
+            *_fetched = true;
+            return _loc.obj();
+        }
+
+        virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+            BSONObjIterator keyPatternIt(_keyPattern);
+            BSONObjIterator keyDataIt(_key);
+
+            // Look in the key.
+            while (keyPatternIt.more()) {
+                BSONElement keyPatternElt = keyPatternIt.next();
+                verify(keyDataIt.more());
+                BSONElement keyDataElt = keyDataIt.next();
+
+                if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                    if (Array == keyDataElt.type()) {
+                        return new SimpleArrayElementIterator(keyDataElt, true);
+                    }
+                    else {
+                        return new SingleElementElementIterator(keyDataElt);
+                    }
+                }
+            }
+
+            // All else fails, fetch.
+            *_fetched = true;
+            return new BSONElementIterator(path, _loc.obj());
+        }
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            delete iterator;
+        }
+
+    private:
+        BSONObj _keyPattern;
+        BSONObj _key;
+        DiskLoc _loc;
+        bool* _fetched;
+    };
+
     void TextStage::filterAndScore(BSONObj key, DiskLoc loc) {
+        ++_specificStats.keysExamined;
+
         // Locate score within possibly compound key: {prefix,term,score,suffix}.
         BSONObjIterator keyIt(key);
         for (unsigned i = 0; i < _params.spec.numExtraBefore(); i++) {
@@ -223,15 +276,25 @@ namespace mongo {
             // We have already rejected this document.
             return;
         }
-        if (documentAggregateScore == 0 && _filter) {
-            // We have not seen this document before and need to apply a filter.
-            Record* rec_p = loc.rec();
-            BSONObj doc = BSONObj::make(rec_p);
 
-            // TODO: Covered index matching logic here.
-            if (!_filter->matchesBSON(doc)) {
-                documentAggregateScore = -1;
-                return;
+        if (documentAggregateScore == 0) {
+            if (_filter) {
+                // We have not seen this document before and need to apply a filter.
+                bool fetched = false;
+                TextMatchableDocument tdoc(_params.index->keyPattern(), key, loc, &fetched);
+
+                if (!_filter->matches(&tdoc)) {
+                    // We had to fetch but we're not going to return it.
+                    if (fetched) {
+                        ++_specificStats.fetches;
+                    }
+                    documentAggregateScore = -1;
+                    return;
+                }
+            }
+            else {
+                // If we're here, we're going to return the doc, and we do a fetch later.
+                ++_specificStats.fetches;
             }
         }
 

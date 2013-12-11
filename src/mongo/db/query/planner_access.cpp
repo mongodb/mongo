@@ -157,9 +157,9 @@ namespace mongo {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type) {
+        if (STAGE_GEO_2D == type || STAGE_TEXT == type) {
             // XXX: 'expr' is possibly indexed by 'node'.  Right now we don't take advantage
-            // of covering for 2d indices.
+            // of covering here (??).
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             return;
         }

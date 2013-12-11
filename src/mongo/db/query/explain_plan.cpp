@@ -168,6 +168,12 @@ namespace mongo {
             res->setIsMultiKey(false);
             res->setIndexOnly(false);
         }
+        else if (leaf->stageType == STAGE_TEXT) {
+            TextStats* tStats = static_cast<TextStats*>(leaf->specific.get());
+            res->setCursor("TextCursor");
+            res->setNScanned(tStats->keysExamined);
+            res->setNScannedObjects(tStats->fetches);
+        }
         else if (leaf->stageType == STAGE_IXSCAN) {
             IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
             dassert(indexStats);
