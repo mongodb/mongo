@@ -618,10 +618,11 @@ namespace mongo {
          */
         class LazyState {
         public:
-            LazyState() : _lastClient( NULL ), _lastOp( -1 ), _slaveOk( false ), _retries( 0 ) {}
+            LazyState() :
+                _lastClient( NULL ), _lastOp( -1 ), _secondaryQueryOk( false ), _retries( 0 ) {}
             DBClientConnection* _lastClient;
             int _lastOp;
-            bool _slaveOk;
+            bool _secondaryQueryOk;
             int _retries;
 
         } _lazyState;

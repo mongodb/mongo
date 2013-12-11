@@ -1902,14 +1902,12 @@ namespace mongo {
             _lazyState = LazyState();
 
         const int lastOp = toSend.operation();
-        bool slaveOk = false;
 
         if (lastOp == dbQuery) {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm(toSend);
             QueryMessage qm(dm);
 
-            const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
             shared_ptr<ReadPreferenceSetting> readPref( _extractReadPref( qm.query,
                                                                           qm.queryOptions ) );
             if ( _isSecondaryQuery( qm.ns, qm.query, *readPref ) ) {
@@ -1942,7 +1940,7 @@ namespace mongo {
                         conn->say(toSend);
 
                         _lazyState._lastOp = lastOp;
-                        _lazyState._slaveOk = slaveOk;
+                        _lazyState._secondaryQueryOk = true;
                         _lazyState._lastClient = conn;
                     }
                     catch ( const DBException& DBExcep ) {
@@ -1977,7 +1975,7 @@ namespace mongo {
             *actualServer = master->getServerAddress();
 
         _lazyState._lastOp = lastOp;
-        _lazyState._slaveOk = slaveOk;
+        _lazyState._secondaryQueryOk = false;
         // Don't retry requests to primary since there is only one host to try
         _lazyState._retries = MAX_RETRY;
         _lazyState._lastClient = master;
@@ -2016,46 +2014,52 @@ namespace mongo {
         else if (targetHost) *targetHost = "";
 
         if( ! _lazyState._lastClient ) return;
+
+        // nReturned == 1 means that we got one result back, which might be an error
+        // nReturned == -1 is a sentinel value for "no data returned" aka (usually) network problem
+        // If neither, this must be a query result so our response is ok wrt the replica set
         if( nReturned != 1 && nReturned != -1 ) return;
 
         BSONObj dataObj;
         if( nReturned == 1 ) dataObj = BSONObj( data );
 
         // Check if we should retry here
-        if( _lazyState._lastOp == dbQuery && _lazyState._slaveOk ){
+        if( _lazyState._lastOp == dbQuery && _lazyState._secondaryQueryOk ){
 
-            // Check the error code for a slave not secondary error
-            if( nReturned == -1 ||
+            // query could potentially go to a secondary, so see if this is an error (or empty) and
+            // retry if we're not past our retry limit.
+
+            if( nReturned == -1 /* no result, maybe network problem */ ||
                 ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo()
                   && dataObj["code"].Int() == NotMasterOrSecondaryCode ) ){
 
-                bool wasMaster = false;
                 if( _lazyState._lastClient == _lastSlaveOkConn.get() ){
                     isntSecondary();
                 }
                 else if( _lazyState._lastClient == _master.get() ){
-                    wasMaster = true;
                     isntMaster();
                 }
-                else
-                    warning() << "passed " << dataObj << " but last rs client " << _lazyState._lastClient->toString() << " is not master or secondary" << endl;
+                else {
+                    warning() << "passed " << dataObj << " but last rs client "
+                              << _lazyState._lastClient->toString() << " is not master or secondary"
+                              << endl;
+                }
 
-                if( _lazyState._retries < 3 ){
+                if ( _lazyState._retries < static_cast<int>( MAX_RETRY ) ) {
                     _lazyState._retries++;
                     *retry = true;
                 }
                 else{
-                    (void)wasMaster; // silence set-but-not-used warning
-                    // verify( wasMaster );
-                    // printStackTrace();
-                    log() << "too many retries (" << _lazyState._retries << "), could not get data from replica set" << endl;
+                    log() << "too many retries (" << _lazyState._retries
+                          << "), could not get data from replica set" << endl;
                 }
             }
         }
         else if( _lazyState._lastOp == dbQuery ){
-            // slaveOk is not set, just mark the master as bad
 
-            if( nReturned == -1 ||
+            // if query could not potentially go to a secondary, just mark the master as bad
+
+            if( nReturned == -1 /* no result, maybe network problem */ ||
                ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo()
                  && dataObj["code"].Int() == NotMasterNoSlaveOkCode ) )
             {
