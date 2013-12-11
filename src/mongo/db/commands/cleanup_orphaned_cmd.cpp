@@ -210,6 +210,13 @@ namespace mongo {
                 return false;
             }
 
+            ChunkVersion shardVersion;
+            Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
+            if ( !status.isOK() ) {
+                errmsg = str::stream() << "failed to refresh shard metadata: " << status.reason();
+                return false;
+            }
+
             BSONObj stoppedAtKey;
             CleanupResult cleanupResult = cleanupOrphanedData( NamespaceString( ns ),
                                                                startingFromKey,
