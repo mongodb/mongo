@@ -238,7 +238,7 @@ off_page:		ikey = key;
 			 * keys.  Deleted overflow keys must be instantiated
 			 * first, acquire the overflow lock and check.  Read
 			 * the key if we still need to do so, but holding the
-			 * overflow lock.  Note we not using the version of
+			 * overflow lock.  Note we are not using the version of
 			 * the cell-data-ref calls that acquire the overflow
 			 * lock and do a look-aside into the tracking cache:
 			 * this is an overflow key, not a value, meaning it's
