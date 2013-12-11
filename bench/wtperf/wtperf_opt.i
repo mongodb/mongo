@@ -81,6 +81,7 @@ DEF_OPT_AS_UINT32(checkpoint_interval, 120, "checkpoint every interval seconds")
 DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
+DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
 DEF_OPT_AS_UINT32(value_sz, 100, "value size")
@@ -88,8 +89,6 @@ DEF_OPT_AS_UINT32(icount, 5000, "number of records to initially populate")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
-DEF_OPT_AS_INT(merge_sleep, 0,
-    "post-populate sleep seconds for LSM merging activity (-1 for load time)")
 DEF_OPT_AS_BOOL(pareto, 0, "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the populate "

@@ -388,7 +388,13 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.compact' : Method([]),
+'session.compact' : Method([
+	Config('timeout', '1200', r'''
+	    maximum amount of time to allow for compact in seconds. The
+		actual amount of time spent in compact may exceed the configured
+		value. A value of zero disables the timeout''',
+		type='int'),
+]),
 
 'session.create' :
 	    Method(table_only_meta + file_config + lsm_config + source_meta + [

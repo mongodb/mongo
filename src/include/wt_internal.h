@@ -83,6 +83,8 @@ struct __wt_col_rle;
     typedef struct __wt_col_rle WT_COL_RLE;
 struct __wt_colgroup;
     typedef struct __wt_colgroup WT_COLGROUP;
+struct __wt_compact;
+    typedef struct __wt_compact WT_COMPACT;
 struct __wt_condvar;
     typedef struct __wt_condvar WT_CONDVAR;
 struct __wt_config;
@@ -237,6 +239,7 @@ struct __wt_update;
 #include "btree.h"
 #include "cache.h"
 #include "config.h"
+#include "compact.h"
 #include "cursor.h"
 #include "dlh.h"
 #include "error.h"

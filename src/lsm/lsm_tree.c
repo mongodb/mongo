@@ -927,6 +927,52 @@ __wt_lsm_tree_unlock(
 }
 
 /*
+ * __wt_lsm_compact --
+ *	Compact an LSM tree called via __wt_schema_worker.
+ */
+int
+__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
+	uint64_t last_merge_progressing;
+	time_t begin, end;
+
+	/* Ignore non LSM names. */
+	if (!WT_PREFIX_MATCH(name, "lsm:"))
+		return (0);
+
+	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
+
+	if (!F_ISSET(S2C(session), WT_CONN_LSM_MERGE) ||
+	    lsm_tree->merge_threads == 0)
+		WT_RET_MSG(session, EINVAL,
+		    "LSM compaction requires active merge threads");
+
+	WT_RET(__wt_seconds(session, &begin));
+
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+
+	/* Wake up the merge threads. */
+	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
+
+	/* Now wait for merge activity to stop. */
+	do {
+		last_merge_progressing = lsm_tree->merge_progressing;
+		__wt_sleep(1, 0);
+		WT_RET(__wt_seconds(session, &end));
+		if (session->compact->max_time > 0 &&
+		    session->compact->max_time < (uint64_t)(end - begin))
+			WT_ERR(ETIMEDOUT);
+	} while (lsm_tree->merge_progressing != last_merge_progressing &&
+	    lsm_tree->nchunks > 1);
+
+err:	F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+
+	return (ret);
+}
+
+/*
  * __wt_lsm_tree_worker --
  *	Run a schema worker operation on each level of a LSM tree.
  */

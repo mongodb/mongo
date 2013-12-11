@@ -901,7 +901,12 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the object to compact, such as
 	 * \c "table:stock"
-	 * @configempty{session.compact, see dist/api_data.py}
+	 * @configstart{session.compact, see dist/api_data.py}
+	 * @config{timeout, maximum amount of time to allow for compact in
+	 * seconds.  The actual amount of time spent in compact may exceed the
+	 * configured value.  A value of zero disables the timeout., an integer;
+	 * default \c 1200.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(compact)(WT_SESSION *session,

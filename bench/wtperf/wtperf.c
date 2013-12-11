@@ -742,13 +742,14 @@ err:		g_error = g_stop = 1;
 static int
 execute_populate(CONFIG *cfg)
 {
+	WT_SESSION *session;
 	struct timespec start, stop;
 	double secs;
 	uint64_t last_ops;
 	uint32_t interval;
-	u_int sleepsec;
 	int elapsed, ret;
 
+	session = NULL;
 	lprintf(cfg, 0, 1,
 	    "Starting %" PRIu32 " populate thread(s)", cfg->populate_threads);
 
@@ -781,8 +782,10 @@ execute_populate(CONFIG *cfg)
 		interval = 0;
 		g_insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
-		    "%" PRIu64 " populate inserts in %" PRIu32 " secs",
-		    g_insert_ops - last_ops, cfg->report_interval);
+		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
+		    PRIu32 ") in %" PRIu32 " secs",
+		    g_insert_ops - last_ops, g_insert_ops,
+		    cfg->icount, cfg->report_interval);
 		last_ops = g_insert_ops;
 	}
 	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
@@ -810,17 +813,20 @@ execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f", secs, cfg->icount / secs);
 
 	/*
-	 * If configured, sleep for awhile to allow LSM merging to complete in
-	 * the background.  If user specifies -1, then sleep for as long as it
-	 * took to load.
+	 * If configured, compact to allow LSM merging to complete.
 	 */
-	if (cfg->merge_sleep) {
-		if (cfg->merge_sleep < 0)
-			sleepsec = (u_int)(stop.tv_sec - start.tv_sec);
-		else
-			sleepsec = (u_int)cfg->merge_sleep;
-		lprintf(cfg, 0, 1, "Sleep %u seconds for merging", sleepsec);
-		(void)sleep(sleepsec);
+	if (cfg->compact) {
+		if ((ret = cfg->conn->open_session(
+		    cfg->conn, NULL, NULL, &session)) != 0) {
+			lprintf(cfg, ret, 0,
+			     "execute_populate: WT_CONNECTION.open_session");
+			return (ret);
+		}
+		lprintf(cfg, 0, 1, "Compact after populate");
+		ret = session->compact(session, cfg->uri, NULL);
+		session->close(session, NULL);
+		if (ret != 0)
+			return (ret);
 	}
 
 	/*

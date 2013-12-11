@@ -91,6 +91,7 @@ struct __wt_lsm_tree {
 
 	long throttle_sleep;		/* Rate limiting */
 	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
+	uint64_t merge_progressing;	/* Bumped when merges are active */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
@@ -123,10 +124,11 @@ struct __wt_lsm_tree {
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 
-#define	WT_LSM_TREE_NEED_SWITCH	0x01
-#define	WT_LSM_TREE_OPEN	0x02
-#define	WT_LSM_TREE_THROTTLE	0x04
-#define	WT_LSM_TREE_WORKING	0x08
+#define	WT_LSM_TREE_COMPACTING	0x01
+#define	WT_LSM_TREE_NEED_SWITCH	0x02
+#define	WT_LSM_TREE_OPEN	0x04
+#define	WT_LSM_TREE_THROTTLE	0x08
+#define	WT_LSM_TREE_WORKING	0x10
 	uint32_t flags;
 };
 

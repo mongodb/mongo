@@ -115,6 +115,11 @@ static const WT_CONFIG_CHECK confchk_session_checkpoint[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_session_compact[] = {
+	{ "timeout", "int", NULL, NULL},
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_lsm_subconfigs[] = {
 	{ "auto_throttle", "boolean", NULL, NULL },
 	{ "bloom", "boolean", NULL, NULL },
@@ -355,8 +360,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "session.compact",
-	  "",
-	  NULL
+	  "timeout=1200",
+	  confchk_session_compact
 	},
 	{ "session.create",
 	  "allocation_size=4KB,block_allocation=best,block_compressor=,"

@@ -96,23 +96,104 @@
  */
 
 /*
- * __session_compact_worker --
- *	Worker function to do the actual compaction call.
+ * __wt_compact_uri_analyze --
+ *	Extract information relevant to deciding what work compact needs to
+ *	do from a URI that is part of a table schema.
+ *	Called via the schema_worker function.
+ */
+int
+__wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri)
+{
+	/*
+	 * Add references to schema URI objects to the list of objects to be
+	 * compacted.
+	 */
+	if (WT_PREFIX_MATCH(uri, "lsm:"))
+		session->compact->lsm_count++;
+	else if (WT_PREFIX_MATCH(uri, "file:"))
+		session->compact->file_count++;
+
+	return (0);
+}
+
+/*
+ * __session_compact_check_timeout --
+ *	Check if the timeout has been exceeded.
  */
 static int
-__session_compact_worker(
-    WT_SESSION *wt_session, const char *uri, const char *config)
+__session_compact_check_timeout(
+    WT_SESSION_IMPL *session, struct timespec begin)
+{
+	struct timespec end;
+
+	if (session->compact->max_time == 0)
+		return (0);
+
+	WT_RET(__wt_epoch(session, &end));
+	if (session->compact->max_time <
+	    WT_TIMEDIFF(end, begin) / WT_BILLION)
+		WT_RET(ETIMEDOUT);
+	return (0);
+}
+
+/*
+ * __compact_file --
+ *
+ */
+static int
+__compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
+	WT_DECL_ITEM(t);
+	WT_SESSION *wt_session;
+	WT_TXN *txn;
+	int i;
+	struct timespec start_time;
 
-	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL(session, compact, config, cfg);
+	txn = &session->txn;
+	wt_session = &session->iface;
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_compact, NULL, cfg, 0));
+	/*
+	 * File compaction requires checkpoints, which will fail in a
+	 * transactional context.  Check now so the error message isn't
+	 * confusing.
+	 */
+	if (session->compact->file_count != 0 && F_ISSET(txn, TXN_RUNNING))
+		WT_ERR_MSG(session, EINVAL,
+		    " File compaction not permitted in a transaction");
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	/*
+	 * Force the checkpoint: we don't want to skip it because the work we
+	 * need to have done is done in the underlying block manager.
+	 */
+	WT_ERR(__wt_scr_alloc(session, 128, &t));
+	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
+
+	WT_ERR(__wt_epoch(session, &start_time));
+
+	/*
+	 * We compact 10% of the file on each pass, try 10 times (which is
+	 * probably overkill), and quit if we make no progress. Check for a
+	 * timeout each time through the loop.
+	 */
+	for (i = 0; i < 10; ++i) {
+		WT_ERR(wt_session->checkpoint(wt_session, t->data));
+
+		session->compaction = 0;
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_worker(
+		    session, uri, __wt_compact, NULL, cfg, 0));
+		WT_ERR(ret);
+		if (!session->compaction)
+			break;
+
+		WT_ERR(wt_session->checkpoint(wt_session, t->data));
+		WT_ERR(wt_session->checkpoint(wt_session, t->data));
+		WT_ERR(__session_compact_check_timeout(session, start_time));
+	}
+
+err:	__wt_scr_free(&t);
+	return (ret);
 }
 
 /*
@@ -123,36 +204,33 @@ int
 __wt_session_compact(
     WT_SESSION *wt_session, const char *uri, const char *config)
 {
-	WT_DECL_ITEM(t);
+	WT_COMPACT compact;
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, compact, config, cfg);
 
-	/*
-	 * Force the checkpoint: we don't want to skip it because the work we
-	 * need to have done is done in the underlying block manager.
-	 */
-	WT_RET(__wt_scr_alloc(session, 128, &t));
-	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
+	/* Setup the structure in the session handle */
+	memset(&compact, 0, sizeof(WT_COMPACT));
+	session->compact = &compact;
 
-	/*
-	 * We compact 10% of the file on each pass, try 10 times (which is
-	 * probably overkill), and quit if we make no progress.
-	 */
-	for (i = 0; i < 10; ++i) {
-		WT_ERR(wt_session->checkpoint(wt_session, t->data));
+	WT_ERR(__wt_config_gets(session, cfg, "timeout", &cval));
+	session->compact->max_time = (uint64_t)cval.val;
 
-		session->compaction = 0;
-		WT_ERR(__session_compact_worker(wt_session, uri, config));
-		if (!session->compaction)
-			break;
+	/* Find the types of data sources are being compacted. */
+	WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(
+	    session, uri, NULL, __wt_compact_uri_analyze, cfg, 0));
+	WT_ERR(ret);
 
-		WT_ERR(wt_session->checkpoint(wt_session, t->data));
-		WT_ERR(wt_session->checkpoint(wt_session, t->data));
-	}
+	if (session->compact->lsm_count != 0)
+		WT_ERR(__wt_schema_worker(
+		    session, uri, NULL, __wt_lsm_compact, cfg, 0));
+	if (session->compact->file_count != 0)
+		WT_ERR(__compact_file(session, uri, cfg));
 
-err:	__wt_scr_free(&t);
+err:	session->compact = NULL;
+	API_END_NOTFOUND_MAP(session, ret);
 	return (ret);
 }

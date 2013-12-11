@@ -899,6 +899,7 @@ extern int __wt_lsm_tree_lock( WT_SESSION_IMPL *session,
     int exclusive);
 extern int __wt_lsm_tree_unlock( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
     int (*file_func)(WT_SESSION_IMPL *,
@@ -1280,6 +1281,7 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
     WT_SESSION_IMPL **sessionp);
+extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_session_compact( WT_SESSION *wt_session,
     const char *uri,
     const char *config);
