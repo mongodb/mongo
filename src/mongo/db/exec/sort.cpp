@@ -456,6 +456,9 @@ namespace mongo {
      *     sortBuffer() - Copies items from set to vectors.
      */
     void SortStage::addToBuffer(const SortableDataItem& item) {
+        // Holds ID of working set member to be freed at end of this function.
+        WorkingSetID wsidToFree = WorkingSet::INVALID_ID;
+
         if (_limit == 0) {
             _data.push_back(item);
             _memUsage += getMemUsage(_ws, item.wsid);
@@ -466,7 +469,7 @@ namespace mongo {
                 _memUsage = getMemUsage(_ws, item.wsid);
                 return;
             }
-            WorkingSetID wsidToFree = item.wsid;
+            wsidToFree = item.wsid;
             const WorkingSetComparator& cmp = *_sortKeyComparator;
             // Compare new item with existing item in vector.
             if (cmp(item, _data[0])) {
@@ -474,7 +477,6 @@ namespace mongo {
                 _data[0] = item;
                 _memUsage = getMemUsage(_ws, item.wsid);
             }
-            _ws->free(wsidToFree);
         }
         else {
             // Update data item set instead of vector
@@ -488,7 +490,7 @@ namespace mongo {
             // Limit will be exceeded - compare with item with lowest key
             // If new item does not have a lower key value than last item,
             // do nothing.
-            WorkingSetID wsidToFree = item.wsid;
+            wsidToFree = item.wsid;
             SortableDataItemSet::const_iterator lastItemIt = --(_dataSet->end());
             const SortableDataItem& lastItem = *lastItemIt;
             const WorkingSetComparator& cmp = *_sortKeyComparator;
@@ -501,6 +503,15 @@ namespace mongo {
                 // used by the last item and to keep the scope of the iterator to a minimum.
                 _dataSet->erase(lastItemIt);
                 _dataSet->insert(item);
+            }
+        }
+
+        // If the working set ID is valid, remove from
+        // DiskLoc invalidation map and free from working set.
+        if (wsidToFree != WorkingSet::INVALID_ID) {
+            WorkingSetMember* member = _ws->get(wsidToFree);
+            if (member->hasLoc()) {
+                _wsidByDiskLoc.erase(member->loc);
             }
             _ws->free(wsidToFree);
         }

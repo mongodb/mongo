@@ -83,11 +83,14 @@ namespace QueryStageSortTests {
             set<DiskLoc>::iterator it = locs.begin();
 
             for (int i = 0; i < numObj(); ++i, ++it) {
+                ASSERT_FALSE(it == locs.end());
+
                 // Insert some owned obj data.
                 WorkingSetMember member;
-                member.state = WorkingSetMember::OWNED_OBJ;
-                member.obj = it->obj().getOwned();
-                ASSERT(member.obj.isOwned());
+                member.loc = *it;
+                member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                member.obj = it->obj();
+                ASSERT_FALSE(member.obj.isOwned());
                 ms->pushBack(member);
             }
         }
@@ -115,6 +118,7 @@ namespace QueryStageSortTests {
 
             SortStageParams params;
             params.pattern = BSON("foo" << direction);
+            params.limit = limit();
 
             // Must fetch so we can look at the doc as a BSONObj.
             PlanExecutor runner(ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL));
@@ -137,11 +141,29 @@ namespace QueryStageSortTests {
                 last = current;
             }
 
+            checkCount(count);
+        }
+
+        /**
+         * Check number of results returned from sort.
+         */
+        void checkCount(int count) {
             // No limit, should get all objects back.
-            ASSERT_EQUALS(numObj(), count);
+            // Otherwise, result set should be smaller of limit and input data size.
+            if (limit() > 0 && limit() < numObj()) {
+                ASSERT_EQUALS(limit(), count);
+            }
+            else {
+                ASSERT_EQUALS(numObj(), count);
+            }
         }
 
         virtual int numObj() = 0;
+
+        // Returns sort limit
+        // Leave as 0 to disable limit.
+        virtual int limit() const { return 0; };
+
 
         static const char* ns() { return "unittests.QueryStageSort"; }
     private:
@@ -186,6 +208,15 @@ namespace QueryStageSortTests {
         }
     };
 
+    // Sort in descreasing order with limit applied
+    template <int LIMIT>
+    class QueryStageSortDecWithLimit : public QueryStageSortDec {
+    public:
+        virtual int limit() const {
+            return LIMIT;
+        }
+    };
+
     // Sort a big bunch of objects.
     class QueryStageSortExt : public QueryStageSortTestBase {
     public:
@@ -222,13 +253,14 @@ namespace QueryStageSortTests {
             set<DiskLoc> locs;
             getLocs(&locs, coll);
 
-            // Build the mock stage which feeds the data.
+            // Build the mock scan stage which feeds the data.
             WorkingSet ws;
             auto_ptr<MockStage> ms(new MockStage(&ws));
             insertVarietyOfObjects(ms.get(), coll);
 
             SortStageParams params;
             params.pattern = BSON("foo" << 1);
+            params.limit = limit();
             auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
 
             const int firstRead = 10;
@@ -262,7 +294,7 @@ namespace QueryStageSortTests {
             }
             ss->recoverFromYield();
 
-            // The sort should still work.
+            // After invalidating all our data, we have nothing left to sort.
             int count = 0;
             while (!ss->isEOF()) {
                 WorkingSetID id;
@@ -274,9 +306,20 @@ namespace QueryStageSortTests {
                 ++count;
             }
 
-            // We've invalidated everything, but only 2/3 of our data had a DiskLoc to be
-            // invalidated.  We get the rest as-is.
-            ASSERT_EQUALS(count, numObj());
+            // Therefore, we expect an empty result set from running the sort stage to completion.
+            ASSERT_EQUALS(0, count);
+        }
+    };
+
+    // Invalidation of everything fed to sort with limit enabled.
+    // Limit size of working set within sort stage to a small number
+    // Sort stage implementation should not try to invalidate DiskLocc that
+    // are no longer in the working set.
+    template<int LIMIT>
+    class QueryStageSortInvalidationWithLimit : public QueryStageSortInvalidation {
+    public:
+        virtual int limit() const {
+            return LIMIT;
         }
     };
 
@@ -287,8 +330,14 @@ namespace QueryStageSortTests {
         void setupTests() {
             add<QueryStageSortInc>();
             add<QueryStageSortDec>();
+            // Sort with limit has a general limiting strategy for limit > 1
+            add<QueryStageSortDecWithLimit<10> >();
+            // and a special case for limit == 1
+            add<QueryStageSortDecWithLimit<1> >();
             add<QueryStageSortExt>();
             add<QueryStageSortInvalidation>();
+            add<QueryStageSortInvalidationWithLimit<10> >();
+            add<QueryStageSortInvalidationWithLimit<1> >();
         }
     }  queryStageSortTest;
 
