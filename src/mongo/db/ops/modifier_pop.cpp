@@ -189,12 +189,13 @@ namespace mongo {
         const bool pathExists = _preparedState->pathFoundElement.ok() &&
             (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
 
+        if (!pathExists)
+            return logBuilder->addToUnsets(_fieldRef.dottedField());
+
         // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = pathExists ?
-            doc.makeElementWithNewFieldName(
-                _fieldRef.dottedField(),
-                _preparedState->pathFoundElement) :
-            doc.makeElementBool(_fieldRef.dottedField(), true);
+        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
+                                                            _fieldRef.dottedField(),
+                                                            _preparedState->pathFoundElement);
 
         if (!logElement.ok()) {
             return Status(ErrorCodes::InternalError,
@@ -202,10 +203,6 @@ namespace mongo {
                                         << "set '" << _fieldRef.dottedField() << "' -> "
                                         << _preparedState->pathFoundElement.toString() );
         }
-
-        // Now, we attach the {<fieldname>: <value>} Element under the {$op: ...} one.
-        return pathExists ?
-            logBuilder->addToSets(logElement) :
-            logBuilder->addToUnsets(logElement);
+        return logBuilder->addToSets(logElement);
     }
 } // namespace mongo

@@ -128,36 +128,13 @@ namespace mongo {
         return addToSets(elemToSet);
     }
 
-    Status LogBuilder::addToUnsets(Element elt) {
-        return addToSection(elt, &_unsetAccumulator, kUnset);
-    }
-
-    Status LogBuilder::addToUnsetsWithNewFieldName(const StringData& name,
-                                                 const mutablebson::Element val) {
-        mutablebson::Element elemToSet =
-                _logRoot.getDocument().makeElementWithNewFieldName(name, val);
-        if (!elemToSet.ok())
+    Status LogBuilder::addToUnsets(StringData path) {
+        mutablebson::Element logElement = _logRoot.getDocument().makeElementBool(path, true);
+        if (!logElement.ok())
             return Status(ErrorCodes::InternalError,
-                          str::stream() << "Could not create new '"
-                                        << name << "' element from existing element '"
-                                        << val.getFieldName() << "' of type "
-                                        << typeName(val.getType()));
+                          str::stream() << "Cannot create $unset oplog entry for path" <<  path);
 
-        return addToUnsets(elemToSet);
-    }
-
-    Status LogBuilder::addToUnsetsWithNewFieldName(const StringData& name,
-                                                 const BSONElement& val){
-        mutablebson::Element elemToSet =
-                _logRoot.getDocument().makeElementWithNewFieldName(name, val);
-        if (!elemToSet.ok())
-            return Status(ErrorCodes::InternalError,
-                          str::stream() << "Could not create new '"
-                                        << name << "' element from existing element '"
-                                        << val.fieldName() << "' of type "
-                                        << typeName(val.type()));
-
-        return addToUnsets(elemToSet);
+        return addToSection(logElement, &_unsetAccumulator, kUnset);
     }
 
     Status LogBuilder::getReplacementObject(Element* outElt) {

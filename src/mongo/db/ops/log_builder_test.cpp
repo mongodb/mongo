@@ -80,34 +80,8 @@ namespace {
     TEST(LogBuilder, AddOneToUnset) {
         mmb::Document doc;
         LogBuilder lb(doc.root());
-
-        const mmb::Element elt_xy = doc.makeElementInt("x.y", 1);
-        ASSERT_TRUE(elt_xy.ok());
-        ASSERT_OK(lb.addToUnsets(elt_xy));
-
-        ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'x.y' : 1 } }"), doc);
-    }
-
-    TEST(LogBuilder, AddElementToUnset) {
-        mmb::Document doc;
-        LogBuilder lb(doc.root());
-
-        const mmb::Element elt_ab = doc.makeElementInt("", 1);
-        ASSERT_TRUE(elt_ab.ok());
-        ASSERT_OK(lb.addToUnsetsWithNewFieldName("a.b", elt_ab));
-
-        ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'a.b' : 1 } }"), doc);
-    }
-
-    TEST(LogBuilder, AddBSONElementToUnset) {
-        mmb::Document doc;
-        LogBuilder lb(doc.root());
-
-        mongo::BSONObj obj = mongo::fromjson("{'':1}");
-
-        ASSERT_OK(lb.addToUnsetsWithNewFieldName("a.b", obj.firstElement()));
-
-        ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'a.b' : 1 } }"), doc);
+        ASSERT_OK(lb.addToUnsets("x.y"));
+        ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'x.y' : true } }"), doc);
     }
 
     TEST(LogBuilder, AddOneToEach) {
@@ -118,15 +92,13 @@ namespace {
         ASSERT_TRUE(elt_ab.ok());
         ASSERT_OK(lb.addToSets(elt_ab));
 
-        const mmb::Element elt_xy = doc.makeElementInt("x.y", 1);
-        ASSERT_TRUE(elt_xy.ok());
-        ASSERT_OK(lb.addToUnsets(elt_xy));
+        ASSERT_OK(lb.addToUnsets("x.y"));
 
         ASSERT_EQUALS(
             mongo::fromjson(
                 "{ "
                 "   $set : { 'a.b' : 1 }, "
-                "   $unset : { 'x.y' : 1 } "
+                "   $unset : { 'x.y' : true } "
                 "}"
                 ), doc);
     }
@@ -194,19 +166,14 @@ namespace {
         mmb::Document doc;
         LogBuilder lb(doc.root());
 
-        const mmb::Element elt_ab = doc.makeElementInt("a.b", 1);
-        ASSERT_TRUE(elt_ab.ok());
-        ASSERT_OK(lb.addToUnsets(elt_ab));
-
-        const mmb::Element elt_xy = doc.makeElementInt("x.y", 1);
-        ASSERT_TRUE(elt_xy.ok());
-        ASSERT_OK(lb.addToUnsets(elt_xy));
+        ASSERT_OK(lb.addToUnsets("a.b"));
+        ASSERT_OK(lb.addToUnsets("x.y"));
 
         ASSERT_EQUALS(
             mongo::fromjson(
                 "{ $unset : {"
-                "   'a.b' : 1, "
-                "   'x.y' : 1 "
+                "   'a.b' : true, "
+                "   'x.y' : true "
                 "} }"
                 ), doc);
     }
@@ -273,8 +240,7 @@ namespace {
         ASSERT_TRUE(replacement.ok());
         ASSERT_OK(replacement.appendInt("a", 1));
 
-        mmb::Element setCandidate = doc.makeElementInt("x", 0);
-        ASSERT_NOT_OK(lb.addToUnsets(setCandidate));
+        ASSERT_NOT_OK(lb.addToUnsets("x"));
     }
 
     // Ensure that once you have obtained the object replacement slot and mutated it, that the

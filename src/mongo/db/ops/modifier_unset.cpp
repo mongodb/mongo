@@ -179,21 +179,7 @@ namespace mongo {
     }
 
     Status ModifierUnset::log(LogBuilder* logBuilder) const {
-
-        // We'd like to create an entry such as {$unset: {<fieldname>: 1}} under 'logRoot'.
-        // We start by creating the {$unset: ...} Element.
-        mutablebson::Document& doc = logBuilder->getDocument();
-
-        // Create the {<fieldname>: <value>} Element. Note that <fieldname> must be a
-        // dotted field, and not only the last part of that field. The rationale here is that
-        // somoene picking up this log entry -- e.g., a secondary -- must be capable of doing
-        // the same path find/creation that was done in the previous calls here.
-        mutablebson::Element logElement = doc.makeElementInt(_fieldRef.dottedField(), 1);
-        if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create log details for $unset mod");
-        }
-
-        return logBuilder->addToUnsets(logElement);
+        return logBuilder->addToUnsets(_fieldRef.dottedField());
     }
 
 } // namespace mongo

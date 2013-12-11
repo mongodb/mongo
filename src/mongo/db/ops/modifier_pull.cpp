@@ -230,13 +230,7 @@ namespace mongo {
 
             // If we didn't find the element that we wanted to pull from, we log an unset for
             // that element.
-
-            mb::Element logElement = doc.makeElementInt(_fieldRef.dottedField(), 1);
-            if (!logElement.ok())
-                return Status(ErrorCodes::InternalError,
-                              "cannot create log entry for $pull mod");
-
-            return logBuilder->addToUnsets(logElement);
+            return logBuilder->addToUnsets(_fieldRef.dottedField());
 
         } else {
 

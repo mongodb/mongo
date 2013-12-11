@@ -93,7 +93,7 @@ namespace {
 
     TEST(SimpleMod, PrepareNoOp) {
         Document doc(fromjson("{}"));
-        Mod modUnset(fromjson("{$unset: {a: 1}}"));
+        Mod modUnset(fromjson("{$unset: {a: true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -104,7 +104,7 @@ namespace {
 
     TEST(SimpleMod, PrepareApplyNormal) {
         Document doc(fromjson("{a: 1, b: 2}"));
-        Mod modUnset(fromjson("{$unset: {a: 1}}"));
+        Mod modUnset(fromjson("{$unset: {a: true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -119,7 +119,7 @@ namespace {
 
     TEST(SimpleMod, PrepareApplyInPlace) {
         Document doc(fromjson("{x: 0, a: 1}"));
-        Mod modUnset(fromjson("{$unset: {a: 1}}"));
+        Mod modUnset(fromjson("{$unset: {a: true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -134,7 +134,7 @@ namespace {
 
     TEST(SimpleMod, PrepareApplyGeneratesEmptyDocument) {
         Document doc(fromjson("{a: 1}"));
-        Mod modUnset(fromjson("{$unset: {a: 1}}"));
+        Mod modUnset(fromjson("{$unset: {a: true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -149,7 +149,7 @@ namespace {
 
     TEST(SimpleMod, PrepareApplyUnsetSubtree) {
         Document doc(fromjson("{a: {b: 1}, c: 2}"));
-        Mod modUnset(fromjson("{$unset: {a: 1}}"));
+        Mod modUnset(fromjson("{$unset: {a: true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -165,7 +165,7 @@ namespace {
     TEST(SimpleMod, LogNormal) {
         BSONObj obj = fromjson("{a: 1}");
         Document doc(obj);
-        Mod modUnset(fromjson("{$unset: {a: 1}}"));
+        Mod modUnset(fromjson("{$unset: {a: true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -185,7 +185,7 @@ namespace {
 
     TEST(DottedMod, PrepareNoOp) {
         Document doc(fromjson("{c:2}"));
-        Mod modUnset(fromjson("{$unset: {'a.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -196,7 +196,7 @@ namespace {
 
     TEST(DottedMod, PrepareApplyNormal) {
         Document doc(fromjson("{a: {b: 1}, c: 2}"));
-        Mod modUnset(fromjson("{$unset: {'a.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -211,7 +211,7 @@ namespace {
 
     TEST(DottedMod, PrepareApplyInPlace) {
         Document doc(fromjson("{x: 0, a: {b: 1}}"));
-        Mod modUnset(fromjson("{$unset: {'a.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -226,7 +226,7 @@ namespace {
 
     TEST(DottedMod, PrepareApplyUnsetNestedSubobject) {
         Document doc(fromjson("{a: {b: {c: 1}}}"));
-        Mod modUnset(fromjson("{$unset: {'a.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -245,7 +245,7 @@ namespace {
 
     TEST(IndexedMod, PrepareNoOp) {
         Document doc(fromjson("{a:[]}"));
-        Mod modUnset(fromjson("{$unset: {'a.0': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -256,7 +256,7 @@ namespace {
 
     TEST(IndexedMod, PrepareApplyNormal) {
         Document doc(fromjson("{a:[0,1,2]}"));
-        Mod modUnset(fromjson("{$unset: {'a.0': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -271,7 +271,7 @@ namespace {
 
     TEST(IndexedMod, PrepareApplyInPlace) {
         Document doc(fromjson("{b:1, a:[1]}"));
-        Mod modUnset(fromjson("{$unset: {'a.0': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -287,7 +287,7 @@ namespace {
     TEST(IndexedMod, PrepareApplyInPlaceNuance) {
         // Can't change the encoding in the middle of a bson stream.
         Document doc(fromjson("{a:[1], b:1}"));
-        Mod modUnset(fromjson("{$unset: {'a.0': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -302,7 +302,7 @@ namespace {
 
     TEST(IndexedMod, PrepareApplyInnerObject) {
         Document doc(fromjson("{a:[{b:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.0.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -317,7 +317,7 @@ namespace {
 
     TEST(IndexedMod, PrepareApplyObject) {
         Document doc(fromjson("{a:[{b:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.0': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -332,7 +332,7 @@ namespace {
 
     TEST(IndexedMod, LogNormal) {
         Document doc(fromjson("{a:[0,1,2]}"));
-        Mod modUnset(fromjson("{$unset: {'a.0': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.0': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "", &execInfo));
@@ -349,7 +349,7 @@ namespace {
 
     TEST(PositionalMod, PrepareNoOp) {
         Document doc(fromjson("{a:[{b:0}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "1", &execInfo));
@@ -360,7 +360,7 @@ namespace {
 
     TEST(PositionalMod, PrepareMissingPositional) {
         Document doc(fromjson("{a:[{b:0},{c:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_NOT_OK(modUnset.prepare(doc.root(), "" /* no position */, &execInfo));
@@ -368,7 +368,7 @@ namespace {
 
     TEST(PositionalMod, PrepareApplyNormal) {
         Document doc(fromjson("{a:[{b:0},{c:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "0", &execInfo));
@@ -383,7 +383,7 @@ namespace {
 
     TEST(PositionalMod, PrepareApplyObject) {
         Document doc(fromjson("{a:[{b:0},{c:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "0", &execInfo));
@@ -398,7 +398,7 @@ namespace {
 
     TEST(PositionalMod, PrepareApplyInPlace) {
         Document doc(fromjson("{b:1, a:[{b:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "0", &execInfo));
@@ -413,7 +413,7 @@ namespace {
 
     TEST(PositionalMod, LogNormal) {
         Document doc(fromjson("{b:1, a:[{b:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$.b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "0", &execInfo));
@@ -424,12 +424,12 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(modUnset.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': 1}}"), logDoc);
+        ASSERT_EQUALS(fromjson("{$unset: {'a.0.b': true}}"), logDoc);
     }
 
     TEST(LegacyData, CanUnsetInvalidField) {
         Document doc(fromjson("{b:1, a:[{$b:1}]}"));
-        Mod modUnset(fromjson("{$unset: {'a.$.$b': 1}}"));
+        Mod modUnset(fromjson("{$unset: {'a.$.$b': true}}"));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(modUnset.prepare(doc.root(), "0", &execInfo));
@@ -444,7 +444,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(modUnset.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{$unset: {'a.0.$b': 1}}"), logDoc);
+        ASSERT_EQUALS(fromjson("{$unset: {'a.0.$b': true}}"), logDoc);
     }
 
 

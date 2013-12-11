@@ -225,25 +225,23 @@ namespace mongo {
     Status ModifierPullAll::log(LogBuilder* logBuilder) const {
         // log document
         mutablebson::Document& doc = logBuilder->getDocument();
-
         const bool pathExists = _preparedState->pathFoundElement.ok() &&
             (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
 
+        if (!pathExists)
+            return logBuilder->addToUnsets(_fieldRef.dottedField());
+
         // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = pathExists ?
-            doc.makeElementWithNewFieldName(
-                _fieldRef.dottedField(),
-                _preparedState->pathFoundElement):
-            doc.makeElementBool(_fieldRef.dottedField(), true);
+        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
+                                                            _fieldRef.dottedField(),
+                                                            _preparedState->pathFoundElement);
 
         if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create details");
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not append entry to $pullAll oplog entry: "
+                                        << "set '" << _fieldRef.dottedField() << "' -> "
+                                        << _preparedState->pathFoundElement.toString() );
         }
-
-        // Now, we attach the {<fieldname>: <value>} Element under the {$op: ...} one.
-        return pathExists ?
-            logBuilder->addToSets(logElement) :
-            logBuilder->addToUnsets(logElement);
+        return logBuilder->addToSets(logElement);
     }
-
 } // namespace mongo
