@@ -232,5 +232,4 @@ __wt_session_compact(
 
 err:	session->compact = NULL;
 	API_END_NOTFOUND_MAP(session, ret);
-	return (ret);
 }
