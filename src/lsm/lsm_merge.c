@@ -62,8 +62,10 @@ __wt_lsm_merge(
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
 	u_int max_generation_gap;
-	int create_bloom;
+	int create_bloom, tret;
 	const char *cfg[3];
+	const char *drop_cfg[] =
+	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
 
 	bloom = NULL;
 	chunk_size = 0;
@@ -368,14 +370,15 @@ err:	if (src != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
 	__wt_scr_free(&bbuf);
 	if (ret != 0) {
-		/*
-		 * Ideally we would drop the new chunk on error, but that
-		 * introduces potential deadlock problems. It is relatively
-		 * harmless to leave the file - it does not interfere
-		 * with later re-use.
+		/* Drop the newly-created files on error. */
 		WT_WITH_SCHEMA_LOCK(session,
-		    (void)__wt_schema_drop(session, chunk->uri, NULL));
-		 */
+		    tret = __wt_schema_drop(session, chunk->uri, drop_cfg));
+		WT_TRET(tret);
+		if (create_bloom) {
+			WT_WITH_SCHEMA_LOCK(session, tret = __wt_schema_drop(
+			    session, chunk->bloom_uri, drop_cfg));
+			WT_TRET(tret);
+		}
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
