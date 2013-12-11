@@ -1190,6 +1190,80 @@ namespace {
     // $in
     //
 
+    TEST_F(IndexAssignmentTest, InBasic) {
+        addIndex(fromjson("{a: 1}"));
+        runQuery(fromjson("{a: {$in: [1, 2]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {a: {$in: [1, 2]}}}}");
+        assertSolutionExists("{fetch: {filter: null, "
+                             "node: {ixscan: {pattern: {a: 1}}}}}");
+    }
+
+    // Logically equivalent to the preceding $in query.
+    // Indexed solution should be the same.
+    TEST_F(IndexAssignmentTest, InBasicOrEquivalent) {
+        addIndex(fromjson("{a: 1}"));
+        runQuery(fromjson("{$or: [{a: 1}, {a: 2}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {$or: [{a: 1}, {a: 2}]}}}");
+        assertSolutionExists("{fetch: {filter: null, "
+                             "node: {ixscan: {pattern: {a: 1}}}}}");
+    }
+
+    TEST_F(IndexAssignmentTest, InCompoundIndexFirst) {
+        addIndex(fromjson("{a: 1, b: 1}"));
+        runQuery(fromjson("{a: {$in: [1, 2]}, b: 3}"));
+
+        assertNumSolutions(2U);
+        // TODO: update filter in cscan solution when SERVER-12024 is implemented
+        assertSolutionExists("{cscan: {dir: 1, filter: {a: {$in: [1, 2]}, b: 3}}}");
+        assertSolutionExists("{fetch: {filter: null, "
+                             "node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
+    }
+
+    // Logically equivalent to the preceding $in query.
+    // Indexed solution should be the same.
+    // Currently fails - pre-requisite to SERVER-12024
+    /*
+    TEST_F(IndexAssignmentTest, InCompoundIndexFirstOrEquivalent) {
+        addIndex(fromjson("{a: 1, b: 1}"));
+        runQuery(fromjson("{$and: [{$or: [{a: 1}, {a: 2}]}, {b: 3}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {$and: [{$or: [{a: 1}, {a: 2}]}, {b: 3}]}}}");
+        assertSolutionExists("{fetch: {filter: null, "
+                             "node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
+    }
+    */
+
+    TEST_F(IndexAssignmentTest, InCompoundIndexLast) {
+        addIndex(fromjson("{a: 1, b: 1}"));
+        runQuery(fromjson("{a: 3, b: {$in: [1, 2]}}"));
+
+        assertNumSolutions(2U);
+        // TODO: update filter in cscan solution when SERVER-12024 is implemented
+        assertSolutionExists("{cscan: {dir: 1, filter: {a: 3, b: {$in: [1, 2]}}}}");
+        assertSolutionExists("{fetch: {filter: null, "
+                             "node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
+    }
+
+    // Logically equivalent to the preceding $in query.
+    // Indexed solution should be the same.
+    // Currently fails - pre-requisite to SERVER-12024
+    /*
+    TEST_F(IndexAssignmentTest, InCompoundIndexLastOrEquivalent) {
+        addIndex(fromjson("{a: 1, b: 1}"));
+        runQuery(fromjson("{$and: [{a: 3}, {$or: [{b: 1}, {b: 2}]}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {$and: [{a: 3}, {$or: [{b: 1}, {b: 2}]}]}}}");
+        assertSolutionExists("{fetch: {filter: null, "
+                             "node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
+    }
+    */
+
     TEST_F(IndexAssignmentTest, InWithSort) {
         addIndex(BSON("a" << 1 << "b" << 1));
         runQuerySortProjSkipLimit(fromjson("{a: {$in: [3, 1, 8]}}"),
