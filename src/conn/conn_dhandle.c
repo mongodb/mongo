@@ -353,10 +353,11 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 static int
 __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 {
+	SLIST_HEAD(__wt_dhtmp_lh, __wt_data_handle) sweeplh;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *dhandle_next, *save_dhandle;
-	SLIST_HEAD(__wt_dhtmp_lh, __wt_data_handle) sweeplh;
 	WT_DECL_RET;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
 
@@ -366,7 +367,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	 * Coordinate with eviction or other threads sweeping.  If the lock
 	 * is not free, we're done.  Cleaning up the list is a best effort only.
 	 */
-	if (__wt_spin_trylock(session, &conn->dhandle_lock) != 0) {
+	if (__wt_spin_trylock(session, &conn->dhandle_lock, &id) != 0) {
 		WT_STAT_FAST_CONN_INCR(session, dh_sweep_evict);
 		return (0);
 	}

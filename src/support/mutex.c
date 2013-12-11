@@ -18,7 +18,7 @@
  * once).  For that reason, reference static memory from the connection.
  */
 static WT_SPINLOCK *__spinlock_list[WT_SPINLOCK_MAX];
-static WT_CONNECTION_STATS_SPINLOCK __spinlock_block[WT_SPINLOCK_MAX * 2];
+static WT_CONNECTION_STATS_SPINLOCK __spinlock_block[WT_SPINLOCK_MAX];
 
 /*
  * __wt_spin_lock_stat_init --
@@ -105,10 +105,9 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 	 */
 	ignore = (uint64_t)(conn->stat_usecs / 1000000) * 10;
 
-	/* Dump the reference list. */
+	/* Output the number of times each spinlock was acquired. */
 	for (i = 0; i < WT_ELEMENTS(__spinlock_list); ++i) {
-		spin = conn->spinlock_list[i];
-		if (spin == NULL)
+		if ((spin = conn->spinlock_list[i]) == NULL)
 			continue;
 
 		WT_RET_TEST((fprintf(conn->stat_fp,
@@ -121,11 +120,23 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			spin->counter = 0;
 	}
 
-	/* Dump the blocking matrix. */
+	/*
+	 * Output the number of times each location acquire its spinlock and
+	 * the blocking matrix.
+	 */
 	for (i = 0; i < WT_ELEMENTS(__spinlock_block); ++i) {
 		p = &conn->spinlock_block[i];
 		if (p->file == NULL)
 			break;
+
+		WT_RET_TEST((fprintf(conn->stat_fp,
+		    "%s %d %s spinlock %s acquired by %s(%d)\n",
+		    conn->stat_stamp,
+		    p->total <= ignore ? 0 : p->total,
+		    tag,
+		    p->name, p->file, p->line) < 0), __wt_errno());
+		if (conn->stat_clear)
+			p->total = 0;
 
 		for (j = 0; j < WT_ELEMENTS(__spinlock_block); ++j) {
 			t = &conn->spinlock_block[j];
@@ -139,11 +150,13 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			    tag,
 			    p->name, p->file, p->line,
 			    t->file, t->line) < 0), __wt_errno());
-
-			    if (conn->stat_clear)
+			if (conn->stat_clear)
 				p->blocked[j] = 0;
 		}
 	}
+
+	WT_FULL_BARRIER();			/* Minimize the window. */
+
 	return (0);
 }
 #endif /* SPINLOCK_PTHREAD_MUTEX_LOGGING */

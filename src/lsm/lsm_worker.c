@@ -240,6 +240,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_TXN_ISOLATION saved_isolation;
 	u_int i, j;
 	int locked;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
@@ -318,7 +319,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    !locked && ret == 0 &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);) {
 				if ((ret = __wt_spin_trylock(session,
-				    &S2C(session)->checkpoint_lock)) == 0)
+				    &S2C(session)->checkpoint_lock, &id)) == 0)
 					locked = 1;
 				else if (ret == EBUSY) {
 					__wt_yield();
@@ -507,6 +508,7 @@ __lsm_discard_handle(
 {
 	WT_DECL_RET;
 	int locked;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
@@ -523,8 +525,8 @@ __lsm_discard_handle(
 	 * the schema lock.
 	 */
 	locked = 0;
-	if (checkpoint == NULL && (ret =
-	    __wt_spin_trylock(session, &S2C(session)->checkpoint_lock)) == 0)
+	if (checkpoint == NULL && (ret = __wt_spin_trylock(
+	    session, &S2C(session)->checkpoint_lock, &id)) == 0)
 		locked = 1;
 	if (ret == 0)
 		F_SET(session->dhandle, WT_DHANDLE_DISCARD);

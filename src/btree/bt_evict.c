@@ -995,6 +995,7 @@ __evict_get_page(
 	WT_EVICT_ENTRY *evict;
 	WT_REF *ref;
 	uint32_t candidates;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
@@ -1022,7 +1023,7 @@ __evict_get_page(
 	for (;;) {
 		if (cache->evict_current == NULL)
 			return (WT_NOTFOUND);
-		if (__wt_spin_trylock(session, &cache->evict_lock) == 0)
+		if (__wt_spin_trylock(session, &cache->evict_lock, &id) == 0)
 			break;
 		__wt_yield();
 	}

@@ -120,8 +120,8 @@ for f in \
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
 done
 
-# The test suite follows Python coding standards: check for tab characters.
-egrep '	' test/suite/*.py |
+# Check Python coding standards: check for tab characters.
+egrep '	' tools/*.py test/suite/*.py |
     sed 's/:.*//' |
     sort -u |
     sed 's/^/	/' > $t
@@ -129,10 +129,10 @@ test -s $t && {
 	echo '[tab] characters appear in test suite scripts:'
 	cat $t
 }
-# Check for trailing semi-colons.
-egrep ';$' test/suite/*.py > $t
+# Check Python coding standards: check for trailing semi-colons.
+egrep ';$' tools/*.py test/suite/*.py > $t
 test -s $t && {
-	echo 'trailing semi-colon characters appear in test suite scripts:'
+	echo 'trailing semi-colons in tools or test suite Python code:'
 	cat $t
 }
 
