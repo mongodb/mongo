@@ -96,8 +96,11 @@ printjson( request = {update : coll.getName(),
                       ordered:true} );
 printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
-assert.eq(1, result.n);
-assert.eq(1, coll.count({}));
+assert.eq(1, coll.count({ }));
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 
 //
 // Two document upsert, write concern 0 specified, ordered = true
@@ -109,10 +112,11 @@ printjson( request = {update : coll.getName(),
                       ordered:true} );
 printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
-assert.eq(2, result.n);
-assert(!('upserted' in result));
 assert.eq(2, coll.count());
-assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 
 //
 // Single document update
@@ -197,9 +201,11 @@ printjson( request = {update : coll.getName(),
 printjson( result = coll.runCommand(request) );
 printjson( coll.find().toArray() );
 assert(result.ok);
-assert.eq(1, result.n);
-assert(!('upserted' in result));
 assert.eq(1, coll.count());
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 
 //
 // Upsert fail due to duplicate key index, w:1, ordered:true

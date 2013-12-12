@@ -55,8 +55,11 @@ printjson( request = {'delete' : coll.getName(),
                       writeConcern:{w:0}} );
 printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
-assert.eq(1, result.n);
 assert.eq(0, coll.count());
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 
 //
 // Single document remove, w:1 write concern specified, ordered:true
@@ -154,9 +157,11 @@ printjson( request = {'delete' : coll.getName(),
                       ordered: false} );
 printjson( result = coll.runCommand(request) );
 assert(result.ok);
-assert.eq(1, result.n);
-assert(!('writeErrors' in result));
 assert.eq(0, coll.count());
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 
 //
 // Cause remove error using ordered:true and w:0
@@ -170,7 +175,9 @@ printjson( request = {'delete' : coll.getName(),
                       ordered: true} );
 printjson( result = coll.runCommand(request) );
 assert(result.ok);
-assert.eq(0, result.n);
-assert(!('writeErrors' in result));
 assert.eq(1, coll.count());
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 

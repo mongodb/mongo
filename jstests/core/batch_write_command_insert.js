@@ -48,8 +48,11 @@ coll.remove({});
 printjson( request = {insert : coll.getName(), documents: [{a:1}], writeConcern:{w:0}} );
 printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
-assert.eq(1, result.n);
 assert.eq(coll.count(), 1);
+
+for (var field in result) {
+    assert.eq('ok', field, 'unexpected field found in result: ' + field);
+}
 
 //
 // Single document insert, w:1 write concern specified, ordered:true

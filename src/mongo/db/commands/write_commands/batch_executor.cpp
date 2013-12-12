@@ -109,7 +109,7 @@ namespace mongo {
 
                 // In case updates turned out to be upserts, the callers may be interested
                 // in learning what _id was used for that document.
-                if ( !upsertedID.isEmpty() &&  verbose ) {
+                if ( !upsertedID.isEmpty() && verbose ) {
                     std::auto_ptr<BatchedUpsertDetail> upsertDetail(new BatchedUpsertDetail);
                     upsertDetail->setIndex(i);
                     upsertDetail->setUpsertedID(upsertedID);
@@ -123,10 +123,8 @@ namespace mongo {
                 // have a stale view of sharding state.
                 if ( error->getErrCode() == ErrorCodes::StaleShardVersion ) staleBatch = true;
 
-                // Don't bother recording if the user doesn't want a verbose answer. We want to
-                // keep the error if this is a one-item batch, since we already compact the
-                // response for those.
-                if (verbose || numBatchItems == 1) {
+                // Don't bother recording if the user doesn't want a verbose answer.
+                if ( verbose ) {
                     error->setIndex( static_cast<int>( i ) );
                     response->addToErrDetails( error.release() );
                 }
@@ -140,7 +138,7 @@ namespace mongo {
         }
 
         // Send opTime in response
-        if ( anyReplEnabled() ) {
+        if ( anyReplEnabled() && verbose ) {
             response->setLastOp( _client->getLastOp() );
         }
 
@@ -156,7 +154,7 @@ namespace mongo {
                 status = writeConcern.parse( _defaultWriteConcern );
             }
 
-            if ( !status.isOK() ) {
+            if ( !status.isOK() && verbose ) {
                 WCErrorDetail wcError;
                 wcError.setErrCode( ErrorCodes::WriteConcernFailed );
                 wcError.setErrMessage( status.toString() );
@@ -169,17 +167,23 @@ namespace mongo {
                 WriteConcernResult res;
                 status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
 
-                WCErrorDetail wcError;
-                buildWCError( status, res, &wcError );
-                response->setWriteConcernError( wcError );
+
+                if ( verbose ) {
+                    WCErrorDetail wcError;
+                    buildWCError( status, res, &wcError );
+                   response->setWriteConcernError( wcError );
+                }
             }
         }
 
         // Set the main body of the response. We assume that, if there was an error, the error
         // code would already be set.
-        response->setN( stats.numInserted + stats.numUpserted + stats.numUpdated
-                        + stats.numDeleted );
-        response->setNDocsModified(stats.numModified);
+
+        if ( verbose ) {
+            response->setN( stats.numInserted + stats.numUpserted + stats.numUpdated
+                            + stats.numDeleted );
+            response->setNDocsModified(stats.numModified);
+        }
 
         // TODO: Audit where we want to queue here - the shardingState calls may block for remote
         // data

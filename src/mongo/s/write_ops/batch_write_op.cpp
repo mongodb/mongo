@@ -32,6 +32,29 @@
 
 namespace mongo {
 
+    /**
+     * Returns a new write concern that has the copy of every field from the original
+     * document but with a w set to 1. This is intended for upgrading { w: 0 } write
+     * concern to { w: 1 }.
+     */
+    static BSONObj upgradeWriteConcern ( const BSONObj& origWriteConcern ) {
+        BSONObjIterator iter( origWriteConcern );
+        BSONObjBuilder newWriteConcern;
+
+        while ( iter.more() ) {
+            BSONElement elem( iter.next() );
+
+            if ( strncmp( elem.fieldName(), "w", 2 ) == 0 ) {
+                newWriteConcern.append( "w", 1 );
+            }
+            else {
+                newWriteConcern.append( elem );
+            }
+        }
+
+        return newWriteConcern.obj();
+    }
+
     BatchWriteStats::BatchWriteStats() :
         numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numModified( 0 ), numDeleted( 0 ) {
     }
@@ -270,7 +293,15 @@ namespace mongo {
         }
 
         if ( _clientRequest->isWriteConcernSet() ) {
-            request->setWriteConcern( _clientRequest->getWriteConcern() );
+            if ( _clientRequest->isVerboseWC() ) {
+                request->setWriteConcern( _clientRequest->getWriteConcern() );
+            }
+            else {
+                // Mongos needs to send to the shard with w > 0 so it will be able to
+                // see the writeErrors.
+                request->setWriteConcern( upgradeWriteConcern(
+                        _clientRequest->getWriteConcern() ));
+            }
         }
 
         if ( !request->isOrderedSet() ) {
@@ -518,11 +549,18 @@ namespace mongo {
             }
         }
 
+        batchResp->setOk( !batchResp->isErrCodeSet() );
+
+        if ( !_clientRequest->isVerboseWC() ) {
+            dassert( batchResp->isValid( NULL ) );
+            return;
+        }
+
         //
         // Build the per-item errors.
         //
 
-        if ( !errOps.empty() && _clientRequest->isVerboseWC() ) {
+        if ( !errOps.empty() ) {
             for ( vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it ) {
                 WriteOp& writeOp = **it;
                 WriteErrorDetail* error = new WriteErrorDetail();
@@ -535,7 +573,7 @@ namespace mongo {
         // Append the upserted ids, if required
         //
 
-        if ( _upsertedIds.size() != 0 && _clientRequest->isVerboseWC() ) {
+        if ( _upsertedIds.size() != 0 ) {
             batchResp->setUpsertDetails( _upsertedIds.vector() );
         }
 
@@ -546,7 +584,6 @@ namespace mongo {
         if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update )
             batchResp->setNDocsModified( _stats->numModified );
 
-        batchResp->setOk( !batchResp->isErrCodeSet() );
         dassert( batchResp->isValid( NULL ) );
     }
 
