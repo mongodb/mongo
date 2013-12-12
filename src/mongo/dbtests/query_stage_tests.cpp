@@ -207,50 +207,6 @@ namespace QueryStageTests {
         }
     };
 
-    class QueryStageIXScan2dSphere : public IndexScanBase {
-    public:
-        virtual ~QueryStageIXScan2dSphere() { }
-
-        void run() {
-            // Add numObj() geo points.  Make sure we get them back.
-            makeGeoData();
-            addIndex(BSON("geo" << "2dsphere"));
-
-            IndexScanParams params;
-            params.descriptor = getIndex(BSON("geo" << "2dsphere"));
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = BSON("geo" << BSON("$geoNear" << BSON("$geometry"
-                                  << BSON("type" << "Point"
-                                        << "coordinates" << BSON_ARRAY(0 << 0)))));
-            params.bounds.endKey = BSONObj();
-            params.bounds.endKeyInclusive = true;
-            params.direction = 1;
-
-            ASSERT_EQUALS(countResults(params), numObj());
-        }
-    };
-
-    class QueryStageIXScan2d : public IndexScanBase {
-    public:
-        virtual ~QueryStageIXScan2d() { }
-
-        void run() {
-            makeGeoData();
-            addIndex(BSON("geo" << "2d"));
-
-            // 2d should also work.
-            IndexScanParams params;
-            params.descriptor = getIndex(BSON("geo" << "2d"));
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = BSON("geo" << BSON("$near" << BSON_ARRAY(0 << 0)));
-            params.bounds.endKey = BSONObj();
-            params.bounds.endKeyInclusive = true;
-            params.direction = 1;
-
-            ASSERT_EQUALS(countResults(params), numObj());
-        }
-    };
-
     class All : public Suite {
     public:
         All() : Suite( "query_stage_tests" ) { }
@@ -261,8 +217,6 @@ namespace QueryStageTests {
             add<QueryStageIXScanLowerUpperIncl>();
             add<QueryStageIXScanLowerUpperInclFilter>();
             add<QueryStageIXScanCantMatch>();
-            add<QueryStageIXScan2dSphere>();
-            add<QueryStageIXScan2d>();
         }
     }  queryStageTestsAll;
 
