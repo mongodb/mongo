@@ -8,7 +8,8 @@
 #include "wt_internal.h"
 
 /*
- * Convert a string to an unsigned quad integer.
+ * __wt_strtouq --
+ *	Convert a string to an unsigned quad integer.
  */
 uint64_t
 __wt_strtouq(const char *nptr, char **endptr, int base)

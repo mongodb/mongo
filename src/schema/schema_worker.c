@@ -10,13 +10,13 @@
 /*
  * __wt_schema_worker --
  *	Get Btree handles for the object and cycle through calls to an
- * underlying worker function with each handle.
+ *	underlying worker function with each handle.
  */
 int
 __wt_schema_worker(WT_SESSION_IMPL *session,
    const char *uri,
    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
-   int (*name_func)(WT_SESSION_IMPL *, const char *),
+   int (*name_func)(WT_SESSION_IMPL *, const char *, int *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_COLGROUP *colgroup;
@@ -27,12 +27,18 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	WT_TABLE *table;
 	const char *tablename;
 	u_int i;
+	int skip;
 
 	table = NULL;
 	tablename = uri;
 
+	skip = 0;
 	if (name_func != NULL)
-		WT_ERR(name_func(session, uri));
+		WT_ERR(name_func(session, uri, &skip));
+
+	/* If the callback said to skip this object, we're done. */
+	if (skip)
+		return (0);
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
@@ -52,6 +58,10 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
+		/*
+		 * LSM compaction is handled elsewhere, but if we get here
+		 * trying to compact files, don't descend into an LSM tree.
+		 */
 		if (file_func != __wt_compact)
 			WT_ERR(__wt_lsm_tree_worker(session,
 			    uri, file_func, name_func, cfg, open_flags));
@@ -68,19 +78,25 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		 */
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
+			skip = 0;
 			if (name_func != NULL)
-				WT_ERR(name_func(session, colgroup->name));
-			WT_ERR(__wt_schema_worker(session, colgroup->source,
-			    file_func, name_func, cfg, open_flags));
+				WT_ERR(name_func(
+				    session, colgroup->name, &skip));
+			if (!skip)
+				WT_ERR(__wt_schema_worker(
+				    session, colgroup->source,
+				    file_func, name_func, cfg, open_flags));
 		}
 
 		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
+			skip = 0;
 			if (name_func != NULL)
-				WT_ERR(name_func(session, idx->name));
-			WT_ERR(__wt_schema_worker(session, idx->source,
-			    file_func, name_func, cfg, open_flags));
+				WT_ERR(name_func(session, idx->name, &skip));
+			if (!skip)
+				WT_ERR(__wt_schema_worker(session, idx->source,
+				    file_func, name_func, cfg, open_flags));
 		}
 	} else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
 		wt_session = (WT_SESSION *)session;

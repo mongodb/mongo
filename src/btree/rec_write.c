@@ -2136,8 +2136,12 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 #define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
 
+/*
+ * __rec_col_fix_bulk_insert_split_check --
+ *	Check if a bulk-loaded fixed-length column store page needs to split.
+ */
 static inline int
-__rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
+__rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_RECONCILE *r;
@@ -2408,9 +2412,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__rec_txn_read(session, r, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
-		__bit_setv_recno(
-		    page, WT_INSERT_RECNO(ins), btree->bitcnt,
-		    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+		__bit_setv_recno(page, WT_INSERT_RECNO(ins),
+		    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 	}
 
 	/* Allocate the memory. */
@@ -3451,22 +3454,38 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				/*
 				 * Overflow keys referencing discarded values
-				 * are no longer useful, schedule the discard
-				 * of the backing blocks.  Don't worry about
-				 * reuse, reusing the key in this reconciliation
-				 * is unlikely.
-				 *
-				 * Keys are part of the name-space though, we
-				 * can't remove them from the in-memory tree;
-				 * if an overflow key was never instantiated,
-				 * do it now.
+				 * are no longer useful, discard the backing
+				 * blocks.  Don't worry about reuse, reusing
+				 * keys from a row-store page reconciliation
+				 * seems unlikely enough to ignore.
 				 */
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
+					/*
+					 * Keys are part of the name-space, we
+					 * can't remove them from the in-memory
+					 * tree; if an overflow key was deleted
+					 * without being instantiated (for
+					 * example, cursor-based truncation, do
+					 * it now.
+					 */
 					if (ikey == NULL)
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
 						    page, rip, NULL, 1));
+
+					/*
+					 * Acquire the overflow lock to avoid
+					 * racing with a thread instantiating
+					 * the key.  Reader threads hold read
+					 * locks on the overflow lock when
+					 * checking for key instantiation.
+					 */
+					WT_ERR(__wt_writelock(session,
+					    S2BT(session)->ovfl_lock));
+					WT_ERR(__wt_rwunlock(session,
+					    S2BT(session)->ovfl_lock));
+
 					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    unpack->data, unpack->size));
@@ -3778,7 +3797,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_write_wrapup  --
+ * __rec_write_wrapup --
  *	Finish the reconciliation.
  */
 static int
@@ -4025,7 +4044,7 @@ err:			__wt_scr_free(&tkey);
 }
 
 /*
- * __rec_write_wrapup_err  --
+ * __rec_write_wrapup_err --
  *	Finish the reconciliation on error.
  */
 static int

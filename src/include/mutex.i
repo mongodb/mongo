@@ -123,8 +123,8 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #define	WT_SPINLOCK_REGISTER		-1
 #define	WT_SPINLOCK_REGISTER_FAILED	-2
 #define	__wt_spin_lock(session, addr) do {				\
-	static int __id = WT_SPINLOCK_REGISTER;			\
-	__wt_spin_lock_func(session, addr, &__id, __FILE__, __LINE__);\
+	static int __id = WT_SPINLOCK_REGISTER;				\
+	__wt_spin_lock_func(session, addr, &__id, __FILE__, __LINE__);	\
 } while (0)
 
 static inline void

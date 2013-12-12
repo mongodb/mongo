@@ -86,11 +86,14 @@ __log_archive_server(void *arg)
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*
-		 * If archiving is reconfigured and turned off, wait until
-		 * it gets turned back on and check again.
+		 * If archiving is reconfigured and turned off, wait until it
+		 * gets turned back on and check again.  Don't wait forever: if
+		 * a notification gets lost during close, we want to find out
+		 * eventually.
 		 */
 		if (conn->archive == 0) {
-			WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
+			WT_ERR_TIMEDOUT_OK(
+			    __wt_cond_wait(session, conn->arch_cond, 1000000));
 			continue;
 		}
 
@@ -132,7 +135,8 @@ __log_archive_server(void *arg)
 		log->first_lsn.offset = 0;
 
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 0));
+		WT_ERR_TIMEDOUT_OK(
+		    __wt_cond_wait(session, conn->arch_cond, 1000000));
 	}
 
 	if (0) {
@@ -180,8 +184,11 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	INIT_LSN(&log->ckpt_lsn);
 	INIT_LSN(&log->first_lsn);
 	INIT_LSN(&log->sync_lsn);
+	INIT_LSN(&log->trunc_lsn);
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
+	WT_RET(__wt_cond_alloc(session,
+	    "log release", 0, &log->log_release_cond));
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
@@ -249,6 +256,9 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		conn->arch_session = NULL;
 	}
+
+	WT_TRET(__wt_log_slot_destroy(session));
+	WT_TRET(__wt_cond_destroy(session, &conn->log->log_release_cond));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_free(session, conn->log);

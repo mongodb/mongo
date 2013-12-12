@@ -77,10 +77,11 @@ wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp)
 int
 wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'U':
@@ -103,10 +104,11 @@ wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 int
 wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'b':
@@ -131,10 +133,11 @@ wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i)
 int
 wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'S':
@@ -156,10 +159,11 @@ wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s)
 int
 wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'B':
@@ -187,10 +191,11 @@ wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
 int
 wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'U':
@@ -213,10 +218,11 @@ wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 int
 wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'b':
@@ -240,10 +246,11 @@ wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip)
 int
 wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'S':
@@ -264,10 +271,11 @@ wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp)
 int
 wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
 {
-	WT_PACK_VALUE pv;
+	WT_DECL_PACK_VALUE(pv);
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'B':

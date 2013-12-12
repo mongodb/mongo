@@ -27,7 +27,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
 	   WT_CONFIG_BASE(session, session_open_cursor),
-	   "checkpoint=WiredTigerCheckpoint", NULL, NULL };
+	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = 0;
 	WT_RET(__wt_lsm_tree_get(session, uri, 0, &lsm_tree));
@@ -49,8 +49,6 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	 * chunk's statistics, which has the same effect.
 	 */
 	stats = &cst->u.dsrc_stats;
-	cst->stats_first = cst->stats = (WT_STATS *)stats;
-	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));
@@ -73,9 +71,10 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 		WT_ERR(__wt_buf_fmt(
 		    session, uribuf, "statistics:%s", chunk->uri));
 		ret = __wt_curstat_open(session, uribuf->data,
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor);
-		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		if (ret == WT_NOTFOUND &&
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))
 			ret = __wt_curstat_open(
 			    session, uribuf->data, cfg, &stat_cursor);
 		WT_ERR(ret);
@@ -99,7 +98,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 			__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
-		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (!F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			continue;
 
 		/* Maintain a count of bloom filters. */
@@ -135,6 +134,8 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
 	if (cst->stat_clear)
 		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
+
+	__wt_curstat_dsrc_final(cst);
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));

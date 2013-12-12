@@ -75,8 +75,7 @@ __wt_collator_config(
 
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncoll, &conn->collqh, q)
-			if (WT_STRING_MATCH(
-			    ncoll->name, cval.str, cval.len)) {
+			if (WT_STRING_MATCH(ncoll->name, cval.str, cval.len)) {
 				*collatorp = ncoll->collator;
 				return (0);
 			}
@@ -962,6 +961,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "overflow",		WT_VERB_overflow },
 		{ "read",		WT_VERB_read },
 		{ "reconcile",		WT_VERB_reconcile },
+		{ "recovery",		WT_VERB_recovery },
 		{ "salvage",		WT_VERB_salvage },
 		{ "shared_cache",	WT_VERB_shared_cache },
 		{ "verify",		WT_VERB_verify },

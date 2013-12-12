@@ -43,28 +43,73 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __cursor_leave --
- *	Clear a cursor's position.
+ * __cursor_enter --
+ *	Activate a cursor.
  */
 static inline int
-__cursor_leave(WT_CURSOR_BTREE *cbt)
+__cursor_enter(WT_SESSION_IMPL *session)
 {
-	WT_CURSOR *cursor;
+	/*
+	 * If there are no other cursors positioned in the session, check
+	 * whether the cache is full and then get a snapshot if necessary.
+	 */
+	if (session->ncursors == 0) {
+		WT_RET(__wt_cache_full_check(session));
+		__wt_txn_read_first(session);
+	}
+	++session->ncursors;
+	return (0);
+}
+
+/*
+ * __cursor_leave --
+ *	Deactivate a cursor.
+ */
+static inline int
+__cursor_leave(WT_SESSION_IMPL *session)
+{
+	/*
+	 * Decrement the count of active cursors in the session.  When that
+	 * goes to zero, there are no active cursors, and we can release any
+	 * snapshot we're holding for read committed isolation.
+	 */
+	WT_ASSERT(session, session->ncursors > 0);
+	if (--session->ncursors == 0)
+		__wt_txn_read_last(session);
+
+	return (0);
+}
+
+/*
+ * __curfile_enter --
+ *	Activate a file cursor.
+ */
+static inline int
+__curfile_enter(WT_CURSOR_BTREE *cbt)
+{
 	WT_SESSION_IMPL *session;
 
-	cursor = &cbt->iface;
-	session = (WT_SESSION_IMPL *)cursor->session;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/*
-	 * If the cursor was active, decrement the count of active cursors in
-	 * the session.  When that goes to zero, there are no active cursors,
-	 * and we can release any snapshot we're holding for read committed
-	 * isolation.
-	 */
+	WT_RET(__cursor_enter(session));
+	F_SET(cbt, WT_CBT_ACTIVE);
+	return (0);
+}
+
+/*
+ * __curfile_leave --
+ *	Clear a file cursor's position.
+ */
+static inline int
+__curfile_leave(WT_CURSOR_BTREE *cbt)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	/* If the cursor was active, deactivate it. */
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
-		WT_ASSERT(session, session->ncursors > 0);
-		if (--session->ncursors == 0)
-			__wt_txn_read_last(session);
+		WT_RET(__cursor_leave(session));
 		F_CLR(cbt, WT_CBT_ACTIVE);
 	}
 
@@ -80,30 +125,6 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __cursor_enter --
- *	Setup the cursor's state for a new call.
- */
-static inline int
-__cursor_enter(WT_CURSOR_BTREE *cbt)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	/*
-	 * If there are no other cursors positioned in the session, check
-	 * whether the cache is full and then get a snapshot if necessary.
-	 */
-	if (session->ncursors == 0) {
-		WT_RET(__wt_cache_full_check(session));
-		__wt_txn_read_first(session);
-	}
-	++session->ncursors;
-	F_SET(cbt, WT_CBT_ACTIVE);
-	return (0);
-}
-
-/*
  * __cursor_func_init --
  *	Cursor call setup.
  */
@@ -115,9 +136,9 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	if (reenter)
-		WT_RET(__cursor_leave(cbt));
+		WT_RET(__curfile_leave(cbt));
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
-		WT_RET(__cursor_enter(cbt));
+		WT_RET(__curfile_enter(cbt));
 	__wt_txn_cursor_op(session);
 	return (0);
 }
@@ -133,7 +154,7 @@ __cursor_error_resolve(WT_CURSOR_BTREE *cbt)
 	 * On error, we can't iterate, so clear the cursor's position and
 	 * release any page references we're holding.
 	 */
-	WT_RET(__cursor_leave(cbt));
+	WT_RET(__curfile_leave(cbt));
 
 	/* Clear the cursor's search state. */
 	__cursor_search_clear(cbt);

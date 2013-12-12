@@ -26,13 +26,12 @@ __bloom_init(WT_SESSION_IMPL *session,
 	size_t len;
 
 	bloom = NULL;
-	WT_ERR(__wt_calloc(session, 1, sizeof(WT_BLOOM), &bloom));
+	WT_ERR(__wt_calloc_def(session, 1, &bloom));
 	WT_ERR(__wt_strdup(session, uri, &bloom->uri));
-	WT_ERR(__wt_strdup(session, config, &bloom->config));
 	len = strlen(WT_BLOOM_TABLE_CONFIG) + 2;
 	if (config != NULL)
 		len += strlen(config);
-	WT_ERR(__wt_calloc(session, len, sizeof(char), &bloom->config));
+	WT_ERR(__wt_calloc_def(session, len, &bloom->config));
 	/* Add the standard config at the end, so it overrides user settings. */
 	(void)snprintf(bloom->config, len,
 	    "%s,%s", config == NULL ? "" : config, WT_BLOOM_TABLE_CONFIG);

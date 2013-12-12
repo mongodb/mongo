@@ -4,9 +4,11 @@ trap 'exit 1' 1 2
 
 top=../..
 
+home="RUNDIR"
+wturi="file:wt"
+
 colflag=0
 bdbdir=""
-wt_name="file:wt"
 while :
 	do case "$1" in
 	# -b means we need to dump the Berkeley DB database
@@ -17,9 +19,13 @@ while :
 	-c)
 		colflag=1
 		shift ;;
+	-h)
+		shift ;
+		home=$1
+		shift;;
 	-n)
 		shift ;
-		wt_name=$1
+		wturi=$1
 		shift ;;
 	*)
 		break ;;
@@ -52,31 +58,31 @@ fi
 
 config='extensions=['$ext']'
 
-$top/wt -h RUNDIR -C "$config" dump $wt_name |
-    sed -e '1,/^Data$/d' > RUNDIR/wt_dump
+$top/wt -h $home -C "$config" dump $wturi |
+    sed -e '1,/^Data$/d' > $home/wt_dump
 
 if test "X$bdbdir" = "X"; then
 	exit 0
 fi
 
 if test $colflag -eq 0; then
-	$bdbdir/bin/db_dump -p RUNDIR/bdb |
+	$bdbdir/bin/db_dump -p $home/bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e '/DATA=END/d' \
-		-e 's/^ //' > RUNDIR/bdb_dump
+		-e 's/^ //' > $home/bdb_dump
 else
 	# Format stores record numbers in Berkeley DB as string keys,
 	# it's simpler that way.  Convert record numbers from strings
 	# to numbers.
-	$bdbdir/bin/db_dump -p RUNDIR/bdb |
+	$bdbdir/bin/db_dump -p $home/bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e '/DATA=END/d' \
 		-e 's/^ //' |
 	    sed -e 's/^0*//' \
 		-e 's/\.00$//' \
-		-e N > RUNDIR/bdb_dump
+		-e N > $home/bdb_dump
 fi
 
-cmp RUNDIR/wt_dump RUNDIR/bdb_dump > /dev/null
+cmp $home/wt_dump $home/bdb_dump > /dev/null
 
 exit $?

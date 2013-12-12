@@ -158,7 +158,7 @@ run(int r)
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
 	WT_UNUSED_RET(system(
-	    "rm -f WiredTiger WiredTiger.* __slvg.* __schema.*"));
+	    "rm -f WiredTiger* __slvg.* __schema.*"));
 	assert((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*
@@ -457,7 +457,12 @@ build(int ikey, int ivalue, int cnt)
 	char config[256], kbuf[64], vbuf[64];
 	int new_slvg;
 
-	assert(wiredtiger_open(NULL, NULL, "create", &conn) == 0);
+	/*
+	 * Disable logging: we're modifying files directly, we don't want to
+	 * run recovery.
+	 */
+	assert(wiredtiger_open(
+	    NULL, NULL, "create,log=(enabled=false)", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->drop(session, "file:" LOAD, "force") == 0);
 
@@ -604,24 +609,25 @@ process(void)
 	config[0] = '\0';
 	if (verbose)
 		snprintf(config, sizeof(config),
-		    "error_prefix=\"%s\",verbose=[salvage,verify]",
+		    "error_prefix=\"%s\",verbose=[salvage,verify],",
 		    progname);
+	strcat(config, "log=(enabled=false),");
+
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->salvage(session, "file:" SLVG, 0) == 0);
 	assert(conn->close(conn, 0) == 0);
 
 	/* Verify. */
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->verify(session, "file:" SLVG, 0) == 0);
 	assert(conn->close(conn, 0) == 0);
 
 	/* Dump. */
 	assert((fp = fopen(DUMP, "w")) != NULL);
-	assert(wiredtiger_open(NULL, NULL, "", &conn) == 0);
+	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->create(session, "file:" SLVG, NULL) == 0);
 	assert(session->open_cursor(
 	    session, "file:" SLVG, NULL, "dump=print", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {

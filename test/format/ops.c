@@ -50,11 +50,18 @@ wts_ops(void)
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t backup_tid;
+	pthread_t backup_tid, compact_tid;
 	int ret, running;
 	uint32_t i;
 
 	conn = g.wts_conn;
+
+	/*
+	 * We support replay of threaded runs, but don't log random numbers
+	 * after threaded operations start, there's no point.
+	 */
+	if (!SINGLETHREADED)
+		g.rand_log_stop = 1;
 
 	/* Initialize the table extension code. */
 	table_append_init();
@@ -74,7 +81,10 @@ wts_ops(void)
 	} else {
 		g.threads_finished = 0;
 
-		/* Create thread structure, start worker, hot-backup threads. */
+		/*
+		 * Create thread structure; start worker, backup, compaction
+		 * threads.
+		 */
 		if ((tinfo =
 		    calloc((size_t)g.c_threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
@@ -87,6 +97,9 @@ wts_ops(void)
 		}
 		if ((ret =
 		    pthread_create(&backup_tid, NULL, hot_backup, NULL)) != 0)
+			die(ret, "pthread_create");
+		if (g.c_compact && (ret =
+		    pthread_create(&compact_tid, NULL, compact, NULL)) != 0)
 			die(ret, "pthread_create");
 
 		/* Wait for the threads. */
@@ -121,9 +134,11 @@ wts_ops(void)
 		}
 		free(tinfo);
 
-		/* Wait for the backup thread. */
+		/* Wait for the backup, compaction thread. */
 		g.threads_finished = 1;
 		(void)pthread_join(backup_tid, NULL);
+		if (g.c_compact)
+			(void)pthread_join(compact_tid, NULL);
 	}
 
 	if (g.logging != 0) {
@@ -142,7 +157,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, ckpt_op, compact_op, session_op, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, session_op, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
@@ -166,25 +181,24 @@ ops(void *arg)
 
 	/*
 	 * Select the first operation where we'll create sessions and cursors,
-	 * perform checkpoint and compaction operations.
+	 * perform checkpoint operations.
 	 */
 	ckpt_op = MMRAND(1, thread_ops);
-	compact_op = MMRAND(1, thread_ops);
 	session_op = 0;
 
 	session = NULL;
 	cursor = cursor_insert = NULL;
 	for (intxn = 0, cnt = 0; cnt < thread_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
-			track("read/write ops", 0ULL, tinfo);
+			track("ops", 0ULL, tinfo);
 
 		/*
-		 * We can't checkpoint, compact or swap sessions/cursors in a
+		 * We can't checkpoint or swap sessions/cursors while in a
 		 * transaction, resolve any running transaction.  Otherwise,
 		 * reset the cursor: we may block waiting for a lock and there
 		 * is no reason to keep pages pinned.
 		 */
-		if (cnt == ckpt_op || cnt == compact_op || cnt == session_op) {
+		if (cnt == ckpt_op || cnt == session_op) {
 			if (intxn) {
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
@@ -272,13 +286,6 @@ ops(void *arg)
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
 
-		/* Compact the store (data-sources don't support compaction). */
-		if (cnt == compact_op &&
-		    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata"))
-			if ((ret = session->compact(
-			    session, g.uri, NULL)) != 0 && ret != WT_DEADLOCK)
-				die(ret, "session.compact");
-
 		/*
 		 * If we're not single-threaded and we're not in a transaction,
 		 * start a transaction 80% of the time.
@@ -303,7 +310,7 @@ ops(void *arg)
 		 * of deletes will mean fewer inserts and writes.  Modifications
 		 * are always followed by a read to confirm it worked.
 		 */
-		op = (uint32_t)(wts_rand() % 100);
+		op = (uint32_t)(rng() % 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
 			switch (g.type) {
@@ -404,17 +411,14 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		 */
 		if (intxn)
 			switch (MMRAND(1, 10)) {
-			case 1:
-			case 2:
-			case 3:
-			case 4:
+			case 1: case 2: case 3: case 4:		/* 40% */
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
 					die(ret, "session.commit_transaction");
 				++tinfo->commit;
 				intxn = 0;
 				break;
-			case 5:
+			case 5:					/* 10% */
 				if (0) {
 deadlock:				++tinfo->deadlock;
 				}
@@ -468,7 +472,7 @@ wts_read_scan(void)
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
-		cnt += wts_rand() % 17 + 1;
+		cnt += rng() % 17 + 1;
 		if (cnt > g.rows)
 			cnt = g.rows;
 		if (cnt - last_cnt > 1000) {

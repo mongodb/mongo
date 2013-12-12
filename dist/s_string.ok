@@ -70,6 +70,7 @@ DUPLICATEV
 DbCursor
 DbEnv
 Decrement
+EAGAIN
 EB
 EBUSY
 EINTR
@@ -115,6 +116,7 @@ IMPL's
 INDX
 INIT
 INITIALIZER
+INMEM
 INSERT's
 INUSE
 ISSET
@@ -131,6 +133,7 @@ Kounavis
 LEX
 LF
 LNO
+LOGSCAN
 LRU
 LSB
 LSM
@@ -155,6 +158,7 @@ Memrata
 Metadata
 Mewhort
 Multi
+Multithreaded
 Mutex
 Mutexes
 NEEDKEY
@@ -441,6 +445,7 @@ errv
 errx
 esc
 eventv
+evictable
 evictserver
 exactp
 extern
@@ -458,8 +463,10 @@ ffs
 fgetln
 fh
 filefrag
+fileid
 filename
 filenames
+fileop
 fileops
 filesize
 filesystem
@@ -467,6 +474,7 @@ firstfit
 fixup
 flcs
 fmt
+fmterr
 fnv
 foc
 fopen
@@ -548,6 +556,8 @@ keyv
 kv
 kvs
 kvsbdb
+lang
+latencies
 ld
 len
 lenp
@@ -567,6 +577,7 @@ logf
 logmgr
 lognum
 logput
+logread
 lookup
 lookups
 lr
@@ -672,6 +683,7 @@ poptable
 posint
 posix
 pre
+prealloc
 preload
 prepended
 presize
@@ -680,6 +692,7 @@ printf
 printlog
 priv
 ps
+pse
 psp
 pthread
 putK
@@ -706,6 +719,7 @@ realloc
 recno
 recnos
 recsize
+recurse
 reinitialization
 req
 rescan
@@ -716,6 +730,7 @@ ret
 retp
 rf
 rle
+rng
 rpc
 rref
 run's
@@ -830,6 +845,7 @@ treplacement
 trk
 trk's
 troot
+trunc
 trywrlock
 tsalvage
 tsplit
@@ -853,6 +869,7 @@ typedef
 uB
 uid
 uint
+uintmax
 unbare
 uncompressing
 uncompresssed
@@ -892,6 +909,7 @@ versa
 vlcs
 vmsg
 vpack
+vprintf
 vrfy
 vsize
 vslot

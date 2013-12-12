@@ -65,7 +65,7 @@ err:	if (cursor != NULL)
  */
 static int
 __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
-	int (*op)(WT_SESSION_IMPL *, const char *[]))
+	int (*op)(WT_SESSION_IMPL *, const char *[]), int *fullp)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
@@ -132,6 +132,8 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	}
 
 err:	__wt_scr_free(&tmp);
+	if (ret == 0 && fullp != NULL)
+		*fullp = !target_list;
 	return (ret);
 }
 
@@ -186,12 +188,14 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	void *saved_meta_next;
-	int tracking;
+	int full, started, tracking;
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
 	txn = &session->txn;
-	tracking = 0;
+	full = started = tracking = 0;
+
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
 
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
@@ -214,16 +218,29 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_write_leaves));
+	WT_ERR(__checkpoint_apply(
+	    session, cfg, __wt_checkpoint_write_leaves, &full));
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
+
+	/* Tell logging that we are about to start a database checkpoint. */
+	if (S2C(session)->logging && full)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	/* Start a snapshot transaction for the checkpoint. */
 	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
-	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
+	/* Tell logging that we have started a database checkpoint. */
+	if (S2C(session)->logging && full) {
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, full, WT_TXN_LOG_CKPT_START, NULL));
+		started = 1;
+	}
+
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
 	/* Release the snapshot transaction, before syncing the file(s). */
 	__wt_txn_release(session);
@@ -233,7 +250,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * lazy checkpoints, but we don't support them yet).
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+		WT_ERR(__checkpoint_apply(
+		    session, cfg, __wt_checkpoint_sync, NULL));
 
 	/* Checkpoint the metadata file. */
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
@@ -280,10 +298,20 @@ err:	/*
 		__wt_txn_release(session);
 	else
 		__wt_txn_release_snapshot(session);
+
+	/* Tell logging that we have finished a database checkpoint. */
+	if (S2C(session)->logging && started)
+		WT_TRET(__wt_txn_checkpoint_log(session, full,
+		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
+		    NULL));
+
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
 	session->isolation = txn->isolation = saved_isolation;
+
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+
 	return (ret);
 }
 
@@ -415,16 +443,18 @@ __checkpoint_worker(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_LSN ckptlsn;
 	const char *name;
 	int deleted, force, hot_backup_locked, track_ckpt;
 	char *name_alloc;
 
 	btree = S2BT(session);
-	conn = S2C(session);
-	dhandle = session->dhandle;
-
 	bm = btree->bm;
+	conn = S2C(session);
 	ckpt = ckptbase = NULL;
+	INIT_LSN(&ckptlsn);
+	dhandle = session->dhandle;
+	name_alloc = NULL;
 	hot_backup_locked = 0;
 	name_alloc = NULL;
 	track_ckpt = 1;
@@ -446,7 +476,7 @@ __checkpoint_worker(
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
-		WT_ASSERT(session, session->dhandle->refcnt == 0);
+		WT_ASSERT(session, session->dhandle->session_ref == 0);
 		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	}
@@ -578,8 +608,10 @@ __checkpoint_worker(
 				continue;
 			}
 			WT_ERR_MSG(session, EBUSY,
-			    "named checkpoints cannot be created if backup "
-			    "cursors are open");
+			    "checkpoint %s blocked by hot backup: it would "
+			    "delete an existing checkpoint, and checkpoints "
+			    "cannot be deleted during a hot backup",
+			    ckpt->name);
 		}
 
 	/*
@@ -695,6 +727,11 @@ __checkpoint_worker(
 	 */
 	WT_ERR(__wt_bt_cache_force_write(session));
 
+	/* Tell logging that a file checkpoint is starting. */
+	if (S2C(session)->logging)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
+
 	/*
 	 * Clear the tree's modified flag; any changes before we clear the flag
 	 * are guaranteed to be part of this checkpoint (unless reconciliation
@@ -723,8 +760,8 @@ __checkpoint_worker(
 			ckpt->write_gen = btree->write_gen;
 
 fake:	/* Update the object's metadata. */
-	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
-	WT_ERR(ret);
+	WT_ERR(__wt_meta_ckptlist_set(
+	    session, dhandle->name, ckptbase, &ckptlsn));
 
 	/*
 	 * If we wrote a checkpoint (rather than faking one), pages may be
@@ -739,6 +776,11 @@ fake:	/* Update the object's metadata. */
 		else
 			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
+
+	/* Tell logging that the checkpoint is complete. */
+	if (S2C(session)->logging)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
 err:	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
@@ -806,6 +848,8 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_close(WT_SESSION_IMPL *session)
 {
+	int needsync;
+
 	/*
 	 * Checkpoint handles are read-only: closing one discards its blocks,
 	 * otherwise there's no work to do.
@@ -815,11 +859,12 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session)
 		    __wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
-	 * Otherwise, checkpoint the file and optionally flush the writes to
-	 * stable storage.
+	 * Otherwise, checkpoint the file and, if it was modified, optionally
+	 * flush the writes to stable storage.
 	 */
+	needsync = S2BT(session)->modified;
 	WT_RET(__checkpoint_worker(session, NULL, 0));
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+	if (needsync && F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		WT_RET(__wt_checkpoint_sync(session, NULL));
 	return (0);
 }

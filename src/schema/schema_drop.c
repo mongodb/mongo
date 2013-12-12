@@ -27,14 +27,6 @@ __drop_file(
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
-	if (session->dhandle == NULL &&
-	    (ret = __wt_session_get_btree(session, uri, NULL, cfg,
-	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
-		if (ret == WT_NOTFOUND || ret == ENOENT)
-			ret = 0;
-		return (ret);
-	}
-
 	/* Close all btree handles associated with this file. */
 	WT_RET(__wt_conn_dhandle_close_all(session, uri));
 
@@ -96,8 +88,7 @@ __drop_index(
 	WT_TABLE *table;
 
 	/* If we can get the colgroup, detach it from the table. */
-	if ((ret = __wt_schema_get_index(
-	    session, uri, &table, &idx)) == 0) {
+	if ((ret = __wt_schema_get_index(session, uri, &table, &idx)) == 0) {
 		table->idx_complete = 0;
 		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
 	}
@@ -157,6 +148,10 @@ err:	if (force && ret == WT_NOTFOUND)
 	return (ret);
 }
 
+/*
+ * __wt_schema_drop --
+ *	Process a WT_SESSION::drop operation for all supported types.
+ */
 int
 __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {

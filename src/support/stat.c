@@ -114,8 +114,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "reconciliation failed because an update could not be included";
 	stats->rec_split_internal.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
-	stats->rec_split_max.desc =
-	    "reconciliation maximum number of splits created for a page";
+	stats->rec_split_max.desc = "reconciliation maximum splits for a page";
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
@@ -311,8 +310,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
 	stats->block_byte_read.desc = "block manager: bytes read";
 	stats->block_byte_write.desc = "block manager: bytes written";
-	stats->block_locked_allocation.desc =
-	    "block manager: memory allocations while locked";
 	stats->block_map_read.desc = "block manager: mapped blocks read";
 	stats->block_preload.desc = "block manager: blocks pre-loaded";
 	stats->block_read.desc = "block manager: blocks read";
@@ -330,9 +327,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
 	stats->cache_eviction_force.desc =
-	    "cache: pages evicted because they exceeded the in memory maximum";
+	    "cache: pages evicted because they exceeded the in-memory maximum";
 	stats->cache_eviction_force_fail.desc =
-	    "cache: failed eviction of pages that exceeded the in memory maximum";
+	    "cache: failed eviction of pages that exceeded the in-memory maximum";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
@@ -364,10 +361,13 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
 	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
+	stats->dh_conn_sweeps.desc = "dhandle: connection sweep attempts";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
+	stats->dh_session_sweeps.desc = "dhandle: session sweep attempts";
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
-	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
+	stats->log_buffer_grow.desc = "log: log buffer size increases";
+	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc = "log: user provided log bytes written";
 	stats->log_bytes_written.desc = "log: log bytes written";
 	stats->log_max_filesize.desc = "log: maximum log file size";
@@ -380,7 +380,15 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
 	stats->log_slot_joins.desc = "log: consolidated slot joins";
 	stats->log_slot_races.desc = "log: consolidated slot join races";
+	stats->log_slot_ready_wait_timeout.desc =
+	    "log: log slot ready wait timeouts";
+	stats->log_slot_release_wait_timeout.desc =
+	    "log: log slot release wait timeouts";
+	stats->log_slot_switch_fails.desc =
+	    "log: slots selected for switching that were unavailable";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
+	stats->log_slot_toosmall.desc =
+	    "log: failed to find a slot large enough for record";
 	stats->log_slot_transitions.desc =
 	    "log: consolidated slot join transitions";
 	stats->log_sync.desc = "log: log sync operations";
@@ -401,6 +409,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_checkpoint.desc = "transaction checkpoints";
+	stats->txn_checkpoint_running.desc =
+	    "transaction checkpoint currently running";
 	stats->txn_commit.desc = "transactions committed";
 	stats->txn_fail_cache.desc =
 	    "transaction failures due to cache overflow";
@@ -417,7 +427,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
-	stats->block_locked_allocation.v = 0;
 	stats->block_map_read.v = 0;
 	stats->block_preload.v = 0;
 	stats->block_read.v = 0;
@@ -453,9 +462,11 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
 	stats->dh_conn_handles.v = 0;
+	stats->dh_conn_sweeps.v = 0;
 	stats->dh_session_handles.v = 0;
+	stats->dh_session_sweeps.v = 0;
 	stats->dh_sweep_evict.v = 0;
-	stats->dh_sweeps.v = 0;
+	stats->log_buffer_grow.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;
@@ -466,7 +477,11 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_slot_consolidated.v = 0;
 	stats->log_slot_joins.v = 0;
 	stats->log_slot_races.v = 0;
+	stats->log_slot_ready_wait_timeout.v = 0;
+	stats->log_slot_release_wait_timeout.v = 0;
+	stats->log_slot_switch_fails.v = 0;
 	stats->log_slot_toobig.v = 0;
+	stats->log_slot_toosmall.v = 0;
 	stats->log_slot_transitions.v = 0;
 	stats->log_sync.v = 0;
 	stats->log_writes.v = 0;

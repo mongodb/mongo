@@ -114,7 +114,7 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * ___open_index --
+ * __open_index --
  *	Open an index.
  */
 static int
@@ -131,14 +131,12 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 	/* Get the data source from the index config. */
 	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
-	WT_ERR(__wt_buf_fmt(
-	    session, buf, "%.*s", (int)cval.len, cval.str));
+	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
 	idx->source = __wt_buf_steal(session, buf, NULL);
 	idx->need_value = WT_PREFIX_MATCH(idx->source, "lsm:");
 
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
-	WT_ERR(__wt_buf_fmt(
-	    session, buf, "%.*s", (int)cval.len, cval.str));
+	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
 	idx->key_format = __wt_buf_steal(session, buf, NULL);
 
 	/*
@@ -208,8 +206,8 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __wt_schema_open_indices --
- *	Open the indices for a table.
+ * __wt_schema_open_index --
+ *	Open one or more indices for a table.
  */
 int
 __wt_schema_open_index(WT_SESSION_IMPL *session,

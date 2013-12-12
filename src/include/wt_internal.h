@@ -83,6 +83,8 @@ struct __wt_col_rle;
     typedef struct __wt_col_rle WT_COL_RLE;
 struct __wt_colgroup;
     typedef struct __wt_colgroup WT_COLGROUP;
+struct __wt_compact;
+    typedef struct __wt_compact WT_COMPACT;
 struct __wt_condvar;
     typedef struct __wt_condvar WT_CONDVAR;
 struct __wt_config;
@@ -147,6 +149,10 @@ struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
 struct __wt_log_desc;
     typedef struct __wt_log_desc WT_LOG_DESC;
+struct __wt_log_op_desc;
+    typedef struct __wt_log_op_desc WT_LOG_OP_DESC;
+struct __wt_log_rec_desc;
+    typedef struct __wt_log_rec_desc WT_LOG_REC_DESC;
 struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
 struct __wt_lsm_data_source;
@@ -203,6 +209,8 @@ struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
     typedef struct __wt_txn_global WT_TXN_GLOBAL;
+struct __wt_txn_op;
+    typedef struct __wt_txn_op WT_TXN_OP;
 struct __wt_txn_state;
     typedef struct __wt_txn_state WT_TXN_STATE;
 struct __wt_update;
@@ -231,6 +239,7 @@ struct __wt_update;
 #include "btree.h"
 #include "cache.h"
 #include "config.h"
+#include "compact.h"
 #include "cursor.h"
 #include "dlh.h"
 #include "error.h"
@@ -261,7 +270,6 @@ struct __wt_update;
 
 #include "bitstring.i"
 #include "column.i"
-#include "log.i"
 #include "serial.i"
 
 #if defined(__cplusplus)

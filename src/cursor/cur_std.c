@@ -19,7 +19,7 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
-/* 
+/*
  * __wt_cursor_noop --
  *	Cursor noop.
  */
@@ -137,6 +137,44 @@ __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 	if (!raw_set)
 		F_SET(cursor, WT_CURSTD_RAW);
 	cursor->set_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
+}
+
+/*
+ * __wt_cursor_get_raw_value --
+ *	Temporarily force raw mode in a cursor to get a canonical copy of
+ * the value.
+ */
+int
+__wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
+{
+	WT_DECL_RET;
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	ret = cursor->get_value(cursor, value);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
+	return (ret);
+}
+
+/*
+ * __wt_cursor_set_raw_value --
+ *	Temporarily force raw mode in a cursor to set a canonical copy of
+ * the value.
+ */
+void
+__wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
+{
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	cursor->set_value(cursor, value);
 	if (!raw_set)
 		F_CLR(cursor, WT_CURSTD_RAW);
 }
@@ -278,14 +316,17 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
-	/* Fast path some common cases. */
+	/* Fast path some common cases: single strings, byte arrays and bits. */
 	if (strcmp(fmt, "S") == 0)
 		*va_arg(ap, const char **) = cursor->value.data;
 	else if (strcmp(fmt, "u") == 0) {
 		value = va_arg(ap, WT_ITEM *);
 		value->data = cursor->value.data;
 		value->size = cursor->value.size;
-	} else
+	} else if (strcmp(fmt, "t") == 0 ||
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0))
+		*va_arg(ap, uint8_t *) = *(uint8_t *)cursor->value.data;
+	else
 		ret = __wt_struct_unpackv(session,
 		    cursor->value.data, cursor->value.size, fmt, ap);
 
@@ -373,8 +414,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(cursor, session, close, NULL);
-
+	session = (WT_SESSION_IMPL *)cursor->session;
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
 
@@ -387,8 +427,6 @@ __wt_cursor_close(WT_CURSOR *cursor)
 
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
-
-err:	API_END(session);
 	return (ret);
 }
 

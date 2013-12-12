@@ -340,11 +340,13 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	va_list ap;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NO_CONF(session, log_printf);
 
 	va_start(ap, fmt);
-	ret =__wt_log_vprintf(session, fmt, ap);
+	ret = __wt_log_vprintf(session, fmt, ap);
 	va_end(ap);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -380,30 +382,18 @@ static int
 __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	txn = &session->txn;
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
 
-	/* Compaction makes no sense for LSM objects, ignore requests. */
-	if (WT_PREFIX_MATCH(uri, "lsm:"))
-		return (0);
 	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 	    !WT_PREFIX_MATCH(uri, "file:") &&
 	    !WT_PREFIX_MATCH(uri, "index:") &&
+	    !WT_PREFIX_MATCH(uri, "lsm:") &&
 	    !WT_PREFIX_MATCH(uri, "table:"))
 		return (__wt_bad_object_type(session, uri));
-
-	/*
-	 * Compaction requires checkpoints, which will fail in a transactional
-	 * context.  Check now so the error message isn't confusing.
-	 */
-	if (F_ISSET(txn, TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL,
-		    "Compaction not permitted in a transaction");
 
 	return (__wt_session_compact(wt_session, uri, config));
 }
@@ -691,6 +681,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+
 	txn = &session->txn;
 
 	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint);

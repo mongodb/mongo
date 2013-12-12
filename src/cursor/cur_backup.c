@@ -214,9 +214,10 @@ __backup_start(
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 
-	/* Add log files if logging is on. */
-	if (conn->log) {
-		WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
+	/* Add log files if logging is on and we're doing a full backup. */
+	if (!target_list && conn->log) {
+		WT_ERR(
+		    __wt_log_get_active_files(session, &logfiles, &logcount));
 		for (i = 0; i < logcount; i++)
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
 	}
@@ -427,12 +428,14 @@ __backup_file_remove(WT_SESSION_IMPL *session)
  *	Called via the schema_worker function.
  */
 int
-__wt_backup_list_uri_append(WT_SESSION_IMPL *session, const char *name)
+__wt_backup_list_uri_append(
+    WT_SESSION_IMPL *session, const char *name, int *skip)
 {
 	WT_CURSOR_BACKUP *cb;
 	const char *value;
 
 	cb = session->bkp_cursor;
+	WT_UNUSED(skip);
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));

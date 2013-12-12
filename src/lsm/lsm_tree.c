@@ -9,8 +9,7 @@
 
 static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
-static int __lsm_tree_set_name(
-	WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
+static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
 
 /*
  * __lsm_tree_discard --
@@ -76,6 +75,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
+
 		/*
 		 * Signal all threads to wake them up, then wait for them to
 		 * exit.
@@ -88,15 +88,17 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 */
 		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 			for (i = 0; i < lsm_tree->merge_threads; i++) {
-				F_SET(lsm_tree->worker_sessions[i],
-				    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+				if ((s = lsm_tree->worker_sessions[i]) == NULL)
+					continue;
+				if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+					s->skip_schema_lock = 1;
 				WT_TRET(__wt_cond_signal(
 				    session, lsm_tree->work_cond));
 				WT_TRET(__wt_thread_join(
 				    session, lsm_tree->worker_tids[i]));
 			}
-		F_SET(lsm_tree->ckpt_session,
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+		if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+			lsm_tree->ckpt_session->skip_schema_lock = 1;
 		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
 	}
@@ -185,6 +187,29 @@ __wt_lsm_tree_chunk_name(
 }
 
 /*
+ * __wt_lsm_tree_set_chunk_size --
+ *	Set the size of the chunk. Should only be called for chunks that are
+ *	on disk, or about to become on disk.
+ */
+int
+__wt_lsm_tree_set_chunk_size(
+    WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
+{
+	off_t size;
+	const char *filename;
+
+	filename = chunk->uri;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET_MSG(session, EINVAL,
+		    "Expected a 'file:' URI: %s", chunk->uri);
+	WT_RET(__wt_filesize_name(session, filename, &size));
+
+	chunk->size = (uint64_t)size;
+
+	return (0);
+}
+
+/*
  * __wt_lsm_tree_setup_chunk --
  *	Initialize a chunk of an LSM tree.
  */
@@ -223,7 +248,7 @@ __wt_lsm_tree_setup_chunk(
 }
 
 /*
- * __wt_lsm_start_worker --
+ * __lsm_tree_start_worker --
  *	Start the worker thread for an LSM tree.
  */
 static int
@@ -328,15 +353,15 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->collator_name));
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_auto_throttle", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.auto_throttle", &cval));
 	if (cval.val)
 		F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
 	else
 		F_CLR(lsm_tree, WT_LSM_TREE_THROTTLE);
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom", &cval));
 	FLD_SET(lsm_tree->bloom,
 	    (cval.val == 0 ? WT_LSM_BLOOM_OFF : WT_LSM_BLOOM_MERGED));
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_oldest", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_oldest", &cval));
 	if (cval.val != 0)
 		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST);
 
@@ -346,7 +371,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		    "Bloom filters can only be created on newest and oldest "
 		    "chunks if bloom filters are enabled");
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_config", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_config", &cval));
 	if (cval.type == WT_CONFIG_ITEM_STRUCT) {
 		cval.str++;
 		cval.len -= 2;
@@ -354,23 +379,39 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->bloom_config));
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_hash_count", &cval));
 	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
-	lsm_tree->chunk_size = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_max", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_max", &cval));
+	lsm_tree->chunk_max = (uint64_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_size", &cval));
+	lsm_tree->chunk_size = (uint64_t)cval.val;
+	if (lsm_tree->chunk_size > lsm_tree->chunk_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "Chunk size (chunk_size) must be smaller than or equal to "
+		    "the maximum chunk size (chunk_max)");
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_max", &cval));
 	lsm_tree->merge_max = (uint32_t)cval.val;
 	lsm_tree->merge_min = lsm_tree->merge_max / 2;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_threads", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_threads", &cval));
 	lsm_tree->merge_threads = (uint32_t)cval.val;
 	/* Sanity check that api_data.py is in sync with lsm.h */
 	WT_ASSERT(session, lsm_tree->merge_threads <= WT_LSM_MAX_WORKERS);
 
+	/*
+	 * Set up the config for each chunk.  If possible, avoid high latencies
+	 * from fsync by flushing the cache every 8MB (will be overridden by
+	 * any application setting).
+	 */
+	tmpconfig = "";
+#ifdef HAVE_SYNC_FILE_RANGE
+	if (!S2C(session)->direct_io)
+		tmpconfig = "os_cache_dirty_max=8MB,";
+#endif
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "%s,key_format=u,value_format=u", config));
+	    "%s%s,key_format=u,value_format=u", tmpconfig, config));
 	lsm_tree->file_config = __wt_buf_steal(session, buf, NULL);
 
 	/* Create the first chunk and flush the metadata. */
@@ -516,15 +557,20 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __lsm_tree_throttle --
+ * __wt_lsm_tree_throttle --
  *	Calculate whether LSM updates need to be throttled.
  */
 void
 __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
-	uint64_t cache_sz, cache_used, record_count;
-	uint32_t i, in_memory;
+	uint64_t cache_sz, cache_used, in_memory, record_count;
+	uint64_t oldtime, timediff;
+	uint32_t i;
+
+	/* Never throttle in small trees. */
+	if (lsm_tree->nchunks < 3)
+		return;
 
 	cache_sz = S2C(session)->cache_size;
 
@@ -541,11 +587,11 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	for (i = in_memory = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
 	    i < lsm_tree->nchunks;
 	    ++i, --cp)
-		if (!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK)) {
+		if (!F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_ONDISK)) {
 			record_count += (*cp)->count;
 			++in_memory;
 		} else if ((*cp)->generation == 0 ||
-		    F_ISSET(*cp, WT_LSM_CHUNK_STABLE))
+		    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE))
 			break;
 
 	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
@@ -553,7 +599,7 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
 	else if (i == lsm_tree->nchunks ||
-	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {
+	    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)) {
 		/*
 		 * No checkpoint has completed this run.  Keep slowing down
 		 * inserts until one does.
@@ -563,9 +609,9 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	} else {
 		WT_ASSERT(session,
 		    WT_TIMECMP(chunk->create_ts, (*cp)->create_ts) >= 0);
-		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
-		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
-		    (20 * record_count));
+		timediff = WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts);
+		lsm_tree->throttle_sleep =
+		    (long)((in_memory - 2) * timediff / (20 * record_count));
 
 		/*
 		 * Get more aggressive as the number of in memory chunks
@@ -576,7 +622,7 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * There is nothing particularly special about the chosen
 		 * multipliers.
 		 */
-		cache_used = (uint64_t)in_memory * lsm_tree->chunk_size * 2;
+		cache_used = in_memory * lsm_tree->chunk_size * 2;
 		if (cache_used > cache_sz * 0.8)
 			lsm_tree->throttle_sleep *= 5;
 	}
@@ -584,16 +630,25 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/*
 	 * Update our estimate of how long each in-memory chunk stays active.
 	 * Filter out some noise by keeping a weighted history of the
-	 * calculated value.
+	 * calculated value.  Wait until we have enough chunks that we can
+	 * check that the new value is sane: otherwise, after a long idle
+	 * period, we can calculate a crazy value.
 	 */
-	prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
-	if (in_memory > 1) {
+	if (in_memory > 1 &&
+	    i != lsm_tree->nchunks &&
+	    !F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)) {
+		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
-		WT_ASSERT(session, WT_TIMECMP(
-		    chunk->create_ts, prev_chunk->create_ts) >= 0);
-		lsm_tree->chunk_fill_ms =
-		    (3 * lsm_tree->chunk_fill_ms + WT_TIMEDIFF(
-		    chunk->create_ts, prev_chunk->create_ts) / 1000000) / 4;
+		WT_ASSERT(session,
+		    WT_TIMECMP(chunk->create_ts, prev_chunk->create_ts) >= 0);
+		timediff = WT_TIMEDIFF(chunk->create_ts, prev_chunk->create_ts);
+		WT_ASSERT(session,
+		    WT_TIMECMP(prev_chunk->create_ts, (*cp)->create_ts) >= 0);
+		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, (*cp)->create_ts);
+		if (timediff < 10 * oldtime)
+			lsm_tree->chunk_fill_ms =
+			    (3 * lsm_tree->chunk_fill_ms +
+			    timediff / 1000000) / 4;
 	}
 }
 
@@ -615,14 +670,15 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * for a lock.
 	 */
 	if ((nchunks = lsm_tree->nchunks) != 0 &&
-	    !F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) &&
+	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
+	    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
 
-	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+	/* Update the throttle time. */
+	__wt_lsm_tree_throttle(session, lsm_tree);
 
-	if (nchunks > 1)
-		__wt_lsm_tree_throttle(session, lsm_tree);
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    nchunks + 1, &lsm_tree->chunk));
@@ -640,6 +696,8 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 	++lsm_tree->dsk_gen;
+
+	lsm_tree->modified = 1;
 
 err:	/* TODO: mark lsm_tree bad on error(?) */
 	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -676,7 +734,7 @@ __wt_lsm_tree_drop(
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
@@ -686,7 +744,7 @@ __wt_lsm_tree_drop(
 		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
 			continue;
 		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
@@ -746,13 +804,13 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
 		__wt_free(session, old);
 
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM)) {
 			old = chunk->bloom_uri;
 			chunk->bloom_uri = NULL;
 			WT_ERR(__wt_lsm_tree_bloom_name(
 			    session, lsm_tree, chunk->id, &buf));
 			chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
-			F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+			F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 			WT_ERR(__wt_schema_rename(
 			    session, old, chunk->uri, cfg));
 			__wt_free(session, old);
@@ -871,6 +929,58 @@ __wt_lsm_tree_unlock(
 }
 
 /*
+ * __wt_lsm_compact --
+ *	Compact an LSM tree called via __wt_schema_worker.
+ */
+int
+__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
+{
+	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
+	uint64_t last_merge_progressing;
+	time_t begin, end;
+
+	/*
+	 * This function is applied to all matching sources: ignore anything
+	 * that is not an LSM tree.
+	 */
+	if (!WT_PREFIX_MATCH(name, "lsm:"))
+		return (0);
+
+	/* Tell __wt_schema_worker not to look inside the LSM tree. */
+	*skip = 1;
+
+	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
+
+	if (!F_ISSET(S2C(session), WT_CONN_LSM_MERGE) ||
+	    lsm_tree->merge_threads == 0)
+		WT_RET_MSG(session, EINVAL,
+		    "LSM compaction requires active merge threads");
+
+	WT_RET(__wt_seconds(session, &begin));
+
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+
+	/* Wake up the merge threads. */
+	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
+
+	/* Now wait for merge activity to stop. */
+	do {
+		last_merge_progressing = lsm_tree->merge_progressing;
+		__wt_sleep(1, 0);
+		WT_RET(__wt_seconds(session, &end));
+		if (session->compact->max_time > 0 &&
+		    session->compact->max_time < (uint64_t)(end - begin))
+			WT_ERR(ETIMEDOUT);
+	} while (lsm_tree->merge_progressing != last_merge_progressing &&
+	    lsm_tree->nchunks > 1);
+
+err:	F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+
+	return (ret);
+}
+
+/*
  * __wt_lsm_tree_worker --
  *	Run a schema worker operation on each level of a LSM tree.
  */
@@ -878,7 +988,7 @@ int
 __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
    const char *uri,
    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
-   int (*name_func)(WT_SESSION_IMPL *, const char *),
+   int (*name_func)(WT_SESSION_IMPL *, const char *, int *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_DECL_RET;
@@ -888,6 +998,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_lsm_tree_get(session, uri,
 	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
+
 	/*
 	 * We mark that we're busy using the tree to coordinate
 	 * with merges so that merging doesn't change the chunk
@@ -897,12 +1008,12 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))
 			continue;
 		WT_ERR(__wt_schema_worker(session, chunk->uri,
 		    file_func, name_func, cfg, open_flags));
 		if (name_func == __wt_backup_list_uri_append &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
 			    file_func, name_func, cfg, open_flags));
 	}

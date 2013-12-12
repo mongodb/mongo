@@ -30,14 +30,15 @@ struct __wt_cursor_lsm {
 	uint64_t *txnid_max;		/* Maximum txn for each chunk */
 	size_t txnid_alloc;
 
-#define	WT_CLSM_ITERATE_NEXT    0x01    /* Forward iteration */
-#define	WT_CLSM_ITERATE_PREV    0x02    /* Backward iteration */
-#define	WT_CLSM_MERGE           0x04    /* Merge cursor, don't update */
-#define	WT_CLSM_MINOR_MERGE	0x08    /* Minor merge, include tombstones */
-#define	WT_CLSM_MULTIPLE        0x10    /* Multiple cursors have values for the
+#define	WT_CLSM_ACTIVE		0x01    /* Incremented the session count */
+#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration */
+#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration */
+#define	WT_CLSM_MERGE           0x08    /* Merge cursor, don't update */
+#define	WT_CLSM_MINOR_MERGE	0x10    /* Minor merge, include tombstones */
+#define	WT_CLSM_MULTIPLE        0x20    /* Multiple cursors have values for the
 					   current key */
-#define	WT_CLSM_OPEN_READ	0x20    /* Open for reads */
-#define	WT_CLSM_OPEN_SNAPSHOT	0x40    /* Open for snapshot isolation */
+#define	WT_CLSM_OPEN_READ	0x40    /* Open for reads */
+#define	WT_CLSM_OPEN_SNAPSHOT	0x80    /* Open for snapshot isolation */
 	uint32_t flags;
 };
 
@@ -54,6 +55,7 @@ struct __wt_lsm_chunk {
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 	uint32_t refcnt;		/* Number of worker thread references */
 	uint32_t bloom_busy;		/* Number of worker thread references */
+	uint64_t size;			/* Final chunk size */
 
 	uint64_t txnid_max;		/* Newest transactional update */
 
@@ -63,7 +65,7 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_CHUNK_MERGING	0x08
 #define	WT_LSM_CHUNK_ONDISK	0x10
 #define	WT_LSM_CHUNK_STABLE	0x20
-	uint32_t flags;
+	uint32_t flags_atomic;
 } WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 /*
@@ -89,11 +91,13 @@ struct __wt_lsm_tree {
 
 	long throttle_sleep;		/* Rate limiting */
 	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
+	uint64_t merge_progressing;	/* Bumped when merges are active */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
-	uint32_t chunk_size;
+	uint64_t chunk_size;
+	uint64_t chunk_max;
 	u_int merge_min, merge_max;
 	u_int merge_threads;
 
@@ -114,15 +118,17 @@ struct __wt_lsm_tree {
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	u_int nchunks;			/* Number of active chunks */
 	uint32_t last;			/* Last allocated ID */
+	int modified;			/* Have there been updates? */
 
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 
-#define	WT_LSM_TREE_NEED_SWITCH	0x01
-#define	WT_LSM_TREE_OPEN	0x02
-#define	WT_LSM_TREE_THROTTLE	0x04
-#define	WT_LSM_TREE_WORKING	0x08
+#define	WT_LSM_TREE_COMPACTING	0x01
+#define	WT_LSM_TREE_NEED_SWITCH	0x02
+#define	WT_LSM_TREE_OPEN	0x04
+#define	WT_LSM_TREE_THROTTLE	0x08
+#define	WT_LSM_TREE_WORKING	0x10
 	uint32_t flags;
 };
 

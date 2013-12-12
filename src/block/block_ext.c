@@ -169,7 +169,7 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 	__block_size_srch(el->sz, ext->size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL || szp->size != ext->size) {
-		WT_RET(__wt_block_size_alloc(session, &szp, 1));
+		WT_RET(__wt_block_size_alloc(session, &szp));
 		szp->size = ext->size;
 		szp->depth = ext->depth;
 		for (i = 0; i < ext->depth; ++i) {
@@ -211,7 +211,7 @@ __block_off_insert(
 {
 	WT_EXT *ext;
 
-	WT_RET(__wt_block_ext_alloc(session, &ext, 1));
+	WT_RET(__wt_block_ext_alloc(session, &ext));
 	ext->off = off;
 	ext->size = size;
 
@@ -357,8 +357,7 @@ __wt_block_off_remove_overlap(
 
 	/* If "before" or "after" overlaps, retrieve the overlapping entry. */
 	if (before != NULL && before->off + before->size > off) {
-		WT_RET(
-		    __block_off_remove(session, el, before->off, &ext));
+		WT_RET(__block_off_remove(session, el, before->off, &ext));
 
 		/* Calculate overlapping extents. */
 		a_off = ext->off;
@@ -366,8 +365,7 @@ __wt_block_off_remove_overlap(
 		b_off = off + size;
 		b_size = ext->size - (a_size + size);
 	} else if (after != NULL && off + size > after->off) {
-		WT_RET(
-		    __block_off_remove(session, el, after->off, &ext));
+		WT_RET(__block_off_remove(session, el, after->off, &ext));
 
 		/*
 		 * Calculate overlapping extents.  There's no initial overlap
@@ -550,8 +548,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 #ifdef HAVE_DIAGNOSTIC
 	WT_RET(__wt_block_misplaced(session, block, "free", offset, size, 1));
 #endif
-	WT_RET(__wt_block_ext_alloc(session, NULL, 5));
-	WT_RET(__wt_block_size_alloc(session, NULL, 2));
+	WT_RET(__wt_block_ext_prealloc(session, 5));
 	__wt_spin_lock(session, &block->live_lock);
 	ret = __wt_block_off_free(session, block, offset, (off_t)size);
 	__wt_spin_unlock(session, &block->live_lock);
@@ -868,7 +865,7 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 }
 
 /*
- * __wt_block_insert_ext, __block_merge --
+ * __wt_block_insert_ext --
  *	Insert an extent into an extent list, merging if possible.
  */
 int
@@ -888,6 +885,12 @@ __wt_block_insert_ext(
 	 */
 	return (__block_merge(session, el, off, size));
 }
+
+/*
+ * __block_merge --
+ *	Insert an extent into an extent list, merging if possible (internal
+ *	version).
+ */
 static int
 __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 {
@@ -1240,6 +1243,10 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	memset(el, 0, sizeof(*el));
 }
 
+/*
+ * __block_extlist_dump --
+ *	Dump an extent list as verbose messages.
+ */
 static int
 __block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)

@@ -37,7 +37,7 @@ int
 main(int argc, char *argv[])
 {
 	int ch, reps, ret;
-	const char *config;
+	const char *config, *home;
 
 	config = NULL;
 
@@ -59,7 +59,8 @@ main(int argc, char *argv[])
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
+	home = NULL;
+	while ((ch = getopt(argc, argv, "1C:c:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -69,6 +70,9 @@ main(int argc, char *argv[])
 			break;
 		case 'c':			/* Configuration from a file */
 			config = optarg;
+			break;
+		case 'h':
+			home = optarg;
 			break;
 		case 'L':			/* Re-direct output to a log */
 			/*
@@ -86,7 +90,6 @@ main(int argc, char *argv[])
 			break;
 		case 'r':			/* Replay a run */
 			g.replay = 1;
-			g.c_runs = 1;
 			break;
 		default:
 			usage();
@@ -97,10 +100,13 @@ main(int argc, char *argv[])
 	/*
 	 * If we weren't given a configuration file, set values from "CONFIG",
 	 * if it exists.
+	 *
+	 * Small hack to ignore any CONFIG file named ".", that just makes it
+	 * possible to ignore any local CONFIG file, used when running checks.
 	 */
 	if (config == NULL && access("CONFIG", R_OK) == 0)
 		config = "CONFIG";
-	if (config != NULL)
+	if (config != NULL && strcmp(config, ".") != 0)
 		config_file(config);
 
 	/*
@@ -109,6 +115,21 @@ main(int argc, char *argv[])
 	 */
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
+
+	/*
+	 * Multithreaded runs can be replayed: it's useful and we'll get the
+	 * configuration correct.  Obviously the order of operations changes,
+	 * warn the user.
+	 */
+	if (g.replay && !SINGLETHREADED)
+		printf("Warning: replaying a threaded run\n");
+
+	/*
+	 * Single-threaded runs historically exited after a single replay, which
+	 * makes sense when you're debugging, leave that semantic in place.
+	 */
+	if (g.replay && SINGLETHREADED)
+		g.c_runs = 1;
 
 	/* Use line buffering on stdout so status updates aren't buffered. */
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
@@ -125,6 +146,12 @@ main(int argc, char *argv[])
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
+	/* Seed the random number generator. */
+	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+
+	/* Set up paths. */
+	path_setup(home);
+
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		startup();			/* Start a run */
@@ -136,7 +163,7 @@ main(int argc, char *argv[])
 		track("starting up", 0ULL, NULL);
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
-		wts_open(RUNDIR, 1, &g.wts_conn);
+		wts_open(g.home, 1, &g.wts_conn);
 		wts_create();
 
 		wts_load();			/* Load initial records */
@@ -192,7 +219,7 @@ main(int argc, char *argv[])
 		 * against the Berkeley DB data set again, if possible).
 		 */
 		if (g.c_delete_pct == 0) {
-			wts_open(RUNDIR, 1, &g.wts_conn);
+			wts_open(g.home, 1, &g.wts_conn);
 			wts_salvage();
 			wts_verify("post-salvage verify");
 			wts_close();
@@ -232,35 +259,49 @@ main(int argc, char *argv[])
 static void
 startup(void)
 {
+	int ret;
+
 	/* Close the logging file. */
 	if (g.logfp != NULL) {
 		(void)fclose(g.logfp);
 		g.logfp = NULL;
 	}
 
-	/* Close the random number file. */
+	/* Close the random number logging file. */
 	if (g.rand_log != NULL) {
 		(void)fclose(g.rand_log);
 		g.rand_log = NULL;
 	}
 
-	/* Create RUNDIR if it doesn't yet exist. */
-	if (access(RUNDIR, X_OK) != 0 && mkdir(RUNDIR, 0777) != 0)
-		die(errno, "mkdir: %s", RUNDIR);
+	/* Create home if it doesn't yet exist. */
+	if (access(g.home, X_OK) != 0 && mkdir(g.home, 0777) != 0)
+		die(errno, "mkdir: %s", g.home);
 
 	/* Remove the run's files except for rand. */
-	WT_UNUSED_RET(system("cd RUNDIR && rm -rf `ls | sed /rand/d`"));
+	if ((ret = system(g.home_init)) != 0)
+		die(ret, "home directory initialization failed");
 
 	/* Create the data-source directory. */
-	if (mkdir(RUNDIR_KVS, 0777) != 0)
-		die(errno, "mkdir: %s", RUNDIR_KVS);
+	if (mkdir(g.home_kvs, 0777) != 0)
+		die(errno, "mkdir: %s", g.home_kvs);
 
-	/* Open/truncate the logging file. */
+	/*
+	 * Open/truncate the logging file; line buffer so we see up-to-date
+	 * information on error.
+	 */
 	if (g.logging != 0) {
-		if ((g.logfp = fopen("RUNDIR/log", "w")) == NULL)
-			die(errno, "fopen: RUNDIR/log");
+		if ((g.logfp = fopen(g.home_log, "w")) == NULL)
+			die(errno, "fopen: %s", g.home_log);
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
+
+	/*
+	 * Open/truncate the random number logging file; line buffer so we see
+	 * up-to-date information on error.
+	 */
+	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
+		die(errno, "%s", g.home_rand);
+	(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
 }
 
 /*
@@ -270,10 +311,13 @@ startup(void)
 static void
 onint(int signo)
 {
+	int ret;
+
 	WT_UNUSED(signo);
 
 	/* Remove the run's files except for rand. */
-	WT_UNUSED_RET(system("cd RUNDIR && rm -rf `ls | sed /rand/d`"));
+	if ((ret = system(g.home_init)) != 0)
+		die(ret, "home directory initialization failed");
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
@@ -330,13 +374,14 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s [-1Llqr]\n    "
-	    "[-C wiredtiger-config] [-c config-file] "
+	    "[-C wiredtiger-config] [-c config-file] [-h home] "
 	    "[name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-c read test program configuration from a file\n"
+	    "\t-h home (default 'RUNDIR')\n"
 	    "\t-L output to a log file\n"
 	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"

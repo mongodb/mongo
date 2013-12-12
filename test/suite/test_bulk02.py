@@ -100,20 +100,9 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Backup a set of chosen tables/files using the wt backup command.
     # The only files are bulk-load files, so they shouldn't be copied.
-    def backup(self, session):
-        # Create a backup directory.
+    def check_backup(self, session):
         backupdir = 'backup.dir'
-        os.mkdir(backupdir)
-
-        # Open up the backup cursor, and copy the files.
-        cursor = session.open_cursor('backup:', None, None)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            shutil.copy(cursor.get_key(), backupdir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
+        self.backup(backupdir, session)
 
         # Open the target directory, and confirm the object has no contents.
         conn = wiredtiger.wiredtiger_open(backupdir)
@@ -141,9 +130,9 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
         # Test with the same and different sessions than the bulk-get call,
         # test both the database handle and session handle caches.
         if self.session_type == 'same':
-            self.backup(self.session)
+            self.check_backup(self.session)
         else:
-            self.backup(self.conn.open_session())
+            self.check_backup(self.conn.open_session())
 
 
 if __name__ == '__main__':

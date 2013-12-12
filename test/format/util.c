@@ -155,7 +155,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * use the same data value all the time.
 	 */
 	if ((g.type == ROW || g.type == VAR) &&
-	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) > g.c_repeat_data_pct) {
+	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) < g.c_repeat_data_pct) {
 		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
@@ -201,32 +201,120 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 }
 
 /*
- * wts_rand --
+ * path_setup --
+ *	Build the standard paths and shell commands we use.
+ */
+void
+path_setup(const char *home)
+{
+	size_t len;
+
+	/* Home directory. */
+	if ((g.home = strdup(home == NULL ? "RUNDIR" : home)) == NULL)
+		syserr("malloc");
+
+	/* Log file. */
+	len = strlen(g.home) + strlen("log") + 2;
+	if ((g.home_log = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_log, len, "%s/%s", g.home, "log");
+
+	/* RNG log file. */
+	len = strlen(g.home) + strlen("rand") + 2;
+	if ((g.home_rand = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_rand, len, "%s/%s", g.home, "rand");
+
+	/* Run file. */
+	len = strlen(g.home) + strlen("run") + 2;
+	if ((g.home_run = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_run, len, "%s/%s", g.home, "run");
+
+	/* Statistics file. */
+	len = strlen(g.home) + strlen("stats") + 2;
+	if ((g.home_stats = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
+
+	/* Hot-backup directory. */
+	len = strlen(g.home) + strlen("BACKUP") + 2;
+	if ((g.home_backup = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
+
+	/* BDB directory. */
+	len = strlen(g.home) + strlen("bdb") + 2;
+	if ((g.home_bdb = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb");
+
+	/* KVS directory. */
+	len = strlen(g.home) + strlen("KVS") + 2;
+	if ((g.home_kvs = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_kvs, len, "%s/%s", g.home, "KVS");
+
+	/*
+	 * Home directory initialize command: remove everything except the RNG
+	 * log file.
+	 */
+#undef	CMD
+#define	CMD	"cd %s && rm -rf `ls | sed /rand/d`"
+	len = strlen(g.home) + strlen(CMD) + 1;
+	if ((g.home_init = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_init, len, CMD, g.home);
+
+	/* Hot backup directory initialize command, remove and re-create it. */
+#undef	CMD
+#define	CMD	"rm -rf %s && mkdir %s"
+	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
+	if ((g.home_backup_init = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup);
+
+	/*
+	 * Salvage command, save the interesting files so we can replay the
+	 * salvage command as necessary.
+	 */
+#undef	CMD
+#define	CMD								\
+	"cd %s && "							\
+	"rm -rf slvg.copy && mkdir slvg.copy && "			\
+	"cp WiredTiger* wt* slvg.copy/"
+	len = strlen(g.home) + strlen(CMD) + 1;
+	if ((g.home_salvage_copy = malloc(len)) == NULL)
+		syserr("malloc");
+	snprintf(g.home_salvage_copy, len, CMD, g.home);
+}
+
+/*
+ * rng --
  *	Return a random number.
  */
 uint32_t
-wts_rand(void)
+rng(void)
 {
 	char buf[64];
 	uint32_t r;
-
-	/* If we're threaded, it's not repeatable, ignore the log. */
-	if (!SINGLETHREADED)
-		return ((uint32_t)rand());
 
 	/*
 	 * We can entirely reproduce a run based on the random numbers used
 	 * in the initial run, plus the configuration files.  It would be
 	 * nice to just log the initial RNG seed, rather than logging every
-	 * random number generated, but we can't -- Berkeley DB calls rand()
-	 * internally, and so that messes up the pattern of random numbers
-	 * (and WT might call rand() in the future, who knows?)
+	 * random number generated, but we'd have to include our own RNG,
+	 * Berkeley DB calls rand() internally, and that messes up the pattern
+	 * of random numbers.
+	 *
+	 * Check g.replay and g.rand_log_stop: multithreaded runs log/replay
+	 * until they get to the operations phase, then turn off log/replay,
+	 * threaded operation order can't be replayed.
 	 */
-	if (g.replay) {
-		if (g.rand_log == NULL &&
-		   (g.rand_log = fopen("RUNDIR/rand", "r")) == NULL)
-			die(errno, "fopen: RUNDIR/rand");
+	if (g.rand_log_stop)
+		return ((uint32_t)rand());
 
+	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
 			if (feof(g.rand_log)) {
 				fprintf(stderr,
@@ -234,24 +322,13 @@ wts_rand(void)
 				    "exiting\n");
 				exit(EXIT_SUCCESS);
 			}
-			die(errno, "feof: random number log");
+			die(errno, "random number log");
 		}
 
-		r = (uint32_t)strtoul(buf, NULL, 10);
-	} else {
-		if (g.rand_log == NULL) {
-			if ((g.rand_log = fopen("RUNDIR/rand", "w")) == NULL)
-				die(errno, "fopen: RUNDIR/rand");
-			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-
-			/*
-			 * Seed the random number generator for each new run (we
-			 * know it's a new run when we re-open the log file).
-			 */
-			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-		}
-		r = (uint32_t)rand();
-		fprintf(g.rand_log, "%" PRIu32 "\n", r);
+		return ((uint32_t)strtoul(buf, NULL, 10));
 	}
+
+	r = (uint32_t)rand();
+	fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	return (r);
 }

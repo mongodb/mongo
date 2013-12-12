@@ -1,3 +1,50 @@
+WiredTiger release 2.0.1, 2013-12-12
+------------------------------------
+
+The WiredTiger 2.0.1 release contains major new features, numerous performance
+enhancements and bug fixes.
+
+Significant changes include:
+
+* WiredTiger now supports fine-grained durability via Write Ahead Logging (WAL).
+  Logging is enabled with the "log=(enabled)" configuration string to
+  wiredtiger_open. If the connection is not shut down cleanly and logging is
+  enabled, WiredTiger will automatically run recovery the next time it is
+  opened, rolling forward changes in the log until the last commit.
+  [#605]
+
+* Many enhancements to the LSM implementation to improve the throughput and
+  reduce maximum operation latency including:
+  - Algorithmic improvements when multiple merge threads are configured.
+  - Improvements to bloom filter lookup speed.
+  - Enhancements to internal cursor management, to reduce search overhead.
+  - Prioritize switching to a new level 0 chunk in utility threads, to avoid
+    application thread pauses.
+  - More advanced logic in choosing when to create bloom filters.
+
+* LSM specific WT_SESSION::create configuration option enhancements. Including:
+  - Move existing options into their own group, and strip leading lsm_ prefix.
+  - Add a new merge_max configuration option.
+  - Update the default chunk_size to be 10MB.
+  - Increase the default bloom filter bit and hash counts.
+  - Clean up files left after interrupted merges.
+  See the upgrading documentation for details.
+  [#784, #785, #786, #802]
+
+* WT_SESSION::compact can now be used to merge LSM trees into a small number
+  of chunks on disk.
+  [#792]
+
+* Enhanced the Java API, so that when WiredTiger automatically closes a
+  handle, the handle is automatically invalidated for the Java application.
+  [#485]
+
+* Add a script that can create an interactive web page to view statistics
+  from a WiredTiger statistics log. Based on D3: http://d3js.org/
+
+* Enhancements to the wtperf performance testing tool to add new features
+
+
 WiredTiger release 1.6.6, 2013-11-19
 ------------------------------------
 

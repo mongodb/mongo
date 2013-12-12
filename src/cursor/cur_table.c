@@ -36,6 +36,7 @@ static int __curtable_update(WT_CURSOR *cursor);
 		F_SET(*__cp, WT_CURSTD_KEY_EXT |			\
 		    WT_CURSTD_VALUE_EXT);				\
 		WT_ERR((*__cp)->f(*__cp));				\
+		WT_ERR((*__cp)->reset(*__cp));				\
 	}								\
 } while (0)
 
@@ -602,6 +603,10 @@ err:	API_END(session);
 	return (ret);
 }
 
+/*
+ * __curtable_open_colgroups --
+ *	Open cursors on column groups for a table cursor.
+ */
 static int
 __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
@@ -638,6 +643,10 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	return (0);
 }
 
+/*
+ * __curtable_open_indices --
+ *	Open cursors on indices for a table cursor.
+ */
 static int
 __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 {

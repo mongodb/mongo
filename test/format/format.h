@@ -72,13 +72,9 @@ extern WT_EXTENSION_API *wt_api;
 #define	M(v)		((v) * 1000000)		/* Million */
 
 /* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
+#define	MMRAND(min, max)	(rng() % (((max) + 1) - (min)) + (min))
 
 #define	WT_NAME	"wt"				/* Object name */
-
-#define	RUNDIR		"RUNDIR"		/* Run home */
-#define	RUNDIR_BACKUP	"RUNDIR/BACKUP"		/* Hot-backup directory */
-#define	RUNDIR_KVS	"RUNDIR/KVS"		/* Run home for data-source */
 
 #define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
@@ -86,12 +82,25 @@ extern WT_EXTENSION_API *wt_api;
 typedef struct {
 	char *progname;				/* Program name */
 
+	char *home;				/* Home directory */
+	char *home_init;			/* Initialize home command */
+	char *home_backup;			/* Hot-backup directory */
+	char *home_backup_init;			/* Initialize backup command */
+	char *home_bdb;				/* BDB directory */
+	char *home_kvs;				/* KVS directory */
+	char *home_log;				/* Operation log file path */
+	char *home_rand;			/* RNG log file path */
+	char *home_run;				/* Run file path */
+	char *home_stats;			/* Statistics file path */
+	char *home_salvage_copy;		/* Salvage copy command */
+
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
 
 	WT_CONNECTION	 *wts_conn;
 	WT_EXTENSION_API *wt_api;
 
+	int   rand_log_stop;			/* Logging turned off */
 	FILE *rand_log;				/* Random number log */
 
 	uint32_t run_cnt;			/* Run counter */
@@ -120,22 +129,18 @@ typedef struct {
 
 	char *uri;				/* Object name */
 
-#define	FIX		1			/* File types */
-#define	ROW		2
-#define	VAR		3
-	u_int   type;				/* File type */
-
-#define	COMPRESS_NONE	1
-#define	COMPRESS_BZIP	2
-#define	COMPRESS_LZO	3
-#define	COMPRESS_RAW	4
-#define	COMPRESS_SNAPPY	5
-	u_int compression;			/* Compression type */
-
 	char *config_open;			/* Command-line configuration */
 
-	u_int c_bitcnt;				/* Config values */
+	u_int c_auto_throttle;			/* Config values */
+	u_int c_bitcnt;
+	u_int c_bloom;
+	u_int c_bloom_bit_count;
+	u_int c_bloom_hash_count;
+	u_int c_bloom_oldest;
 	u_int c_cache;
+	u_int c_compact;
+	char *c_checksum;
+	u_int c_chunk_size;
 	char *c_compression;
 	char *c_config_open;
 	u_int c_data_extend;
@@ -154,8 +159,11 @@ typedef struct {
 	u_int c_key_max;
 	u_int c_key_min;
 	u_int c_leaf_page_max;
+	u_int c_merge_max;
+	u_int c_merge_threads;
 	u_int c_ops;
-	u_int c_prefix;
+	u_int c_prefix_compression;
+	u_int c_prefix_compression_min;
 	u_int c_repeat_data_pct;
 	u_int c_reverse;
 	u_int c_rows;
@@ -166,6 +174,23 @@ typedef struct {
 	u_int c_value_max;
 	u_int c_value_min;
 	u_int c_write_pct;
+
+#define	FIX			1	
+#define	ROW			2
+#define	VAR			3
+	u_int type;				/* File type's flag value */
+
+#define	CHECKSUM_OFF		1
+#define	CHECKSUM_ON		2
+#define	CHECKSUM_UNCOMPRESSED	3
+	u_int c_checksum_flag;			/* Checksum flag value */
+
+#define	COMPRESS_NONE		1
+#define	COMPRESS_BZIP		2
+#define	COMPRESS_LZO		3
+#define	COMPRESS_RAW		4
+#define	COMPRESS_SNAPPY		5
+	u_int c_compression_flag;		/* Compression flag value */
 
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */
@@ -201,6 +226,7 @@ void	 bdb_read(uint64_t, void *, uint32_t *, int *);
 void	 bdb_remove(uint64_t, int *);
 void	 bdb_update(const void *, uint32_t, const void *, uint32_t, int *);
 
+void	*compact(void *);
 void	 config_clear(void);
 void	 config_error(void);
 void	 config_file(const char *);
@@ -212,6 +238,9 @@ void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 path_setup(const char *);
+uint32_t rng(void);
+void	 rng_init(void);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
@@ -222,7 +251,6 @@ void	 wts_dump(const char *, int);
 void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
-uint32_t wts_rand(void);
 void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);

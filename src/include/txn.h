@@ -51,6 +51,51 @@ enum __wt_txn_isolation {
 	TXN_ISO_SNAPSHOT
 };
 
+/*
+ * WT_TXN_OP --
+ *	A transactional operation.  Each transaction builds an in-memory array
+ *	of these operations as it runs, then uses the array to either write log
+ *	records during commit or undo the operations during rollback.
+ */
+struct __wt_txn_op {
+	uint32_t fileid;
+	enum {
+		TXN_OP_BASIC,
+		TXN_OP_INMEM,
+		TXN_OP_REF,
+		TXN_OP_TRUNCATE_COL,
+		TXN_OP_TRUNCATE_ROW
+	} type;
+	union {
+		/* TXN_OP_BASIC, TXN_OP_INMEM */
+		struct {
+			WT_INSERT *ins;
+			WT_UPDATE *upd;
+			WT_ITEM key;
+		} op;
+		/* TXN_OP_REF */
+		WT_REF *ref;
+		/* TXN_OP_TRUNCATE_COL */
+		struct {
+			uint64_t start, stop;
+		} truncate_col;
+		/* TXN_OP_TRUNCATE_ROW */
+		struct {
+			WT_ITEM start, stop;
+			enum {
+				TXN_TRUNC_ALL,
+				TXN_TRUNC_BOTH,
+				TXN_TRUNC_START,
+				TXN_TRUNC_STOP
+			} mode;
+		} truncate_row;
+	} u;
+};
+
+/*
+ * WT_TXN --
+ *	Per-session transaction context.
+ */
 struct __wt_txn {
 	uint64_t id;
 
@@ -66,20 +111,19 @@ struct __wt_txn {
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
 
-	/*
-	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
-	 * modified by this transaction.
-	 */
-	uint64_t      **mod;
+	/* Array of modifications by this transaction. */
+	WT_TXN_OP      *mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
 
-	WT_REF	      **modref;
-	size_t		modref_alloc;
-	u_int		modref_count;
-
 	/* Requested notification when transactions are resolved. */
 	WT_TXN_NOTIFY *notify;
+
+	/* Checkpoint status. */
+	WT_LSN		ckpt_lsn;
+	int		full_ckpt;
+	uint32_t	ckpt_nsnapshot;
+	WT_ITEM		*ckpt_snapshot;
 
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02

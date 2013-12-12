@@ -112,8 +112,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (strstr(config, "direct_io") != NULL)
 		g.c_hot_backups = 0;
 
-	if ((ret =
-	    wiredtiger_open(home, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open: %s", home);
 
 	if (set_api)
@@ -146,7 +145,7 @@ wts_create(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	char config[2048], *end, *p;
+	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
 
@@ -201,7 +200,11 @@ wts_create(void)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
-		if (!g.c_prefix)
+		if (g.c_prefix_compression)
+			p += snprintf(p, (size_t)(end - p),
+			    ",prefix_compression_min=%u",
+			    g.c_prefix_compression_min);
+		else
 			p += snprintf(p, (size_t)(end - p),
 			    ",prefix_compression=false");
 		if (g.c_reverse)
@@ -218,22 +221,22 @@ wts_create(void)
 		break;
 	}
 
-	/* Configure checksums (not configurable from the command line). */
-	switch MMRAND(1, 10) {
-	case 1:						/* 10% */
-		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
-		break;
-	case 2:						/* 10% */
+	/* Configure checksums. */
+	switch (g.c_checksum_flag) {
+	case CHECKSUM_OFF:
 		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
 		break;
-	default:					/* 80% */
+	case CHECKSUM_ON:
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		break;
+	case CHECKSUM_UNCOMPRESSED:
 		p += snprintf(
 		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
 		break;
 	}
 
 	/* Configure compression. */
-	switch (g.compression) {
+	switch (g.c_compression_flag) {
 	case COMPRESS_NONE:
 		break;
 	case COMPRESS_BZIP:
@@ -270,10 +273,30 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
 
 	if (DATASOURCE("lsm")) {
-		p += snprintf(p, (size_t)(end - p), ",type=lsm");
-		if (MMRAND(1, 10) <= 2)			/* 20% */
-			p += snprintf(
-			    p, (size_t)(end - p), ",lsm_bloom_oldest=true");
+		p += snprintf(p, (size_t)(end - p), ",type=lsm,lsm=(");
+		p += snprintf(p, (size_t)(end - p),
+		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
+		p += snprintf(p, (size_t)(end - p),
+		    "chunk_size=%" PRIu32 "MB,", g.c_chunk_size);
+		/*
+		 * We can't set bloom_oldest without bloom, and we want to test
+		 * with Bloom filters on most of the time anyway.
+		 */
+		if (g.c_bloom_oldest)
+			g.c_bloom = 1;
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom=%s,", g.c_bloom ? "true" : "false");
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom_bit_count=%u,", g.c_bloom_bit_count);
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom_hash_count=%u,", g.c_bloom_hash_count);
+		p += snprintf(p, (size_t)(end - p),
+		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
+		p += snprintf(p, (size_t)(end - p),
+		    "merge_max=%u,", g.c_merge_max);
+		p += snprintf(p, (size_t)(end - p),
+		    "merge_threads=%u,", g.c_merge_threads);
+		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 
 	if (DATASOURCE("memrata"))
@@ -302,8 +325,9 @@ wts_close(void)
 void
 wts_dump(const char *tag, int dump_bdb)
 {
-	int offset, ret;
-	char cmd[256];
+	size_t len;
+	int ret;
+	char *cmd;
 
 	/* Data-sources that don't support dump through the wt utility. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
@@ -311,19 +335,21 @@ wts_dump(const char *tag, int dump_bdb)
 
 	track("dump files and compare", 0ULL, NULL);
 
-	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
-	if (dump_bdb)
-		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -b %s", BERKELEY_DB_PATH);
-	if (g.type == FIX || g.type == VAR)
-		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -c");
+	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
+	if ((cmd = malloc(len)) == NULL)
+		syserr("malloc");
+	(void)snprintf(cmd, len,
+	    "sh s_dumpcmp -h %s %s %s %s %s %s",
+	    g.home,
+	    dump_bdb ? "-b " : "",
+	    dump_bdb ? BERKELEY_DB_PATH : "",
+	    g.type == FIX || g.type == VAR ? "-c" : "",
+	    g.uri == NULL ? "" : "-n",
+	    g.uri == NULL ? "" : g.uri);
 
-	if (g.uri != NULL)
-		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -n %s", g.uri);
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
+	free(cmd);
 }
 
 void
@@ -350,11 +376,7 @@ wts_salvage(void)
 	 * Save a copy of the interesting files so we can replay the salvage
 	 * step as necessary.
 	 */
-	if ((ret = system(
-	    "cd RUNDIR && "
-	    "rm -rf slvg.copy && "
-	    "mkdir slvg.copy && "
-	    "cp WiredTiger* wt* slvg.copy/")) != 0)
+	if ((ret = system(g.home_salvage_copy)) != 0)
 		die(ret, "salvage copy step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -429,8 +451,8 @@ wts_stats(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
-	if ((fp = fopen("RUNDIR/stats", "w")) == NULL)
-		die(errno, "fopen: RUNDIR/stats");
+	if ((fp = fopen(g.home_stats, "w")) == NULL)
+		die(errno, "fopen: %s", g.home_stats);
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");

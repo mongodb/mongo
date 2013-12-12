@@ -58,13 +58,19 @@ struct __wt_session_impl {
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
+
+					/* Session handle reference list */
 	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
+#define	WT_DHANDLE_SWEEP_WAIT	60	/* Wait before discarding */
+#define	WT_DHANDLE_SWEEP_PERIOD	20	/* Only sweep every 20 seconds */
+	time_t last_sweep;		/* Last sweep for dead handles */
 
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
 	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
+	WT_COMPACT	 *compact;	/* Compact state */
 
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
@@ -96,6 +102,7 @@ struct __wt_session_impl {
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
+	void	*lang_private;		/* Language specific private storage */
 
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */
@@ -107,6 +114,8 @@ struct __wt_session_impl {
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
 	int compaction;			/* Compaction did some work */
+	int skip_schema_lock;		/* Another thread holds the schema lock
+					 * on our behalf */
 
 	uint32_t flags;
 

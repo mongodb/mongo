@@ -1,13 +1,13 @@
 /*! @page compaction Compaction
 
-The WT_SESSION::compact method can be used to compact a row- or column-store
-btree (log-structured merge trees cannot be compacted).
+The WT_SESSION::compact method can be used to compact btree and log-structured
+merge tree data sources.
 
-The data source does not have to be quiescent, compaction may be performed on
-a live data source.
+The data source does not have to be quiescent, compaction may be performed on a
+live data source.
 
-Because checkpoints named by the application are not discarded until
-explicitly removed or replaced, they may prevent WT_SESSION::compact
-from accomplishing anything.
-
+Because checkpoints named by the application are not discarded until explicitly
+removed or replaced, they may prevent WT_SESSION::compact from accomplishing
+anything.
+ *
  */

@@ -49,7 +49,8 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 /*
  * __cursor_invalid --
  *	Return if the cursor references an invalid K/V pair (either the pair
- * doesn't exist at all because the tree is empty, or the pair was deleted).
+ *	doesn't exist at all because the tree is empty, or the pair was
+ *	deleted).
  */
 static inline int
 __cursor_invalid(WT_CURSOR_BTREE *cbt)
@@ -67,11 +68,23 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	page = cbt->page;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/* If we found an item on an insert list, check there. */
+	/* If we found an insert list entry with a visible update, use it. */
 	if (ins != NULL) {
-		if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
-			return (1);
-		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+		if ((upd = __wt_txn_read(session, ins->upd)) != NULL)
+			return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+
+		/* Do we have a position on the page? */
+		switch (btree->type) {
+		case BTREE_COL_FIX:
+			if (cbt->recno >= page->u.col_fix.recno + page->entries)
+				return (1);
+			break;
+		case BTREE_COL_VAR:
+		case BTREE_ROW:
+			if (cbt->slot > page->entries)
+				return (1);
+			break;
+		}
 	}
 
 	/* The page may be empty, the search routine doesn't check. */
@@ -84,9 +97,8 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 		break;
 	case BTREE_COL_VAR:
 		cip = &page->u.col_var.d[cbt->slot];
-		if ((cell = WT_COL_PTR(page, cip)) == NULL)
-			return (WT_NOTFOUND);
-		if (__wt_cell_type(cell) == WT_CELL_DEL)
+		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
+		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (1);
 		break;
 	case BTREE_ROW:
@@ -114,7 +126,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_reset);
 	WT_STAT_FAST_DATA_INCR(session, cursor_reset);
 
-	ret = __cursor_leave(cbt);
+	ret = __curfile_leave(cbt);
 	__cursor_search_clear(cbt);
 
 	return (ret);
@@ -325,7 +337,7 @@ err:	if (ret == WT_RESTART)
 		goto retry;
 	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0)
-		WT_TRET(__cursor_leave(cbt));
+		WT_TRET(__curfile_leave(cbt));
 	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
@@ -683,19 +695,32 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
 	WT_BTREE *btree;
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cbt = (start != NULL) ? start : stop;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
 
+	/*
+	 * For recovery, we log the start and stop keys for a truncate
+	 * operation, not the individual records removed.  On the other hand,
+	 * for rollback we need to keep track of all the in-memory operations.
+	 *
+	 * We deal with this here by logging the truncate range first, then (in
+	 * the logging code) disabling writing of the in-memory remove records
+	 * to disk.
+	 */
+	if (S2C(session)->logging)
+		WT_RET(__wt_txn_truncate_log(session, start, stop));
+
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		WT_RET(__cursor_truncate_fix(
+		WT_ERR(__cursor_truncate_fix(
 		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_COL_VAR:
-		WT_RET(__cursor_truncate(
+		WT_ERR(__cursor_truncate(
 		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_ROW:
@@ -710,15 +735,17 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 		 * are positioned in the tree.
 		 */
 		if (start != NULL)
-			WT_RET(__wt_btcur_search(start));
+			WT_ERR(__wt_btcur_search(start));
 		if (stop != NULL)
-			WT_RET(__wt_btcur_search(stop));
-		WT_RET(__cursor_truncate(
+			WT_ERR(__wt_btcur_search(stop));
+		WT_ERR(__cursor_truncate(
 		    session, start, stop, __wt_row_modify));
 		break;
 	}
 
-	return (0);
+err:	if (S2C(session)->logging)
+		WT_TRET(__wt_txn_truncate_end(session));
+	return (ret);
 }
 
 /*
@@ -733,7 +760,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	ret = __cursor_leave(cbt);
+	ret = __curfile_leave(cbt);
 	__wt_buf_free(session, &cbt->tmp);
 
 	return (ret);

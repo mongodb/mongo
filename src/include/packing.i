@@ -24,12 +24,18 @@ typedef struct {
 	char type;
 } WT_PACK_VALUE;
 
+#define	WT_PACK_VALUE_INIT  { { 0 }, 0, 0, 0 }
+#define	WT_DECL_PACK_VALUE(pv)  WT_PACK_VALUE pv = WT_PACK_VALUE_INIT
+
 typedef struct {
 	WT_SESSION_IMPL *session;
 	const char *cur, *end, *orig;
 	unsigned long repeats;
 	WT_PACK_VALUE lastv;
 } WT_PACK;
+
+#define	WT_PACK_INIT    { NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT }
+#define	WT_DECL_PACK(pack)  WT_PACK pack = WT_PACK_INIT
 
 static inline int
 __pack_initn(
@@ -454,9 +460,9 @@ static inline int
 __wt_struct_packv(WT_SESSION_IMPL *session,
     void *buffer, size_t size, const char *fmt, va_list ap)
 {
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	uint8_t *p, *end;
 
 	p = buffer;
@@ -491,11 +497,9 @@ static inline int
 __wt_struct_sizev(
     WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, va_list ap)
 {
+	WT_DECL_PACK_VALUE(pv);
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	size_t total;
-
-	WT_CLEAR(pv);
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
@@ -521,9 +525,9 @@ static inline int
 __wt_struct_unpackv(WT_SESSION_IMPL *session,
     const void *buffer, size_t size, const char *fmt, va_list ap)
 {
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	const uint8_t *p, *end;
 
 	p = buffer;

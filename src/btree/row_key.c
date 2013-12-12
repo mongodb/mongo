@@ -174,7 +174,7 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 		 * 1: the test for an on/off page reference.
 		 */
 		if (__wt_off_page(page, key)) {
-			ikey = key;
+off_page:		ikey = key;
 
 			/*
 			 * If this is the key we originally wanted, we don't
@@ -233,10 +233,32 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 			/*
 			 * If this is the key we wanted from the start, we don't
 			 * care if it's an overflow key, get a copy and wrap up.
+			 *
+			 * Avoid racing with reconciliation deleting overflow
+			 * keys.  Deleted overflow keys must be instantiated
+			 * first, acquire the overflow lock and check.  Read
+			 * the key if we still need to do so, but holding the
+			 * overflow lock.  Note we are not using the version of
+			 * the cell-data-ref calls that acquire the overflow
+			 * lock and do a look-aside into the tracking cache:
+			 * this is an overflow key, not a value, meaning it's
+			 * instantiated before being deleted, not copied into
+			 * the tracking cache.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(__wt_dsk_cell_data_ref(
-				    session, WT_PAGE_ROW_LEAF, unpack, retb));
+				WT_ERR(__wt_readlock(
+				    session, S2BT(session)->ovfl_lock));
+				key = WT_ROW_KEY_COPY(rip);
+				if (__wt_off_page(page, key)) {
+					WT_ERR(__wt_rwunlock(session,
+					    S2BT(session)->ovfl_lock));
+					goto off_page;
+				}
+				ret = __wt_dsk_cell_data_ref(
+				    session, WT_PAGE_ROW_LEAF, unpack, retb);
+				WT_TRET(__wt_rwunlock(session,
+				    S2BT(session)->ovfl_lock));
+				WT_ERR(ret);
 				break;
 			}
 

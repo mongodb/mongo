@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 /*
- * __open_directory_sync:
+ * __open_directory_sync --
  *	Fsync the directory in which we created the file.
  */
 static int

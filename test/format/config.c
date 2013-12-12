@@ -28,11 +28,14 @@
 #include "format.h"
 #include "config.h"
 
+static void	   config_checksum(void);
 static void	   config_compression(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
 static int	   config_find_is_perm(const char *, size_t);
-static u_int	   config_translate(const char *);
+static void	   config_map_checksum(const char *, u_int *);
+static void	   config_map_compression(const char *, u_int *);
+static void	   config_map_file_type(const char *, u_int *);
 
 /*
  * config_setup --
@@ -52,39 +55,39 @@ config_setup(void)
 	 * them.
 	 */
 	if (!config_find_is_perm("data_source", strlen("data_source")))
-		switch (MMRAND(0, 2)) {
-		case 0:
+		switch (MMRAND(1, 3)) {
+		case 1:
 			config_single("data_source=file", 0);
 			break;
-		case 1:
+		case 2:
 #if 0
 			config_single("data_source=lsm", 0);
 			break;
 #endif
-		case 2:
+		case 3:
 			config_single("data_source=table", 0);
 			break;
 		}
 
 	if (!config_find_is_perm("file_type", strlen("file_type")))
-		switch (MMRAND(0, 2)) {
-		case 0:
+		switch (MMRAND(1, 3)) {
+		case 1:
 			if (!DATASOURCE("lsm")) {
 				config_single("file_type=fix", 0);
 				break;
 			}
 			/* FALLTHROUGH */
-		case 1:
+		case 2:
 			if (!DATASOURCE("lsm")) {
 				config_single("file_type=var", 0);
 				break;
 			}
 			/* FALLTHROUGH */
-		case 2:
+		case 3:
 			config_single("file_type=row", 0);
 			break;
 		}
-	g.type = config_translate(g.c_file_type);
+	config_map_file_type(g.c_file_type, &g.type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still
@@ -109,10 +112,10 @@ config_setup(void)
 		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
-	/* Default single-threaded 25% of the time. */
+	/* Default single-threaded 10% of the time. */
 	cp = config_find("threads", strlen("threads"));
 	if (!(cp->flags & C_PERM))
-		*cp->v = MMRAND(0, 3) == 0 ? 1: CONF_RAND(cp);
+		*cp->v = MMRAND(1, 100) < 10 ? 1: CONF_RAND(cp);
 
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
@@ -140,6 +143,7 @@ config_setup(void)
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		g.c_reverse = 0;
 
+	config_checksum();
 	config_compression();
 
 	/* Clear operations values if the whole run is read-only. */
@@ -147,10 +151,6 @@ config_setup(void)
 		for (cp = c; cp->name != NULL; ++cp)
 			if (cp->flags & C_OPS)
 				*cp->v = 0;
-
-	/* Multi-threaded runs cannot be replayed. */
-	if (g.replay && !SINGLETHREADED)
-		die(0, "-r is incompatible with threaded runs");
 
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
@@ -176,6 +176,31 @@ config_setup(void)
 }
 
 /*
+ * config_checksum --
+ *	Checksum configuration.
+ */
+static void
+config_checksum(void)
+{
+	CONFIG *cp;
+
+	/* Choose a checksum mode if nothing was specified. */
+	cp = config_find("checksum", strlen("checksum"));
+	if (!(cp->flags & C_PERM))
+		switch (MMRAND(1, 10)) {
+		case 1:					/* 10% */
+			config_single("checksum=on", 0);
+			break;
+		case 2:					/* 10% */
+			config_single("checksum=off", 0);
+			break;
+		default:				/* 80% */
+			config_single("checksum=uncompressed", 0);
+			break;
+		}
+}
+
+/*
  * config_compression --
  *	Compression configuration.
  */
@@ -194,29 +219,26 @@ config_compression(void)
 	cp = config_find("compression", strlen("compression"));
 	if (!(cp->flags & C_PERM)) {
 		cstr = "compression=none";
-		switch (MMRAND(0, 9)) {
-		case 0:					/* 10% */
+		switch (MMRAND(1, 10)) {
+		case 1:					/* 10% */
 			break;
-		case 1: case 2: case 3: case 4:		/* 40% */
+		case 2: case 3: case 4: case 5:		/* 40% */
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=bzip";
 			break;
-		case 5:					/* 10% */
+		case 6:					/* 10% */
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=raw";
 			break;
-		case 6: case 7: case 8: case 9:		/* 40% */
+		case 7: case 8: case 9: case 10:	/* 40% */
 			if (access(SNAPPY_PATH, R_OK) == 0)
 				cstr = "compression=snappy";
 			break;
 		}
 		config_single(cstr, 0);
 	}
-	g.compression = config_translate(g.c_compression);
-	if (!(cp->flags & C_PERM))
-		return;
 
-	switch (g.compression) {
+	switch (g.c_compression_flag) {
 	case COMPRESS_BZIP:
 	case COMPRESS_RAW:
 		if (access(BZIP_PATH, R_OK) != 0)
@@ -240,21 +262,16 @@ void
 config_error(void)
 {
 	CONFIG *cp;
-	FILE *fp;
 
 	/* Display configuration names. */
+	fprintf(stderr, "\n");
 	fprintf(stderr, "Configuration names:\n");
 	for (cp = c; cp->name != NULL; ++cp)
-		fprintf(stderr, "%16s : %s\n", cp->name, cp->desc);
-
-	fprintf(stderr, "\n");
-	if ((fp = fopen("CONFIG.example", "w")) != NULL) {
-		fprintf(stderr, "Re-creating CONFIG.example file... ");
-		for (cp = c; cp->name != NULL; ++cp)
-			fprintf(fp, "#%s\n#\t%s\n\n", cp->name, cp->desc);
-		(void)fclose(fp);
-		fprintf(stderr, "done\n");
-	}
+		if (strlen(cp->name) > 17)
+			fprintf(stderr,
+			    "%s\n%17s: %s\n", cp->name, " ", cp->desc);
+		else
+			fprintf(stderr, "%17s: %s\n", cp->name, cp->desc);
 }
 
 /*
@@ -270,8 +287,8 @@ config_print(int error_display)
 	if (error_display)
 		fp = stdout;
 	else
-		if ((fp = fopen("RUNDIR/run", "w")) == NULL)
-			die(errno, "fopen: RUNDIR/run");
+		if ((fp = fopen(g.home_run, "w")) == NULL)
+			die(errno, "fopen: %s", g.home_run);
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -349,6 +366,7 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
+	int v;
 	const char *ep;
 
 	if ((ep = strchr(s, '=')) == NULL) {
@@ -372,69 +390,97 @@ config_single(const char *s, int perm)
 				"Invalid data source option: %s\n", ep);
 			    exit(EXIT_FAILURE);
 		}
-		if (strncmp(s, "file_type", strlen("file_type")) == 0)
-			*cp->vstr = strdup(
-			    config_file_type(config_translate(ep)));
-		else
+
+		if (strncmp(s, "checksum", strlen("checksum")) == 0) {
+			config_map_checksum(ep, &g.c_checksum_flag);
+			*cp->vstr = strdup(ep);
+		} else if (strncmp(
+		    s, "compression", strlen("compression")) == 0) {
+			config_map_compression(ep, &g.c_compression_flag);
+			*cp->vstr = strdup(ep);
+		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
+			config_map_file_type(ep, &g.type);
+			*cp->vstr = strdup(config_file_type(g.type));
+		} else
 			*cp->vstr = strdup(ep);
 		if (*cp->vstr == NULL)
-			syserr("Config string parsing");
+			syserr("malloc");
+
 		return;
 	}
 
-	*cp->v = config_translate(ep);
+	v = atoi(ep);
 	if (cp->flags & C_BOOL) {
-		if (*cp->v != 0 && *cp->v != 1) {
+		if (v != 0 && v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",
 			    g.progname, s);
 			exit(EXIT_FAILURE);
 		}
-	} else if (*cp->v < cp->min || *cp->v > cp->maxset) {
+	} else if (v < 0 || (u_int)v < cp->min || (u_int)v > cp->maxset) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
 		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
 		    g.progname, s, *cp->v, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
+	*cp->v = (u_int)v;
 }
 
 /*
- * config_translate --
- *	Return an integer value representing the argument.
+ * config_map_file_type --
+ *	Map a file type configuration to a flag.
  */
-static u_int
-config_translate(const char *s)
+static void
+config_map_file_type(const char *s, u_int *vp)
 {
-	/* If it's already a integer value, we're done. */
-	if (isdigit(s[0]))
-		return ((u_int)atoi(s));
-
-	/* File type names. */
 	if (strcmp(s, "fix") == 0 ||
-	    strcmp(s, "flcs") == 0 ||		/* Deprecated */
 	    strcmp(s, "fixed-length column-store") == 0)
-		return (FIX);
-	if (strcmp(s, "var") == 0 ||
-	    strcmp(s, "vlcs") == 0 ||		/* Deprecated */
+		*vp = FIX;
+	else if (strcmp(s, "var") == 0 ||
 	    strcmp(s, "variable-length column-store") == 0)
-		return (VAR);
-	if (strcmp(s, "row") == 0 ||
+		*vp = VAR;
+	else if (strcmp(s, "row") == 0 ||
 	    strcmp(s, "row-store") == 0)
-		return (ROW);
+		*vp = ROW;
+	else
+		die(EINVAL, "illegal file type configuration: %s", s);
+}
 
-	/* Compression type names. */
+/*
+ * config_map_checksum --
+ *	Map a checksum configuration to a flag.
+ */
+static void
+config_map_checksum(const char *s, u_int *vp)
+{
+	if (strcmp(s, "on") == 0)
+		*vp = CHECKSUM_ON;
+	else if (strcmp(s, "off") == 0)
+		*vp = CHECKSUM_ON;
+	else if (strcmp(s, "uncompressed") == 0)
+		*vp = CHECKSUM_UNCOMPRESSED;
+	else
+		die(EINVAL, "illegal checksum configuration: %s", s);
+}
+
+/*
+ * config_map_compression --
+ *	Map a compression configuration to a flag.
+ */
+static void
+config_map_compression(const char *s, u_int *vp)
+{
 	if (strcmp(s, "none") == 0)
-		return (COMPRESS_NONE);
-	if (strcmp(s, "bzip") == 0)
-		return (COMPRESS_BZIP);
-	if (strcmp(s, "lzo") == 0)
-		return (COMPRESS_LZO);
-	if (strcmp(s, "raw") == 0)
-		return (COMPRESS_RAW);
-	if (strcmp(s, "snappy") == 0)
-		return (COMPRESS_SNAPPY);
-
-	fprintf(stderr, "%s: %s: unknown configuration value\n", g.progname, s);
-	exit(EXIT_FAILURE);
+		*vp = COMPRESS_NONE;
+	else if (strcmp(s, "bzip") == 0)
+		*vp = COMPRESS_BZIP;
+	else if (strcmp(s, "lzo") == 0)
+		*vp = COMPRESS_LZO;
+	else if (strcmp(s, "raw") == 0)
+		*vp = COMPRESS_RAW;
+	else if (strcmp(s, "snappy") == 0)
+		*vp = COMPRESS_SNAPPY;
+	else
+		die(EINVAL, "illegal compression configuration: %s", s);
 }
 
 /*
@@ -447,7 +493,7 @@ config_find(const char *s, size_t len)
 	CONFIG *cp;
 
 	for (cp = c; cp->name != NULL; ++cp) 
-		if (strncmp(s, cp->name, len) == 0)
+		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
 			return (cp);
 
 	fprintf(stderr,

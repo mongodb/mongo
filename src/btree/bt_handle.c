@@ -156,7 +156,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 
 	/* Destroy locks. */
-	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
+	WT_TRET(__wt_rwlock_destroy(session, &btree->ovfl_lock));
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
@@ -196,6 +196,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		WT_VERBOSE_RET(session, version,
 		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
 	}
+
+	/* Get the file ID. */
+	WT_RET(__wt_config_gets(session, cfg, "id", &cval));
+	btree->id = (uint32_t)cval.val;
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
@@ -302,7 +306,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Overflow lock. */
 	WT_RET(__wt_rwlock_alloc(
-	    session, "btree overflow lock", &btree->val_ovfl_lock));
+	    session, "btree overflow lock", &btree->ovfl_lock));
 
 	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);
 
@@ -513,7 +517,7 @@ __wt_btree_new_leaf_page(
 }
 
 /*
- * __wt_btree_no_eviction --
+ * __wt_btree_evictable --
  *      Setup or release a cache-resident tree.
  */
 void
@@ -701,6 +705,10 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	return (split_size);
 }
 
+/*
+ * pse1 --
+ *	Page size error message 1.
+ */
 static int
 pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 {
@@ -710,6 +718,10 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 	    type, max, ovfl);
 }
 
+/*
+ * pse2 --
+ *	Page size error message 2.
+ */
 static int
 pse2(WT_SESSION_IMPL *session,
     const char *type, uint32_t max, uint32_t ovfl, int pct)

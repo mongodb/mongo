@@ -35,19 +35,10 @@ try:
 except ImportError:
     import unittest
 
-import sys, time, traceback, os, re
-import wiredtiger
 from contextlib import contextmanager
+import os, re, shutil, sys, time, traceback
 
-def removeAll(top):
-    if not os.path.isdir(top):
-        return
-    for root, dirs, files in os.walk(top, topdown=False):
-        for name in files:
-            os.remove(os.path.join(root, name))
-        for name in dirs:
-            os.rmdir(os.path.join(root, name))
-    os.rmdir(top)
+import wiredtiger
 
 def shortenWithEllipsis(s, maxlen):
     if len(s) > maxlen:
@@ -155,7 +146,7 @@ class WiredTigerTestCase(unittest.TestCase):
             d = 'WT_TEST.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
         else:
             d = 'WT_TEST'
-        removeAll(d)
+        shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
         WiredTigerTestCase._parentTestdir = d
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
@@ -235,12 +226,12 @@ class WiredTigerTestCase(unittest.TestCase):
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
-        self.__class__.wt_ntests += 1
         self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.className() + '.' + str(self.__class__.wt_ntests))
+        self.__class__.wt_ntests += 1
         if WiredTigerTestCase._verbose > 2:
             self.prhead('started in ' + self.testdir, True)
         self.origcwd = os.getcwd()
-        removeAll(self.testdir)
+        shutil.rmtree(self.testdir, ignore_errors=True)
         if os.path.exists(self.testdir):
             raise Exception(self.testdir + ": cannot remove directory")
         os.makedirs(self.testdir)
@@ -277,7 +268,7 @@ class WiredTigerTestCase(unittest.TestCase):
 
         # Clean up unless there's a failure
         if passed and not WiredTigerTestCase._preserveFiles:
-            removeAll(self.testdir)
+            shutil.rmtree(self.testdir, ignore_errors=True)
         else:
             self.pr('preserving directory ' + self.testdir)
 
@@ -288,6 +279,20 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('preserving directory ' + self.testdir)
         if WiredTigerTestCase._verbose > 2:
             self.prhead('TEST COMPLETED')
+
+    def backup(self, backup_dir, session=None):
+        if session is None:
+            session = self.session
+        shutil.rmtree(backup_dir, ignore_errors=True)
+        os.mkdir(backup_dir)
+        bkp_cursor = session.open_cursor('backup:', None, None)
+        while True:
+            ret = bkp_cursor.next()
+            if ret != 0:
+                break
+            shutil.copy(bkp_cursor.get_key(), backup_dir)
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        bkp_cursor.close()
 
     @contextmanager
     def expectedStdout(self, expect):

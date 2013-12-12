@@ -18,21 +18,22 @@ int
 __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
     uint32_t flags, char ***dirlist, u_int *countp)
 {
-	WT_DECL_RET;
 	struct dirent *dp;
 	DIR *dirp;
+	WT_DECL_RET;
 	const char *path;
-	char **entries;
 	size_t dirallocsz;
 	u_int count, dirsz;
 	int match;
+	char **entries;
+
+	*dirlist = NULL;
+	*countp = 0;
 
 	WT_RET(__wt_filename(session, dir, &path));
 
-	*countp = 0;
-	dirallocsz = 0;
-	*dirlist = NULL;
 	dirp = NULL;
+	dirallocsz = 0;
 	dirsz = 0;
 	entries = NULL;
 	if (flags == 0)

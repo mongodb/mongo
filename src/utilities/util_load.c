@@ -74,10 +74,12 @@ load_dump(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int hex, tret;
-	char **entry, **list, *p, *uri, config[64];
+	char **entry, **list, *p, **tlist, *uri, config[64];
 
+	cursor = NULL;
 	list = NULL;		/* -Wuninitialized */
 	hex = 0;		/* -Wuninitialized */
+	uri = NULL;
 
 	/* Read the metadata file. */
 	if ((ret = config_read(&list, &hex)) != 0)
@@ -97,8 +99,10 @@ load_dump(WT_SESSION *session)
 		 */
 		if ((list[0] == NULL || list[1] == NULL || list[2] != NULL) ||
 		    (WT_PREFIX_MATCH(list[0], "file:") &&
-		    WT_PREFIX_MATCH(list[0], "lsm:")))
-			return (format());
+		    WT_PREFIX_MATCH(list[0], "lsm:"))) {
+			ret = format();
+			goto err;
+		}
 
 		entry = list;
 	}
@@ -115,12 +119,14 @@ load_dump(WT_SESSION *session)
 
 	/* Update the config based on any command-line configuration. */
 	if ((ret = config_update(session, list)) != 0)
-		return (ret);
+		goto err;
 
 	uri = list[0];
 	for (entry = list; *entry != NULL; entry += 2)
-		if ((ret = session->create(session, entry[0], entry[1])) != 0)
-			return (util_err(ret, "%s: session.create", entry[0]));
+		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
+			ret = util_err(ret, "%s: session.create", entry[0]);
+			goto err;
+		}
 
 	/* Open the insert cursor. */
 	(void)snprintf(config, sizeof(config),
@@ -128,8 +134,10 @@ load_dump(WT_SESSION *session)
 	    hex ? "hex" : "print",
 	    append ? ",append" : "", no_overwrite ? ",overwrite=false" : "");
 	if ((ret = session->open_cursor(
-	    session, uri, NULL, config, &cursor)) != 0)
-		return (util_err(ret, "%s: session.open", uri));
+	    session, uri, NULL, config, &cursor)) != 0) {
+		ret = util_err(ret, "%s: session.open", uri);
+		goto err;
+	}
 
 	/*
 	 * Check the append flag (it only applies to objects where the primary
@@ -144,18 +152,22 @@ load_dump(WT_SESSION *session)
 	} else
 		ret = insert(cursor, uri);
 
-	/*
+err:	/*
 	 * Technically, we don't have to close the cursor because the session
 	 * handle will do it for us, but I'd like to see the flush to disk and
 	 * the close succeed, it's better to fail early when loading files.
 	 */
-	if ((tret = cursor->close(cursor)) != 0) {
+	if (cursor != NULL && (tret = cursor->close(cursor)) != 0) {
 		tret = util_err(tret, "%s: cursor.close", uri);
 		if (ret == 0)
 			ret = tret;
 	}
 	if (ret == 0)
 		ret = util_flush(session, uri);
+
+	for (tlist = list; *tlist != NULL; ++tlist)
+		free(*tlist);
+	free(list);
 
 	return (ret == 0 ? 0 : 1);
 }
@@ -168,10 +180,12 @@ static int
 config_read(char ***listp, int *hexp)
 {
 	ULINE l;
+	WT_DECL_RET;
 	int entry, eof, max_entry;
 	const char *s;
-	char **list;
+	char **list, **tlist;
 
+	list = NULL;
 	memset(&l, 0, sizeof(l));
 
 	/* Header line #1: "WiredTiger Dump" and a WiredTiger version. */
@@ -199,29 +213,44 @@ config_read(char ***listp, int *hexp)
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
-		if (util_read_line(&l, 0, &eof))
-			return (1);
+		if ((ret = util_read_line(&l, 0, &eof)) != 0)
+			goto err;
 		if (strcmp(l.mem, "Data") == 0)
 			break;
 
-		/* Grow the array of header lines as necessary. */
-		if ((max_entry == 0 || entry == max_entry - 1) &&
-		    (list = realloc(list,
-		    (size_t)(max_entry += 100) * sizeof(char *))) == NULL)
-			return (util_err(errno, NULL));
-		if ((list[entry] = strdup(l.mem)) == NULL)
-			return (util_err(errno, NULL));
+		/*
+		 * Grow the array of header lines as necessary -- we need an
+		 * extra slot for NULL termination.
+		 */
+		if (entry + 1 >= max_entry) {
+			if ((tlist = realloc(list, (size_t)
+			    (max_entry += 100) * sizeof(char *))) == NULL) {
+				ret = util_err(errno, NULL);
+				goto err;
+			}
+			list = tlist;
+		}
+		if ((list[entry] = strdup(l.mem)) == NULL) {
+			ret = util_err(errno, NULL);
+			goto err;
+		}
+		list[entry + 1] = NULL;
 	}
 
 	/* Headers are required, and they're supposed to be in pairs. */
-	if (list == NULL || entry % 2 != 0)
-		return (format());
-
-	list[entry] = NULL;
+	if (list == NULL || entry % 2 != 0) {
+		ret = format();
+		goto err;
+	}
 	*listp = list;
-
-	/* Leak the memory, I don't care. */
 	return (0);
+
+err:	if (list != NULL) {
+		for (tlist = list; *tlist != NULL; ++tlist)
+			free(*tlist);
+		free(list);
+	}
+	return (ret);
 }
 
 /*

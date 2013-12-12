@@ -38,7 +38,7 @@ check_copy(void)
 	WT_SESSION *session;
 	int ret;
 
-	wts_open(RUNDIR_BACKUP, 0, &conn);
+	wts_open(g.home_backup, 0, &conn);
 
 	/*
 	 * Open a session and verify the store; some data-sources don't support
@@ -51,14 +51,15 @@ check_copy(void)
 	if (!DATASOURCE("lsm") && !DATASOURCE("memrata")) {
 		if ((ret = conn->open_session(
 		    conn, NULL, NULL, &session)) != 0)
-			die(ret, "connection.open_session");
+			die(ret, "connection.open_session: %s", g.home_backup);
 
 		if ((ret = session->verify(session, g.uri, NULL)) != 0)
-			die(ret, "session.verify: %s", g.uri);
+			die(ret,
+			    "session.verify: %s: %s", g.home_backup, g.uri);
 	}
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die(ret, "connection.close: %s", RUNDIR_BACKUP);
+		die(ret, "connection.close: %s", g.home_backup);
 }
 
 /*
@@ -68,12 +69,18 @@ check_copy(void)
 static void
 hot_copy(const char *name)
 {
-	char buf[1024];
+	size_t len;
+	char *cmd;
+	int ret;
 
-	(void)snprintf(
-	    buf, sizeof(buf), "cp RUNDIR/%s RUNDIR/BACKUP/%s", name, name);
-	if (system(buf) != 0)
-		die(errno, "hot backup copy: %s", buf);
+	len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
+	if ((cmd = malloc(len)) == NULL)
+		syserr("malloc");
+	(void)snprintf(cmd, len,
+	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
+	if ((ret = system(cmd)) != 0)
+		die(ret, "hot backup copy: %s", cmd);
+	free(cmd);
 }
 
 /*
@@ -90,7 +97,9 @@ hot_backup(void *arg)
 	int ret;
 	const char *key;
 
-	(void)arg;
+	WT_UNUSED(arg);
+
+	conn = g.wts_conn;
 
 	/* If hot backups aren't configured, we're done. */
 	if (!g.c_hot_backups)
@@ -100,11 +109,8 @@ hot_backup(void *arg)
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return (NULL);
 
-	conn = g.wts_conn;
-
 	/* Open a session. */
-	if ((ret = conn->open_session(
-	    conn, NULL, NULL, &session)) != 0)
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
 	/*
@@ -125,9 +131,8 @@ hot_backup(void *arg)
 			die(ret, "pthread_rwlock_wrlock: hot-backup lock");
 
 		/* Re-create the backup directory. */
-		WT_UNUSED_RET(system("cd RUNDIR && rm -rf BACKUP"));
-		if (mkdir(RUNDIR_BACKUP, 0777) != 0)
-			die(errno, "mkdir: %s", RUNDIR_BACKUP);
+		if ((ret = system(g.home_backup_init)) != 0)
+			die(ret, "hot-backup directory creation failed");
 
 		/*
 		 * open_cursor can return EBUSY if a metadata operation is

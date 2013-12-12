@@ -272,7 +272,7 @@ __statlog_server(void *arg)
 		 * statistics and check again.
 		 */
 		if (conn->stat_all == 0 && conn->stat_fast == 0) {
-			WT_ERR(__wt_cond_wait(
+			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, conn->stat_cond, conn->stat_usecs));
 			continue;
 		}
@@ -341,7 +341,7 @@ __statlog_server(void *arg)
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
 
 		/* Wait until the next event. */
-		WT_ERR(
+		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, conn->stat_cond, conn->stat_usecs));
 	}
 

@@ -51,19 +51,10 @@ GLOBAL g;
 
 static int cleanup(void);
 void die(int e, const char *fmt, ...);
-static int handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
-static void onint(int signo);
 static int populate_entries(void);
 static int run(void);
 static int setup(void);
 static void usage(void);
-
-static WT_EVENT_HANDLER event_handler = {
-	NULL,
-	handle_message,
-	NULL,
-	NULL	/* Close handler. */
-};
 
 int
 main(int argc, char *argv[])
@@ -75,15 +66,12 @@ main(int argc, char *argv[])
 	else
 		++g.progname;
 
-	/* Configure the FreeBSD malloc for debugging. */
-	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
-
 	/* Set default configuration values. */
 	g.c_cache = 10;
 	g.c_ops = 100000;
-	g.c_key_max = 1000;
-	g.c_k = 4;
-	g.c_factor = 8;
+	g.c_key_max = 100;
+	g.c_k = 8;
+	g.c_factor = 16;
 	g.c_srand = 3233456;
 
 	/* Set values from the command line. */
@@ -111,9 +99,6 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* Clean up on signal. */
-	(void)signal(SIGINT, onint);
-
 	setup();
 	run();
 	cleanup();
@@ -121,7 +106,8 @@ main(int argc, char *argv[])
 	return (EXIT_SUCCESS);
 }
 
-int setup(void)
+int
+setup(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
@@ -143,7 +129,7 @@ int setup(void)
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s",
 	    g.progname, g.c_cache, g.config_open == NULL ? "" : g.config_open);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(NULL, NULL, config, &conn)) != 0)
 		die(ret, "wiredtiger_open");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -157,14 +143,15 @@ int setup(void)
 	return (0);
 }
 
-int run(void)
+int
+run(void)
 {
 	WT_BLOOM *bloomp;
 	WT_ITEM item;
 	WT_SESSION_IMPL *sess;
-	const char *uri = "file:my_bloom.bf";
-	int ret;
 	uint32_t fp, i;
+	int ret;
+	const char *uri = "file:my_bloom.bf";
 
 	/* Use the internal session handle to access private APIs. */
 	sess = (WT_SESSION_IMPL *)g.wt_session;
@@ -225,7 +212,8 @@ int run(void)
 	return (0);
 }
 
-int cleanup(void)
+int
+cleanup(void)
 {
 	uint32_t i;
 
@@ -241,7 +229,8 @@ int cleanup(void)
  * Create and keep all the strings used to populate the bloom filter, so that
  * we can do validation with the same set of entries.
  */
-static int populate_entries(void)
+static int
+populate_entries(void)
 {
 	uint32_t i, j;
 	uint8_t **entries;
@@ -262,16 +251,6 @@ static int populate_entries(void)
 
 	g.entries = entries;
 	return (0);
-}
-
-static int
-handle_message(WT_EVENT_HANDLER *handler,
-    WT_SESSION *session, const char *message)
-{
-	(void)handler;
-	(void)session;
-
-	return (printf("%s\n", message) < 0 ? -1 : 0);
 }
 
 /*
@@ -297,22 +276,6 @@ die(int e, const char *fmt, ...)
 }
 
 /*
- * onint --
- *	Interrupt signal handler.
- */
-static void
-onint(int signo)
-{
-	(void)signo;
-
-	/* Remove the run's files except for __rand. 
-	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");*/
-
-	fprintf(stderr, "\n");
-	exit(EXIT_FAILURE);
-}
-
-/*
  * usage --
  *	Display usage statement and exit failure.
  */
@@ -326,8 +289,6 @@ usage(void)
 	    "\t-k size of entry strings\n"
 	    "\t-o number of operations to perform\n"
 	    "\t-s random seed for run\n");
-
-	fprintf(stderr, "\n");
 
 	exit(EXIT_FAILURE);
 }

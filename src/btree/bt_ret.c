@@ -8,6 +8,42 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_row_key_get --
+ *	Get a reference to the current key.
+ */
+int
+__wt_row_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
+{
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	page = cbt->page;
+
+	switch (page->type) {
+	case WT_PAGE_ROW_LEAF:
+		rip = &page->u.row.d[cbt->slot];
+
+		/*
+		 * If the cursor references a WT_INSERT item, take the key from
+		 * there.  Otherwise, take the key from the original page, and
+		 * the value from any related WT_UPDATE item, or the page if
+		 * the key was never updated.
+		 */
+		if (cbt->ins != NULL) {
+			key->data = WT_INSERT_KEY(cbt->ins);
+			key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+		} else
+			WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	return (0);
+}
+
+/*
  * __wt_kv_return --
  *	Return a page referenced key/value pair to the application.
  */
@@ -78,10 +114,10 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * original page, and the value from any related WT_UPDATE item,
 		 * or the page if the key was never updated.
 		 */
-		if (cbt->ins != NULL &&
-		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
+		if (cbt->ins != NULL) {
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);
 			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+			upd = __wt_txn_read(session, cbt->ins->upd);
 		} else {
 			WT_RET(__wt_row_leaf_key(
 			    session, page, rip, &cursor->key, 0));

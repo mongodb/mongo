@@ -361,6 +361,10 @@ err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
 	return (ret);
 }
 
+/*
+ * __cache_pool_assess --
+ *	Assess the usage of the cache pool.
+ */
 static int
 __cache_pool_assess(uint64_t *phighest)
 {
@@ -403,9 +407,10 @@ __cache_pool_assess(uint64_t *phighest)
 }
 
 /*
- * Adjust the allocation of cache to each connection. If force is set ignore
- * cache load information, and reduce the allocation for every connection
- * allocated more than their reserved size.
+ * __cache_pool_adjust --
+ *	Adjust the allocation of cache to each connection. If force is set
+ *	ignore cache load information, and reduce the allocation for every
+ *	connection allocated more than their reserved size.
  */
 static int
 __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
@@ -512,7 +517,7 @@ __wt_cache_pool_server(void *arg)
 
 	while (F_ISSET(cp, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
-			WT_ERR(__wt_cond_wait(
+			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, cp->cache_pool_cond, 1000000));
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the

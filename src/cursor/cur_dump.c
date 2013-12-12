@@ -247,6 +247,10 @@ WT_CURDUMP_PASS(prev)
 WT_CURDUMP_PASS(reset)
 WT_CURDUMP_PASS(search)
 
+/*
+ * __curdump_search_near --
+ *	WT_CURSOR::search_near for dump cursors.
+ */
 static int
 __curdump_search_near(WT_CURSOR *cursor, int *exact)
 {
@@ -260,6 +264,10 @@ WT_CURDUMP_PASS(insert)
 WT_CURDUMP_PASS(update)
 WT_CURDUMP_PASS(remove)
 
+/*
+ * __curdump_close --
+ *	WT_CURSOR::close for dump cursors.
+ */
 static int
 __curdump_close(WT_CURSOR *cursor)
 {

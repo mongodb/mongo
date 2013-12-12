@@ -233,7 +233,7 @@ struct __wt_page_modify {
 		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
 	} *ovfl_track;
 
-	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
+	uint64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
 	/*
 	 * The write generation is incremented when a page is modified, a page

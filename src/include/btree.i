@@ -716,7 +716,7 @@ __wt_skip_choose_depth(void)
  * single leaf page, returns true so the calling code will switch to a new tree.
  */
 static inline int
-__wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
+__wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;

@@ -293,8 +293,7 @@ __curindex_close(WT_CURSOR *cursor)
 	if (cindex->child != NULL)
 		WT_TRET(cindex->child->close(cindex->child));
 
-	if (cindex->table != NULL)
-		__wt_schema_release_table(session, cindex->table);
+	__wt_schema_release_table(session, cindex->table);
 	/* The URI is owned by the index. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
@@ -303,6 +302,10 @@ err:	API_END(session);
 	return (ret);
 }
 
+/*
+ * __curindex_open_colgroups --
+ *	Open cursors on the column groups required for an index cursor.
+ */
 static int
 __curindex_open_colgroups(
     WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg_arg[])

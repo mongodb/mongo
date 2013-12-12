@@ -1584,7 +1584,9 @@ PREDEFINED             = DOXYGEN \
                          __wt_extension_api:=WT_EXTENSION_API \
                          __wt_extractor:=WT_EXTRACTOR \
                          __wt_item:=WT_ITEM \
-                         __wt_session:=WT_SESSION
+                         __wt_session:=WT_SESSION \
+                         WT_HANDLE_CLOSED(x):=x \
+                         WT_HANDLE_NULLABLE(x):=x
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then 
 # this tag can be used to specify a list of macro names that should be expanded. 
