@@ -1,0 +1,21 @@
+# -*- mode: python -*-
+
+Import("env")
+
+#
+# The db/'common' lib has the abstractions that are shared by components of the
+# server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
+# get resolved.
+#
+
+env.CppUnitTest(
+    target= 'index_catalog_test',
+    source= 'index_catalog_test.cpp',
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb"
+    ],
+    NO_CRUTCH = True,
+)
+
