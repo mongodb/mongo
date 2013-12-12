@@ -199,7 +199,7 @@ namespace audit {
     void logAddShard(ClientBasic* client,
                      const StringData& name,
                      const std::string& servers,
-                     long long maxsize) MONGO_AUDIT_STUB
+                     long long maxSize) MONGO_AUDIT_STUB
 
     void logRemoveShard(ClientBasic* client,
                         const StringData& shardname) MONGO_AUDIT_STUB

@@ -333,7 +333,7 @@ namespace audit {
     void logAddShard(ClientBasic* client,
                      const StringData& name,
                      const std::string& servers,
-                     long long maxsize);
+                     long long maxSize);
 
     /**
      * Logs the result of a removeShard command.
