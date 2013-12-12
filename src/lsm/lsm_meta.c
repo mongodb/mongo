@@ -100,7 +100,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					    lsm_tree, chunk->id, &buf));
 					chunk->uri =
 					    __wt_buf_steal(session, &buf, NULL);
-					F_SET(chunk, WT_LSM_CHUNK_EVICTED |
+					F_SET_ATOMIC(chunk,
+					    WT_LSM_CHUNK_EVICTED |
 					    WT_LSM_CHUNK_ONDISK |
 					    WT_LSM_CHUNK_STABLE);
 				} else if (WT_STRING_MATCH(
@@ -109,7 +110,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					    lsm_tree, chunk->id, &buf));
 					chunk->bloom_uri =
 					    __wt_buf_steal(session, &buf, NULL);
-					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+					F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				} else if (WT_STRING_MATCH(
 				    "chunk_size", lk.str, lk.len)) {
@@ -134,7 +135,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
 					WT_ERR(__wt_strndup(session,
 					    lv.str, lv.len, &chunk->bloom_uri));
-					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+					F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				}
 				WT_ERR(__wt_realloc_def(session,
@@ -144,7 +145,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				lsm_tree->old_chunks[nchunks++] = chunk;
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
-				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
+				F_SET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK);
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nold_chunks = nchunks;
@@ -199,7 +200,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (i > 0)
 			WT_ERR(__wt_buf_catfmt(session, buf, ","));
 		WT_ERR(__wt_buf_catfmt(session, buf, "id=%" PRIu32, chunk->id));
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_buf_catfmt(session, buf, ",bloom"));
 		if (chunk->size != 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,
@@ -221,7 +222,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			WT_ERR(__wt_buf_catfmt(session, buf, ","));
 		WT_ERR(__wt_buf_catfmt(session, buf, "\"%s\"", chunk->uri));
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_buf_catfmt(
 			    session, buf, ",bloom=\"%s\"", chunk->bloom_uri));
 	}

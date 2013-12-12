@@ -587,11 +587,11 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	for (i = in_memory = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
 	    i < lsm_tree->nchunks;
 	    ++i, --cp)
-		if (!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK)) {
+		if (!F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_ONDISK)) {
 			record_count += (*cp)->count;
 			++in_memory;
 		} else if ((*cp)->generation == 0 ||
-		    F_ISSET(*cp, WT_LSM_CHUNK_STABLE))
+		    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE))
 			break;
 
 	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
@@ -599,7 +599,7 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
 	else if (i == lsm_tree->nchunks ||
-	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {
+	    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)) {
 		/*
 		 * No checkpoint has completed this run.  Keep slowing down
 		 * inserts until one does.
@@ -635,7 +635,8 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * period, we can calculate a crazy value.
 	 */
 	if (in_memory > 1 &&
-	    i != lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {
+	    i != lsm_tree->nchunks &&
+	    !F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)) {
 		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session,
@@ -669,7 +670,8 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * for a lock.
 	 */
 	if ((nchunks = lsm_tree->nchunks) != 0 &&
-	    !F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) &&
+	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
+	    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
 
@@ -732,7 +734,7 @@ __wt_lsm_tree_drop(
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
@@ -742,7 +744,7 @@ __wt_lsm_tree_drop(
 		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
 			continue;
 		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
@@ -802,13 +804,13 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
 		__wt_free(session, old);
 
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM)) {
 			old = chunk->bloom_uri;
 			chunk->bloom_uri = NULL;
 			WT_ERR(__wt_lsm_tree_bloom_name(
 			    session, lsm_tree, chunk->id, &buf));
 			chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
-			F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+			F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 			WT_ERR(__wt_schema_rename(
 			    session, old, chunk->uri, cfg));
 			__wt_free(session, old);
@@ -1006,12 +1008,12 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))
 			continue;
 		WT_ERR(__wt_schema_worker(session, chunk->uri,
 		    file_func, name_func, cfg, open_flags));
 		if (name_func == __wt_backup_list_uri_append &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
 			    file_func, name_func, cfg, open_flags));
 	}

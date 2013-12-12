@@ -258,8 +258,8 @@ __clsm_open_cursors(
 	 * metadata inconsistent.
 	 */
 	if (update && (lsm_tree->nchunks == 0 ||
-	    F_ISSET(lsm_tree->chunk[lsm_tree->nchunks - 1],
-	    WT_LSM_CHUNK_ONDISK))) {
+	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) == NULL ||
+	    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))) {
 		/* Release our lock because switch will get a write lock. */
 		locked = 0;
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -342,13 +342,13 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
 			    btree->dhandle->checkpoint;
 			if (checkpoint == NULL &&
-			    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    !F_ISSET(chunk, WT_LSM_CHUNK_EMPTY))
+			    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY))
 				break;
 
 			/* Make sure the Bloom config matches. */
 			if (clsm->blooms[ngood] == NULL &&
-			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+			    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 				break;
 		}
 
@@ -406,23 +406,25 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 */
 		WT_ASSERT(session, *cp == NULL);
 		ret = __wt_open_cursor(session, chunk->uri, c,
-		    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-		    !F_ISSET(chunk, WT_LSM_CHUNK_EMPTY)) ? ckpt_cfg : NULL, cp);
+		    (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
+		    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY)) ?
+			ckpt_cfg : NULL, cp);
 
 		/*
 		 * XXX kludge: we may have an empty chunk where no checkpoint
 		 * was written.  If so, try to open the ordinary handle on that
 		 * chunk instead.
 		 */
-		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+		if (ret == WT_NOTFOUND &&
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK)) {
 			ret = __wt_open_cursor(
 			    session, chunk->uri, c, NULL, cp);
 			if (ret == 0)
-				F_SET(chunk, WT_LSM_CHUNK_EMPTY);
+				F_SET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY);
 		}
 		WT_ERR(ret);
 
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_bit_count,
@@ -434,7 +436,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 	}
 
 	/* The last chunk is our new primary. */
-	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+	if (chunk != NULL && !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
 		primary = clsm->cursors[clsm->nchunks - 1];
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)(primary))->btree,
@@ -459,13 +461,13 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
 			    btree->dhandle->checkpoint;
 			WT_ASSERT(session,
-			    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    !F_ISSET(chunk, WT_LSM_CHUNK_EMPTY)) ?
+			    (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY)) ?
 			    checkpoint != NULL : checkpoint == NULL);
 
 			/* Make sure the Bloom config matches. */
 			WT_ASSERT(session,
-			    (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+			    (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM) &&
 			    !F_ISSET(clsm, WT_CLSM_MERGE)) ?
 			    clsm->blooms[i] != NULL : clsm->blooms[i] == NULL);
 		}
@@ -1079,9 +1081,9 @@ __clsm_put(WT_SESSION_IMPL *session,
 
 	lsm_tree = clsm->lsm_tree;
 
-	WT_ASSERT(session, clsm->primary_chunk != NULL);
-	WT_ASSERT(session, !F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK));
 	WT_ASSERT(session,
+	    clsm->primary_chunk != NULL &&
+	    !F_ISSET_ATOMIC(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK) &&
 	    TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
 
 	/*
