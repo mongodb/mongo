@@ -94,6 +94,7 @@
 "serverStatus",
 "setParameter",
 "setShardVersion",
+"shardCollection",
 "shardingState",
 "shutdown",
 "splitChunk",
