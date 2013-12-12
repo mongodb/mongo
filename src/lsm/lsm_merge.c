@@ -106,8 +106,9 @@ __wt_lsm_merge(
 	 */
 	end_chunk = lsm_tree->nchunks - 1;
 	while (end_chunk > 0 &&
-	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_BLOOM) ||
-	    F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_MERGING)))
+	    ((chunk = lsm_tree->chunk[end_chunk]) == NULL ||
+	    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM) ||
+	    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_MERGING)))
 		--end_chunk;
 
 	/*
@@ -140,7 +141,7 @@ __wt_lsm_merge(
 		nchunks = (end_chunk + 1) - start_chunk;
 
 		/* If the chunk is already involved in a merge, stop. */
-		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
+		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_MERGING))
 			break;
 
 		/*
@@ -171,12 +172,12 @@ __wt_lsm_merge(
 				break;
 		}
 
-		F_SET(chunk, WT_LSM_CHUNK_MERGING);
+		F_SET_ATOMIC(chunk, WT_LSM_CHUNK_MERGING);
 		record_count += chunk->count;
 		--start_chunk;
 
 		if (nchunks == lsm_tree->merge_max) {
-			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
+			F_CLR_ATOMIC(youngest, WT_LSM_CHUNK_MERGING);
 			record_count -= youngest->count;
 			chunk_size -= youngest->size;
 			--end_chunk;
@@ -199,7 +200,7 @@ __wt_lsm_merge(
 		    chunk->generation >
 		    youngest->generation + max_generation_gap) {
 			for (i = 0; i < nchunks; i++)
-				F_CLR(lsm_tree->chunk[start_chunk + i],
+				F_CLR_ATOMIC(lsm_tree->chunk[start_chunk + i],
 				    WT_LSM_CHUNK_MERGING);
 			nchunks = 0;
 		}
@@ -353,10 +354,10 @@ __wt_lsm_merge(
 	    session, lsm_tree, start_chunk, nchunks, chunk);
 
 	if (create_bloom)
-		F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+		F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 	chunk->count = insert_count;
 	chunk->generation = generation;
-	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
+	F_SET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	lsm_tree->dsk_gen++;

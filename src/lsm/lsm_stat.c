@@ -71,9 +71,10 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 		WT_ERR(__wt_buf_fmt(
 		    session, uribuf, "statistics:%s", chunk->uri));
 		ret = __wt_curstat_open(session, uribuf->data,
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor);
-		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		if (ret == WT_NOTFOUND &&
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))
 			ret = __wt_curstat_open(
 			    session, uribuf->data, cfg, &stat_cursor);
 		WT_ERR(ret);
@@ -97,7 +98,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 			__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
-		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (!F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
 			continue;
 
 		/* Maintain a count of bloom filters. */
