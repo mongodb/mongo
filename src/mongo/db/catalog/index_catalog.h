@@ -101,7 +101,28 @@ namespace mongo {
 
         IndexAccessMethod* getBtreeIndex( IndexDescriptor* desc );
 
-        // TODO: add iterator, search methods
+        class IndexIterator {
+        public:
+            bool more() { return _i < _n; }
+            IndexDescriptor* next() { return _catalog->getDescriptor( _i++ ); }
+        private:
+            IndexIterator( IndexCatalog* cat, bool includeUnfinishedIndexes ) {
+                _catalog = cat;
+                if ( includeUnfinishedIndexes )
+                    _n = _catalog->numIndexesTotal();
+                else
+                    _n = _catalog->numIndexesReady();
+                _i = 0;
+            }
+            int _i;
+            int _n;
+            IndexCatalog* _catalog;
+            friend class IndexCatalog;
+        };
+
+        IndexIterator getIndexIterator( bool includeUnfinishedIndexes ) {
+            return IndexIterator( this, includeUnfinishedIndexes );
+        };
 
         // ---- index modifiers ------
 
