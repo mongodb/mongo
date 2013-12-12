@@ -31,7 +31,7 @@ DECLARE_bool(always_recurse_on_children);
 
 typedef pair<S2Point, S2Point> S2Edge;
 
-static const double kEarthRadiusMeters = 6371000;
+static const double kEarthRadiusMeters = 6378100;
 
 
 
