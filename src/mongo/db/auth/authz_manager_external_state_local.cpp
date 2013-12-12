@@ -347,8 +347,15 @@ namespace {
             if (status == ErrorCodes::OplogOperationUnsupported) {
                 _roleGraph = RoleGraph();
                 _roleGraphState = roleGraphStateInitial;
+                BSONObjBuilder oplogEntryBuilder;
+                oplogEntryBuilder << "op" << op << "ns" << ns << "o" << o;
+                if (o2)
+                    oplogEntryBuilder << "o2" << *o2;
+                if (b)
+                    oplogEntryBuilder << "b" << *b;
                 error() << "Unsupported modification to roles collection in oplog; "
-                    "TODO how to remedy. " << status << " Oplog entry: " << op;
+                    "restart this process to reenable user-defined roles; " << status.reason() <<
+                    "; Oplog entry: " << oplogEntryBuilder.done();
             }
             else if (!status.isOK()) {
                 warning() << "Skipping bad update to roles collection in oplog. " << status <<

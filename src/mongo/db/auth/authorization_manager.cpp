@@ -1318,7 +1318,10 @@ namespace {
             return isAuthzCollection(cmdObj.firstElement().str()) ||
                 isAuthzCollection(cmdObj["to"].str());
         }
-        else if (cmdName == "dropIndexes") {
+        else if (cmdName == "dropIndexes" || cmdName == "deleteIndexes") {
+            return false;
+        }
+        else if (cmdName == "create") {
             return false;
         }
         else {

@@ -233,6 +233,9 @@ namespace {
             // implementation of applyOps itself.
             return Status::OK();
         }
+        if (cmdName == "create") {
+            return Status::OK();
+        }
         if (cmdName == "drop") {
             if (cmdObj.firstElement().str() == rolesCollectionNamespace.coll()) {
                 *roleGraph = RoleGraph();
@@ -256,7 +259,7 @@ namespace {
             }
             return Status::OK();
         }
-        if (cmdName == "dropIndexes") {
+        if (cmdName == "dropIndexes" || cmdName == "deleteIndexes") {
             return Status::OK();
         }
         if ((cmdName == "collMod" || cmdName == "emptyCappedCollection") &&
