@@ -106,8 +106,8 @@ __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip)
 {
 	/*
 	 * Add references to schema URI objects to the list of objects to be
-	 * compacted.  Don't recurse into LSM trees or we will get false
-	 * positives on the "file:" URIs for the chunks.
+	 * compacted.  Skip over LSM trees or we will get false positives on
+	 * the "file:" URIs for the chunks.
 	 */
 	if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		session->compact->lsm_count++;
