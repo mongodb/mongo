@@ -33,6 +33,7 @@
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 
@@ -71,10 +72,16 @@ namespace mongo {
                                           const std::string& dbname,
                                           const BSONObj& cmdObj ) {
 
-        return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
-                                               _writeType,
-                                               NamespaceString( parseNs( dbname, cmdObj ) ),
-                                               cmdObj );
+        Status status( auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                _writeType,
+                NamespaceString( parseNs( dbname, cmdObj ) ),
+                cmdObj ));
+
+        if ( !status.isOK() ) {
+            setLastError( status.code(), status.reason().c_str() );
+        }
+
+        return status;
     }
 
     // Write commands are counted towards their corresponding opcounters, not command opcounters.

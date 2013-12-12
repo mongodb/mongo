@@ -69,10 +69,16 @@ namespace mongo {
                                     const std::string& dbname,
                                     const BSONObj& cmdObj ) {
 
-            return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
-                                                   _writeType,
-                                                   NamespaceString( parseNs( dbname, cmdObj ) ),
-                                                   cmdObj );
+            Status status( auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                    _writeType,
+                    NamespaceString( parseNs( dbname, cmdObj ) ),
+                    cmdObj ));
+
+            if ( !status.isOK() ) {
+                setLastError( status.code(), status.reason().c_str() );
+            }
+
+            return status;
         }
 
         // Cluster write command entry point.
