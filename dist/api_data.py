@@ -661,7 +661,7 @@ methods = {
 	    log any statistics the database is configured to maintain,
 	    to a file.  See @ref statistics for more information''',
 	    type='category', subconfig=[
-	    Config('path', '"WiredTigerStat.%H"', r'''
+	    Config('path', '"WiredTigerStat.%d.%H"', r'''
 	        the pathname to a file into which the log records are written,
 	        may contain ISO C standard strftime conversion specifications.
 	        If the value is not an absolute path name, the file is created
