@@ -25,11 +25,6 @@
 #error dbclient.h is for C++ driver consumer use only
 #endif
 
-#if defined(_WIN32) && !defined(_DLL)
-#error "Client applications linking against mongoclient.dll must link against the DLL version of " \
-    "the C runtime.  Compile with /MD or /MDd."
-#endif  // defined(_WIN32) && !defined(_DLL)
-
 #define LIBMONGOCLIENT_CONSUMER
 
 #include "mongo/client/redef_macros.h"

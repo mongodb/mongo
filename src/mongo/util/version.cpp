@@ -138,6 +138,9 @@ namespace mongo {
         ss << "not-scons win";
         ss << " mscver:" << _MSC_FULL_VER << " built:" << __DATE__;
         ss << " boostver:" << BOOST_VERSION;
+#if( !defined(_MT) )
+#error _MT is not defined
+#endif
         ss << (sizeof(char *) == 8) ? " 64bit" : " 32bit";
         return ss.str();
     }
