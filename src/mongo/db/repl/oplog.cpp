@@ -516,7 +516,7 @@ namespace mongo {
                     Timer t;
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(o);
                     request.setUpdates(o);
@@ -545,7 +545,7 @@ namespace mongo {
                     b.append(_id);
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(b.done());
                     request.setUpdates(o);
@@ -572,7 +572,7 @@ namespace mongo {
             const bool upsert = valueB || convertUpdateToUpsert;
 
             const NamespaceString requestNs(ns);
-            UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
+            UpdateRequest request(requestNs);
 
             request.setQuery(updateCriteria);
             request.setUpdates(o);

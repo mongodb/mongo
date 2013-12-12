@@ -212,8 +212,6 @@ namespace mongo {
                                        // element having field name '$elemMatch'.
     };
 
-    class QueryPattern;
-    
     /**
      * A set of FieldRanges determined from constraints on the fields of a query,
      * that may be used to determine index bounds.
@@ -279,7 +277,7 @@ namespace mongo {
 
         const char *ns() const { return _ns.c_str(); }
         
-        QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
+        // QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         SpecialIndices getSpecial() const;
 
         /**

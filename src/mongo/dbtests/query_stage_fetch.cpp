@@ -33,7 +33,6 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/cursor.h"
 #include "mongo/db/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"

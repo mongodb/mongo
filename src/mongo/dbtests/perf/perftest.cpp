@@ -37,7 +37,6 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query_optimizer_internal.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/file_allocator.h"
@@ -665,6 +664,8 @@ namespace Count {
 
 namespace Plan {
 
+    // QUERY_MIGRATION: what is this really testing?
+#if 0
     class Hint {
     public:
         Hint() : ns_( testNs( this ) ) {
@@ -741,6 +742,7 @@ namespace Plan {
             add< Query >();
         }
     } all;
+#endif
 } // namespace Plan
 
 namespace Misc {

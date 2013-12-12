@@ -31,8 +31,6 @@
 #pragma once
 
 #include "mongo/db/index_set.h"
-#include "mongo/db/querypattern.h"
-
 
 namespace mongo {
 
@@ -72,11 +70,6 @@ namespace mongo {
         /* you must notify the cache if you are doing writes, as query plan utility will change */
         void notifyOfWriteOp();
 
-        CachedQueryPlan cachedQueryPlanForPattern( const QueryPattern &pattern );
-
-        void registerCachedQueryPlanForPattern( const QueryPattern &pattern,
-                                                const CachedQueryPlan &cachedQueryPlan );
-
     private:
 
         Collection* _collection; // not owned
@@ -86,15 +79,6 @@ namespace mongo {
         IndexPathSet _indexedPaths;
 
         void computeIndexKeys();
-
-        // --- for old query optimizer
-
-        void _clearQueryCache_inlock();
-
-        mutex _qcCacheMutex;
-        int _qcWriteCount;
-        std::map<QueryPattern,CachedQueryPlan> _qcCache;
-
     };
 
 }

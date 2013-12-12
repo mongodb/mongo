@@ -35,6 +35,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/structure/collection.h"
 
 namespace mongo {
@@ -142,12 +143,15 @@ namespace mongo {
             // inclusive range?
             bool inc = cmdObj.getBoolField( "inc" );
             NamespaceDetails *nsd = nsdetails( ns );
-            ReverseCappedCursor c( nsd );
-            massert( 13417, "captrunc collection not found or empty", c.ok() );
-            for( int i = 0; i < n; ++i ) {
-                massert( 13418, "captrunc invalid n", c.advance() );
+            massert( 13417, "captrunc collection not found or empty", nsd);
+
+            boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(ns, InternalPlanner::BACKWARD));
+            DiskLoc end;
+            // We remove 'n' elements so the start is one past that
+            for( int i = 0; i < n + 1; ++i ) {
+                Runner::RunnerState state = runner->getNext(NULL, &end);
+                massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
             }
-            DiskLoc end = c.currLoc();
             nsd->cappedTruncateAfter( ns.c_str(), end, inc );
             return true;
         }

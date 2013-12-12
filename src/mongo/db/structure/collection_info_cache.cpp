@@ -43,9 +43,7 @@ namespace mongo {
 
     CollectionInfoCache::CollectionInfoCache( Collection* collection )
         : _collection( collection ),
-          _keysComputed( false ),
-          _qcCacheMutex( "_qcCacheMutex" ),
-          _qcWriteCount( 0 ) {}
+          _keysComputed( false ) { }
 
     void CollectionInfoCache::reset() {
         Lock::assertWriteLocked( _collection->ns().ns() );
@@ -73,33 +71,11 @@ namespace mongo {
     }
 
     void CollectionInfoCache::notifyOfWriteOp() {
-        scoped_lock lk( _qcCacheMutex );
-        if ( _qcCache.empty() )
-            return;
-        if ( ++_qcWriteCount >= 100 )
-            _clearQueryCache_inlock();
+        // TODO: hook up w/new cache when impl
     }
 
     void CollectionInfoCache::clearQueryCache() {
-        scoped_lock lk( _qcCacheMutex );
-        _clearQueryCache_inlock();
-    }
-
-    void CollectionInfoCache::_clearQueryCache_inlock() {
-        _qcCache.clear();
-        _qcWriteCount = 0;
-    }
-
-    CachedQueryPlan CollectionInfoCache::cachedQueryPlanForPattern( const QueryPattern &pattern ) {
-        scoped_lock lk( _qcCacheMutex );
-        return _qcCache[ pattern ];
-    }
-
-
-    void CollectionInfoCache::registerCachedQueryPlanForPattern( const QueryPattern &pattern,
-                                                                 const CachedQueryPlan &cachedQueryPlan ) {
-        scoped_lock lk( _qcCacheMutex );
-        _qcCache[ pattern ] = cachedQueryPlan;
+        // TODO: hook up w/new cache when impl
     }
 
 }

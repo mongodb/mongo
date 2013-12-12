@@ -30,7 +30,6 @@
 
 #include "mongo/db/btreebuilder.h"
 
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/structure/collection.h"
@@ -88,45 +87,6 @@ namespace BtreeBuilderTests {
     };
 
     /**
-     * BtreeBuilder::commit() constructs a btree from the keys provided to BtreeBuilder::addKey().
-     */
-    class Commit : public IndexBuildBase {
-    public:
-        void run() {
-            IndexDetails& id = addIndexWithInfo();
-            // Create a btree builder.
-            BtreeBuilder<V1> builder( false, id );
-            // Add some keys to the builder, in order.
-            int32_t nKeys = 1000;
-            for( int32_t i = 0; i < nKeys; ++i ) {
-                BSONObj key = BSON( "a" << i );
-                builder.addKey( key, /* dummy location */ DiskLoc() );
-            }
-            // The root of the index has not yet been set.
-            ASSERT( id.head.isNull() );
-            // Call commit on the builder to finish building the btree.
-            builder.commit( true );
-            // The root of the index is now set.
-            ASSERT( !id.head.isNull() );
-            // Create a cursor over the index.
-            scoped_ptr<BtreeCursor> cursor(
-                    BtreeCursor::make( nsdetails( _ns ),
-                                       id,
-                                       BSON( "" << -1 ),    // startKey below minimum key value.
-                                       BSON( "" << nKeys ), // endKey above maximum key value.
-                                       true,                // endKeyInclusive true.
-                                       1                    // direction forward.
-                                       ) );
-            // Check that the keys in the index are the expected ones.
-            int32_t expectedKey = 0;
-            for( ; cursor->ok(); cursor->advance(), ++expectedKey ) {
-                ASSERT_EQUALS( expectedKey, cursor->currKey().firstElement().number() );
-            }
-            ASSERT_EQUALS( nKeys, expectedKey );
-        }
-    };
-
-    /**
      * BtreeBuilder::commit() is interrupted if there is a request to kill the current operation.
      */
     class InterruptCommit : public IndexBuildBase {
@@ -174,7 +134,6 @@ namespace BtreeBuilderTests {
         }
 
         void setupTests() {
-            add<Commit>();
             add<InterruptCommit>( false );
             add<InterruptCommit>( true );
         }

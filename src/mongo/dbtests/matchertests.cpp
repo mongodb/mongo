@@ -31,12 +31,10 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/cursor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/db/query_optimizer.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -223,87 +221,6 @@ namespace MatcherTests {
         }
     };
 
-    namespace Covered { // Tests for CoveredIndexMatcher.
-    
-        /**
-         * Test that MatchDetails::elemMatchKey() is set correctly after an unindexed cursor match.
-         */
-        class ElemMatchKeyUnindexed : public CollectionBase {
-        public:
-            void run() {
-                client().insert( ns(), fromjson( "{ a:[ {}, { b:1 } ] }" ) );
-                
-                Client::ReadContext context( ns() );
-
-                CoveredIndexMatcher matcher( BSON( "a.b" << 1 ), BSON( "$natural" << 1 ) );
-                MatchDetails details;
-                details.requestElemMatchKey();
-                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), BSONObj() );
-                // Verify that the cursor is unindexed.
-                ASSERT_EQUALS( "BasicCursor", cursor->toString() );
-                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
-                // The '1' entry of the 'a' array is matched.
-                ASSERT( details.hasElemMatchKey() );
-                ASSERT_EQUALS( string( "1" ), details.elemMatchKey() );
-            }
-        };
-        
-        /**
-         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match.
-         */
-        class ElemMatchKeyIndexed : public CollectionBase {
-        public:
-            void run() {
-                client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
-                client().insert( ns(), fromjson( "{ a:[ {}, { b:9 }, { b:1 } ] }" ) );
-                
-                Client::ReadContext context( ns() );
-                
-                BSONObj query = BSON( "a.b" << 1 );
-                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
-                MatchDetails details;
-                details.requestElemMatchKey();
-                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), query );
-                // Verify that the cursor is indexed.
-                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
-                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
-                // The '2' entry of the 'a' array is matched.
-                ASSERT( details.hasElemMatchKey() );
-                ASSERT_EQUALS( string( "2" ), details.elemMatchKey() );
-            }
-        };
-        
-        /**
-         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match
-         * on a non multikey index.
-         */
-        class ElemMatchKeyIndexedSingleKey : public CollectionBase {
-        public:
-            void run() {
-                client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
-                client().insert( ns(), fromjson( "{ a:[ { b:1 } ] }" ) );
-                
-                Client::ReadContext context( ns() );
-                
-                BSONObj query = BSON( "a.b" << 1 );
-                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
-                MatchDetails details;
-                details.requestElemMatchKey();
-                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), query );
-                // Verify that the cursor is indexed.
-                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
-                // Verify that the cursor is not multikey.
-                ASSERT( !cursor->isMultiKey() );
-                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
-                // The '0' entry of the 'a' array is matched.
-                ASSERT( details.hasElemMatchKey() );
-                ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
-            }
-        };
-
-    } // namespace Covered
-
-
     template< typename M >
     class TimingBase {
     public:
@@ -472,9 +389,6 @@ namespace MatcherTests {
             ADD_BOTH(MixedNumericEmbedded);
             ADD_BOTH(ElemMatchKey);
             ADD_BOTH(WhereSimple1);
-            add<Covered::ElemMatchKeyUnindexed>();
-            add<Covered::ElemMatchKeyIndexed>();
-            add<Covered::ElemMatchKeyIndexedSingleKey>();
             ADD_BOTH(AllTiming);
             ADD_BOTH(WithinBox);
             ADD_BOTH(WithinCenter);

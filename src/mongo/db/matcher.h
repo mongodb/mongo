@@ -37,7 +37,6 @@
 namespace mongo {
 
     class Cursor;
-    class CoveredIndexMatcher;
     class FieldRangeVector;
 
     struct element_lt {

@@ -33,7 +33,6 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "mongo/db/cc_by_loc.h"
-#include "mongo/db/cursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -58,9 +57,6 @@ namespace mongo {
      */
     class ClientCursor : private boost::noncopyable {
     public:
-        ClientCursor(int qopts, const shared_ptr<Cursor>& c, const StringData& ns,
-                     BSONObj query = BSONObj());
-
         ClientCursor(Runner* runner, int qopts = 0, const BSONObj query = BSONObj());
 
         ClientCursor(const string& ns);
@@ -248,36 +244,6 @@ namespace mongo {
          */
         bool isAggCursor;
 
-        //
-        // Cursor-only DEPRECATED methods.
-        //
-
-        void storeOpForSlave( DiskLoc last );
-
-        // Only used by ops/query.cpp, which will stop using them when queries are answered only by
-        // a runner.
-        const BSONObj& query() const { return _query; }
-        shared_ptr<ParsedQuery> pq;
-        // This one is used also by pipeline/document_source_cursor.cpp
-        shared_ptr<Projection> fields; // which fields query wants returned
-
-        DiskLoc lastLoc() const { return _lastLoc; }
-        Cursor* c() const { return _c.get(); }
-        bool ok() { return _c->ok(); }
-        bool advance() { return _c->advance(); }
-        BSONObj current() { return _c->current(); }
-        DiskLoc currLoc() { return _c->currLoc(); }
-        BSONObj currKey() const { return _c->currKey(); }
-
-        bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
-        bool currentMatches() {
-            if ( ! _c->matcher() )
-                return true;
-            return _c->matcher()->matchesCurrent( _c.get() );
-        }
-
-        void setDoingDeletes( bool doingDeletes ) {_doingDeletes = doingDeletes; }
-
     private:
         friend class ClientCursorHolder;
         friend class ClientCursorPin;
@@ -376,28 +342,6 @@ namespace mongo {
 
         // The new world: a runner.
         scoped_ptr<Runner> _runner;
-
-        //
-        // Cursor-only private data and methods.  DEPRECATED.
-        //
-
-        // The old world: a cursor.  DEPRECATED.
-        const shared_ptr<Cursor> _c;
-        
-        /**
-         * call when cursor's location changes so that we can update the cursorsbylocation map.  if
-         * you are locked and internally iterating, only need to call when you are ready to
-         * "unlock".
-         */
-        void updateLocation();
-        void setLastLoc_inlock(DiskLoc);
-        Record* _recordForYield( RecordNeeds need );
-
-        DiskLoc _lastLoc;                        // use getter and setter not this (important)
-        bool _doingDeletes; // when true we are the delete and aboutToDelete shouldn't manipulate us
-
-        // TODO: This will be moved into the runner.
-        ElapsedTracker _yieldSometimesTracker;
     };
 
     /**
@@ -420,56 +364,11 @@ namespace mongo {
         CursorId _cursorid;
     };
 
-    /** Assures safe and reliable cleanup of a ClientCursor. */
-    class ClientCursorHolder : boost::noncopyable {
-    public:
-        ClientCursorHolder( ClientCursor *c = 0 );
-        ~ClientCursorHolder();
-        void reset( ClientCursor *c = 0 );
-        ClientCursor* get();
-        operator bool() { return _c; }
-        ClientCursor * operator-> ();
-        const ClientCursor * operator-> () const;
-        /** Release ownership of the ClientCursor. */
-        void release();
-    private:
-        ClientCursor *_c;
-        CursorId _id;
-    };
-
     /** thread for timing out old cursors */
     class ClientCursorMonitor : public BackgroundJob {
     public:
         string name() const { return "ClientCursorMonitor"; }
         void run();
     };
-        
-    struct ClientCursorYieldLock : boost::noncopyable {
-        explicit ClientCursorYieldLock( ptr<ClientCursor> cc );
-        ~ClientCursorYieldLock();
-
-        /**
-         * @return if the cursor is still ok
-         *         if it is, we also relock
-         */
-        bool stillOk();
-        void relock();
-
-        private:
-        const bool _canYield;
-        ClientCursor::YieldData _data;
-        scoped_ptr<dbtempreleasecond> _unlock;
-    };
 
 } // namespace mongo
-
-// ClientCursor should only be used with auto_ptr because it needs to be
-// release()ed after a yield if stillOk() returns false and these pointer types
-// do not support releasing. This will prevent them from being used accidentally
-// Instead of auto_ptr<>, which still requires some degree of manual management
-// of this, consider using ClientCursor::Holder which handles ClientCursor's
-// unusual self-deletion mechanics.
-namespace boost{
-    template<> class scoped_ptr<mongo::ClientCursor> {};
-    template<> class shared_ptr<mongo::ClientCursor> {};
-}

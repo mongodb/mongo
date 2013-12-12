@@ -34,7 +34,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
-#include "mongo/db/query_plan_selection_policy.h"
 
 namespace mongo {
 

@@ -41,7 +41,6 @@ namespace mongo {
     extern const BSONObj reverseNaturalObj; // {"$natural": -1 }
 
     class Cursor;
-    class CoveredIndexMatcher;
 
     /**
      * db helpers are helper functions and classes that let us easily manipulate the local

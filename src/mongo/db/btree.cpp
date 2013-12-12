@@ -41,7 +41,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dur_commitjob.h"
 #include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
-#include "mongo/db/intervalbtreecursor.h"  // also for aboutToDeleteBucket
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
@@ -834,7 +833,6 @@ namespace mongo {
     template< class V >
     void BtreeBucket<V>::delBucket(const DiskLoc thisLoc, const IndexDetails& id) {
         BtreeIndexCursor::aboutToDeleteBucket(thisLoc);
-        IntervalBtreeCursor::aboutToDeleteBucket(thisLoc);
         verify( !isHead() );
 
         DiskLoc ll = this->parent;
@@ -967,7 +965,6 @@ namespace mongo {
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
         BtreeIndexCursor::aboutToDeleteBucket(thisLoc);
-        IntervalBtreeCursor::aboutToDeleteBucket(thisLoc);
         deallocBucket( thisLoc, id );
     }
 

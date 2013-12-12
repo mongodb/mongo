@@ -33,6 +33,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/matcher.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {

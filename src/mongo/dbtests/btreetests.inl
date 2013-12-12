@@ -308,6 +308,8 @@
         }
     };
 
+/*
+// QUERY_MIGRATION: port later
     class PackUnused : public Base {
     public:
         void run() {
@@ -413,6 +415,7 @@
             Base::insert( k );
         }
     };
+    */
 
     class MergeBuckets : public Base {
     public:
@@ -1642,8 +1645,9 @@
             add< MissingLocateMultiBucket >();
             add< SERVER983 >();
             add< DontReuseUnused >();
-            add< PackUnused >();
-            add< DontDropReferenceKey >();
+            // QUERY_MIGRATION
+            // add< PackUnused >();
+            // add< DontDropReferenceKey >();
             add< MergeBucketsLeft >();
             add< MergeBucketsRight >();
 //            add< MergeBucketsHead >();

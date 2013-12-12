@@ -45,7 +45,6 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/pagefault.h"
-#include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_runner.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"

@@ -38,6 +38,7 @@
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_selection.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/catalog/ondisk/namespace.h"
 #include "mongo/db/structure/collection.h"
@@ -2150,13 +2151,15 @@ namespace NamespaceTests {
 
                 DiskLoc last, first;
                 {
-                    ReverseCappedCursor c(nsd);
-                    last = c.currLoc();
+                    auto_ptr<Runner> runner(
+                        InternalPlanner::collectionScan(ns(), InternalPlanner::BACKWARD));
+                    runner->getNext(NULL, &last);
                     ASSERT( !last.isNull() );
                 }
                 {
-                    scoped_ptr<ForwardCappedCursor> c( ForwardCappedCursor::make( nsd ) );
-                    first = c->currLoc();
+                    auto_ptr<Runner> runner(
+                        InternalPlanner::collectionScan(ns(), InternalPlanner::FORWARD));
+                    runner->getNext(NULL, &first);
                     ASSERT( !first.isNull() );
                     ASSERT( first != last ) ;
                 }
@@ -2165,12 +2168,18 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( nsd->numRecords() , 28 );
 
                 {
-                    scoped_ptr<ForwardCappedCursor> c( ForwardCappedCursor::make( nsd ) );
-                    ASSERT( first == c->currLoc() );
+                    DiskLoc loc;
+                    auto_ptr<Runner> runner(
+                        InternalPlanner::collectionScan(ns(), InternalPlanner::FORWARD));
+                    runner->getNext(NULL, &loc);
+                    ASSERT( first == loc);
                 }
                 {
-                    ReverseCappedCursor c(nsd);
-                    ASSERT( last != c.currLoc() ); // old last should be deleted
+                    auto_ptr<Runner> runner(
+                        InternalPlanner::collectionScan(ns(), InternalPlanner::BACKWARD));
+                    DiskLoc loc;
+                    runner->getNext(NULL, &loc);
+                    ASSERT( last != loc );
                     ASSERT( !last.isNull() );
                 }
 
@@ -2246,49 +2255,6 @@ namespace NamespaceTests {
             }
         };
         
-        class CachedPlanBase : public Base {
-        public:
-            CachedPlanBase() :
-                _fieldRangeSet( ns(), BSON( "a" << 1 ), true, true ),
-                _pattern( _fieldRangeSet, BSONObj() ) {
-                create();
-            }
-        protected:
-            void assertCachedIndexKey( const BSONObj &indexKey ) const {
-                ASSERT_EQUALS( indexKey,
-                               infoCache()->cachedQueryPlanForPattern( _pattern ).indexKey() );
-            }
-            void registerIndexKey( const BSONObj &indexKey ) {
-                infoCache()->registerCachedQueryPlanForPattern( _pattern,
-                                                                CachedQueryPlan( indexKey, 1, CandidatePlanCharacter( true, false ) ) );
-            }
-            FieldRangeSet _fieldRangeSet;
-            QueryPattern _pattern;
-        };
-        
-        /**
-         * setIndexIsMultikey() sets the multikey flag for an index and clears the query plan
-         * cache.
-         */
-        class SetIndexIsMultikey : public CachedPlanBase {
-        public:
-            void run() {
-                DBDirectClient client;
-                client.ensureIndex( ns(), BSON( "a" << 1 ) );
-                registerIndexKey( BSON( "a" << 1 ) );
-                
-                ASSERT( !nsd()->isMultikey( 1 ) );
-                
-                indexCatalog()->markMultikey( indexCatalog()->getDescriptor( 1 ) );
-                ASSERT( nsd()->isMultikey( 1 ) );
-                assertCachedIndexKey( BSONObj() );
-                
-                registerIndexKey( BSON( "a" << 1 ) );
-                indexCatalog()->markMultikey( indexCatalog()->getDescriptor( 1 ) );
-                assertCachedIndexKey( BSON( "a" << 1 ) );
-            }
-        };
-
         class SwapIndexEntriesTest : public Base {
         public:
             void run() {
@@ -2324,24 +2290,6 @@ namespace NamespaceTests {
         };
 
     } // namespace NamespaceDetailsTests
-
-    namespace CollectionInfoCacheTests {
-
-        /** clearQueryCache() clears the query plan cache. */
-        class ClearQueryCache : public NamespaceDetailsTests::CachedPlanBase {
-        public:
-            void run() {
-                // Register a query plan in the query plan cache.
-                registerIndexKey( BSON( "a" << 1 ) );
-                assertCachedIndexKey( BSON( "a" << 1 ) );
-
-                // The query plan is cleared.
-                infoCache()->clearQueryCache();
-                assertCachedIndexKey( BSONObj() );
-            }
-        };
-
-    } // namespace CollectionInfoCacheTests
 
     class All : public Suite {
     public:
@@ -2455,8 +2403,6 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::SwapIndexEntriesTest >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
-            add< NamespaceDetailsTests::SetIndexIsMultikey >();
-            add< CollectionInfoCacheTests::ClearQueryCache >();
             add< MissingFieldTests::BtreeIndexMissingField >();
             add< MissingFieldTests::TwoDIndexMissingField >();
             add< MissingFieldTests::HashedIndexMissingField >();

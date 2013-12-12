@@ -40,7 +40,6 @@
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/scanandorder.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"

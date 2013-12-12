@@ -34,8 +34,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/query_optimizer_internal.h"
-#include "mongo/db/querypattern.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
@@ -427,68 +425,6 @@ namespace QueryUtilTests {
                 FieldRangeSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ), true,
                                   true );
                 ASSERT( !s6.range( "a" ).equality() );
-            }
-        };
-
-        class QueryPatternBase {
-        protected:
-            static QueryPattern p( const BSONObj &query, const BSONObj &sort = BSONObj() ) {
-                return FieldRangeSet( "", query, true, true ).pattern( sort );
-            }
-        };
-
-        class QueryPatternTest : public QueryPatternBase {
-        public:
-            void run() {
-                ASSERT( p( BSON( "a" << 1 ) ) == p( BSON( "a" << 1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ) ) == p( BSON( "a" << 5 ) ) );
-                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "b" << 1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "a" << LTE << 1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ) ) != p( BSON( "a" << 1 << "b" << 2 ) ) );
-                ASSERT( p( BSON( "a" << 1 << "b" << 3 ) ) != p( BSON( "a" << 1 ) ) );
-                ASSERT( p( BSON( "a" << LT << 1 ) ) == p( BSON( "a" << LTE << 5 ) ) );
-                ASSERT( p( BSON( "a" << LT << 1 << GTE << 0 ) ) == p( BSON( "a" << LTE << 5 << GTE << 0 ) ) );
-                ASSERT( p( BSON( "a" << 1 ) ) < p( BSON( "a" << 1 << "b" << 1 ) ) );
-                ASSERT( !( p( BSON( "a" << 1 << "b" << 1 ) ) < p( BSON( "a" << 1 ) ) ) );
-                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << "a" ) ) );
-                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << -1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "c" << 1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 << "c" << -1 ) ) == p( BSON( "a" << 4 ), BSON( "b" << -1 << "c" << 1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 << "c" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 ) ) );
-                ASSERT( p( BSON( "a" << 1 ), BSON( "b" << 1 ) ) != p( BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) ) );
-            }
-        };
-
-        class QueryPatternEmpty : public QueryPatternBase {
-        public:
-            void run() {
-                ASSERT( p( BSON( "a" << GT << 5 << LT << 7 ) ) !=
-                       p( BSON( "a" << GT << 7 << LT << 5 ) ) );
-            }
-        };
-
-        class QueryPatternNeConstraint : public QueryPatternBase {
-        public:
-            void run() {
-                ASSERT( p( BSON( "a" << NE << 5 ) ) != p( BSON( "a" << GT << 1 ) ) );
-                ASSERT( p( BSON( "a" << NE << 5 ) ) != p( BSONObj() ) );
-                ASSERT( p( BSON( "a" << NE << 5 ) ) == p( BSON( "a" << NE << "a" ) ) );
-            }
-        };
-        
-        /** Check QueryPattern categories for optimized bounds. */
-        class QueryPatternOptimizedBounds {
-        public:
-            void run() {
-                // With unoptimized bounds, different inequalities yield different query patterns.
-                ASSERT( p( BSON( "a" << GT << 1 ), false ) != p( BSON( "a" << LT << 1 ), false ) );
-                // SERVER-4675 Descriptive test - With optimized bounds, different inequalities
-                // yield different query patterns.
-                ASSERT( p( BSON( "a" << GT << 1 ), true ) == p( BSON( "a" << LT << 1 ), true ) );
-            }
-        private:
-            static QueryPattern p( const BSONObj &query, bool optimize ) {
-                return FieldRangeSet( "", query, true, optimize ).pattern( BSONObj() );
             }
         };
 
@@ -1700,82 +1636,6 @@ namespace QueryUtilTests {
             }
         };
         
-        /** Check that clearIndexesForPatterns() clears recorded query plans. */
-        class ClearIndexesForPatterns : public IndexBase {
-        public:
-            void run() {
-                index( BSON( "a" << 1 ) );
-                BSONObj query = BSON( "a" << GT << 5 << LT << 5 );
-                BSONObj sort = BSON( "a" << 1 );
-
-                Collection* collection = ctx()->db()->getCollection( ns() );
-                verify( collection );
-                CollectionInfoCache* cache = collection->infoCache();
-
-                // Record the a:1 index for the query's single and multi key query patterns.
-                QueryPattern singleKey = FieldRangeSet( ns(), query, true, true ).pattern( sort );
-                cache->registerCachedQueryPlanForPattern( singleKey,
-                                                          CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                                                           CandidatePlanCharacter( true, true ) ) );
-                QueryPattern multiKey = FieldRangeSet( ns(), query, false, true ).pattern( sort );
-                cache->registerCachedQueryPlanForPattern( multiKey,
-                                                          CachedQueryPlan( BSON( "a" << 1 ), 5,
-                                                                           CandidatePlanCharacter( true, true ) ) );
-
-                // The single and multi key fields for this query must differ for the test to be
-                // valid.
-                ASSERT( singleKey != multiKey );
-                
-                // Clear the recorded query plans using clearIndexesForPatterns.
-                FieldRangeSetPair frsp( ns(), query );
-                QueryUtilIndexed::clearIndexesForPatterns( frsp, sort );
-                
-                // Check that the recorded query plans were cleared.
-                ASSERT_EQUALS( BSONObj(), cache->cachedQueryPlanForPattern( singleKey ).indexKey() );
-                ASSERT_EQUALS( BSONObj(), cache->cachedQueryPlanForPattern( multiKey ).indexKey() );
-            }
-        };
-
-        /** Check query plan returned by bestIndexForPatterns(). */
-        class BestIndexForPatterns : public IndexBase {
-        public:
-            void run() {
-                index( BSON( "a" << 1 ) );
-                index( BSON( "b" << 1 ) );
-                BSONObj query = BSON( "a" << GT << 5 << LT << 5 );
-                BSONObj sort = BSON( "a" << 1 );
-
-                Collection* collection = ctx()->db()->getCollection( ns() );
-                verify( collection );
-                CollectionInfoCache* cache = collection->infoCache();
-
-                // No query plan is returned when none has been recorded.
-                FieldRangeSetPair frsp( ns(), query );
-                ASSERT_EQUALS( BSONObj(),
-                              QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
-
-                // A multikey index query plan is returned if recorded.
-                QueryPattern multiKey = FieldRangeSet( ns(), query, false, true ).pattern( sort );
-                cache->registerCachedQueryPlanForPattern( multiKey,
-                                                          CachedQueryPlan( BSON( "a" << 1 ), 5,
-                                                                           CandidatePlanCharacter( true, true ) ) );
-                ASSERT_EQUALS( BSON( "a" << 1 ),
-                              QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
-
-                // A non multikey index query plan is preferentially returned if recorded.
-                QueryPattern singleKey = FieldRangeSet( ns(), query, true, true ).pattern( sort );
-                cache->registerCachedQueryPlanForPattern( singleKey,
-                                                          CachedQueryPlan( BSON( "b" << 1 ), 5,
-                                                                           CandidatePlanCharacter( true, true ) ) );
-                ASSERT_EQUALS( BSON( "b" << 1 ),
-                              QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
-
-                // The single and multi key fields for this query must differ for the test to be
-                // valid.
-                ASSERT( singleKey != multiKey );
-            }
-        };
-
     } // namespace FieldRangeSetPairTests
     
     namespace FieldRangeVectorTests {
@@ -2923,10 +2783,6 @@ namespace QueryUtilTests {
             add<FieldRangeTests::NonSingletonOr>();
             add<FieldRangeTests::Empty>();
             add<FieldRangeTests::Equality>();
-            add<FieldRangeTests::QueryPatternTest>();
-            add<FieldRangeTests::QueryPatternEmpty>();
-            add<FieldRangeTests::QueryPatternNeConstraint>();
-            add<FieldRangeTests::QueryPatternOptimizedBounds>();
             add<FieldRangeTests::NoWhere>();
             add<FieldRangeTests::Numeric>();
             add<FieldRangeTests::InLowerBound>();
@@ -3060,8 +2916,6 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::NoNonUniversalRanges>();
             add<FieldRangeSetPairTests::MatchPossible>();
             add<FieldRangeSetPairTests::MatchPossibleForIndex>();
-            add<FieldRangeSetPairTests::ClearIndexesForPatterns>();
-            add<FieldRangeSetPairTests::BestIndexForPatterns>();
             add<FieldRangeVectorTests::ToString>();
             add<FieldRangeVectorTests::HasAllIndexedRanges>();
             add<FieldRangeVectorTests::SingleInterval>();

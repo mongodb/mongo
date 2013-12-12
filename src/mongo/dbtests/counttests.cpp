@@ -30,7 +30,6 @@
 
 #include <boost/thread/thread.hpp>
 
-#include "mongo/db/cursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/count.h"

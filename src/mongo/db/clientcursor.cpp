@@ -50,7 +50,6 @@
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
-#include "mongo/db/scanandorder.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/timer.h"
@@ -67,18 +66,7 @@ namespace mongo {
                                   const NamespaceDetails* nsd,
                                   const DiskLoc& dl ); // from s/d_logic.h
 
-    ClientCursor::ClientCursor(int qopts, const shared_ptr<Cursor>& c, const StringData& ns,
-                               BSONObj query)
-        : _ns(ns.toString()), _query(query), _runner(NULL), _c(c), _yieldSometimesTracker(128, 10) {
-
-        _queryOptions = qopts;
-        _doingDeletes = false;
-        init();
-    }
-
-    ClientCursor::ClientCursor(Runner* runner, int qopts, const BSONObj query)
-        : _yieldSometimesTracker(128, 10) {
-
+    ClientCursor::ClientCursor(Runner* runner, int qopts, const BSONObj query) {
         _runner.reset(runner);
         _ns = runner->ns();
         _query = query;
@@ -88,8 +76,7 @@ namespace mongo {
 
     ClientCursor::ClientCursor(const string& ns)
         : _ns(ns),
-          _queryOptions(QueryOption_NoCursorTimeout),
-          _yieldSometimesTracker(128, 10) {
+          _queryOptions(QueryOption_NoCursorTimeout) {
 
         init();
     }
@@ -128,11 +115,6 @@ namespace mongo {
 
         {
             recursive_scoped_lock lock(ccmutex);
-            if (NULL != _c.get()) {
-                // Removes 'this' from bylocation map
-                setLastLoc_inlock( DiskLoc() );
-            }
-
             clientCursorsById.erase(_cursorid);
 
             // defensive:
@@ -202,7 +184,7 @@ namespace mongo {
             // Note that a valid ClientCursor state is "no cursor no runner."  This is because
             // the set of active cursor IDs in ClientCursor is used as representation of query
             // state.  See sharding_block.h.  TODO(greg,hk): Move this out.
-            if (NULL == cc->c() && NULL == cc->_runner.get()) {
+            if (NULL == cc->_runner.get()) {
                 ++it;
                 continue;
             }
@@ -212,8 +194,6 @@ namespace mongo {
             // We will only delete CCs with runners that are not actively in use.  The runners that
             // are actively in use are instead kill()-ed.
             if (NULL != cc->_runner.get()) {
-                verify(NULL == cc->c());
-
                 if (isDB || cc->_runner->ns() == ns) {
                     // If there is a pinValue >= 100, somebody is actively using the CC and we do
                     // not delete it.  Instead we notify the holder that we killed it.  The holder
@@ -228,22 +208,6 @@ namespace mongo {
                     }
                 }
             }
-            // Begin cursor-only DEPRECATED
-            else if (cc->c()->shouldDestroyOnNSDeletion()) {
-                verify(NULL == cc->_runner.get());
-
-                if (isDB) {
-                    // already checked that db matched above
-                    dassert( StringData(cc->_ns).startsWith( ns ) );
-                    shouldDelete = true;
-                }
-                else {
-                    if ( ns == cc->_ns ) {
-                        shouldDelete = true;
-                    }
-                }
-            }
-            // End cursor-only DEPRECATED
 
             if (shouldDelete) {
                 ClientCursor* toDelete = it->second;
@@ -301,80 +265,6 @@ namespace mongo {
             if (NULL == cc->_runner.get()) { continue; }
             cc->_runner->invalidate(dl);
         }
-
-        // Begin cursor-only.  Only cursors that are in ccByLoc are processed here.
-        CCByLoc& bl = db->ccByLoc();
-        CCByLoc::iterator j = bl.lower_bound(ByLocKey::min(dl));
-        CCByLoc::iterator stop = bl.upper_bound(ByLocKey::max(dl));
-        if ( j == stop )
-            return;
-
-        vector<ClientCursor*> toAdvance;
-
-        while ( 1 ) {
-            toAdvance.push_back(j->second);
-            DEV verify( j->first.loc == dl );
-            ++j;
-            if ( j == stop )
-                break;
-        }
-
-        if( toAdvance.size() >= 3000 ) {
-            log() << "perf warning MPW101: " << toAdvance.size() << " cursors for one diskloc "
-                  << dl.toString()
-                  << ' ' << toAdvance[1000]->_ns
-                  << ' ' << toAdvance[2000]->_ns
-                  << ' ' << toAdvance[1000]->_pinValue
-                  << ' ' << toAdvance[2000]->_pinValue
-                  << ' ' << toAdvance[1000]->_pos
-                  << ' ' << toAdvance[2000]->_pos
-                  << ' ' << toAdvance[1000]->_idleAgeMillis
-                  << ' ' << toAdvance[2000]->_idleAgeMillis
-                  << ' ' << toAdvance[1000]->_doingDeletes
-                  << ' ' << toAdvance[2000]->_doingDeletes
-                  << endl;
-            //wassert( toAdvance.size() < 5000 );
-        }
-
-        for ( vector<ClientCursor*>::iterator i = toAdvance.begin(); i != toAdvance.end(); ++i ) {
-            ClientCursor* cc = *i;
-            wassert(cc->_db == db);
-
-            if ( cc->_doingDeletes ) continue;
-
-            Cursor *c = cc->_c.get();
-            if ( c->capped() ) {
-                /* note we cannot advance here. if this condition occurs, writes to the oplog
-                   have "caught" the reader.  skipping ahead, the reader would miss postentially
-                   important data.
-                   */
-                delete cc;
-                continue;
-            }
-
-            c->recoverFromYield();
-            DiskLoc tmp1 = c->refLoc();
-            if ( tmp1 != dl ) {
-                // This might indicate a failure to call ClientCursor::prepareToYield() but it can
-                // also happen during correct operation, see SERVER-2009.
-                problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
-            }
-            else {
-                c->advance();
-            }
-            while (!c->eof() && c->refLoc() == dl) {
-                /* We don't delete at EOF because we want to return "no more results" rather than "no such cursor".
-                 * The loop is to handle MultiKey indexes where the deleted record is pointed to by multiple adjacent keys.
-                 * In that case we need to advance until we get to the next distinct record or EOF.
-                 * SERVER-4154
-                 * SERVER-5198
-                 * But see SERVER-5725.
-                 */
-                c->advance();
-            }
-            cc->updateLocation();
-        }
-        // End cursor-only
     }
 
     void ClientCursor::registerRunner(Runner* runner) {
@@ -517,20 +407,6 @@ namespace mongo {
                 }
             }
         }
-    }
-
-    // DEPRECATED only used by Cursor.
-    void ClientCursor::storeOpForSlave( DiskLoc last ) {
-        verify(NULL == _runner.get());
-        if ( ! ( _queryOptions & QueryOption_OplogReplay ))
-            return;
-
-        if ( last.isNull() )
-            return;
-
-        BSONElement e = last.obj()["ts"];
-        if ( e.type() == Date || e.type() == Timestamp )
-            _slaveReadTill = e._opTime();
     }
 
     void ClientCursor::updateSlaveLocation( CurOp& curop ) {
@@ -715,139 +591,6 @@ namespace mongo {
         return found;
     }
 
-    //
-    // Yielding that is DEPRECATED.  Will be removed when we use runners and they yield internally.
-    //
-
-    Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
-        if ( ! ok() )
-            return 0;
-
-        if ( need == DontNeed ) {
-            return 0;
-        }
-        else if ( need == MaybeCovered ) {
-            // TODO
-            return 0;
-        }
-        else if ( need == WillNeed ) {
-            // no-op
-        }
-        else {
-            warning() << "don't understand RecordNeeds: " << (int)need << endl;
-            return 0;
-        }
-
-        DiskLoc l = currLoc();
-        if ( l.isNull() )
-            return 0;
-        
-        Record * rec = l.rec();
-        if ( rec->likelyInPhysicalMemory() ) 
-            return 0;
-        
-        return rec;
-    }
-
-    void ClientCursor::updateLocation() {
-        verify( _cursorid );
-        _idleAgeMillis = 0;
-        // Cursor-specific
-        _c->prepareToYield();
-        DiskLoc cl = _c->refLoc();
-        if ( lastLoc() == cl ) {
-            //log() << "info: lastloc==curloc " << ns << endl;
-        }
-        else {
-            recursive_scoped_lock lock(ccmutex);
-            setLastLoc_inlock(cl);
-        }
-    }
-
-    void ClientCursor::setLastLoc_inlock(DiskLoc L) {
-        verify(NULL == _runner.get());
-        verify( _pos != -2 ); // defensive - see ~ClientCursor
-
-        if (L == _lastLoc) { return; }
-        CCByLoc& bl = _db->ccByLoc();
-
-        if (!_lastLoc.isNull()) {
-            bl.erase(ByLocKey(_lastLoc, _cursorid));
-        }
-
-        if (!L.isNull()) {
-            bl[ByLocKey(L,_cursorid)] = this;
-        }
-
-        _lastLoc = L;
-    }
-
-    bool ClientCursor::yield( int micros , Record * recordToLoad ) {
-        // some cursors (geo@oct2011) don't support yielding
-        if (!_c->supportYields())  { return true; }
-
-        YieldData data;
-        prepareToYield( data );
-        staticYield( micros , _ns , recordToLoad );
-        return ClientCursor::recoverFromYield( data );
-    }
-
-    bool ClientCursor::yieldSometimes(RecordNeeds need, bool* yielded) {
-        if (yielded) { *yielded = false; }
-
-        if ( ! _yieldSometimesTracker.intervalHasElapsed() ) {
-            Record* rec = _recordForYield( need );
-            if ( rec ) {
-                // yield for page fault
-                if ( yielded ) {
-                    *yielded = true;   
-                }
-                bool res = yield( suggestYieldMicros() , rec );
-                if ( res )
-                    _yieldSometimesTracker.resetLastTime();
-                return res;
-            }
-            return true;
-        }
-
-        int micros = suggestYieldMicros();
-        if ( micros > 0 ) {
-            if ( yielded ) {
-                *yielded = true;   
-            }
-            bool res = yield( micros , _recordForYield( need ) );
-            if ( res ) 
-                _yieldSometimesTracker.resetLastTime();
-            return res;
-        }
-        return true;
-    }
-
-    bool ClientCursor::prepareToYield( YieldData &data ) {
-        if (!_c->supportYields()) { return false; }
-
-        // need to store in case 'this' gets deleted
-        data._id = _cursorid;
-        data._doingDeletes = _doingDeletes;
-        _doingDeletes = false;
-
-        updateLocation();
-
-        return true;
-    }
-
-    bool ClientCursor::recoverFromYield( const YieldData &data ) {
-        ClientCursor *cc = ClientCursor::find( data._id , false );
-        if ( cc == 0 ) {
-            // id was deleted
-            return false;
-        }
-
-        cc->_doingDeletes = data._doingDeletes;
-        cc->_c->recoverFromYield();
-        return true;
-    }
-
     int ClientCursor::suggestYieldMicros() {
         int writers = 0;
         int readers = 0;
@@ -906,41 +649,6 @@ namespace mongo {
 
     ClientCursor* ClientCursorPin::c() const {
         return ClientCursor::find( _cursorid );
-    }
-
-    //
-    // Holder methods DEPRECATED
-    //
-    ClientCursorHolder::ClientCursorHolder(ClientCursor *c) : _c(0), _id(INVALID_CURSOR_ID) {
-        reset(c);
-    }
-
-    ClientCursorHolder::~ClientCursorHolder() {
-        DESTRUCTOR_GUARD(reset(););
-    }
-
-    void ClientCursorHolder::reset(ClientCursor *c) {
-        if ( c == _c )
-            return;
-        if ( _c ) {
-            // be careful in case cursor was deleted by someone else
-            ClientCursor::erase( _id );
-        }
-        if ( c ) {
-            _c = c;
-            _id = c->_cursorid;
-        }
-        else {
-            _c = 0;
-            _id = INVALID_CURSOR_ID;
-        }
-    }
-    ClientCursor* ClientCursorHolder::get() { return _c; }
-    ClientCursor * ClientCursorHolder::operator-> () { return _c; }
-    const ClientCursor * ClientCursorHolder::operator-> () const { return _c; }
-    void ClientCursorHolder::release() {
-        _c = 0;
-        _id = INVALID_CURSOR_ID;
     }
 
     //
@@ -1061,38 +769,5 @@ namespace mongo {
             return b.obj();
         }
     } cursorServerStats;
-
-    //
-    // YieldLock
-    //
-
-    ClientCursorYieldLock::ClientCursorYieldLock( ptr<ClientCursor> cc )
-        : _canYield(cc->_c->supportYields()) {
-     
-        if ( _canYield ) {
-            cc->prepareToYield( _data );
-            _unlock.reset(new dbtempreleasecond());
-        }
-
-    }
-    
-    ClientCursorYieldLock::~ClientCursorYieldLock() {
-        if ( _unlock ) {
-            warning() << "ClientCursorYieldLock not closed properly" << endl;
-            relock();
-        }
-    }
-    
-    bool ClientCursorYieldLock::stillOk() {
-        if ( ! _canYield )
-            return true;
-        relock();
-        return ClientCursor::recoverFromYield( _data );
-    }
-    
-    void ClientCursorYieldLock::relock() {
-        _unlock.reset();
-    }
-
 
 } // namespace mongo

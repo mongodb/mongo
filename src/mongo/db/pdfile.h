@@ -38,7 +38,6 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/db/cursor.h"
 #include "mongo/db/database.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobjmanipulator.h"
@@ -55,7 +54,6 @@
 
 namespace mongo {
 
-    class Cursor;
     class DataFileHeader;
     class Extent;
     class OpDebug;
@@ -66,7 +64,6 @@ namespace mongo {
     bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
-    shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 
     bool isValidNS( const StringData& ns );
 
@@ -109,7 +106,6 @@ namespace mongo {
                        bool god = false,
                        bool mayAddIndex = true,
                        bool* addedID = 0);
-        static shared_ptr<Cursor> findAll(const StringData& ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
            assumes ns is capped and no indexes

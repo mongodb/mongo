@@ -18,6 +18,7 @@
 #include "mongo/db/queryutil.h"
 
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -1386,10 +1387,6 @@ namespace mongo {
             }
         }
         return true;
-    }
-
-    QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
-        return QueryPattern( *this, sort );
     }
 
     int FieldRangeSet::numNonUniversalRanges() const {

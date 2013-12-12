@@ -28,6 +28,7 @@
 
 #include "mongo/db/exec/2dcommon.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/geo/geoquery.h"
 
 #pragma once
 
