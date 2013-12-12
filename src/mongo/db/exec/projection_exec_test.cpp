@@ -127,6 +127,10 @@ namespace {
         }
     }
 
+    //
+    // position $
+    //
+
     TEST(ProjectionExecTest, TransformPositionalDollar) {
         // Valid position $ projections.
         testTransform("{'a.$': 1}", "{a: 10}", "{a: [10, 20, 30]}", true, "{a: [10]}");
@@ -136,6 +140,52 @@ namespace {
 
         // Invalid position $ projections.
         testTransform("{'a.$': 1}", "{a: {$size: 1}}", "{a: [5]}", false, "");
+    }
+
+    //
+    // $elemMatch
+    //
+
+    TEST(ProjectionExecTest, TransformElemMatch) {
+        const char* s = "{a: [{x: 1, y: 10}, {x: 1, y: 20}, {x: 2, y: 10}]}";
+
+        // Valid $elemMatch projections.
+        testTransform("{a: {$elemMatch: {x: 1}}}", "{}", s, true, "{a: [{x: 1, y: 10}]}");
+        testTransform("{a: {$elemMatch: {x: 1, y: 20}}}", "{}", s, true, "{a: [{x: 1, y: 20}]}");
+        testTransform("{a: {$elemMatch: {x: 2}}}", "{}", s, true, "{a: [{x: 2, y: 10}]}");
+        testTransform("{a: {$elemMatch: {x: 3}}}", "{}", s, true, "{}");
+
+        // $elemMatch on unknown field z
+        testTransform("{a: {$elemMatch: {z: 1}}}", "{}", s, true, "{}");
+    }
+
+    //
+    // $slice
+    //
+
+    TEST(ProjectionExecTest, TransformSliceCount) {
+        // Valid $slice projections using format {$slice: count}.
+        testTransform("{a: {$slice: -10}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+        testTransform("{a: {$slice: -3}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+        testTransform("{a: {$slice: -1}}", "{}", "{a: [4, 6, 8]}", true, "{a: [8]}");
+        testTransform("{a: {$slice: 0}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
+        testTransform("{a: {$slice: 1}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4]}");
+        testTransform("{a: {$slice: 3}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+        testTransform("{a: {$slice: 10}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+    }
+
+    TEST(ProjectionExecTest, TransformSliceSkipLimit) {
+        // Valid $slice projections using format {$slice: [skip, limit]}.
+        // Non-positive limits are rejected at the query parser and therefore not handled by
+        // the projection execution stage. In fact, it will abort on an invalid limit.
+        testTransform("{a: {$slice: [-10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+        testTransform("{a: {$slice: [-3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+        testTransform("{a: {$slice: [-1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [8]}");
+        testTransform("{a: {$slice: [0, 2]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6]}");
+        testTransform("{a: {$slice: [0, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4]}");
+        testTransform("{a: {$slice: [1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [6]}");
+        testTransform("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
+        testTransform("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
     }
 
 }  // namespace
