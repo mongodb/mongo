@@ -361,12 +361,8 @@ wts_salvage(void)
 
 	/*
 	 * Data-sources that don't support salvage.
-	 *
-	 * XXX
-	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
-	 * don't do that for now.
 	 */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("lsm") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
@@ -396,12 +392,8 @@ wts_verify(const char *tag)
 
 	/*
 	 * Data-sources that don't support verify.
-	 *
-	 * XXX
-	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
-	 * don't do that for now.
 	 */
-	if (DATASOURCE("lsm") || DATASOURCE("memrata"))
+	if (DATASOURCE("memrata"))
 		return;
 
 	conn = g.wts_conn;
@@ -412,8 +404,12 @@ wts_verify(const char *tag)
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
-	if ((ret = session->verify(session, g.uri, NULL)) != 0)
+
+	/* Session operations for LSM can return EBUSY. */
+	ret = session->verify(session, g.uri, NULL);
+	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
 		die(ret, "session.verify: %s: %s", g.uri, tag);
+
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
