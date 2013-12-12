@@ -94,7 +94,7 @@
 "serverStatus",
 "setParameter",
 "setShardVersion",
-"shardCollection",
+"shardCollection",  # Not used for permissions checks, but to id the event in logs.
 "shardingState",
 "shutdown",
 "splitChunk",
