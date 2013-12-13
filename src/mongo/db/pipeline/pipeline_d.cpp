@@ -105,6 +105,7 @@ namespace {
          */
 
         bool haveProjection = false;
+        bool needQueryProjection = false; // true if we need to send the project to query system
         BSONObj projection;
         DocumentSource::ParsedDeps dependencies;
         {
@@ -120,6 +121,13 @@ namespace {
                 projection = DocumentSource::depsToProjection(deps);
                 dependencies = DocumentSource::parseDeps(deps);
                 haveProjection = true;
+                needQueryProjection = deps.count("$textScore");
+            }
+            else if (DocumentSourceMatch::isTextQuery(queryObj)) {
+                // doing a text query. assume we need score since we can't prove we don't.
+                projection = BSON(Document::metaFieldTextScore << BSON("$meta" << "textScore"));
+                haveProjection = true;
+                needQueryProjection = true;
             }
         }
 
@@ -136,7 +144,7 @@ namespace {
             sortStage = dynamic_cast<DocumentSourceSort*>(sources.front().get());
             if (sortStage) {
                 // build the sort key
-                sortObj = sortStage->serializeSortKey().toBson();
+                sortObj = sortStage->serializeSortKey(/*explain*/false).toBson();
             }
         }
 
@@ -186,11 +194,12 @@ namespace {
             CanonicalQuery* cq;
             // Passing an empty projection since it is faster to use documentFromBsonWithDeps.
             // This will need to change to support covering indexes (SERVER-12015).
-            uassertStatusOK(CanonicalQuery::canonicalize(pExpCtx->ns,
-                                                         queryObj,
-                                                         sortObj,
-                                                         BSONObj(), // projection
-                                                         &cq));
+            uassertStatusOK(
+                CanonicalQuery::canonicalize(pExpCtx->ns,
+                                             queryObj,
+                                             sortObj,
+                                             needQueryProjection ? projection : BSONObj(),
+                                             &cq));
             Runner* rawRunner;
             if (getRunner(cq, &rawRunner, runnerOptions).isOK()) {
                 // success: The Runner will handle sorting for us using an index.
@@ -208,11 +217,12 @@ namespace {
         if (!runner.get()) {
             const BSONObj noSort;
             CanonicalQuery* cq;
-            uassertStatusOK(CanonicalQuery::canonicalize(pExpCtx->ns,
-                                                         queryObj,
-                                                         noSort,
-                                                         BSONObj(), // projection
-                                                         &cq));
+            uassertStatusOK(
+                CanonicalQuery::canonicalize(pExpCtx->ns,
+                                             queryObj,
+                                             noSort,
+                                             needQueryProjection ? projection : BSONObj(),
+                                             &cq));
 
             Runner* rawRunner;
             uassertStatusOK(getRunner(cq, &rawRunner, runnerOptions));
@@ -240,7 +250,7 @@ namespace {
             pSource->setSort(sortObj);
 
         if (haveProjection) {
-            pSource->setProjection(projection, dependencies);
+            pSource->setProjection(projection, dependencies, needQueryProjection);
         }
 
         while (!sources.empty() && pSource->coalesce(sources.front())) {

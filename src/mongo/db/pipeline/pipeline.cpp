@@ -200,6 +200,8 @@ namespace mongo {
             verify(stage);
             sources.push_back(stage);
 
+            // TODO find a good general way to check stages that must be first syntactically
+
             if (dynamic_cast<DocumentSourceOut*>(stage.get())) {
                 uassert(16991, "$out can only be the final stage in the pipeline",
                         iStep == nSteps - 1);
@@ -218,10 +220,14 @@ namespace mongo {
     }
 
     void Pipeline::Optimizations::Local::moveMatchBeforeSort(Pipeline* pipeline) {
+        // TODO Keep moving matches across multiple sorts as moveLimitBeforeSkip does below.
+        // TODO Check sort for limit. Not an issue currently due to order optimizations are applied,
+        // but should be fixed.
         SourceContainer& sources = pipeline->sources;
         for (size_t srcn = sources.size(), srci = 1; srci < srcn; ++srci) {
             intrusive_ptr<DocumentSource> &pSource = sources[srci];
-            if (dynamic_cast<DocumentSourceMatch *>(pSource.get())) {
+            DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch *>(pSource.get());
+            if (match && !match->isTextQuery()) {
                 intrusive_ptr<DocumentSource> &pPrevious = sources[srci - 1];
                 if (dynamic_cast<DocumentSourceSort *>(pPrevious.get())) {
                     /* swap this item with the previous */

@@ -58,12 +58,12 @@ namespace mongo {
     void DocumentSourceSort::serializeToArray(vector<Value>& array, bool explain) const {
         if (explain) { // always one Value for combined $sort + $limit
             array.push_back(Value(DOC(getSourceName() <<
-                DOC("sortKey" << serializeSortKey()
+                DOC("sortKey" << serializeSortKey(explain)
                  << "mergePresorted" << (_mergingPresorted ? Value(true) : Value())
                  << "limit" << (limitSrc ? Value(limitSrc->getLimit()) : Value())))));
         }
         else { // one Value for $sort and maybe a Value for $limit
-            MutableDocument inner (serializeSortKey());
+            MutableDocument inner (serializeSortKey(explain));
             if (_mergingPresorted)
                 inner["$mergePresorted"] = Value(true);
             array.push_back(Value(DOC(getSourceName() << inner.freeze())));
@@ -106,19 +106,25 @@ namespace mongo {
         vAscending.push_back(ascending);
     }
 
-    Document DocumentSourceSort::serializeSortKey() const {
+    Document DocumentSourceSort::serializeSortKey(bool explain) const {
         MutableDocument keyObj;
         // add the key fields
         const size_t n = vSortKey.size();
         for(size_t i = 0; i < n; ++i) {
-            // get the field name out of each ExpressionFieldPath
-            const FieldPath& withVariable = vSortKey[i]->getFieldPath();
-            verify(withVariable.getPathLength() > 1);
-            verify(withVariable.getFieldName(0) == "ROOT");
-            const string fieldPath = withVariable.tail().getPath(false);
+            if (ExpressionFieldPath* efp = dynamic_cast<ExpressionFieldPath*>(vSortKey[i].get())) {
+                // ExpressionFieldPath gets special syntax that includes direction
+                const FieldPath& withVariable = efp->getFieldPath();
+                verify(withVariable.getPathLength() > 1);
+                verify(withVariable.getFieldName(0) == "ROOT");
+                const string fieldPath = withVariable.tail().getPath(false);
 
-            // append a named integer based on the sort order
-            keyObj.setField(fieldPath, Value(vAscending[i] ? 1 : -1));
+                // append a named integer based on the sort order
+                keyObj.setField(fieldPath, Value(vAscending[i] ? 1 : -1));
+            }
+            else {
+                // other expressions use a made-up field name
+                keyObj[string(str::stream() << "$computed" << i)] = vSortKey[i]->serialize(explain);
+            }
         }
         return keyObj.freeze();
     }
@@ -150,7 +156,6 @@ namespace mongo {
         intrusive_ptr<DocumentSourceSort> pSort = new DocumentSourceSort(pExpCtx);
 
         /* check for then iterate over the sort object */
-        size_t sortKeys = 0;
         BSONForEach(keyField, sortOrder) {
             const char* fieldName = keyField.fieldName();
 
@@ -159,8 +164,19 @@ namespace mongo {
                 pSort->_mergingPresorted = true;
                 continue;
             }
+
+            if (keyField.type() == Object) {
+                // this restriction is due to needing to figure out sort direction
+                uassert(17312,
+                        "the only expression supported by $sort right now is {$meta: 'textScore'}",
+                        keyField.Obj() == BSON("$meta" << "textScore"));
+
+                pSort->vSortKey.push_back(new ExpressionMeta());
+                pSort->vAscending.push_back(false); // best scoring documents first
+                continue;
+            }
                 
-            uassert(15974, "$sort key ordering must be specified using a number",
+            uassert(15974, "$sort key ordering must be specified using a number or {$meta: 'text'}",
                     keyField.isNumber());
 
             int sortOrder = keyField.numberInt();
@@ -169,11 +185,10 @@ namespace mongo {
                     ((sortOrder == 1) || (sortOrder == -1)));
 
             pSort->addKey(fieldName, (sortOrder > 0));
-            ++sortKeys;
         }
 
-        uassert(15976, str::stream() << sortName <<
-                " must have at least one sort key", (sortKeys > 0));
+        uassert(15976, str::stream() << sortName << " must have at least one sort key",
+                !pSort->vSortKey.empty());
 
         if (limit > 0) {
             bool coalesced = pSort->coalesce(DocumentSourceLimit::create(pExpCtx, limit));
@@ -231,7 +246,7 @@ namespace mongo {
 
         bool more() { return _cursor->more(); }
         Data next() {
-            Document doc(_cursor->next());
+            const Document doc = Document::fromBsonWithMetaData(_cursor->next());
             return make_pair(_sorter->extractKey(doc), doc);
         }
     private:

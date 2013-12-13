@@ -46,8 +46,9 @@ namespace mongo {
         /** 
          * Moves matches before any adjacent sort phases.
          *
-         * This means we sort fewer items.  Neither changes the documents in
-         * the stream, so this transformation shouldn't affect the result.
+         * This means we sort fewer items.  Neither sorts, nor matches (excluding $text)
+         * change the documents in the stream, so this transformation shouldn't affect
+         * the result.
          */
         static void moveMatchBeforeSort(Pipeline* pipeline);
 

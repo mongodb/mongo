@@ -58,6 +58,7 @@ namespace mongo {
         /* create the result document */
         const size_t sizeHint = pEO->getSizeHint();
         MutableDocument out (sizeHint);
+        out.copyMetaDataFrom(*input);
 
         /*
           Use the ExpressionObject to create the base result.

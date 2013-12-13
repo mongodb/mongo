@@ -111,8 +111,10 @@ namespace mongo {
             return boost::optional<Document>();
         }
         else if (expressionResult == descendVal) {
+            const Document in = _variables->getDocument(_currentId);
             MutableDocument out;
-            FieldIterator fields(_variables->getDocument(_currentId));
+            out.copyMetaDataFrom(in);
+            FieldIterator fields(in);
             while (fields.more()) {
                 const Document::FieldPair field(fields.next());
 

@@ -228,5 +228,10 @@ for (var shardName in res.shards) {
     assert("stages" in res.shards[shardName]);
 }
 
+// Call sub-tests designed to work sharded and unsharded.
+// They check for this variable to know to shard their collections.
+RUNNING_IN_SHARDED_AGG_TEST = true; // global
+load("jstests/aggregation/bugs/server11675.js"); // text support
+
 // shut everything down
 shardedAggTest.stop();

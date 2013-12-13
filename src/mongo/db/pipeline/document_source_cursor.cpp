@@ -97,11 +97,11 @@ namespace mongo {
         BSONObj obj;
         Runner::RunnerState state;
         while ((state = runner->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
-            if (_haveDeps) {
+            if (_haveDeps && !_projectionInQuery) {
                 _currentBatch.push_back(documentFromBsonWithDeps(obj, _dependencies));
             }
             else {
-                _currentBatch.push_back(Document(obj));
+                _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
             }
 
             if (_limit) {
@@ -268,9 +268,13 @@ namespace {
         return new DocumentSourceCursor(ns, cursorId, pExpCtx);
     }
 
-    void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
+    void DocumentSourceCursor::setProjection(
+            const BSONObj& projection,
+            const ParsedDeps& deps,
+            bool projectionInQuery) {
         _projection = projection;
         _dependencies = deps;
+        _projectionInQuery = projectionInQuery;
         _haveDeps = true;
     }
 }

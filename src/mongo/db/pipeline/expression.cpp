@@ -1505,6 +1505,36 @@ namespace {
         _each->addDependencies(deps);
     }
 
+    /* ------------------------- ExpressionMeta ----------------------------- */
+
+    REGISTER_EXPRESSION("$meta", ExpressionMeta::parse);
+    intrusive_ptr<Expression> ExpressionMeta::parse(
+            BSONElement expr,
+            const VariablesParseState& vpsIn) {
+
+        uassert(17307, "$meta only supports String arguments",
+                expr.type() == String);
+        uassert(17308, "Unsupported argument to $meta: " + expr.String(),
+                expr.String() == "textScore");
+
+        return new ExpressionMeta();
+    }
+
+    Value ExpressionMeta::serialize(bool explain) const {
+        return Value(DOC("$meta" << "textScore"));
+    }
+
+    Value ExpressionMeta::evaluateInternal(Variables* vars) const {
+        const Document& root = vars->getRoot();
+        return root.hasTextScore()
+                ? Value(root.getTextScore())
+                : Value();
+    }
+
+    void ExpressionMeta::addDependencies(set<string>& deps, vector<string>* path) const {
+        deps.insert("$textScore");
+    }
+
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
     Value ExpressionMillisecond::evaluateInternal(Variables* vars) const {

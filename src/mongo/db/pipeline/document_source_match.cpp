@@ -52,6 +52,10 @@ namespace mongo {
     boost::optional<Document> DocumentSourceMatch::getNext() {
         pExpCtx->checkForInterrupt();
 
+        // The user facing error should have been generated earlier.
+        massert(17309, "Should never call getNext on a $match stage with $text clause",
+                !_isTextQuery);
+
         while (boost::optional<Document> next = pSource->getNext()) {
             // The matcher only takes BSON documents, so we have to make one.
             if (matcher->matches(next->toBson()))
@@ -66,6 +70,22 @@ namespace mongo {
         DocumentSourceMatch* otherMatch = dynamic_cast<DocumentSourceMatch*>(nextSource.get());
         if (!otherMatch)
             return false;
+
+        if (otherMatch->_isTextQuery) {
+            // Non-initial text queries are disallowed (enforced by setSource below). This prevents
+            // "hiding" a non-initial text query by combining it with another match.
+            return false;
+
+            // The rest of this block is for once we support non-initial text queries.
+
+            if (_isTextQuery) {
+                // The score should only come from the last $match. We can't combine since then this
+                // match's score would impact otherMatch's.
+                return false;
+            }
+
+            _isTextQuery = true;
+        }
 
         // Replace our matcher with the $and of ours and theirs.
         matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery()
@@ -271,6 +291,25 @@ namespace {
         return redactSafePortionTopLevel(getQuery()).toBson();
     }
 
+    void DocumentSourceMatch::setSource(DocumentSource* source) {
+        uassert(17313, "$match with $text is only allowed as the first pipeline stage",
+                !_isTextQuery);
+
+        DocumentSource::setSource(source);
+    }
+
+    bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
+        BSONForEach(e, query) {
+            const StringData fieldName = e.fieldNameStringData();
+            if (fieldName == StringData("$text", StringData::LiteralTag()))
+                return true;
+
+            if (e.isABSONObj() && isTextQuery(e.Obj()))
+                return true;
+        }
+        return false;
+    }
+
     static void uassertNoDisallowedClauses(BSONObj query) {
         BSONForEach(e, query) {
             // can't use the Matcher API because this would segfault the constructor
@@ -305,5 +344,6 @@ namespace {
                                              const intrusive_ptr<ExpressionContext> &pExpCtx)
         : DocumentSource(pExpCtx)
         , matcher(new Matcher(query.getOwned()))
+        , _isTextQuery(isTextQuery(query))
     {}
 }

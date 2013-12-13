@@ -156,7 +156,7 @@ namespace mongo {
         if (++_currentCursor == _cursors.end())
             _currentCursor = _cursors.begin();
 
-        return Document(next);
+        return Document::fromBsonWithMetaData(next);
     }
 
     void DocumentSourceMergeCursors::dispose() {

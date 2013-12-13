@@ -56,6 +56,7 @@ namespace {
     public:
         PipelineRunner(intrusive_ptr<Pipeline> pipeline)
             : _pipeline(pipeline)
+            , _includeMetaData(_pipeline->getContext()->inShard) // send metadata to merger
         {}
 
         virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
@@ -68,8 +69,8 @@ namespace {
                 return RUNNER_ADVANCED;
             }
 
-            if (boost::optional<Document> next = _pipeline->output()->getNext()) {
-                *objOut = next->toBson();
+            if (boost::optional<BSONObj> next = getNextBson()) {
+                *objOut = *next;
                 return RUNNER_ADVANCED;
             }
 
@@ -79,8 +80,8 @@ namespace {
             if (!_stash.empty())
                 return false;
 
-            if (boost::optional<Document> next = _pipeline->output()->getNext()) {
-                _stash.push_back(next->toBson());
+            if (boost::optional<BSONObj> next = getNextBson()) {
+                _stash.push_back(*next);
                 return false;
             }
 
@@ -111,9 +112,23 @@ namespace {
         }
 
     private:
+        boost::optional<BSONObj> getNextBson() {
+            if (boost::optional<Document> next = _pipeline->output()->getNext()) {
+                if (_includeMetaData) {
+                    return next->toBsonWithMetaData();
+                }
+                else {
+                    return next->toBson();
+                }
+            }
+
+            return boost::none;
+        }
+
         // Things in the _stash sould be returned before pulling items from _pipeline.
-        intrusive_ptr<Pipeline> _pipeline;
+        const intrusive_ptr<Pipeline> _pipeline;
         vector<BSONObj> _stash;
+        const bool _includeMetaData;
     };
 }
 

@@ -166,6 +166,8 @@ namespace mongo {
                           , _usedBytes(0)
                           , _numFields(0)
                           , _hashTabMask(0)
+                          , _hasTextScore(false)
+                          , _textScore(0)
         {}
         ~DocumentStorage();
 
@@ -237,6 +239,23 @@ namespace mongo {
             return !_buffer ? 0 : (_bufferEnd - _buffer + hashTabBytes());
         }
 
+        /**
+         * Copies all metadata from source if it has any.
+         * Note: does not clear metadata from this.
+         */
+        void copyMetaDataFrom(const DocumentStorage& source) {
+            if (source.hasTextScore()) {
+                setTextScore(source.getTextScore());
+            }
+        }
+
+        bool hasTextScore() const { return _hasTextScore; }
+        double getTextScore() const { return _textScore; }
+        void setTextScore(double score) {
+            _hasTextScore = true;
+            _textScore = score;
+        }
+
     private:
 
         /// Same as lastElement->next() or firstElement() if empty.
@@ -305,6 +324,9 @@ namespace mongo {
         unsigned _usedBytes; // position where next field would start
         unsigned _numFields; // this includes removed fields
         unsigned _hashTabMask; // equal to hashTabBuckets()-1 but used more often
+
+        bool _hasTextScore; // When adding more metadata fields, this should become a bitvector
+        double _textScore;
         // When adding a field, make sure to update clone() method
     };
 }
