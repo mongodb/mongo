@@ -252,125 +252,6 @@ namespace MatcherTests {
     };
 
 
-    template <typename M>
-      class AtomicMatchTest {
-    public:
-        void run() {
-
-            {
-                M m( BSON( "x" << 5 ) );
-                ASSERT( !m.atomic() );
-            }
-
-            {
-                M m( BSON( "x" << 5 << "$atomic" << false ) );
-                ASSERT( !m.atomic() );
-            }
-
-            {
-                M m( BSON( "x" << 5 << "$atomic" << true ) );
-                ASSERT( m.atomic() );
-            }
-
-            {
-                bool threwError = false;
-                try {
-                    M m( BSON( "x" << 5 <<
-                               "$or" << BSON_ARRAY( BSON( "$atomic" << true << "y" << 6 ) ) ) );
-                }
-                catch ( ... ) {
-                    threwError = true;
-                }
-                ASSERT( threwError );
-            }
-        }
-    };
-
-    template <typename M>
-    class SingleSimpleCriterion {
-    public:
-        void run() {
-
-            {
-                M m( BSON( "x" << 5 ) );
-                ASSERT( m.singleSimpleCriterion() );
-            }
-
-            {
-                M m( BSON( "x" << 5 << "y" << 5 ) );
-                ASSERT( !m.singleSimpleCriterion() );
-            }
-
-            {
-                M m( BSON( "x" << BSON( "$gt" << 5 ) ) );
-                ASSERT( !m.singleSimpleCriterion() );
-            }
-
-        }
-    };
-
-    template <typename M>
-    class IndexPortion1 {
-    public:
-        void run() {
-            M full( BSON( "x" << 5 << "y" << 7 ) );
-            M partial( full, BSON( "x" << 1) );
-
-            ASSERT( full.matches( BSON( "x" << 5 << "y" << 7 ) ) );
-            ASSERT( partial.matches( BSON( "x" << 5 << "y" << 7 ) ) );
-
-            ASSERT( !full.matches( BSON( "x" << 5 << "y" << 8 ) ) );
-            ASSERT( partial.matches( BSON( "x" << 5 << "y" << 8 ) ) );
-
-            ASSERT( !full.keyMatch( partial ) );
-            ASSERT( full.keyMatch( full ) );
-            ASSERT( partial.keyMatch( partial ) );
-        }
-    };
-
-    template <typename M>
-    class ExistsFalse1 {
-    public:
-        void run() {
-            {
-                M m( BSON( "a" << BSON( "$exists" << true ) ) );
-                ASSERT( !m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "a" << BSON( "$exists" << false ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "a" << BSON( "$not" << BSON( "$exists" << false ) ) ) );
-                ASSERT( !m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$or" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << true ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$not" << BSON( "$exists" << true ) ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-
-        }
-    };
-
     class All : public Suite {
     public:
         All() : Suite( "matcher" ) {
@@ -393,10 +274,6 @@ namespace MatcherTests {
             ADD_BOTH(WithinBox);
             ADD_BOTH(WithinCenter);
             ADD_BOTH(WithinPolygon);
-            ADD_BOTH(AtomicMatchTest);
-            ADD_BOTH(SingleSimpleCriterion);
-            ADD_BOTH(IndexPortion1);
-            ADD_BOTH(ExistsFalse1);
         }
     } dball;
 
