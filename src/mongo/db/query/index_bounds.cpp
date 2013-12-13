@@ -182,6 +182,10 @@ namespace mongo {
     }
 
     bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction) {
+        if (isSimpleRange) {
+            return direction == sgn(endKey.woCompare(startKey, keyPattern, false));
+        }
+
         BSONObjIterator it(keyPattern);
 
         for (size_t i = 0; i < fields.size(); ++i) {

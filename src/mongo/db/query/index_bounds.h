@@ -82,9 +82,7 @@ namespace mongo {
         std::string toString() const;
         BSONObj toBSON() const;
 
-        // TODO: KILL THIS?
-        // We need this for legacy non-index indices (2d/2dsphere) that take a BSONObj and don't
-        // deal with the kind of absurd Btree-only behavior of IndexBoundsChecker.
+        // TODO: we use this for max/min scan.  Consider migrating that.
         bool isSimpleRange;
         BSONObj startKey;
         BSONObj endKey;
