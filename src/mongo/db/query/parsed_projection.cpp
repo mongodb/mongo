@@ -138,12 +138,12 @@ namespace mongo {
                     }
 
                     // Make sure the argument to $meta is something we recognize.
-                    // e.g. {x: {$meta: "text"}}
+                    // e.g. {x: {$meta: "textScore"}}
                     if (String != e2.type()) {
                         return Status(ErrorCodes::BadValue, "unexpected argument to $meta in proj");
                     }
 
-                    if (!mongoutils::str::equals(e2.valuestr(), "text")
+                    if (!mongoutils::str::equals(e2.valuestr(), "textScore")
                         && !mongoutils::str::equals(e2.valuestr(), "diskloc")
                         && !mongoutils::str::equals(e2.valuestr(), "indexKey")
                         && !mongoutils::str::equals(e2.valuestr(), "geoNearDistance")

@@ -84,10 +84,10 @@ namespace mongo {
                 comparatorBob.append(elt);
                 btreeBob.append(elt);
             }
-            else if (LiteParsedQuery::isTextMeta(elt)) {
+            else if (LiteParsedQuery::isTextScoreMeta(elt)) {
                 // Sort text score decreasing by default.  Field name doesn't matter but we choose
                 // something that a user shouldn't ever have.
-                comparatorBob.append("$meta_text", -1);
+                comparatorBob.append("$metaTextScore", -1);
                 _sortHasMeta = true;
             }
             else {
@@ -147,7 +147,7 @@ namespace mongo {
                 // Merge btree key elt.
                 mergedKeyBob.append(btreeIt.next());
             }
-            else if (LiteParsedQuery::isTextMeta(elt)) {
+            else if (LiteParsedQuery::isTextScoreMeta(elt)) {
                 // Add text score metadata
                 double score = 0.0;
                 if (member.hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
@@ -156,7 +156,7 @@ namespace mongo {
                                 member.getComputed(WSM_COMPUTED_TEXT_SCORE));
                     score = scoreData->getScore();
                 }
-                mergedKeyBob.append("$meta_text", score);
+                mergedKeyBob.append("$metaTextScore", score);
             }
         }
 

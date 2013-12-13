@@ -66,9 +66,9 @@ namespace mongo {
 
         /**
          * Helper function to identify text search sort key
-         * Example: {a: {$meta: "text"}}
+         * Example: {a: {$meta: "textScore"}}
          */
-        static bool isTextMeta(BSONElement elt);
+        static bool isTextScoreMeta(BSONElement elt);
 
         /**
          * Helper function to identify diskLoc projection
@@ -81,7 +81,7 @@ namespace mongo {
          * Returns true if each element satisfies one of:
          * 1. a number with value 1
          * 2. a number with value -1
-         * 3. isTextMeta
+         * 3. isTextScoreMeta
          */
         static bool isValidSortOrder(const BSONObj& sortObj);
 
@@ -90,7 +90,7 @@ namespace mongo {
          * Each element of the object returned satisfies one of:
          * 1. a number with value 1
          * 2. a number with value -1
-         * 3. isTextMeta
+         * 3. isTextScoreMeta
          */
         static BSONObj normalizeSortOrder(const BSONObj& sortObj);
 

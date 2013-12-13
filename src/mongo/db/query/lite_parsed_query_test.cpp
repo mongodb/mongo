@@ -120,23 +120,23 @@ namespace {
     // Text meta BSON element validation
     //
 
-    bool isFirstElementTextMeta(const char* sortStr) {
+    bool isFirstElementTextScoreMeta(const char* sortStr) {
         BSONObj sortObj = fromjson(sortStr);
         BSONElement elt = sortObj.firstElement();
-        bool result = LiteParsedQuery::isTextMeta(elt);
+        bool result = LiteParsedQuery::isTextScoreMeta(elt);
         return result;
     }
 
     // Check validation of $meta expressions
-    TEST(LiteParsedQueryTest, IsTextMeta) {
-        // Valid text meta sort
-        ASSERT(isFirstElementTextMeta("{a: {$meta: \"text\"}}"));
+    TEST(LiteParsedQueryTest, IsTextScoreMeta) {
+        // Valid textScore meta sort
+        ASSERT(isFirstElementTextScoreMeta("{a: {$meta: \"textScore\"}}"));
 
-        // Invalid text meta sorts
-        ASSERT_FALSE(isFirstElementTextMeta("{a: {$meta: 1}}"));
-        ASSERT_FALSE(isFirstElementTextMeta("{a: {$meta: \"image\"}}"));
-        ASSERT_FALSE(isFirstElementTextMeta("{a: {$world: \"text\"}}"));
-        ASSERT_FALSE(isFirstElementTextMeta("{a: {$meta: \"text\", b: 1}}"));
+        // Invalid textScore meta sorts
+        ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$meta: 1}}"));
+        ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$meta: \"image\"}}"));
+        ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$world: \"textScore\"}}"));
+        ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$meta: \"textScore\", b: 1}}"));
     }
 
     void testSortOrder(bool expectedValid, const char* expectedStr, const char* sortStr) {
@@ -161,7 +161,7 @@ namespace {
     // In a valid sort order, each element satisfies one of:
     // 1. a number with value 1
     // 2. a number with value -1
-    // 3. isTextMeta
+    // 3. isTextScoreMeta
     //
 
     TEST(LiteParsedQueryTest, NormalizeAndValidateSortOrder) {
@@ -169,7 +169,7 @@ namespace {
         testSortOrder(true, "{}", "{}");
         testSortOrder(true, "{a: 1}", "{a: 1}");
         testSortOrder(true, "{a: -1}", "{a: -1}");
-        testSortOrder(true, "{a: {$meta: \"text\"}}", "{a: {$meta: \"text\"}}");
+        testSortOrder(true, "{a: {$meta: \"textScore\"}}", "{a: {$meta: \"textScore\"}}");
 
         // Invalid sorts
         testSortOrder(false, "{a: 1}", "{a: 100}");
@@ -188,8 +188,8 @@ namespace {
         testSortOrder(false, "{a: 1}", "{a: \"bb\"}");
         testSortOrder(false, "{a: 1}", "{a: {$meta: 1}}");
         testSortOrder(false, "{a: 1}", "{a: {$meta: \"image\"}}");
-        testSortOrder(false, "{a: 1}", "{a: {$world: \"text\"}}");
-        testSortOrder(false, "{a: 1}", "{a: {$meta: \"text\", b: 1}}");
+        testSortOrder(false, "{a: 1}", "{a: {$world: \"textScore\"}}");
+        testSortOrder(false, "{a: 1}", "{a: {$meta: \"textScore\", b: 1}}");
     }
 
 }  // namespace

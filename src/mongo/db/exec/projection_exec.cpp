@@ -121,8 +121,8 @@ namespace mongo {
                 }
                 else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
                     verify(String == e2.type());
-                    if (mongoutils::str::equals(e2.valuestr(), "text")) {
-                        _meta[e.fieldName()] = META_TEXT;
+                    if (mongoutils::str::equals(e2.valuestr(), "textScore")) {
+                        _meta[e.fieldName()] = META_TEXT_SCORE;
                     }
                     else if (mongoutils::str::equals(e2.valuestr(), "diskloc")) {
                         _meta[e.fieldName()] = META_DISKLOC;
@@ -323,7 +323,7 @@ namespace mongo {
                                   "near loc proj requested but no data available");
                 }
             }
-            else if (META_TEXT == it->second) {
+            else if (META_TEXT_SCORE == it->second) {
                 if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
                     const TextScoreComputedData* score
                         = static_cast<const TextScoreComputedData*>(

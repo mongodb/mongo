@@ -90,8 +90,8 @@ namespace mongo {
     }
 
     // static
-    bool LiteParsedQuery::isTextMeta(BSONElement elt) {
-        // elt must be foo: {$meta: "text"}
+    bool LiteParsedQuery::isTextScoreMeta(BSONElement elt) {
+        // elt must be foo: {$meta: "textScore"}
         if (mongo::Object != elt.type()) {
             return false;
         }
@@ -108,7 +108,7 @@ namespace mongo {
         if (mongo::String != metaElt.type()) {
             return false;
         }
-        if (!mongoutils::str::equals("text", metaElt.valuestr())) {
+        if (!mongoutils::str::equals("textScore", metaElt.valuestr())) {
             return false;
         }
         // must have exactly 1 element
@@ -152,7 +152,7 @@ namespace mongo {
         BSONObjIterator i(sortObj);
         while (i.more()) {
             BSONElement e = i.next();
-            if (isTextMeta(e)) {
+            if (isTextScoreMeta(e)) {
                 continue;
             }
             long long n = e.safeNumberLong();
@@ -169,7 +169,7 @@ namespace mongo {
         BSONObjIterator i(sortObj);
         while (i.more()) {
             BSONElement e = i.next();
-            if (isTextMeta(e)) {
+            if (isTextScoreMeta(e)) {
                 b.append(e);
                 continue;
             }

@@ -52,7 +52,7 @@ namespace mongo {
          * document / query.
          */
         enum MetaProjection {
-            META_TEXT,
+            META_TEXT_SCORE,
             META_GEONEAR_DIST,
             META_GEONEAR_POINT,
             META_DISKLOC,
