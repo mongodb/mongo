@@ -397,6 +397,13 @@ namespace {
                     }
                 }
 
+                BSONElement dir = ixscanObj["dir"];
+                if (!dir.eoo() && NumberInt == dir.type()) {
+                    if (dir.numberInt() != ixn->direction) {
+                        return false;
+                    }
+                }
+
                 BSONElement filter = ixscanObj["filter"];
                 if (filter.eoo()) {
                     return true;
@@ -1601,6 +1608,32 @@ namespace {
         assertSolutionExists("{sort: {pattern: {_id: -1}, limit: 0, node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
                                 "{filter: null, pattern: {_id: 1}}}}}");
+    }
+
+    //
+    // Wacky query args
+    //
+
+    TEST_F(QueryPlannerTest, MaxMinSort) {
+        addIndex(BSON("a" << 1));
+
+        // Run an empty query, sort {a: 1}, max/min arguments.
+        runQueryFull(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 0, BSONObj(),
+                     fromjson("{a: 2}"), fromjson("{a: 8}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, MaxMinReverseSort) {
+        addIndex(BSON("a" << 1));
+
+        // Run an empty query, sort {a: -1}, max/min arguments.
+        runQueryFull(BSONObj(), fromjson("{a: -1}"), BSONObj(), 0, 0, BSONObj(),
+                     fromjson("{a: 2}"), fromjson("{a: 8}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: -1, pattern: {a: 1}}}}}");
     }
 
     //
