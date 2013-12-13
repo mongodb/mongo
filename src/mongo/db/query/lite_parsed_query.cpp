@@ -47,12 +47,14 @@ namespace mongo {
                                  const BSONObj& query, const BSONObj& proj, const BSONObj& sort,
                                  const BSONObj& hint,
                                  const BSONObj& minObj, const BSONObj& maxObj,
+                                 bool snapshot,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort;
         pq->_hint = hint;
         pq->_min = minObj;
         pq->_max = maxObj;
+        pq->_snapshot = snapshot;
 
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (status.isOK()) { *out = pq.release(); }

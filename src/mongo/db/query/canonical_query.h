@@ -68,7 +68,7 @@ namespace mongo {
                                    long long skip, long long limit,
                                    const BSONObj& hint,
                                    const BSONObj& minObj, const BSONObj& maxObj,
-                                   CanonicalQuery** out);
+                                   bool snapshot, CanonicalQuery** out);
 
         // What namespace is this query over?
         const string& ns() const { return _pq->ns(); }
