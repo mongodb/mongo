@@ -43,10 +43,12 @@
 #if defined(_WIN32)
 #include "mongo/platform/atomic_intrinsics_win32.h"
 #elif defined(__GNUC__)
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(HAVE_GCC_ATOMIC_BUILTINS)
+#include "mongo/platform/atomic_intrinsics_gcc_generic.h"
+#elif defined(__i386__) || defined(__x86_64__)
 #include "mongo/platform/atomic_intrinsics_gcc_intel.h"
 #else
-#include "mongo/platform/atomic_intrinsics_gcc_generic.h"
+#error "Unsupported platform: no gcc atomic builtins or port available"
 #endif
 #else
 #error "Unsupported os/compiler family"
