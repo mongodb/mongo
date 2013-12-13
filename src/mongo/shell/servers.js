@@ -687,6 +687,27 @@ MongoRunner.isStopped = function( port ){
     return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? false : true
 }
 
+/**
+ * Starts an instance of the specified mongo tool
+ *
+ * @param {String} binaryName The name of the tool to run
+ * @param {Object} opts options to pass to the tool
+ *    {
+ *      binVersion {string}: version of tool to run
+ *    }
+ *
+ * @see MongoRunner.arrOptions
+ */
+MongoRunner.runMongoTool = function( binaryName, opts ){
+
+    var opts = opts || {}
+
+    var argsArray = MongoRunner.arrOptions(binaryName, opts)
+
+    return runMongoProgram.apply(null, argsArray);
+
+}
+
 startMongodTest = function (port, dirname, restart, extraOptions ) {
     if (!port)
         port = MongoRunner.nextOpenPort();
