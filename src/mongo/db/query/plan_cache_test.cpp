@@ -87,7 +87,7 @@ namespace {
                                                      skip, limit,
                                                      hintObj,
                                                      minObj, maxObj,
-                                                     &cq);
+                                                     false, &cq);
         ASSERT_OK(result);
         return cq;
     }

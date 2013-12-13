@@ -50,6 +50,7 @@ namespace mongo {
                            const BSONObj& hint,
                            const BSONObj& minObj,
                            const BSONObj& maxObj,
+                           bool snapshot,
                            LiteParsedQuery** out);
 
         /**

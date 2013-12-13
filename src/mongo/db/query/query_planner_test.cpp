@@ -111,14 +111,19 @@ namespace {
         void runQueryHintMinMax(const BSONObj& query, const BSONObj& hint,
                                 const BSONObj& minObj, const BSONObj& maxObj) {
 
-            runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
+            runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj, false);
         }
 
         void runQuerySortProjSkipLimitHint(const BSONObj& query,
                                            const BSONObj& sort, const BSONObj& proj,
                                            long long skip, long long limit,
                                            const BSONObj& hint) {
-            runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
+            runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj(), false);
+        }
+
+        void runQuerySnapshot(const BSONObj& query) {
+            runQueryFull(query, BSONObj(), BSONObj(), 0, 0, BSONObj(), BSONObj(),
+                         BSONObj(), true);
         }
 
         void runQueryFull(const BSONObj& query,
@@ -126,10 +131,11 @@ namespace {
                           long long skip, long long limit,
                           const BSONObj& hint,
                           const BSONObj& minObj,
-                          const BSONObj& maxObj) {
+                          const BSONObj& maxObj,
+                          bool snapshot) {
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                    minObj, maxObj, &cq);
+                                                    minObj, maxObj, snapshot, &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             s = QueryPlanner::plan(*cq, params, &solns);
@@ -160,14 +166,14 @@ namespace {
 
         void runInvalidQueryHintMinMax(const BSONObj& query, const BSONObj& hint,
                                        const BSONObj& minObj, const BSONObj& maxObj) {
-            runInvalidQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
+            runInvalidQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj, false);
         }
 
         void runInvalidQuerySortProjSkipLimitHint(const BSONObj& query,
                                                   const BSONObj& sort, const BSONObj& proj,
                                                   long long skip, long long limit,
                                                   const BSONObj& hint) {
-            runInvalidQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
+            runInvalidQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj(), false);
         }
 
         void runInvalidQueryFull(const BSONObj& query,
@@ -175,10 +181,11 @@ namespace {
                                  long long skip, long long limit,
                                  const BSONObj& hint,
                                  const BSONObj& minObj,
-                                 const BSONObj& maxObj) {
+                                 const BSONObj& maxObj,
+                                 bool snapshot) {
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                    minObj, maxObj, &cq);
+                                                    minObj, maxObj, snapshot, &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             s = QueryPlanner::plan(*cq, params, &solns);
@@ -948,7 +955,7 @@ namespace {
 
         // Run an empty query, sort {a: 1}, max/min arguments.
         runQueryFull(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 0, BSONObj(),
-                     fromjson("{a: 2}"), fromjson("{a: 8}"));
+                     fromjson("{a: 2}"), fromjson("{a: 8}"), false);
 
         ASSERT_EQUALS(getNumSolutions(), 1U);
         assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
@@ -959,12 +966,25 @@ namespace {
 
         // Run an empty query, sort {a: -1}, max/min arguments.
         runQueryFull(BSONObj(), fromjson("{a: -1}"), BSONObj(), 0, 0, BSONObj(),
-                     fromjson("{a: 2}"), fromjson("{a: 8}"));
+                     fromjson("{a: 2}"), fromjson("{a: 8}"), false);
 
         ASSERT_EQUALS(getNumSolutions(), 1U);
         assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: -1, pattern: {a: 1}}}}}");
     }
 
+
+    //
+    // $snapshot
+    //
+
+    TEST_F(QueryPlannerTest, Snapshot) {
+        addIndex(BSON("a" << 1));
+        runQuerySnapshot(fromjson("{a: {$gt: 0}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:{$gt:0}}, node: "
+                                "{ixscan: {filter: null, pattern: {_id: 1}}}}}");
+    }
 
     //
     // Tree operations that require simple tree rewriting.
