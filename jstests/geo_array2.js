@@ -81,7 +81,7 @@ for( var i = -1; i < 2; i++ ){
 		// Do nearSphere check
 		
 		// Earth Radius
-		var eRad = 6371
+		var eRad = 6378.1
 				
 		nearResults = db.geoarray2.find( { loc : { $nearSphere : center , $maxDistance : 500 /* km */ / eRad }, type : type } ).toArray()
 		
