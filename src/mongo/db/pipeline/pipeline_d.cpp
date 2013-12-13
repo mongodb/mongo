@@ -32,7 +32,6 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/parsed_query.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_runner.h"

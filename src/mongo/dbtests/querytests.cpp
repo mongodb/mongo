@@ -37,7 +37,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/parsed_query.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/structure/collection.h"
