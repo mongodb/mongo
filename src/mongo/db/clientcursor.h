@@ -32,7 +32,6 @@
 
 #include <boost/thread/recursive_mutex.hpp>
 
-#include "mongo/db/cc_by_loc.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -50,6 +49,9 @@ namespace mongo {
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     class ClientCursor;
     class ParsedQuery;
+
+    typedef long long CursorId; /* passed to the client so it can send back on getMore */
+    static const CursorId INVALID_CURSOR_ID = -1; // But see SERVER-5726.
 
     /**
      * ClientCursor is a wrapper that represents a cursorid from our database application's

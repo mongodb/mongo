@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/db/cc_by_loc.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
@@ -121,8 +120,6 @@ namespace mongo {
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
 
-        CCByLoc& ccByLoc() { return _ccByLoc; }
-
         const NamespaceIndex& namespaceIndex() const { return _namespaceIndex; }
         NamespaceIndex& namespaceIndex() { return _namespaceIndex; }
 
@@ -207,8 +204,6 @@ namespace mongo {
         const string _namespacesName; // "alleyinsider.system.namespaces"
         const string _indexesName; // "alleyinsider.system.indexes"
         const string _extentFreelistName;
-
-        CCByLoc _ccByLoc; // use by ClientCursor
 
         RecordStats _recordStats;
         int _profile; // 0=off.

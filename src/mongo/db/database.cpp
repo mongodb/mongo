@@ -55,10 +55,6 @@ namespace mongo {
     Database::~Database() {
         verify( Lock::isW() );
         _magic = 0;
-        if( _ccByLoc.size() ) {
-            log() << "\n\n\nWARNING: ccByLoc not empty on database close! "
-                  << _ccByLoc.size() << ' ' << _name << endl;
-        }
 
         for ( CollectionMap::iterator i = _collections.begin(); i != _collections.end(); ++i ) {
             delete i->second;
