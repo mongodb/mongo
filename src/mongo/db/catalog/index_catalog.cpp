@@ -448,6 +448,13 @@ namespace mongo {
             }
         }
 
+        if ( _collection->isCapped() && spec["dropDups"].trueValue() ) {
+            return Status( ErrorCodes::CannotCreateIndex,
+                           str::stream() << "Cannot create an index with dropDups=true on a "
+                                         << "capped collection, as capped collections do "
+                                         << "not allow document removal." );
+        }
+
         if ( !IndexDetails::isIdIndexPattern( key ) ) {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
