@@ -11,7 +11,7 @@ function assertExplain( expected, explain, checkAllPlans ) {
         assert.eq( expected[ field ], explain[ field ], field );
     }
     if ( checkAllPlans && explain.allPlans && explain.allPlans.length == 1 ) {
-        for( field in { n:1, nscanned:1, nscannedObjects:1 } ) {
+        for( field in expected ) {
             assert.eq( expected[ field ], explain.allPlans[ 0 ][ field ], field );
         }
     }

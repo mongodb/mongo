@@ -904,24 +904,6 @@ namespace {
     }
 
     //
-    // Hint
-    //
-
-    TEST_F(QueryPlannerTest, HintValid) {
-        addIndex(BSON("a" << 1));
-        runQueryHint(BSONObj(), fromjson("{a: 1}"));
-
-        assertNumSolutions(1U);
-        assertSolutionExists("{fetch: {filter: null, "
-                                "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
-    }
-
-    TEST_F(QueryPlannerTest, HintInvalid) {
-        addIndex(BSON("a" << 1));
-        runInvalidQueryHint(BSONObj(), fromjson("{b: 1}"));
-    }
-
-    //
     // Min/Max
     //
 
@@ -1645,6 +1627,52 @@ namespace {
         assertNumSolutions(1U);
         assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, node: "
                                 "{cscan: {filter: {a: 1}, dir: 1}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, HintValid) {
+        addIndex(BSON("a" << 1));
+        runQueryHint(BSONObj(), fromjson("{a: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: null, "
+                                "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, HintValidWithPredicate) {
+        addIndex(BSON("a" << 1));
+        runQueryHint(fromjson("{a: {$gt: 1}}"), fromjson("{a: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: null, "
+                                "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, HintValidWithSort) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        runQuerySortHint(fromjson("{a: 100, b: 200}"), fromjson("{b: 1}"), fromjson("{a: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, node: "
+                                "{fetch: {filter: {b: 200}, "
+                                "node: {ixscan: {filter: null, pattern: {a: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, HintMultipleSolutions) {
+        addIndex(fromjson("{'a.b': 1}"));
+        runQueryHint(fromjson("{'a.b': 1, a: {$elemMatch: {b: 2}}}"), fromjson("{'a.b': 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{fetch: {filter: {a: {$elemMatch: {b: 2}}}, "
+                                "node: {ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
+        assertSolutionExists("{fetch: {filter: {'a.b': 1},"
+                                "node: {fetch: {filter: {a: {$elemMatch: {b: 2}}}, "
+                                "node: {ixscan: {filter: null, pattern: {'a.b': 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, HintInvalid) {
+        addIndex(BSON("a" << 1));
+        runInvalidQueryHint(BSONObj(), fromjson("{b: 1}"));
     }
 
     //

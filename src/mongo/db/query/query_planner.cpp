@@ -484,9 +484,10 @@ namespace mongo {
         // An index was hinted.  If there are any solutions, they use the hinted index.  If not, we
         // scan the entire index to provide results and output that as our plan.  This is the
         // desired behavior when an index is hinted that is not relevant to the query.
-        if (!hintIndex.isEmpty() && (0 == out->size())) {
-            QuerySolution* soln = buildWholeIXSoln(params.indices[hintIndexNumber], query, params);
-            if (NULL != soln) {
+        if (!hintIndex.isEmpty()) {
+            if (0 == out->size()) {
+                QuerySolution* soln = buildWholeIXSoln(params.indices[hintIndexNumber], query, params);
+                verify(NULL != soln);
                 QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
                 out->push_back(soln);
             }
@@ -543,6 +544,7 @@ namespace mongo {
         // XXX: currently disabling the always-use-a-collscan in order to find more planner bugs.
         if (    !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
              && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
+             && hintIndex.isEmpty()
              && ((params.options & QueryPlannerParams::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan)))
         {
             QuerySolution* collscan = buildCollscanSoln(query, false, params);
