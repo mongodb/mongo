@@ -164,8 +164,8 @@ namespace mongo {
                 uassert(17297, "distanceMultiplier must be non-negative", distanceMultiplier >= 0);
             }
 
-            BSONObj projObj = BSON("$pt" << BSON("$meta" << "geoNearPoint") <<
-                                   "$dis" << BSON("$meta" << "geoNearDistance"));
+            BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) <<
+                                   "$dis" << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
             CanonicalQuery* cq;
             if (!CanonicalQuery::canonicalize(ns, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), &cq).isOK()) {

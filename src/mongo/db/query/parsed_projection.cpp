@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/parsed_projection.h"
 
+#include "mongo/db/query/lite_parsed_query.h"
+
 namespace mongo {
 
     /**
@@ -143,23 +145,23 @@ namespace mongo {
                         return Status(ErrorCodes::BadValue, "unexpected argument to $meta in proj");
                     }
 
-                    if (!mongoutils::str::equals(e2.valuestr(), "textScore")
-                        && !mongoutils::str::equals(e2.valuestr(), "diskloc")
-                        && !mongoutils::str::equals(e2.valuestr(), "indexKey")
-                        && !mongoutils::str::equals(e2.valuestr(), "geoNearDistance")
-                        && !mongoutils::str::equals(e2.valuestr(), "geoNearPoint")) {
+                    if (e2.valuestr() != LiteParsedQuery::metaTextScore
+                        && e2.valuestr() != LiteParsedQuery::metaDiskLoc
+                        && e2.valuestr() != LiteParsedQuery::metaIndexKey
+                        && e2.valuestr() != LiteParsedQuery::metaGeoNearDistance
+                        && e2.valuestr() != LiteParsedQuery::metaGeoNearPoint) {
                         return Status(ErrorCodes::BadValue,
                                       "unsupported $meta operator: " + e2.str());
                     }
 
                     // This clobbers everything else.
-                    if (mongoutils::str::equals(e2.valuestr(), "indexKey")) {
+                    if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
                         hasIndexKeyProjection = true;
                     }
-                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearDistance")) {
+                    else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
                         wantGeoNearDistance = true;
                     }
-                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearPoint")) {
+                    else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
                         wantGeoNearPoint = true;
                     }
                 }

@@ -26,6 +26,12 @@ namespace mongo {
     const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
     const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
 
+    const string LiteParsedQuery::metaTextScore("textScore");
+    const string LiteParsedQuery::metaGeoNearDistance("geoNearDistance");
+    const string LiteParsedQuery::metaGeoNearPoint("geoNearPoint");
+    const string LiteParsedQuery::metaDiskLoc("diskloc");
+    const string LiteParsedQuery::metaIndexKey("indexKey");
+
     // static
     Status LiteParsedQuery::make(const QueryMessage& qm, LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
@@ -108,7 +114,7 @@ namespace mongo {
         if (mongo::String != metaElt.type()) {
             return false;
         }
-        if (!mongoutils::str::equals("textScore", metaElt.valuestr())) {
+        if (LiteParsedQuery::metaTextScore != metaElt.valuestr()) {
             return false;
         }
         // must have exactly 1 element
@@ -137,7 +143,7 @@ namespace mongo {
         if (mongo::String != metaElt.type()) {
             return false;
         }
-        if (!mongoutils::str::equals("diskloc", metaElt.valuestr())) {
+        if (LiteParsedQuery::metaDiskLoc != metaElt.valuestr()) {
             return false;
         }
         // must have exactly 1 element
@@ -324,7 +330,8 @@ namespace mongo {
                         BSONObjBuilder projBob;
                         projBob.appendElements(_proj);
                         // XXX: what's the syntax here?
-                        BSONObj indexKey = BSON("$$" << BSON("$meta" << "indexKey"));
+                        BSONObj indexKey = BSON("$$" <<
+                                                BSON("$meta" << LiteParsedQuery::metaIndexKey));
                         projBob.append(indexKey.firstElement());
                         _proj = projBob.obj();
                     }
@@ -338,7 +345,8 @@ namespace mongo {
                     if (e.trueValue()) {
                         BSONObjBuilder projBob;
                         projBob.appendElements(_proj);
-                        BSONObj metaDiskLoc = BSON("$diskLoc" << BSON("$meta" << "diskloc"));
+                        BSONObj metaDiskLoc = BSON("$diskLoc" <<
+                                                   BSON("$meta" << LiteParsedQuery::metaDiskLoc));
                         projBob.append(metaDiskLoc.firstElement());
                         _proj = projBob.obj();
                     }

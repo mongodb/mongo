@@ -31,6 +31,7 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -121,19 +122,19 @@ namespace mongo {
                 }
                 else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
                     verify(String == e2.type());
-                    if (mongoutils::str::equals(e2.valuestr(), "textScore")) {
+                    if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
                         _meta[e.fieldName()] = META_TEXT_SCORE;
                     }
-                    else if (mongoutils::str::equals(e2.valuestr(), "diskloc")) {
+                    else if (e2.valuestr() == LiteParsedQuery::metaDiskLoc) {
                         _meta[e.fieldName()] = META_DISKLOC;
                     }
-                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearPoint")) {
+                    else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
                         _meta[e.fieldName()] = META_GEONEAR_POINT;
                     }
-                    else if (mongoutils::str::equals(e2.valuestr(), "geoNearDistance")) {
+                    else if (e2.valuestr() == LiteParsedQuery::metaGeoNearDistance) {
                         _meta[e.fieldName()] = META_GEONEAR_DIST;
                     }
-                    else if (mongoutils::str::equals(e2.valuestr(), "indexKey")) {
+                    else if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
                         _hasReturnKey = true;
                         // The index key clobbers everything so just stop parsing here.
                         return;

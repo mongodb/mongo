@@ -94,11 +94,16 @@ namespace mongo {
          */
         static BSONObj normalizeSortOrder(const BSONObj& sortObj);
 
-        // Name of the maxTimeMS command option.
+        // Names of the maxTimeMS command and query option.
         static const string cmdOptionMaxTimeMS;
-
-        // Name of the maxTimeMS query option.
         static const string queryOptionMaxTimeMS;
+
+        // Names of the $meta projection values.
+        static const string metaTextScore;
+        static const string metaGeoNearDistance;
+        static const string metaGeoNearPoint;
+        static const string metaDiskLoc;
+        static const string metaIndexKey;
 
         const string& ns() const { return _ns; }
         bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }

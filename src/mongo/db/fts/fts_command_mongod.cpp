@@ -85,7 +85,7 @@ namespace mongo {
             BSONObj queryObj = queryBob.obj();
 
             // We sort by the score.
-            BSONObj sortSpec = BSON("$s" << BSON("$meta" << "textScore"));
+            BSONObj sortSpec = BSON("$s" << BSON("$meta" << LiteParsedQuery::metaTextScore));
 
             // We also project the score into the document and strip it out later during the reformatting
             // of the results.
