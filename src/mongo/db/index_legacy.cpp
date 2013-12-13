@@ -32,7 +32,6 @@
 #include "mongo/db/fts/fts_enabled.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"

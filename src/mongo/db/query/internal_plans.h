@@ -29,10 +29,10 @@
 #pragma once
 
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/query/eof_runner.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/pdfile.h"   // for nsdetails(...)
+#include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/internal_runner.h"
 
 namespace mongo {

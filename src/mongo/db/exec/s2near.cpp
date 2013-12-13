@@ -28,12 +28,13 @@
 
 #include "mongo/db/exec/s2near.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/expression_index.h"
 #include "third_party/s2/s2regionintersection.h"
 

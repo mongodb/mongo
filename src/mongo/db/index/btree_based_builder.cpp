@@ -29,7 +29,7 @@
 #include "mongo/db/index/btree_based_builder.h"
 
 #include "mongo/db/btreebuilder.h"
-#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/kill_current_op.h"

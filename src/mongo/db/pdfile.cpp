@@ -61,7 +61,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/extsort.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"

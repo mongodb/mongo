@@ -38,7 +38,6 @@
 #include "mongo/db/extsort.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/index/btree_based_builder.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"

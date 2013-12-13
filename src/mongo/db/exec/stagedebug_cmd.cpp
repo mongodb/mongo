@@ -41,7 +41,7 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/text.h"
-#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_details.h"

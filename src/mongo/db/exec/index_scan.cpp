@@ -30,7 +30,6 @@
 
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
