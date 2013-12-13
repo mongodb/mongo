@@ -38,7 +38,7 @@ namespace mongo {
     /**
      * Returns OK, allocating and filling in '*explain' describing the access paths used in
      * the 'stats' tree of a given query solution. The caller has the ownership of
-     * '*explain', on success. Otherwise return and erros status describing the problem.
+     * '*explain', on success. Otherwise return an error status describing the problem.
      *
      * If 'fullDetails' was requested, the explain will return all available information about
      * the plan, otherwise, just a summary. The fields in the summary are: 'cursor', 'n',
