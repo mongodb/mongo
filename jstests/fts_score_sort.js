@@ -3,7 +3,6 @@
 var t = db.getSiblingDB("test").getCollection("fts_score_sort");
 t.drop();
 
-db.adminCommand({setParameter: 1, textSearchEnabled: true});
 db.adminCommand({setParameter: 1, newQueryFrameworkEnabled: true});
 
 t.insert({_id: 0, a: "textual content"});

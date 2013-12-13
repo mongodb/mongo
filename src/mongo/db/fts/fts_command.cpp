@@ -32,7 +32,6 @@
 #include <vector>
 
 #include "mongo/db/fts/fts_command.h"
-#include "mongo/db/fts/fts_enabled.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
@@ -65,9 +64,9 @@ namespace mongo {
                              BSONObjBuilder& result,
                              bool fromRepl) {
 
-            if ( !isTextSearchEnabled() ) {
-                errmsg = "text search not enabled";
-                return false;
+            ONCE {
+                log() << "The text command will be removed in a future release.  Use the $text "
+                         "query operator instead." << startupWarningsLog;
             }
 
             string ns = dbname + "." + cmdObj.firstElement().String();

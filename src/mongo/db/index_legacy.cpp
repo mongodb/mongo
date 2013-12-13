@@ -29,7 +29,6 @@
 #include "mongo/db/index_legacy.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/fts/fts_enabled.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/hash_access_method.h"
@@ -43,13 +42,6 @@ namespace mongo {
         string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
 
         if (IndexNames::TEXT == pluginName) {
-            StringData desc = cc().desc();
-            if (desc.find("conn") == 0) {
-                // this is to make sure we only complain for users
-                // if you do get a text index created an a primary
-                // want it to index on the secondary as well
-                massert(16811, "text search not enabled", fts::isTextSearchEnabled() );
-            }
             return fts::FTSSpec::fixSpec(obj);
         }
 

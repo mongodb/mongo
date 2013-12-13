@@ -4,7 +4,6 @@ var t = db.getSiblingDB("test").getCollection("fts_querylang");
 var cursor;
 var results;
 
-db.adminCommand({setParameter: 1, textSearchEnabled: true});
 db.adminCommand({setParameter: 1, newQueryFrameworkEnabled: true});
 
 t.drop();

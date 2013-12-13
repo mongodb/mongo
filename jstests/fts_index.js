@@ -2,8 +2,6 @@
 // 1. Text indexes properly validate the index spec used to create them.
 // 2. Text indexes properly enforce a schema on the language_override field.
 
-load("jstests/libs/fts.js");
-
 var coll = db.fts_index;
 var indexName = "textIndex";
 coll.drop();
