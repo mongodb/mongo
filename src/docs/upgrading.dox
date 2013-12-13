@@ -1,16 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_200 Upgrading to Version 2.0.0
+@section version_20 Upgrading to Version 2.0
 <dl>
 
 <dt>File format changes</dt>
 <dd>
-The underlying file format is unchanged in 2.0.0
+The underlying file format is unchanged in 2.0
 </dd>
 
 <dt>WT_SESSION::create LSM configuration options</dt>
 <dd>
-In the 2.0.0 release of WiredTiger the LSM configuration options have been
+In the 2.0 release of WiredTiger the LSM configuration options have been
 collected into a configuration option subgroup. All configuration options
 to WT_SESSION::create that previously had a prefix of \c lsm_ now belong to
 the \c lsm configuration group. If you are explicitly configuring any of the

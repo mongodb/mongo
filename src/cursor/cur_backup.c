@@ -428,12 +428,14 @@ __backup_file_remove(WT_SESSION_IMPL *session)
  *	Called via the schema_worker function.
  */
 int
-__wt_backup_list_uri_append(WT_SESSION_IMPL *session, const char *name)
+__wt_backup_list_uri_append(
+    WT_SESSION_IMPL *session, const char *name, int *skip)
 {
 	WT_CURSOR_BACKUP *cb;
 	const char *value;
 
 	cb = session->bkp_cursor;
+	WT_UNUSED(skip);
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));

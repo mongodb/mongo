@@ -43,17 +43,15 @@ check_copy(void)
 	/*
 	 * Open a session and verify the store; some data-sources don't support
 	 * verify.
-	 *
-	 * XXX
-	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
-	 * don't do that for now.
 	 */
-	if (!DATASOURCE("lsm") && !DATASOURCE("memrata")) {
+	if (!DATASOURCE("memrata")) {
 		if ((ret = conn->open_session(
 		    conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session: %s", g.home_backup);
 
-		if ((ret = session->verify(session, g.uri, NULL)) != 0)
+		/* Session operations for LSM can return EBUSY. */
+		ret = session->verify(session, g.uri, NULL);
+		if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
 			die(ret,
 			    "session.verify: %s: %s", g.home_backup, g.uri);
 	}

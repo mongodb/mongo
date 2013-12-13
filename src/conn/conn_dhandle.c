@@ -601,10 +601,9 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	    session == S2C(session)->default_session ||
 	    F_ISSET(session, WT_SESSION_LOGGING_DISABLED));
 
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_TRET(__wt_conn_btree_sync_and_close(session));
-		S2C(session)->dhandle_dead++;
-	}
+	S2C(session)->dhandle_dead++;
 	if (!locked) {
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 		WT_TRET(__wt_rwunlock(session, dhandle->rwlock));

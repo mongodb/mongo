@@ -823,10 +823,16 @@ execute_populate(CONFIG *cfg)
 			return (ret);
 		}
 		lprintf(cfg, 0, 1, "Compact after populate");
-		ret = session->compact(session, cfg->uri, NULL);
-		session->close(session, NULL);
-		if (ret != 0)
+		if ((ret = session->compact(session, cfg->uri, NULL)) != 0) {
+			lprintf(cfg, ret, 0,
+			     "execute_populate: WT_SESSION.compact");
 			return (ret);
+		}
+		if ((ret = session->close(session, NULL)) != 0) {
+			lprintf(cfg, ret, 0,
+			     "execute_populate: WT_SESSION.close");
+			return (ret);
+		}
 	}
 
 	/*

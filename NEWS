@@ -1,7 +1,7 @@
-WiredTiger release 2.0.0, 2013-12-11
+WiredTiger release 2.0.1, 2013-12-12
 ------------------------------------
 
-The WiredTiger 2.0.0 release contains major new features, numerous performance
+The WiredTiger 2.0.1 release contains major new features, numerous performance
 enhancements and bug fixes.
 
 Significant changes include:
