@@ -40,6 +40,7 @@ namespace mongo {
     const BSONField<BSONObj> BatchedCommandResponse::errInfo("errInfo");
     const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
     const BSONField<long long> BatchedCommandResponse::n("n", 0);
+    const BSONField<long long> BatchedCommandResponse::nDocsModified("nDocsModified", 0);
     const BSONField<BSONObj> BatchedCommandResponse::singleUpserted("upserted");
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
@@ -87,6 +88,7 @@ namespace mongo {
 
         if (_isErrMessageSet) builder.append(errMessage(), _errMessage);
 
+        if (_isNDocsModifiedSet) builder.appendNumber(nDocsModified(), _nDocsModified);
         if (_isNSet) builder.appendNumber(n(), _n);
 
         // We're using the BSONObj to store the _id value.
@@ -160,6 +162,22 @@ namespace mongo {
             _n = tempN;
         }
 
+        // We're using appendNumber on generation so we'll try a smaller type
+        // (int) first and then fall back to the original type (long long).
+        BSONField<int> fieldNUpdated("nDocumentsModified");
+        int tempNUpdated;
+        fieldState = FieldParser::extract(source, fieldNUpdated, &tempNUpdated, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) {
+            // try falling back to a larger type
+            fieldState = FieldParser::extract(source, nDocsModified, &_nDocsModified, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) return false;
+            _isNDocsModifiedSet = fieldState == FieldParser::FIELD_SET;
+        }
+        else if (fieldState == FieldParser::FIELD_SET) {
+            _isNDocsModifiedSet = true;
+            _nDocsModified = tempNUpdated;
+        }
+
         // singleUpserted and upsertDetails have the same field name, but are distinguished
         // by type.  First try parsing singleUpserted, if that doesn't work, try upsertDetails
         fieldState = FieldParser::extractID(source, singleUpserted, &_singleUpserted, errMsg);
@@ -198,6 +216,9 @@ namespace mongo {
         _errMessage.clear();
         _isErrMessageSet = false;
 
+        _nDocsModified = 0;
+        _isNDocsModifiedSet = false;
+
         _n = 0;
         _isNSet = false;
 
@@ -233,6 +254,9 @@ namespace mongo {
 
         other->_errMessage = _errMessage;
         other->_isErrMessageSet = _isErrMessageSet;
+
+        other->_nDocsModified = _nDocsModified;
+        other->_isNDocsModifiedSet = _isNDocsModifiedSet;
 
         other->_n = _n;
         other->_isNSet = _isNSet;
@@ -344,6 +368,28 @@ namespace mongo {
     const std::string& BatchedCommandResponse::getErrMessage() const {
         dassert(_isErrMessageSet);
         return _errMessage;
+    }
+
+    void BatchedCommandResponse::setNDocsModified(long long n) {
+        _nDocsModified = n;
+        _isNDocsModifiedSet = true;
+    }
+
+    void BatchedCommandResponse::unsetNDocsModified() {
+         _isNDocsModifiedSet = false;
+     }
+
+    bool BatchedCommandResponse::isNDocsModified() const {
+         return _isNDocsModifiedSet;
+    }
+
+    long long BatchedCommandResponse::getNDocsModified() const {
+        if ( _isNDocsModifiedSet ) {
+            return _nDocsModified;
+        }
+        else {
+            return nDocsModified.getDefault();
+        }
     }
 
     void BatchedCommandResponse::setN(long long n) {

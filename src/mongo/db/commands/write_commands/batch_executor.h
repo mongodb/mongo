@@ -35,6 +35,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/batched_update_document.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -68,13 +69,28 @@ namespace mongo {
         struct WriteStats {
 
             WriteStats() :
-                    numInserted( 0 ), numUpdated( 0 ), numUpserted( 0 ), numDeleted( 0 ) {
+                    numInserted( 0 ), numModified( 0 ), numUpdated( 0 ),
+                    numUpserted( 0 ), numDeleted( 0 ) {
             }
 
             int numInserted;
+
+            // The number of docs modified and updated (inc no-ops).
+            // NOTE: The difference of the two are the number of no-ops.
+            int numModified;
             int numUpdated;
+
             int numUpserted;
             int numDeleted;
+
+            const std::string toString() const {
+                return mongoutils::str::stream()
+                            << "numInserted: " << numInserted
+                            << " numModified: " << numModified
+                            << " numUpdated: " << numUpdated
+                            << " numUpserted: " << numUpserted
+                            << " numDeleted: " << numDeleted;
+            }
         };
 
         /**

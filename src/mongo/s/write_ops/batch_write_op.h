@@ -171,6 +171,7 @@ namespace mongo {
         int numInserted;
         int numUpserted;
         int numUpdated;
+        int numModified;
         int numDeleted;
 
     };

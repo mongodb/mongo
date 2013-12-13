@@ -41,16 +41,20 @@ namespace mongo {
 
         UpdateResult( bool existing_,
                       bool modifiers_,
+                      unsigned long long numDocsModified_,
                       unsigned long long numMatched_,
                       const BSONObj& upsertedObject_ )
             : existing(existing_)
             , modifiers(modifiers_)
+            , numDocsModified(numDocsModified_)
             , numMatched(numMatched_) {
 
             BSONElement id = upsertedObject_["_id"];
             if ( ! existing && numMatched == 1 && !id.eoo() ) {
                 upserted = id.wrap(kUpsertedFieldName);
             }
+
+            LOG(4) << "UpdateResult -- " << toString();
         }
 
 
@@ -60,7 +64,10 @@ namespace mongo {
         // was this a $ mod
         const bool modifiers;
 
-        // how many objects touched
+        // how many docs updated
+        const long long numDocsModified;
+
+        // how many docs seen by update
         const long long numMatched;
 
         // if something was upserted, the new _id of the object
@@ -71,6 +78,7 @@ namespace mongo {
                         << " upserted: " << upserted
                         << " modifiers: " << modifiers
                         << " existing: " << existing
+                        << " numDocsModified: " << numDocsModified
                         << " numMatched: " << numMatched;
         }
     };

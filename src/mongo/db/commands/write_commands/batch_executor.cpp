@@ -199,6 +199,7 @@ namespace mongo {
         response->setOk( !response->isErrCodeSet() );
         response->setN( stats.numInserted + stats.numUpserted + stats.numUpdated
                         + stats.numDeleted );
+        response->setNDocsModified(stats.numModified);
         dassert( response->isValid( NULL ) );
 
         // TODO: Audit where we want to queue here - the shardingState calls may block for remote
@@ -490,7 +491,9 @@ namespace mongo {
         opDebug.query = queryObj;
 
         bool updateExisting = false;
-        long long numUpdated = 0;
+        bool didInsert = false;
+        long long numMatched = 0;
+        long long numDocsModified = 0;
         BSONObj resUpsertedID;
         try {
 
@@ -508,12 +511,17 @@ namespace mongo {
 
             UpdateResult res = update( request, &opDebug );
 
+            numDocsModified = res.numDocsModified;
             updateExisting = res.existing;
-            numUpdated = res.numMatched;
+            numMatched = res.numMatched;
             resUpsertedID = res.upserted;
 
-            stats->numUpdated += resUpsertedID.isEmpty() ? numUpdated : 0;
-            stats->numUpserted += !resUpsertedID.isEmpty() ? 1 : 0;
+            // We have an _id from an insert
+            didInsert = !resUpsertedID.isEmpty();
+
+            stats->numModified += didInsert ? 0 : numDocsModified;
+            stats->numUpdated += didInsert ? 0 : numMatched;
+            stats->numUpserted += didInsert ? 1 : 0;
         }
         catch ( const UserException& ex ) {
             opDebug.exceptionInfo = ex.getInfo();
@@ -521,9 +529,9 @@ namespace mongo {
             return false;
         }
 
-        _le->recordUpdate( updateExisting, numUpdated, resUpsertedID );
+        _le->recordUpdate( updateExisting, numMatched, resUpsertedID );
 
-        if (!resUpsertedID.isEmpty()) {
+        if (didInsert) {
             *upsertedID = resUpsertedID;
         }
 

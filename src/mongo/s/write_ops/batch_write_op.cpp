@@ -340,6 +340,7 @@ namespace mongo {
                 numUpserted = 1;
             }
             stats->numUpdated += ( response.getN() - numUpserted );
+            stats->numModified += ( response.getNDocsModified() - numUpserted );
             stats->numUpserted += numUpserted;
         }
         else {

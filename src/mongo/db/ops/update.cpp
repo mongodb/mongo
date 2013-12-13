@@ -504,7 +504,7 @@ namespace mongo {
         // reflecting only the actions taken locally. In particlar, we must have the no-op
         // counter reset so that we can meaningfully comapre it with numMatched above.
         opDebug->nscanned = 0;
-        opDebug->nupdateNoops = 0;
+        opDebug->nDocsModified = 0;
 
         mutablebson::Document doc;
         mutablebson::DamageVector damages;
@@ -522,10 +522,8 @@ namespace mongo {
         int oldYieldCount = curOp->numYields();
 
         while (true) {
-            const int numChanged = numMatched - opDebug->nupdateNoops;
-
             // See if we have a write in isolation mode
-            isolationModeWriteOccured = isolated && (numChanged > 0);
+            isolationModeWriteOccured = isolated && (opDebug->nDocsModified > 0);
 
             // Change to manual yielding (no yielding) if we have written in isolation mode
             if (isolationModeWriteOccured) {
@@ -621,7 +619,7 @@ namespace mongo {
             // This code flow is admittedly odd. But, right now, journaling is baked in the file
             // manager. And if we aren't using the file manager, we have to do jounaling
             // ourselves.
-            bool objectWasChanged = false;
+            bool docWasModified = false;
             BSONObj newObj;
             const char* source = NULL;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
@@ -664,7 +662,7 @@ namespace mongo {
                             where->size);
                         std::memcpy(targetPtr, sourcePtr, where->size);
                     }
-                    objectWasChanged = true;
+                    docWasModified = true;
                     opDebug->fastmod = true;
                 }
                 newObj = oldObj;
@@ -687,7 +685,7 @@ namespace mongo {
                     updatedLocs.insert(newLoc);
                 }
 
-                objectWasChanged = true;
+                docWasModified = true;
             }
 
             // Restore state after modification
@@ -704,9 +702,9 @@ namespace mongo {
                 }
             }
 
-            // If it was noop since the document didn't change, record that.
-            if (!objectWasChanged)
-                opDebug->nupdateNoops++;
+            // Only record doc modifications if they wrote (exclude no-ops)
+            if (docWasModified)
+                opDebug->nDocsModified++;
 
             if (!request.isMulti()) {
                 break;
@@ -721,7 +719,8 @@ namespace mongo {
             opDebug->nupdated = numMatched;
             return UpdateResult(numMatched > 0 /* updated existing object(s) */,
                                 !driver->isDocReplacement() /* $mod or obj replacement */,
-                                numMatched /* # of docments update, even no-ops */,
+                                opDebug->nDocsModified /* number of modified docs, no no-ops */,
+                                numMatched /* # of docs matched/updated, even no-ops */,
                                 BSONObj());
         }
 
@@ -826,6 +825,7 @@ namespace mongo {
         opDebug->nupdated = 1;
         return UpdateResult(false /* updated a non existing document */,
                             !driver->isDocReplacement() /* $mod or obj replacement? */,
+                            1 /* docs written*/,
                             1 /* count of updated documents */,
                             newObj /* object that was upserted */ );
     }
