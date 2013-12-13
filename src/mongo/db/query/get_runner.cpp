@@ -139,7 +139,8 @@ namespace mongo {
         if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
             if (!collection->isCapped()) {
                 return Status(ErrorCodes::BadValue,
-                              "tailable cursor requested on non capped collection");
+                              "error processing query: " + canonicalQuery->toString() +
+                              " tailable cursor requested on non capped collection");
             }
 
             // If a sort is specified it must be equal to expectedSort.
@@ -147,7 +148,8 @@ namespace mongo {
             const BSONObj& actualSort = canonicalQuery->getParsed().getSort();
             if (!actualSort.isEmpty() && !(actualSort == expectedSort)) {
                 return Status(ErrorCodes::BadValue,
-                              "invalid sort specified for tailable cursor: "
+                              "error processing query: " + canonicalQuery->toString() +
+                              " invalid sort specified for tailable cursor: "
                               + actualSort.toString());
             }
         }
@@ -185,7 +187,9 @@ namespace mongo {
         vector<QuerySolution*> solutions;
         Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
         if (!status.isOK()) {
-            return status;
+            return Status(ErrorCodes::BadValue,
+                          "error processing query: " + canonicalQuery->toString() +
+                          " planner returned error: " + status.reason());
         }
 
         /*
@@ -196,7 +200,9 @@ namespace mongo {
 
         // We cannot figure out how to answer the query.  Should this ever happen?
         if (0 == solutions.size()) {
-            return Status(ErrorCodes::BadValue, "No query solutions");
+            return Status(ErrorCodes::BadValue, 
+                          "error processing query: " + canonicalQuery->toString() +
+                          " No query solutions");
         }
 
         if (1 == solutions.size()) {

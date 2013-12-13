@@ -395,10 +395,6 @@ namespace mongo {
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
 
-        // Need to call cq->toString() now, since upon error getRunner doesn't guarantee
-        // cq is in a consistent state.
-        string cqStr = cq->toString();
-
         // We'll now try to get the query runner that will execute this query for us. There
         // are a few cases in which we know upfront which runner we should get and, therefore,
         // we shortcut the selection process here.
@@ -429,8 +425,8 @@ namespace mongo {
         }
 
         if (!status.isOK()) {
-            uasserted(17007, "Unable to execute query. Reason: " + status.reason() +
-                      ". Query: " + cqStr);
+            // NOTE: Do not access cq as getRunner has deleted it.
+            uasserted(17007, "Unable to execute query: " + status.reason());
         }
 
         verify(NULL != rawRunner);
