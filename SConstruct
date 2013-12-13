@@ -1431,6 +1431,30 @@ def doConfigure(myenv):
         if haveUUThread:
             myenv.Append(CPPDEFINES=['MONGO_HAVE___THREAD'])
 
+    if using_gcc() or using_clang():
+        def CheckGCCAtomicBuiltins(context):
+            test_body = """
+            int main(int argc, char **argv) {
+                int a = 0;
+                int b = 0;
+                int c = 0;
+
+                __atomic_compare_exchange(&a, &b, &c, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+                return 0;
+            }
+            """
+            context.Message('Checking for gcc atomic builtins... ')
+            ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
+            context.Result(ret)
+            return ret
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckGCCAtomicBuiltins': CheckGCCAtomicBuiltins,
+        })
+        haveGCCAtomicBuiltins = conf.CheckGCCAtomicBuiltins()
+        conf.Finish()
+        if haveGCCAtomicBuiltins:
+            conf.env.Append(CPPDEFINES=["HAVE_GCC_ATOMIC_BUILTINS"])
+
     conf = Configure(myenv)
     libdeps.setup_conftests(conf)
 
