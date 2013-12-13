@@ -10,25 +10,35 @@
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
 /*
- * Spinlock list, blocking matrix.
- *
- * The connection may be opened/closed, but we want to track spinlock behavior
- * across those opens/closes (and, we use static variables inside the library
- * to identify caller locations, which only works if we initialize them exactly
- * once).  For that reason, reference static memory from the connection.
+ * __spin_lock_next_id --
+ *	Return the next spinlock caller ID.
  */
-static WT_SPINLOCK *__spinlock_list[WT_SPINLOCK_MAX];
-static WT_CONNECTION_STATS_SPINLOCK __spinlock_block[WT_SPINLOCK_MAX];
-
-/*
- * __wt_spin_lock_stat_init --
- *	Set up the spinlock statistics.
- */
-void
-__wt_spin_lock_stat_init(WT_CONNECTION_IMPL *conn)
+static void
+__spin_lock_next_id(WT_SESSION_IMPL *session, int *idp)
 {
-	conn->spinlock_list = __spinlock_list;
-	conn->spinlock_block = __spinlock_block;
+	static int lock_id = 0, next_id = 0;
+
+	/* If we've already registered this location, we're done. */
+	if (*idp != WT_SPINLOCK_REGISTER)
+		return;
+
+	/*
+	 * We can't use the global spinlock to lock the ID allocation (duh!),
+	 * use a CAS instruction to serialize access to a local variable.
+	 * This work only gets done once per library instantiation, there
+	 * isn't a performance concern.
+	 */
+	while (!WT_ATOMIC_CAS(lock_id, 0, 1))
+		__wt_yield();
+
+	if (next_id < WT_SPINLOCK_MAX) {
+		if (*idp == WT_SPINLOCK_REGISTER)
+			*idp = next_id++;
+	} else
+		__wt_errx(session,
+		    "spinlock register allocation failed, too many spinlocks");
+
+	lock_id = 0;
 }
 
 /*
@@ -41,50 +51,37 @@ __wt_spin_lock_register(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS_SPINLOCK *p;
-	u_int i;
-	const char *s;
-
-	*idp = WT_SPINLOCK_REGISTER_FAILED;
 
 	conn = S2C(session);
 
-	/* If this spinlock isn't yet on our spinlock list, add it. */
-	for (i = 0; i < WT_ELEMENTS(__spinlock_list); ++i) {
-		if (conn->spinlock_list[i] == t)
-			break;
-		if (conn->spinlock_list[i] == NULL &&
-		    WT_ATOMIC_CAS(conn->spinlock_list[i], NULL, t))
-			break;
-	}
-	if (i == WT_ELEMENTS(__spinlock_list)) {
-		__wt_err(session, ENOMEM,
-		    "spin-lock reference list allocation failed, too many "
-		    "spinlocks");
-		return;
-	}
+	/*
+	 * The caller's location ID is a static offset into a per-connection
+	 * structure, and that has problems: first, if there are multiple
+	 * connections, we'll need to hold some kind of lock to avoid racing
+	 * when setting that value, and second, if/when there are multiple
+	 * connections and/or a single connection is closed and re-opened, the
+	 * variable may be initialized and underlying connection information
+	 * may not.
+	 *
+	 * First, allocate an ID if needed.
+	 */
+	__spin_lock_next_id(session, idp);
 
 	/*
-	 * Walk the connection's spinlock blocking matrix, looking for an empty
-	 * slot.
+	 * Add this spinlock to our list and the caller's information to the
+	 * blocking matrix.  We could race here (if two threads of control
+	 * register the same mutex at the same time), but we don't care, both
+	 * threads are setting identical information.
 	 */
-	if ((s = strrchr(file, '/')) == NULL)
-		s = file;
-	else
-		++s;
-	for (i = 0; i < WT_ELEMENTS(__spinlock_block); ++i) {
-		p = &conn->spinlock_block[i];
-		if (p->file == NULL && WT_ATOMIC_CAS(p->file, NULL, s)) {
-			p->line = line;
-			p->name = t->name;
-			*idp = (int)i;
-			break;
-		}
-	}
+	conn->spinlock_list[*idp] = t;
 
-	if (i == WT_ELEMENTS(__spinlock_block))
-		__wt_err(session, ENOMEM,
-		    "spin-lock blocking matrix allocation failed, too many "
-		    "spinlocks");
+	p = &conn->spinlock_block[*idp];
+	p->name = t->name;
+	if ((p->file = strrchr(file, '/')) == NULL)
+		p->file = file;
+	else
+		++p->file;
+	p->line = line;
 }
 
 /*
@@ -106,7 +103,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 	ignore = (uint64_t)(conn->stat_usecs / 1000000) * 10;
 
 	/* Output the number of times each spinlock was acquired. */
-	for (i = 0; i < WT_ELEMENTS(__spinlock_list); ++i) {
+	for (i = 0; i < WT_ELEMENTS(conn->spinlock_list); ++i) {
 		if ((spin = conn->spinlock_list[i]) == NULL)
 			continue;
 
@@ -124,10 +121,10 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 	 * Output the number of times each location acquire its spinlock and
 	 * the blocking matrix.
 	 */
-	for (i = 0; i < WT_ELEMENTS(__spinlock_block); ++i) {
+	for (i = 0; i < WT_ELEMENTS(conn->spinlock_block); ++i) {
 		p = &conn->spinlock_block[i];
-		if (p->file == NULL)
-			break;
+		if (p->name == NULL)
+			continue;
 
 		WT_RET_TEST((fprintf(conn->stat_fp,
 		    "%s %d %s spinlock %s acquired by %s(%d)\n",
@@ -138,9 +135,9 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		if (conn->stat_clear)
 			p->total = 0;
 
-		for (j = 0; j < WT_ELEMENTS(__spinlock_block); ++j) {
+		for (j = 0; j < WT_ELEMENTS(conn->spinlock_block); ++j) {
 			t = &conn->spinlock_block[j];
-			if (t->file == NULL)
+			if (t->name == NULL)
 				continue;
 
 			WT_RET_TEST((fprintf(conn->stat_fp,
@@ -159,4 +156,5 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 
 	return (0);
 }
+
 #endif /* SPINLOCK_PTHREAD_MUTEX_LOGGING */

@@ -113,9 +113,9 @@
 
 #define	WT_ATOMIC_ADD(v, val)			((v) += (val), (v))
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
-    ((v) = ((v) == (oldv) ? (newv) : (oldv)), 1)
+    ((v) = ((v) == (oldv) ? (newv) : (oldv)), (v) == (oldv))
 #define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
-    ((v) = ((v) == (oldv) ? (newv) : (oldv)), (oldv))
+    ((v) = ((v) == (oldv) ? (newv) : (oldv)), (v) == (oldv))
 #define	WT_ATOMIC_STORE(v, val)			((v) = (val))
 #define	WT_ATOMIC_SUB(v, val)			((v) -= (val), (v))
 

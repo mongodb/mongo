@@ -154,8 +154,17 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session,
 	if (session == NULL || !(conn = S2C(session))->stat_fast)
 		return (pthread_mutex_trylock(&t->lock));
 
-	/* If this caller hasn't yet registered, do so. */
-	if (*idp == WT_SPINLOCK_REGISTER)
+	/*
+	 * If this caller hasn't yet registered, do so.  The caller's location
+	 * ID is a static offset into a per-connection structure, and that has
+	 * problems: first, if there are multiple connections, we'll need to
+	 * hold some kind of lock to avoid racing when setting that value, and
+	 * second, if/when there are multiple connections and/or a single
+	 * connection is closed and re-opened, the variable may be initialized
+	 * and the underlying connection information may not.  Check both.
+	 */
+	if (*idp == WT_SPINLOCK_REGISTER ||
+	    conn->spinlock_block[*idp].name == NULL)
 		__wt_spin_lock_register(session, t, file, line, idp);
 
 	/*

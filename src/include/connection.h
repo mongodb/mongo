@@ -180,17 +180,18 @@ struct __wt_connection_impl {
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-#define	WT_SPINLOCK_MAX	50
-	WT_SPINLOCK **spinlock_list;	/* Spinlock registry */
-
+#define	WT_SPINLOCK_MAX	50		/* Spinlock registry */
+	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
+					/* Spinlock blocking matrix */
 	struct __wt_connection_stats_spinlock {
 		const char *name;	/* Mutex name */
-		const char *file;	/* Caller's file/line */
+
+		const char *file;	/* Caller's file/line, ID location */
 		int line;
 
 		u_int total;		/* Count of total, blocked calls */
 		u_int blocked[WT_SPINLOCK_MAX];
-	} *spinlock_block;		/* Spinlock blocking matrix */
+	} spinlock_block[WT_SPINLOCK_MAX];
 #endif
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */

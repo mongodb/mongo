@@ -33,9 +33,6 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	/* Statistics. */
 	__wt_stat_init_connection_stats(&conn->stats);
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	__wt_spin_lock_stat_init(conn);
-#endif
 
 	/* Locks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
