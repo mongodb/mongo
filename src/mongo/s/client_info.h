@@ -34,6 +34,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/writeback_listener.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -71,12 +72,24 @@ namespace mongo {
          * notes that this client use this shard
          * keeps track of all shards accessed this request
          */
-        void addShard( const string& shard );
+        void addShardHost( const string& shardHost );
+
+        /**
+         * Notes that this client wrote to these particular hosts with write commands.
+         */
+        void addHostOpTimes( const HostOpTimeMap& hostOpTimes );
 
         /**
          * gets shards used on the previous request
          */
-        set<string> * getPrev() const { return _prev; };
+        set<string>* getPrevShardHosts() const { return &_prev->shardHostsWritten; }
+
+        /**
+         * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
+         */
+        const map<string, OpTime>& getPrevHostOpTimes() const {
+            return _prev->hostOpTimes;
+        }
 
         /**
          * gets all shards we've accessed since the last time we called clearSinceLastGetError
@@ -90,11 +103,19 @@ namespace mongo {
 
 
         /**
-         * resets the list of shards using to process the current request
+         * resets the information stored for the current request
          */
-        void clearCurrentShards(){ _cur->clear(); }
+        void clearRequestInfo(){ _cur->clear(); }
 
         void disableForCommand();
+
+        /**
+         * Uses GLE and the shard hosts and opTimes last written by write commands to enforce a
+         * write concern.
+         *
+         * Returns true if write concern was enforced, false with errMsg if not.
+         */
+        bool enforceWriteConcern( const string& dbName, const BSONObj& options, string* errMsg );
 
         /**
          * calls getLastError
@@ -138,14 +159,25 @@ namespace mongo {
         int _id; // unique client id
         HostAndPort _remote; // server:port of remote socket end
 
-        // we use _a and _b to store shards we've talked to on the current request and the previous
+        struct RequestInfo {
+
+            void clear() {
+                shardHostsWritten.clear();
+                hostOpTimes.clear();
+            }
+
+            set<string> shardHostsWritten;
+            map<string, OpTime> hostOpTimes;
+        };
+
+        // we use _a and _b to store info from the current request and the previous request
         // we use 2 so we can flip for getLastError type operations
 
-        set<string> _a; // actual set for _cur or _prev
-        set<string> _b; //   "
+        RequestInfo _a; // actual set for _cur or _prev
+        RequestInfo _b; //   "
 
-        set<string> * _cur; // pointer to _a or _b depending on state
-        set<string> * _prev; //  ""
+        RequestInfo* _cur; // pointer to _a or _b depending on state
+        RequestInfo* _prev; //  ""
 
 
         set<string> _sinceLastGetError; // all shards accessed since last getLastError

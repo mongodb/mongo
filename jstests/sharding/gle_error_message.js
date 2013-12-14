@@ -67,7 +67,8 @@ jsTest.log( "GLE : " + tojson( coll.getDB().getLastErrorObj() ) )
 
 st.shard0 = MongoRunner.runMongod( st.shard0 )
 
-
+// NEED TO WAIT 5s so the connection pool knows we're down and up
+sleep( 5 * 1000 );
 
 jsTest.log( "Testing GLE when main host goes down..." )
 
@@ -89,12 +90,13 @@ catch( e ){
     jsTest.log( "GLE : " + e )
     
     // Stupid string exceptions
-    assert( /could not get last error/.test( e + "") )
+    assert( /could not get last error|socket exception/.test( e + "") )
 }
 
 st.shard1 = MongoRunner.runMongod( st.shard1 )
 
-
+// NEED TO WAIT 5s so the connection pool knows we're down and up
+sleep( 5 * 1000 );
 
 jsTest.log( "Testing multi GLE for multi-host writes..." )
 
@@ -124,12 +126,13 @@ catch( e ){
     jsTest.log( "GLE : " + e )
     
     // Stupid string exceptions
-    assert( /could not get last error/.test( e + "") )
+    assert( /could not get last error|socket exception/.test( e + "") )
 }
 
 st.shard0 = MongoRunner.runMongod( st.shard0 )
 
-
+// NEED TO WAIT 5s so the connection pool knows we're down
+sleep( 5 * 1000 );
 
 jsTest.log( "Testing stale version GLE when host goes down..." )
 

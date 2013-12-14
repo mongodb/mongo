@@ -36,19 +36,22 @@
 
 namespace mongo {
 
-    namespace {
+    BatchWriteExec::BatchWriteExec( NSTargeter* targeter,
+                                    ShardResolver* resolver,
+                                    MultiCommandDispatch* dispatcher ) :
+        _targeter( targeter ),
+        _resolver( resolver ),
+        _dispatcher( dispatcher ),
+        _stats( new BatchWriteExecStats ) {
+    }
 
-        struct ConnectionStringComp {
-            bool operator()( const ConnectionString& connStrA,
-                             const ConnectionString& connStrB ) const {
-                return connStrA.toString().compare( connStrB.toString() ) < 0;
-            }
-        };
+    namespace {
 
         //
         // Map which allows associating ConnectionString hosts with TargetedWriteBatches
         // This is needed since the dispatcher only returns hosts with responses.
         //
+
         // TODO: Unordered map?
         typedef map<ConnectionString, TargetedWriteBatch*, ConnectionStringComp> HostBatchMap;
     }
@@ -137,7 +140,8 @@ namespace mongo {
             //
 
             size_t numSent = 0;
-            while ( numSent != childBatches.size() ) {
+            size_t numToSend = childBatches.size();
+            while ( numSent != numToSend ) {
 
                 // Collect batches out on the network, mapped by endpoint
                 HostBatchMap pendingBatches;
@@ -176,6 +180,7 @@ namespace mongo {
 
                         // We're done with this batch
                         *it = NULL;
+                        --numToSend;
                         continue;
                     }
 
@@ -243,6 +248,13 @@ namespace mongo {
                             noteStaleResponses( staleErrors, _targeter );
                             ++numStaleBatches;
                         }
+
+                        // Remember that we successfully wrote to this shard
+                        // NOTE: This will record lastOps for shards where we actually didn't update
+                        // or delete any documents, which preserves old behavior but is conservative
+                        _stats->noteWriteAt( shardHost,
+                                             response.isLastOpSet() ?
+                                                 OpTime( response.getLastOp() ) : OpTime() );
                     }
                     else {
 
@@ -258,4 +270,19 @@ namespace mongo {
         batchOp.buildClientResponse( clientResponse );
     }
 
+    const BatchWriteExecStats& BatchWriteExec::getStats() {
+        return *_stats;
+    }
+
+    BatchWriteExecStats* BatchWriteExec::releaseStats() {
+        return _stats.release();
+    }
+
+    void BatchWriteExecStats::noteWriteAt( const ConnectionString& host, OpTime opTime ) {
+        _writeOpTimes[host] = opTime;
+    }
+
+    const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
+        return _writeOpTimes;
+    }
 }

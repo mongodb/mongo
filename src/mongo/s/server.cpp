@@ -110,6 +110,16 @@ namespace mongo {
         return false;
     }
 
+    static BSONObj buildErrReply( const DBException& ex ) {
+        BSONObjBuilder errB;
+        errB.append( "$err", ex.what() );
+        errB.append( "code", ex.getCode() );
+        if ( !ex._shard.empty() ) {
+            errB.append( "shard", ex._shard );
+        }
+        return errB.obj();
+    }
+
     class ShardedMessageHandler : public MessageHandler {
     public:
         virtual ~ShardedMessageHandler() {}
@@ -135,37 +145,38 @@ namespace mongo {
                     ShardConnection::releaseMyConnections();
                 }
             }
-            catch ( AssertionException & e ) {
-                LOG( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;
+            catch ( const AssertionException& ex ) {
 
-                le->raiseError( e.getCode() , e.what() );
-
-                m.header()->id = r.id();
-
-                if ( r.expectResponse() ) {
-                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
-                    replyToQuery( ResultFlag_ErrSet, p , m , err );
-                }
-            }
-            catch ( DBException& e ) {
-                // note that e.toString() is more detailed on a SocketException than 
-                // e.what().  we should think about what is the right level of detail both 
-                // for logging and return code.
-                log() << "DBException in process: " << e.what() << endl;
-
-                le->raiseError( e.getCode() , e.what() );
-
-                m.header()->id = r.id();
+                LOG( ex.isUserAssertion() ? 1 : 0 ) << "Assertion failed"
+                    << " while processing " << opToString( m.operation() ) << " op"
+                    << " for " << r.getns() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
-                    BSONObjBuilder b;
-                    b.append("$err",e.what()).append("code",e.getCode());
-                    if( !e._shard.empty() ) {
-                        b.append("shard",e._shard);
-                    }
-                    replyToQuery( ResultFlag_ErrSet, p , m , b.obj() );
+                    m.header()->id = r.id();
+                    replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
+                }
+                else {
+                    le->raiseError( ex.getCode() , ex.what() );
                 }
             }
+            catch ( const DBException& ex ) {
+
+                log() << "Exception thrown"
+                    << " while processing " << opToString( m.operation() ) << " op"
+                    << " for " << r.getns() << causedBy( ex ) << endl;
+
+                if ( r.expectResponse() ) {
+                    m.header()->id = r.id();
+                    replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
+                }
+                else {
+                    le->raiseError( ex.getCode() , ex.what() );
+                }
+            }
+
+            // Clear out the last error for GLE unless it's been explicitly disabled
+            if ( r.expectResponse() && !le->disabled )
+                le->reset();
         }
 
         virtual void disconnected( AbstractMessagingPort* p ) {

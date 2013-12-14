@@ -33,7 +33,7 @@
 namespace mongo {
 
     BatchWriteStats::BatchWriteStats() :
-        numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numDeleted( 0 ) {
+        numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numModified( 0 ), numDeleted( 0 ) {
     }
 
     BatchWriteOp::BatchWriteOp() :
@@ -340,7 +340,7 @@ namespace mongo {
                 numUpserted = 1;
             }
             stats->numUpdated += ( response.getN() - numUpserted );
-            stats->numModified += ( response.getNDocsModified() - numUpserted );
+            stats->numModified += response.getNDocsModified();
             stats->numUpserted += numUpserted;
         }
         else {
@@ -629,6 +629,8 @@ namespace mongo {
         int nValue = _stats->numInserted + _stats->numUpserted + _stats->numUpdated
                      + _stats->numDeleted;
         batchResp->setN( nValue );
+        if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update )
+            batchResp->setNDocsModified( _stats->numModified );
 
         batchResp->setOk( !batchResp->isErrCodeSet() );
         dassert( batchResp->isValid( NULL ) );

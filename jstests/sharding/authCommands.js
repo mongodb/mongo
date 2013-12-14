@@ -117,6 +117,8 @@ var checkReadOps = function( hasReadAuth ) {
         print( "Checking read operations, should work" );
         assert.eq( 1000, testDB.foo.find().itcount() );
         assert.eq( 1000, testDB.foo.count() );
+        // NOTE: This is an explicit check that GLE can be run with read prefs, not the result of
+        // above.
         assert.eq( null, testDB.runCommand({getlasterror : 1}).err );
         checkCommandSucceeded( testDB, {dbstats : 1} );
         checkCommandSucceeded( testDB, {collstats : 'foo'} );

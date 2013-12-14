@@ -494,7 +494,7 @@ namespace mongo {
         }
     }
 
-    bool ShardConnection::releaseConnectionsAfterResponse( false );
+    bool ShardConnection::releaseConnectionsAfterResponse( true );
 
     ExportedServerParameter<bool> ReleaseConnectionsAfterResponse(
         ServerParameterSet::getGlobal(),

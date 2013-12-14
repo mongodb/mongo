@@ -39,6 +39,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
@@ -167,6 +168,10 @@ namespace mongo {
                 error = NULL;
             }
         }
+
+        // Send opTime in response
+        if ( anyReplEnabled() )
+            response->setLastOp( _client->getLastOp().asDate() );
 
         // Apply write concern if we had any successful writes
         if ( numItemErrors < numBatchItems ) {

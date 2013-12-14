@@ -1,13 +1,36 @@
 /**
- * This file test that updates on a sharded collection obeys the shard key invariants.
- * The invariant boils down into these rules:
+ * Shard key invariant:
  *
- * 1. If the update is a replacement style update or an upsert, the full shard key must
- *    be present in the update object.
- * 2. If the update object contains a shard key, the value in the query object should
- *    be equal.
- * 3. If the update object contains a shard key but is not present in the query, then
- *    the matching documents should have the same value.
+ * A document must be created with a full non-array-or-regex shard key, and the value of that shard
+ * key can never change.
+ *
+ * To enforce this invariant, we have the following mongos rule:
+ *
+ * - Upserts must always contain the full shard key and must only be targeted* to the applicable shard.
+ *
+ * and the following mongod rules:
+ *
+ * - Upserted shard key values must not be arrays (or regexes).
+ * - If a shard key value is present in the update query, upserts must only insert documents which
+ *   match this value.
+ * - Updates must not modify shard keys.
+ *
+ * *Updates are targeted by the update query if $op-style, or the update document if replacement-style.
+ *
+ * NOTE: The above is enough to ensure that shard keys do not change.  It is not enough to ensure 
+ * uniqueness of an upserted document based on the upsert query.  This is necessary due to the save()
+ * style operation:
+ * db.coll.update({ _id : xxx }, { _id : xxx, shard : xxx, key : xxx, other : xxx }, { upsert : true })
+ *
+ * TODO: Minimize the impact of this hole by disallowing anything but save-style upserts of this form.
+ * Save-style upserts of this form are not safe (duplicate _ids can be created) but the user is
+ * explicitly responsible for this for the _id field.  
+ *
+ * In addition, there is an rule where non-multi updates can only affect 0 or 1 documents.
+ *
+ * To enforce this, we have the following mongos rule:
+ *
+ * - Non-multi updates must be targeted based on an exact _id query or the full shard key.
  *
  * Test setup:
  * - replacement style updates have the multiUpdate flag set to false.
@@ -401,14 +424,17 @@ doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
 
+// Inspecting query and update alone is not enough to tell whether a shard key will change.
+/*
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ b: 100 }, { a: 100 }, false);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
+*/
 
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
@@ -629,19 +655,19 @@ compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ a: 100, b: 100 }, { $set: { b: 100, c: 1 }}, false, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
-assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
+assert(friendlyEqual(doc, { a: 100, b: 100, c: 1 }), 'doc did not change: ' + tojson(doc));
 
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ a: 100, b: 100 }, { $set: { a: 100, b: 100, c: 1 }}, false, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
-assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
+assert(friendlyEqual(doc, { a: 100, b: 100, c: 1 }), 'doc did not change: ' + tojson(doc));
 
 // Cannot modify _id!
 compoundColl.remove({}, false);
@@ -708,24 +734,24 @@ assert(doc == null, 'doc was upserted: ' + tojson(doc));
 compoundColl.remove({}, false);
 compoundColl.update({ a: 100, b: 100 }, { $set: { b: 100, c: 1 }}, true, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
-assert(doc == null, 'doc was upserted: ' + tojson(doc));
+assert(doc != null, 'doc was not upserted: ' + tojson(doc));
 
 compoundColl.remove({}, false);
 compoundColl.update({ a: 100, b: 100 }, { $set: { a: 100, b: 100, c: 1 }}, true, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
-assert(doc == null, 'doc was upserted: ' + tojson(doc));
+assert(doc != null, 'doc was not upserted: ' + tojson(doc));
 
-// Cannot modify _id!
+// Can upsert with new _id
 compoundColl.remove({}, false);
 compoundColl.update({ a: 100, b: 100 }, { $set: { a: 100, b: 100, _id: 1 }}, true, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
-assert(doc == null, 'doc was upserted: ' + tojson(doc));
+assert(doc != null, 'doc was not upserted: ' + tojson(doc));
 
 compoundColl.remove({}, false);
 compoundColl.update({ a: 100, b: 100 }, { $set: { a: 100, b: 2, c: 1 }}, true, true);
@@ -856,12 +882,15 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
+/*
 compoundColl.remove({}, false);
 compoundColl.update({ _id: 1 }, { $set: { a: 1, b: 1 }}, true, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
-assert(doc == null, 'doc was upserted: ' + tojson(doc));
+delete doc._id;
+assert(friendlyEqual(doc, { a: 1, b: 1 }), 'bad doc: ' + tojson(doc));
+*/
 
 //
 // Dotted query update
@@ -871,10 +900,10 @@ dotColl.remove({}, false);
 dotColl.insert({ x: { a: 100 }});
 dotColl.update({ 'x.a': 100 }, { x: { a: 100, b: 2 }});
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
 delete doc._id;
-assert(friendlyEqual(doc, { x: { a: 100 }}), 'doc changed: ' + tojson(doc));
+assert(friendlyEqual(doc, { x: { a: 100, b: 2 }}), 'doc did not change: ' + tojson(doc));
 
 // Dotted field names in the resulting objects should not be allowed.
 // This check currently resides in the client drivers.
@@ -1001,9 +1030,9 @@ assert(friendlyEqual(doc, { x: { a: 100, b: 200 }}), 'doc did not change: ' + to
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { x: { a: 100, b: 2 }}, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
-assert(doc == null, 'doc was upserted: ' + tojson(doc));
+assert(doc != null, 'doc was not upserted: ' + tojson(doc));
 
 // Dotted field names in the resulting objects should not be allowed.
 // This check currently resides in the client drivers.
@@ -1047,7 +1076,7 @@ gle = db.runCommand({ getLastError: 1 });
 assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
 delete doc._id;
-assert(friendlyEqual(doc, { x: { a: 100, b: 2 }}), 'bad doc: ' + tojson(doc));
+assert(friendlyEqual(doc, { x: { a: 100, 2: 3 }}), 'bad doc: ' + tojson(doc));
 */
 
 dotColl.remove({}, false);

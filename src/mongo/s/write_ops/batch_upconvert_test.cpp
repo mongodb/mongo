@@ -28,6 +28,7 @@
 
 #include "mongo/s/write_ops/batch_upconvert.h"
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -56,7 +57,11 @@ namespace {
         doc.appendSelfToBufBuilder( insertMsgB );
         insertMsg.setData( dbInsert, insertMsgB.buf(), insertMsgB.len() );
 
-        auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( insertMsg ) );
+        OwnedPointerVector<BatchedCommandRequest> requestsOwned;
+        vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+        msgToBatchRequests( insertMsg, &requests );
+
+        BatchedCommandRequest* request = requests.back();
         ASSERT_EQUALS( request->getBatchType(), BatchedCommandRequest::BatchType_Insert );
         string errMsg;
         ASSERT( request->isValid( &errMsg ) );

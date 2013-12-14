@@ -82,15 +82,6 @@ namespace mongo {
 
             int numUpserted;
             int numDeleted;
-
-            const std::string toString() const {
-                return mongoutils::str::stream()
-                            << "numInserted: " << numInserted
-                            << " numModified: " << numModified
-                            << " numUpdated: " << numUpdated
-                            << " numUpserted: " << numUpserted
-                            << " numDeleted: " << numDeleted;
-            }
         };
 
         /**

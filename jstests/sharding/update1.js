@@ -45,8 +45,6 @@ for(i=0; i < 2; i++){
     coll.update({_id:1, key:1}, {$set: {key:2}});
     err = db.getLastErrorObj();
     assert.eq(coll.findOne({_id:1}).key, 1, 'key unchanged');
-    assert.eq(err.code, 13123, 'key error code 1');
-    assert.eq(err.code, 13123, 'key error code 2');
 
     coll.update({_id:1, key:1}, {$set: {foo:2}});
     assert.isnull(db.getLastError(), 'getLastError reset');

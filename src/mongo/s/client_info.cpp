@@ -64,9 +64,16 @@ namespace mongo {
     ClientInfo::~ClientInfo() {
     }
 
-    void ClientInfo::addShard( const string& shard ) {
-        _cur->insert( shard );
-        _sinceLastGetError.insert( shard );
+    void ClientInfo::addShardHost( const string& shardHost ) {
+        _cur->shardHostsWritten.insert( shardHost );
+        _sinceLastGetError.insert( shardHost );
+    }
+
+    void ClientInfo::addHostOpTimes( const HostOpTimeMap& hostOpTimes ) {
+        for ( HostOpTimeMap::const_iterator it = hostOpTimes.begin();
+            it != hostOpTimes.end(); ++it ) {
+            _cur->hostOpTimes[it->first.toString()] = it->second;
+        }
     }
 
     void ClientInfo::newPeerRequest( const HostAndPort& peer ) {
@@ -84,7 +91,7 @@ namespace mongo {
     void ClientInfo::newRequest() {
         _lastAccess = (int) time(0);
 
-        set<string> * temp = _cur;
+        RequestInfo* temp = _cur;
         _cur = _prev;
         _prev = temp;
         _cur->clear();
@@ -175,13 +182,75 @@ namespace mongo {
     }
 
     void ClientInfo::disableForCommand() {
-        set<string> * temp = _cur;
+        RequestInfo* temp = _cur;
         _cur = _prev;
         _prev = temp;
     }
 
     static TimerStats gleWtimeStats;
     static ServerStatusMetricField<TimerStats> displayGleLatency( "getLastError.wtime", &gleWtimeStats );
+
+    static BSONObj addOpTimeTo( const BSONObj& options, const OpTime& opTime ) {
+        BSONObjBuilder builder;
+        builder.appendElements( options );
+        builder.appendTimestamp( "wOpTime", opTime.asDate() );
+        return builder.obj();
+    }
+
+    bool ClientInfo::enforceWriteConcern( const string& dbName,
+                                          const BSONObj& options,
+                                          string* errMsg ) {
+
+        const map<string, OpTime>& hostOpTimes = getPrevHostOpTimes();
+
+        if ( hostOpTimes.empty() ) {
+            return true;
+        }
+
+        for ( map<string, OpTime>::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end();
+            ++it ) {
+
+            const string& shardHost = it->first;
+            const OpTime& opTime = it->second;
+
+            LOG(5) << "enforcing write concern " << options << " on " << shardHost << endl;
+
+            BSONObj optionsWithOpTime = addOpTimeTo( options, opTime );
+
+            bool ok = false;
+
+            boost::scoped_ptr<ScopedDbConnection> connPtr;
+            try {
+                connPtr.reset( new ScopedDbConnection( shardHost ) );
+                ScopedDbConnection& conn = *connPtr;
+
+                BSONObj result;
+                ok = conn->runCommand( dbName , optionsWithOpTime , result );
+                if ( !ok )
+                    *errMsg = result.toString();
+
+                conn.done();
+            }
+            catch( const DBException& ex ){
+                *errMsg = ex.toString();
+
+                if ( connPtr )
+                    connPtr->done();
+            }
+
+            // Done if anyone fails
+            if ( !ok ) {
+
+                *errMsg = str::stream() << "could not enforce write concern on " << shardHost
+                                        << causedBy( errMsg );
+
+                warning() << *errMsg << endl;
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     bool ClientInfo::getLastError( const string& dbName,
                                    const BSONObj& options,
@@ -206,7 +275,7 @@ namespace mongo {
         }
 
 
-        set<string> * shards = getPrev();
+        set<string>* shards = getPrevShardHosts();
 
         if ( shards->size() == 0 ) {
             result.appendNull( "err" );

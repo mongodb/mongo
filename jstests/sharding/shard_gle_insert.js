@@ -29,8 +29,8 @@ try{
     
     // for example -- err : "socket exception [SEND_ERROR] for 127.0.0.1:30001"
     //  or            err : "socket exception [CONNECT_ERROR] for localhost:30001"
-    
-    if (err && !/socket exception/.test(err)) {
+
+    if (err && !/socket exception|connect failed/.test(err)) {
         gle_state = 1;
         print( "Test failure -- received response from getLastError:" + err );
     }

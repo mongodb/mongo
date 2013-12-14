@@ -30,7 +30,11 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include <map>
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/optime.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/shard_resolver.h"
@@ -38,6 +42,8 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
+
+    class BatchWriteExecStats;
 
     /**
      * The BatchWriteExec is able to execute client batch write requests, resulting in a batch
@@ -60,9 +66,7 @@ namespace mongo {
 
         BatchWriteExec( NSTargeter* targeter,
                         ShardResolver* resolver,
-                        MultiCommandDispatch* dispatcher ) :
-            _targeter( targeter ), _resolver( resolver ), _dispatcher( dispatcher ) {
-        }
+                        MultiCommandDispatch* dispatcher );
 
         /**
          * Executes a client batch write request by sending child batches to several shard
@@ -77,6 +81,10 @@ namespace mongo {
         void executeBatch( const BatchedCommandRequest& clientRequest,
                            BatchedCommandResponse* clientResponse );
 
+        const BatchWriteExecStats& getStats();
+
+        BatchWriteExecStats* releaseStats();
+
     private:
 
         // Not owned here
@@ -87,5 +95,32 @@ namespace mongo {
 
         // Not owned here
         MultiCommandDispatch* _dispatcher;
+
+        // Stats
+        auto_ptr<BatchWriteExecStats> _stats;
+    };
+
+    // Useful comparator for using connection strings in ordered sets and maps
+    struct ConnectionStringComp {
+        bool operator()( const ConnectionString& connStrA,
+                         const ConnectionString& connStrB ) const {
+            return connStrA.toString().compare( connStrB.toString() ) < 0;
+        }
+    };
+
+    typedef std::map<ConnectionString, OpTime, ConnectionStringComp> HostOpTimeMap;
+
+    class BatchWriteExecStats {
+    public:
+
+        // TODO: Other stats can go here
+
+        void noteWriteAt( const ConnectionString& host, OpTime opTime );
+
+        const HostOpTimeMap& getWriteOpTimes() const;
+
+    private:
+
+        HostOpTimeMap _writeOpTimes;
     };
 }

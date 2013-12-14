@@ -39,20 +39,21 @@ opCounters = db.serverStatus().opcounters;
 t.insert({_id:0})
 print( db.getLastError() )
 assert(db.getLastError());
-assert.eq(opCounters.insert + (isMongos ? 1 : 0), db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert, db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, continueOnError=false.
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id:3},{_id:3},{_id:4}])
 assert(db.getLastError());
-assert.eq(opCounters.insert + (isMongos ? 3 : 1), db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + 1, db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, continueOnError=true.
 var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
 assert(db.getLastError());
-assert.eq(opCounters.insert + 3, db.serverStatus().opcounters.insert);
+// Mongos counts correctly now
+assert.eq(opCounters.insert + (isMongos ? 2 : 3), db.serverStatus().opcounters.insert);
 
 //
 // 2. Update.

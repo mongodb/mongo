@@ -141,8 +141,8 @@ namespace mongo {
 
         virtual ~AssertionException() throw() { }
 
-        virtual bool severe() { return true; }
-        virtual bool isUserAssertion() { return false; }
+        virtual bool severe() const { return true; }
+        virtual bool isUserAssertion() const { return false; }
 
         /* true if an interrupted exception - see KillCurrentOp */
         bool interrupted() {
@@ -155,8 +155,8 @@ namespace mongo {
     class MONGO_CLIENT_API UserException : public AssertionException {
     public:
         UserException(int c , const std::string& m) : AssertionException( m , c ) {}
-        virtual bool severe() { return false; }
-        virtual bool isUserAssertion() { return true; }
+        virtual bool severe() const { return false; }
+        virtual bool isUserAssertion() const { return true; }
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
@@ -164,7 +164,7 @@ namespace mongo {
     public:
         MsgAssertionException( const ExceptionInfo& ei ) : AssertionException( ei ) {}
         MsgAssertionException(int c, const std::string& m) : AssertionException( m , c ) {}
-        virtual bool severe() { return false; }
+        virtual bool severe() const { return false; }
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 

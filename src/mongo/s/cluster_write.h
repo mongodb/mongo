@@ -28,10 +28,55 @@
 
 #pragma once
 
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
+
+    class ClusterWriterStats;
+    class BatchWriteExecStats;
+
+    class ClusterWriter {
+    public:
+
+        ClusterWriter( bool autoSplit, int timeoutMillis );
+
+        void write( const BatchedCommandRequest& request, BatchedCommandResponse* response );
+
+        const ClusterWriterStats& getStats();
+
+    private:
+
+        void configWrite( const BatchedCommandRequest& request,
+                          BatchedCommandResponse* response,
+                          bool fsyncCheck );
+
+        void shardWrite( const BatchedCommandRequest& request,
+                         BatchedCommandResponse* response );
+
+        bool _autoSplit;
+        int _timeoutMillis;
+
+        scoped_ptr<ClusterWriterStats> _stats;
+    };
+
+    class ClusterWriterStats {
+    public:
+
+        // Transfers ownership to the cluster write stats
+        void setShardStats( BatchWriteExecStats* _shardStats );
+
+        bool hasShardStats() const;
+
+        const BatchWriteExecStats& getShardStats() const;
+
+        // TODO: When we have ConfigCoordinator stats, put these here too.
+
+    private:
+
+        scoped_ptr<BatchWriteExecStats> _shardStats;
+    };
 
     void clusterWrite( const BatchedCommandRequest& request,
                        BatchedCommandResponse* response,

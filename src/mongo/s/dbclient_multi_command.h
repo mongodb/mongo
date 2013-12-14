@@ -44,6 +44,8 @@ namespace mongo {
     class DBClientMultiCommand : public MultiCommandDispatch {
     public:
 
+        DBClientMultiCommand() : _timeoutMillis( 0 ) {}
+
         ~DBClientMultiCommand();
 
         void addCommand( const ConnectionString& endpoint,

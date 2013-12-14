@@ -54,7 +54,8 @@ namespace mongo {
         // Internally uses our shard cache, does no reload
         Shard shard = Shard::findIfExists( shardName );
         if ( shard.getName() == "" ) {
-            return Status( ErrorCodes::ShardNotFound, "" );
+            return Status( ErrorCodes::ShardNotFound,
+                           string("unknown shard name ") + shardName );
         }
 
         ConnectionString rawShardHost = ConnectionString::parse( shard.getConnString(), errMsg );
@@ -75,7 +76,8 @@ namespace mongo {
         ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get( rawShardHost.getSetName(),
                                                                    false );
         if ( !replMonitor ) {
-            return Status( ErrorCodes::ReplicaSetNotFound, "" );
+            return Status( ErrorCodes::ReplicaSetNotFound,
+                           string("unknown replica set ") + rawShardHost.getSetName() );
         }
 
         try {
@@ -86,7 +88,9 @@ namespace mongo {
             return Status::OK();
         }
         catch ( const DBException& ex ) {
-            return Status( ErrorCodes::HostNotFound, "" );
+            return Status( ErrorCodes::HostNotFound,
+                           string("could not contact primary for replica set ")
+                           + replMonitor->getName() );
         }
 
         // Unreachable

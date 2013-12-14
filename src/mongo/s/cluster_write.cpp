@@ -160,43 +160,73 @@ namespace mongo {
         return configHosts;
     }
 
-    static void shardWrite( const BatchedCommandRequest& request,
-                            BatchedCommandResponse* response,
-                            bool autoSplit ) {
+    void clusterInsert( const string& ns,
+                        const BSONObj& doc,
+                        BatchedCommandResponse* response ) {
+        auto_ptr<BatchedInsertRequest> insert( new BatchedInsertRequest() );
+        insert->addToDocuments( doc );
 
-        ChunkManagerTargeter targeter;
-        Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
+        BatchedCommandRequest request( insert.release() );
+        request.setNS( ns );
 
-        if ( !targetInitStatus.isOK() ) {
-
-            warning() << "could not initialize targeter for"
-                      << ( request.isInsertIndexRequest() ? " index" : "" )
-                      << " write op in collection " << request.getTargetingNS() << endl;
-
-            // Errors will be reported in response if we are unable to target
-        }
-
-        DBClientShardResolver resolver;
-        DBClientMultiCommand dispatcher;
-        BatchWriteExec exec( &targeter, &resolver, &dispatcher );
-        exec.executeBatch( request, response );
-
-        if ( autoSplit ) splitIfNeeded( request.getNS(), *targeter.getStats() );
+        clusterWrite( request, response, false );
     }
 
-    static void configWrite( const BatchedCommandRequest& request,
-                             BatchedCommandResponse* response,
-                             bool fsyncCheck ) {
+    void clusterUpdate( const string& ns,
+                        const BSONObj& query,
+                        const BSONObj& update,
+                        bool upsert,
+                        bool multi,
+                        BatchedCommandResponse* response ) {
+        auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument() );
+        updateDoc->setQuery( query );
+        updateDoc->setUpdateExpr( update );
+        updateDoc->setUpsert( upsert );
+        updateDoc->setMulti( multi );
 
-        DBClientMultiCommand dispatcher;
-        dispatcher.setTimeoutMillis( ConfigOpTimeoutMillis );
-        ConfigCoordinator exec( &dispatcher, getConfigHosts() );
-        exec.executeBatch( request, response, fsyncCheck );
+        auto_ptr<BatchedUpdateRequest> updateRequest( new BatchedUpdateRequest() );
+        updateRequest->addToUpdates( updateDoc.release() );
+
+        BatchedCommandRequest request( updateRequest.release() );
+        request.setNS( ns );
+
+        clusterWrite( request, response, false );
+    }
+
+    void clusterDelete( const string& ns,
+                        const BSONObj& query,
+                        int limit,
+                        BatchedCommandResponse* response ) {
+        auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
+        deleteDoc->setQuery( query );
+        deleteDoc->setLimit( limit );
+
+        auto_ptr<BatchedDeleteRequest> deleteRequest( new BatchedDeleteRequest() );
+        deleteRequest->addToDeletes( deleteDoc.release() );
+
+        BatchedCommandRequest request( deleteRequest.release() );
+        request.setNS( ns );
+
+        clusterWrite( request, response, false );
+    }
+
+    void clusterCreateIndex( const string& ns,
+                             BSONObj keys,
+                             bool unique,
+                             BatchedCommandResponse* response) {
+        clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
+                       createIndexDoc( ns, keys, unique ), response );
     }
 
     void clusterWrite( const BatchedCommandRequest& request,
                        BatchedCommandResponse* response,
                        bool autoSplit ) {
+        ClusterWriter writer( autoSplit, 0 );
+        writer.write( request, response );
+    }
+
+    void ClusterWriter::write( const BatchedCommandRequest& request,
+                               BatchedCommandResponse* response ) {
 
         // App-level validation of a create index insert
         if ( request.isInsertIndexRequest() ) {
@@ -255,66 +285,63 @@ namespace mongo {
             configWrite( request, response, verboseWC );
         }
         else {
-            shardWrite( request, response, autoSplit );
+            shardWrite( request, response );
         }
     }
 
-    void clusterInsert( const string& ns,
-                        const BSONObj& doc,
-                        BatchedCommandResponse* response ) {
-        auto_ptr<BatchedInsertRequest> insert( new BatchedInsertRequest() );
-        insert->addToDocuments( doc );
-
-        BatchedCommandRequest request( insert.release() );
-        request.setNS( ns );
-
-        clusterWrite( request, response, false );
+    ClusterWriter::ClusterWriter( bool autoSplit, int timeoutMillis ) :
+        _autoSplit( autoSplit ), _timeoutMillis( timeoutMillis ), _stats( new ClusterWriterStats ) {
     }
 
-    void clusterUpdate( const string& ns,
-                        const BSONObj& query,
-                        const BSONObj& update,
-                        bool upsert,
-                        bool multi,
-                        BatchedCommandResponse* response ) {
-        auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument() );
-        updateDoc->setQuery( query );
-        updateDoc->setUpdateExpr( update );
-        updateDoc->setUpsert( upsert );
-        updateDoc->setMulti( multi );
-
-        auto_ptr<BatchedUpdateRequest> updateRequest( new BatchedUpdateRequest() );
-        updateRequest->addToUpdates( updateDoc.release() );
-
-        BatchedCommandRequest request( updateRequest.release() );
-        request.setNS( ns );
-
-        clusterWrite( request, response, false );
+    const ClusterWriterStats& ClusterWriter::getStats() {
+        return *_stats;
     }
 
-    void clusterDelete( const string& ns,
-                        const BSONObj& query,
-                        int limit,
-                        BatchedCommandResponse* response ) {
-        auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
-        deleteDoc->setQuery( query );
-        deleteDoc->setLimit( limit );
+    void ClusterWriter::shardWrite( const BatchedCommandRequest& request,
+                                    BatchedCommandResponse* response ) {
 
-        auto_ptr<BatchedDeleteRequest> deleteRequest( new BatchedDeleteRequest() );
-        deleteRequest->addToDeletes( deleteDoc.release() );
+        ChunkManagerTargeter targeter;
+        Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
 
-        BatchedCommandRequest request( deleteRequest.release() );
-        request.setNS( ns );
+        if ( !targetInitStatus.isOK() ) {
 
-        clusterWrite( request, response, false );
+            warning() << "could not initialize targeter for"
+                      << ( request.isInsertIndexRequest() ? " index" : "" )
+                      << " write op in collection " << request.getTargetingNS() << endl;
+
+            // Errors will be reported in response if we are unable to target
+        }
+
+        DBClientShardResolver resolver;
+        DBClientMultiCommand dispatcher;
+        BatchWriteExec exec( &targeter, &resolver, &dispatcher );
+        exec.executeBatch( request, response );
+
+        if ( _autoSplit )
+            splitIfNeeded( request.getNS(), *targeter.getStats() );
+
+        _stats->setShardStats( exec.releaseStats() );
     }
 
-    void clusterCreateIndex( const string& ns,
-                             BSONObj keys,
-                             bool unique,
-                             BatchedCommandResponse* response) {
-        clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
-                       createIndexDoc( ns, keys, unique ), response );
+    void ClusterWriter::configWrite( const BatchedCommandRequest& request,
+                                     BatchedCommandResponse* response,
+                                     bool fsyncCheck ) {
+
+        DBClientMultiCommand dispatcher;
+        ConfigCoordinator exec( &dispatcher, getConfigHosts() );
+        exec.executeBatch( request, response, fsyncCheck );
+    }
+
+    void ClusterWriterStats::setShardStats( BatchWriteExecStats* shardStats ) {
+        _shardStats.reset( shardStats );
+    }
+
+    bool ClusterWriterStats::hasShardStats() const {
+        return NULL != _shardStats.get();
+    }
+
+    const BatchWriteExecStats& ClusterWriterStats::getShardStats() const {
+        return *_shardStats;
     }
 
 } // namespace mongo

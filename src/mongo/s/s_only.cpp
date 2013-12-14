@@ -46,7 +46,7 @@ namespace mongo {
      *  in an operation to be read later by getLastError()
     */
     void usingAShardConnection( const string& addr ) {
-        ClientInfo::get()->addShard( addr );
+        ClientInfo::get()->addShardHost( addr );
     }
 
     TSP_DEFINE(Client,currentClient)

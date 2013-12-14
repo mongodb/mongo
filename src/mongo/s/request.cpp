@@ -91,7 +91,7 @@ namespace mongo {
         }
 
         _m.header()->id = _id;
-        _clientInfo->clearCurrentShards();
+        _clientInfo->clearRequestInfo();
     }
 
     // Deprecated, will move to the strategy itself

@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/status.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
@@ -59,7 +60,7 @@
 
 namespace mongo {
 
-    bool Strategy::useClusterWriteCommands = false;
+    bool Strategy::useClusterWriteCommands = true;
     ExportedServerParameter<bool> _useClusterWriteCommands( ServerParameterSet::getGlobal(),
                                                             "useClusterWriteCommands",
                                                             &Strategy::useClusterWriteCommands,
@@ -1312,20 +1313,62 @@ namespace mongo {
                 bool fromWBL = r.d().reservedField() & Reserved_FromWriteback;
                 if ( fromWBL ) return;
 
-                auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( r.m() ) );
+                // make sure we have a last error
+                dassert( lastError.get( false /* don't create */) );
 
-                // Adjust namespaces for command
-                NamespaceString fullNS( request->getNS() );
-                string cmdNS = fullNS.getCommandNS();
-                // We only pass in collection name to command
-                request->setNS( fullNS.coll() );
+                OwnedPointerVector<BatchedCommandRequest> requestsOwned;
+                vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
 
-                BSONObjBuilder builder;
-                BSONObj requestBSON = request->toBSON();
-                Command::runAgainstRegistered( cmdNS.c_str(), requestBSON, builder, 0 );
-                // We purposely don't do anything with the response, lastError is populated in
-                // the command itself.
+                msgToBatchRequests( r.m(), &requests );
 
+                for ( vector<BatchedCommandRequest*>::iterator it = requests.begin();
+                    it != requests.end(); ++it ) {
+
+                    // Multiple commands registered to last error as multiple requests
+                    if ( it != requests.begin() )
+                        lastError.startRequest( r.m(), lastError.get( false ) );
+
+                    BatchedCommandRequest* request = *it;
+
+                    // Adjust namespaces for command
+                    NamespaceString fullNS( request->getNS() );
+                    string cmdNS = fullNS.getCommandNS();
+                    // We only pass in collection name to command
+                    request->setNS( fullNS.coll() );
+
+                    BSONObjBuilder builder;
+                    BSONObj requestBSON = request->toBSON();
+
+                    {
+                        // Disable the last error object for the duration of the write cmd
+                        LastError::Disabled disableLastError( lastError.get( false ) );
+                        Command::runAgainstRegistered( cmdNS.c_str(), requestBSON, builder, 0 );
+                    }
+
+                    BatchedCommandResponse response;
+                    bool parsed = response.parseBSON( builder.done(), NULL );
+                    (void) parsed; // for compile
+                    dassert( parsed && response.isValid( NULL ) );
+
+                    // Populate the lastError object based on the write
+                    lastError.get( false )->reset();
+                    bool hadError = batchErrorToLastError( *request,
+                                                           response,
+                                                           lastError.get( false ) );
+
+                    // Need to specially count inserts
+                    if ( op == dbInsert ) {
+                        for( int i = 0; i < response.getN(); ++i )
+                            r.gotInsert();
+                    }
+
+                    // If this is an ordered batch and we had a non-write-concern error, we should
+                    // stop sending.
+                    if ( request->getOrdered() && hadError )
+                        break;
+                }
+
+                // Cut off the legacy writes
                 return;
             }
 

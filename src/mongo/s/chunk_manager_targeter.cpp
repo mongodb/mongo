@@ -574,6 +574,17 @@ namespace mongo {
         return Status::OK();
     }
 
+    // To match legacy reload behavior, we have to backoff on config reload per-thread
+    // TODO: Centralize this behavior better by refactoring config reload in mongos
+    static const int maxWaitMillis = 500;
+    static boost::thread_specific_ptr<Backoff> perThreadBackoff;
+
+    static void refreshBackoff() {
+        if ( !perThreadBackoff.get() )
+            perThreadBackoff.reset( new Backoff( maxWaitMillis, maxWaitMillis * 2 ) );
+        perThreadBackoff.get()->nextSleepMillis();
+    }
+
     Status ChunkManagerTargeter::refreshNow( RefreshType refreshType ) {
 
         DBConfigPtr config;
@@ -582,6 +593,9 @@ namespace mongo {
         if ( !getDBConfigSafe( _nss.db(), config, &errMsg ) ) {
             return Status( ErrorCodes::DatabaseNotFound, errMsg );
         }
+
+        // Try not to spam the configs
+        refreshBackoff();
 
         // TODO: Improve synchronization and make more explicit
         if ( refreshType == RefreshType_RefreshChunkManager ) {

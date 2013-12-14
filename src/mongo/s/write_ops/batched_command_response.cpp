@@ -148,7 +148,7 @@ namespace mongo {
 
         // We're using appendNumber on generation so we'll try a smaller type
         // (int) first and then fall back to the original type (long long).
-        BSONField<int> fieldN("n");
+        BSONField<int> fieldN(n());
         int tempN;
         fieldState = FieldParser::extract(source, fieldN, &tempN, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) {
@@ -164,7 +164,7 @@ namespace mongo {
 
         // We're using appendNumber on generation so we'll try a smaller type
         // (int) first and then fall back to the original type (long long).
-        BSONField<int> fieldNUpdated("nDocumentsModified");
+        BSONField<int> fieldNUpdated(nDocsModified());
         int tempNUpdated;
         fieldState = FieldParser::extract(source, fieldNUpdated, &tempNUpdated, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) {
