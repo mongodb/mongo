@@ -27,7 +27,6 @@
 
 import wiredtiger, wttest
 from helper import key_populate, simple_populate
-from wtscenario import multiply_scenarios, number_scenarios
 
 # test_overwrite.py
 #    cursor overwrite configuration method
