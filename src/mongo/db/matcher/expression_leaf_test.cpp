@@ -1451,15 +1451,6 @@ namespace mongo {
         ASSERT( in.matchesBSON( BSON( "b" << 4 ), NULL ) );
     }
 
-    TEST( InMatchExpression, MatchesUndefined ) {
-        BSONObj operand = BSON_ARRAY( BSONUndefined );
-
-        InMatchExpression in;
-        in.init( "a" );
-        Status s = in.getArrayFilterEntries()->addEquality( operand.firstElement() );
-        ASSERT_NOT_OK(s);
-    }
-
     TEST( InMatchExpression, MatchesMinKey ) {
         BSONObj operand = BSON_ARRAY( MinKey );
         InMatchExpression in;

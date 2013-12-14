@@ -49,12 +49,6 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
     }
 
-    TEST( MatchExpressionParserLeafTest, SimpleEQUndefined ) {
-        BSONObj query = BSON( "x" << BSON( "$eq" << BSONUndefined ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
     TEST( MatchExpressionParserLeafTest, SimpleGT1 ) {
         BSONObj query = BSON( "x" << BSON( "$gt" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
@@ -301,12 +295,6 @@ namespace mongo {
 
     TEST( MatchExpressionParserLeafTest, INNotArray ) {
         BSONObj query = BSON( "x" << BSON( "$in" << 5 ) );
-        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-    }
-
-    TEST( MatchExpressionParserLeafTest, INUndefined ) {
-        BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( BSONUndefined ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
     }
