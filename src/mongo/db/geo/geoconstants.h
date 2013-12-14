@@ -31,6 +31,6 @@
 namespace mongo {
 
     // Thanks, Wikipedia.
-    const double kRadiusOfEarthInMeters = (6378.1 * 1000);
+    const double kRadiusOfEarthInMeters = (6371 * 1000);
 
 }  // namespace mongo
