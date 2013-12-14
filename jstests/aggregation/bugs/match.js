@@ -109,9 +109,6 @@ function checkMatchResults( indexed ) {
     }
     t.save( { _id:3, a:0 } );
     assertResults( [ { _id:0 }, { _id:1, a:null } ], { a:null } );
-    if ( !indexed ) { // SERVER-1160
-        assertResults( null, { a:{ $in:[ undefined ] } } );
-    }
     assertResults( null, { a:{ $exists:true } } );
     assertResults( null, { a:{ $exists:false } } );
 
