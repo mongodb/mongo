@@ -43,13 +43,13 @@ namespace mongo {
      */
     struct MockEndpoint {
 
-        MockEndpoint( const ConnectionString& endpoint, const BatchedErrorDetail& error ) :
+        MockEndpoint( const ConnectionString& endpoint, const WriteErrorDetail& error ) :
             endpoint( endpoint ) {
             error.cloneTo( &this->error );
         }
 
         const ConnectionString endpoint;
-        BatchedErrorDetail error;
+        WriteErrorDetail error;
     };
 
     /**

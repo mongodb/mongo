@@ -15,7 +15,7 @@ function resultOK( result ) {
            !( 'code' in result ) &&
            !( 'errmsg' in result ) &&
            !( 'errInfo' in result ) &&
-           !( 'errDetails' in result );
+           !( 'writeErrors' in result );
 };
 
 function resultNOK( result ) {
@@ -110,11 +110,11 @@ printjson( request = {'delete' : coll.getName(),
 printjson( result = coll.runCommand(request) );
 assert(resultNOK(result));
 assert.eq(1, result.n);
-assert.eq(1, result.errDetails.length);
+assert.eq(1, result.writeErrors.length);
 
-assert.eq(1, result.errDetails[0].index);
-assert.eq('number', typeof result.errDetails[0].code);
-assert.eq('string', typeof result.errDetails[0].errmsg);
+assert.eq(1, result.writeErrors[0].index);
+assert.eq('number', typeof result.writeErrors[0].code);
+assert.eq('string', typeof result.writeErrors[0].errmsg);
 assert.eq(0, coll.count());
 
 //
@@ -130,15 +130,15 @@ printjson( request = {'delete' : coll.getName(),
 printjson( result = coll.runCommand(request) );
 assert(resultNOK(result));
 assert.eq(1, result.n);
-assert.eq(2, result.errDetails.length);
+assert.eq(2, result.writeErrors.length);
 
-assert.eq(0, result.errDetails[0].index);
-assert.eq('number', typeof result.errDetails[0].code);
-assert.eq('string', typeof result.errDetails[0].errmsg);
+assert.eq(0, result.writeErrors[0].index);
+assert.eq('number', typeof result.writeErrors[0].code);
+assert.eq('string', typeof result.writeErrors[0].errmsg);
 
-assert.eq(1, result.errDetails[1].index);
-assert.eq('number', typeof result.errDetails[1].code);
-assert.eq('string', typeof result.errDetails[1].errmsg);
+assert.eq(1, result.writeErrors[1].index);
+assert.eq('number', typeof result.writeErrors[1].code);
+assert.eq('string', typeof result.writeErrors[1].errmsg);
 assert.eq(0, coll.count());
 
 //
@@ -154,7 +154,7 @@ printjson( request = {'delete' : coll.getName(),
 printjson( result = coll.runCommand(request) );
 assert(resultNOK(result));
 assert.eq(1, result.n);
-assert(!('errDetails' in result));
+assert(!('writeErrors' in result));
 assert.eq(0, coll.count());
 
 //
@@ -170,6 +170,6 @@ printjson( request = {'delete' : coll.getName(),
 printjson( result = coll.runCommand(request) );
 assert(resultNOK(result));
 assert.eq(0, result.n);
-assert(!('errDetails' in result));
+assert(!('writeErrors' in result));
 assert.eq(1, coll.count());
 

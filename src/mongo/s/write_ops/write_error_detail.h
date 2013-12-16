@@ -41,8 +41,8 @@ namespace mongo {
      * This class represents the layout and content of a insert/update/delete runCommand,
      * the response side.
      */
-    class BatchedErrorDetail : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(BatchedErrorDetail);
+    class WriteErrorDetail : public BSONSerializable {
+        MONGO_DISALLOW_COPYING(WriteErrorDetail);
     public:
 
         //
@@ -58,11 +58,11 @@ namespace mongo {
         // construction / destruction
         //
 
-        BatchedErrorDetail();
-        virtual ~BatchedErrorDetail();
+        WriteErrorDetail();
+        virtual ~WriteErrorDetail();
 
         /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(BatchedErrorDetail* other) const;
+        void cloneTo(WriteErrorDetail* other) const;
 
         //
         // bson serializable interface implementation

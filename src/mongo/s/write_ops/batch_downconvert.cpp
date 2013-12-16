@@ -65,21 +65,21 @@ namespace mongo {
         return error.msg != "";
     }
 
-    BatchedErrorDetail* BatchSafeWriter::lastErrorToBatchError( const LastError& lastError ) {
+    WriteErrorDetail* BatchSafeWriter::lastErrorToBatchError( const LastError& lastError ) {
 
         bool isFailedOp = lastError.msg != "";
         bool isStaleOp = lastError.writebackId.isSet();
         dassert( !( isFailedOp && isStaleOp ) );
 
         if ( isFailedOp ) {
-            BatchedErrorDetail* batchError = new BatchedErrorDetail;
+            WriteErrorDetail* batchError = new WriteErrorDetail;
             if ( lastError.code != 0 ) batchError->setErrCode( lastError.code );
             else batchError->setErrCode( ErrorCodes::UnknownError );
             batchError->setErrMessage( lastError.msg );
             return batchError;
         }
         else if ( isStaleOp ) {
-            BatchedErrorDetail* batchError = new BatchedErrorDetail;
+            WriteErrorDetail* batchError = new WriteErrorDetail;
             batchError->setErrCode( ErrorCodes::StaleShardVersion );
             batchError->setErrInfo( BSON( "downconvert" << true ) ); // For debugging
             batchError->setErrMessage( "shard version was stale" );
@@ -104,7 +104,7 @@ namespace mongo {
             _safeWriter->safeWrite( conn, itemRef, &lastError );
 
             // Register the error if we need to
-            BatchedErrorDetail* batchError = lastErrorToBatchError( lastError );
+            WriteErrorDetail* batchError = lastErrorToBatchError( lastError );
             if ( batchError ) {
                 batchError->setIndex( i );
                 response->addToErrDetails( batchError );
@@ -127,7 +127,7 @@ namespace mongo {
              && !response->isErrCodeSet() ) {
 
             // Promote single error to batch error
-            const BatchedErrorDetail* error = response->getErrDetailsAt( 0 );
+            const WriteErrorDetail* error = response->getErrDetailsAt( 0 );
             response->setErrCode( error->getErrCode() );
             if ( error->isErrInfoSet() ) response->setErrInfo( error->getErrInfo() );
             response->setErrMessage( error->getErrMessage() );

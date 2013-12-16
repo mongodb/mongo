@@ -32,7 +32,7 @@
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -93,9 +93,9 @@ namespace {
         ASSERT( clientResponse.getOk() );
     }
 
-    BatchedErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
+    WriteErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
 
-        BatchedErrorDetail* error = new BatchedErrorDetail();
+        WriteErrorDetail* error = new WriteErrorDetail();
         error->setErrCode( code );
         error->setErrInfo( info );
         error->setErrMessage( message );
@@ -103,7 +103,7 @@ namespace {
         return error;
     }
 
-    void setBatchError( const BatchedErrorDetail& error, BatchedCommandResponse* response ) {
+    void setBatchError( const WriteErrorDetail& error, BatchedCommandResponse* response ) {
         response->setOk( false );
         response->setN( 0 );
         response->setErrCode( error.getErrCode() );
@@ -153,7 +153,7 @@ namespace {
         ASSERT_EQUALS( targeted.size(), 1u );
         assertEndpointsEqual( targeted.front()->getEndpoint(), endpoint );
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "message" ) );
         BatchedCommandResponse response;
@@ -448,7 +448,7 @@ namespace {
 
         // Second shard write fails
         BatchedCommandResponse errorResponse;
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "message" ) );
         setBatchError( *error, &errorResponse );
@@ -561,7 +561,7 @@ namespace {
         ASSERT( batchOp.targetBatch( targeter, false, &targeted ).isOK() );
         ASSERT_EQUALS( targeted.size(), 1u );
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
                                                           BSONObj(),
                                                           "mock stale version" ) );
         BatchedCommandResponse response;

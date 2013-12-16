@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h" // ConnectionString (header-only)
 #include "mongo/s/write_ops/batch_write_op.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 
 namespace mongo {
 
@@ -56,7 +56,7 @@ namespace mongo {
         typedef map<ConnectionString, TargetedWriteBatch*, ConnectionStringComp> HostBatchMap;
     }
 
-    static void buildErrorFrom( const Status& status, BatchedErrorDetail* error ) {
+    static void buildErrorFrom( const Status& status, WriteErrorDetail* error ) {
         error->setErrCode( status.code() );
         error->setErrMessage( status.reason() );
     }
@@ -174,7 +174,7 @@ namespace mongo {
                         // Record a resolve failure
                         // TODO: It may be necessary to refresh the cache if stale, or maybe just
                         // cancel and retarget the batch
-                        BatchedErrorDetail error;
+                        WriteErrorDetail error;
                         buildErrorFrom( resolveStatus, &error );
                         batchOp.noteBatchError( *nextBatch, error );
 
@@ -259,7 +259,7 @@ namespace mongo {
                     else {
 
                         // Error occurred dispatching, note it
-                        BatchedErrorDetail error;
+                        WriteErrorDetail error;
                         buildErrorFrom( dispatchStatus, &error );
                         batchOp.noteBatchError( *batch, error );
                     }

@@ -105,7 +105,7 @@ namespace {
         resolver.chooseWriteHost( mockRanges.front()->endpoint.shardName, &shardHost );
 
         vector<MockEndpoint*> mockEndpoints;
-        BatchedErrorDetail error;
+        WriteErrorDetail error;
         error.setErrCode( ErrorCodes::UnknownError );
         error.setErrMessage( "mock error" );
         mockEndpoints.push_back( new MockEndpoint( shardHost, error ) );
@@ -160,7 +160,7 @@ namespace {
         resolver.chooseWriteHost( mockRanges.front()->endpoint.shardName, &shardHost );
 
         vector<MockEndpoint*> mockEndpoints;
-        BatchedErrorDetail error;
+        WriteErrorDetail error;
         error.setErrCode( ErrorCodes::StaleShardVersion );
         error.setErrInfo( BSONObj() ); // Needed for correct handling
         error.setErrMessage( "mock stale error" );

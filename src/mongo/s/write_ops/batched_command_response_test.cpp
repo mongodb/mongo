@@ -31,7 +31,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
@@ -40,23 +40,23 @@ namespace {
     using mongo::BSONArray;
     using mongo::BSONObj;
     using mongo::BatchedCommandResponse;
-    using mongo::BatchedErrorDetail;
+    using mongo::WriteErrorDetail;
     using mongo::Date_t;
     using std::string;
 
     TEST(RoundTrip, Normal) {
 
-        BSONArray errDetailsArray =
+        BSONArray writeErrorsArray =
             BSON_ARRAY(
-                BSON(BatchedErrorDetail::index(0) <<
-                     BatchedErrorDetail::errCode(-2) <<
-                     BatchedErrorDetail::errInfo(BSON("more info" << 1)) <<
-                     BatchedErrorDetail::errMessage("index 0 failed")
+                BSON(WriteErrorDetail::index(0) <<
+                     WriteErrorDetail::errCode(-2) <<
+                     WriteErrorDetail::errInfo(BSON("more info" << 1)) <<
+                     WriteErrorDetail::errMessage("index 0 failed")
                     ) <<
-                BSON(BatchedErrorDetail::index(1) <<
-                     BatchedErrorDetail::errCode(-3) <<
-                     BatchedErrorDetail::errInfo(BSON("more info" << 1)) <<
-                     BatchedErrorDetail::errMessage("index 1 failed too")
+                BSON(WriteErrorDetail::index(1) <<
+                     WriteErrorDetail::errCode(-3) <<
+                     WriteErrorDetail::errInfo(BSON("more info" << 1)) <<
+                     WriteErrorDetail::errMessage("index 1 failed too")
                     )
                 );
 
@@ -67,7 +67,7 @@ namespace {
                  BatchedCommandResponse::errMessage("this batch didn't work") <<
                  BatchedCommandResponse::n(0) <<
                  BatchedCommandResponse::lastOp(Date_t(1)) <<
-                 BatchedCommandResponse::errDetails() << errDetailsArray);
+                 BatchedCommandResponse::writeErrors() << writeErrorsArray);
 
         string errMsg;
         BatchedCommandResponse response;

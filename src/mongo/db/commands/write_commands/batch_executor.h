@@ -93,7 +93,7 @@ namespace mongo {
         bool applyWriteItem( const BatchItemRef& itemRef,
                              WriteStats* stats,
                              BSONObj* upsertedID,
-                             BatchedErrorDetail* error );
+                             WriteErrorDetail* error );
 
         //
         // Helpers to issue underlying write.
@@ -106,26 +106,26 @@ namespace mongo {
                       CurOp* currentOp,
                       WriteStats* stats,
                       BSONObj* upsertedID,
-                      BatchedErrorDetail* error );
+                      WriteErrorDetail* error );
 
         bool doInsert( const std::string& ns,
                        const BSONObj& insertOp,
                        CurOp* currentOp,
                        WriteStats* stats,
-                       BatchedErrorDetail* error );
+                       WriteErrorDetail* error );
 
         bool doUpdate( const std::string& ns,
                        const BatchedUpdateDocument& updateOp,
                        CurOp* currentOp,
                        WriteStats* stats,
                        BSONObj* upsertedID,
-                       BatchedErrorDetail* error );
+                       WriteErrorDetail* error );
 
         bool doDelete( const std::string& ns,
                        const BatchedDeleteDocument& deleteOp,
                        CurOp* currentOp,
                        WriteStats* stats,
-                       BatchedErrorDetail* error );
+                       WriteErrorDetail* error );
 
         // Default write concern, if one isn't provide in the batches.
         const BSONObj _defaultWriteConcern;

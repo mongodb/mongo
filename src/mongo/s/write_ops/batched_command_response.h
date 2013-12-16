@@ -35,7 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 
 namespace mongo {
@@ -61,7 +61,7 @@ namespace mongo {
         static const BSONField<BSONObj> singleUpserted; // ID type
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<Date_t> lastOp;
-        static const BSONField<std::vector<BatchedErrorDetail*> > errDetails;
+        static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
 
         //
         // construction / destruction
@@ -135,13 +135,13 @@ namespace mongo {
         bool isLastOpSet() const;
         Date_t getLastOp() const;
 
-        void setErrDetails(const std::vector<BatchedErrorDetail*>& errDetails);
-        void addToErrDetails(BatchedErrorDetail* errDetails);
+        void setErrDetails(const std::vector<WriteErrorDetail*>& errDetails);
+        void addToErrDetails(WriteErrorDetail* errDetails);
         void unsetErrDetails();
         bool isErrDetailsSet() const;
         std::size_t sizeErrDetails() const;
-        const std::vector<BatchedErrorDetail*>& getErrDetails() const;
-        const BatchedErrorDetail* getErrDetailsAt(std::size_t pos) const;
+        const std::vector<WriteErrorDetail*>& getErrDetails() const;
+        const WriteErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
     private:
         // Convention: (M)andatory, (O)ptional
@@ -184,7 +184,7 @@ namespace mongo {
         bool _isLastOpSet;
 
         // (O)  Array of item-level error information
-        boost::scoped_ptr<std::vector<BatchedErrorDetail*> >_errDetails;
+        boost::scoped_ptr<std::vector<WriteErrorDetail*> >_writeErrorDetails;
     };
 
 } // namespace mongo

@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 
 #include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
@@ -34,19 +34,19 @@
 namespace mongo {
 
     using mongoutils::str::stream;
-        const BSONField<int> BatchedErrorDetail::index("index");
-        const BSONField<int> BatchedErrorDetail::errCode("code");
-        const BSONField<BSONObj> BatchedErrorDetail::errInfo("errInfo");
-        const BSONField<std::string> BatchedErrorDetail::errMessage("errmsg");
+        const BSONField<int> WriteErrorDetail::index("index");
+        const BSONField<int> WriteErrorDetail::errCode("code");
+        const BSONField<BSONObj> WriteErrorDetail::errInfo("errInfo");
+        const BSONField<std::string> WriteErrorDetail::errMessage("errmsg");
 
-    BatchedErrorDetail::BatchedErrorDetail() {
+    WriteErrorDetail::WriteErrorDetail() {
         clear();
     }
 
-    BatchedErrorDetail::~BatchedErrorDetail() {
+    WriteErrorDetail::~WriteErrorDetail() {
     }
 
-    bool BatchedErrorDetail::isValid(std::string* errMsg) const {
+    bool WriteErrorDetail::isValid(std::string* errMsg) const {
         std::string dummy;
         if (errMsg == NULL) {
             errMsg = &dummy;
@@ -66,7 +66,7 @@ namespace mongo {
         return true;
     }
 
-    BSONObj BatchedErrorDetail::toBSON() const {
+    BSONObj WriteErrorDetail::toBSON() const {
         BSONObjBuilder builder;
 
         if (_isIndexSet) builder.append(index(), _index);
@@ -80,7 +80,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool BatchedErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
+    bool WriteErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;
@@ -106,7 +106,7 @@ namespace mongo {
         return true;
     }
 
-    void BatchedErrorDetail::clear() {
+    void WriteErrorDetail::clear() {
         _index = 0;
         _isIndexSet = false;
 
@@ -121,7 +121,7 @@ namespace mongo {
 
     }
 
-    void BatchedErrorDetail::cloneTo(BatchedErrorDetail* other) const {
+    void WriteErrorDetail::cloneTo(WriteErrorDetail* other) const {
         other->clear();
 
         other->_index = _index;
@@ -137,78 +137,78 @@ namespace mongo {
         other->_isErrMessageSet = _isErrMessageSet;
     }
 
-    std::string BatchedErrorDetail::toString() const {
+    std::string WriteErrorDetail::toString() const {
         return "implement me";
     }
 
-    void BatchedErrorDetail::setIndex(int index) {
+    void WriteErrorDetail::setIndex(int index) {
         _index = index;
         _isIndexSet = true;
     }
 
-    void BatchedErrorDetail::unsetIndex() {
+    void WriteErrorDetail::unsetIndex() {
          _isIndexSet = false;
      }
 
-    bool BatchedErrorDetail::isIndexSet() const {
+    bool WriteErrorDetail::isIndexSet() const {
          return _isIndexSet;
     }
 
-    int BatchedErrorDetail::getIndex() const {
+    int WriteErrorDetail::getIndex() const {
         dassert(_isIndexSet);
         return _index;
     }
 
-    void BatchedErrorDetail::setErrCode(int errCode) {
+    void WriteErrorDetail::setErrCode(int errCode) {
         _errCode = errCode;
         _isErrCodeSet = true;
     }
 
-    void BatchedErrorDetail::unsetErrCode() {
+    void WriteErrorDetail::unsetErrCode() {
          _isErrCodeSet = false;
      }
 
-    bool BatchedErrorDetail::isErrCodeSet() const {
+    bool WriteErrorDetail::isErrCodeSet() const {
          return _isErrCodeSet;
     }
 
-    int BatchedErrorDetail::getErrCode() const {
+    int WriteErrorDetail::getErrCode() const {
         dassert(_isErrCodeSet);
         return _errCode;
     }
 
-    void BatchedErrorDetail::setErrInfo(const BSONObj& errInfo) {
+    void WriteErrorDetail::setErrInfo(const BSONObj& errInfo) {
         _errInfo = errInfo.getOwned();
         _isErrInfoSet = true;
     }
 
-    void BatchedErrorDetail::unsetErrInfo() {
+    void WriteErrorDetail::unsetErrInfo() {
          _isErrInfoSet = false;
      }
 
-    bool BatchedErrorDetail::isErrInfoSet() const {
+    bool WriteErrorDetail::isErrInfoSet() const {
          return _isErrInfoSet;
     }
 
-    const BSONObj& BatchedErrorDetail::getErrInfo() const {
+    const BSONObj& WriteErrorDetail::getErrInfo() const {
         dassert(_isErrInfoSet);
         return _errInfo;
     }
 
-    void BatchedErrorDetail::setErrMessage(const StringData& errMessage) {
+    void WriteErrorDetail::setErrMessage(const StringData& errMessage) {
         _errMessage = errMessage.toString();
         _isErrMessageSet = true;
     }
 
-    void BatchedErrorDetail::unsetErrMessage() {
+    void WriteErrorDetail::unsetErrMessage() {
          _isErrMessageSet = false;
      }
 
-    bool BatchedErrorDetail::isErrMessageSet() const {
+    bool WriteErrorDetail::isErrMessageSet() const {
          return _isErrMessageSet;
     }
 
-    const std::string& BatchedErrorDetail::getErrMessage() const {
+    const std::string& WriteErrorDetail::getErrMessage() const {
         dassert(_isErrMessageSet);
         return _errMessage;
     }

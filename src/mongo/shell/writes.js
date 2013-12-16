@@ -90,10 +90,10 @@ if ( ( typeof WriteResult ) == 'undefined' ){
                 this._wcError = topLevelError;
             }
 
-            if ( result.errDetails ) {
+            if ( result.writeErrors ) {
                 // Item errors
-                this._itemErrors = result.errDetails;
-                assert( Array.isArray( this._itemErrors ) );
+                this._writeErrors = result.writeErrors;
+                assert( Array.isArray( this._writeErrors ) );
             }
             else if ( !isWCError ) {
                 // Batch error
@@ -149,11 +149,11 @@ if ( ( typeof WriteResult ) == 'undefined' ){
     };
 
     WriteResult.prototype.numItemErrors = function() {
-        return '_itemErrors' in this ? this._itemErrors.length : 0;
+        return '_itemErrors' in this ? this._writeErrors.length : 0;
     };
 
     WriteResult.prototype.getItemError = function( itemIndex ) {
-        return this._itemErrors[itemIndex];
+        return this._writeErrors[itemIndex];
     };
 
     WriteResult.prototype.getSingleError = function() {

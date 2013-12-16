@@ -45,7 +45,7 @@
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -91,7 +91,7 @@ namespace mongo {
         Timer commandTimer;
 
         WriteStats stats;
-        std::auto_ptr<BatchedErrorDetail> error( new BatchedErrorDetail );
+        std::auto_ptr<WriteErrorDetail> error( new WriteErrorDetail );
         bool verbose = request.isVerboseWC();
 
         // Apply each batch item, stopping on an error if we were asked to apply the batch
@@ -140,7 +140,7 @@ namespace mongo {
 
                 if ( request.getOrdered() ) break;
 
-                error.reset( new BatchedErrorDetail );
+                error.reset( new WriteErrorDetail );
             }
         }
 
@@ -160,7 +160,7 @@ namespace mongo {
             }
             else {
                 // Promote the single error.
-                const BatchedErrorDetail* error = response->getErrDetailsAt( 0 );
+                const WriteErrorDetail* error = response->getErrDetailsAt( 0 );
                 response->setErrCode( error->getErrCode() );
                 if ( error->isErrInfoSet() ) response->setErrInfo( error->getErrInfo() );
                 response->setErrMessage( error->getErrMessage() );
@@ -255,7 +255,7 @@ namespace mongo {
     bool WriteBatchExecutor::applyWriteItem( const BatchItemRef& itemRef,
                                              WriteStats* stats,
                                              BSONObj* upsertedID,
-                                             BatchedErrorDetail* error ) {
+                                             WriteErrorDetail* error ) {
         const BatchedCommandRequest& request = *itemRef.getRequest();
         const string& ns = request.getNS();
 
@@ -323,7 +323,7 @@ namespace mongo {
         return opSuccess;
     }
 
-    static void toBatchedError( const UserException& ex, BatchedErrorDetail* error ) {
+    static void toBatchedError( const UserException& ex, WriteErrorDetail* error ) {
         // TODO: Complex transform here?
         error->setErrCode( ex.getCode() );
         error->setErrMessage( ex.what() );
@@ -331,7 +331,7 @@ namespace mongo {
 
     static void buildStaleError( const ChunkVersion& shardVersionRecvd,
                                  const ChunkVersion& shardVersionWanted,
-                                 BatchedErrorDetail* error ) {
+                                 WriteErrorDetail* error ) {
 
         // Write stale error to results
         error->setErrCode( ErrorCodes::StaleShardVersion );
@@ -348,7 +348,7 @@ namespace mongo {
 
     static void buildUniqueIndexError( const BSONObj& keyPattern,
                                        const BSONObj& indexPattern,
-                                       BatchedErrorDetail* error ) {
+                                       WriteErrorDetail* error ) {
         error->setErrCode( ErrorCodes::CannotCreateIndex );
         string errMsg = stream() << "cannot create unique index over " << indexPattern
                                  << " with shard key pattern " << keyPattern;
@@ -360,7 +360,7 @@ namespace mongo {
                                       CurOp* currentOp,
                                       WriteStats* stats,
                                       BSONObj* upsertedID,
-                                      BatchedErrorDetail* error ) {
+                                      WriteErrorDetail* error ) {
 
         const BatchedCommandRequest& request = *itemRef.getRequest();
         int index = itemRef.getItemIndex();
@@ -449,7 +449,7 @@ namespace mongo {
                                        const BSONObj& insertOp,
                                        CurOp* currentOp,
                                        WriteStats* stats,
-                                       BatchedErrorDetail* error ) {
+                                       WriteErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
         _opCounters->gotInsert();
@@ -481,7 +481,7 @@ namespace mongo {
                                        CurOp* currentOp,
                                        WriteStats* stats,
                                        BSONObj* upsertedID,
-                                       BatchedErrorDetail* error ) {
+                                       WriteErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
         _opCounters->gotUpdate();
@@ -547,7 +547,7 @@ namespace mongo {
                                        const BatchedDeleteDocument& deleteOp,
                                        CurOp* currentOp,
                                        WriteStats* stats,
-                                       BatchedErrorDetail* error ) {
+                                       WriteErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
         _opCounters->gotDelete();

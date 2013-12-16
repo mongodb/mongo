@@ -153,7 +153,7 @@ namespace mongo {
         return request;
     }
 
-    void buildErrorFromResponse( const BatchedCommandResponse& response, BatchedErrorDetail* error ) {
+    void buildErrorFromResponse( const BatchedCommandResponse& response, WriteErrorDetail* error ) {
         error->setErrCode( response.getErrCode() );
         if ( error->isErrInfoSet() ) error->setErrInfo( response.getErrInfo() );
         error->setErrMessage( response.getErrMessage() );
@@ -163,8 +163,8 @@ namespace mongo {
                                 const BatchedCommandResponse& response,
                                 LastError* error ) {
 
-        scoped_ptr<BatchedErrorDetail> topLevelError;
-        BatchedErrorDetail* lastBatchError = NULL;
+        scoped_ptr<WriteErrorDetail> topLevelError;
+        WriteErrorDetail* lastBatchError = NULL;
 
         if ( !response.getOk() ) {
 
@@ -174,7 +174,7 @@ namespace mongo {
             // We don't care about write concern errors, these happen in legacy mode in GLE
             if ( code != ErrorCodes::WriteConcernFailed && !response.isErrDetailsSet() ) {
                 // Top-level error, all writes failed
-                topLevelError.reset( new BatchedErrorDetail );
+                topLevelError.reset( new WriteErrorDetail );
                 buildErrorFromResponse( response, topLevelError.get() );
                 lastBatchError = topLevelError.get();
             }

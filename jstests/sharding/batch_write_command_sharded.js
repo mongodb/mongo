@@ -24,7 +24,7 @@ function resultOK( result ) {
            !( 'code' in result ) &&
            !( 'errmsg' in result ) &&
            !( 'errInfo' in result ) &&
-           !( 'errDetails' in result );
+           !( 'writeErrors' in result );
 };
 
 function resultNOK( result ) {

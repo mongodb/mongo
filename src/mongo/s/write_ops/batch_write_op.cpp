@@ -54,7 +54,7 @@ namespace mongo {
         _clientRequest = clientRequest;
     }
 
-    static void buildTargetError( const Status& errStatus, BatchedErrorDetail* details ) {
+    static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
         details->setErrCode( errStatus.code() );
         details->setErrMessage( errStatus.reason() );
     }
@@ -90,7 +90,7 @@ namespace mongo {
     }
 
     // Helper function to cancel all the write ops of targeted batches in a map
-    static void cancelBatches( const BatchedErrorDetail& why,
+    static void cancelBatches( const WriteErrorDetail& why,
                                WriteOp* writeOps,
                                TargetedBatchMap* batchMap ) {
 
@@ -157,7 +157,7 @@ namespace mongo {
                 // current batches.
                 //
 
-                BatchedErrorDetail targetError;
+                WriteErrorDetail targetError;
                 buildTargetError( targetStatus, &targetError );
 
                 if ( recordTargetErrors ) {
@@ -274,22 +274,22 @@ namespace mongo {
     //
 
     namespace {
-        struct BatchedErrorDetailComp {
-            bool operator()( const BatchedErrorDetail* errorA,
-                             const BatchedErrorDetail* errorB ) const {
+        struct WriteErrorDetailComp {
+            bool operator()( const WriteErrorDetail* errorA,
+                             const WriteErrorDetail* errorB ) const {
                 return errorA->getIndex() < errorB->getIndex();
             }
         };
     }
 
     static void cloneBatchErrorTo( const BatchedCommandResponse& batchResp,
-                                   BatchedErrorDetail* details ) {
+                                   WriteErrorDetail* details ) {
         details->setErrCode( batchResp.getErrCode() );
         if ( batchResp.isErrInfoSet() ) details->setErrInfo( batchResp.getErrInfo() );
         details->setErrMessage( batchResp.getErrMessage() );
     }
 
-    static void cloneBatchErrorFrom( const BatchedErrorDetail& details,
+    static void cloneBatchErrorFrom( const WriteErrorDetail& details,
                                      BatchedCommandResponse* response ) {
         response->setErrCode( details.getErrCode() );
         if ( details.isErrInfoSet() ) response->setErrInfo( details.getErrInfo() );
@@ -303,8 +303,8 @@ namespace mongo {
     // Given *either* a batch error or an array of per-item errors, copies errors we're interested
     // in into a TrackedErrorMap
     static void trackErrors( const ShardEndpoint& endpoint,
-                             const BatchedErrorDetail* batchError,
-                             const vector<BatchedErrorDetail*> itemErrors,
+                             const WriteErrorDetail* batchError,
+                             const vector<WriteErrorDetail*> itemErrors,
                              TrackedErrors* trackedErrors ) {
         if ( batchError ) {
             if ( trackedErrors->isTracking( batchError->getErrCode() ) ) {
@@ -312,10 +312,10 @@ namespace mongo {
             }
         }
         else {
-            for ( vector<BatchedErrorDetail*>::const_iterator it = itemErrors.begin();
+            for ( vector<WriteErrorDetail*>::const_iterator it = itemErrors.begin();
                 it != itemErrors.end(); ++it ) {
 
-                const BatchedErrorDetail* error = *it;
+                const WriteErrorDetail* error = *it;
 
                 if ( trackedErrors->isTracking( error->getErrCode() ) ) {
                     trackedErrors->addError( new ShardError( endpoint, *error ) );
@@ -359,8 +359,8 @@ namespace mongo {
         // (Write Concern errors are stored and handled later.)
         //
 
-        vector<BatchedErrorDetail*> itemErrors;
-        scoped_ptr<BatchedErrorDetail> batchError;
+        vector<WriteErrorDetail*> itemErrors;
+        scoped_ptr<WriteErrorDetail> batchError;
 
         if ( !response.getOk() ) {
 
@@ -369,7 +369,7 @@ namespace mongo {
 
             // Special handling for write concern errors, save for later
             if ( isWCError ) {
-                BatchedErrorDetail error;
+                WriteErrorDetail error;
                 cloneBatchErrorTo( response, &error );
                 ShardError* wcError = new ShardError( targetedBatch.getEndpoint(), error );
                 _wcErrors.mutableVector().push_back( wcError );
@@ -384,13 +384,13 @@ namespace mongo {
                                    response.getErrDetails().end() );
 
                 // Sort per-item errors by index
-                std::sort( itemErrors.begin(), itemErrors.end(), BatchedErrorDetailComp() );
+                std::sort( itemErrors.begin(), itemErrors.end(), WriteErrorDetailComp() );
             }
             else if ( !isWCError ) {
 
                 // Per-item errors were not set and this error is not a WC error
                 // => this is a full-batch error
-                batchError.reset( new BatchedErrorDetail );
+                batchError.reset( new WriteErrorDetail );
                 cloneBatchErrorTo( response, batchError.get() );
             }
         }
@@ -403,7 +403,7 @@ namespace mongo {
         // This will either set all errors to the batch error or apply per-item errors as-needed
         //
 
-        vector<BatchedErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
+        vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
         int index = 0;
         for ( vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
             it != targetedBatch.getWrites().end(); ++it, ++index ) {
@@ -414,7 +414,7 @@ namespace mongo {
             dassert( writeOp.getWriteState() == WriteOpState_Pending );
 
             // See if we have an error for the write
-            BatchedErrorDetail* writeError = NULL;
+            WriteErrorDetail* writeError = NULL;
 
             if ( batchError ) {
                 // Default to batch error, if it exists
@@ -480,7 +480,7 @@ namespace mongo {
     }
 
     void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
-                                       const BatchedErrorDetail& error ) {
+                                       const WriteErrorDetail& error ) {
         BatchedCommandResponse response;
         response.setOk( false );
         response.setN( 0 );
@@ -506,7 +506,7 @@ namespace mongo {
     //
 
     // Aggregate all errors for batch operations together into a single error
-    static void combineOpErrors( const vector<WriteOp*>& errOps, BatchedErrorDetail* error ) {
+    static void combineOpErrors( const vector<WriteOp*>& errOps, WriteErrorDetail* error ) {
 
         // Special case, pass through details of single error for better usability
         if ( errOps.size() == 1 ) {
@@ -532,7 +532,7 @@ namespace mongo {
 
     // Aggregate all WC errors for the whole batch into a single error
     static void combineWCErrors( const vector<ShardError*>& wcResponses,
-                                 BatchedErrorDetail* error ) {
+                                 WriteErrorDetail* error ) {
 
         // Special case, pass through details of single error for better usability
         if ( wcResponses.size() == 1 ) {
@@ -586,12 +586,12 @@ namespace mongo {
         //
 
         if ( !_wcErrors.empty() ) {
-            BatchedErrorDetail comboWCError;
+            WriteErrorDetail comboWCError;
             combineWCErrors( _wcErrors.vector(), &comboWCError );
             cloneBatchErrorFrom( comboWCError, batchResp );
         }
         else if ( !errOps.empty() ) {
-            BatchedErrorDetail comboBatchError;
+            WriteErrorDetail comboBatchError;
             combineOpErrors( errOps, &comboBatchError );
             cloneBatchErrorFrom( comboBatchError, batchResp );
 
@@ -606,7 +606,7 @@ namespace mongo {
         if ( !errOps.empty() && _clientRequest->isVerboseWC() ) {
             for ( vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it ) {
                 WriteOp& writeOp = **it;
-                BatchedErrorDetail* error = new BatchedErrorDetail();
+                WriteErrorDetail* error = new WriteErrorDetail();
                 writeOp.getOpError().cloneTo( error );
                 batchResp->addToErrDetails( error );
             }

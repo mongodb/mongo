@@ -37,7 +37,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 
 // TODO: Remove post-2.6
 
@@ -83,7 +83,7 @@ namespace mongo {
         static bool isFailedOp( const LastError& error );
 
         // Helper exposed for testing
-        static BatchedErrorDetail* lastErrorToBatchError( const LastError& error );
+        static WriteErrorDetail* lastErrorToBatchError( const LastError& error );
 
     private:
 

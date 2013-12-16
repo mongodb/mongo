@@ -34,7 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/s/ns_targeter.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
@@ -109,7 +109,7 @@ namespace mongo {
          *
          * Can only be used in state _Error
          */
-        const BatchedErrorDetail& getOpError() const;
+        const WriteErrorDetail& getOpError() const;
 
         /**
          * Creates TargetedWrite operations for every applicable shard, which contain the
@@ -131,7 +131,7 @@ namespace mongo {
          * Can only be called when state is _Pending and no TargetedWrites have been noted, or is a
          * no-op if called when the state is still _Ready (and therefore no writes are pending).
          */
-        void cancelWrites( const BatchedErrorDetail* why );
+        void cancelWrites( const WriteErrorDetail* why );
 
         /**
          * Marks the targeted write as finished for this write op.
@@ -147,14 +147,14 @@ namespace mongo {
          * As above, one of noteWriteComplete or noteWriteError should be called exactly once for
          * every TargetedWrite.
          */
-        void noteWriteError( const TargetedWrite& targetedWrite, const BatchedErrorDetail& error );
+        void noteWriteError( const TargetedWrite& targetedWrite, const WriteErrorDetail& error );
 
         /**
          * Sets the error for this write op directly, and forces the state to _Error.
          *
          * Should only be used when in state _Ready.
          */
-        void setOpError( const BatchedErrorDetail& error );
+        void setOpError( const WriteErrorDetail& error );
 
     private:
 
@@ -173,7 +173,7 @@ namespace mongo {
         std::vector<ChildWriteOp*> _childOps;
 
         // filled when state == _Error
-        scoped_ptr<BatchedErrorDetail> _error;
+        scoped_ptr<WriteErrorDetail> _error;
 
         // Finished child operations, for debugging
         std::vector<ChildWriteOp*> _history;
@@ -203,7 +203,7 @@ namespace mongo {
         scoped_ptr<ShardEndpoint> endpoint;
 
         // filled when state == _Error or (optionally) when state == _Cancelled
-        scoped_ptr<BatchedErrorDetail> error;
+        scoped_ptr<WriteErrorDetail> error;
     };
 
     // First value is write item index in the batch, second value is child write op index

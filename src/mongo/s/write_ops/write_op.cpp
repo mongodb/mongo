@@ -51,7 +51,7 @@ namespace mongo {
         return _state;
     }
 
-    const BatchedErrorDetail& WriteOp::getOpError() const {
+    const WriteErrorDetail& WriteOp::getOpError() const {
         dassert( _state == WriteOpState_Error );
         return *_error;
     }
@@ -130,7 +130,7 @@ namespace mongo {
     }
 
     // Aggregate a bunch of errors for a single op together
-    static void combineOpErrors( const vector<ChildWriteOp*>& errOps, BatchedErrorDetail* error ) {
+    static void combineOpErrors( const vector<ChildWriteOp*>& errOps, WriteErrorDetail* error ) {
 
         // Special case single response
         if ( errOps.size() == 1 ) {
@@ -190,7 +190,7 @@ namespace mongo {
             _state = WriteOpState_Ready;
         }
         else if ( !childErrors.empty() ) {
-            _error.reset( new BatchedErrorDetail );
+            _error.reset( new WriteErrorDetail );
             combineOpErrors( childErrors, _error.get() );
             _state = WriteOpState_Error;
         }
@@ -205,7 +205,7 @@ namespace mongo {
         _childOps.clear();
     }
 
-    void WriteOp::cancelWrites( const BatchedErrorDetail* why ) {
+    void WriteOp::cancelWrites( const WriteErrorDetail* why ) {
 
         dassert( _state == WriteOpState_Pending || _state == WriteOpState_Ready );
         for ( vector<ChildWriteOp*>::iterator it = _childOps.begin(); it != _childOps.end();
@@ -216,7 +216,7 @@ namespace mongo {
 
             childOp->endpoint.reset( new ShardEndpoint( childOp->pendingWrite->endpoint ) );
             if ( why ) {
-                childOp->error.reset( new BatchedErrorDetail );
+                childOp->error.reset( new WriteErrorDetail );
                 why->cloneTo( childOp->error.get() );
             }
             childOp->state = WriteOpState_Cancelled;
@@ -241,14 +241,14 @@ namespace mongo {
     }
 
     void WriteOp::noteWriteError( const TargetedWrite& targetedWrite,
-                                  const BatchedErrorDetail& error ) {
+                                  const WriteErrorDetail& error ) {
 
         const WriteOpRef& ref = targetedWrite.writeOpRef;
         ChildWriteOp& childOp = *_childOps.at( ref.second );
 
         childOp.pendingWrite = NULL;
         childOp.endpoint.reset( new ShardEndpoint( targetedWrite.endpoint ) );
-        childOp.error.reset( new BatchedErrorDetail );
+        childOp.error.reset( new WriteErrorDetail );
         error.cloneTo( childOp.error.get() );
         dassert( ref.first == _itemRef.getItemIndex() );
         childOp.error->setIndex( _itemRef.getItemIndex() );
@@ -256,9 +256,9 @@ namespace mongo {
         updateOpState();
     }
 
-    void WriteOp::setOpError( const BatchedErrorDetail& error ) {
+    void WriteOp::setOpError( const WriteErrorDetail& error ) {
         dassert( _state == WriteOpState_Ready );
-        _error.reset( new BatchedErrorDetail );
+        _error.reset( new WriteErrorDetail );
         error.cloneTo( _error.get() );
         _error->setIndex( _itemRef.getItemIndex() );
         _state = WriteOpState_Error;

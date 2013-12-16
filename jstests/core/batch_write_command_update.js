@@ -15,7 +15,7 @@ function resultOK( result ) {
            !( 'code' in result ) &&
            !( 'errmsg' in result ) &&
            !( 'errInfo' in result ) &&
-           !( 'errDetails' in result );
+           !( 'writeErrors' in result );
 };
 
 function resultNOK( result ) {
@@ -205,11 +205,11 @@ printjson( result = coll.runCommand(request) );
 assert(resultNOK(result));
 assert.eq(2, result.n);
 assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
-assert.eq(1, result.errDetails.length);
+assert.eq(1, result.writeErrors.length);
 
-assert.eq(2, result.errDetails[0].index);
-assert.eq('number', typeof result.errDetails[0].code);
-assert.eq('string', typeof result.errDetails[0].errmsg);
+assert.eq(2, result.writeErrors[0].index);
+assert.eq('number', typeof result.writeErrors[0].code);
+assert.eq('string', typeof result.writeErrors[0].errmsg);
 
 assert.eq(2, result.upserted.length);
 assert.eq(0, result.upserted[0].index);
@@ -232,15 +232,15 @@ printjson( result = coll.runCommand(request) );
 assert(resultNOK(result));
 assert.eq(2, result.n);
 assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
-assert.eq(2, result.errDetails.length);
+assert.eq(2, result.writeErrors.length);
 
-assert.eq(1, result.errDetails[0].index);
-assert.eq('number', typeof result.errDetails[0].code);
-assert.eq('string', typeof result.errDetails[0].errmsg);
+assert.eq(1, result.writeErrors[0].index);
+assert.eq('number', typeof result.writeErrors[0].code);
+assert.eq('string', typeof result.writeErrors[0].errmsg);
 
-assert.eq(2, result.errDetails[1].index);
-assert.eq('number', typeof result.errDetails[1].code);
-assert.eq('string', typeof result.errDetails[1].errmsg);
+assert.eq(2, result.writeErrors[1].index);
+assert.eq('number', typeof result.writeErrors[1].code);
+assert.eq('string', typeof result.writeErrors[1].errmsg);
 
 assert.eq(2, result.upserted.length);
 assert.eq(0, result.upserted[0].index);
