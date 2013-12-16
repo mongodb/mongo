@@ -15,6 +15,10 @@
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
+#define	WT_DECL_SPINLOCK_ID(i)
+#define	__wt_spin_trylock(session, lock, idp)				\
+	__wt_spin_trylock_func(session, lock)
+
 /* Default to spinning 1000 times before yielding. */
 #ifndef WT_SPIN_COUNT
 #define	WT_SPIN_COUNT 1000
@@ -39,7 +43,7 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 }
 
 static inline int
-__wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+__wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
