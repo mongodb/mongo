@@ -85,8 +85,8 @@ namespace mongo {
          * puts the file represented by data into the db
          * @param data pointer to buffer to store in GridFS
          * @param length length of buffer
-         * @param remoteName optional filename to use for file stored in GridFS
-         *                   (default is to use fileName parameter)
+         * @param remoteName filename to use for file stored in GridFS
+         *                   (needed as no fileName to default too)
          * @param contentType optional MIME type for this object.
          *                    (default is to omit)
          * @return the file object
