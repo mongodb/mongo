@@ -23,6 +23,8 @@ var roles = [
     {key: "clusterMonitor", role: "clusterMonitor", dbname: adminDbName},
     {key: "hostManager", role: "hostManager", dbname: adminDbName},
     {key: "clusterManager", role: "clusterManager", dbname: adminDbName},
+    {key: "backup", role: "backup", dbname: adminDbName},
+    {key: "restore", role: "restore", dbname: adminDbName},
     {key: "root", role: "root", dbname: adminDbName},
     {key: "__system", role: "__system", dbname: adminDbName}
 ];

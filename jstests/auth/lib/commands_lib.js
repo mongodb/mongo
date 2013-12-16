@@ -89,6 +89,7 @@ var roles_write = {
     readWrite: 1,
     readWriteAnyDatabase: 1,
     dbOwner: 1,
+    restore: 1,
     root: 1,
     __system: 1
 };
@@ -98,12 +99,14 @@ var roles_readWrite = {
     readWrite: 1,
     readWriteAnyDatabase: 1,
     dbOwner: 1,
+    backup: 1,
     root: 1,
     __system: 1
 };
 var roles_readWriteAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
+    backup: 1,
     root: 1,
     __system: 1
 };
@@ -184,6 +187,8 @@ var roles_all = {
     hostManager: 1,
     clusterManager: 1,
     clusterAdmin: 1,
+    backup: 1,
+    restore: 1,
     root: 1,
     __system: 1
 };
@@ -280,7 +285,11 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_write,
+                    roles: { readWrite: 1,
+                             readWriteAnyDatabase: 1,
+                             dbOwner: 1,
+                             root: 1,
+                             __system: 1},
                     privileges: [
                         { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] },
                         { resource: {db: firstDbName, collection: "foo_out"}, actions: ["insert"] },
@@ -364,7 +373,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: secondDbName,
-                    roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                    roles: {readWriteAnyDatabase: 1, restore: 1, root: 1, __system: 1},
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["insert", "createIndex"] }
                     ],
@@ -384,7 +393,12 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_write,
+                    roles: { readWrite: 1,
+                             readWriteAnyDatabase: 1,
+                             dbOwner: 1,
+                             root: 1,
+                             __system: 1
+                           },
                     privileges: [
                         { resource: {db: firstDbName, collection: "y"}, actions: ["insert", "createIndex", "convertToCapped"] },
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
@@ -424,14 +438,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_dbAdmin,
+                    roles: Object.extend({restore: 1}, roles_dbAdmin),
                     privileges: [
                         { resource: {db: firstDbName, collection: "foo"}, actions: ["collMod"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_dbAdminAny,
+                    roles: Object.extend({restore:1}, roles_dbAdminAny),
                     privileges: [
                         { resource: {db: secondDbName, collection: "foo"}, actions: ["collMod"] }
                     ]
@@ -608,28 +622,28 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_writeDbAdmin,
+                    roles: Object.extend({restore:1}, roles_writeDbAdmin),
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"] }
                     ]
                 },
                 {
                     runOnDb: firstDbName,
-                    roles: roles_writeDbAdmin,
+                    roles: Object.extend({restore:1}, roles_writeDbAdmin),
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["insert"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_writeDbAdminAny,
+                    roles: Object.extend({restore:1}, roles_writeDbAdminAny),
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["createCollection"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_writeDbAdminAny,
+                    roles: Object.extend({restore:1}, roles_writeDbAdminAny),
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["insert"] }
                     ]
@@ -724,14 +738,25 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: { read: 1,
+                             readAnyDatabase: 1,
+                             readWrite: 1,
+                             readWriteAnyDatabase: 1,
+                             dbOwner: 1,
+                             root: 1,
+                             __system: 1
+                           },
                     privileges: [
                         { resource: {db: firstDbName, collection: ""}, actions: ["dbHash"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: { readAnyDatabase: 1,
+                             readWriteAnyDatabase: 1,
+                             root: 1,
+                             __system: 1
+                           },
                     privileges: [
                         { resource: {db: secondDbName, collection: ""}, actions: ["dbHash"] }
                     ]
@@ -821,14 +846,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_writeDbAdmin,
+                    roles: Object.extend({restore: 1}, roles_writeDbAdmin),
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_writeDbAdminAny,
+                    roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["dropCollection"] }
                     ]
@@ -981,7 +1006,12 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_write,
+                    roles: { readWrite: 1,
+                             readWriteAnyDatabase: 1,
+                             dbOwner: 1,
+                             root: 1,
+                             __system: 1
+                           },
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find", "update"] }
                     ]
@@ -1307,6 +1337,7 @@ var authCommandsLib = {
                         userAdminAnyDatabase: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },
@@ -1395,7 +1426,12 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_write,
+                    roles: { readWrite: 1,
+                             readWriteAnyDatabase: 1,
+                             dbOwner: 1,
+                             root: 1,
+                             __system: 1
+                           },
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] },
                         { resource: {db: firstDbName, collection: "mr_out"}, actions: ["insert", "remove"] }
