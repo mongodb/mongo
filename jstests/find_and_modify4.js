@@ -34,7 +34,7 @@ function helper(upsert){
 assert.eq(helper(false), null);
 assert.eq(t.count(), 0);
 
-// upsert:false so nothing there before; something there after
+// upsert:true so nothing there before; something there after
 assert.eq(helper(true), null);
 assert.eq(t.count(), 1);
 assert.eq(helper(true),  {_id: 'asdf', val: 1});
