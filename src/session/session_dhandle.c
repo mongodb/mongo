@@ -320,10 +320,12 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	uint64_t hash;
+	uint32_t open_flags;
 	int candidate;
 
 	dhandle = NULL;
 	candidate = 0;
+	open_flags = flags;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	SLIST_FOREACH(dhandle_cache, &session->dhandles, l) {
@@ -347,9 +349,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * must match.
 		 */
 		ret = __wt_session_lock_btree(session, flags);
-		if (ret == WT_NOTFOUND)
+		if (ret == WT_NOTFOUND) {
 			dhandle_cache = NULL;
-		else
+			open_flags |= WT_DHANDLE_HAVE_REF;
+		} else
 			WT_RET(ret);
 	}
 

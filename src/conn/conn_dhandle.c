@@ -103,7 +103,8 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			WT_RET(__conn_dhandle_open_lock(
 			    session, dhandle, flags));
-			++dhandle->session_ref;
+			if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
+				++dhandle->session_ref;
 			session->dhandle = dhandle;
 			return (0);
 		}
