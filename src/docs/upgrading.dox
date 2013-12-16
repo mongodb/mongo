@@ -1,5 +1,15 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_21 Upgrading to Version 2.1
+<dl>
+
+<dt>WT_ITEM::size type</dt>
+<dd>
+In the 2.1 release of WiredTiger WT_ITEM::size type has changed from
+\c uint32_t to \c size_t.  Applications may require modifications to
+resolve compile-time errors.
+</dd>
+
 @section version_20 Upgrading to Version 2.0
 <dl>
 

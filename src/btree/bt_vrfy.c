@@ -97,7 +97,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
-		    ckpt->raw.data, ckpt->raw.size,
+		    ckpt->raw.data, (uint32_t)ckpt->raw.size,
 		    root_addr, &root_addr_size, 1));
 
 		/*

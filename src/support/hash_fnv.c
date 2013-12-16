@@ -155,7 +155,7 @@ fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
  *	WiredTiger wrapper around third party hash implementation.
  */
 uint64_t
-__wt_hash_fnv64(const void *string, uint32_t len)
+__wt_hash_fnv64(const void *string, size_t len)
 {
 	return (fnv_64a_buf(string, len, FNV1A_64_INIT));
 }

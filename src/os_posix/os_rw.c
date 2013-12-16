@@ -45,12 +45,12 @@ __wt_read(WT_SESSION_IMPL *session,
  */
 int
 __wt_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, off_t offset, uint32_t bytes, const void *buf)
+    WT_FH *fh, off_t offset, size_t bytes, const void *buf)
 {
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
 	WT_VERBOSE_RET(session, fileops,
-	    "%s: write %" PRIu32 " bytes at offset %" PRIuMAX,
+	    "%s: write %zu bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
@@ -64,8 +64,8 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	if (pwrite(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
 		WT_RET_MSG(session, __wt_errno(),
-		    "%s write error: failed to write %" PRIu32
-		    " bytes at offset %" PRIuMAX,
+		    "%s write error: failed to write %zu bytes at offset %"
+		    PRIuMAX,
 		    fh->name, bytes, (uintmax_t)offset);
 
 	return (0);

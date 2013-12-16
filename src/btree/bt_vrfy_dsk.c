@@ -42,7 +42,7 @@ int
 __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
-	uint32_t size;
+	size_t size;
 	uint8_t *p, *end;
 	u_int i;
 
@@ -287,8 +287,7 @@ __verify_dsk_row(
 			WT_ERR_VRFY(session,
 			    "key %" PRIu32 " on page at %s has a prefix "
 			    "compression count of %" PRIu32
-			    ", larger than the length of the previous key, %"
-			    PRIu32,
+			    ", larger than the length of the previous key, %zu",
 			    cell_num, addr, prefix, last->size);
 
 		/*

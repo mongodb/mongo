@@ -249,7 +249,7 @@ __wt_lsm_merge(
 		WT_CLEAR(buf);
 		WT_ERR(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
+		chunk->bloom_uri = __wt_buf_steal(session, &buf);
 
 		WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
 		    lsm_tree->bloom_config,

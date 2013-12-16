@@ -408,7 +408,7 @@ extern int __wt_ovfl_txnc_add(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size,
     const void *value,
-    uint32_t value_size);
+    size_t value_size);
 extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write(WT_SESSION_IMPL *session,
@@ -435,12 +435,12 @@ extern int __wt_row_ikey_incr(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t cell_offset,
     const void *key,
-    uint32_t size,
+    size_t size,
     void *ikeyp);
 extern int __wt_row_ikey(WT_SESSION_IMPL *session,
     uint32_t cell_offset,
     const void *key,
-    uint32_t size,
+    size_t size,
     void *ikeyp);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
@@ -1086,7 +1086,7 @@ extern int __wt_read(WT_SESSION_IMPL *session,
 extern int __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh,
     off_t offset,
-    uint32_t bytes,
+    size_t bytes,
     const void *buf);
 extern void __wt_sleep(long seconds, long micro_seconds);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
@@ -1372,7 +1372,7 @@ extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
 extern uint64_t __wt_hash_city64(const void *s, size_t len);
-extern uint64_t __wt_hash_fnv64(const void *string, uint32_t len);
+extern uint64_t __wt_hash_fnv64(const void *string, size_t len);
 extern int
 __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #ifdef HAVE_DIAGNOSTIC
@@ -1383,7 +1383,7 @@ extern int __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_hazard_close(WT_SESSION_IMPL *session);
 extern int __wt_raw_to_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
-    uint32_t size,
+    size_t size,
     WT_ITEM *to);
 extern void __wt_raw_to_hex_mem( const uint8_t *from,
     uint32_t size,
@@ -1448,9 +1448,7 @@ extern int __wt_buf_set_printable( WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const void *from_arg,
     size_t size);
-extern void *__wt_buf_steal(WT_SESSION_IMPL *session,
-    WT_ITEM *buf,
-    uint32_t *sizep);
+extern void *__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern int __wt_buf_fmt(WT_SESSION_IMPL *session,
     WT_ITEM *buf,

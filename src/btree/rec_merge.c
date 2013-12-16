@@ -250,8 +250,8 @@ __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_PAGE *page;
 	WT_REF *child_ref;
+	size_t size;
 	void *p;
-	uint32_t size;
 
 	page = ref->page;
 	switch (page->type) {

@@ -99,7 +99,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		 * checkpoint is for an empty file).
 		 */
 		WT_ERR(bm->checkpoint_load(bm, session,
-		    ckpt.raw.data, ckpt.raw.size,
+		    ckpt.raw.data, (uint32_t)ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
 		if (creation || root_addr_size == 0)
 			WT_ERR(__btree_tree_open_empty(session, creation));

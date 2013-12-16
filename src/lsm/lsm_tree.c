@@ -227,7 +227,7 @@ __wt_lsm_tree_setup_chunk(
 	WT_RET(__wt_epoch(session, &chunk->create_ts));
 
 	WT_RET(__wt_lsm_tree_chunk_name(session, lsm_tree, chunk->id, &buf));
-	chunk->uri = __wt_buf_steal(session, &buf, NULL);
+	chunk->uri = __wt_buf_steal(session, &buf);
 
 	/*
 	 * If the underlying file exists, drop the chunk first - there may be
@@ -412,7 +412,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s%s,key_format=u,value_format=u", tmpconfig, config));
-	lsm_tree->file_config = __wt_buf_steal(session, buf, NULL);
+	lsm_tree->file_config = __wt_buf_steal(session, buf);
 
 	/* Create the first chunk and flush the metadata. */
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
@@ -800,7 +800,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 
 		WT_ERR(__wt_lsm_tree_chunk_name(
 		    session, lsm_tree, chunk->id, &buf));
-		chunk->uri = __wt_buf_steal(session, &buf, NULL);
+		chunk->uri = __wt_buf_steal(session, &buf);
 		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
 		__wt_free(session, old);
 
@@ -809,7 +809,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 			chunk->bloom_uri = NULL;
 			WT_ERR(__wt_lsm_tree_bloom_name(
 			    session, lsm_tree, chunk->id, &buf));
-			chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
+			chunk->bloom_uri = __wt_buf_steal(session, &buf);
 			F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 			WT_ERR(__wt_schema_rename(
 			    session, old, chunk->uri, cfg));

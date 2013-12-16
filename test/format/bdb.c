@@ -96,15 +96,15 @@ bdb_close(void)
 
 void
 bdb_insert(
-    const void *key_data, uint32_t key_size,
-    const void *value_data, uint32_t value_size)
+    const void *key_data, size_t key_size,
+    const void *value_data, size_t value_size)
 {
 	DBC *dbc;
 
 	key.data = (void *)key_data;
-	key.size = key_size;
+	key.size = (uint32_t)key_size;
 	value.data = (void *)value_data;
-	value.size = value_size;
+	value.size = (uint32_t)value_size;
 
 	dbc = g.dbc;
 
@@ -113,8 +113,8 @@ bdb_insert(
 
 void
 bdb_np(int next,
-    void *keyp, uint32_t *keysizep,
-    void *valuep, uint32_t *valuesizep, int *notfoundp)
+    void *keyp, size_t *keysizep,
+    void *valuep, size_t *valuesizep, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
 	int ret;
@@ -136,13 +136,15 @@ bdb_np(int next,
 }
 
 void
-bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
+bdb_read(uint64_t keyno, void *valuep, size_t *valuesizep, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
+	size_t size;
 	int ret;
 
+	key_gen(keybuf, &size, keyno, 0);
 	key.data = keybuf;
-	key_gen(key.data, &key.size, keyno, 0);
+	key.size = (uint32_t)size;
 
 	*notfoundp = 0;
 	if ((ret = dbc->get(dbc, &key, &value, DB_SET)) != 0) {
@@ -157,16 +159,16 @@ bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
 }
 
 void
-bdb_update(const void *arg_key, uint32_t arg_key_size,
-    const void *arg_value, uint32_t arg_value_size, int *notfoundp)
+bdb_update(const void *arg_key, size_t arg_key_size,
+    const void *arg_value, size_t arg_value_size, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
 	int ret;
 
 	key.data = (void *)arg_key;
-	key.size = arg_key_size;
+	key.size = (uint32_t)arg_key_size;
 	value.data = (void *)arg_value;
-	value.size = arg_value_size;
+	value.size = (uint32_t)arg_value_size;
 
 	*notfoundp = 0;
 	if ((ret = dbc->put(dbc, &key, &value, DB_KEYFIRST)) != 0) {
@@ -183,12 +185,15 @@ void
 bdb_remove(uint64_t keyno, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
+	size_t size;
 	int ret;
 
+	key_gen(keybuf, &size, keyno, 0);
 	key.data = keybuf;
-	key_gen(key.data, &key.size, keyno, 0);
+	key.size = (uint32_t)size;
 
-	bdb_read(keyno, &value.data, &value.size, notfoundp);
+	bdb_read(keyno, &value.data, &size, notfoundp);
+	value.size = (uint32_t)size;
 	if (*notfoundp)
 		return;
 

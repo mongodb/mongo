@@ -28,9 +28,20 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
 {
 	WT_UNUSED(session);
 
+	/*
+	 * We write the page size, in bytes, into the block's header as a 4B
+	 * unsigned value, and it's possible for the engine to accept an item
+	 * we can't write.  For example, a huge key/value where the allocation
+	 * size has been set to something large will overflow 4B when it tries
+	 * to align the write.  We could make this work (for example, writing
+	 * the page size in units of allocation size or something else), but
+	 * it's not worth the effort, writing 4GB objects into a btree makes
+	 * no sense.  Limit the writes to (4GB - 1KB), it gives us potential
+	 * mode bits, and I'm not interested in debugging corner cases anyway.
+	 */
 	*sizep = (size_t)
 	    WT_ALIGN(*sizep + WT_BLOCK_HEADER_BYTE_SIZE, block->allocsize);
-	return (0);
+	return (*sizep > UINT32_MAX - 1024 ? EINVAL : 0);
 }
 
 /*
@@ -70,8 +81,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
+	size_t align_size;
 	off_t offset;
-	uint32_t align_size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
@@ -90,11 +101,16 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * boundary, this is one of the reasons the btree layer must find out
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
-	align_size = (uint32_t)WT_ALIGN(buf->size, block->allocsize);
+	align_size = WT_ALIGN(buf->size, block->allocsize);
 	if (align_size > buf->memsize) {
 		WT_ASSERT(session, align_size <= buf->memsize);
 		WT_RET_MSG(session, EINVAL,
 		    "buffer size check: write buffer incorrectly allocated");
+	}
+	if (align_size > UINT32_MAX) {
+		WT_ASSERT(session, align_size <= UINT32_MAX);
+		WT_RET_MSG(session, EINVAL,
+		    "buffer size check: write buffer too large to write");
 	}
 
 	/* Zero out any unused bytes at the end of the buffer. */
@@ -104,7 +120,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * Set the disk size so we don't have to incrementally read blocks
 	 * during salvage.
 	 */
-	blk->disk_size = align_size;
+	blk->disk_size = (uint32_t)align_size;
 
 	/*
 	 * Update the block's checksum: if our caller specifies, checksum the
@@ -149,7 +165,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (fh->extend_len != 0 &&
 	    (fh->extend_size <= fh->size ||
 	    (offset + fh->extend_len <= fh->extend_size &&
-	    offset + fh->extend_len + align_size >= fh->extend_size))) {
+	    offset + fh->extend_len + (off_t)align_size >= fh->extend_size))) {
 		fh->extend_size = offset + fh->extend_len * 2;
 		WT_RET(__wt_fallocate(session, fh, offset, fh->extend_len * 2));
 	}
@@ -158,8 +174,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
-		WT_TRET(
-		    __wt_block_off_free(session, block, offset, align_size));
+		WT_TRET(__wt_block_off_free(
+		    session, block, offset, (off_t)align_size));
 		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_RET(ret);
@@ -182,7 +198,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 #ifdef HAVE_POSIX_FADVISE
 	/* Optionally discard blocks from the system buffer cache. */
 	if (block->os_cache_max != 0 &&
-	    (block->os_cache += align_size) > block->os_cache_max) {
+	    (block->os_cache += (int64_t)align_size) > block->os_cache_max) {
 		block->os_cache = 0;
 		if ((ret = posix_fadvise(fh->fd,
 		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0)
@@ -194,11 +210,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
 
 	WT_VERBOSE_RET(session, write,
-	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    (uintmax_t)offset, align_size, blk->cksum);
+	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
+	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum);
 
 	*offsetp = offset;
-	*sizep = align_size;
+	*sizep = (uint32_t)align_size;
 	*cksump = blk->cksum;
 
 	return (ret);

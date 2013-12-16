@@ -27,7 +27,7 @@ static const u_char hex[] = "0123456789abcdef";
  */
 int
 __wt_raw_to_hex(
-    WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
+    WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to)
 {
 	size_t len;
 	u_char *t;
@@ -36,7 +36,7 @@ __wt_raw_to_hex(
 	 * In the worst case, every character takes up 2 spaces, plus a
 	 * trailing nul byte.
 	 */
-	len = (size_t)size * 2 + 1;
+	len = size * 2 + 1;
 	WT_RET(__wt_buf_init(session, to, len));
 
 	FILL_HEX(from, size, to->mem, len);

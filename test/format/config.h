@@ -55,12 +55,12 @@ typedef struct {
 
 	/* Value is a string. */
 #define	C_STRING	0x020
-	uint32_t 	flags;
+	u_int	 	flags;
 
 	uint32_t	min;		/* Minimum value */
 	uint32_t	maxrand;	/* Maximum value randomly chosen */
 	uint32_t	maxset;		/* Maximum value explicitly set */
-	u_int		*v;		/* Value for this run */
+	uint32_t	*v;		/* Value for this run */
 	char		**vstr;		/* Value for string options */
 } CONFIG;
 
@@ -169,7 +169,7 @@ static CONFIG c[] = {
 
 	{ "key_max",
 	  "maximum size of keys",
-	  C_ROW, 0x0, 64, 128, 4096, &g.c_key_max, NULL },
+	  C_ROW, 0x0, 64, 128, MEGABYTE(10), &g.c_key_max, NULL },
 
 	{ "key_min",
 	  "minimum size of keys",
@@ -229,7 +229,7 @@ static CONFIG c[] = {
 
 	{ "value_max",
 	  "maximum size of values",
-	  C_ROW|C_VAR, 0x0, 32, 4096, 65536, &g.c_value_max, NULL },
+	  C_ROW|C_VAR, 0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },
 
 	{ "value_min",
 	  "minimum size of values",

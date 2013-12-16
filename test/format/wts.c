@@ -194,7 +194,7 @@ wts_create(void)
 	switch (g.type) {
 	case FIX:
 		p += snprintf(p, (size_t)(end - p),
-		    ",value_format=%dt", g.c_bitcnt);
+		    ",value_format=%" PRIu32 "t", g.c_bitcnt);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
@@ -202,7 +202,7 @@ wts_create(void)
 			    ",huffman_key=english");
 		if (g.c_prefix_compression)
 			p += snprintf(p, (size_t)(end - p),
-			    ",prefix_compression_min=%u",
+			    ",prefix_compression_min=%" PRIu32,
 			    g.c_prefix_compression_min);
 		else
 			p += snprintf(p, (size_t)(end - p),
@@ -263,10 +263,11 @@ wts_create(void)
 	    g.c_internal_key_truncation ? "true" : "false");
 
 	/* Configure Btree page key gap. */
-	p += snprintf(p, (size_t)(end - p), ",key_gap=%u", g.c_key_gap);
+	p += snprintf(p, (size_t)(end - p), ",key_gap=%" PRIu32, g.c_key_gap);
 
 	/* Configure Btree split page percentage. */
-	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
+	p += snprintf(p, (size_t)(end - p),
+	    ",split_pct=%" PRIu32, g.c_split_pct);
 
 	/* Configure data types. */
 	if (DATASOURCE("kvsbdb"))
@@ -287,15 +288,15 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    "bloom=%s,", g.c_bloom ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
-		    "bloom_bit_count=%u,", g.c_bloom_bit_count);
+		    "bloom_bit_count=%" PRIu32 ",", g.c_bloom_bit_count);
 		p += snprintf(p, (size_t)(end - p),
-		    "bloom_hash_count=%u,", g.c_bloom_hash_count);
+		    "bloom_hash_count=%" PRIu32 ",", g.c_bloom_hash_count);
 		p += snprintf(p, (size_t)(end - p),
 		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
-		    "merge_max=%u,", g.c_merge_max);
+		    "merge_max=%" PRIu32 ",", g.c_merge_max);
 		p += snprintf(p, (size_t)(end - p),
-		    "merge_threads=%u,", g.c_merge_threads);
+		    "merge_threads=%" PRIu32 ",", g.c_merge_threads);
 		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 

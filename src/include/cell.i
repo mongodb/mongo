@@ -384,7 +384,7 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
  *	Pack an overflow cell.
  */
 static inline uint32_t
-__wt_cell_pack_ovfl(WT_CELL *cell, uint8_t type, uint64_t rle, uint32_t size)
+__wt_cell_pack_ovfl(WT_CELL *cell, uint8_t type, uint64_t rle, size_t size)
 {
 	uint8_t *p;
 

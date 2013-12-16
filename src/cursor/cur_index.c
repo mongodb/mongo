@@ -424,12 +424,12 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		WT_CLEAR(fmt);
 		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), NULL, 0, &fmt));
-		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
+		cursor->value_format = __wt_buf_steal(session, &fmt);
 
 		WT_CLEAR(plan);
 		WT_ERR(__wt_struct_plan(session, table,
 		    columns, strlen(columns), 0, &plan));
-		cindex->value_plan = __wt_buf_steal(session, &plan, NULL);
+		cindex->value_plan = __wt_buf_steal(session, &plan);
 	}
 
 	/* Open the column groups needed for this index cursor. */

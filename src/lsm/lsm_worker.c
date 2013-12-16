@@ -435,7 +435,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 		WT_CLEAR(buf);
 		WT_RET(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
+		chunk->bloom_uri = __wt_buf_steal(session, &buf);
 	}
 
 	/*
