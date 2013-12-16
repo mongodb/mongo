@@ -196,7 +196,54 @@ namespace mongo {
     }
 
     bool ProcessInfo::checkNumaEnabled() {
-        return false;
+        typedef BOOL(WINAPI *LPFN_GLPI)(
+            PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
+            PDWORD);
+
+        DWORD returnLength = 0;
+        DWORD numaNodeCount = 0;
+        scoped_array<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> buffer;
+
+        LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(GetProcAddress(
+            GetModuleHandleW(L"kernel32"),
+            "GetLogicalProcessorInformation")));
+        if (glpi == NULL) {
+            return false;
+        }
+
+        DWORD returnCode = 0;
+        do {
+            returnCode = glpi(buffer.get(), &returnLength);
+
+            if (returnCode == FALSE) {
+                if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+                    buffer.reset(reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION>(
+                        new BYTE[returnLength]));
+                }
+                else {
+                    DWORD gle = GetLastError();
+                    warning() << "GetLogicalProcessorInformation failed with "
+                        << errnoWithDescription(gle);
+                    return false;
+                }
+            }
+        } while (returnCode == FALSE);
+
+        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer.get();
+
+        unsigned int byteOffset = 0;
+        while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
+            if (ptr->Relationship == RelationNumaNode) {
+                // Non-NUMA systems report a single record of this type.
+                numaNodeCount++;
+            }
+
+            byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+            ptr++;
+        }
+
+        // For non-NUMA machines, the count is 1
+        return numaNodeCount > 1;
     }
 
     bool ProcessInfo::blockCheckSupported() {
