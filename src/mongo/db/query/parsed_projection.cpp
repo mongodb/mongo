@@ -286,7 +286,17 @@ namespace mongo {
             }
         }
         else {
-            return mongoutils::str::before(query->path().rawData(), '.') == matchfield;
+            StringData queryPath = query->path();
+            const char* pathRawData = queryPath.rawData();
+            // We have to make a distinction between match expressions that are
+            // initialized with an empty field/path name "" and match expressions
+            // for which the path is not meaningful (eg. $where and the internal
+            // expression type ALWAYS_FALSE).
+            if (!pathRawData) {
+                return false;
+            }
+            std::string pathPrefix = mongoutils::str::before(pathRawData, '.');
+            return pathPrefix == matchfield;
         }
         return false;
     }
