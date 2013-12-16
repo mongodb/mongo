@@ -49,7 +49,9 @@ namespace mongo {
         }
 
         static T loadRelaxed(volatile const T* value) {
-            return *value;
+            T result;
+            __atomic_load(value, &result, __ATOMIC_RELAXED);
+            return result;
         }
 
         static void store(volatile T* dest, T newValue) {
