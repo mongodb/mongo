@@ -251,6 +251,7 @@ UTF
 UnixLib
 Unmap
 Unmarshall
+Unregister
 VARCHAR
 VLDB
 Vanishingly
@@ -887,6 +888,7 @@ unmerged
 unmodify
 unpackv
 unreferenced
+unregister
 unsized
 untyped
 upd

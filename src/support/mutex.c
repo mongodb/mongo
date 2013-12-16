@@ -98,6 +98,15 @@ __wt_spin_lock_unregister(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	for (i = 0; i < WT_SPINLOCK_MAX; i++)
 		if (conn->spinlock_list[i] == t)
 			conn->spinlock_list[i] = NULL;
+
+	/*
+	 * XXX
+	 * The statistics thread reads through this array, there's a possible
+	 * race: if that thread reads the pointer then goes to sleep, then we
+	 * free the spinlock, then the statistics thread wakes up, it can read
+	 * free'd memory.
+	 */
+	WT_FULL_BARRIER();
 }
 
 /*
