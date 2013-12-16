@@ -128,6 +128,31 @@ namespace {
         }
     }
 
+    //
+    // $elemMatch value
+    // Example: {a: {$elemMatch: {$gt: 2}}}
+    //
+
+    TEST(IndexBoundsBuilderTest, TranslateElemMatchValue) {
+        // Bounds generated should be the same as the embedded expression
+        // except for the tightness.
+        BSONObj obj = fromjson("{a: {$elemMatch: {$gt: 2}}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': 2, '': Infinity}"), false, true)));
+        ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    //
+    // Comparison operators ($lte, $lt, $gt, $gte, $eq)
+    //
+
     TEST(IndexBoundsBuilderTest, TranslateLteNumber) {
         BSONObj obj = fromjson("{a: {$lte: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));

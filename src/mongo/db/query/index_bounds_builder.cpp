@@ -225,9 +225,6 @@ namespace mongo {
                 OrderedIntervalList next;
                 BoundsTightness tightness;
                 translate(expr->getChild(i), elt, &next, &tightness);
-                if (tightness != IndexBoundsBuilder::EXACT) {
-                    *tightnessOut = tightness;
-                }
                 intersectize(next, &acc);
             }
 
@@ -238,6 +235,11 @@ namespace mongo {
             if (!oilOut->intervals.empty()) {
                 std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
             }
+            // $elemMatch value requires an array.
+            // Scalars and directly nested objects are not matched with $elemMatch.
+            // We can't tell if a multi-key index key is derived from an array field.
+            // Therefore, a fetch is required.
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);

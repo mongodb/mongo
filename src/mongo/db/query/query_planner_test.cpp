@@ -1265,10 +1265,10 @@ namespace {
 
         ASSERT_EQUALS(getNumSolutions(), 3U);
         assertSolutionExists("{cscan: {dir: 1, filter: {foo:{$elemMatch:{$gt:5,$lt:10}}}}}");
-        assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
-                                "{filter: null, pattern: {foo: 1}}}}}");
-        assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
-                                "{filter: null, pattern: {foo: 1, bar: 1}}}}}");
+        assertSolutionExists("{fetch: {filter: {foo: {$elemMatch: {$gt: 5, $lt: 10}}}, node: "
+                                "{ixscan: {filter: null, pattern: {foo: 1}}}}}");
+        assertSolutionExists("{fetch: {filter: {foo: {$elemMatch: {$gt: 5, $lt: 10}}}, node: "
+                                "{ixscan: {filter: null, pattern: {foo: 1, bar: 1}}}}}");
     }
 
     TEST_F(QueryPlannerTest, ElemMatchNested) {
