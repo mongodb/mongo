@@ -32,7 +32,7 @@ namespace mongo {
     public:
 
         static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            __atomic_compare_exchange(dest, &expected, &newValue, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+            __atomic_compare_exchange(dest, &expected, &newValue, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
             return expected;
         }
 

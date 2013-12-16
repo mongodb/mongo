@@ -1364,7 +1364,7 @@ def doConfigure(myenv):
                 int b = 0;
                 int c = 0;
 
-                __atomic_compare_exchange(&a, &b, &c, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+                __atomic_compare_exchange(&a, &b, &c, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
                 return 0;
             }
             """
