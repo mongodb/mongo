@@ -42,7 +42,7 @@ your solution will take.
 The Life Cycle of a Pull Request
 --------------------------------
 
-When you submit a pull request, here is what happens:
+Here's what happens when you submit a pull request:
 
 - The MongoDB engineering team will review your pull request to make sure you have included a
   SERVER ticket in your request and signed the contributor agreement.
