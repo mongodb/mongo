@@ -143,6 +143,7 @@ env.Library(
         'write_ops/batched_update_request.cpp',
         'write_ops/batched_update_document.cpp',
         'write_ops/batched_upsert_detail.cpp',
+        'write_ops/wc_error_detail.cpp',
         'write_ops/write_error_detail.cpp',
     ],
     LIBDEPS=[

@@ -37,6 +37,7 @@
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 
 namespace mongo {
 
@@ -62,6 +63,7 @@ namespace mongo {
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<Date_t> lastOp;
         static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
+        static const BSONField<BSONObj> writeConcernError;
 
         //
         // construction / destruction
@@ -143,6 +145,11 @@ namespace mongo {
         const std::vector<WriteErrorDetail*>& getErrDetails() const;
         const WriteErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
+        void setWriteConcernError(const WCErrorDetail& error);
+        void unsetWriteConcernError();
+        bool isWriteConcernErrorSet() const;
+        const WCErrorDetail* getWriteConcernError() const;
+
     private:
         // Convention: (M)andatory, (O)ptional
 
@@ -185,6 +192,9 @@ namespace mongo {
 
         // (O)  Array of item-level error information
         boost::scoped_ptr<std::vector<WriteErrorDetail*> >_writeErrorDetails;
+
+        // (O)  errors that occurred while trying to satisfy the write concern.
+        boost::scoped_ptr<WCErrorDetail> _wcErrDetails;
     };
 
 } // namespace mongo

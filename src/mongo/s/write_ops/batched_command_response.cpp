@@ -47,6 +47,7 @@ namespace mongo {
     const BSONField<Date_t> BatchedCommandResponse::lastOp("lastOp");
     const BSONField<std::vector<WriteErrorDetail*> >
         BatchedCommandResponse::writeErrors("writeErrors");
+    const BSONField<BSONObj> BatchedCommandResponse::writeConcernError("writeConcernError");
 
     BatchedCommandResponse::BatchedCommandResponse() {
         clear();
@@ -118,6 +119,10 @@ namespace mongo {
                 errDetailsBuilder.append(errDetailsDocument);
             }
             errDetailsBuilder.done();
+        }
+
+        if (_wcErrDetails.get()) {
+            builder.append(writeConcernError(), _wcErrDetails->toBSON());
         }
 
         return builder.obj();
@@ -200,6 +205,20 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         if (fieldState == FieldParser::FIELD_SET) _writeErrorDetails.reset(tempErrDetails);
 
+        BSONObj wcErrorObj;
+        fieldState = FieldParser::extract(source, writeConcernError, &wcErrorObj, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+
+        if (!wcErrorObj.isEmpty()) {
+            auto_ptr<WCErrorDetail> tempWCerror;
+            tempWCerror.reset(new WCErrorDetail());
+            if (!tempWCerror->parseBSON(wcErrorObj, errMsg)) {
+                return false;
+            }
+
+            _wcErrDetails.reset(tempWCerror.release());
+        }
+
         return true;
     }
 
@@ -238,6 +257,8 @@ namespace mongo {
             };
             _writeErrorDetails.reset();
         }
+
+        _wcErrDetails.reset();
     }
 
     void BatchedCommandResponse::cloneTo(BatchedCommandResponse* other) const {
@@ -287,6 +308,11 @@ namespace mongo {
                 (*it)->cloneTo(errDetailsItem);
                 other->addToErrDetails(errDetailsItem);
             }
+        }
+
+        if (_wcErrDetails.get()) {
+            other->_wcErrDetails.reset(new WCErrorDetail());
+            _wcErrDetails->cloneTo(other->_wcErrDetails.get());
         }
     }
 
@@ -547,6 +573,23 @@ namespace mongo {
         dassert(_writeErrorDetails.get());
         dassert(_writeErrorDetails->size() > pos);
         return _writeErrorDetails->at(pos);
+    }
+
+    void BatchedCommandResponse::setWriteConcernError(const WCErrorDetail& error) {
+        _wcErrDetails.reset(new WCErrorDetail());
+        error.cloneTo(_wcErrDetails.get());
+    }
+
+    void BatchedCommandResponse::unsetWriteConcernError() {
+        _wcErrDetails.reset();
+    }
+
+    bool BatchedCommandResponse::isWriteConcernErrorSet() const {
+        return _wcErrDetails.get();
+    }
+
+    const WCErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
+        return _wcErrDetails.get();
     }
 
 } // namespace mongo
