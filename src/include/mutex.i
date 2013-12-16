@@ -100,6 +100,10 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	if (t->initialized) {
 		(void)pthread_mutex_destroy(&t->lock);
 		t->initialized = 0;
+
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
+		__wt_spin_lock_unregister(session, t);
+#endif
 	}
 }
 

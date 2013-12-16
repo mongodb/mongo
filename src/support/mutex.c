@@ -85,6 +85,22 @@ __wt_spin_lock_register(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_spin_lock_unregister --
+ *	Unregister a spinlock
+ */
+void
+__wt_spin_lock_unregister(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_CONNECTION_IMPL *conn;
+	u_int i;
+
+	conn = S2C(session);
+	for (i = 0; i < WT_SPINLOCK_MAX; i++)
+		if (conn->spinlock_list[i] == t)
+			conn->spinlock_list[i] = NULL;
+}
+
+/*
  * __wt_statlog_dump_spinlock --
  *	Log the spin-lock statistics.
  */
