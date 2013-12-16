@@ -55,7 +55,8 @@ def munge(title, values):
     # sometimes there is a common prefix and/or suffix on every record
     #ylabel = ' '.join(title.split(' ')[1:]).lower()
     ylabel = ' '.join(title.split(' ')).lower()
-    if title.split(' ', 1)[1] in no_scale_per_second_list:
+    if title.split(' ')[1] != 'spinlock' and \
+      title.split(' ', 1)[1] in no_scale_per_second_list:
         seconds = 1
     else:
         t1, v1 = values[1]

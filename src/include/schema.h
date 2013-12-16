@@ -68,19 +68,20 @@ struct __wt_table {
 #define	WT_COLGROUPS(t)	WT_MAX((t)->ncolgroups, 1)
 
 #define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
-	int schema_locked = 0;						\
+	int __schema_locked = 0;					\
+	WT_DECL_SPINLOCK_ID(__id);		/* Must appear last */	\
 	WT_ASSERT(session,						\
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
 	    !F_ISSET(session, WT_SESSION_NO_SCHEMA_LOCK));		\
 	while (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))		\
 		if (session->skip_schema_lock || __wt_spin_trylock(	\
-		    session, &S2C(session)->schema_lock) == 0) {	\
+		    session, &S2C(session)->schema_lock, &__id) == 0) {	\
 			F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
-			schema_locked = 1;				\
+			__schema_locked = 1;				\
 		} else							\
 			__wt_yield();					\
 	(op);								\
-	if (schema_locked) {						\
+	if (__schema_locked) {						\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
 		if (!session->skip_schema_lock)				\
 			__wt_spin_unlock(				\

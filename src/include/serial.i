@@ -113,6 +113,7 @@ __update_serial_func(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_UPDATE **upd_entry, WT_UPDATE *upd)
 {
 	WT_UPDATE *obsolete;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	/*
 	 * Swap the update into place.  If that fails, a new update was added
@@ -133,7 +134,7 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 */
 	if (upd->next != NULL &&
 	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE) &&
-	    WT_PAGE_TRYLOCK(session, page) == 0) {
+	    WT_PAGE_TRYLOCK(session, page, &id) == 0) {
 		obsolete = __wt_update_obsolete_check(session, upd->next);
 		WT_PAGE_UNLOCK(session, page);
 		if (obsolete != NULL)

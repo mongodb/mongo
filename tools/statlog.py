@@ -57,14 +57,15 @@ def plot(title, values):
     num = "%03d" % reportno
 
     ylabel = 'Value'
-    if title.split(' ', 1)[1] in no_scale_per_second_list:
+    if title.split(' ')[1] != 'spinlock' and \
+      title.split(' ', 1)[1] in no_scale_per_second_list:
         seconds = 1
     else:
         t1, v1 = values[1]
         seconds = (datetime.strptime(t1, TIMEFMT) -
             datetime.strptime(t0, TIMEFMT)).seconds
-	if seconds == 0:
-		seconds = 1
+        if seconds == 0:
+            seconds = 1
         ylabel += ' per second'
 
     # Write the raw data into a file for processing.

@@ -1425,6 +1425,7 @@ extern void __wt_spin_lock_register(WT_SESSION_IMPL *session,
     const char *file,
     int line,
     int *idp);
+extern void __wt_spin_lock_unregister(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
 extern int __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn,
     const char *tag);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
