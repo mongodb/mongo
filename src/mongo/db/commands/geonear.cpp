@@ -129,7 +129,7 @@ namespace mongo {
             }
 
             if (!cmdObj["uniqueDocs"].eoo()) {
-                nearBob.append("$uniqueDocs", cmdObj["uniqueDocs"].trueValue());
+                warning() << ns << ": ignoring deprecated uniqueDocs option in geoNear command";
             }
 
             // And, build the full query expression.

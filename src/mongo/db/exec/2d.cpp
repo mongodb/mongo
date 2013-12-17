@@ -146,7 +146,7 @@ namespace twod_exec {
     //
 
     GeoCircleBrowse::GeoCircleBrowse(const TwoDParams& params, TwoDAccessMethod* accessMethod)
-        : GeoBrowse(accessMethod, "circle", params.filter, params.gq.uniqueDocs()) {
+        : GeoBrowse(accessMethod, "circle", params.filter) {
 
         _converter = accessMethod->getParams().geoHashConverter;
 
@@ -217,7 +217,7 @@ namespace twod_exec {
     //
 
     GeoBoxBrowse::GeoBoxBrowse(const TwoDParams& params, TwoDAccessMethod* accessMethod)
-        : GeoBrowse(accessMethod, "box", params.filter, params.gq.uniqueDocs()) {
+        : GeoBrowse(accessMethod, "box", params.filter) {
 
         _converter = accessMethod->getParams().geoHashConverter;
 
@@ -259,7 +259,7 @@ namespace twod_exec {
     //
 
     GeoPolygonBrowse::GeoPolygonBrowse(const TwoDParams& params, TwoDAccessMethod* accessMethod)
-        : GeoBrowse(accessMethod, "polygon", params.filter, params.gq.uniqueDocs()) {
+        : GeoBrowse(accessMethod, "polygon", params.filter) {
 
         _converter = accessMethod->getParams().geoHashConverter;
 

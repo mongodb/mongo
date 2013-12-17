@@ -465,41 +465,62 @@ for ( var test = 0; test < numTests; test++ ) {
 	// $polygon
 	print( "Polygon query..." )
 	assert.eq( results.poly.docsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } ).count() )
-					 
-	// $near
-	print( "Near query..." )
-	assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.find( { "locs.loc" : { $near : query.center, $maxDistance : query.radius } } ).count( true ) )
 
-	if( query.sphereRadius >= 0 ){
-		print( "Near sphere query...")
-		// $centerSphere
-		assert.eq( results.sphere.locsIn > 100 ? 100 : results.sphere.locsIn, t.find( { "locs.loc" : { $nearSphere : query.sphereCenter, $maxDistance : query.sphereRadius } } ).count( true ) )
-	}
-	
-	// geoNear
-	// results limited by size of objects
-	if( data.maxLocs < 100 ){
-	    
-	    // GeoNear query
-	    print( "GeoNear query..." )
-	    assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius }).results.length )
-	    // GeoNear query
-        assert.eq( results.center.docsIn > 100 ? 100 : results.center.docsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius, uniqueDocs : true }).results.length )
-       
-	    
-		var num = 2 * results.center.locsIn;
-		if( num > 200 ) num = 200;
-		
+    // $near, $nearSphere and geoNear results have a default document limit of 100.
+    var defaultDocLimit = 100;
+
+    // $near
+    print( "Near query..." )
+    assert.eq( Math.min( defaultDocLimit, results.center.docsIn ),
+               t.find( { "locs.loc" : { $near : query.center,
+                                        $maxDistance : query.radius } } ).count( true ),
+               "Near query: center: " + query.center +
+               "; radius: " + query.radius +
+               "; docs: " + results.center.docsIn +
+               "; locs: " + results.center.locsIn )
+
+    if( query.sphereRadius >= 0 ){
+        print( "Near sphere query...")
+        // $centerSphere
+        assert.eq( Math.min( defaultDocLimit, results.sphere.docsIn ),
+                   t.find( { "locs.loc" : { $nearSphere : query.sphereCenter,
+                                            $maxDistance : query.sphereRadius } } ).count( true ),
+                   "Near sphere query: sphere center: " + query.sphereCenter +
+                   "; radius: " + query.sphereRadius +
+                   "; docs: " + results.sphere.docsIn + "; locs: " + results.sphere.locsIn )
+    }
+
+    // geoNear
+    // results limited by size of objects
+    if( data.maxLocs < defaultDocLimit ){
+
+        // GeoNear query
+        print( "GeoNear query..." )
+        assert.eq( Math.min( defaultDocLimit, results.center.docsIn ),
+                   t.getDB().runCommand( { geoNear : "testAllGeo", near : query.center,
+                                           maxDistance : query.radius } ).results.length,
+                   "GeoNear query: center: " + query.center +
+                   "; radius: " + query.radius +
+                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn )
+
+
+        var num = Math.min( 2* defaultDocLimit, 2 * results.center.docsIn);
+
 		var output = db.runCommand( {
 			geoNear : "testAllGeo", 
 			near : query.center, 
 			maxDistance : query.radius ,
 			includeLocs : true,
 			num : num } ).results
-				
-		assert.eq( Math.min( 200, results.center.locsIn ), output.length )
-	
-		var distance = 0;
+
+        assert.eq( Math.min( num, results.center.docsIn ),
+                   output.length,
+                   "GeoNear query with limit of " + num +
+                   ": center: " + query.center +
+                   "; radius: " + query.radius +
+                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn )
+
+    	var distance = 0;
 		for ( var i = 0; i < output.length; i++ ) {
 			var retDistance = output[i].dis
 			var retLoc = locArray( output[i].loc )

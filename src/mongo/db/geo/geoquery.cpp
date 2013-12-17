@@ -64,7 +64,7 @@ namespace mongo {
                 maxDistance = e.Number();
                 uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
             } else if (equals(e.fieldName(), "$uniqueDocs")) {
-                uniqueDocs = e.trueValue();
+                warning() << "ignoring deprecated option $uniqueDocs";
             }
         }
 
@@ -145,7 +145,8 @@ namespace mongo {
         while (withinIt.more()) {
             BSONElement elt = withinIt.next();
             if (equals(elt.fieldName(), "$uniqueDocs")) {
-                _uniqueDocs = elt.trueValue();
+                warning() << "deprecated $uniqueDocs option: " << obj.toString() << endl;
+                // return false;
             }
             else if (elt.isABSONObj()) {
                 hasGeometry = geoContainer.parseFrom(elt.wrap());

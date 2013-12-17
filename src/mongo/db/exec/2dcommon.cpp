@@ -97,14 +97,10 @@ namespace twod_exec {
     // GeoAccumulator
     //
 
-    GeoAccumulator::GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter, bool uniqueDocs,
-            bool needDistance)
+    GeoAccumulator::GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter)
         : _accessMethod(accessMethod), _converter(accessMethod->getParams().geoHashConverter),
-        _lookedAt(0), _matchesPerfd(0), _objectsLoaded(0), _pointsLoaded(0), _found(0),
-        _uniqueDocs(uniqueDocs), _needDistance(needDistance) {
-
-            _filter = filter;
-        }
+          _filter(filter),
+          _lookedAt(0), _matchesPerfd(0), _objectsLoaded(0), _pointsLoaded(0), _found(0) { }
 
     GeoAccumulator::~GeoAccumulator() { }
 
@@ -302,8 +298,8 @@ namespace twod_exec {
     // GeoBrowse
     //
 
-    GeoBrowse::GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter, bool uniqueDocs, bool needDistance)
-        : GeoAccumulator(accessMethod, filter, uniqueDocs, needDistance),
+    GeoBrowse::GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter)
+        : GeoAccumulator(accessMethod, filter),
         _type(type), _firstCall(true), _nscanned(),
         _centerPrefix(0, 0, 0),
         _descriptor(accessMethod->getDescriptor()),
@@ -592,7 +588,7 @@ namespace twod_exec {
             return 0;
         }
 
-        if(_uniqueDocs && ! onBounds) {
+        if(! onBounds) {
             //log() << "Added ind to " << _type << endl;
             _stack.push_front(GeoPoint(node));
             found++;
@@ -615,8 +611,8 @@ namespace twod_exec {
                     //log() << "Added mult to " << _type << endl;
                     _stack.push_front(GeoPoint(node));
                     found++;
-                    // If returning unique, just exit after first point is added
-                    if(_uniqueDocs) break;
+                    // IExit after first point is added
+                    break;
                 }
             }
         }

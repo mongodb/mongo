@@ -25,9 +25,9 @@ var result = t.find({ "data.loc" : { $near : [0, 0] } }).toArray();
 
 printjson( result )
 
-assert.eq( 8, result.length )
+assert.eq( 4, result.length )
 
-var order = [ 1, 2, 1, 3, 2, 4, 3, 4 ]
+var order = [ 1, 2, 3, 4 ]
 
 for( var i = 0; i < result.length; i++ ){
 	assert.eq( "1000" + order[i], result[i].zip )

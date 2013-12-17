@@ -40,8 +40,8 @@ for( var i = -1; i < 2; i++ ){
 	for(var j = -1; j < 2; j++ ){
 		
 		var center = [ i * 50 , j * 50 ]
-		var count = i == 0 && j == 0 ? 2 * 9 : 1
-		var objCount = i == 0 && j == 0 ? 2 : 1
+		var count = i == 0 && j == 0 ? 9 : 1
+		var objCount = 1
 		
 		// Do near check
 				

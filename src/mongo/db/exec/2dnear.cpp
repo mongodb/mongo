@@ -71,9 +71,7 @@ namespace mongo {
                                            _params.filter,
                                            _params.nearQuery.maxDistance,
                                            _params.nearQuery.isNearSphere ? twod_exec::GEO_SPHERE
-                                                                          : twod_exec::GEO_PLANE,
-                                           _params.nearQuery.uniqueDocs,
-                                           false));
+                                                                          : twod_exec::GEO_PLANE));
 
             // This is where all the work is done.  :(
             search->exec();
@@ -169,10 +167,8 @@ namespace twod_exec {
             const Point& n,
             MatchExpression* filter,
             double maxDistance,
-            GeoDistType type,
-            bool uniqueDocs,
-            bool needDistance)
-        : GeoBrowse(accessMethod, "search", filter, uniqueDocs, needDistance),
+            GeoDistType type)
+        : GeoBrowse(accessMethod, "search", filter),
         _max(max),
         _near(n),
         _maxDistance(maxDistance),
@@ -231,27 +227,24 @@ namespace twod_exec {
         GeoPoint newPoint(node, keyD, false);
         int prevSize = _points.size();
 
-        //cout << "uniquedocs: " << _uniqueDocs << endl;
-
         // STEP 1 : Remove old duplicate points from the set if needed
-        if(_uniqueDocs){
-            // Lookup old point with same doc
-            map<DiskLoc, Holder::iterator>::iterator oldPointIt = _seenPts.find(newPoint.loc());
 
-            if(oldPointIt != _seenPts.end()){
-                const GeoPoint& oldPoint = *(oldPointIt->second);
-                // We don't need to care if we've already seen this same approx pt or better,
-                // or we've already gone to disk once for the point
-                if(oldPoint < newPoint){
-                    return 0;
-                }
-                _points.erase(oldPointIt->second);
+        // Lookup old point with same doc
+        map<DiskLoc, Holder::iterator>::iterator oldPointIt = _seenPts.find(newPoint.loc());
+
+        if(oldPointIt != _seenPts.end()){
+            const GeoPoint& oldPoint = *(oldPointIt->second);
+            // We don't need to care if we've already seen this same approx pt or better,
+            // or we've already gone to disk once for the point
+            if(oldPoint < newPoint){
+                return 0;
             }
+            _points.erase(oldPointIt->second);
         }
 
         //cout << "inserting point\n";
         Holder::iterator newIt = _points.insert(newPoint);
-        if(_uniqueDocs) _seenPts[ newPoint.loc() ] = newIt;
+        _seenPts[ newPoint.loc() ] = newIt;
 
         verify(_max > 0);
 
@@ -285,9 +278,8 @@ namespace twod_exec {
             verify(startErase != _points.end() || numToErase == 0);
         }
 
-        if(_uniqueDocs){
-            for(Holder::iterator i = startErase; i != _points.end(); ++i)
-                _seenPts.erase(i->loc());
+        for(Holder::iterator i = startErase; i != _points.end(); ++i) {
+            _seenPts.erase(i->loc());
         }
 
         _points.erase(startErase, _points.end());
@@ -306,11 +298,8 @@ namespace twod_exec {
             int numWanted,
             MatchExpression* filter,
             double maxDistance,
-            GeoDistType type,
-            bool uniqueDocs,
-            bool needDistance)
-        : GeoHopper(accessMethod, numWanted, startPt, filter, maxDistance, type,
-                uniqueDocs, needDistance),
+            GeoDistType type)
+        : GeoHopper(accessMethod, numWanted, startPt, filter, maxDistance, type),
         _start(accessMethod->getParams().geoHashConverter->hash(startPt.x, startPt.y)),
         _numWanted(numWanted),
         _type(type),
@@ -423,7 +412,8 @@ namespace twod_exec {
         }
 
         vector<BSONObj> locs;
-        getPointsFor(pt.key(), pt.obj(), locs, _uniqueDocs);
+        // last argument is uniqueDocs
+        getPointsFor(pt.key(), pt.obj(), locs, true);
 
         GeoPoint nearestPt(pt, -1, true);
 
@@ -432,19 +422,14 @@ namespace twod_exec {
             double d;
             if(! exactDocCheck(loc, d)) continue;
 
-            if(_uniqueDocs && (nearestPt.distance() < 0 || d < nearestPt.distance())){
+            if(nearestPt.distance() < 0 || d < nearestPt.distance()){
                 nearestPt._distance = d;
                 nearestPt._pt = *i;
                 continue;
-            } else if(! _uniqueDocs){
-                GeoPoint exactPt(pt, d, true);
-                exactPt._pt = *i;
-                points.insert(exactPt);
-                exactPt < pt ? before++ : after++;
             }
         }
 
-        if(_uniqueDocs && nearestPt.distance() >= 0){
+        if(nearestPt.distance() >= 0){
             points.insert(nearestPt);
             if(nearestPt < pt) before++;
             else after++;
@@ -513,7 +498,7 @@ namespace twod_exec {
             // If we're not, and we're done with points, break
             if(! inWindow && expandedPoints >= _max) break;
 
-            bool expandApprox = !currPt.isExact() && (!_uniqueDocs || finish || inWindow);
+            bool expandApprox = !currPt.isExact() && (finish || inWindow);
 
             if (expandApprox) {
                 // Add new point(s). These will only be added in a radius of 2 * _distError

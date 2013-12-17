@@ -141,8 +141,7 @@ namespace twod_exec {
 
     class GeoAccumulator {
     public:
-        GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter, bool uniqueDocs,
-                       bool needDistance);
+        GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter);
 
         virtual ~GeoAccumulator();
 
@@ -171,9 +170,6 @@ namespace twod_exec {
         long long _objectsLoaded;
         long long _pointsLoaded;
         long long _found;
-
-        bool _uniqueDocs;
-        bool _needDistance;
     };
 
     class GeoBrowse : public GeoAccumulator {
@@ -189,8 +185,7 @@ namespace twod_exec {
             DONE
         } _state;
 
-        GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter,
-                  bool uniqueDocs = true, bool needDistance = false);
+        GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter);
 
         virtual bool ok();
         virtual bool advance();

@@ -111,9 +111,7 @@ namespace twod_exec {
                   const Point& n,
                   MatchExpression* filter,
                   double maxDistance = numeric_limits<double>::max(),
-                  GeoDistType type = GEO_PLANE,
-                  bool uniqueDocs = false,
-                  bool needDistance = true);
+                  GeoDistType type = GEO_PLANE);
 
         virtual KeyResult approxKeyCheck(const Point& p, double& d);
 
@@ -150,9 +148,7 @@ namespace twod_exec {
                   int numWanted = 100,
                   MatchExpression* filter = NULL,
                   double maxDistance = numeric_limits<double>::max(),
-                  GeoDistType type = GEO_PLANE,
-                  bool uniqueDocs = false,
-                  bool needDistance = false);
+                  GeoDistType type = GEO_PLANE);
 
         void exec();
 
