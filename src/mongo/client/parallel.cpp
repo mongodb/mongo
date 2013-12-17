@@ -23,6 +23,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -489,11 +490,32 @@ namespace mongo {
             if( ! isVersioned() ) verify( _cInfo.isEmpty() );
         }
 
-        if ( ! _sortKey.isEmpty() && ! _fields.isEmpty() ) {
-            // we need to make sure the sort key is in the projection
+        // Partition sort key fields into (a) text meta fields and (b) all other fields.
+        set<string> textMetaSortKeyFields;
+        set<string> normalSortKeyFields;
 
-            set<string> sortKeyFields;
-            _sortKey.getFieldNames(sortKeyFields);
+        // Transform _sortKey fields {a:{$meta:"textScore"}} into {a:-1}, in order to apply the
+        // merge sort for text metadata in the correct direction.
+        BSONObjBuilder transformedSortKeyBuilder;
+
+        BSONObjIterator sortKeyIt( _sortKey );
+        while ( sortKeyIt.more() ) {
+            BSONElement e = sortKeyIt.next();
+            if ( LiteParsedQuery::isTextScoreMeta( e ) ) {
+                textMetaSortKeyFields.insert( e.fieldName() );
+                transformedSortKeyBuilder.append( e.fieldName(), -1 );
+            }
+            else {
+                normalSortKeyFields.insert( e.fieldName() );
+                transformedSortKeyBuilder.append( e );
+            }
+        }
+        _sortKey = transformedSortKeyBuilder.obj();
+
+        // Verify that that all text metadata sort fields are in the projection.  For all other sort
+        // fields, copy them into the projection if they are missing (and if projection is
+        // negative).
+        if ( ! _sortKey.isEmpty() && ! _fields.isEmpty() ) {
 
             BSONObjBuilder b;
             bool isNegative = false;
@@ -505,26 +527,38 @@ namespace mongo {
 
                     string fieldName = e.fieldName();
 
-                    // exact field
-                    bool found = sortKeyFields.erase(fieldName);
-
-                    // subfields
-                    set<string>::const_iterator begin = sortKeyFields.lower_bound(fieldName + ".\x00");
-                    set<string>::const_iterator end   = sortKeyFields.lower_bound(fieldName + ".\xFF");
-                    sortKeyFields.erase(begin, end);
-
-                    if ( ! e.trueValue() ) {
-                        uassert( 13431 , "have to have sort key in projection and removing it" , !found && begin == end );
+                    if ( LiteParsedQuery::isTextScoreMeta( e ) ) {
+                        textMetaSortKeyFields.erase( fieldName );
                     }
-                    else if (!e.isABSONObj()) {
-                        isNegative = true;
+                    else {
+                        // exact field
+                        bool found = normalSortKeyFields.erase( fieldName );
+
+                        // subfields
+                        set<string>::const_iterator begin =
+                            normalSortKeyFields.lower_bound( fieldName + ".\x00" );
+                        set<string>::const_iterator end =
+                            normalSortKeyFields.lower_bound( fieldName + ".\xFF" );
+                        normalSortKeyFields.erase( begin, end );
+
+                        if ( ! e.trueValue() ) {
+                            uassert( 13431,
+                                     "have to have sort key in projection and removing it",
+                                     !found && begin == end );
+                        }
+                        else if ( !e.isABSONObj() ) {
+                            isNegative = true;
+                        }
                     }
                 }
             }
 
-            if (isNegative) {
-                for (set<string>::const_iterator it(sortKeyFields.begin()), end(sortKeyFields.end()); it != end; ++it) {
-                    b.append(*it, 1);
+            if ( isNegative ) {
+                for ( set<string>::const_iterator it( normalSortKeyFields.begin() ),
+                                                  end( normalSortKeyFields.end() );
+                      it != end;
+                      ++it ) {
+                    b.append( *it, 1 );
                 }
             }
 
@@ -534,6 +568,10 @@ namespace mongo {
         if( ! _qSpec.isEmpty() ){
             _qSpec.setFields( _fields );
         }
+
+        uassert( 17306,
+                 "have to have all text meta sort keys in projection",
+                 textMetaSortKeyFields.empty() );
     }
 
     void ParallelConnectionMetadata::cleanup( bool full ){
