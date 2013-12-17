@@ -157,14 +157,14 @@
   <!-- SRW / Windows2008+ -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Win2008PlusRelease' Or '(Configuration)'=='Win2008PlusDebug'">
     <ClCompile>
-      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
 
   <!-- legacy -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Debug'">
     <ClCompile>
-      <PreprocessorDefinitions>NTDDI_VERSION=0x05020200;_WIN32_WINNT=0x0502</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x05020200;_WIN32_WINNT=0x0502;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
 
