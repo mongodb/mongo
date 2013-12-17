@@ -67,6 +67,43 @@ namespace mongo {
 
     namespace dbgrid_pub_cmds {
 
+        namespace {
+
+            /**
+             * Utility function to compute a single error code from a vector of command results.  If
+             * there is an error code common to all of the error results, returns that error code;
+             * otherwise, returns 0.
+             */
+            int getUniqueCode( const vector<Strategy::CommandResult>& results ) {
+                int commonErrCode = -1;
+                for ( vector<Strategy::CommandResult>::const_iterator it = results.begin();
+                      it != results.end();
+                      it++ ) {
+                    // Only look at shards with errors.
+                    if ( !it->result["ok"].trueValue() ) {
+                        int errCode = it->result["code"].numberInt();
+                        if ( commonErrCode == -1 ) {
+                            commonErrCode = errCode;
+                        }
+                        else if ( commonErrCode != errCode ) {
+                            // At least two shards with errors disagree on the error code.
+                            commonErrCode = 0;
+                        }
+                    }
+                }
+
+                // If no error encountered or shards with errors disagree on the error code, return
+                // 0.
+                if ( commonErrCode == -1 || commonErrCode == 0 ) {
+                    return 0;
+                }
+
+                // Otherwise, shards with errors agree on the error code; return that code.
+                return commonErrCode;
+            }
+
+        } // namespace
+
         class PublicGridCommand : public Command {
         public:
             PublicGridCommand( const char* n, const char* oldname=NULL ) : Command( n, false, oldname ) {
@@ -717,6 +754,12 @@ namespace mongo {
                         shardSubTotal.doneFast();
                         errmsg = "failed on : " + shardName;
                         result.append( "cause", iter->result );
+                        // Add "code" to the top-level response, if the failure of the sharded
+                        // command can be accounted to a single error.
+                        int code = getUniqueCode( countResult );
+                        if ( code != 0 ) {
+                            result.append( "code", code );
+                        }
                         return false;
                     }
                 }
@@ -773,6 +816,9 @@ namespace mongo {
                     {
                         ScopedDbConnection conn(i->getConnString());
                         if ( ! conn->runCommand( dbName , cmdObj , res ) ) {
+                            if ( !res["code"].eoo() ) {
+                                result.append( res["code"] );
+                            }
                             errmsg = "failed on shard: " + res.toString();
                             return false;
                         }
@@ -1582,6 +1628,12 @@ namespace mongo {
                     cleanUp( servers, dbName, shardResultCollection );
                     errmsg = "MR parallel processing failed: ";
                     errmsg += singleResult.toString();
+                    // Add "code" to the top-level response, if the failure of the sharded command
+                    // can be accounted to a single error.
+                    int code = getUniqueCode( results );
+                    if ( code != 0 ) {
+                        result.append( "code", code );
+                    }
                     return 0;
                 }
 
@@ -2057,11 +2109,21 @@ namespace mongo {
                 DocumentSourceMergeCursors::CursorIds cursors;
                 for (size_t i = 0; i < shardResults.size(); i++) {
                     BSONObj result = shardResults[i].result;
-                    uassert(17022, str::stream()
-                                    << "sharded pipeline failed on shard "
-                                    << shardResults[i].shardTarget.getName() << ": "
-                                    << result.toString(),
-                            result["ok"].trueValue());
+
+                    if ( !result["ok"].trueValue() ) {
+                        // If the failure of the sharded command can be accounted to a single error,
+                        // throw a UserException with that error code; otherwise, throw with a
+                        // location uassert code.
+                        int errCode = getUniqueCode( shardResults );
+                        if ( errCode == 0 ) {
+                            errCode = 17022;
+                        }
+                        verify( errCode == result["code"].numberInt() || errCode == 17022 );
+                        uasserted( errCode, str::stream()
+                                             << "sharded pipeline failed on shard "
+                                             << shardResults[i].shardTarget.getName() << ": "
+                                             << result.toString() );
+                    }
 
                     BSONObj cursor = result["cursor"].Obj();
 

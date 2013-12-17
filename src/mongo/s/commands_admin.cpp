@@ -1118,6 +1118,9 @@ namespace mongo {
                                       res)) {
                     errmsg = "move failed";
                     result.append( "cause" , res );
+                    if ( !res["code"].eoo() ) {
+                        result.append( res["code"] );
+                    }
                     return false;
                 }
 
