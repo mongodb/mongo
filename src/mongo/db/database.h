@@ -34,6 +34,7 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -212,11 +213,10 @@ namespace mongo {
 
         int _magic; // used for making sure the object is still loaded in memory
 
-        // TODO: probably shouldn't be a std::map
         // TODO: make sure deletes go through
         // this in some ways is a dupe of _namespaceIndex
         // but it points to a much more useful data structure
-        typedef std::map< std::string, Collection* > CollectionMap;
+        typedef StringMap< Collection* > CollectionMap;
         CollectionMap _collections;
         mutex _collectionLock;
 
