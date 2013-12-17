@@ -129,6 +129,10 @@ lsm_config = [
 	    Config('merge_max', '15', r'''
 	        the maximum number of chunks to include in a merge operation''',
 	        min='2', max='100'),
+	    Config('merge_min', '0', r'''
+	        the minimum number of chunks to include in a merge operation. If
+	        set to 0 or 1 half the value of merge_max is used''',
+	        max='100'),
 	    Config('merge_threads', '1', r'''
 	        the number of threads to perform merge operations''',
 	        min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
@@ -391,9 +395,9 @@ methods = {
 'session.compact' : Method([
 	Config('timeout', '1200', r'''
 	    maximum amount of time to allow for compact in seconds. The
-		actual amount of time spent in compact may exceed the configured
-		value. A value of zero disables the timeout''',
-		type='int'),
+	    actual amount of time spent in compact may exceed the configured
+	    value. A value of zero disables the timeout''',
+	    type='int'),
 ]),
 
 'session.create' :

@@ -393,7 +393,14 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		    "the maximum chunk size (chunk_max)");
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_max", &cval));
 	lsm_tree->merge_max = (uint32_t)cval.val;
-	lsm_tree->merge_min = lsm_tree->merge_max / 2;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_min", &cval));
+	if (cval.val == 0 || cval.val == 1)
+		lsm_tree->merge_min = lsm_tree->merge_max / 2;
+	else
+		lsm_tree->merge_min = (uint32_t)cval.val;
+	if (lsm_tree->merge_min > lsm_tree->merge_max)
+		WT_ERR_MSG(session, EINVAL,
+		    "LSM merge_min must be less than or equal to merge_max");
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_threads", &cval));
 	lsm_tree->merge_threads = (uint32_t)cval.val;
 	/* Sanity check that api_data.py is in sync with lsm.h */

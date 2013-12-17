@@ -77,10 +77,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			lsm_tree->chunk_max = (uint64_t)cv.val;
 		else if (WT_STRING_MATCH("chunk_size", ck.str, ck.len))
 			lsm_tree->chunk_size = (uint64_t)cv.val;
-		else if (WT_STRING_MATCH("merge_max", ck.str, ck.len)) {
+		else if (WT_STRING_MATCH("merge_max", ck.str, ck.len))
 			lsm_tree->merge_max = (uint32_t)cv.val;
-			lsm_tree->merge_min = lsm_tree->merge_max / 2;
-		} else if (WT_STRING_MATCH("merge_threads", ck.str, ck.len))
+		else if (WT_STRING_MATCH("merge_min", ck.str, ck.len))
+			lsm_tree->merge_min = (uint32_t)cv.val;
+		else if (WT_STRING_MATCH("merge_threads", ck.str, ck.len))
 			lsm_tree->merge_threads = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
 			lsm_tree->last = (u_int)cv.val;
@@ -186,13 +187,15 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    ",chunk_size=%" PRIu64
 	    ",auto_throttle=%" PRIu32
 	    ",merge_max=%" PRIu32
+	    ",merge_min=%" PRIu32
 	    ",merge_threads=%" PRIu32
 	    ",bloom=%" PRIu32
 	    ",bloom_bit_count=%" PRIu32
 	    ",bloom_hash_count=%" PRIu32,
 	    lsm_tree->last, lsm_tree->chunk_max, lsm_tree->chunk_size,
 	    F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) ? 1 : 0,
-	    lsm_tree->merge_max, lsm_tree->merge_threads, lsm_tree->bloom,
+	    lsm_tree->merge_max, lsm_tree->merge_min,
+	    lsm_tree->merge_threads, lsm_tree->bloom,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count));
 	WT_ERR(__wt_buf_catfmt(session, buf, ",chunks=["));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
