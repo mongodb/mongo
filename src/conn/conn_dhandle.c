@@ -91,7 +91,8 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 
 	/* We must be holding the schema lock at a higher level. */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+	    !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	/* Increment the reference count if we already have the btree open. */
 	hash = __wt_hash_city64(name, strlen(name));
@@ -103,8 +104,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			WT_RET(__conn_dhandle_open_lock(
 			    session, dhandle, flags));
-			if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
-				++dhandle->session_ref;
+			++dhandle->session_ref;
 			session->dhandle = dhandle;
 			return (0);
 		}
@@ -430,7 +430,11 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	    S2C(session)->dhandle_dead >= WT_DHANDLE_SWEEP_TRIGGER)
 		WT_RET(__conn_dhandle_sweep(session));
 
-	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
+	if (LF_ISSET(WT_DHANDLE_HAVE_REF))
+		WT_RET(
+		    __conn_dhandle_open_lock(session, session->dhandle, flags));
+	else
+		WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
 	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
@@ -572,11 +576,12 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
-	/*
-	 * Decrement the reference count and return if still in use.
-	 */
+	/* Decrement the reference count and return if still in use. */
 	if (--dhandle->session_ref > 0)
 		return (0);
+
+	/* Increment the dead handle count to encourage a sweep. */
+	S2C(session)->dhandle_dead++;
 
 	/*
 	 * If we are the last reference, get an exclusive lock on the handle
@@ -604,7 +609,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_TRET(__wt_conn_btree_sync_and_close(session));
-	S2C(session)->dhandle_dead++;
+
 	if (!locked) {
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 		WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
