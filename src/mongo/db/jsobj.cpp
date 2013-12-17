@@ -40,6 +40,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/time_support.h"
 
 
 // make sure our assumptions are valid
@@ -205,22 +206,35 @@ namespace mongo {
             break;
         }
         case mongo::Date:
-            if ( format == Strict )
-                s << "{ \"$date\" : ";
-            else
-                s << "Date( ";
-            if( pretty ) {
+            if (format == Strict) {
                 Date_t d = date();
-                if( d == 0 ) s << '0';
-                else
-                    s << '"' << date().toString() << '"';
-            }
-            else
-                s << date().asInt64();
-            if ( format == Strict )
+                s << "{ \"$date\" : ";
+                if (static_cast<long long>(d.millis) < 0) {
+                    s << "{ \"$numberLong\" : \"" << static_cast<long long>(d.millis) << "\" }";
+                }
+                else {
+                    s << "\"" << dateToISOStringLocal(date()) << "\"";
+                }
                 s << " }";
-            else
+            }
+            else {
+                s << "Date( ";
+                if (pretty) {
+                    Date_t d = date();
+                    if (static_cast<long long>(d.millis) < 0) {
+                        // FIXME: This is not parseable by the shell, since it may not fit in a
+                        // float
+                        s << d.millis;
+                    }
+                    else {
+                        s << "\"" << dateToISOStringLocal(date()) << "\"";
+                    }
+                }
+                else {
+                    s << date().asInt64();
+                }
                 s << " )";
+            }
             break;
         case RegEx:
             if ( format == Strict ) {
