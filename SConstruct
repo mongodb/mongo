@@ -1369,7 +1369,7 @@ def doConfigure(myenv):
             }
             """
             context.Message('Checking for gcc atomic builtins... ')
-            ret = context.TryLink(textwrap.dedent(test_body), '.c')
+            ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
             context.Result(ret)
             return ret
         conf = Configure(myenv, help=False, custom_tests = {
