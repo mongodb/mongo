@@ -73,6 +73,11 @@ namespace mongo {
     Status EOFRunner::getExplainPlan(TypeExplain** explain) const {
         *explain = new TypeExplain;
 
+        // Fill in mandatory fields.
+        (*explain)->setN(0);
+        (*explain)->setNScannedObjects(0);
+        (*explain)->setNScanned(0);
+
         // Fill in all the main fields that don't have a default in the explain data structure.
         (*explain)->setCursor("BasicCursor");
         (*explain)->setScanAndOrder(false);
@@ -84,6 +89,9 @@ namespace mongo {
         TypeExplain* allPlans = new TypeExplain;
         allPlans->setCursor("BasicCursor");
         (*explain)->addToAllPlans(allPlans); // ownership xfer
+
+        (*explain)->setNScannedObjectsAllPlans(0);
+        (*explain)->setNScannedAllPlans(0);
 
         return Status::OK();
     }
