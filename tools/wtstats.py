@@ -167,9 +167,16 @@ if args.list:
 output_file = open(args.output, 'w')
 #---------------------------------------
 if args.focus:
-    chart = lineWithFocusChart(name='statlog', height=450 + 10 * len(ydata), x_is_date=args.abstime, x_axis_format='%H:%M:%S', y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/')
+    chartfun = lineWithFocusChart
 else:
-    chart = lineChart(name='statlog', height=450 + 10 * len(ydata), x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/')
+    chartfun = lineChart
+
+chartd = {'name':'statlog', 'height':450+10*len(ydata), 'x_is_date':args.abstime, 'y_axis_format':'g', 'assets_directory':'http://source.wiredtiger.com/graphs/'}
+# Add in the x axis if the user wants time.
+if args.abstime:
+    chartd['x_axis_format'] = '%H:%M:%S'
+# Call the appropriate chart function with the args.
+chart=chartfun(**chartd)
 
 for title, values in ydata:
     chart.add_serie(y=values, x=xdata, name=title)
