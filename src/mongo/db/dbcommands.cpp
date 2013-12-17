@@ -512,13 +512,32 @@ namespace mongo {
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            uassert(15888, "must pass name of collection to create", cmdObj.firstElement().valuestrsafe()[0] != '\0');
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            BSONObjIterator it(cmdObj);
+
+            // Extract ns from first cmdObj element.
+            BSONElement firstElt = it.next();
+            uassert(15888,
+                    "must pass name of collection to create",
+                    firstElt.valuestrsafe()[0] != '\0');
+            string ns = dbname + '.' + firstElt.valuestr();
+
+            // Build options object from remaining cmdObj elements.
+            BSONObjBuilder optionsBuilder;
+            while (it.more()) {
+                optionsBuilder.append(it.next());
+            }
+            BSONObj options = optionsBuilder.obj();
+            uassert(14832,
+                    "specify size:<n> when capped is true",
+                    !options["capped"].trueValue() || options["size"].isNumber() ||
+                        options.hasField("$nExtents"));
+
+            // Create collection.
             string err;
-            uassert(14832, "specify size:<n> when capped is true", !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() || cmdObj.hasField("$nExtents"));
-            bool ok = userCreateNS(ns.c_str(), cmdObj, err, ! fromRepl );
-            if ( !ok && !err.empty() )
+            bool ok = userCreateNS(ns.c_str(), options, err, !fromRepl);
+            if (!ok && !err.empty()) {
                 errmsg = err;
+            }
             return ok;
         }
     } cmdCreate;
