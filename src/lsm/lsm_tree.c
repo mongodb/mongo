@@ -971,6 +971,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Wake up the merge threads. */
 	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
 
+	/* Allow some time for merges to get started. */
+	__wt_sleep(10, 0);
+
 	/* Now wait for merge activity to stop. */
 	do {
 		last_merge_progressing = lsm_tree->merge_progressing;
