@@ -212,14 +212,15 @@ namespace mongo {
             ++it ) {
 
             ChildWriteOp* childOp = *it;
-            dassert( childOp->state == WriteOpState_Pending );
 
-            childOp->endpoint.reset( new ShardEndpoint( childOp->pendingWrite->endpoint ) );
-            if ( why ) {
-                childOp->error.reset( new WriteErrorDetail );
-                why->cloneTo( childOp->error.get() );
+            if ( childOp->state == WriteOpState_Pending ) {
+                childOp->endpoint.reset( new ShardEndpoint( childOp->pendingWrite->endpoint ) );
+                if ( why ) {
+                    childOp->error.reset( new WriteErrorDetail );
+                    why->cloneTo( childOp->error.get() );
+                }
+                childOp->state = WriteOpState_Cancelled;
             }
-            childOp->state = WriteOpState_Cancelled;
         }
 
         _history.insert( _history.end(), _childOps.begin(), _childOps.end() );

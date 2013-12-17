@@ -65,9 +65,10 @@ printjson( request = {insert : coll.getName(),
                    documents: [{a:1}],
                    writeConcern: {w:4, wtimeout:2*1000}});
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
-assert(result.errInfo.wtimeout);
+assert(result.writeConcernError != null);
+assert(result.writeConcernError.errInfo.wtimeout);
 assert.eq(1, coll.count());
 
 //

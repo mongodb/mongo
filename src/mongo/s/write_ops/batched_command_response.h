@@ -138,6 +138,7 @@ namespace mongo {
         Date_t getLastOp() const;
 
         void setErrDetails(const std::vector<WriteErrorDetail*>& errDetails);
+        // errDetails ownership is transferred to here.
         void addToErrDetails(WriteErrorDetail* errDetails);
         void unsetErrDetails();
         bool isErrDetailsSet() const;

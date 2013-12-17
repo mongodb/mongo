@@ -128,8 +128,8 @@ namespace mongo {
          * Resets the state of this write op to _Ready and stops waiting for any outstanding
          * TargetedWrites.  Optional error can be provided for reporting.
          *
-         * Can only be called when state is _Pending and no TargetedWrites have been noted, or is a
-         * no-op if called when the state is still _Ready (and therefore no writes are pending).
+         * Can only be called when state is _Pending, or is a no-op if called when the state
+         * is still _Ready (and therefore no writes are pending).
          */
         void cancelWrites( const WriteErrorDetail* why );
 

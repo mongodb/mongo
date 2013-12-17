@@ -132,13 +132,15 @@ namespace {
 
         ASSERT( !response.getOk() );
         ASSERT_EQUALS( response.getErrCode(), error.getErrCode() );
-        ASSERT_EQUALS( response.getErrMessage(), error.getErrMessage() );
+        ASSERT( response.getErrMessage().find( error.getErrMessage() ) != string::npos );
     }
 
     //
     // Test retryable errors
     //
 
+#if 0
+    // XXX TODO: rewrite - StaleShardVersion will never be a top level error anymore.
     TEST(BatchWriteExecTests, RetryOpError) {
 
         //
@@ -185,8 +187,7 @@ namespace {
 
         BatchedCommandResponse response;
         exec.executeBatch( request, &response );
-
         ASSERT( response.getOk() );
     }
-
+#endif
 } // unnamed namespace

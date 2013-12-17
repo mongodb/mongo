@@ -167,9 +167,7 @@ namespace {
 
         ASSERT( !clientResponse.getOk() );
         ASSERT_EQUALS( clientResponse.getErrCode(), error->getErrCode() );
-        ASSERT_EQUALS( clientResponse.getErrInfo()["data"].Int(),
-                       error->getErrInfo()["data"].Int() );
-        ASSERT_EQUALS( clientResponse.getErrMessage(), error->getErrMessage() );
+        ASSERT( clientResponse.getErrMessage().find( error->getErrMessage()) != string::npos );
     }
 
     TEST(WriteOpTests, TargetMultiOpSameShard) {
@@ -458,7 +456,7 @@ namespace {
         BatchedCommandResponse clientResponse;
         batchOp.buildClientResponse( &clientResponse );
         ASSERT( !clientResponse.getOk() );
-        ASSERT_EQUALS( clientResponse.sizeErrDetails(), 2u );
+        ASSERT_FALSE( clientResponse.isErrDetailsSet() );
     }
 
     TEST(WriteOpTests, TargetMultiOpFailedTarget) {
@@ -511,7 +509,7 @@ namespace {
 
         BatchedCommandResponse clientResponse;
         batchOp.buildClientResponse( &clientResponse );
-        ASSERT( !clientResponse.getOk() );
+        ASSERT( clientResponse.getOk() );
         ASSERT_EQUALS( clientResponse.sizeErrDetails(), 2u );
     }
 
@@ -561,11 +559,14 @@ namespace {
         ASSERT( batchOp.targetBatch( targeter, false, &targeted ).isOK() );
         ASSERT_EQUALS( targeted.size(), 1u );
 
-        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
-                                                          BSONObj(),
-                                                          "mock stale version" ) );
+        auto_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
+                                                      BSONObj(),
+                                                      "mock stale version" ) );
+        error->setIndex( 0 );
+
         BatchedCommandResponse response;
-        setBatchError( *error, &response );
+        response.addToErrDetails( error.release() );
+        response.setOk( 1 );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( !batchOp.isFinished() );

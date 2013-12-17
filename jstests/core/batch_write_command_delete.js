@@ -108,8 +108,9 @@ printjson( request = {'delete' : coll.getName(),
                       writeConcern:{w:1},
                       ordered: true} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
+assert(result.writeErrors != null);
 assert.eq(1, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);
@@ -128,7 +129,7 @@ printjson( request = {'delete' : coll.getName(),
                       writeConcern:{w:1},
                       ordered: false} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(2, result.writeErrors.length);
 
@@ -152,7 +153,7 @@ printjson( request = {'delete' : coll.getName(),
                       writeConcern:{w:0},
                       ordered: false} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert(!('writeErrors' in result));
 assert.eq(0, coll.count());
@@ -168,7 +169,7 @@ printjson( request = {'delete' : coll.getName(),
                       writeConcern:{w:0},
                       ordered: true} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(0, result.n);
 assert(!('writeErrors' in result));
 assert.eq(1, coll.count());

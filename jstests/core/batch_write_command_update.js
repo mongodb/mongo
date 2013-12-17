@@ -187,7 +187,7 @@ printjson( request = {update : coll.getName(),
                       ordered:true} );
 printjson( result = coll.runCommand(request) );
 printjson( coll.find().toArray() );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert(!('upserted' in result));
 assert.eq(1, coll.count());
@@ -202,7 +202,7 @@ printjson( request = {update : coll.getName(),
                       writeConcern: {w:1},
                       ordered:true} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(2, result.n);
 assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
 assert.eq(1, result.writeErrors.length);
@@ -229,9 +229,9 @@ printjson( request = {update : coll.getName(),
                       writeConcern: {w:1},
                       ordered:false} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(2, result.n);
-assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
+assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified");
 assert.eq(2, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);

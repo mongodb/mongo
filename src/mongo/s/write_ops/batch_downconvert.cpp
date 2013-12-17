@@ -123,18 +123,6 @@ namespace mongo {
             if ( request.getOrdered() && BatchSafeWriter::isFailedOp( lastError ) ) break;
         }
 
-        if ( request.sizeWriteOps() == 1 && response->isErrDetailsSet()
-             && !response->isErrCodeSet() ) {
-
-            // Promote single error to batch error
-            const WriteErrorDetail* error = response->getErrDetailsAt( 0 );
-            response->setErrCode( error->getErrCode() );
-            if ( error->isErrInfoSet() ) response->setErrInfo( error->getErrInfo() );
-            response->setErrMessage( error->getErrMessage() );
-
-            response->unsetErrDetails();
-        }
-
         if ( request.sizeWriteOps() == 1 && response->isUpsertDetailsSet() ) {
 
             // Promote single upsert to batch upsert

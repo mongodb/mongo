@@ -160,6 +160,9 @@ namespace mongo {
         // Upserted ids for the whole write batch
         OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
 
+        // Use to store the error from the last shard that returned { ok: 0 }.
+        scoped_ptr<ShardError> _batchCommandError;
+
         // Stats for the entire batch op
         scoped_ptr<BatchWriteStats> _stats;
     };

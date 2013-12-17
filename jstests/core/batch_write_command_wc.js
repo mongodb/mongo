@@ -49,9 +49,12 @@ printjson( request = {insert : coll.getName(),
                       documents: [{a:1}],
                       writeConcern: {w:1, j:true}});
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, coll.count());
+assert(result.writeConcernError != null);
+assert.eq(2, result.writeConcernError.code);
+assert.eq('string', typeof(result.writeConcernError.errmsg));
 
 //
 // Basic no journal insert, insert error and no write
@@ -60,9 +63,9 @@ printjson( request = {insert : coll.getName(),
                       documents: [{a:1, $invalid: true}],
                       writeConcern: {w:1, j:true}});
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(0, result.n);
-assert(!('writeErrors' in result));
+assert('writeErrors' in result);
 assert.eq(0, coll.count());
 
 //
@@ -72,13 +75,17 @@ printjson( request = {insert : coll.getName(),
                    documents: [{a:1}, {a:1, $invalid: true}],
                    writeConcern: {w:1, j:true}});
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);
 assert.eq('number', typeof result.writeErrors[0].code);
 assert.eq('string', typeof result.writeErrors[0].errmsg);
+
+assert(result.writeConcernError != null);
+assert.eq(2, result.writeConcernError.code);
+assert.eq('string', typeof(result.writeConcernError.errmsg));
 
 assert.eq(1, coll.count());
 

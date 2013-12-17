@@ -74,7 +74,10 @@ assert.eq(coll.count(), 1);
 coll.remove({});
 printjson( request = {insert : coll.getName(), documents: [{$set:{a:1}}], writeConcern:{w:1}, ordered:false} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
+assert(result.writeErrors != null);
+assert.eq(1, result.writeErrors.length);
+assert.eq(0, result.n);
 assert.eq(coll.count(), 0);
 
 //
@@ -98,7 +101,9 @@ coll.remove({});
 coll.insert({a:1});
 printjson( request = {insert : coll.getName(), documents: [{a:1}]} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
+assert.eq(1, result.writeErrors.length);
+assert.eq(0, result.n);
 assert.eq(coll.count(), 1);
 
 //
@@ -106,7 +111,7 @@ assert.eq(coll.count(), 1);
 coll.remove({});
 printjson( request = {insert : coll.getName(), documents: [{a:1}, {a:1}, {a:1}], writeConcern:{w:1}, ordered:false} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(2, result.writeErrors.length);
 assert.eq(coll.count(), 1);
@@ -126,7 +131,7 @@ assert.eq(coll.count(), 1);
 coll.remove({});
 printjson( request = {insert : coll.getName(), documents: [{a:1}, {a:1}, {a:1}], writeConcern:{w:1}, ordered:true} );
 printjson( result = coll.runCommand(request) );
-assert(resultNOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, result.writeErrors.length);
 
