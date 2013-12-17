@@ -30,6 +30,8 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/query_planner_params.h"
 
 namespace mongo {
 
@@ -78,6 +80,90 @@ namespace mongo {
     typedef std::string PlanCacheKey;
 
     /**
+     * A PlanCacheIndexTree is the meaty component of the data
+     * stored in SolutionCacheData. It is a tree structure with
+     * index tags that indicates to the access planner which indices
+     * it should try to use.
+     *
+     * How a PlanCacheIndexTree is created:
+     *   The query planner tags a match expression with indices. It
+     *   then uses the tagged tree to create a PlanCacheIndexTree,
+     *   using QueryPlanner::cacheDataFromTaggedTree. The PlanCacheIndexTree
+     *   is isomorphic to the tagged match expression, and has matching
+     *   index tags.
+     *
+     * How a PlanCacheIndexTree is used:
+     *   When the query planner is planning from the cache, it uses
+     *   the PlanCacheIndexTree retrieved from the cache in order to
+     *   recreate index assignments. Specifically, a raw MatchExpression
+     *   is tagged according to the index tags in the PlanCacheIndexTree.
+     *   This is done by QueryPlanner::tagAccordingToCache.
+     */
+    struct PlanCacheIndexTree {
+        PlanCacheIndexTree() : entry(NULL), index_pos(0) { }
+
+        ~PlanCacheIndexTree() {
+            for (vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
+                    it != children.end(); ++it) {
+                delete *it;
+            }
+        }
+
+        /**
+         * Clone 'ie' and set 'this->entry' to be the clone.
+         */
+        void setIndexEntry(const IndexEntry& ie);
+
+        /**
+         * Make a deep copy.
+         */
+        PlanCacheIndexTree* clone() const;
+
+        /**
+         * For debugging.
+         */
+        std::string toString(int indents = 0) const;
+
+        // Children owned here. If 'wholeIXSoln' is false, then 'tree'
+        // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
+        // is true, then 'tree' is used to store the relevant IndexEntry.
+        std::vector<PlanCacheIndexTree*> children;
+
+        // Owned here.
+        boost::scoped_ptr<IndexEntry> entry;
+
+        size_t index_pos;
+    };
+
+    /**
+     * Data stored inside a QuerySolution which can subsequently be
+     * used to create a cache entry. When this data is retrieved
+     * from the cache, it is sufficient to reconstruct the original
+     * QuerySolution.
+     */
+    struct SolutionCacheData {
+        SolutionCacheData() : tree(NULL), wholeIXSoln(false), wholeIXSolnDir(1) { }
+
+        // Make a deep copy.
+        SolutionCacheData* clone() const;
+
+        // For debugging.
+        std::string toString() const;
+
+        // Owned here
+        scoped_ptr<PlanCacheIndexTree> tree;
+
+        // If true, indicates that the plan should
+        // use the index as a proxy for a collection
+        // scan (e.g. using index to provide sort).
+        bool wholeIXSoln;
+
+        // The direction of the index scan used as
+        // a proxy for a collection scan.
+        int wholeIXSolnDir;
+    };
+
+    /**
      * We don't want to cache every possible query. This function
      * encapsulates the criteria for what makes a canonical query
      * suitable for lookup/inclusion in the cache.
@@ -102,8 +188,7 @@ namespace mongo {
      */
     struct CachedSolution {
         // Owned here.
-        // XXX: what type is this?  it's really a tree where the node is a tag on a matchexpression.
-        void* plannerData;
+        boost::scoped_ptr<SolutionCacheData> plannerData;
 
         // Key used to provide feedback on the entry.
         PlanCacheKey key;
@@ -137,10 +222,10 @@ namespace mongo {
         // For debugging.
         std::string toString() const;
 
-        // Data provided to the planner to allow it to recreate the solution this entry represents.
-        // TODO: This is the same thing as the TBD type in CachedSolution.
-        // CachedSolution must be fully owned so we'll copy this to return it.
-        void* plannerData;
+        // Data provided to the planner to allow it to recreate the solution this entry
+        // represents. The SolutionCacheData is fully owned here, so in order to return
+        // it from the cache a deep copy is made and returned inside CachedSolution.
+        boost::scoped_ptr<SolutionCacheData> plannerData;
 
         // Why the best solution was picked.
         // TODO: Do we want to store other information like the other plans considered?
@@ -219,6 +304,12 @@ namespace mongo {
          * Remove *all* entries.
          */
         void clear();
+
+        /**
+         * Traverses expression tree post-order.
+         * Sorts children at each non-leaf node by (MatchType, path())
+         */
+        static void sortTree(MatchExpression* tree);
 
     private:
         unordered_map<PlanCacheKey, PlanCacheEntry*> _cache;

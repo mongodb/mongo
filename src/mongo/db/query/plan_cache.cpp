@@ -62,20 +62,6 @@ namespace {
     }
 
     /**
-     * Traverses expression tree post-order.
-     * Sorts children at each non-leaf node by (MatchType, path())
-     */
-    void sortTree(MatchExpression* tree) {
-        for (size_t i = 0; i < tree->numChildren(); ++i) {
-            sortTree(tree->getChild(i));
-        }
-        std::vector<MatchExpression*>* children = tree->getChildVector();
-        if (NULL != children) {
-            std::sort(children->begin(), children->end(), OperatorAndFieldNameComparison);
-        }
-    }
-
-    /**
      * 2-character encoding of MatchExpression::MatchType.
      */
     const char* encodeMatchType(MatchExpression::MatchType mt) {
@@ -193,7 +179,7 @@ namespace mongo {
      */
     void normalizeQueryForCache(CanonicalQuery* queryOut) {
         // Sorting is the only normalization for now.
-        sortTree(queryOut->root());
+        PlanCache::sortTree(queryOut->root());
     }
 
     /**
@@ -213,9 +199,15 @@ namespace mongo {
     //
 
     PlanCacheEntry::PlanCacheEntry(const QuerySolution& s, PlanRankingDecision* d) {
+        // The caller of this constructor is responsible for ensuring
+        // that the QuerySolution 's' has valid cacheData. If there's no
+        // data to cache you shouldn't be trying to construct a PlanCacheEntry.
+        verify(NULL != s.cacheData.get());
+
         decision.reset(d);
         pinned = false;
-        // XXX: pull things out of 's' that we need to inorder to recreate the same soln
+        // Copy the solution's cache data into the plan cache entry.
+        plannerData.reset(s.cacheData->clone());
     }
 
     PlanCacheEntry::~PlanCacheEntry() {
@@ -237,6 +229,66 @@ namespace mongo {
     }
 
     //
+    // PlanCacheIndexTree
+    //
+
+    void PlanCacheIndexTree::setIndexEntry(const IndexEntry& ie) {
+        entry.reset(new IndexEntry(ie));
+    }
+
+    PlanCacheIndexTree* PlanCacheIndexTree::clone() const {
+        PlanCacheIndexTree* root = new PlanCacheIndexTree();
+        if (NULL != entry.get()) {
+            root->index_pos = index_pos;
+            root->setIndexEntry(*entry.get());
+        }
+
+        for (vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
+                it != children.end(); ++it) {
+            PlanCacheIndexTree* clonedChild = (*it)->clone();
+            root->children.push_back(clonedChild);
+        }
+        return root;
+    }
+
+    std::string PlanCacheIndexTree::toString(int indents) const {
+        std::stringstream ss;
+        if (!children.empty()) {
+            ss << string(3 * indents, '-') << "Node" << std::endl;
+            int newIndent = indents + 1;
+            for (vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
+                    it != children.end(); ++it) {
+                ss << (*it)->toString(newIndent);
+            }
+            return ss.str();
+        }
+        else {
+            ss << string(3 * indents, '-') << "Leaf ";
+            if (NULL != entry.get()) {
+                ss << entry->keyPattern.toString() << ", pos: " << index_pos;
+            }
+            ss << std::endl;
+        }
+        return ss.str();
+    }
+
+    //
+    // SolutionCacheData
+    //
+
+    SolutionCacheData* SolutionCacheData::clone() const {
+        SolutionCacheData* other = new SolutionCacheData();
+        other->tree.reset(this->tree->clone());
+        other->wholeIXSoln = this->wholeIXSoln;
+        other->wholeIXSolnDir = this->wholeIXSolnDir;
+        return other;
+    }
+
+    std::string SolutionCacheData::toString() const {
+        return this->tree->toString();
+    }
+
+    //
     // PlanCache
     //
 
@@ -244,6 +296,8 @@ namespace mongo {
 
     Status PlanCache::add(const CanonicalQuery& query, const QuerySolution& soln,
                           PlanRankingDecision* why) {
+        // XXX: This method is responsible for returning an error if the
+        // cacheData in 'soln' returns false for 'exists()'.
         return Status(ErrorCodes::BadValue, "not implemented yet");
     }
 
@@ -261,6 +315,17 @@ namespace mongo {
 
     void PlanCache::clear() {
         // XXX: implement
+    }
+
+    // static
+    void PlanCache::sortTree(MatchExpression* tree) {
+        for (size_t i = 0; i < tree->numChildren(); ++i) {
+            sortTree(tree->getChild(i));
+        }
+        std::vector<MatchExpression*>* children = tree->getChildVector();
+        if (NULL != children) {
+            std::sort(children->begin(), children->end(), OperatorAndFieldNameComparison);
+        }
     }
 
 }  // namespace mongo

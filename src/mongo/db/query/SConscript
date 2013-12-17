@@ -72,6 +72,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="query_planner_test_lib",
+    source=[
+        "query_planner_test_lib.cpp",
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
 env.StaticLibrary(
     target="query_logger",
     source=[
@@ -138,7 +148,7 @@ env.CppUnitTest(
         "plan_cache_test.cpp"
     ],
     LIBDEPS=[
-        "query_planner",
+        "query_planner_test_lib",
     ],
 )
 
@@ -158,6 +168,6 @@ env.CppUnitTest(
         "query_planner_test.cpp"
     ],
     LIBDEPS=[
-        "query_planner",
+        "query_planner_test_lib",
     ],
 )

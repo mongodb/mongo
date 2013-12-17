@@ -33,6 +33,7 @@
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
@@ -167,6 +168,9 @@ namespace mongo {
         // XXX temporary: if it has a sort stage the sort wasn't provided by an index,
         // so we use that index (if it exists) to provide a sort.
         bool hasSortStage;
+
+        // Owned here. Used by the plan cache.
+        boost::scoped_ptr<SolutionCacheData> cacheData;
 
         /**
          * Output a human-readable string representing the plan.

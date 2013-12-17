@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
@@ -160,36 +161,165 @@ namespace mongo {
         return !sortIt.more();
     }
 
+    Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
+                                                 const vector<IndexEntry>& relevantIndices,
+                                                 PlanCacheIndexTree** out) {
+        if (NULL == taggedTree) {
+            *out = NULL;
+            return Status(ErrorCodes::BadValue, "Cannot produce cache data: tree is NULL.");
+        }
+
+        auto_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
+
+        if (NULL != taggedTree->getTag()) {
+            IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
+            if (itag->index >= relevantIndices.size()) {
+                *out = NULL;
+                std::stringstream ss;
+                ss << "Index number is " << itag->index
+                   << " but there are only " << relevantIndices.size()
+                   << " relevant indices.";
+                return Status(ErrorCodes::BadValue, ss.str());
+            }
+            IndexEntry* ientry = new IndexEntry(relevantIndices[itag->index]);
+            indexTree->entry.reset(ientry);
+            indexTree->index_pos = itag->pos;
+        }
+
+        for (size_t i = 0; i < taggedTree->numChildren(); ++i) {
+            MatchExpression* taggedChild = taggedTree->getChild(i);
+            PlanCacheIndexTree* indexTreeChild;
+            Status s = cacheDataFromTaggedTree(taggedChild, relevantIndices, &indexTreeChild);
+            if (!s.isOK()) {
+                *out = NULL;
+                return s;
+            }
+            indexTree->children.push_back(indexTreeChild);
+        }
+
+        *out = indexTree.release();
+        return Status::OK();
+    }
+
+    // static
+    Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
+                                             const PlanCacheIndexTree* const indexTree,
+                                             const map<BSONObj, size_t>& indexMap) {
+        if (NULL == filter) {
+            return Status(ErrorCodes::BadValue, "Cannot tag tree: filter is NULL.");
+        }
+        if (NULL == indexTree) {
+            return Status(ErrorCodes::BadValue, "Cannot tag tree: indexTree is NULL.");
+        }
+
+        // We're tagging the tree here, so it shouldn't have
+        // any tags hanging off yet.
+        verify(NULL == filter->getTag());
+
+        if (filter->numChildren() != indexTree->children.size()) {
+            std::stringstream ss;
+            ss << "Cache topology and query did not match: "
+               << "query has " << filter->numChildren() << " children "
+               << "and cache has " << indexTree->children.size() << " children.";
+            return Status(ErrorCodes::BadValue, ss.str());
+        }
+
+        // Continue the depth-first tree traversal.
+        for (size_t i = 0; i < filter->numChildren(); ++i) {
+            Status s = tagAccordingToCache(filter->getChild(i), indexTree->children[i], indexMap);
+            if (!s.isOK()) {
+                return s;
+            }
+        }
+
+        if (NULL != indexTree->entry.get()) {
+            map<BSONObj, size_t>::const_iterator got = indexMap.find(indexTree->entry->keyPattern);
+            if (got == indexMap.end()) {
+                std::stringstream ss;
+                ss << "Did not find index with keyPattern: " << indexTree->entry->keyPattern.toString();
+                return Status(ErrorCodes::BadValue, ss.str());
+            }
+            filter->setTag(new IndexTag(got->second, indexTree->index_pos));
+        }
+
+        return Status::OK();
+    }
+
     // static
     Status QueryPlanner::planFromCache(const CanonicalQuery& query,
                                        const QueryPlannerParams& params,
                                        CachedSolution* cachedSoln,
                                        QuerySolution** out) {
+        // TODO: Right now the plan cache does not cache a collscan. We
+        // should make it possible to cache a collscan as the best solution.
+        if (NULL == cachedSoln->plannerData.get()) {
+            return Status(ErrorCodes::BadValue,
+                          "planner data does not exist in the cached solution");
+        }
+
+        SolutionCacheData* cacheData = cachedSoln->plannerData.get();
+        if (cacheData->wholeIXSoln) {
+            QuerySolution* soln = buildWholeIXSoln(*cacheData->tree->entry,
+                query, params, cacheData->wholeIXSolnDir);
+            if (soln == NULL) {
+                return Status(ErrorCodes::BadValue,
+                              "plan cache error: soln that uses index to provide sort");
+            }
+            else {
+                *out = soln;
+                return Status::OK();
+            }
+        }
+
+        // If we're here then this is not the 'wholeIXSoln' case, and we proceed
+        // by using the PlanCacheIndexTree to tag the query tree.
 
         // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
         MatchExpression* clone = query.root()->shallowClone();
 
-        // XXX: Use data in cachedSoln to tag 'clone' with the indices used.  The tags use an index
-        // ID which is an index into some vector of IndexEntry(s).  How do we maintain this across
-        // calls to plan?  Do we want to store in the soln the keypatterns of the indices and just
-        // map those to an index into params.indices?  Might be easiest thing to do, and certainly
-        // most intelligible for debugging.
+        // Sort the tree in order to ensure that the sort order
+        // makes that of the cached solution.
+        PlanCache::sortTree(clone);
+
+        QLOG() << "Tagging the match expression according to cache data: " << endl
+               << "Filter:" << endl << clone->toString()
+               << "Cache data:" << endl << cacheData->toString();
+
+        // Map from index name to index number.
+        // TODO: can we assume that the index numbering has the same lifetime
+        // as the cache state?
+        map<BSONObj, size_t> indexMap;
+        for (size_t i = 0; i < params.indices.size(); ++i) {
+            const IndexEntry& ie = params.indices[i];
+            indexMap[ie.keyPattern] = i;
+            QLOG() << "Index " << i << ": " << ie.keyPattern.toString() << endl;
+        }
+
+        Status s = tagAccordingToCache(clone, cacheData->tree.get(), indexMap);
+        if (!s.isOK()) {
+            return s;
+        }
+
+        // The planner requires a defined sort order.
+        sortUsingTags(clone);
+
+        QLOG() << "Tagged tree:" << endl << clone->toString();
 
         // Use the cached index assignments to build solnRoot.  Takes ownership of clone.
         QuerySolutionNode* solnRoot =
             QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices);
 
-        // XXX: are the NULL cases an error/when does this happen / can this happen?
         if (NULL != solnRoot) {
+            // Takes ownership of 'solnRoot'.
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
             if (NULL != soln) {
                 QLOG() << "Planner: adding cached solution:\n" << soln->toString() << endl;
                 *out = soln;
+                return Status::OK();
             }
         }
 
-        // XXX: if any NULLs return error status?
-        return Status::OK();
+        return Status(ErrorCodes::BadValue, "couldn't plan from cache");
     }
 
     // static
@@ -503,6 +633,17 @@ namespace mongo {
                 QLOG() << "about to build solntree from tagged tree:\n" << rawTree->toString()
                        << endl;
 
+                // The cached data needs to use a predefined ordering.
+                boost::scoped_ptr<MatchExpression> clone(rawTree->shallowClone());
+                PlanCache::sortTree(clone.get());
+
+                PlanCacheIndexTree* cacheData;
+                Status indexTreeStatus = cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
+                if (!indexTreeStatus.isOK()) {
+                    warning() << "building the plan cache index tree failed" << endl;
+                }
+                auto_ptr<PlanCacheIndexTree> autoData(cacheData);
+
                 // This can fail if enumeration makes a mistake.
                 QuerySolutionNode* solnRoot =
                     QueryPlannerAccess::buildIndexedDataAccess(query, rawTree, false, relevantIndices);
@@ -512,6 +653,11 @@ namespace mongo {
                 QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
                 if (NULL != soln) {
                     QLOG() << "Planner: adding solution:\n" << soln->toString() << endl;
+                    if (indexTreeStatus.isOK()) {
+                        SolutionCacheData* scd = new SolutionCacheData();
+                        scd->tree.reset(autoData.release());
+                        soln->cacheData.reset(scd);
+                    }
                     out->push_back(soln);
                 }
             }
@@ -561,6 +707,14 @@ namespace mongo {
                                << endl;
                         QuerySolution* soln = buildWholeIXSoln(params.indices[i], query, params);
                         if (NULL != soln) {
+                            PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
+                            indexTree->setIndexEntry(params.indices[i]);
+                            SolutionCacheData* scd = new SolutionCacheData();
+                            scd->tree.reset(indexTree);
+                            scd->wholeIXSoln = true;
+                            scd->wholeIXSolnDir = 1;
+
+                            soln->cacheData.reset(scd);
                             out->push_back(soln);
                             break;
                         }
@@ -570,6 +724,14 @@ namespace mongo {
                                << "to provide sort." << endl;
                         QuerySolution* soln = buildWholeIXSoln(params.indices[i], query, params, -1);
                         if (NULL != soln) {
+                            PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
+                            indexTree->setIndexEntry(params.indices[i]);
+                            SolutionCacheData* scd = new SolutionCacheData();
+                            scd->tree.reset(indexTree);
+                            scd->wholeIXSoln = true;
+                            scd->wholeIXSolnDir = -1;
+
+                            soln->cacheData.reset(scd);
                             out->push_back(soln);
                             break;
                         }
