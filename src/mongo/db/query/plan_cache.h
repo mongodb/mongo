@@ -78,6 +78,26 @@ namespace mongo {
     typedef std::string PlanCacheKey;
 
     /**
+     * We don't want to cache every possible query. This function
+     * encapsulates the criteria for what makes a canonical query
+     * suitable for lookup/inclusion in the cache.
+     */
+    bool shouldCacheQuery(const CanonicalQuery& query);
+
+    /**
+     * Normalizes canonical query for caching.
+     * Current sorts nodes of internal match expression.
+     * Not to be confused with internal function CanonicalQuery::normalizeTree()
+     */
+    void normalizeQueryForCache(CanonicalQuery* queryOut);
+
+    /**
+     * Generates a key for a normalized (for caching) canonical query
+     * from the match expression and sort order.
+     */
+    PlanCacheKey getPlanCacheKey(const CanonicalQuery& query);
+
+    /**
      * Information returned from a get(...) query.
      */
     struct CachedSolution {
