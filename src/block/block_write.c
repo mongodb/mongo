@@ -198,7 +198,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 #ifdef HAVE_POSIX_FADVISE
 	/* Optionally discard blocks from the system buffer cache. */
 	if (block->os_cache_max != 0 &&
-	    (block->os_cache += (int64_t)align_size) > block->os_cache_max) {
+	    (block->os_cache += align_size) > block->os_cache_max) {
 		block->os_cache = 0;
 		if ((ret = posix_fadvise(fh->fd,
 		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0)

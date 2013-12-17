@@ -130,7 +130,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
-	block->os_cache_max = cval.val;
+	block->os_cache_max = (size_t)cval.val;
 #ifdef HAVE_POSIX_FADVISE
 	if (conn->direct_io && block->os_cache_max)
 		WT_ERR_MSG(session, EINVAL,
@@ -144,7 +144,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 
 	/* Configuration: optional immediate write scheduling flag. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
-	block->os_cache_dirty_max = cval.val;
+	block->os_cache_dirty_max = (size_t)cval.val;
 #ifdef HAVE_SYNC_FILE_RANGE
 	if (conn->direct_io && block->os_cache_dirty_max)
 		WT_ERR_MSG(session, EINVAL,

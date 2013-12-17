@@ -203,10 +203,10 @@ struct __wt_block {
 	int	 allocfirst;		/* Allocation is first-fit */
 	int	 allocfirst_save;	/* Allocation is first-fit, saved */
 	uint32_t allocsize;		/* Allocation size */
-	int64_t	 os_cache;		/* System buffer cache flush max */
-	int64_t	 os_cache_max;
-	int64_t	 os_cache_dirty;	/* System buffer cache write max */
-	int64_t	 os_cache_dirty_max;
+	size_t	 os_cache;		/* System buffer cache flush max */
+	size_t	 os_cache_max;
+	size_t	 os_cache_dirty;	/* System buffer cache write max */
+	size_t	 os_cache_dirty_max;
 
 	u_int	 block_header;		/* Header length */
 
