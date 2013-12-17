@@ -129,11 +129,17 @@ namespace mongo {
             switch ( osvi.dwMajorVersion ) {
             case 6:
                 switch ( osvi.dwMinorVersion ) {
+                    case 3:
+                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                            osName += "Windows 8.1";
+                        else
+                            osName += "Windows Server 2012 R2";
+                        break;
                     case 2:
                         if ( osvi.wProductType == VER_NT_WORKSTATION )
                             osName += "Windows 8";
                         else
-                            osName += "Windows Server 8";
+                            osName += "Windows Server 2012";
                         break;
                     case 1:
                         if ( osvi.wProductType == VER_NT_WORKSTATION )
