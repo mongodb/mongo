@@ -749,11 +749,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), NULL, 1, &fmt));
-		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
+		cursor->value_format = __wt_buf_steal(session, &fmt);
 
 		WT_ERR(__wt_struct_plan(session, table,
 		    columns, strlen(columns), 0, &plan));
-		ctable->plan = __wt_buf_steal(session, &plan, NULL);
+		ctable->plan = __wt_buf_steal(session, &plan);
 	}
 
 	/*

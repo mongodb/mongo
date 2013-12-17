@@ -808,7 +808,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
 	off_t size;
-	uint32_t len;
+	size_t len;
 	int created;
 	char buf[256];
 
@@ -856,10 +856,9 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
-		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
+		len = (size_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
 		    WT_SINGLETHREAD, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(
-		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
+		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0, len, buf));
 		created = 1;
 	} else
 		created = 0;

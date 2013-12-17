@@ -281,7 +281,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	if (direct)
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
-		    logrec->len, (void *)logrec));
+		    (size_t)logrec->len, (void *)logrec));
 	else
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
 		    logrec, logrec->len);
@@ -476,7 +476,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	uint32_t write_size;
+	size_t write_size;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -493,7 +493,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
-		write_size = (uint32_t)
+		write_size = (size_t)
 		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
 		WT_ERR(__wt_write(session, slot->slot_fh,
 		    slot->slot_start_offset, write_size, slot->slot_buf.mem));
@@ -970,7 +970,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * direct_io is in use because it makes the reading code cleaner.
 	 */
 	WT_STAT_FAST_CONN_INCRV(session, log_bytes_user, record->size);
-	rdup_len = __wt_rduppo2(record->size, log->allocsize);
+	rdup_len = __wt_rduppo2((uint32_t)record->size, log->allocsize);
 	WT_ERR(__wt_buf_grow(session, record, rdup_len));
 	WT_ASSERT(session, record->data == record->mem);
 	/*
@@ -983,7 +983,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		record->size = rdup_len;
 	}
 	logrec = (WT_LOG_RECORD *)record->mem;
-	logrec->len = record->size;
+	logrec->len = (uint32_t)record->size;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
 

@@ -658,8 +658,9 @@ static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
 	WT_REF *ref;
+	size_t len;
 	uint8_t *p;
-	uint32_t i, len;
+	uint32_t i;
 
 	WT_REF_FOREACH(page, ref, i) {
 		__wt_ref_key(page, ref, &p, &len);

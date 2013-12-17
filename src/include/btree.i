@@ -311,7 +311,7 @@ __wt_off_page(WT_PAGE *page, const void *p)
  * possible.
  */
 static inline void
-__wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
+__wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
 	/*
 	 * An internal page key is in one of two places: if we instantiated the

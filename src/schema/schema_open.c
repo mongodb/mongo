@@ -81,7 +81,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		}
 
 		WT_ERR(__wt_calloc_def(session, 1, &colgroup));
-		colgroup->name = __wt_buf_steal(session, buf, NULL);
+		colgroup->name = __wt_buf_steal(session, buf);
 		colgroup->config = cgconfig;
 		cgconfig = NULL;
 		WT_ERR(__wt_config_getones(session,
@@ -90,7 +90,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		    session, colgroup->config, "source", &cval));
 		WT_ERR(__wt_buf_fmt(session, buf, "%.*s",
 		    (int)cval.len, cval.str));
-		colgroup->source = __wt_buf_steal(session, buf, NULL);
+		colgroup->source = __wt_buf_steal(session, buf);
 		table->cgroups[i] = colgroup;
 		colgroup = NULL;
 	}
@@ -100,7 +100,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 		WT_ERR(__wt_struct_plan(session,
 		    table, table->colconf.str, table->colconf.len, 1, buf));
-		table->plan = __wt_buf_steal(session, buf, NULL);
+		table->plan = __wt_buf_steal(session, buf);
 	}
 
 	table->cg_complete = 1;
@@ -132,12 +132,12 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	/* Get the data source from the index config. */
 	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
-	idx->source = __wt_buf_steal(session, buf, NULL);
+	idx->source = __wt_buf_steal(session, buf);
 	idx->need_value = WT_PREFIX_MATCH(idx->source, "lsm:");
 
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
-	idx->key_format = __wt_buf_steal(session, buf, NULL);
+	idx->key_format = __wt_buf_steal(session, buf);
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
@@ -186,19 +186,19 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &plan));
 	WT_ERR(__wt_struct_plan(session, table, buf->data, buf->size, 0, plan));
-	idx->key_plan = __wt_buf_steal(session, plan, NULL);
+	idx->key_plan = __wt_buf_steal(session, plan);
 
 	/* Set up the cursor key format (the visible columns). */
 	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_struct_truncate(session,
 	    idx->key_format, cursor_key_cols, buf));
-	idx->idxkey_format = __wt_buf_steal(session, buf, NULL);
+	idx->idxkey_format = __wt_buf_steal(session, buf);
 
 	/* By default, index cursor values are the table value columns. */
 	/* TODO Optimize to use index columns in preference to table lookups. */
 	WT_ERR(__wt_struct_plan(session,
 	    table, table->colconf.str, table->colconf.len, 1, plan));
-	idx->value_plan = __wt_buf_steal(session, plan, NULL);
+	idx->value_plan = __wt_buf_steal(session, plan);
 
 err:	__wt_scr_free(&buf);
 	__wt_scr_free(&plan);
@@ -341,7 +341,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 	WT_CLEAR(buf);
 	WT_RET(__wt_buf_fmt(session, &buf, "table:%.*s", (int)namelen, name));
-	tablename = __wt_buf_steal(session, &buf, NULL);
+	tablename = __wt_buf_steal(session, &buf);
 
 	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, tablename);

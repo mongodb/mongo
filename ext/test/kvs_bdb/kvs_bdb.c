@@ -251,7 +251,7 @@ copyin_key(WT_CURSOR *wtcursor)
 		key->size = sizeof(db_recno_t);
 	} else {
 		key->data = (char *)wtcursor->key.data;
-		key->size = wtcursor->key.size;
+		key->size = (uint32_t)wtcursor->key.size;
 	}
 	return (0);
 }
@@ -283,7 +283,7 @@ copyin_value(WT_CURSOR *wtcursor)
 	value = &cursor->value;
 
 	value->data = (char *)wtcursor->value.data;
-	value->size = wtcursor->value.size;
+	value->size = (uint32_t)wtcursor->value.size;
 }
 
 static INLINE void
@@ -465,7 +465,7 @@ kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 	DBT *key, *value;
 	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
-	uint32_t len;
+	size_t len;
 	int ret = 0;
 
 	session = wtcursor->session;

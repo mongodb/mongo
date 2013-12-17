@@ -93,9 +93,10 @@ typedef WT_CONNECTION			WT_CONNECTION_CLOSED;
 #endif
 
 /*!
- * A raw item of data to be managed.  Data items have a pointer to the data and
- * a length (limited to 4GB for items stored in tables).  WT_ITEM structures do
- * not need to be cleared before use.
+ * A raw item of data to be managed, including a pointer to the data and a
+ * length.
+ *
+ * WT_ITEM structures do not need to be cleared before use.
  */
 struct __wt_item {
 	/*!
@@ -109,8 +110,12 @@ struct __wt_item {
 
 	/*!
 	 * The number of bytes in the data item.
+	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
 	 */
-	uint32_t size;
+	size_t size;
 
 #ifndef DOXYGEN
 #define	WT_ITEM_ALIGNED					0x00000001
@@ -396,6 +401,10 @@ struct __wt_cursor {
 	 * loading the data in sorted order will be much faster than doing
 	 * out-of-order inserts.  See @ref bulk_load for more information.
 	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 * In particular, if \c overwrite is not configured and a record with
@@ -421,6 +430,10 @@ struct __wt_cursor {
 	 * On success, the cursor ends positioned at the modified record; to
 	 * minimize cursor resources, the WT_CURSOR::reset method should be
 	 * called as soon as the cursor no longer needs that position.
+	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors

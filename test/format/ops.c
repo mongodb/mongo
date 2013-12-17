@@ -1074,7 +1074,7 @@ print_item(const char *tag, WT_ITEM *item)
 {
 	static const char hex[] = "0123456789abcdef";
 	const uint8_t *data;
-	uint32_t size;
+	size_t size;
 	int ch;
 
 	data = item->data;

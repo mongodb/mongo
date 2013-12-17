@@ -180,9 +180,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Optionally stream-compress the data, but don't compress blocks that
 	 * are already as small as they're going to get.
 	 */
-	if (buf->size <= btree->allocsize ||
-	    btree->compressor == NULL ||
-	    btree->compressor->compress == NULL || compressed) {
+	if (btree->compressor == NULL ||
+	    btree->compressor->compress == NULL || compressed)
+		ip = buf;
+	else if (buf->size <= btree->allocsize) {
 		ip = buf;
 		WT_STAT_FAST_DATA_INCR(session, compress_write_too_small);
 	} else {

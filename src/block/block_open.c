@@ -235,7 +235,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	desc->cksum = 0;
 	desc->cksum = __wt_cksum(desc, allocsize);
 
-	ret = __wt_write(session, fh, (off_t)0, allocsize, desc);
+	ret = __wt_write(session, fh, (off_t)0, (size_t)allocsize, desc);
 
 	__wt_scr_free(&buf);
 	return (ret);

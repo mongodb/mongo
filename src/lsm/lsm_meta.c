@@ -99,7 +99,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					WT_ERR(__wt_lsm_tree_chunk_name(session,
 					    lsm_tree, chunk->id, &buf));
 					chunk->uri =
-					    __wt_buf_steal(session, &buf, NULL);
+					    __wt_buf_steal(session, &buf);
 					F_SET_ATOMIC(chunk,
 					    WT_LSM_CHUNK_EVICTED |
 					    WT_LSM_CHUNK_ONDISK |
@@ -109,7 +109,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					WT_ERR(__wt_lsm_tree_bloom_name(session,
 					    lsm_tree, chunk->id, &buf));
 					chunk->bloom_uri =
-					    __wt_buf_steal(session, &buf, NULL);
+					    __wt_buf_steal(session, &buf);
 					F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				} else if (WT_STRING_MATCH(

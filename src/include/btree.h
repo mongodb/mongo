@@ -24,18 +24,24 @@
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
 /*
- * Variable-length value items and row-store key/value item lengths are stored
- * in 32-bit unsigned integers, meaning the largest theoretical key/value item
- * is 4GB.  However, in the WT_UPDATE structure we use the UINT32_MAX size as a
- * "deleted" flag.  Limit the size of a single object to 4GB - 512B: it's a few
- * additional bytes if we ever want to store a small structure length plus the
- * object size in 32 bits, or if we ever need more denoted values.  Storing 4GB
- * objects in a Btree borders on clinical insanity, anyway.
+ * The length of variable-length column-store values and row-store keys/values
+ * are stored in a 4B type, so the largest theoretical key/value item is 4GB.
+ * However, in the WT_UPDATE structure we use the UINT32_MAX size as a "deleted"
+ * flag, and second, the size of an overflow object is constrained by what an
+ * underlying block manager can actually write.  (For example, in the default
+ * block manager, writing an overflow item includes the underlying block's page
+ * header and block manager specific structure, aligned to an allocation-sized
+ * unit).  The btree engine limits the size of a single object to (4GB - 1KB);
+ * that gives us additional bytes if we ever want to store a structure length
+ * plus the object size in 4B, or if we need additional flag values.  Attempts
+ * to store large key/value items in the tree trigger an immediate check to the
+ * block manager, to make sure it can write the item.  Storing 4GB objects in a
+ * btree borders on clinical insanity, anyway.
  *
  * Record numbers are stored in 64-bit unsigned integers, meaning the largest
  * record number is "really, really big".
  */
-#define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 512)
+#define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 1024)
 
 /*
  * A location in a file is a variable-length cookie, but it has a maximum size

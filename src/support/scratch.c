@@ -39,8 +39,6 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 	size_t offset;
 	int set_data;
 
-	WT_ASSERT(session, size <= UINT32_MAX);
-
 	/* Clear buffers previously used for mapped returns. */
 	if (F_ISSET(buf, WT_ITEM_MAPPED))
 		__wt_buf_clear(buf);
@@ -151,7 +149,7 @@ __wt_buf_set_printable(
  *	Steal a buffer for another purpose.
  */
 void *
-__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
+__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
 	void *retp;
 
@@ -178,8 +176,6 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 
 	/* Second, give our caller the buffer's memory. */
 	retp = buf->mem;
-	if (sizep != NULL)
-		*sizep = buf->size;
 
 	/* Third, discard the buffer's memory. */
 	__wt_buf_clear(buf);

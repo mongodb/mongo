@@ -895,7 +895,7 @@ __wt_ovfl_txnc_search(
 int
 __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
     const uint8_t *addr, uint32_t addr_size,
-    const void *value, uint32_t value_size)
+    const void *value, size_t value_size)
 {
 	WT_OVFL_TXNC **head, **stack[WT_SKIP_MAXDEPTH], *txnc;
 	size_t size;
@@ -930,7 +930,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	txnc->value_offset = WT_PTRDIFF32(p, txnc);
-	txnc->value_size = value_size;
+	txnc->value_size = (uint32_t)value_size;
 	memcpy(p, value, value_size);
 	txnc->current = S2C(session)->txn_global.current;
 
