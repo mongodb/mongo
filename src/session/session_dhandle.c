@@ -340,6 +340,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	if (dhandle_cache != NULL) {
 		candidate = 1;
+		/* We found the data handle, don't try to get it again. */
+		LF_SET(WT_DHANDLE_HAVE_REF);
 		session->dhandle = dhandle;
 
 		/*
