@@ -130,6 +130,7 @@ static const WT_CONFIG_CHECK confchk_lsm_subconfigs[] = {
 	{ "chunk_max", "int", "min=100MB,max=10TB", NULL },
 	{ "chunk_size", "int", "min=512K,max=500MB", NULL },
 	{ "merge_max", "int", "min=2,max=100", NULL },
+	{ "merge_min", "int", "max=100", NULL },
 	{ "merge_threads", "int", "min=1,max=10", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -371,7 +372,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
 	  "leaf_page_max=1MB,lsm=(auto_throttle=,bloom=,bloom_bit_count=16,"
 	  "bloom_config=,bloom_hash_count=8,bloom_oldest=0,chunk_max=5GB,"
-	  "chunk_size=10MB,merge_max=15,merge_threads=1),"
+	  "chunk_size=10MB,merge_max=15,merge_min=0,merge_threads=1),"
 	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
 	  "prefix_compression=,prefix_compression_min=4,source=,"
 	  "split_pct=75,type=file,value_format=u",
