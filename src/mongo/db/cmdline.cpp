@@ -151,9 +151,14 @@ namespace {
             if ( s.find( "FASTSYNC" ) != string::npos )
                 cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
 
-            if ( s.c_str()[0] == '#' ) { 
-                // skipping commented line
-            } else if ( s.find( "=FALSE" ) == string::npos ) {
+            // skip commented lines
+            if ( s.c_str()[0] == '#' ) {
+            // In this block, we copy the actual line into our intermediate buffer to actually be
+            // parsed later only if the string does not contain the substring "=FALSE" OR the option
+            // is a setParameter option.  Note that this is done after we call boost::to_upper
+            // above.
+            } else if ( s.find( "=FALSE" ) == string::npos ||
+                        s.find( "SETPARAMETER" ) == 0 ) {
                 ss << line << endl;
             } else {
                 cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
