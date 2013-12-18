@@ -10,7 +10,8 @@ db.runCommand({create: orig, temp:1})
 assert.eq(db.system.namespaces.findOne({name:ns(orig)}).options.temp, 1)
 
 db.adminCommand({renameCollection: ns(orig), to: ns(dest)});
-assert.eq(db.system.namespaces.findOne({name:ns(dest)}).options.temp, undefined)
+var options = db.system.namespaces.findOne({name:ns(dest)}).options || {};
+assert.eq(options.temp, undefined);
 
 db[dest].drop();
 
