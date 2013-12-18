@@ -29,6 +29,7 @@
 #       Test huge key/value items.
 
 import wiredtiger, wttest
+from wttest import unittest
 from helper import key_populate
 
 class test_huge(wttest.WiredTigerTestCase):
@@ -96,6 +97,7 @@ class test_huge(wttest.WiredTigerTestCase):
         cursor.close()
 
     # Huge key test.
+    @unittest.skip("Excessive memory allocation")
     def test_huge(self):
         v = "a" * 1073741824                    # 1GB
         if self.keyfmt == 'S':                  # Huge keys for row-store only

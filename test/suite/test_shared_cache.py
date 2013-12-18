@@ -25,14 +25,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 # If unittest2 is available, use it in preference to (the old) unittest
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
 
 import os
 import shutil
 import wiredtiger, wttest
+from wttest import unittest
 from helper import key_populate, simple_populate
 
 # test_shared_cache.py
