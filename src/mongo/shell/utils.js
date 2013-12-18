@@ -8,6 +8,17 @@ chatty = function(s){
         print( s );
 }
 
+function reconnect(db) {
+    assert.soon(function() {
+                    try {
+                        db.runCommand({ping:1});
+                        return true;
+                    } catch (x) {
+                        return false;
+                    }
+                });
+};
+
 // Please consider using bsonWoCompare instead of this as much as possible.
 friendlyEqual = function( a , b ){
     if ( a == b )
