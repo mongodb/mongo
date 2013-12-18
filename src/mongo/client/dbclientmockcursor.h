@@ -18,10 +18,11 @@
 #pragma once
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
-    class DBClientMockCursor : public DBClientCursorInterface {
+    class MONGO_CLIENT_API DBClientMockCursor : public DBClientCursorInterface {
     public:
         DBClientMockCursor( const BSONArray& mockCollection ) : _iter( mockCollection ) {}
         virtual ~DBClientMockCursor() {}

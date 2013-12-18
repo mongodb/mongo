@@ -17,9 +17,8 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
 #include "mongo/client/export_macros.h"
+#include "mongo/pch.h"
 
 namespace mongo {
 

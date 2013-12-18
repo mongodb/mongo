@@ -66,7 +66,7 @@ namespace mongo {
         }
         void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
         std::string toString() const;
-        bool empty() const { return msg.empty(); }        
+        bool empty() const { return msg.empty(); }
         void reset(){ msg = ""; code=-1; }
         std::string msg;
         int code;
@@ -75,10 +75,10 @@ namespace mongo {
     /** helper class that builds error strings.  lighter weight than a StringBuilder, albeit less flexible.
         NOINLINE_DECL used in the constructor implementations as we are assuming this is a cold code path when used.
 
-        example: 
+        example:
           throw UserException(123, ErrorMsg("blah", num_val));
     */
-    class MONGO_CLIENT_API ErrorMsg { 
+    class MONGO_CLIENT_API ErrorMsg {
     public:
         ErrorMsg(const char *msg, char ch);
         ErrorMsg(const char *msg, unsigned val);
@@ -170,12 +170,13 @@ namespace mongo {
 
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(
             const char *msg, const char *file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
     MONGO_CLIENT_API void wasserted(const char *msg, const char *file, unsigned line);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedWithStatus(
             int msgid, const Status& status);
-    
+
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
         could cause, such as duplicate key, disk full, etc.
     */
@@ -186,8 +187,6 @@ namespace mongo {
         std::string.  a stack trace is logged.
     */
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char *msg);
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid,
-                                                                     const std::string& msg);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char *msg);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string &msg);
 

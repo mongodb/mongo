@@ -24,6 +24,7 @@
 
 #include <boost/function.hpp>
 
+#include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
@@ -33,7 +34,7 @@
 namespace mongo {
 
     /** the query field 'options' can have these bits set: */
-    enum QueryOptions {
+    enum MONGO_CLIENT_API QueryOptions {
         /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
            the final object's position.  you can resume using the cursor later, from where it was located,
            if more data were received.  Set on dbQuery and dbGetMore.
@@ -79,7 +80,7 @@ namespace mongo {
 
         /** When sharded, this means its ok to return partial results
             Usually we will fail a query if all required shards aren't up
-            If this is set, it'll be a partial result set 
+            If this is set, it'll be a partial result set
          */
         QueryOption_PartialResults = 1 << 7 ,
 
@@ -87,7 +88,7 @@ namespace mongo {
 
     };
 
-    enum UpdateOptions {
+    enum MONGO_CLIENT_API UpdateOptions {
         /** Upsert - that is, insert the item if no matching item is found. */
         UpdateOption_Upsert = 1 << 0,
 
@@ -99,7 +100,7 @@ namespace mongo {
         UpdateOption_Broadcast = 1 << 2
     };
 
-    enum RemoveOptions {
+    enum MONGO_CLIENT_API RemoveOptions {
         /** only delete one option */
         RemoveOption_JustOne = 1 << 0,
 
@@ -107,11 +108,11 @@ namespace mongo {
         RemoveOption_Broadcast = 1 << 1
     };
 
-    
-    /** 
+
+    /**
      * need to put in DbMesssage::ReservedOptions as well
      */
-    enum InsertOptions {
+    enum MONGO_CLIENT_API InsertOptions {
         /** With muli-insert keep processing inserts if one fails */
         InsertOption_ContinueOnError = 1 << 0
     };
@@ -119,7 +120,7 @@ namespace mongo {
     /**
      * Start from *top* of bits, these are generic write options that apply to all
      */
-    enum WriteOptions {
+    enum MONGO_CLIENT_API WriteOptions {
         /** logical writeback option */
         WriteOption_FromWriteback = 1 << 31
     };
@@ -130,12 +131,12 @@ namespace mongo {
     // the api user, but we need these constants to disassemble/reassemble the messages correctly.
     //
 
-    enum ReservedOptions {
+    enum MONGO_CLIENT_API ReservedOptions {
         Reserved_InsertOption_ContinueOnError = 1 << 0 ,
         Reserved_FromWriteback = 1 << 1
     };
 
-    enum ReadPreference {
+    enum MONGO_CLIENT_API ReadPreference {
         /**
          * Read from primary only. All operations produce an error (throw an
          * exception where applicable) if primary is unavailable. Cannot be
@@ -167,8 +168,8 @@ namespace mongo {
         ReadPreference_Nearest,
     };
 
-    class DBClientBase;
-    class DBClientConnection;
+    class MONGO_CLIENT_API DBClientBase;
+    class MONGO_CLIENT_API DBClientConnection;
 
     /**
      * ConnectionString handles parsing different ways to connect to mongo and determining method
@@ -177,7 +178,7 @@ namespace mongo {
      *    server:port
      *    foo/server:port,server:port   SET
      *    server,server,server          SYNC
-     *                                    Warning - you usually don't want "SYNC", it's used 
+     *                                    Warning - you usually don't want "SYNC", it's used
      *                                    for some special things such as sharding config servers.
      *                                    See syncclusterconnection.h for more info.
      *
@@ -187,7 +188,7 @@ namespace mongo {
      * if ( ! cs.isValid() ) throw "bad: " + errmsg;
      * DBClientBase * conn = cs.connect( errmsg );
      */
-    class ConnectionString {
+    class MONGO_CLIENT_API ConnectionString {
     public:
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC, CUSTOM };
 
@@ -228,7 +229,7 @@ namespace mongo {
 
         ConnectionString( const string& s , ConnectionType favoredMultipleType ) {
             _type = INVALID;
-            
+
             _fillServers( s );
             if ( _type != INVALID ) {
                 // set already
@@ -246,13 +247,13 @@ namespace mongo {
         bool isValid() const { return _type != INVALID; }
 
         string toString() const { return _string; }
-        
+
         DBClientBase* connect( string& errmsg, double socketTimeout = 0 ) const;
 
         string getSetName() const { return _setName; }
 
         vector<HostAndPort> getServers() const { return _servers; }
-        
+
         ConnectionType type() const { return _type; }
 
         /**
@@ -311,7 +312,7 @@ namespace mongo {
      * controls how much a clients cares about writes
      * default is NORMAL
      */
-    enum WriteConcern {
+    enum MONGO_CLIENT_API WriteConcern {
         W_NONE = 0 , // TODO: not every connection type fully supports this
         W_NORMAL = 1
         // TODO SAFE = 2
@@ -327,7 +328,7 @@ namespace mongo {
            QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
            QUERY( "age" << GT << 30 << LT << 50 )
     */
-    class Query {
+    class MONGO_CLIENT_API Query {
     public:
         static const BSONField<BSONObj> ReadPrefField;
         static const BSONField<std::string> ReadPrefModeField;
@@ -449,7 +450,7 @@ namespace mongo {
      * Represents a full query description, including all options required for the query to be passed on
      * to other hosts
      */
-    class QuerySpec {
+    class MONGO_CLIENT_API QuerySpec {
 
         string _ns;
         int _ntoskip;
@@ -460,7 +461,7 @@ namespace mongo {
         Query _queryObj;
 
     public:
-        
+
         QuerySpec( const string& ns,
                    const BSONObj& query, const BSONObj& fields,
                    int ntoskip, int ntoreturn, int options )
@@ -482,21 +483,21 @@ namespace mongo {
         BSONObj* fieldsData() { return &_fields; }
 
         // don't love this, but needed downstrem
-        const BSONObj* fieldsPtr() const { return &_fields; } 
+        const BSONObj* fieldsPtr() const { return &_fields; }
 
         string ns() const { return _ns; }
         int ntoskip() const { return _ntoskip; }
         int ntoreturn() const { return _ntoreturn; }
         int options() const { return _options; }
-        
+
         void setFields( BSONObj& o ) { _fields = o.getOwned(); }
 
         string toString() const {
-            return str::stream() << "QSpec " << 
+            return str::stream() << "QSpec " <<
                 BSON( "ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn << "options" << _options
                       << "query" << _query << "fields" << _fields );
         }
-        
+
     };
 
 
@@ -507,15 +508,15 @@ namespace mongo {
 
     // Useful utilities for namespaces
     /** @return the database name portion of an ns string */
-    string nsGetDB( const string &ns );
+    MONGO_CLIENT_API string nsGetDB( const string &ns );
 
     /** @return the collection name portion of an ns string */
-    string nsGetCollection( const string &ns );
+    MONGO_CLIENT_API string nsGetCollection( const string &ns );
 
     /**
        interface that handles communication with the db
      */
-    class DBConnector {
+    class MONGO_CLIENT_API DBConnector {
     public:
         virtual ~DBConnector() {}
         /** actualServer is set to the actual server where they call went if there was a choice (SlaveOk) */
@@ -534,7 +535,7 @@ namespace mongo {
     /**
        The interface that any db connection should implement
      */
-    class DBClientInterface : boost::noncopyable {
+    class MONGO_CLIENT_API DBClientInterface : boost::noncopyable {
     public:
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) = 0;
@@ -562,8 +563,8 @@ namespace mongo {
         */
         virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 
-            query() and iterate the cursor. 
+        /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use
+            query() and iterate the cursor.
         */
         void findN(vector<BSONObj>& out, const string&ns, Query query, int nToReturn, int nToSkip = 0, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
@@ -577,7 +578,7 @@ namespace mongo {
        DB "commands"
        Basically just invocations of connection.$cmd.findOne({...});
     */
-    class DBClientWithCommands : public DBClientInterface {
+    class MONGO_CLIENT_API DBClientWithCommands : public DBClientInterface {
         set<string> _seenIndexes;
     public:
         /** controls how chatty the client is about network errors & such.  See log.h */
@@ -722,7 +723,7 @@ namespace mongo {
          */
         virtual BSONObj getLastErrorDetailed(bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
 
-        /** Can be called with the returned value from getLastErrorDetailed to extract an error string. 
+        /** Can be called with the returned value from getLastErrorDetailed to extract an error string.
             If all you need is the string, just call getLastError() instead.
         */
         static string getLastErrorString( const BSONObj& res );
@@ -1022,7 +1023,7 @@ namespace mongo {
     /**
      abstract class that implements the core db operations
      */
-    class DBClientBase : public DBClientWithCommands, public DBConnector {
+    class MONGO_CLIENT_API DBClientBase : public DBClientWithCommands, public DBConnector {
     protected:
         static AtomicInt64 ConnectionIdSequence;
         long long _connectionId; // unique connection id for this connection
@@ -1136,9 +1137,9 @@ namespace mongo {
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
         // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
-        
+
         virtual ConnectionString::ConnectionType type() const = 0;
-        
+
         virtual double getSoTimeout() const = 0;
 
         virtual uint64_t getSockCreationMicroSec() const {
@@ -1149,7 +1150,7 @@ namespace mongo {
 
     class DBClientReplicaSet;
 
-    class ConnectException : public UserException {
+    class MONGO_CLIENT_API ConnectException : public UserException {
     public:
         ConnectException(string msg) : UserException(9000,msg) { }
     };
@@ -1158,7 +1159,7 @@ namespace mongo {
         A basic connection to the database.
         This is the main entry point for talking to a simple Mongo setup
     */
-    class DBClientConnection : public DBClientBase {
+    class MONGO_CLIENT_API DBClientConnection : public DBClientBase {
     public:
         using DBClientBase::query;
 
@@ -1332,14 +1333,14 @@ namespace mongo {
 
     /** pings server to check if it's up
      */
-    bool serverAlive( const string &uri );
+    MONGO_CLIENT_API bool serverAlive( const string &uri );
 
-    DBClientBase * createDirectClient();
+    MONGO_CLIENT_API DBClientBase * createDirectClient();
 
-    BSONElement getErrField( const BSONObj& result );
-    bool hasErrField( const BSONObj& result );
+    MONGO_CLIENT_API BSONElement getErrField( const BSONObj& result );
+    MONGO_CLIENT_API bool hasErrField( const BSONObj& result );
 
-    inline std::ostream& operator<<( std::ostream &s, const Query &q ) {
+    MONGO_CLIENT_API inline std::ostream& operator<<( std::ostream &s, const Query &q ) {
         return s << q.toString();
     }
 

@@ -23,6 +23,7 @@
 #include <boost/version.hpp>
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -95,9 +96,9 @@ namespace mongo {
     // parses time of day in "hh:mm" format assuming 'hh' is 00-23
     bool toPointInTime( const std::string& str , boost::posix_time::ptime* timeOfDay );
 
-    void sleepsecs(int s);
-    void sleepmillis(long long ms);
-    void sleepmicros(long long micros);
+    MONGO_CLIENT_API void sleepsecs(int s);
+    MONGO_CLIENT_API void sleepmillis(long long ms);
+    MONGO_CLIENT_API void sleepmicros(long long micros);
 
     class Backoff {
     public:
