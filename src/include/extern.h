@@ -1078,10 +1078,10 @@ extern int __wt_remove(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_rename(WT_SESSION_IMPL *session,
     const char *from,
     const char *to);
-extern int __wt_read(WT_SESSION_IMPL *session,
+extern int __wt_read( WT_SESSION_IMPL *session,
     WT_FH *fh,
     off_t offset,
-    uint32_t bytes,
+    size_t bytes,
     void *buf);
 extern int __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh,

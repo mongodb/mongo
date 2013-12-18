@@ -656,8 +656,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * Read the minimum allocation size a record could be.
 	 */
 	WT_ERR(__wt_buf_init(session, record, log->allocsize));
-	WT_ERR(__wt_read(
-	    session, log_fh, lsnp->offset, log->allocsize, record->mem));
+	WT_ERR(__wt_read(session,
+	    log_fh, lsnp->offset, (size_t)log->allocsize, record->mem));
 	/*
 	 * First 4 bytes is the real record length.  See if we
 	 * need to read more than the allocation size.  We expect
@@ -672,8 +672,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	if (reclen > log->allocsize) {
 		rdup_len = __wt_rduppo2(reclen, log->allocsize);
 		WT_ERR(__wt_buf_grow(session, record, rdup_len));
-		WT_ERR(__wt_read(
-		    session, log_fh, lsnp->offset, rdup_len, record->mem));
+		WT_ERR(__wt_read(session,
+		    log_fh, lsnp->offset, (size_t)rdup_len, record->mem));
 	}
 	/*
 	 * We read in the record, verify checksum.
@@ -825,8 +825,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * Read the minimum allocation size a record could be.
 		 */
 		WT_ASSERT(session, buf.memsize >= allocsize);
-		WT_ERR(__wt_read(
-		    session, log_fh, rd_lsn.offset, allocsize, buf.mem));
+		WT_ERR(__wt_read(session,
+		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
 		 * First 8 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
@@ -848,8 +848,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		rdup_len = __wt_rduppo2(reclen, allocsize);
 		if (reclen > allocsize) {
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
-			WT_ERR(__wt_read(
-			    session, log_fh, rd_lsn.offset, reclen, buf.mem));
+			WT_ERR(__wt_read(session,
+			    log_fh, rd_lsn.offset, (size_t)reclen, buf.mem));
 			WT_STAT_FAST_CONN_INCR(session, log_scan_rereads);
 		}
 		/*

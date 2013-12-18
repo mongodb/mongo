@@ -12,13 +12,16 @@
  *	Read a chunk.
  */
 int
-__wt_read(WT_SESSION_IMPL *session,
-    WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
+__wt_read(
+    WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, size_t bytes, void *buf)
 {
+	ssize_t nr;
+	uint8_t *addr;
+
 	WT_STAT_FAST_CONN_INCR(session, read_io);
 
 	WT_VERBOSE_RET(session, fileops,
-	    "%s: read %" PRIu32 " bytes at offset %" PRIuMAX,
+	    "%s: read %zu bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
@@ -30,12 +33,13 @@ __wt_read(WT_SESSION_IMPL *session,
 	    bytes >= S2C(session)->buffer_alignment &&
 	    bytes % S2C(session)->buffer_alignment == 0));
 
-	if (pread(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s read error: failed to read %" PRIu32
-		    " bytes at offset %" PRIuMAX,
-		    fh->name, bytes, (uintmax_t)offset);
-
+	for (addr = buf;
+	    bytes > 0; addr += nr, bytes -= (size_t)nr, offset += nr)
+		if ((nr = pread(fh->fd, addr, bytes, offset)) < 0)
+			WT_RET_MSG(session, __wt_errno(),
+			    "%s read error: failed to read %zu bytes at "
+			    "offset %" PRIuMAX,
+			    fh->name, bytes, (uintmax_t)offset);
 	return (0);
 }
 
@@ -47,6 +51,9 @@ int
 __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh, off_t offset, size_t bytes, const void *buf)
 {
+	ssize_t nw;
+	const uint8_t *addr;
+
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
 	WT_VERBOSE_RET(session, fileops,
@@ -62,11 +69,12 @@ __wt_write(WT_SESSION_IMPL *session,
 	    bytes >= S2C(session)->buffer_alignment &&
 	    bytes % S2C(session)->buffer_alignment == 0));
 
-	if (pwrite(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
-		WT_RET_MSG(session, __wt_errno(),
-		    "%s write error: failed to write %zu bytes at offset %"
-		    PRIuMAX,
-		    fh->name, bytes, (uintmax_t)offset);
-
+	for (addr = buf;
+	    bytes > 0; addr += nw, bytes -= (size_t)nw, offset += nw)
+		if ((nw = pwrite(fh->fd, addr, bytes, offset)) < 0)
+			WT_RET_MSG(session, __wt_errno(),
+			    "%s write error: failed to write %zu bytes at "
+			    "offset %" PRIuMAX,
+			    fh->name, bytes, (uintmax_t)offset);
 	return (0);
 }

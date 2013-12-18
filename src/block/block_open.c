@@ -258,7 +258,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Read the first allocation-sized block and verify the file format. */
 	WT_ERR(__wt_read(
-	    session, block->fh, (off_t)0, block->allocsize, buf->mem));
+	    session, block->fh, (off_t)0, (size_t)block->allocsize, buf->mem));
 
 	desc = buf->mem;
 	WT_VERBOSE_ERR(session, block,

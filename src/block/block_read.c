@@ -167,7 +167,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 		alloc_size = (uint32_t)WT_MAX(size, buf->memsize + 10);
 	}
 	WT_RET(__wt_buf_init(session, buf, alloc_size));
-	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
+	WT_RET(__wt_read(session, block->fh, offset, (size_t)size, buf->mem));
 	buf->size = size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);

@@ -638,8 +638,8 @@ __conn_config_file(
 	 * what we're doing.
 	 */
 	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
-	WT_ERR(
-	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
+	WT_ERR(__wt_read(
+	    session, fh, (off_t)0, (size_t)len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
 	cbuf->size = len + 1;
 
