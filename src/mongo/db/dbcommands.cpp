@@ -1438,7 +1438,7 @@ namespace mongo {
                 }
                 if( global && Lock::isLocked() == 'w' ) { 
                     // can't go w->W
-                    log() << "need glboal W lock but already have w on command : " << cmdObj.toString() << endl;
+                    log() << "need global W lock but already have w on command : " << cmdObj.toString() << endl;
                 }
             }
             scoped_ptr<Lock::ScopedLock> lk( global ? 
