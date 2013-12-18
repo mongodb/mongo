@@ -99,7 +99,10 @@
     <ClCompile>
       <ObjectFileName>%(RelativeDir)/</ObjectFileName>
       <AdditionalIncludeDirectories>src;src\mongo;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2;src\third_party\yaml-cpp-0.5.1\include</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      <!-- above is temp - NTDDI etc. should be configurable, not finished yet, this gets us compiling some for now. 
+         <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      -->
       <DisableSpecificWarnings>4355;4800;4267;4244;4351</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>No</MinimalRebuild>
@@ -154,6 +157,7 @@
     </Link>
   </ItemDefinitionGroup>
 
+<!-- temp commented out, not working yet
   <!-- SRW / Windows2008+ -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Win2008PlusRelease' Or '(Configuration)'=='Win2008PlusDebug'">
     <ClCompile>
@@ -167,6 +171,7 @@
       <PreprocessorDefinitions>NTDDI_VERSION=0x05020200;_WIN32_WINNT=0x0502;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+-->
 
    <!-- SPECIFICS -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
