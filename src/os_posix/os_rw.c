@@ -35,8 +35,8 @@ __wt_read(
 
 	for (addr = buf;
 	    bytes > 0; addr += nr, bytes -= (size_t)nr, offset += nr)
-		if ((nr = pread(fh->fd, addr, bytes, offset)) < 0)
-			WT_RET_MSG(session, __wt_errno(),
+		if ((nr = pread(fh->fd, addr, bytes, offset)) <= 0)
+			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
 			    "%s read error: failed to read %zu bytes at "
 			    "offset %" PRIuMAX,
 			    fh->name, bytes, (uintmax_t)offset);
