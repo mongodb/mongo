@@ -140,12 +140,11 @@ class WiredTigerTestCase(unittest.TestCase):
 
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
-                    gdbSub = False, verbose = 1):
+                    gdbSub = False, verbose = 1, dirarg = None):
         WiredTigerTestCase._preserveFiles = preserveFiles
+        d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
-            d = 'WT_TEST.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
-        else:
-            d = 'WT_TEST'
+            d += '.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
         WiredTigerTestCase._parentTestdir = d
