@@ -788,7 +788,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
  */
 static inline int
 __wt_lex_compare_skip(
-    const WT_ITEM *user_item, const WT_ITEM *tree_item, uint32_t *matchp)
+    const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
 	const uint8_t *userp, *treep;
 	size_t len, usz, tsz;

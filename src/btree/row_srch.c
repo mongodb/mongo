@@ -18,7 +18,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_INSERT **insp, *last_ins, *ret_ins;
 	WT_ITEM insert_key;
-	uint32_t match, skiphigh, skiplow;
+	size_t match, skiphigh, skiplow;
 	int cmp, i;
 
 	btree = S2BT(session);
@@ -120,7 +120,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_ROW *rip;
-	uint32_t base, indx, limit, match, skiphigh, skiplow;
+	size_t match, skiphigh, skiplow;
+	uint32_t base, indx, limit;
 	int cmp, depth;
 
 	__cursor_search_clear(cbt);
