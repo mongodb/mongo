@@ -2590,6 +2590,7 @@ namespace mongo {
                           result);
                 return false;
             }
+            authzManager->invalidateUserCache();
 
             bool done;
             status = authzManager->upgradeSchemaStep(writeConcern, &done);
