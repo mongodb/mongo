@@ -1986,14 +1986,12 @@ namespace mongo {
             _lazyState = LazyState();
 
         const int lastOp = toSend.operation();
-        bool slaveOk = false;
 
         if (lastOp == dbQuery) {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm(toSend);
             QueryMessage qm(dm);
 
-            const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
             shared_ptr<ReadPreferenceSetting> readPref( _extractReadPref( qm.query,
                                                                           qm.queryOptions ) );
             if ( _isSecondaryQuery( qm.ns, qm.query, *readPref ) ) {
@@ -2024,7 +2022,7 @@ namespace mongo {
                         conn->say(toSend);
 
                         _lazyState._lastOp = lastOp;
-                        _lazyState._slaveOk = slaveOk;
+                        _lazyState._isSecondaryQuery = true;
                         _lazyState._lastClient = conn;
                     }
                     catch ( const DBException& DBExcep ) {
@@ -2050,7 +2048,7 @@ namespace mongo {
             *actualServer = master->getServerAddress();
 
         _lazyState._lastOp = lastOp;
-        _lazyState._slaveOk = slaveOk;
+        _lazyState._isSecondaryQuery = false;
         // Don't retry requests to primary since there is only one host to try
         _lazyState._retries = MAX_RETRY;
         _lazyState._lastClient = master;
@@ -2095,7 +2093,7 @@ namespace mongo {
         if( nReturned == 1 ) dataObj = BSONObj( data );
 
         // Check if we should retry here
-        if( _lazyState._lastOp == dbQuery && _lazyState._slaveOk ){
+        if( _lazyState._lastOp == dbQuery && _lazyState._isSecondaryQuery ){
 
             // Check the error code for a slave not secondary error
             if( nReturned == -1 ||
