@@ -361,8 +361,11 @@ __wt_lsm_merge(
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	lsm_tree->dsk_gen++;
-	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
+	/* Update the throttling while holding the tree lock. */
+	__wt_lsm_tree_throttle(session, lsm_tree);
+
+	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 err:	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)

@@ -1113,8 +1113,9 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 * don't worry about protecting access.
 	 */
 	if (++clsm->primary_chunk->count % 100 == 0 &&
-	    lsm_tree->throttle_sleep > 0)
-		__wt_sleep(0, lsm_tree->throttle_sleep);
+	    lsm_tree->merge_throttle + lsm_tree->ckpt_throttle > 0)
+		__wt_sleep(0,
+		    lsm_tree->ckpt_throttle + lsm_tree->merge_throttle);
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree
