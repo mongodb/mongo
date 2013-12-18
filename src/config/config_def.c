@@ -372,7 +372,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
 	  "leaf_page_max=1MB,lsm=(auto_throttle=,bloom=,bloom_bit_count=16,"
 	  "bloom_config=,bloom_hash_count=8,bloom_oldest=0,chunk_max=5GB,"
-	  "chunk_size=10MB,merge_max=15,merge_min=0,merge_threads=1),"
+	  "chunk_size=10MB,merge_max=15,merge_min=0,merge_threads=2),"
 	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
 	  "prefix_compression=,prefix_compression_min=4,source=,"
 	  "split_pct=75,type=file,value_format=u",
@@ -430,7 +430,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
 	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
-	  "session_max=50,shared_cache=(chunk=10MB,enable=0,name=pool,"
+	  "session_max=100,shared_cache=(chunk=10MB,enable=0,name=pool,"
 	  "reserve=0,size=500MB),statistics=none,"
 	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=dsync,"

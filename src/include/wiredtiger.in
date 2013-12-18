@@ -866,7 +866,7 @@ struct __wt_session {
 	 * 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of
 	 * threads to perform merge operations., an integer between 1 and 10;
-	 * default \c 1.}
+	 * default \c 2.}
 	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
@@ -1535,7 +1535,7 @@ struct __wt_connection {
  * processes). <b>Not yet supported in WiredTiger</b>., a boolean flag; default
  * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
- * threads)., an integer greater than or equal to 1; default \c 50.}
+ * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
  * should configure either a cache_size or a shared_cache not both., a set of
  * related configuration options defined below.}

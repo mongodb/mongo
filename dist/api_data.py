@@ -133,7 +133,7 @@ lsm_config = [
 	        the minimum number of chunks to include in a merge operation. If
 	        set to 0 or 1 half the value of merge_max is used''',
 	        max='100'),
-	    Config('merge_threads', '1', r'''
+	    Config('merge_threads', '2', r'''
 	        the number of threads to perform merge operations''',
 	        min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
 	]),
@@ -657,7 +657,7 @@ methods = {
 	    RPC server for primary processes and use RPC for secondary
 	    processes). <b>Not yet supported in WiredTiger</b>''',
 	    type='boolean'),
-	Config('session_max', '50', r'''
+	Config('session_max', '100', r'''
 	    maximum expected number of sessions (including server
 	    threads)''',
 	    min='1'),

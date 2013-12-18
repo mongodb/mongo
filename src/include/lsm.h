@@ -89,7 +89,8 @@ struct __wt_lsm_tree {
 
 	uint64_t dsk_gen;
 
-	long throttle_sleep;		/* Rate limiting */
+	long ckpt_throttle;		/* Rate limiting due to checkpoints */
+	long merge_throttle;		/* Rate limiting due to merges */
 	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
 	uint64_t merge_progressing;	/* Bumped when merges are active */
 
