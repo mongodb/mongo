@@ -43,7 +43,10 @@ namespace mongo {
         const size_t sizeWithNUL = s.size() + 1;
         const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
 
+#pragma warning(push)
+#pragma warning(disable : 4748)
         intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString(); // uses custom operator new
+#pragma warning(pop)
 
         ptr->_size = s.size();
         char* stringStart = reinterpret_cast<char*>(ptr.get()) + sizeof(RCString);

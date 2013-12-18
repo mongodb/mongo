@@ -137,6 +137,7 @@ namespace mongo {
 // MSVC: warning C4146: unary minus operator applied to unsigned type, result still unsigned
 // This code is statically known to be dead when NumberType is unsigned, so the warning is not real
 #pragma warning(push)
+#pragma warning(disable:4291)
 #pragma warning(disable:4146)
                     if ((NumberType(limits::min() / base) > n) ||
                         ((limits::min() - NumberType(n * base)) > -digitValue)) {

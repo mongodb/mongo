@@ -784,7 +784,7 @@ namespace mongo {
                               << "compatible with " << vinfo << endl;
                 }
             }
-            catch ( const DBException& dbEx ) {
+            catch ( const DBException& ) {
                 if ( allowShardVersionFailure ) {
 
                     // It's okay if we don't set the version when talking to a secondary, we can
