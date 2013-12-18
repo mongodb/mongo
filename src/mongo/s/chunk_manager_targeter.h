@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    class TargeterStats;
+    struct TargeterStats;
 
     /**
      * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and

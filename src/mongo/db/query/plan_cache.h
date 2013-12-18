@@ -33,9 +33,9 @@
 
 namespace mongo {
 
-    class PlanRankingDecision;
-    class QuerySolution;
-    class QuerySolutionNode;
+    struct PlanRankingDecision;
+    struct QuerySolution;
+    struct QuerySolutionNode;
 
     /**
      * TODO: Debug commands:

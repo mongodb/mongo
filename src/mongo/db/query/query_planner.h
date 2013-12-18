@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    class CachedSolution;
+    struct CachedSolution;
 
     /**
      * QueryPlanner's job is to provide an entry point to the query planning and optimization
