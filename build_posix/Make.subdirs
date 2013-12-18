@@ -19,5 +19,6 @@ lang/python PYTHON
 test/bloom
 test/fops
 test/format HAVE_BERKELEY_DB
+test/huge
 test/salvage
 test/thread
