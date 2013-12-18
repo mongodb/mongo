@@ -29,10 +29,10 @@ import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-# test_util05.py
+# test_verify.py
 #    Utilities: wt verify
-class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util05.a'
+class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_verify.a'
     nentries = 1000
 
     def populate(self, tablename):
