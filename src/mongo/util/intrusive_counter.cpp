@@ -44,7 +44,7 @@ namespace mongo {
         const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
 
 #pragma warning(push)
-#pragma warning(disable : 4748)
+#pragma warning(disable : 4291)
         intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString(); // uses custom operator new
 #pragma warning(pop)
 
