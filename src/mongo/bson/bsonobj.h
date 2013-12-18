@@ -28,6 +28,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/export_macros.h"
 #include "mongo/util/bufreader.h"
 
 namespace mongo {
@@ -73,9 +74,9 @@ namespace mongo {
      Code With Scope: <total size><String><Object>
      \endcode
      */
-    class BSONObj {
+    class MONGO_CLIENT_API BSONObj {
     public:
-        
+
         /** Construct a BSONObj from data in the proper format.
          *  Use this constructor when something else owns msgdata's buffer
         */
@@ -97,7 +98,7 @@ namespace mongo {
 
         static BSONObj make( const Record* r );
 
-        ~BSONObj() { 
+        ~BSONObj() {
             _objdata = 0; // defensive
         }
 
@@ -131,7 +132,7 @@ namespace mongo {
         */
         bool isOwned() const { return _holder.get() != 0; }
 
-        /** assure the data buffer is under the control of this BSONObj and not a remote buffer 
+        /** assure the data buffer is under the control of this BSONObj and not a remote buffer
             @see isOwned()
         */
         BSONObj getOwned() const;
@@ -191,7 +192,7 @@ namespace mongo {
         */
         BSONElement getField(const StringData& name) const;
 
-        /** Get several fields at once. This is faster than separate getField() calls as the size of 
+        /** Get several fields at once. This is faster than separate getField() calls as the size of
             elements iterated can then be calculated only once each.
             @param n number of fieldNames, and number of elements in the fields array
             @param fields if a field is found its element is stored in its corresponding position in this array.
@@ -227,7 +228,7 @@ namespace mongo {
         /** @return INT_MIN if not present - does some type conversions */
         int getIntField(const StringData& name) const;
 
-        /** @return false if not present 
+        /** @return false if not present
             @see BSONElement::trueValue()
          */
         bool getBoolField(const StringData& name) const;
@@ -383,15 +384,15 @@ namespace mongo {
         /** @return first field of the object */
         BSONElement firstElement() const { return BSONElement(objdata() + 4); }
 
-        /** faster than firstElement().fieldName() - for the first element we can easily find the fieldname without 
+        /** faster than firstElement().fieldName() - for the first element we can easily find the fieldname without
             computing the element size.
         */
-        const char * firstElementFieldName() const { 
+        const char * firstElementFieldName() const {
             const char *p = objdata() + 4;
             return *p == EOO ? "" : p+1;
         }
 
-        BSONType firstElementType() const { 
+        BSONType firstElementType() const {
             const char *p = objdata() + 4;
             return (BSONType) *p;
         }

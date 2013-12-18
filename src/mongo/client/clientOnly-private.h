@@ -15,10 +15,12 @@
 
 #pragma once
 
+#include "mongo/client/export_macros.h"
+
 namespace mongo {
     class mutex;
 
     namespace shell_utils {
-        extern mongo::mutex &mongoProgramOutputMutex;
+        extern MONGO_CLIENT_API mongo::mutex &mongoProgramOutputMutex;
     }
 }

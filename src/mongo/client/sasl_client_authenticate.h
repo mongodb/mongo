@@ -18,6 +18,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
     class BSONObj;
@@ -54,7 +55,7 @@ namespace mongo {
      * rejected.  Other failures, all of which are tantamount to authentication failure, may also be
      * returned.
      */
-    extern Status (*saslClientAuthenticate)(DBClientWithCommands* client,
+    extern MONGO_CLIENT_API Status (*saslClientAuthenticate)(DBClientWithCommands* client,
                                             const BSONObj& saslParameters);
 
     /**
@@ -66,69 +67,69 @@ namespace mongo {
      * stores into "*payload".  If the type is BinData, the contents are stored directly
      * into "*payload".  In all other cases, returns
      */
-    Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type);
+    Status MONGO_CLIENT_API saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type);
 
     // Constants
 
     /// String name of the saslStart command.
-    extern const char* const saslStartCommandName;
+    extern MONGO_CLIENT_API const char* const saslStartCommandName;
 
     /// String name of the saslContinue command.
-    extern const char* const saslContinueCommandName;
+    extern MONGO_CLIENT_API const char* const saslContinueCommandName;
 
     /// Name of the saslStart parameter indicating that the server should automatically grant the
     /// connection all privileges associated with the user after successful authentication.
-    extern const char* const saslCommandAutoAuthorizeFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandAutoAuthorizeFieldName;
 
     /// Name of the field contain the status code in responses from the server.
-    extern const char* const saslCommandCodeFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandCodeFieldName;
 
     /// Name of the field containing the conversation identifier in server respones and saslContinue
     /// commands.
-    extern const char* const saslCommandConversationIdFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandConversationIdFieldName;
 
     /// Name of the field that indicates whether or not the server believes authentication has
     /// completed successfully.
-    extern const char* const saslCommandDoneFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandDoneFieldName;
 
     /// Field in which  to store error messages associated with non-success return codes.
-    extern const char* const saslCommandErrmsgFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandErrmsgFieldName;
 
     /// Name of parameter to saslStart command indiciating the client's desired sasl mechanism.
-    extern const char* const saslCommandMechanismFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandMechanismFieldName;
 
     /// In the event that saslStart supplies an unsupported mechanism, the server responds with a
     /// field by this name, with a list of supported mechanisms.
-    extern const char* const saslCommandMechanismListFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandMechanismListFieldName;
 
     /// Field containing password information for saslClientAuthenticate().
-    extern const char* const saslCommandPasswordFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandPasswordFieldName;
 
     /// Field containing sasl payloads passed to and from the server.
-    extern const char* const saslCommandPayloadFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandPayloadFieldName;
 
     /// Field containing the string identifier of the user to authenticate in
     /// saslClientAuthenticate().
-    extern const char* const saslCommandUserFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandUserFieldName;
 
     /// Field containing the string identifier of the database containing credential information,
     /// or "$external" if the credential information is stored outside of the mongo cluster.
-    extern const char* const saslCommandUserDBFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandUserDBFieldName;
 
     /// Field overriding the FQDN of the hostname hosting the mongodb srevice in
     /// saslClientAuthenticate().
-    extern const char* const saslCommandServiceHostnameFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandServiceHostnameFieldName;
 
     /// Field overriding the name of the mongodb service saslClientAuthenticate().
-    extern const char* const saslCommandServiceNameFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandServiceNameFieldName;
 
     /// Default database against which sasl authentication commands should run.
-    extern const char* const saslDefaultDBName;
+    extern MONGO_CLIENT_API const char* const saslDefaultDBName;
 
     /// Default sasl service name, "mongodb".
-    extern const char* const saslDefaultServiceName;
+    extern MONGO_CLIENT_API const char* const saslDefaultServiceName;
 
     // Field whose value should be set to true if the field in saslCommandPasswordFieldName needs to
     // be digested.
-    extern const char* const saslCommandDigestPasswordFieldName;
+    extern MONGO_CLIENT_API const char* const saslCommandDigestPasswordFieldName;
 }

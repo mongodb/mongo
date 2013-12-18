@@ -22,6 +22,7 @@
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/net/message.h"
@@ -30,10 +31,10 @@ namespace mongo {
 
     class AScopedConnection;
 
-    /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here 
+    /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here
         @see DBClientMockCursor
      */
-    class DBClientCursorInterface : boost::noncopyable {
+    class MONGO_CLIENT_API DBClientCursorInterface : boost::noncopyable {
     public:
         virtual ~DBClientCursorInterface() {}
         virtual bool more() = 0;
@@ -44,7 +45,7 @@ namespace mongo {
     };
 
     /** Queries return a cursor object */
-    class DBClientCursor : public DBClientCursorInterface {
+    class MONGO_CLIENT_API DBClientCursor : public DBClientCursorInterface {
     public:
         /** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
@@ -201,7 +202,7 @@ namespace mongo {
         void initLazy( bool isRetry = false );
         bool initLazyFinish( bool& retry );
 
-        class Batch : boost::noncopyable { 
+        class Batch : boost::noncopyable {
             friend class DBClientCursor;
             auto_ptr<Message> m;
             int nReturned;
@@ -217,7 +218,7 @@ namespace mongo {
 
         int nextBatchSize();
         void _finishConsInit();
-        
+
         Batch batch;
         DBClientBase* _client;
         string _originalHost;
@@ -255,7 +256,7 @@ namespace mongo {
 
     /** iterate over objects in current batch only - will not cause a network call
      */
-    class DBClientCursorBatchIterator {
+    class MONGO_CLIENT_API DBClientCursorBatchIterator {
     public:
         DBClientCursorBatchIterator( DBClientCursor &c ) : _c( c ), _n() {}
         bool moreInCurrentBatch() { return _c.moreInCurrentBatch(); }

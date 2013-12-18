@@ -21,6 +21,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -42,7 +43,7 @@ namespace mongo {
      * See parse_number.cpp for the available instantiations, and add any new instantiations there.
      */
     template <typename NumberType>
-    Status parseNumberFromStringWithBase(const StringData& stringValue, int base, NumberType* result);
+    MONGO_CLIENT_API Status parseNumberFromStringWithBase(const StringData& stringValue, int base, NumberType* result);
 
     template <typename NumberType>
     static Status parseNumberFromString(const StringData& stringValue, NumberType* result) {

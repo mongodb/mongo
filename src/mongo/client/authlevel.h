@@ -19,6 +19,8 @@
 
 #include <string>
 
+#include "mongo/client/export_macros.h"
+
 namespace mongo {
 
     /*
@@ -28,7 +30,7 @@ namespace mongo {
      *     1 : read
      *     2 : write
      */
-    struct Auth {
+    struct MONGO_CLIENT_API Auth {
 
         enum Level { NONE = 0 ,
                      READ = 1 ,

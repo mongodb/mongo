@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include "mongo/client/export_macros.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/namespace_string.h"
@@ -33,7 +34,7 @@ namespace mongo {
     /**
      * holder for a server address and a query to run
      */
-    class ServerAndQuery {
+    class MONGO_CLIENT_API ServerAndQuery {
     public:
         ServerAndQuery( const string& server , BSONObj extra = BSONObj() , BSONObj orderObject = BSONObj() ) :
             _server( server ) , _extra( extra.getOwned() ) , _orderObject( orderObject.getOwned() ) {
@@ -69,7 +70,7 @@ namespace mongo {
      * this is a cursor that works over a set of servers
      * can be used in serial/parallel as controlled by sub classes
      */
-    class ClusteredCursor {
+    class MONGO_CLIENT_API ClusteredCursor {
     public:
         ClusteredCursor( const QuerySpec& q );
         ClusteredCursor( QueryMessage& q );
@@ -124,7 +125,7 @@ namespace mongo {
     class ParallelConnectionMetadata;
 
     // TODO:  We probably don't really need this as a separate class.
-    class FilteringClientCursor {
+    class MONGO_CLIENT_API FilteringClientCursor {
     public:
         FilteringClientCursor( const BSONObj filter = BSONObj() );
         FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter = BSONObj() );
@@ -160,7 +161,7 @@ namespace mongo {
     };
 
 
-    class Servers {
+    class MONGO_CLIENT_API Servers {
     public:
         Servers() {
         }
@@ -218,7 +219,7 @@ namespace mongo {
      * runs a query in serial across any number of servers
      * returns all results from 1 server, then the next, etc...
      */
-    class SerialServerClusteredCursor : public ClusteredCursor {
+    class MONGO_CLIENT_API SerialServerClusteredCursor : public ClusteredCursor {
     public:
         SerialServerClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , int sortOrder=0);
         virtual bool more();
@@ -240,7 +241,7 @@ namespace mongo {
 
 
 
-    class CommandInfo {
+    class MONGO_CLIENT_API CommandInfo {
     public:
         string versionedNS;
         BSONObj cmdFilter;
@@ -262,7 +263,7 @@ namespace mongo {
     class DBClientCursor;
     typedef shared_ptr<DBClientCursor> DBClientCursorPtr;
 
-    class ParallelConnectionState {
+    class MONGO_CLIENT_API ParallelConnectionState {
     public:
 
         ParallelConnectionState() :
@@ -289,7 +290,7 @@ namespace mongo {
     typedef ParallelConnectionState PCState;
     typedef shared_ptr<PCState> PCStatePtr;
 
-    class ParallelConnectionMetadata {
+    class MONGO_CLIENT_API ParallelConnectionMetadata {
     public:
 
         ParallelConnectionMetadata() :
@@ -328,7 +329,7 @@ namespace mongo {
      *    stale configuration exceptions
      * 3) Command query, either enforcing compatible chunk versions or sent to particular shards.
      */
-    class ParallelSortClusteredCursor : public ClusteredCursor {
+    class MONGO_CLIENT_API ParallelSortClusteredCursor : public ClusteredCursor {
     public:
 
         ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );
@@ -411,7 +412,7 @@ namespace mongo {
      * right now uses underlying sync network ops and uses another thread
      * should be changed to use non-blocking io
      */
-    class Future {
+    class MONGO_CLIENT_API Future {
     public:
         class CommandResult {
         public:
@@ -457,7 +458,7 @@ namespace mongo {
             friend class Future;
         };
 
-        
+
         /**
          * @param server server name
          * @param db db name
