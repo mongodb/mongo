@@ -564,11 +564,22 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */
-#define	WT_LSM_MERGE_THROTTLE_FACTOR	1.1
+#define	WT_LSM_MERGE_THROTTLE_BUMP_PCT	10
 /* Number of level 0 chunks that need to be present to throttle inserts */
 #define	WT_LSM_MERGE_THROTTLE_THRESHOLD	(2 * lsm_tree->merge_max)
 /* Time to wait when first throttling */
 #define	WT_LSM_THROTTLE_START		20
+
+#define WT_LSM_MERGE_THROTTLE_INCREASE(val)	do {			\
+	(val) = WT_MAX(WT_LSM_THROTTLE_START,				\
+	    (val) + ((val) / WT_LSM_MERGE_THROTTLE_BUMP_PCT));		\
+	} while (0)
+
+#define WT_LSM_MERGE_THROTTLE_DECREASE(val)	do {			\
+	(val) = (val) - ((val) / WT_LSM_MERGE_THROTTLE_BUMP_PCT);	\
+	if ((val) < WT_LSM_THROTTLE_START)				\
+		(val) = 0;						\
+	} while (0)
 
 /*
  * __wt_lsm_tree_throttle --
@@ -606,15 +617,10 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (lsm_tree->merge_threads > 1 && gen0_chunks >
 	    WT_LSM_MERGE_THROTTLE_THRESHOLD)
-		lsm_tree->merge_throttle = WT_MAX(WT_LSM_THROTTLE_START,
-		    WT_LSM_MERGE_THROTTLE_FACTOR * lsm_tree->merge_throttle);
+		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
 	else if (lsm_tree->merge_throttle > 0 &&
-	    gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD) {
-		lsm_tree->merge_throttle =
-		    lsm_tree->merge_throttle / WT_LSM_MERGE_THROTTLE_FACTOR;
-		if (lsm_tree->merge_throttle < WT_LSM_THROTTLE_START)
-			lsm_tree->merge_throttle = 0;
-	}
+	    gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
+		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
 
 	/*
 	 * In the steady state, we expect that the checkpoint worker thread
