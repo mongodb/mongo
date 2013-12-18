@@ -430,7 +430,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
 	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
-	  "session_max=50,shared_cache=(chunk=10MB,enable=0,name=pool,"
+	  "session_max=100,shared_cache=(chunk=10MB,enable=0,name=pool,"
 	  "reserve=0,size=500MB),statistics=none,"
 	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=dsync,"

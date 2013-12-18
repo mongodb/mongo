@@ -657,7 +657,7 @@ methods = {
 	    RPC server for primary processes and use RPC for secondary
 	    processes). <b>Not yet supported in WiredTiger</b>''',
 	    type='boolean'),
-	Config('session_max', '50', r'''
+	Config('session_max', '100', r'''
 	    maximum expected number of sessions (including server
 	    threads)''',
 	    min='1'),
