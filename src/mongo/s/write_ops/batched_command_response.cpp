@@ -176,7 +176,8 @@ namespace mongo {
         if ( fieldState == FieldParser::FIELD_INVALID ) return false;
         if ( fieldState == FieldParser::FIELD_SET ) _upsertDetails.reset( tempUpsertDetails );
 
-        fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
+        fieldState = FieldParser::extract(source, lastOp, 
+                                          reinterpret_cast<Date_t*>(&_lastOp), errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isLastOpSet = fieldState == FieldParser::FIELD_SET;
 
@@ -226,7 +227,7 @@ namespace mongo {
 
         _writeErrorDetails.reset();
 
-        _lastOp = 0ULL;
+        _lastOp = OpTime();
         _isLastOpSet = false;
 
         if (_writeErrorDetails.get()) {
@@ -470,7 +471,7 @@ namespace mongo {
         return _upsertDetails->at(pos);
     }
 
-    void BatchedCommandResponse::setLastOp(Date_t lastOp) {
+    void BatchedCommandResponse::setLastOp(OpTime lastOp) {
         _lastOp = lastOp;
         _isLastOpSet = true;
     }
@@ -483,7 +484,7 @@ namespace mongo {
          return _isLastOpSet;
     }
 
-    Date_t BatchedCommandResponse::getLastOp() const {
+    OpTime BatchedCommandResponse::getLastOp() const {
         dassert(_isLastOpSet);
         return _lastOp;
     }

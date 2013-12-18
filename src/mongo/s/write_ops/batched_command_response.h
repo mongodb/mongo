@@ -126,10 +126,10 @@ namespace mongo {
         const std::vector<BatchedUpsertDetail*>& getUpsertDetails() const;
         const BatchedUpsertDetail* getUpsertDetailsAt(std::size_t pos) const;
 
-        void setLastOp(Date_t lastOp);
+        void setLastOp(OpTime lastOp);
         void unsetLastOp();
         bool isLastOpSet() const;
-        Date_t getLastOp() const;
+        OpTime getLastOp() const;
 
         void setErrDetails(const std::vector<WriteErrorDetail*>& errDetails);
         // errDetails ownership is transferred to here.
@@ -182,7 +182,7 @@ namespace mongo {
         boost::scoped_ptr<std::vector<BatchedUpsertDetail*> >_upsertDetails;
 
         // (O)  XXX What is lastop?
-        Date_t _lastOp;
+        OpTime _lastOp;
         bool _isLastOpSet;
 
         // (O)  Array of item-level error information

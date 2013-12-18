@@ -140,8 +140,9 @@ namespace mongo {
         }
 
         // Send opTime in response
-        if ( anyReplEnabled() )
-            response->setLastOp( _client->getLastOp().asDate() );
+        if ( anyReplEnabled() ) {
+            response->setLastOp( _client->getLastOp() );
+        }
 
         // Apply write concern if we had any successful writes
         if ( numItemErrors < numBatchItems ) {

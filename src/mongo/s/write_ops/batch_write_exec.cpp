@@ -253,8 +253,8 @@ namespace mongo {
                         // NOTE: This will record lastOps for shards where we actually didn't update
                         // or delete any documents, which preserves old behavior but is conservative
                         _stats->noteWriteAt( shardHost,
-                                             response.isLastOpSet() ?
-                                                 OpTime( response.getLastOp() ) : OpTime() );
+                                             response.isLastOpSet() ? 
+                                             response.getLastOp() : OpTime() );
                     }
                     else {
 
