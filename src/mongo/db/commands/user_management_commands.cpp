@@ -224,7 +224,7 @@ namespace mongo {
             }
             std::vector<RoleName> indirectRoles;
             status = auth::parseRoleNamesFromBSONArray(
-                    BSONArray(roleToAddDoc["indirectRoles"].Obj()),
+                    BSONArray(roleToAddDoc["inheritedRoles"].Obj()),
                     role.getDB(),
                     &indirectRoles);
             if (!status.isOK()) {

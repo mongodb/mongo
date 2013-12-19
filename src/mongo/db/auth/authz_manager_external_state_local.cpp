@@ -184,16 +184,16 @@ namespace {
         }
 
         mutablebson::Document resultDoc(userDoc, mutablebson::Document::kInPlaceDisabled);
-        mutablebson::Element indirectRolesElement = resultDoc.makeElementArray("indirectRoles");
-        mutablebson::Element privilegesElement = resultDoc.makeElementArray("privileges");
+        mutablebson::Element inheritedRolesElement = resultDoc.makeElementArray("inheritedRoles");
+        mutablebson::Element privilegesElement = resultDoc.makeElementArray("inheritedPrivileges");
         mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
+        fassert(17159, resultDoc.root().pushBack(inheritedRolesElement));
         fassert(17158, resultDoc.root().pushBack(privilegesElement));
-        fassert(17159, resultDoc.root().pushBack(indirectRolesElement));
         if (!isRoleGraphInconsistent) {
             fassert(17160, warningsElement.appendString(
                             "", "Role graph inconsistent, only direct privileges available."));
         }
-        addRoleNameObjectsToArrayElement(indirectRolesElement,
+        addRoleNameObjectsToArrayElement(inheritedRolesElement,
                                          makeRoleNameIteratorForContainer(indirectRoles));
         addPrivilegeObjectsOrWarningsToArrayElement(
                 privilegesElement, warningsElement, allPrivileges);
@@ -222,25 +222,36 @@ namespace {
                         AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole()));
         fassert(17163, resultDoc.root().appendString(
                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME, roleName.getDB()));
+        fassert(17267,
+                resultDoc.root().appendBool("isBuiltin", _roleGraph.isBuiltinRole(roleName)));
         mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");
         fassert(17164, resultDoc.root().pushBack(rolesElement));
-        mutablebson::Element indirectRolesElement = resultDoc.makeElementArray("indirectRoles");
-        fassert(17165, resultDoc.root().pushBack(indirectRolesElement));
+        mutablebson::Element inheritedRolesElement = resultDoc.makeElementArray("inheritedRoles");
+        fassert(17165, resultDoc.root().pushBack(inheritedRolesElement));
         mutablebson::Element privilegesElement = resultDoc.makeElementArray("privileges");
+        mutablebson::Element inheritedPrivilegesElement =
+                resultDoc.makeElementArray("inheritedPrivileges");
         if (showPrivileges) {
             fassert(17166, resultDoc.root().pushBack(privilegesElement));
         }
-        fassert(17267,
-                resultDoc.root().appendBool("isBuiltin", _roleGraph.isBuiltinRole(roleName)));
         mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
 
         addRoleNameObjectsToArrayElement(rolesElement, _roleGraph.getDirectSubordinates(roleName));
         if (_roleGraphState == roleGraphStateConsistent) {
             addRoleNameObjectsToArrayElement(
-                    indirectRolesElement, _roleGraph.getIndirectSubordinates(roleName));
+                    inheritedRolesElement, _roleGraph.getIndirectSubordinates(roleName));
             if (showPrivileges) {
                 addPrivilegeObjectsOrWarningsToArrayElement(
-                        privilegesElement, warningsElement, _roleGraph.getAllPrivileges(roleName));
+                        privilegesElement,
+                        warningsElement,
+                        _roleGraph.getDirectPrivileges(roleName));
+
+                addPrivilegeObjectsOrWarningsToArrayElement(
+                        inheritedPrivilegesElement,
+                        warningsElement,
+                        _roleGraph.getAllPrivileges(roleName));
+
+                fassert(17323, resultDoc.root().pushBack(inheritedPrivilegesElement));
             }
         }
         else if (showPrivileges) {
@@ -312,7 +323,7 @@ namespace {
 
         RoleGraphState newState;
         if (status == ErrorCodes::GraphContainsCycle) {
-            error() << "Inconsistent role graph during authorization manager intialization.  Only "
+            error() << "Inconsistent role graph during authorization manager initialization.  Only "
                 "direct privileges available. " << status.reason();
             newState = roleGraphStateHasCycle;
             status = Status::OK();
@@ -364,7 +375,7 @@ namespace {
             status = _roleGraph.recomputePrivilegeData();
             if (status == ErrorCodes::GraphContainsCycle) {
                 _roleGraphState = roleGraphStateHasCycle;
-                error() << "Inconsistent role graph during authorization manager intialization.  "
+                error() << "Inconsistent role graph during authorization manager initialization.  "
                     "Only direct privileges available. " << status.reason() <<
                     " after applying oplog entry " << op;
             }
