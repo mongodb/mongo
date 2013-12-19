@@ -232,10 +232,12 @@ namespace mongo {
 
         _hasReadPref = queryObj.hasField("$readPreference");
 
-        if (!isValidSortOrder(_sort)) {
-            return Status(ErrorCodes::BadValue, "bad sort specification");
+        if (!_sort.isEmpty()) {
+            if (!isValidSortOrder(_sort)) {
+                return Status(ErrorCodes::BadValue, "bad sort specification");
+            }
+            _sort = normalizeSortOrder(_sort);
         }
-        _sort = normalizeSortOrder(_sort);
 
         // Min and Max objects must have the same fields.
         if (!_min.isEmpty() && !_max.isEmpty()) {
