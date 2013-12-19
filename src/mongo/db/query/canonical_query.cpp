@@ -86,7 +86,7 @@ namespace mongo {
                                         CanonicalQuery** out) {
         BSONObj emptyObj;
         return CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                            emptyObj, emptyObj, out);
+                                            emptyObj, emptyObj, false, out);
     }
 
     // static
@@ -95,12 +95,12 @@ namespace mongo {
                                         long long skip, long long limit,
                                         const BSONObj& hint,
                                         const BSONObj& minObj, const BSONObj& maxObj,
-                                        CanonicalQuery** out) {
+                                        bool snapshot, CanonicalQuery** out) {
         LiteParsedQuery* lpq;
         // Pass empty sort and projection.
         BSONObj emptyObj;
         Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort,
-                                                   hint, minObj, maxObj, &lpq);
+                                                   hint, minObj, maxObj, snapshot, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
