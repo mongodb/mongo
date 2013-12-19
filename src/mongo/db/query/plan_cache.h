@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_tag.h"
@@ -78,6 +79,9 @@ namespace mongo {
 
     // TODO: Is this binary data really?
     typedef std::string PlanCacheKey;
+
+    // TODO: Replace with opaque type.
+    typedef std::string PlanID;
 
     /**
      * A PlanCacheIndexTree is the meaty component of the data
@@ -196,6 +200,12 @@ namespace mongo {
         // For debugging.
         std::string toString() const;
 
+        // XXX: remove when we have a real CachedSolution
+        size_t numPlans;
+        BSONObj query;
+        BSONObj sort;
+        BSONObj projection;
+
         // XXX: no copying
     };
 
@@ -237,6 +247,14 @@ namespace mongo {
 
         // Is this pinned in the cache?  If so, we will never remove it as a result of feedback.
         bool pinned;
+
+        // XXX: for test only. Remove when plan cache entries are implemented.
+        size_t numPlans;
+
+        // XXX: Replace with copy of canonical query?
+        BSONObj query;
+        BSONObj sort;
+        BSONObj projection;
     };
 
     /**
@@ -277,7 +295,17 @@ namespace mongo {
          * If there is an entry in the cache, populates 'crOut' and returns Status::OK().  Caller
          * owns '*crOut'.
          */
-        Status get(const CanonicalQuery& query, CachedSolution** crOut);
+        Status get(const CanonicalQuery& query, CachedSolution** crOut) const;
+
+        /**
+         * Look up the cached data access for the provided key.
+         *
+         * If there is no entry in the cache for the 'query', returns an error Status.
+         *
+         * If there is an entry in the cache, populates 'crOut' and returns Status::OK().  Caller
+         * owns '*crOut'.
+         */
+        Status get(const PlanCacheKey& key, CachedSolution** crOut) const;
 
         /**
          * When the CachedPlanRunner runs a plan out of the cache, we want to record data about the
@@ -311,8 +339,47 @@ namespace mongo {
          */
         static void sortTree(MatchExpression* tree);
 
+        /**
+         * Retrieves all plan cache keys
+         */
+        void getKeys(std::vector<PlanCacheKey>* keysOut) const;
+
+        /**
+         * Pins plan on a query in the cache. Subsequent cached solutions
+         * will be generated based on the pinned plan.
+         */
+        Status pin(const PlanCacheKey& key, const PlanID& plan);
+
+        /**
+         * Unpins query. No-op if there is no plan pinned to the query.
+         */
+        Status unpin(const PlanCacheKey& key);
+
+        /**
+         * Adds user-defined plan.
+         */
+        Status addPlan(const PlanCacheKey& key, const BSONObj& details, PlanID* planOut);
+
+        /**
+         * Removes plan from cache entry.
+         */
+        Status shunPlan(const PlanCacheKey& key, const PlanID& plan);
+
     private:
+
+        /**
+         * Releases resources associated with each cache entry
+         * and clears map.
+         * Invoked by clear() and during destruction.
+         */
+        void _clear();
+
         unordered_map<PlanCacheKey, PlanCacheEntry*> _cache;
+
+        /**
+         * Protects _cache.
+         */
+        mutable boost::mutex _cacheMutex;
     };
 
 }  // namespace mongo

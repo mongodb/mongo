@@ -1479,6 +1479,52 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "planCacheRead",
+            command: {planCacheListKeys: "x"},
+            skipSharded: true,
+            setup: function (db) { db.x.save( {} ); },
+            teardown: function (db) { db.x.drop(); },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_readWriteDbAdmin,
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "x"}, actions: ["planCacheRead"] }
+                    ],
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: roles_readWriteDbAdminAny,
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "x"}, actions: ["planCacheRead"] }
+                    ],
+                },
+            ]
+        },
+        {
+            testname: "planCacheWrite",
+            command: {planCacheClear: "x"},
+            skipSharded: true,
+            setup: function (db) { db.x.save( {} ); },
+            teardown: function (db) { db.x.drop(); },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_dbAdmin,
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "x"}, actions: ["planCacheWrite"] }
+                    ],
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: roles_dbAdminAny,
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "x"}, actions: ["planCacheWrite"] }
+                    ],
+                },
+            ]
+        },
+        {
             testname: "ping",
             command: {ping: 1},
             testcases: [

@@ -117,7 +117,8 @@ namespace {
             << ActionType::dbHash
             << ActionType::dbStats
             << ActionType::find
-            << ActionType::killCursors;
+            << ActionType::killCursors
+            << ActionType::planCacheRead;
 
         // Read-write role
         readWriteRoleActions += readRoleActions;
@@ -162,6 +163,8 @@ namespace {
             << ActionType::createIndex
             << ActionType::indexStats
             << ActionType::enableProfiler
+            << ActionType::planCacheRead
+            << ActionType::planCacheWrite
             << ActionType::reIndex
             << ActionType::renameCollectionSameDB // read_write gets this also
             << ActionType::repairDatabase

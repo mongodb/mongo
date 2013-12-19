@@ -29,13 +29,16 @@
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
+#include <memory>
 #include <sstream>
+#include "boost/thread/locks.hpp"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
 
 namespace {
 
+    using std::auto_ptr;
     using std::ostream;
     using std::string;
     using std::stringstream;
@@ -206,6 +209,8 @@ namespace mongo {
 
         decision.reset(d);
         pinned = false;
+        numPlans = 0;
+
         // Copy the solution's cache data into the plan cache entry.
         plannerData.reset(s.cacheData->clone());
     }
@@ -292,29 +297,163 @@ namespace mongo {
     // PlanCache
     //
 
-    PlanCache::~PlanCache() { clear(); }
+    PlanCache::~PlanCache() {
+        _clear();
+    }
 
     Status PlanCache::add(const CanonicalQuery& query, const QuerySolution& soln,
                           PlanRankingDecision* why) {
-        // XXX: This method is responsible for returning an error if the
-        // cacheData in 'soln' returns false for 'exists()'.
-        return Status(ErrorCodes::BadValue, "not implemented yet");
+        verify(why);
+
+        if (NULL == soln.cacheData.get()) {
+            return Status(ErrorCodes::BadValue, "invalid solution - no cache data");
+        }
+
+        PlanCacheKey key = getPlanCacheKey(query);
+        PlanCacheEntry* entry = new PlanCacheEntry(soln, why);
+        // XXX: fix later
+        entry->numPlans = why->onlyOneSolution ? 1 : 2;
+        const LiteParsedQuery& pq = query.getParsed();
+        entry->query = pq.getFilter().copy();
+        entry->sort = pq.getSort().copy();
+        entry->projection = pq.getProj().copy();
+
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        // XXX: Replacing existing entry - revisit when we have real cached solutions.
+        // Delete previous entry
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i != _cache.end()) {
+            PlanCacheEntry* previousEntry = i->second;
+            delete previousEntry;
+        }
+        _cache[key] = entry;
+
+        return Status::OK();
     }
 
-    Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) {
-        return Status(ErrorCodes::BadValue, "not implemented yet");
+    Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) const{
+        PlanCacheKey key = getPlanCacheKey(query);
+        return get(key, crOut);
+    }
+
+    Status PlanCache::get(const PlanCacheKey& key, CachedSolution** crOut) const {
+        verify(crOut);
+
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        auto_ptr<CachedSolution> cr(new CachedSolution());
+        cr->key = key;
+        cr->numPlans = entry->numPlans;
+        cr->query = entry->query;
+        cr->sort = entry->sort;
+        cr->projection = entry->projection;
+
+        *crOut = cr.release();
+        return Status::OK();
     }
 
     Status PlanCache::feedback(const PlanCacheKey& ck, PlanCacheEntryFeedback* feedback) {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         return Status(ErrorCodes::BadValue, "not implemented yet");
     }
 
     Status PlanCache::remove(const PlanCacheKey& ck) {
-        return Status(ErrorCodes::BadValue, "not implemented yet");
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(ck);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+        _cache.erase(i);
+        delete entry;
+        return Status::OK();
     }
 
     void PlanCache::clear() {
-        // XXX: implement
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        _clear();
+    }
+
+    void PlanCache::getKeys(std::vector<PlanCacheKey>* keysOut) const {
+        verify(keysOut);
+
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
+            const PlanCacheKey& key = i->first;
+            keysOut->push_back(key);
+        }
+    }
+
+    Status PlanCache::pin(const PlanCacheKey& key, const PlanID& plan) {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        // search for plan
+        // XXX: remove when we have real cached plans
+        for (size_t i = 0; i < entry->numPlans; i++) {
+            stringstream ss;
+            ss << "plan" << i;
+            PlanID currentPlan(ss.str());
+            if (currentPlan == plan) {
+                entry->pinned = true;
+                return Status::OK();
+            }
+        }
+
+        return Status(ErrorCodes::BadValue, "no such plan in cache");
+    }
+
+    Status PlanCache::unpin(const PlanCacheKey& key) {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        entry->pinned = false;
+
+        return Status::OK();
+    }
+
+    Status PlanCache::addPlan(const PlanCacheKey& key, const BSONObj& details, PlanID* planOut) {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        // XXX: Generate fake plan ID
+        stringstream ss;
+        ss << "plan" << entry->numPlans;
+        PlanID plan(ss.str());
+
+        entry->numPlans++;
+
+        *planOut = plan;
+        return Status::OK();
     }
 
     // static
@@ -326,6 +465,48 @@ namespace mongo {
         if (NULL != children) {
             std::sort(children->begin(), children->end(), OperatorAndFieldNameComparison);
         }
+    }
+
+    Status PlanCache::shunPlan(const PlanCacheKey& key, const PlanID& plan) {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        // Do not proceed if there's only one plan for this query.
+        if (1 == entry->numPlans) {
+            return Status(ErrorCodes::BadValue, "cannot shun only plan for query");
+        }
+       
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        // search for plan
+        // XXX: remove when we have real cached plans
+        for (size_t i = 0; i < entry->numPlans; i++) {
+            stringstream ss;
+            ss << "plan" << i;
+            PlanID currentPlan(ss.str());
+            if (currentPlan == plan) {
+                entry->numPlans--;
+                return Status::OK();
+            }
+        }
+
+        return Status(ErrorCodes::BadValue, "no such plan in cache");
+    }
+
+    void PlanCache::_clear() {
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
+            PlanCacheEntry* entry = i->second;
+            delete entry;
+        }
+        _cache.clear();
     }
 
 }  // namespace mongo

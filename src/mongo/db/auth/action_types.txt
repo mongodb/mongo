@@ -72,6 +72,8 @@
 "mapReduceShardedFinish",
 "moveChunk",
 "netstat",
+"planCacheRead", # view contents of plan cache
+"planCacheWrite", # clear cache, drop cache entry, pin/unpin/shun plans
 "reIndex",
 "remove",
 "removeShard",

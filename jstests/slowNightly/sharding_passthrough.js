@@ -113,6 +113,7 @@ files.forEach(function(x) {
         'bench_test.*|' +
         'mr_replaceIntoDB|' +
         'mr_auth|' +
+        'plan_cache_commands|' +
         'queryoptimizera|' +
         'indexStatsCommand|' +
         'reversecursor|' +

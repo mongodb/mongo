@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_solution.h"
@@ -234,6 +235,26 @@ namespace {
         // Nested queries
         testNormalizeQueryForCache("{a: {$elemMatch: {c: 1, b:1}}}",
                                    "{a: {$elemMatch: {b: 1, c:1}}}");
+    }
+
+    TEST(PlanCacheTest, AddValidSolution) {
+        PlanCache planCache;
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
+        QuerySolution qs;
+        qs.cacheData.reset(new SolutionCacheData());
+        qs.cacheData->tree.reset(new PlanCacheIndexTree());
+        ASSERT_OK(planCache.add(*cq, qs, new PlanRankingDecision()));
+        std::vector<PlanCacheKey> keys;
+        planCache.getKeys(&keys);
+        ASSERT_EQUALS(keys.size(), 1U);
+    }
+
+    // Adding a query solution without valid cache data should fail.
+    TEST(PlanCacheTest, AddInvalidSolution) {
+        PlanCache planCache;
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
+        QuerySolution qs;
+        ASSERT_NOT_OK(planCache.add(*cq, qs, new PlanRankingDecision()));
     }
 
     /**
