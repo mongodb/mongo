@@ -58,10 +58,9 @@ __wt_lsm_merge(
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
-	uint32_t generation, start_id;
+	uint32_t generation, max_gap, max_gen, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
-	u_int max_generation_gap;
 	int create_bloom, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
@@ -82,7 +81,7 @@ __wt_lsm_merge(
 	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		aggressive = 10;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
-	max_generation_gap = 1 + aggressive / 5;
+	max_gap = (aggressive + 4) / 5;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -159,16 +158,14 @@ __wt_lsm_merge(
 			break;
 
 		/*
-		 * In normal operation, if we have enough chunks for a merge
-		 * and the next chunk is in a different generation, stop.
-		 * In aggressive mode, look for the biggest merge we can do.
+		 * If we have enough chunks for a merge and the next chunk is
+		 * in too high a generation, stop.
 		 */
 		if (nchunks >= merge_min) {
 			previous = lsm_tree->chunk[start_chunk];
-			if (previous->generation <=
-				youngest->generation + max_generation_gap &&
-			    chunk->generation >
-				previous->generation + max_generation_gap - 1)
+			max_gen = youngest->generation + max_gap;
+			if (previous->generation <= max_gen &&
+			    chunk->generation > max_gen)
 				break;
 		}
 
@@ -193,12 +190,11 @@ __wt_lsm_merge(
 		start_id = chunk->id;
 
 		/*
-		 * Don't do small merges or merge across more than 2
+		 * Don't do merges that are too small or across too many
 		 * generations.
 		 */
 		if (nchunks < merge_min ||
-		    chunk->generation >
-		    youngest->generation + max_generation_gap) {
+		    chunk->generation > youngest->generation + max_gap) {
 			for (i = 0; i < nchunks; i++)
 				F_CLR_ATOMIC(lsm_tree->chunk[start_chunk + i],
 				    WT_LSM_CHUNK_MERGING);

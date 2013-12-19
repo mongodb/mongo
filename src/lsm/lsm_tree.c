@@ -570,12 +570,12 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 /* Time to wait when first throttling */
 #define	WT_LSM_THROTTLE_START		20
 
-#define WT_LSM_MERGE_THROTTLE_INCREASE(val)	do {			\
+#define	WT_LSM_MERGE_THROTTLE_INCREASE(val)	do {			\
 	(val) = WT_MAX(WT_LSM_THROTTLE_START,				\
 	    (val) + ((val) / WT_LSM_MERGE_THROTTLE_BUMP_PCT));		\
 	} while (0)
 
-#define WT_LSM_MERGE_THROTTLE_DECREASE(val)	do {			\
+#define	WT_LSM_MERGE_THROTTLE_DECREASE(val)	do {			\
 	(val) = (val) - ((val) / WT_LSM_MERGE_THROTTLE_BUMP_PCT);	\
 	if ((val) < WT_LSM_THROTTLE_START)				\
 		(val) = 0;						\
