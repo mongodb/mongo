@@ -508,11 +508,9 @@ namespace mongo {
         }
 
         for ( unsigned i=0; i<indexes.size(); i++ ) {
-            string idxns = NamespaceString(ns).getSystemIndexesCollection();
-            theDataFileMgr.insertWithObjMod(idxns.c_str(),
-                                            indexes[i],
-                                            false,
-                                            true);
+            IndexCatalog* ic = collection->getIndexCatalog();
+            Status status = ic->createIndex( indexes[i], false );
+            uassertStatusOK( status );
         }
         
     }
