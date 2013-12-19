@@ -57,6 +57,8 @@ def usage():
 Options:\n\
   -C file | --configcreate file  create a config file for controlling tests\n\
   -c file | --config file        use a config file for controlling tests\n\
+  -D dir  | --dir dir            use dir rather than WT_TEST.\n\
+                                 dir is removed/recreated as a first step.\n\
   -d      | --debug              run with \'pdb\', the python debugger\n\
   -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
   -h      | --help               show this message\n\
@@ -200,6 +202,7 @@ if __name__ == '__main__':
     preserve = timestamp = debug = gdbSub = False
     configfile = None
     configwrite = False
+    dirarg = None
     verbose = 1
     args = sys.argv[1:]
     testargs = []
@@ -210,6 +213,12 @@ if __name__ == '__main__':
         # Command line options
         if arg[0] == '-':
             option = arg[1:]
+            if option == '-dir' or option == 'D':
+                if dirarg != None or len(args) == 0:
+                    usage()
+                    sys.exit(False)
+                dirarg = args.pop(0)
+                continue
             if option == '-debug' or option == 'd':
                 debug = True
                 continue
@@ -255,7 +264,8 @@ if __name__ == '__main__':
 
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
-    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
+    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub,
+                                          verbose, dirarg)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
