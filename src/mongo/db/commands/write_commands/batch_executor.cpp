@@ -109,16 +109,11 @@ namespace mongo {
 
                 // In case updates turned out to be upserts, the callers may be interested
                 // in learning what _id was used for that document.
-                if ( !upsertedID.isEmpty() ) {
-                    if ( numBatchItems == 1 ) {
-                        response->setSingleUpserted(upsertedID);
-                    }
-                    else if ( verbose ) {
-                        std::auto_ptr<BatchedUpsertDetail> upsertDetail(new BatchedUpsertDetail);
-                        upsertDetail->setIndex(i);
-                        upsertDetail->setUpsertedID(upsertedID);
-                        response->addToUpsertDetails(upsertDetail.release());
-                    }
+                if ( !upsertedID.isEmpty() &&  verbose ) {
+                    std::auto_ptr<BatchedUpsertDetail> upsertDetail(new BatchedUpsertDetail);
+                    upsertDetail->setIndex(i);
+                    upsertDetail->setUpsertedID(upsertedID);
+                    response->addToUpsertDetails(upsertDetail.release());
                 }
             }
             else {

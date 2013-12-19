@@ -41,7 +41,6 @@ namespace mongo {
     const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
     const BSONField<long long> BatchedCommandResponse::n("n", 0);
     const BSONField<long long> BatchedCommandResponse::nDocsModified("nDocsModified", 0);
-    const BSONField<BSONObj> BatchedCommandResponse::singleUpserted("upserted");
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
     const BSONField<Date_t> BatchedCommandResponse::lastOp("lastOp");
@@ -69,12 +68,6 @@ namespace mongo {
             return false;
         }
 
-        // upserted and singleUpserted cannot live together
-        if (_isSingleUpsertedSet && _upsertDetails.get()) {
-            *errMsg = stream() << "duplicated " << singleUpserted.name() << " field";
-            return false;
-        }
-
         return true;
     }
 
@@ -91,11 +84,6 @@ namespace mongo {
 
         if (_isNDocsModifiedSet) builder.appendNumber(nDocsModified(), _nDocsModified);
         if (_isNSet) builder.appendNumber(n(), _n);
-
-        // We're using the BSONObj to store the _id value.
-        if (_isSingleUpsertedSet) {
-            builder.appendAs(_singleUpserted.firstElement(), singleUpserted());
-        }
 
         if (_upsertDetails.get()) {
             BSONArrayBuilder upsertedBuilder(builder.subarrayStart(upsertDetails()));
@@ -183,18 +171,10 @@ namespace mongo {
             _nDocsModified = tempNUpdated;
         }
 
-        // singleUpserted and upsertDetails have the same field name, but are distinguished
-        // by type.  First try parsing singleUpserted, if that doesn't work, try upsertDetails
-        fieldState = FieldParser::extractID(source, singleUpserted, &_singleUpserted, errMsg);
-        _isSingleUpsertedSet = fieldState == FieldParser::FIELD_SET;
-
-        // Try upsertDetails if singleUpserted didn't work
-        if (fieldState == FieldParser::FIELD_INVALID) {
-            std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
-            fieldState = FieldParser::extract( source, upsertDetails, &tempUpsertDetails, errMsg );
-            if ( fieldState == FieldParser::FIELD_INVALID ) return false;
-            if ( fieldState == FieldParser::FIELD_SET ) _upsertDetails.reset( tempUpsertDetails );
-        }
+        std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
+        fieldState = FieldParser::extract( source, upsertDetails, &tempUpsertDetails, errMsg );
+        if ( fieldState == FieldParser::FIELD_INVALID ) return false;
+        if ( fieldState == FieldParser::FIELD_SET ) _upsertDetails.reset( tempUpsertDetails );
 
         fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -438,24 +418,6 @@ namespace mongo {
         else {
             return n.getDefault();
         }
-    }
-
-    void BatchedCommandResponse::setSingleUpserted(const BSONObj& singleUpserted) {
-        _singleUpserted = singleUpserted.firstElement().wrap( "" ).getOwned();
-        _isSingleUpsertedSet = true;
-    }
-
-    void BatchedCommandResponse::unsetSingleUpserted() {
-         _isSingleUpsertedSet = false;
-     }
-
-    bool BatchedCommandResponse::isSingleUpsertedSet() const {
-         return _isSingleUpsertedSet;
-    }
-
-    const BSONObj& BatchedCommandResponse::getSingleUpserted() const {
-        dassert(_isSingleUpsertedSet);
-        return _singleUpserted;
     }
 
     void BatchedCommandResponse::setUpsertDetails(

@@ -59,7 +59,6 @@ namespace mongo {
         static const BSONField<string> errMessage;
         static const BSONField<long long> n;
         static const BSONField<long long> nDocsModified;
-        static const BSONField<BSONObj> singleUpserted; // ID type
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<Date_t> lastOp;
         static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
@@ -118,11 +117,6 @@ namespace mongo {
         void unsetN();
         bool isNSet() const;
         long long getN() const;
-
-        void setSingleUpserted(const BSONObj& singleUpserted);
-        void unsetSingleUpserted();
-        bool isSingleUpsertedSet() const;
-        const BSONObj& getSingleUpserted() const;
 
         void setUpsertDetails(const std::vector<BatchedUpsertDetail*>& upsertDetails);
         void addToUpsertDetails(BatchedUpsertDetail* upsertDetails);

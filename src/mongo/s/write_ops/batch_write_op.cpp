@@ -339,9 +339,6 @@ namespace mongo {
             if( response.isUpsertDetailsSet() ) {
                 numUpserted = response.sizeUpsertDetails();
             }
-            else if( response.isSingleUpsertedSet() ) {
-                numUpserted = 1;
-            }
             stats->numUpdated += ( response.getN() - numUpserted );
             stats->numModified += response.getNDocsModified();
             stats->numUpserted += numUpserted;
@@ -439,17 +436,7 @@ namespace mongo {
         }
 
         // Track upserted ids if we need to
-        if ( response.isSingleUpsertedSet() ) {
-
-            // Work backward from the child batch item index to the batch item index
-            int batchIndex = targetedBatch.getWrites()[0]->writeOpRef.first;
-
-            BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
-            upsertedId->setIndex( batchIndex );
-            upsertedId->setUpsertedID( response.getSingleUpserted() );
-            _upsertedIds.mutableVector().push_back( upsertedId );
-        }
-        else if ( response.isUpsertDetailsSet() ) {
+        if ( response.isUpsertDetailsSet() ) {
 
             const vector<BatchedUpsertDetail*>& upsertedIds = response.getUpsertDetails();
             for ( vector<BatchedUpsertDetail*>::const_iterator it = upsertedIds.begin();
@@ -548,13 +535,8 @@ namespace mongo {
         // Append the upserted ids, if required
         //
 
-        if ( _upsertedIds.size() != 0 ) {
-            if ( _clientRequest->sizeWriteOps() == 1u ) {
-                batchResp->setSingleUpserted( _upsertedIds.vector().front()->getUpsertedID() );
-            }
-            else if( _clientRequest->isVerboseWC() ) {
-                batchResp->setUpsertDetails( _upsertedIds.vector() );
-            }
+        if ( _upsertedIds.size() != 0 && _clientRequest->isVerboseWC() ) {
+            batchResp->setUpsertDetails( _upsertedIds.vector() );
         }
 
         // Stats

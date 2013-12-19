@@ -245,17 +245,8 @@ namespace mongo {
             return false;
         if ( responseA.getN() != responseB.getN() )
             return false;
-        if ( responseA.isSingleUpsertedSet() != responseB.isSingleUpsertedSet() )
-            return false;
         if ( responseA.isUpsertDetailsSet() != responseB.isUpsertDetailsSet() )
             return false;
-
-        if ( responseA.isSingleUpsertedSet() ) {
-            BSONObj upsertA = responseA.getSingleUpserted();
-            BSONObj upsertB = responseB.getSingleUpserted();
-            if ( upsertA.woCompare( upsertB ) != 0 )
-                return false;
-        }
 
         if ( responseA.isUpsertDetailsSet() ) {
             // TODO:

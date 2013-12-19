@@ -123,15 +123,6 @@ namespace mongo {
             if ( request.getOrdered() && BatchSafeWriter::isFailedOp( lastError ) ) break;
         }
 
-        if ( request.sizeWriteOps() == 1 && response->isUpsertDetailsSet() ) {
-
-            // Promote single upsert to batch upsert
-            const BatchedUpsertDetail* upsertedId = response->getUpsertDetailsAt( 0 );
-            response->setSingleUpserted( upsertedId->getUpsertedID() );
-
-            response->unsetUpsertDetails();
-        }
-
         response->setOk( !response->isErrCodeSet() );
         dassert( response->isValid( NULL ) );
     }
