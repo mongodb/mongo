@@ -58,7 +58,7 @@ __wt_lsm_merge(
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
-	uint32_t generation, max_gap, max_gen, start_id;
+	uint32_t generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
 	int create_bloom, tret;
@@ -82,6 +82,7 @@ __wt_lsm_merge(
 		aggressive = 10;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
+	max_level = (id == 0 ? 0 : id - 1) + aggressive;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -107,8 +108,18 @@ __wt_lsm_merge(
 	while (end_chunk > 0 &&
 	    ((chunk = lsm_tree->chunk[end_chunk]) == NULL ||
 	    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM) ||
-	    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_MERGING)))
+	    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_MERGING))) {
 		--end_chunk;
+
+		/*
+		 * If we find a chunk on disk without a Bloom filter, give up.
+		 * We may have waited a while to lock the tree, and new chunks
+		 * may have been created in the meantime.
+		 */
+		if (chunk != NULL &&
+		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))
+			end_chunk = 0;
+	}
 
 	/*
 	 * Give up immediately if there aren't enough on disk chunks in the
@@ -147,7 +158,7 @@ __wt_lsm_merge(
 		 * Look for small merges before trying a big one: some threads
 		 * should stay in low levels until we get more aggressive.
 		 */
-		if (chunk->generation > id + aggressive)
+		if (chunk->generation > max_level)
 			break;
 
 		/*
@@ -359,7 +370,7 @@ __wt_lsm_merge(
 	lsm_tree->dsk_gen++;
 
 	/* Update the throttling while holding the tree lock. */
-	__wt_lsm_tree_throttle(session, lsm_tree);
+	__wt_lsm_tree_throttle(session, lsm_tree, 1);
 
 	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 err:	if (src != NULL)

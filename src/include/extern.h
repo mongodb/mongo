@@ -881,8 +881,9 @@ extern int __wt_lsm_tree_get(WT_SESSION_IMPL *session,
     WT_LSM_TREE **treep);
 extern void __wt_lsm_tree_release(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
-extern void __wt_lsm_tree_throttle(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree);
+extern void __wt_lsm_tree_throttle( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int decrease_only);
 extern int __wt_lsm_tree_switch(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session,

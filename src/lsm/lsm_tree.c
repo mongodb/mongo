@@ -564,19 +564,20 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */
-#define	WT_LSM_MERGE_THROTTLE_BUMP_PCT	10
+#define	WT_LSM_MERGE_THROTTLE_BUMP_PCT	(100 / lsm_tree->merge_max)
 /* Number of level 0 chunks that need to be present to throttle inserts */
 #define	WT_LSM_MERGE_THROTTLE_THRESHOLD	(2 * lsm_tree->merge_max)
 /* Time to wait when first throttling */
-#define	WT_LSM_THROTTLE_START		20
+#define	WT_LSM_THROTTLE_START		100
 
 #define	WT_LSM_MERGE_THROTTLE_INCREASE(val)	do {			\
-	(val) = WT_MAX(WT_LSM_THROTTLE_START,				\
-	    (val) + ((val) / WT_LSM_MERGE_THROTTLE_BUMP_PCT));		\
+	(val) += ((val) * WT_LSM_MERGE_THROTTLE_BUMP_PCT) / 100;	\
+	if ((val) < WT_LSM_THROTTLE_START)				\
+		(val) = WT_LSM_THROTTLE_START;				\
 	} while (0)
 
 #define	WT_LSM_MERGE_THROTTLE_DECREASE(val)	do {			\
-	(val) = (val) - ((val) / WT_LSM_MERGE_THROTTLE_BUMP_PCT);	\
+	(val) -= ((val) * WT_LSM_MERGE_THROTTLE_BUMP_PCT) / 100;	\
 	if ((val) < WT_LSM_THROTTLE_START)				\
 		(val) = 0;						\
 	} while (0)
@@ -587,12 +588,12 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	with the LSM tree lock held.
  */
 void
-__wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_tree_throttle(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int decrease_only)
 {
-	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
-	uint64_t cache_sz, cache_used, in_memory, record_count;
-	uint64_t gen0_chunks, oldtime, timediff;
-	uint32_t i;
+	WT_LSM_CHUNK *chunk, **cp, *ondisk, *prev_chunk;
+	uint64_t cache_sz, cache_used, oldtime, record_count, timediff;
+	uint32_t i, in_memory, gen0_chunks;
 
 	/* Never throttle in small trees. */
 	if (lsm_tree->nchunks < 3)
@@ -601,53 +602,63 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	cache_sz = S2C(session)->cache_size;
 
 	/*
-	 * Setup throttling based on whether merge threads are keeping up.
-	 * If there are enough chunks that have never been merged we slow
-	 * down inserts so that merges have some chance of keeping up.
-	 */
-	for (i = gen0_chunks = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
-	    i < lsm_tree->nchunks;
-	    ++i, --cp)
-		if ((*cp)->generation == 0)
-			++gen0_chunks;
-
-	/*
-	 * Don't throttle based on merges if there is only a single merge
-	 * thread - that thread is likely busy creating bloom filters.
-	 */
-	if (lsm_tree->merge_threads > 1 && gen0_chunks >
-	    WT_LSM_MERGE_THROTTLE_THRESHOLD)
-		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
-	else if (lsm_tree->merge_throttle > 0 &&
-	    gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
-		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
-
-	/*
 	 * In the steady state, we expect that the checkpoint worker thread
 	 * will keep up with inserts.  If not, throttle the insert rate to
 	 * avoid filling the cache with in-memory chunks.  Threads sleep every
 	 * 100 operations, so take that into account in the calculation.
 	 *
-	 * Count the number of in-memory chunks, and find the most recent
-	 * on-disk chunk (if any).
+	 * Also throttle based on whether merge threads are keeping up.  If
+	 * there are enough chunks that have never been merged we slow down
+	 * inserts so that merges have some chance of keeping up.
+	 *
+	 * Count the number of in-memory chunks, the number of unmerged chunk
+	 * on disk, and find the most recent on-disk chunk (if any).
 	 */
 	record_count = 1;
-	for (i = in_memory = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
+	gen0_chunks = in_memory = 0;
+	ondisk = NULL;
+	for (i = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
 	    i < lsm_tree->nchunks;
 	    ++i, --cp)
 		if (!F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_ONDISK)) {
 			record_count += (*cp)->count;
 			++in_memory;
-		} else if ((*cp)->generation == 0 ||
-		    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE))
-			break;
+		} else {
+			if (ondisk == NULL &&
+			    ((*cp)->generation == 0 ||
+			    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)))
+				ondisk = *cp;
+
+			if ((*cp)->generation == 0 &&
+			    !F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_MERGING))
+				++gen0_chunks;
+			else if (ondisk != NULL)
+				break;
+		}
+
+	/*
+	 * Don't throttle based on merges if there is only a single merge
+	 * thread - that thread is likely busy creating bloom filters.
+	 * Decrease throttling twice as fast when there is less that a full
+	 * level of unmerged chunks.
+	 */
+	if (lsm_tree->merge_threads < 2)
+		lsm_tree->merge_throttle = 0;
+	if (gen0_chunks < lsm_tree->merge_max)
+		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
+	if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
+		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
+	else if (!decrease_only)
+		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
 
 	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->ckpt_throttle = 0;
+	else if (decrease_only)
+		; /* Nothing to do */
 	else if (i == lsm_tree->nchunks ||
-	    F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)) {
+	    F_ISSET_ATOMIC(ondisk, WT_LSM_CHUNK_STABLE)) {
 		/*
 		 * No checkpoint has completed this run.  Keep slowing down
 		 * inserts until one does.
@@ -656,8 +667,8 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    WT_MAX(WT_LSM_THROTTLE_START, 2 * lsm_tree->ckpt_throttle);
 	} else {
 		WT_ASSERT(session,
-		    WT_TIMECMP(chunk->create_ts, (*cp)->create_ts) >= 0);
-		timediff = WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts);
+		    WT_TIMECMP(chunk->create_ts, ondisk->create_ts) >= 0);
+		timediff = WT_TIMEDIFF(chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (long)((in_memory - 2) * timediff / (20 * record_count));
 
@@ -684,15 +695,15 @@ __wt_lsm_tree_throttle(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (in_memory > 1 &&
 	    i != lsm_tree->nchunks &&
-	    !F_ISSET_ATOMIC(*cp, WT_LSM_CHUNK_STABLE)) {
+	    !F_ISSET_ATOMIC(ondisk, WT_LSM_CHUNK_STABLE)) {
 		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session,
 		    WT_TIMECMP(chunk->create_ts, prev_chunk->create_ts) >= 0);
 		timediff = WT_TIMEDIFF(chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
-		    WT_TIMECMP(prev_chunk->create_ts, (*cp)->create_ts) >= 0);
-		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, (*cp)->create_ts);
+		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
+		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
 		if (timediff < 10 * oldtime)
 			lsm_tree->chunk_fill_ms =
 			    (3 * lsm_tree->chunk_fill_ms +
@@ -724,7 +735,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		goto err;
 
 	/* Update the throttle time. */
-	__wt_lsm_tree_throttle(session, lsm_tree);
+	__wt_lsm_tree_throttle(session, lsm_tree, 0);
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 

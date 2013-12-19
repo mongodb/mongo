@@ -375,7 +375,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			++lsm_tree->dsk_gen;
 
 			/* Update the throttle time. */
-			__wt_lsm_tree_throttle(session, lsm_tree);
+			__wt_lsm_tree_throttle(session, lsm_tree, 1);
 			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 			/* Make sure we aren't pinning a transaction ID. */
