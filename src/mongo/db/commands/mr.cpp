@@ -958,10 +958,8 @@ namespace mongo {
             verify(getRunner(cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
-            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-            ClientCursor::registerRunner(runner.get());
+            const ScopedRunnerRegistration safety(runner.get());
             runner->setYieldPolicy(Runner::YIELD_AUTO);
-            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
             // iterate over all sorted objects
             BSONObj o;
@@ -1294,10 +1292,8 @@ namespace mongo {
                         }
 
                         auto_ptr<Runner> runner(rawRunner);
-                        auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-                        ClientCursor::registerRunner(runner.get());
+                        const ScopedRunnerRegistration safety(runner.get());
                         runner->setYieldPolicy(Runner::YIELD_AUTO);
-                        safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
                         Timer mt;
                         // go through each doc

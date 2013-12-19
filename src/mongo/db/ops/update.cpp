@@ -479,11 +479,7 @@ namespace mongo {
         auto_ptr<Runner> runner(rawRunner);
 
         // Register Runner with ClientCursor
-        ClientCursor::registerRunner(runner.get());
-
-        // Cleanup the runner if needed
-        const scoped_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety(
-                new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+        const ScopedRunnerRegistration safety(runner.get());
 
         // Custom ("manual") yield policy
         RunnerYieldPolicy yieldPolicy;

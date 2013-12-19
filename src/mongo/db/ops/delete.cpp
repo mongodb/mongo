@@ -87,12 +87,11 @@ namespace mongo {
         }
 
         auto_ptr<Runner> runner(rawRunner);
-        auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+        auto_ptr<ScopedRunnerRegistration> safety;
 
         if (canYield) {
-            ClientCursor::registerRunner(runner.get());
+            safety.reset(new ScopedRunnerRegistration(runner.get()));
             runner->setYieldPolicy(Runner::YIELD_AUTO);
-            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
         }
 
         DiskLoc rloc;

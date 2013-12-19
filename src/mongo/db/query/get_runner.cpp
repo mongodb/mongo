@@ -235,7 +235,12 @@ namespace mongo {
         }
     }
 
-    DeregisterEvenIfUnderlyingCodeThrows::~DeregisterEvenIfUnderlyingCodeThrows() {
+    ScopedRunnerRegistration::ScopedRunnerRegistration(Runner* runner)
+        : _runner(runner) {
+        ClientCursor::registerRunner(_runner);
+    }
+
+    ScopedRunnerRegistration::~ScopedRunnerRegistration() {
         ClientCursor::deregisterRunner(_runner);
     }
 

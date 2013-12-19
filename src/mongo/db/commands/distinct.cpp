@@ -113,10 +113,8 @@ namespace mongo {
             }
 
             auto_ptr<Runner> runner(rawRunner);
-            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-            ClientCursor::registerRunner(runner.get());
+            const ScopedRunnerRegistration safety(runner.get());
             runner->setYieldPolicy(Runner::YIELD_AUTO);
-            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
             string cursorName;
             BSONObj obj;

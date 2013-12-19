@@ -53,11 +53,11 @@ namespace mongo {
      * For any subsequent calls to getMore, the runner is already registered with ClientCursor
      * by virtue of being cached, so this exception-proofing is not required.
      */
-    struct DeregisterEvenIfUnderlyingCodeThrows {
-        DeregisterEvenIfUnderlyingCodeThrows(Runner* runner) : _runner(runner) { }
-        ~DeregisterEvenIfUnderlyingCodeThrows();
+    struct ScopedRunnerRegistration {
+        ScopedRunnerRegistration(Runner* runner);
+        ~ScopedRunnerRegistration();
 
-        Runner* _runner;
+        Runner* const _runner;
     };
 
 }  // namespace mongo

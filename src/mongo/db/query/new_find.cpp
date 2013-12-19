@@ -475,10 +475,8 @@ namespace mongo {
 
         // We turn on auto-yielding for the runner here.  The runner registers itself with the
         // active runners list in ClientCursor.
-        ClientCursor::registerRunner(runner.get());
+        auto_ptr<ScopedRunnerRegistration> safety(new ScopedRunnerRegistration(runner.get()));
         runner->setYieldPolicy(Runner::YIELD_AUTO);
-        auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety(
-            new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
         BSONObj obj;
         Runner::RunnerState state;

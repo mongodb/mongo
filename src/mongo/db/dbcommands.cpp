@@ -740,9 +740,7 @@ namespace mongo {
 
             // The runner must be registered to be informed of DiskLoc deletions and NS dropping
             // when we yield the lock below.
-            ClientCursor::registerRunner(runner.get());
-            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+            const ScopedRunnerRegistration safety(runner.get());
 
             const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
