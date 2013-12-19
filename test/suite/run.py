@@ -63,6 +63,7 @@ Options:\n\
   -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
   -h      | --help               show this message\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
+  -P N    | --parallel N         run all tests in parallel using N processes\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
 \n\
@@ -200,6 +201,7 @@ if __name__ == '__main__':
 
     # Turn numbers and ranges into test module names
     preserve = timestamp = debug = gdbSub = False
+    parallel = 0
     configfile = None
     configwrite = False
     dirarg = None
@@ -221,6 +223,12 @@ if __name__ == '__main__':
                 continue
             if option == '-debug' or option == 'd':
                 debug = True
+                continue
+            if option == '-parallel' or option == 'P':
+                if parallel != 0 or len(args) == 0:
+                    usage()
+                    sys.exit(False)
+                parallel = int(args.pop(0))
                 continue
             if option == '-preserve' or option == 'p':
                 preserve = True
@@ -283,5 +291,5 @@ if __name__ == '__main__':
         import pdb
         pdb.set_trace()
 
-    result = wttest.runsuite(tests)
+    result = wttest.runsuite(tests, parallel)
     sys.exit(not result.wasSuccessful())

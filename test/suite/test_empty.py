@@ -35,10 +35,10 @@ class test_empty(wttest.WiredTigerTestCase):
     name = 'test_empty'
 
     scenarios = [
-        ('file', dict(type='file:', fmt='r')),
-        ('file', dict(type='file:', fmt='S')),
-        ('table', dict(type='table:', fmt='r')),
-        ('table', dict(type='table:', fmt='S'))
+        ('file-r', dict(type='file:', fmt='r')),
+        ('file-S', dict(type='file:', fmt='S')),
+        ('table-r', dict(type='table:', fmt='r')),
+        ('table-S', dict(type='table:', fmt='S'))
         ]
 
     # Creating an object and then closing it shouldn't write any blocks.
