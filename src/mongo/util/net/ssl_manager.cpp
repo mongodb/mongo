@@ -440,7 +440,7 @@ namespace mongo {
 
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
         // Unless OpenSSL misbehaves, num should always be positive
-        fassert(17306, num > 0);
+        fassert(17314, num > 0);
         SSLManager* sm = static_cast<SSLManager*>(userdata);
         const size_t copied = sm->_password.copy(buf, num - 1);
         buf[copied] = '\0';
