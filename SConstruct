@@ -233,7 +233,7 @@ add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
 
 # library choices
-add_option( "usev8" , "use v8 for javascript" , 0 , True )
+add_option( "disable-scripting" , "do not build support for javascript" , 0 , True )
 add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
 # mongo feature options
@@ -450,7 +450,7 @@ static = has_option( "static" )
 
 noshell = has_option( "noshell" ) 
 
-usev8 = has_option( "usev8" ) 
+disable_scripting = has_option( "disable-scripting" )
 
 asio = has_option( "asio" )
 
@@ -620,7 +620,9 @@ if boostVersion is None:
 else:
     boostVersion = "-" + boostVersion
 
-if ( not ( usev8 or justClientLib) ):
+if disable_scripting or justClientLib:
+    usev8 = False
+else:
     usev8 = True
     options_topass["usev8"] = True
 
