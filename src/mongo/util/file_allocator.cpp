@@ -270,7 +270,7 @@ namespace mongo {
             }
             while( 1 ) {
                 string name;
-                long size;
+                long size = 0;
                 {
                     scoped_lock lk( fa->_pendingMutex );
                     if ( fa->_pending.size() == 0 )
