@@ -409,6 +409,10 @@ namespace mongo {
             return ((unsigned int*)(value() ))[0];
         }
 
+        unsigned long long timestampValue() const {
+            return reinterpret_cast<const unsigned long long*>( value() )[0];
+        }
+
         const char * dbrefNS() const {
             uassert( 10063 ,  "not a dbref" , type() == DBRef );
             return value() + 4;

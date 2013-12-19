@@ -34,6 +34,8 @@
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/ops/insert.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
@@ -55,18 +57,24 @@ namespace PdfileTests {
             static NamespaceDetails *nsd() {
                 return nsdetails( ns() );
             }
-        private:
+
             Lock::GlobalWrite lk_;
             Client::Context _context;
         };
 
-        class InsertAddId : public Base {
+        class InsertNoId : public Base {
         public:
             void run() {
                 BSONObj x = BSON( "x" << 1 );
                 ASSERT( x["_id"].type() == 0 );
-                theDataFileMgr.insertWithObjMod( ns(), x );
+                Collection* collection = _context.db()->getOrCreateCollection( ns() );
+                StatusWith<DiskLoc> dl = collection->insertDocument( x, true );
+                ASSERT( !dl.isOK() );
+
+                x = fixDocumentForInsert( x );
                 ASSERT( x["_id"].type() == jstOID );
+                dl = collection->insertDocument( x, true );
+                ASSERT( dl.isOK() );
             }
         };
 
@@ -75,10 +83,19 @@ namespace PdfileTests {
             void run() {
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );
+                b.append( "_id", 1 );
                 BSONObj o = b.done();
-                ASSERT( 0 == o.getField( "a" ).date() );
-                theDataFileMgr.insertWithObjMod( ns(), o );
-                ASSERT( 0 != o.getField( "a" ).date() );
+
+                BSONObj fixed = fixDocumentForInsert( o );
+                ASSERT_EQUALS( 2, fixed.nFields() );
+                ASSERT( fixed.firstElement().fieldNameStringData() == "_id" );
+                ASSERT( fixed.firstElement().number() == 1 );
+
+                BSONElement a = fixed["a"];
+                ASSERT( o["a"].type() == Timestamp );
+                ASSERT( o["a"].timestampValue() == 0 );
+                ASSERT( a.type() == Timestamp );
+                ASSERT( a.timestampValue() > 0 );
             }
         };
     } // namespace Insert
@@ -143,7 +160,7 @@ namespace PdfileTests {
         All() : Suite( "pdfile" ) {}
 
         void setupTests() {
-            add< Insert::InsertAddId >();
+            add< Insert::InsertNoId >();
             add< Insert::UpdateDate >();
             add< ExtentSizing >();
         }

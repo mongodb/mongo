@@ -542,6 +542,14 @@ namespace mongo {
         LOG(1) << "have free list for " << _extentFreelistName << endl;
     }
 
+    Collection* Database::getOrCreateCollection( const StringData& ns ) {
+        Collection* c = getCollection( ns );
+        if ( !c ) {
+            c = createCollection( ns );
+        }
+        return c;
+    }
+
     Collection* Database::createCollection( const StringData& ns, bool capped,
                                             const BSONObj* options, bool allocateDefaultSpace ) {
         verify( _namespaceIndex.details( ns ) == NULL );
