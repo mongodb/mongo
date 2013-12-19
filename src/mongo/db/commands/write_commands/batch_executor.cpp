@@ -60,7 +60,7 @@ namespace mongo {
         : _defaultWriteConcern(wc), _client( client ), _opCounters( opCounters ), _le( le ) {
     }
 
-    static void buildWCError( const Status& wcStatus,
+    static bool buildWCError( const Status& wcStatus,
                               const WriteConcernResult& wcResult,
                               WCErrorDetail* wcError ) {
 
@@ -72,7 +72,7 @@ namespace mongo {
             errMsg = wcResult.err;
 
         if ( errMsg.empty() )
-            return;
+            return false;
 
         if ( wcStatus.isOK() )
             wcError->setErrCode( ErrorCodes::WriteConcernFailed );
@@ -83,6 +83,8 @@ namespace mongo {
             wcError->setErrInfo( BSON( "wtimeout" << true ) );
 
         wcError->setErrMessage( errMsg );
+
+        return true;
     }
 
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
@@ -156,7 +158,7 @@ namespace mongo {
 
             if ( !status.isOK() && verbose ) {
                 WCErrorDetail wcError;
-                wcError.setErrCode( ErrorCodes::WriteConcernFailed );
+                wcError.setErrCode( status.code() );
                 wcError.setErrMessage( status.toString() );
                 response->setWriteConcernError( wcError );
             }
@@ -167,11 +169,11 @@ namespace mongo {
                 WriteConcernResult res;
                 status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
 
-
-                if ( verbose ) {
+                if (verbose) {
                     WCErrorDetail wcError;
-                    buildWCError( status, res, &wcError );
-                   response->setWriteConcernError( wcError );
+                    if( buildWCError( status, res, &wcError ) ) {
+                        response->setWriteConcernError( wcError );
+                    }
                 }
             }
         }
