@@ -92,6 +92,10 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 	t->name = name;
 	t->initialized = 1;
 
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
+	WT_RET(__wt_spin_lock_register_lock(session, t));
+#endif
+
 	WT_UNUSED(session);
 	return (0);
 }
@@ -101,10 +105,10 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	if (t->initialized) {
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-		__wt_spin_lock_unregister(session, t);
+	__wt_spin_lock_unregister_lock(session, t);
 #endif
+	if (t->initialized) {
 		(void)pthread_mutex_destroy(&t->lock);
 		t->initialized = 0;
 	}
@@ -172,7 +176,8 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session,
 	 */
 	if (*idp == WT_SPINLOCK_REGISTER ||
 	    conn->spinlock_block[*idp].name == NULL)
-		__wt_spin_lock_register(session, t, file, line, idp);
+		WT_RET(__wt_spin_lock_register_caller(
+		    session, t->name, file, line, idp));
 
 	/*
 	 * Try to acquire the mutex: on failure, update blocking statistics, on

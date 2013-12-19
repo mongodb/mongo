@@ -179,9 +179,18 @@ struct __wt_connection_impl {
 	int stat_clear;			/* "clear" statistics configured */
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
+
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-#define	WT_SPINLOCK_MAX	50		/* Spinlock registry */
+	/*
+	 * Spinlock registration, so we can track which spinlocks are heavily
+	 * used, which are blocking and where.
+	 *
+	 * There's an array of spinlocks, and an array of blocking IDs.
+	 */
+#define	WT_SPINLOCK_MAX			1024
+#define	WT_SPINLOCK_MAX_LOCATION_ID	60
 	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
+
 					/* Spinlock blocking matrix */
 	struct __wt_connection_stats_spinlock {
 		const char *name;	/* Mutex name */
@@ -190,8 +199,8 @@ struct __wt_connection_impl {
 		int line;
 
 		u_int total;		/* Count of total, blocked calls */
-		u_int blocked[WT_SPINLOCK_MAX];
-	} spinlock_block[WT_SPINLOCK_MAX];
+		u_int blocked[WT_SPINLOCK_MAX_LOCATION_ID];
+	} spinlock_block[WT_SPINLOCK_MAX_LOCATION_ID];
 #endif
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
