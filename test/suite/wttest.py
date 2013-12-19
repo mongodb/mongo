@@ -429,7 +429,14 @@ class WiredTigerTestCase(unittest.TestCase):
 def runsuite(suite, parallel):
     suite_to_run = suite
     if parallel > 0:
-        from concurrencytest import ConcurrentTestSuite, fork_for_tests
+        try:
+            from concurrencytest import ConcurrentTestSuite, fork_for_tests
+        except ImportError:
+            print ('ERROR: additional python modules must be installed\n' +
+                   '       to use the "--parallel N" option.  Consult\n' +
+                   '       the WiredTiger HOWTO:RunTheTestSuite wiki page.\n')
+            raise
+
         if not WiredTigerTestCase._globalSetup:
             WiredTigerTestCase.globalSetup()
         WiredTigerTestCase._concurrent = True
