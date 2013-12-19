@@ -791,14 +791,14 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
             resetDbpath( this._alldbpaths[i] );
         }
     }
-    if ( this.bridges ) {
-        var mybridgevec;
-        while (mybridgevec = this.bridges.pop()) {
-            var mybridge;
-            while (mybridge = mybridgevec.pop()) {
-                mybridge.stop();
-            }       
-        }
+    if (this.bridges) {
+        for (var i = 0; i < this.bridges.length; i++) {
+            for (var j = 0; j < this.bridges[i].length; j++) {
+                if (this.bridges[i][j] && this.bridges[i][j].port) {
+                    this.bridges[i][j].stop();
+                }
+            }
+        }   
     }
     
     print('ReplSetTest stopSet *** Shut down repl set - test worked ****' )
