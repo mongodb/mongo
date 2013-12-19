@@ -29,25 +29,59 @@
  */
 
 #include "mongo/db/ops/insert.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    BSONObj fixDocumentForInsert( const BSONObj& doc ) {
+    using namespace mongoutils;
+
+    StatusWith<BSONObj> fixDocumentForInsert( const BSONObj& doc ) {
+        if ( doc.objsize() > BSONObjMaxUserSize )
+            return StatusWith<BSONObj>( ErrorCodes::BadValue, "object to insert too large" );
+
         bool firstElementIsId = doc.firstElement().fieldNameStringData() == "_id";
         bool hasTimestampToFix = false;
         {
             BSONObjIterator i( doc );
-            for( int j = 0; i.more() && j < 2; ++j ) {
+            while ( i.more() ) {
                 BSONElement e = i.next();
-                if ( e.type() == Timestamp ) {
+
+                if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
                     hasTimestampToFix = true;
                     break;
                 }
+
+                const char* fieldName = e.fieldName();
+
+                if ( fieldName[0] == '$' ) {
+                    return StatusWith<BSONObj>( ErrorCodes::BadValue,
+                                                str::stream()
+                                                << "Document can't have $ prefixed field names: "
+                                                << e.fieldName() );
+                }
+
+                // check no regexp for _id (SERVER-9502)
+                // also, disallow undefined and arrays
+                if ( str::equals( fieldName, "_id") ) {
+                    if ( e.type() == RegEx ) {
+                        return StatusWith<BSONObj>( ErrorCodes::BadValue,
+                                                    "can't use a regex for _id" );
+                    }
+                    if ( e.type() == Undefined ) {
+                        return StatusWith<BSONObj>( ErrorCodes::BadValue,
+                                                    "can't use a undefined for _id" );
+                    }
+                    if ( e.type() == Array ) {
+                        return StatusWith<BSONObj>( ErrorCodes::BadValue,
+                                                    "can't use a array for _id" );
+                    }
+                }
+
             }
         }
 
         if ( firstElementIsId && !hasTimestampToFix )
-            return BSONObj();
+            return StatusWith<BSONObj>( BSONObj() );
 
         bool hadId = firstElementIsId;
 
@@ -76,7 +110,7 @@ namespace mongo {
             if ( hadId && e.fieldNameStringData() == "_id" ) {
                 // no-op
             }
-            else if ( pos <= 1 && e.type() == Timestamp && e.timestampValue() == 0 ) {
+            else if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
                 mutex::scoped_lock lk(OpTime::m);
                 b.append( e.fieldName(), OpTime::now(lk) );
             }
@@ -85,7 +119,7 @@ namespace mongo {
             }
             pos++;
         }
-        return b.obj();
+        return StatusWith<BSONObj>( b.obj() );
     }
 
 }

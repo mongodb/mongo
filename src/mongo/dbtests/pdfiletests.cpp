@@ -71,7 +71,9 @@ namespace PdfileTests {
                 StatusWith<DiskLoc> dl = collection->insertDocument( x, true );
                 ASSERT( !dl.isOK() );
 
-                x = fixDocumentForInsert( x );
+                StatusWith<BSONObj> fixed = fixDocumentForInsert( x );
+                ASSERT( fixed.isOK() );
+                x = fixed.getValue();
                 ASSERT( x["_id"].type() == jstOID );
                 dl = collection->insertDocument( x, true );
                 ASSERT( dl.isOK() );
@@ -86,7 +88,7 @@ namespace PdfileTests {
                 b.append( "_id", 1 );
                 BSONObj o = b.done();
 
-                BSONObj fixed = fixDocumentForInsert( o );
+                BSONObj fixed = fixDocumentForInsert( o ).getValue();
                 ASSERT_EQUALS( 2, fixed.nFields() );
                 ASSERT( fixed.firstElement().fieldNameStringData() == "_id" );
                 ASSERT( fixed.firstElement().number() == 1 );

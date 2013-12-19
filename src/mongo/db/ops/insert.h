@@ -36,7 +36,7 @@ namespace mongo {
      * if doc is ok, then return is BSONObj()
      * otherwise, BSONObj is what should be inserted instead
      */
-    BSONObj fixDocumentForInsert( const BSONObj& doc );
+    StatusWith<BSONObj> fixDocumentForInsert( const BSONObj& doc );
 
 
 }

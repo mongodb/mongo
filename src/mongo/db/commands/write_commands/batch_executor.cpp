@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -273,7 +274,7 @@ namespace mongo {
                                          storageGlobalParams.dbpath, // TODO: better constructor?
                                          false /* don't check version here */);
 
-                    opSuccess = doWrite( ns, itemRef, &childOp, stats, upsertedID, error );
+                    opSuccess = doWrite( ns, ctx, itemRef, &childOp, stats, upsertedID, error );
                 }
                 childOp.done();
                 //itemTimeMicros = childOp.totalTimeMicros();
@@ -339,6 +340,7 @@ namespace mongo {
     }
 
     bool WriteBatchExecutor::doWrite( const string& ns,
+                                      Client::Context& ctx,
                                       const BatchItemRef& itemRef,
                                       CurOp* currentOp,
                                       WriteStats* stats,
@@ -398,6 +400,7 @@ namespace mongo {
 
             // Insert
             return doInsert( ns,
+                             ctx,
                              request.getInsertRequest()->getDocumentsAt( index ),
                              currentOp,
                              stats,
@@ -409,6 +412,7 @@ namespace mongo {
 
             // Update
             return doUpdate( ns,
+                             ctx,
                              *request.getUpdateRequest()->getUpdatesAt( index ),
                              currentOp,
                              stats,
@@ -421,6 +425,7 @@ namespace mongo {
 
             // Delete
             return doDelete( ns,
+                             ctx,
                              *request.getDeleteRequest()->getDeletesAt( index ),
                              currentOp,
                              stats,
@@ -429,6 +434,7 @@ namespace mongo {
     }
 
     bool WriteBatchExecutor::doInsert( const string& ns,
+                                       Client::Context& ctx,
                                        const BSONObj& insertOp,
                                        CurOp* currentOp,
                                        WriteStats* stats,
@@ -439,16 +445,74 @@ namespace mongo {
 
         opDebug.op = dbInsert;
 
+        StringData collectionName = nsToCollectionSubstring( ns );
+
+        if ( collectionName == "system.indexes" ) {
+            try {
+                const BSONElement& e = insertOp["ns"];
+                if ( e.type() != String ) {
+                    error->setErrCode( ErrorCodes::BadValue );
+                    error->setErrMessage( "tried to create an index without specifying namespace" );
+                    return false;
+                }
+
+                string targetNS = e.String();
+
+                Collection* collection = ctx.db()->getCollection( targetNS );
+                if ( !collection ) {
+                    // implicitly create
+                    collection = ctx.db()->createCollection( targetNS );
+                    if ( !collection ) {
+                        error->setErrMessage( "could not create collection" );
+                        error->setErrCode( ErrorCodes::InternalError );
+                        return false;
+                    }
+                }
+                Status status = collection->getIndexCatalog()->createIndex( insertOp, true );
+                if ( status.code() == ErrorCodes::IndexAlreadyExists )
+                    return true;
+                if ( !status.isOK() ) {
+                    error->setErrMessage( status.toString() );
+                    error->setErrCode( status.code() );
+                    return false;
+                }
+                logOp( "i", ns.c_str(), insertOp );
+                _le->nObjects = 1; // TODO Replace after implementing LastError::recordInsert().
+                opDebug.ninserted = 1;
+                stats->numInserted++;
+                return true;
+            }
+            catch ( const UserException& ex ) {
+                opDebug.exceptionInfo = ex.getInfo();
+                toBatchedError( ex, error );
+                return false;
+            }
+        }
+
         try {
-            // TODO Should call insertWithObjMod directly instead of checkAndInsert?  Note that
-            // checkAndInsert will use mayInterrupt=false, so index builds initiated here won't
-            // be interruptible.
-            BSONObj doc = insertOp; // b/c we're const going in
-            checkAndInsert( ns.c_str(), doc );
+            Collection* collection = ctx.db()->getCollection( ns );
+            if ( !collection ) {
+                // implicitly create
+                collection = ctx.db()->createCollection( ns );
+                if ( !collection ) {
+                    error->setErrMessage( "could not create collection" );
+                    error->setErrCode( ErrorCodes::InternalError );
+                    return false;
+                }
+            }
+
+            StatusWith<DiskLoc> status = collection->insertDocument( insertOp, true );
+            logOp( "i", ns.c_str(), insertOp );
             getDur().commitIfNeeded();
+            if ( !status.isOK() ) {
+                error->setErrMessage( status.getStatus().toString() );
+                error->setErrCode( status.getStatus().code() );
+                return false;
+            }
             _le->nObjects = 1; // TODO Replace after implementing LastError::recordInsert().
             opDebug.ninserted = 1;
             stats->numInserted++;
+            return true;
         }
         catch ( const UserException& ex ) {
             opDebug.exceptionInfo = ex.getInfo();
@@ -460,6 +524,7 @@ namespace mongo {
     }
 
     bool WriteBatchExecutor::doUpdate( const string& ns,
+                                       Client::Context& ctx,
                                        const BatchedUpdateDocument& updateOp,
                                        CurOp* currentOp,
                                        WriteStats* stats,
@@ -527,6 +592,7 @@ namespace mongo {
     }
 
     bool WriteBatchExecutor::doDelete( const string& ns,
+                                       Client::Context& ctx,
                                        const BatchedDeleteDocument& deleteOp,
                                        CurOp* currentOp,
                                        WriteStats* stats,

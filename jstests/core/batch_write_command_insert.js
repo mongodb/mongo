@@ -102,6 +102,8 @@ coll.ensureIndex({a : 1}, {unique : true});
 // Should fail single insert due to duplicate key
 coll.remove({});
 coll.insert({a:1});
+print( coll.count() );
+printjson( coll.findOne() );
 printjson( request = {insert : coll.getName(), documents: [{a:1}]} );
 printjson( result = coll.runCommand(request) );
 assert(result.ok);

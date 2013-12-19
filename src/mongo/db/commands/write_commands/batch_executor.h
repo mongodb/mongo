@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/client.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
@@ -40,7 +41,6 @@
 namespace mongo {
 
     class BSONObjBuilder;
-    class Client;
     class CurOp;
     class OpCounters;
     class OpDebug;
@@ -102,6 +102,7 @@ namespace mongo {
         //
 
         bool doWrite( const string& ns,
+                      Client::Context& ctx,
                       const BatchItemRef& itemRef,
                       CurOp* currentOp,
                       WriteStats* stats,
@@ -109,12 +110,14 @@ namespace mongo {
                       WriteErrorDetail* error );
 
         bool doInsert( const std::string& ns,
+                       Client::Context& ctx,
                        const BSONObj& insertOp,
                        CurOp* currentOp,
                        WriteStats* stats,
                        WriteErrorDetail* error );
 
         bool doUpdate( const std::string& ns,
+                       Client::Context& ctx,
                        const BatchedUpdateDocument& updateOp,
                        CurOp* currentOp,
                        WriteStats* stats,
@@ -122,6 +125,7 @@ namespace mongo {
                        WriteErrorDetail* error );
 
         bool doDelete( const std::string& ns,
+                       Client::Context& ctx,
                        const BatchedDeleteDocument& deleteOp,
                        CurOp* currentOp,
                        WriteStats* stats,

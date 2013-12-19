@@ -225,6 +225,11 @@ namespace mongo {
         return _documents;
     }
 
+    std::vector<BSONObj>& BatchedInsertRequest::getDocuments() {
+        dassert(_isDocumentsSet);
+        return _documents;
+    }
+
     const BSONObj& BatchedInsertRequest::getDocumentsAt(size_t pos) const {
         dassert(_isDocumentsSet);
         dassert(_documents.size() > pos);

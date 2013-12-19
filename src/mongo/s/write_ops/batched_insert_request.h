@@ -97,6 +97,7 @@ namespace mongo {
         bool isDocumentsSet() const;
         std::size_t sizeDocuments() const;
         const std::vector<BSONObj>& getDocuments() const;
+        std::vector<BSONObj>& getDocuments();
         const BSONObj& getDocumentsAt(std::size_t pos) const;
 
         void setWriteConcern(const BSONObj& writeConcern);
