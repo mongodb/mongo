@@ -439,10 +439,12 @@ namespace mongo {
     }
 
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
+        // Unless OpenSSL misbehaves, num should always be positive
+        fassert(17306, num > 0);
         SSLManager* sm = static_cast<SSLManager*>(userdata);
-        std::string pass = sm->_password;
-        strcpy(buf,pass.c_str());
-        return(pass.size());
+        const size_t copied = sm->_password.copy(buf, num - 1);
+        buf[copied] = '\0';
+        return copied;
     }
 
     int SSLManager::verify_cb(int ok, X509_STORE_CTX *ctx) {
