@@ -1092,10 +1092,9 @@ namespace NamespaceTests {
                 return collection()->infoCache();
             }
 
-            static BSONObj bigObj(bool bGenID=false) {
+            static BSONObj bigObj() {
                 BSONObjBuilder b;
-                if (bGenID)
-                    b.appendOID("_id", 0, true);
+                b.appendOID("_id", 0, true);
                 string as( 187, 'a' );
                 b.append( "a", as );
                 return b.obj();
@@ -1158,7 +1157,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 BSONObj b = bigObj();
-                ASSERT( !theDataFileMgr.insert( ns(), b.objdata(), b.objsize() ).isNull() );
+                ASSERT( collection()->insertDocument( b, true ).isOK() );
                 ASSERT_EQUALS( 1, nRecords() );
             }
         };
@@ -1172,8 +1171,10 @@ namespace NamespaceTests {
                 const int Q = 16; // these constants depend on the size of the bson object, the extent size allocated by the system too
                 DiskLoc l[ N ];
                 for ( int i = 0; i < N; ++i ) {
-					BSONObj b = bigObj(true);
-                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+                    BSONObj b = bigObj();
+                    StatusWith<DiskLoc> status = collection()->insertDocument( b, true );
+                    ASSERT( status.isOK() );
+                    l[ i ] = status.getValue();
                     ASSERT( !l[ i ].isNull() );
                     ASSERT( nRecords() <= Q );
                     //ASSERT_EQUALS( 1 + i % 2, nRecords() );
@@ -1189,11 +1190,11 @@ namespace NamespaceTests {
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
-                BSONObj b = bigObj();
-
                 DiskLoc l[ 8 ];
                 for ( int i = 0; i < 8; ++i ) {
-                    l[ i ] = theDataFileMgr.insert( ns(), b.objdata(), b.objsize() );
+                    StatusWith<DiskLoc> status = collection()->insertDocument( bigObj(), true );
+                    ASSERT( status.isOK() );
+                    l[ i ] = status.getValue();
                     ASSERT( !l[ i ].isNull() );
                     //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
                     //if ( i > 3 )
@@ -1203,10 +1204,11 @@ namespace NamespaceTests {
 
                 // Too big
                 BSONObjBuilder bob;
+                bob.appendOID( "_id", NULL, true );
                 bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
                 BSONObj bigger = bob.done();
-                ASSERT_THROWS( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ),
-                               UserException );
+                StatusWith<DiskLoc> status = collection()->insertDocument( bigger, false );
+                ASSERT( !status.isOK() );
                 ASSERT_EQUALS( 0, nRecords() );
             }
         private:
@@ -1604,7 +1606,7 @@ namespace NamespaceTests {
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
-                BSONObj b = bigObj(true);
+                BSONObj b = bigObj();
 
                 int N = MinExtentSize / b.objsize() * nExtents() + 5;
                 int T = N - 4;
@@ -1612,8 +1614,10 @@ namespace NamespaceTests {
                 DiskLoc truncAt;
                 //DiskLoc l[ 8 ];
                 for ( int i = 0; i < N; ++i ) {
-					BSONObj bb = bigObj(true);
-                    DiskLoc a = theDataFileMgr.insert( ns(), bb.objdata(), bb.objsize() );
+                    BSONObj bb = bigObj();
+                    StatusWith<DiskLoc> status = collection()->insertDocument( bb, true );
+                    ASSERT( status.isOK() );
+                    DiskLoc a = status.getValue();
                     if( T == i )
                         truncAt = a;
                     ASSERT( !a.isNull() );
@@ -1661,11 +1665,11 @@ namespace NamespaceTests {
 
                 // Too big
                 BSONObjBuilder bob;
-				bob.appendOID("_id", 0, true);
+                bob.appendOID("_id", 0, true);
                 bob.append( "a", string( MinExtentSize + 300, 'a' ) );
                 BSONObj bigger = bob.done();
-                ASSERT_THROWS( theDataFileMgr.insert( ns(), bigger.objdata(), bigger.objsize() ),
-                               UserException );
+                StatusWith<DiskLoc> status = collection()->insertDocument( bigger, true );
+                ASSERT( !status.isOK() );
                 ASSERT_EQUALS( 0, nRecords() );
             }
         public:
