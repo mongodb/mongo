@@ -37,37 +37,6 @@ namespace mongo {
     public:
         typedef std::vector<User*>::const_iterator iterator;
 
-        /**
-         * Forward iterator over the names of the users stored in a UserSet.
-         *
-         * Instances are valid until the underlying vector<User*> is modified.
-         *
-         * more() must be the first method called after construction, and must be checked
-         * after each call to next() before calling any other methods.
-         */
-        class NameIterator {
-        public:
-            explicit NameIterator(iterator begin, iterator end) : _curr(begin), _end(end) {}
-
-            NameIterator() {}
-
-            bool more() { return _curr != _end; }
-            const UserName& next() {
-                const UserName& ret = get();
-                ++_curr;
-                return ret;
-            }
-
-            const UserName& get() const { return (*_curr)->getName(); }
-
-            const UserName& operator*() const { return get(); }
-            const UserName* operator->() const { return &get(); }
-
-        private:
-            std::vector<User*>::const_iterator _curr;
-            std::vector<User*>::const_iterator _end;
-        };
-
         UserSet();
         ~UserSet();
 
@@ -121,7 +90,7 @@ namespace mongo {
 
         // Gets an iterator over the names of the users stored in the set.  The iterator is
         // valid until the next non-const method is called on the UserSet.
-        NameIterator getNames() const { return NameIterator(begin(), end()); }
+        UserNameIterator getNames() const;
 
         iterator begin() const { return _users.begin(); }
         iterator end() const { return _usersEnd; }

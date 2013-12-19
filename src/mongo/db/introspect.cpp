@@ -52,7 +52,7 @@ namespace {
     void _appendUserInfo(const Client& c,
                          BSONObjBuilder& builder,
                          AuthorizationSession* authSession) {
-        UserSet::NameIterator nameIter = authSession->getAuthenticatedUserNames();
+        UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
 
         UserName bestUser;
         if (nameIter.more())

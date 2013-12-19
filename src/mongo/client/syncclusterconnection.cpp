@@ -161,6 +161,7 @@ namespace mongo {
     void SyncClusterConnection::_connect( const std::string& host ) {
         log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
+        c->setRunCommandHook(_runCommandHook);
         c->setSoTimeout( _socketTimeout );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
@@ -513,4 +514,11 @@ namespace mongo {
             if( _conns[i] ) _conns[i]->setSoTimeout( socketTimeout );
     }
 
+    void SyncClusterConnection::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+        for (size_t i = 0; i < _conns.size(); ++i) {
+            if (_conns[i]) { 
+                _conns[i]->setRunCommandHook(func);
+            }
+        }
+    }
 }

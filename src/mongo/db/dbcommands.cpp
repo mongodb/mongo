@@ -32,6 +32,7 @@
 
 #include <time.h>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -41,6 +42,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -1312,6 +1315,35 @@ namespace mongo {
         bool maintenanceModeSet;
     };
 
+
+    /**
+     * RAII class to optionally set an impersonated username list into the authorization session
+     * for the duration of the life of this object
+     */
+    class ImpersonationSessionGuard {
+        MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
+    public:
+        ImpersonationSessionGuard(AuthorizationSession* authSession,
+                                  bool fieldIsPresent, 
+                                  const std::vector<UserName> &parsedUserNames) :
+            _authSession(authSession), _impersonation(false) {
+            if (fieldIsPresent) {
+                massert(17317, "impersonation unexpectedly active", 
+                        !authSession->isImpersonating());
+                authSession->setImpersonatedUserNames(parsedUserNames);
+                _impersonation = true;
+            }
+        }
+        ~ImpersonationSessionGuard() {
+            if (_impersonation) {
+                _authSession->clearImpersonatedUserNames();
+            }
+        }
+    private:
+        AuthorizationSession* _authSession;
+        bool _impersonation;
+    };
+
     /**
      * this handles
      - auth
@@ -1328,7 +1360,6 @@ namespace mongo {
                               BSONObj& cmdObj,
                               BSONObjBuilder& result,
                               bool fromRepl ) {
-
         std::string dbname = nsToDatabase( cmdns );
         scoped_ptr<MaintenanceModeSetter> mmSetter;
 
@@ -1342,6 +1373,18 @@ namespace mongo {
             appendCommandStatus(result, true, "");
             return;
         }
+
+        // Handle command option impersonatedUsers.
+        // This must come before _checkAuthorization(), as there is some command parsing logic
+        // in that code path that must not see the impersonated user array element.
+        std::vector<UserName> parsedUserNames;
+        AuthorizationSession* authSession = client.getAuthorizationSession();
+        bool fieldIsPresent = false;
+        audit::parseAndRemoveImpersonatedUserField(cmdObj, authSession,
+                                                   &parsedUserNames, &fieldIsPresent);
+        ImpersonationSessionGuard impersonationSession(authSession, 
+                                                       fieldIsPresent, 
+                                                       parsedUserNames);
 
         Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {

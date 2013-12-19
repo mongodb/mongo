@@ -59,6 +59,7 @@
 "grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
 "handshake",
 "hostInfo",
+"impersonate",
 "indexStats",
 "inprog",
 "insert",

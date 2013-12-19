@@ -1393,6 +1393,15 @@ namespace mongo {
         return rsm->getServerAddress();
     }
 
+    void DBClientReplicaSet::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+        if (_master) {
+            _master->setRunCommandHook(func);
+        }
+        if (_lastSlaveOkConn) {
+           _lastSlaveOkConn->setRunCommandHook(func);
+        }
+    }
+
     // A replica set connection is never disconnected, since it controls its own reconnection
     // logic.
     //
@@ -1504,6 +1513,7 @@ namespace mongo {
 
         _master.reset(newConn);
         _master->setReplSetClientCallback(this);
+        _master->setRunCommandHook(_runCommandHook);
 
         _auth( _master.get() );
         return _master.get();
@@ -1888,6 +1898,7 @@ namespace mongo {
 
         _lastSlaveOkConn.reset(newConn);
         _lastSlaveOkConn->setReplSetClientCallback(this);
+        _lastSlaveOkConn->setRunCommandHook(_runCommandHook);
 
         _auth(_lastSlaveOkConn.get());
 

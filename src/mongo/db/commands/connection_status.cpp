@@ -56,7 +56,7 @@ namespace mongo {
             {
                 BSONArrayBuilder authenticatedUsers(authInfo.subarrayStart("authenticatedUsers"));
 
-                UserSet::NameIterator nameIter = authSession->getAuthenticatedUserNames();
+                UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
                 for ( ; nameIter.more(); nameIter.next()) {
                     BSONObjBuilder userInfoBuilder(authenticatedUsers.subobjStart());
                     userInfoBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,

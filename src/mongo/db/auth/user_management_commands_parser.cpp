@@ -137,7 +137,7 @@ namespace auth {
         return Status::OK();
     }
 
-    Status _parseUserNamesFromBSONArray(const BSONArray& usersArray,
+    Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
                                         const StringData& dbname,
                                        std::vector<UserName>* parsedUserNames) {
         return _parseNamesFromBSONArray(usersArray,
@@ -359,9 +359,9 @@ namespace auth {
         if (cmdObj["usersInfo"].numberInt() == 1) {
             parsedArgs->allForDB = true;
         } else if (cmdObj["usersInfo"].type() == Array) {
-            status = _parseUserNamesFromBSONArray(BSONArray(cmdObj["usersInfo"].Obj()),
-                                                  dbname,
-                                                  &parsedArgs->userNames);
+            status = parseUserNamesFromBSONArray(BSONArray(cmdObj["usersInfo"].Obj()),
+                                                 dbname,
+                                                 &parsedArgs->userNames);
             if (!status.isOK()) {
                 return status;
             }

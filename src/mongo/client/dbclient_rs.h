@@ -531,6 +531,8 @@ namespace mongo {
                                       const BSONObj& queryObj,
                                       int queryOptions );
 
+        virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
+
     protected:
         /** Authorize.  Authorizes all nodes as needed
         */

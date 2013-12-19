@@ -957,6 +957,19 @@ namespace mongo {
 
         virtual string toString() = 0;
 
+        /**
+         * A function type for runCommand hooking; the function takes a pointer
+         * to a BSONObjBuilder and returns nothing.  The builder contains a
+         * runCommand BSON object.
+         * Once such a function is set as the runCommand hook, every time the DBClient
+         * processes a runCommand, the hook will be called just prior to sending it to the server. 
+         */
+        typedef boost::function<void(BSONObjBuilder*)> RunCommandHookFunc;
+        virtual void setRunCommandHook(RunCommandHookFunc func);
+        RunCommandHookFunc getRunCommandHook() const {
+            return _runCommandHook;
+        }
+
     protected:
         /** if the result of a command is ok*/
         bool isOk(const BSONObj&);
@@ -995,6 +1008,11 @@ namespace mongo {
         bool _authX509(const string&dbname,
                        const string &username,
                        BSONObj *info);
+
+        /**
+         * This function will be executed by the driver on runCommand calls.
+         */
+        RunCommandHookFunc _runCommandHook;
 
     private:
         enum QueryOptions _cachedAvailableOptions;

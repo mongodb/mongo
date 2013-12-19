@@ -38,6 +38,7 @@
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -451,6 +452,11 @@ namespace mongo {
                                                               causedBy( (string)"unknown failure : " + result.toString() ) ), ok );
 
         }
+
+        // For every DBClient created by mongos, add a hook that will append impersonated users
+        // to the end of every runCommand.  mongod uses this information to produce auditing
+        // records attributed to the proper authenticated user(s).
+        conn->setRunCommandHook(boost::bind(&audit::appendImpersonatedUsers, _1));
     }
 
     void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {

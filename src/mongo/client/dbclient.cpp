@@ -412,12 +412,25 @@ namespace mongo {
         return QueryOptions(0);
     }
 
+    void DBClientWithCommands::setRunCommandHook(RunCommandHookFunc func) {
+        _runCommandHook = func;
+    }
+
     bool DBClientWithCommands::runCommand(const string &dbname,
                                           const BSONObj& cmd,
                                           BSONObj &info,
                                           int options) {
         string ns = dbname + ".$cmd";
-        info = findOne(ns, cmd, 0 , options);
+        if (_runCommandHook) {
+            BSONObjBuilder cmdObj;
+            cmdObj.appendElements(cmd);
+            _runCommandHook(&cmdObj);
+            
+            info = findOne(ns, cmdObj.done(), 0 , options);
+        }
+        else {
+            info = findOne(ns, cmd, 0 , options);
+        }
         return isOk(info);
     }
 

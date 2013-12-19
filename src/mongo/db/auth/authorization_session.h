@@ -89,7 +89,7 @@ namespace mongo {
         size_t getNumAuthenticatedUsers();
 
         // Gets an iterator over the names of all authenticated users stored in this manager.
-        UserSet::NameIterator getAuthenticatedUserNames();
+        UserNameIterator getAuthenticatedUserNames();
 
         // Returns a string representing all logged-in users on the current session.
         // WARNING: this string will contain NUL bytes so don't call c_str()!
@@ -180,6 +180,21 @@ namespace mongo {
         // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), actions).
         bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, const ActionSet& actions);
 
+        // Replaces the vector of UserNames that a system user is impersonating with a new vector.
+        // The auditing system adds these to each audit record in the log.
+        void setImpersonatedUserNames(const std::vector<UserName>& names);
+
+        // Returns an iterator to a vector of impersonated usernames.  
+        UserNameIterator getImpersonatedUserNames() const;
+
+        // Clears the vector of impersonated UserNames.
+        void clearImpersonatedUserNames();
+
+        // Tells whether impersonation is active or not.  This state is set when
+        // setImpersonatedUserNames is called and cleared when clearImpersonatedUserNames is 
+        // called.
+        bool isImpersonating() const;
+
     private:
 
         // If any users authenticated on this session are marked as invalid this updates them with
@@ -195,6 +210,11 @@ namespace mongo {
 
         // All Users who have been authenticated on this connection
         UserSet _authenticatedUsers;
+
+        // A vector of impersonated UserNames.  These are used in the auditing system.
+        // They are not used for authz checks.
+        std::vector<UserName> _impersonatedUserNames;
+        bool _impersonationFlag;
     };
 
 } // namespace mongo

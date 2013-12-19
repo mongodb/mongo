@@ -78,6 +78,15 @@ namespace mongo {
     
     void DBClientCursor::initLazy( bool isRetry ) {
         massert( 15875 , "DBClientCursor::initLazy called on a client that doesn't support lazy" , _client->lazySupported() );
+        if (DBClientWithCommands::RunCommandHookFunc hook = _client->getRunCommandHook()) {
+            if (NamespaceString(ns).isCommand()) {
+                BSONObjBuilder bob;
+                bob.appendElements(query);
+                hook(&bob);
+                query = bob.obj();
+            }
+        }
+        
         Message toSend;
         _assembleInit( toSend );
         _client->say( toSend, isRetry, &_originalHost );

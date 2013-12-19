@@ -28,6 +28,9 @@
 
 #include "mongo/s/dbclient_multi_command.h"
 
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/audit.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/shard.h"
@@ -111,14 +114,17 @@ namespace mongo {
     // THROWS
     static void sayAsCmd( DBClientBase* conn, const StringData& dbName, const BSONObj& cmdObj ) {
         Message toSend;
-
+        BSONObjBuilder usersBuilder;
+        usersBuilder.appendElements(cmdObj);
+        audit::appendImpersonatedUsers(&usersBuilder);
+        
         // see query.h for the protocol we are using here.
         BufBuilder bufB;
         bufB.appendNum( 0 ); // command/query options
         bufB.appendStr( dbName.toString() + ".$cmd" ); // write command ns
         bufB.appendNum( 0 ); // ntoskip (0 for command)
         bufB.appendNum( 1 ); // ntoreturn (1 for command)
-        cmdObj.appendSelfToBufBuilder( bufB );
+        usersBuilder.obj().appendSelfToBufBuilder( bufB );
         toSend.setData( dbQuery, bufB.buf(), bufB.len() );
 
         // Send our command
