@@ -58,7 +58,7 @@ namespace mongo {
     ClientCursor::CCById ClientCursor::clientCursorsById;
     boost::recursive_mutex& ClientCursor::ccmutex( *(new boost::recursive_mutex()) );
     long long ClientCursor::numberTimedOut = 0;
-    set<Runner*> ClientCursor::nonCachedRunners;
+    ClientCursor::RunnerSet ClientCursor::nonCachedRunners;
 
     void aboutToDeleteForSharding(const StringData& ns,
                                   const Database* db,
@@ -152,7 +152,7 @@ namespace mongo {
         // Look at all active non-cached Runners.  These are the runners that are in auto-yield mode
         // that are not attached to the the client cursor. For example, all internal runners don't
         // need to be cached -- there will be no getMore.
-        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end();
+        for (RunnerSet::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end();
              ++it) {
 
             Runner* runner = *it;
@@ -239,7 +239,7 @@ namespace mongo {
         aboutToDeleteForSharding( ns, db, nsd, dl );
 
         // Check our non-cached active runner list.
-        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end();
+        for (RunnerSet::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end();
              ++it) {
 
             Runner* runner = *it;
@@ -268,14 +268,19 @@ namespace mongo {
 
     void ClientCursor::registerRunner(Runner* runner) {
         recursive_scoped_lock lock(ccmutex);
-        verify(nonCachedRunners.end() == nonCachedRunners.find(runner));
-        nonCachedRunners.insert(runner);
+        // The second part of the pair returned by unordered_map::insert tells us whether the
+        // insert was performed or not, so we can use that to ensure that we have not been
+        // double registered.
+        const std::pair<RunnerSet::iterator, bool> result = nonCachedRunners.insert(runner);
+        verify(result.second);
     }
 
     void ClientCursor::deregisterRunner(Runner* runner) {
         recursive_scoped_lock lock(ccmutex);
-        verify(nonCachedRunners.end() != nonCachedRunners.find(runner));
-        nonCachedRunners.erase(runner);
+        // unordered_set::erase returns a count of how many elements were erased, so we can
+        // validate that our de-registration matched an existing register call by ensuring that
+        // exactly one item was erased.
+        verify(nonCachedRunners.erase(runner) == 1);
     }
 
     void yieldOrSleepFor1Microsecond() {

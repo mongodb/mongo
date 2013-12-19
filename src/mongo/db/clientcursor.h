@@ -265,7 +265,8 @@ namespace mongo {
         // runner is deleted, it must be removed from this map.
         //
         // TODO: This is temporary and as such is highly NOT optimized.
-        static set<Runner*> nonCachedRunners;
+        typedef unordered_set<Runner*> RunnerSet;
+        static RunnerSet nonCachedRunners;
 
         // How many cursors have timed out?
         static long long numberTimedOut;
