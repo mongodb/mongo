@@ -428,7 +428,7 @@ class WiredTigerTestCase(unittest.TestCase):
 
 def runsuite(suite, parallel):
     suite_to_run = suite
-    if parallel > 0:
+    if parallel > 1:
         try:
             from concurrencytest import ConcurrentTestSuite, fork_for_tests
         except ImportError:
