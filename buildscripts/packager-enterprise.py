@@ -415,7 +415,7 @@ Label: mongodb
 Suite: mongodb
 Codename: %s
 Version: %s
-Architectures: i386 amd64
+Architectures: amd64
 Components: mongodb
 Description: mongodb packages
 """ % ("dist", "dist")
