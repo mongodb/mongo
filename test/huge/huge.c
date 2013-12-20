@@ -107,9 +107,13 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 
 	big[bytes] = '\0';
 
-	printf("%zu" "%s: %s %s big %s\n",
+	printf("%zu" "%s%s: %s %s big %s\n",
 	    bytes < MEGABYTE ? bytes :
 	    (bytes < GIGABYTE ? bytes / MEGABYTE : bytes / GIGABYTE),
+	    bytes < MEGABYTE ? "" :
+	    (bytes < GIGABYTE ?
+	    (bytes % MEGABYTE == 0 ? "" : "+") :
+	    (bytes % GIGABYTE == 0 ? "" : "+")),
 	    bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"),
 	    cp->uri, cp->config, bigkey ? "key" : "value");
 
