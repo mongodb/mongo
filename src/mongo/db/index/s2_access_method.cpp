@@ -100,9 +100,6 @@ namespace mongo {
             // false means Don't expand the last array, duh.
             obj.getFieldsDotted(e.fieldName(), fieldElements, false);
 
-            // If we're sparse and we're missing any field, bail out.
-            if (_descriptor->isSparse() && fieldElements.empty()) { return; }
-
             BSONObjSet keysForThisField;
             if (IndexNames::GEO_2DSPHERE == e.valuestr()) {
                 getGeoKeys(obj, fieldElements, &keysForThisField);
