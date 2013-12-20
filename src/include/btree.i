@@ -333,7 +333,7 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 	if (ref->key.pkey & 0x01) {
 		*(void **)keyp =
 		    WT_PAGE_REF_OFFSET(page, (ref->key.pkey & 0xFFFFFFFF) >> 1);
-		*sizep = (uint32_t)(ref->key.pkey >> 32);
+		*sizep = ref->key.pkey >> 32;
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
