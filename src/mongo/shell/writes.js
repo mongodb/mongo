@@ -119,7 +119,7 @@ if ( ( typeof WriteResult ) == 'undefined' ){
     };
 
     WriteResult.prototype.tojson = function() {
-        return this._result;
+        return tojson ( this._result );
     };
 
     WriteResult.prototype.toString = function() {
