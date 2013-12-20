@@ -112,5 +112,22 @@ var server11675 = function() {
                                       ,scoreOnMerger: {$meta: 'textScore'} }}
                           ]).toArray();
     assert.eq(res[0].scoreOnMerger, res[0].scoreOnShard);
+    var score = res[0].scoreOnMerger; // save for later tests
+
+    // Make sure metadata crosses shard -> merger boundary even if not used on shard
+    var res = t.aggregate([{$match: {_id:1, $text: {$search: 'apple'}}}
+                          ,{$limit:1} // force a split. later stages run on merger
+                          ,{$project: {scoreOnShard:1
+                                      ,scoreOnMerger: {$meta: 'textScore'} }}
+                          ]).toArray();
+    assert.eq(res[0].scoreOnMerger, score);
+
+    // Make sure metadata works if first $project doesn't use it.
+    var res = t.aggregate([{$match: {_id:1, $text: {$search: 'apple'}}}
+                          ,{$project: {_id:1}}
+                          ,{$project: {_id:1
+                                      ,score: {$meta: 'textScore'} }}
+                          ]).toArray();
+    assert.eq(res[0].score, score);
 }
 server11675();

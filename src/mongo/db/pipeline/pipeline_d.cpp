@@ -109,6 +109,9 @@ namespace {
         BSONObj projection;
         DocumentSource::ParsedDeps dependencies;
         {
+            const bool isTextQuery = DocumentSourceMatch::isTextQuery(queryObj);
+            needQueryProjection = isTextQuery;
+
             set<string> deps;
             DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
             for (size_t i=0; i < sources.size() && status == DocumentSource::SEE_NEXT; i++) {
@@ -117,17 +120,22 @@ namespace {
                     status = DocumentSource::NOT_SUPPORTED;
             }
 
+            // If doing a text query, assume we need score since we can't prove we don't.
+            // Edge cases that make this tricky:
+            // * Need to propagate score from shards to merger even if nothing on shard needs score.
+            // * Stages that are EXHAUSTIVE for field dependencies still propagate metadata.
+            if (isTextQuery)
+                deps.insert("$textScore");
+
             if (status == DocumentSource::EXHAUSTIVE) {
                 projection = DocumentSource::depsToProjection(deps);
                 dependencies = DocumentSource::parseDeps(deps);
                 haveProjection = true;
-                needQueryProjection = deps.count("$textScore");
             }
-            else if (DocumentSourceMatch::isTextQuery(queryObj)) {
-                // doing a text query. assume we need score since we can't prove we don't.
+            else if (isTextQuery) {
+                // We still need score even if we don't know what actual fields are needed.
                 projection = BSON(Document::metaFieldTextScore << BSON("$meta" << "textScore"));
                 haveProjection = true;
-                needQueryProjection = true;
             }
         }
 
