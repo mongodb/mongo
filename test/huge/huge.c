@@ -154,12 +154,10 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	/* Retrieve the record and check it. */
 	if ((ret = cursor->search(cursor)) != 0)
 		die(ret, "WT_CURSOR.search");
-	if (bigkey) {
-		if ((ret = cursor->get_key(cursor, &p)) != 0)
-			die(ret, "WT_CURSOR.get_key");
-	} else
-		if ((ret = cursor->get_value(cursor, &p)) != 0)
-			die(ret, "WT_CURSOR.get_value");
+	if (bigkey && (ret = cursor->get_key(cursor, &p)) != 0)
+		die(ret, "WT_CURSOR.get_key");
+	if ((ret = cursor->get_value(cursor, &p)) != 0)
+		die(ret, "WT_CURSOR.get_value");
 	if (memcmp(p, big, bytes) != 0)
 		die(0, "retrieved big key/value item did not match original");
 
