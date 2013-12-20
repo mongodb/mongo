@@ -588,6 +588,7 @@ namespace mongo {
     void receivedUpdate(Message& m, CurOp& op) {
         DbMessage d(m);
         NamespaceString ns(d.getns());
+        uassertStatusOK( userAllowedWriteNS( ns ) );
         op.debug().ns = ns.ns();
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -673,6 +674,7 @@ namespace mongo {
     void receivedDelete(Message& m, CurOp& op) {
         DbMessage d(m);
         NamespaceString ns(d.getns());
+        uassertStatusOK( userAllowedWriteNS( ns ) );
 
         op.debug().ns = ns.ns();
         int flags = d.pullInt();
@@ -843,6 +845,7 @@ namespace mongo {
     void checkAndInsert(Client::Context& ctx, const char *ns, /*modifies*/BSONObj& js) {
         if ( nsToCollectionSubstring( ns ) == "system.indexes" ) {
             string targetNS = js["ns"].String();
+            uassertStatusOK( userAllowedWriteNS( targetNS ) );
 
             Collection* collection = ctx.db()->getCollection( targetNS );
             if ( !collection ) {
@@ -851,9 +854,12 @@ namespace mongo {
                 verify( collection );
             }
 
-            Status status = collection->getIndexCatalog()->createIndex( js, true );
+            bool mayInterrupt = cc().curop()->parent() == NULL;
+            Status status = collection->getIndexCatalog()->createIndex( js, mayInterrupt );
+
             if ( status.code() == ErrorCodes::IndexAlreadyExists )
                 return;
+
             uassertStatusOK( status );
             logOp( "i", ns, js );
             return;
@@ -861,6 +867,8 @@ namespace mongo {
 
         StatusWith<BSONObj> fixed = fixDocumentForInsert( js );
         uassertStatusOK( fixed.getStatus() );
+        if ( !fixed.getValue().isEmpty() )
+            js = fixed.getValue();
 
         Collection* collection = ctx.db()->getCollection( ns );
         if ( !collection ) {
@@ -896,6 +904,8 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         op.debug().ns = ns;
+
+        uassertStatusOK( userAllowedWriteNS( ns ) );
 
         if( !d.moreJSObjs() ) {
             // strange.  should we complain?

@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/structure/collection.h"
@@ -369,6 +370,11 @@ namespace mongo {
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
         logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
         getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
+
+        if ( strstr( ns, ".system.js" ) ) {
+            Scope::storedFuncMod(); // this is terrible
+        }
+
     }
 
     void createOplog() {

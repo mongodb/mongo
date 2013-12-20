@@ -138,6 +138,12 @@ namespace mongo {
         }
 
     private:
+        /**
+         * same semantics as insertDocument, but doesn't do:
+         *  - some user error checks
+         *  - adjust padding
+         */
+        StatusWith<DiskLoc> _insertDocument( const BSONObj& doc, bool enforceQuota );
 
         // @return 0 for inf., otherwise a number of files
         int largestFileNumberInQuota() const;

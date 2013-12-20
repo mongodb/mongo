@@ -676,7 +676,15 @@ namespace mongo {
         return true;
     }
 
+    void NamespaceDetails::setPaddingFactor( double paddingFactor ) {
+        if ( paddingFactor == _paddingFactor )
+            return;
 
+        if ( isCapped() )
+            return;
+
+        *getDur().writing(&_paddingFactor) = paddingFactor;
+    }
 
     int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {
 

@@ -127,6 +127,10 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
 
+        Status status = userAllowedWriteNS( nss );
+        if ( !status.isOK() )
+            return appendCommandStatus( result, status );
+
         if ( cc().curop() )
             cc().curop()->setNS( nss.ns() );
 

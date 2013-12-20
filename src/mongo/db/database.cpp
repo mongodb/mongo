@@ -568,7 +568,10 @@ namespace mongo {
 
         // TODO: option for: allocation, indexes?
 
-        if ( nsToCollectionSubstring( ns ).startsWith( "system." ) ) {
+        StringData collectionName = nsToCollectionSubstring( ns );
+        uassert( 17314, "cannot create a blank collection", collectionName.size() );
+
+        if ( collectionName.startsWith( "system." ) ) {
             authindex::createSystemIndexes( ns );
         }
 

@@ -468,7 +468,9 @@ namespace mongo {
                         return false;
                     }
                 }
-                Status status = collection->getIndexCatalog()->createIndex( insertOp, true );
+
+                bool mayInterrupt = cc().curop()->parent() == NULL;
+                Status status = collection->getIndexCatalog()->createIndex( insertOp, mayInterrupt );
                 if ( status.code() == ErrorCodes::IndexAlreadyExists )
                     return true;
                 if ( !status.isOK() ) {

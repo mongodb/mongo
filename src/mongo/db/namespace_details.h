@@ -306,9 +306,7 @@ namespace mongo {
 
         double paddingFactor() const { return _paddingFactor; }
 
-        void setPaddingFactor( double paddingFactor ) {
-            *getDur().writing(&_paddingFactor) = paddingFactor;
-        }
+        void setPaddingFactor( double paddingFactor );
 
         /* called to indicate that an update fit in place.  
            fits also called on an insert -- idea there is that if you had some mix and then went to
@@ -321,10 +319,8 @@ namespace mongo {
         */
         void paddingFits() {
             MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
-                double x = _paddingFactor - 0.001;
-                if ( x >= 1.0 ) {
-                    setPaddingFactor( x );
-                }
+                double x = max(1.0, _paddingFactor - 0.001 );
+                setPaddingFactor( x );
             }
         }
         void paddingTooSmall() {            
@@ -337,10 +333,8 @@ namespace mongo {
                    this should be an adequate starting point.
                 */
                 double N = min(_nIndexes,7) + 3;
-                double x = _paddingFactor + (0.001 * N);
-                if ( x <= 2.0 ) {
-                    setPaddingFactor( x );
-                }
+                double x = min(2.0,_paddingFactor + (0.001 * N));
+                setPaddingFactor( x );
             }
         }
 

@@ -161,6 +161,10 @@ namespace mongo {
         BSONObjBuilder bb( result.subobjStart( "collections" ) );
         for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
             string fullCollectionName = *i;
+            if ( fullCollectionName.size() -1 <= dbname.size() ) {
+                errmsg  = str::stream() << "weird fullCollectionName [" << fullCollectionName << "]";
+                return false;
+            }
             string shortCollectionName = fullCollectionName.substr( dbname.size() + 1 );
 
             if ( shortCollectionName.find( "system." ) == 0 )

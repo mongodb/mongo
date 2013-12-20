@@ -62,9 +62,11 @@ namespace mongo {
     }
 
     void NamespaceIndex::add_ns( const Namespace& ns, const NamespaceDetails* details ) {
-        Lock::assertWriteLocked(ns.toString());
+        string nsString = ns.toString();
+        Lock::assertWriteLocked( nsString );
+        massert( 17315, "no . in ns", nsString.find( '.' ) != string::npos );
         init();
-        uassert( 10081 , "too many namespaces/collections", _ht->put(ns, *details));
+        uassert( 10081, "too many namespaces/collections", _ht->put(ns, *details));
     }
 
     void NamespaceIndex::kill_ns(const StringData& ns) {

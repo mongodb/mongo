@@ -122,4 +122,61 @@ namespace mongo {
         return StatusWith<BSONObj>( b.obj() );
     }
 
+    Status userAllowedWriteNS( const StringData& ns ) {
+        return userAllowedWriteNS( nsToDatabaseSubstring( ns ), nsToCollectionSubstring( ns ) );
+    }
+
+    Status userAllowedWriteNS( const NamespaceString& ns ) {
+        return userAllowedWriteNS( ns.db(), ns.coll() );
+    }
+
+    Status userAllowedWriteNS( const StringData& db, const StringData& coll ) {
+        // validity checking
+
+        if ( db.size() == 0 )
+            return Status( ErrorCodes::BadValue, "collection cannot be blank" );
+
+        if ( !NamespaceString::validDBName( db ) )
+            return Status( ErrorCodes::BadValue, "invalid db name" );
+
+        if ( coll.size() == 0 )
+            return Status( ErrorCodes::BadValue, "collection cannot be blank" );
+
+        if ( !NamespaceString::validCollectionName( coll ) )
+            return Status( ErrorCodes::BadValue, "invalid collection name" );
+
+        // check spceial areas
+
+        if ( db == "system" )
+            return Status( ErrorCodes::BadValue, "cannot use 'system' database" );
+
+
+        if ( coll.startsWith( "system." ) ) {
+            if ( coll == "system.indexes" ) return Status::OK();
+            if ( coll == "system.js" ) return Status::OK();
+            if ( coll == "system.users" ) return Status::OK();
+            if ( db == "admin" ) {
+                if ( coll == "system.version" ) return Status::OK();
+                if ( coll == "system.roles" ) return Status::OK();
+                if ( coll == "system.new_users" ) return Status::OK();
+                if ( coll == "system.backup_users" ) return Status::OK();
+            }
+            if ( db == "local" ) {
+                if ( coll == "system.replset" ) return Status::OK();
+            }
+            return Status( ErrorCodes::BadValue,
+                           str::stream() << "cannot write to '" << db << "." << coll << "'" );
+        }
+
+        // some special rules
+
+        if ( coll.find( ".system." ) != string::npos ) {
+            // this matches old (2.4 and older) behavior, but I'm not sure its a good idea
+            return Status( ErrorCodes::BadValue,
+                           str::stream() << "cannot write to '" << db << "." << coll << "'" );
+        }
+
+        return Status::OK();
+    }
+
 }

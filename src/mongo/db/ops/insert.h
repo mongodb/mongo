@@ -28,6 +28,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -38,5 +39,14 @@ namespace mongo {
      */
     StatusWith<BSONObj> fixDocumentForInsert( const BSONObj& doc );
 
+
+    /**
+     * check if this is a collection _any_ user can write to
+     * does NOT to permission checking, that is elsewhere
+     * for example, can't write to foo.system.bar
+     */
+    Status userAllowedWriteNS( const StringData& db, const StringData& coll );
+    Status userAllowedWriteNS( const StringData& ns );
+    Status userAllowedWriteNS( const NamespaceString& ns );
 
 }

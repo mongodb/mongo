@@ -108,7 +108,6 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
-
         if ( _indexCatalog.findIdIndex() ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
@@ -116,15 +115,25 @@ namespace mongo {
             }
         }
 
-        int lenWHdr = _details->getRecordAllocationSize( docToInsert.objsize() + Record::HeaderSize );
-        fassert( 17208, lenWHdr >= ( docToInsert.objsize() + Record::HeaderSize ) );
-
         if ( _details->isCapped() ) {
             // TOOD: old god not done
             Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert );
             if ( !ret.isOK() )
                 return StatusWith<DiskLoc>( ret );
         }
+
+        StatusWith<DiskLoc> status = _insertDocument( docToInsert, enforceQuota );
+        if ( status.isOK() ) {
+            _details->paddingFits();
+        }
+
+        return status;
+    }
+
+    StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
+
+        int lenWHdr = _details->getRecordAllocationSize( docToInsert.objsize() + Record::HeaderSize );
+        fassert( 17208, lenWHdr >= ( docToInsert.objsize() + Record::HeaderSize ) );
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
@@ -145,13 +154,12 @@ namespace mongo {
 
         _details->incrementStats( r->netLength(), 1 );
 
-        // TOOD: old god not done
         _infoCache.notifyOfWriteOp();
 
         try {
             _indexCatalog.indexRecord( docToInsert, loc.getValue() );
         }
-        catch( AssertionException& e ) {
+        catch ( AssertionException& e ) {
             if ( _details->isCapped() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                             str::stream() << "unexpected index insertion failure on"
@@ -159,16 +167,13 @@ namespace mongo {
                                             << " - collection and its index will not match" );
             }
 
-            // normal case -- we can roll back
-            deleteDocument( loc.getValue(), false, true, NULL );
+            // indexRecord takes care of rolling back indexes
+            // so we just have to delete the main storage
+            _recordStore.deallocRecord( loc.getValue(), r );
             return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
         }
 
-        // TODO: this is what the old code did, but is it correct?
-        _details->paddingFits();
-
         return loc;
-
     }
 
     void Collection::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
@@ -273,7 +278,7 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            StatusWith<DiskLoc> loc = insertDocument( objNew, enforceQuota );
+            StatusWith<DiskLoc> loc = _insertDocument( objNew, enforceQuota );
 
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location

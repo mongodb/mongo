@@ -376,6 +376,15 @@ namespace mongo {
             return Status( ErrorCodes::IndexAlreadyExists, "cannot index freelist" );
         }
 
+        StringData specNamespace = spec.getStringField("ns");
+        if ( specNamespace.size() == 0 )
+            return Status( ErrorCodes::CannotCreateIndex,
+                           "the index spec needs a 'ns' field'" );
+
+        if ( _collection->ns() != specNamespace )
+            return Status( ErrorCodes::CannotCreateIndex,
+                           "the index spec ns does not match" );
+
         // logical name of the index
         const char *name = spec.getStringField("name");
         if ( !name[0] )
