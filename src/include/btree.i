@@ -36,7 +36,7 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_ADD(page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 		(void)WT_ATOMIC_ADD(page->modify->bytes_dirty, size);
@@ -56,7 +56,7 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_SUB(page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
 		(void)WT_ATOMIC_SUB(page->modify->bytes_dirty, size);
