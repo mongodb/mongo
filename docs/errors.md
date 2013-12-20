@@ -41,8 +41,8 @@ src/mongo/bson/bsonelement.h
 * 10063 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L413) not a dbref
 * 10064 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L418) not a dbref
 * 10333 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L443) Invalid field name
-* 13111 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L478) 
-* 13118 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L483) unexpected or missing type value in BSON object
+* 13111 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L491) 
+* 13118 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L496) unexpected or missing type value in BSON object
 * 16177 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L269) not codeWScope
 * 16178 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/bsonelement.h#L276) not codeWScope
 
@@ -182,17 +182,18 @@ src/mongo/client/gridfs.cpp
 
 src/mongo/client/parallel.cpp
 ----
-* 10017 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L117) cursor already done
-* 10018 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L429) no more items
-* 10019 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1645) no more elements
-* 13431 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L517) have to have sort key in projection and removing it
-* 13633 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L147) error querying server: 
-* 14812 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1717) Error running command on server: 
-* 14813 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1718) Command returned nothing
-* 15986 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L845) too many retries in total
-* 15987 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L968) could not fully initialize cursor on shard 
-* 15988 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1111) error querying server
-* 15989 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L800) database not found for parallel cursor request
+* 10017 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L118) cursor already done
+* 10018 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L430) no more items
+* 10019 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1683) no more elements
+* 13431 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L545) 
+* 13633 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L148) error querying server: 
+* 14812 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1755) Error running command on server: 
+* 14813 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1756) Command returned nothing
+* 15986 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L883) too many retries in total
+* 15987 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1006) could not fully initialize cursor on shard 
+* 15988 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L1149) error querying server
+* 15989 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L838) database not found for parallel cursor request
+* 17306 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L572) 
 
 
 src/mongo/client/sasl_client_session.cpp
@@ -529,11 +530,11 @@ src/mongo/db/commands/mr_common.cpp
 
 src/mongo/db/commands/pipeline_command.cpp
 ----
-* 16954 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L125) cursor field must be missing or an object
-* 16955 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L131) cursor object can't contain fields other than batchSize
-* 16956 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L135) cursor.batchSize must be a number
-* 16957 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L139) Cursor batchSize must not be negative
-* 16958 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L155) Cursor shouldn't have been deleted
+* 16954 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L140) cursor field must be missing or an object
+* 16955 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L146) cursor object can't contain fields other than batchSize
+* 16956 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L150) cursor.batchSize must be a number
+* 16957 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L154) Cursor batchSize must not be negative
+* 16958 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/commands/pipeline_command.cpp#L170) Cursor shouldn't have been deleted
 
 
 src/mongo/db/commands/server_status.cpp
@@ -653,14 +654,14 @@ src/mongo/db/db.h
 
 src/mongo/db/dbcommands.cpp
 ----
-* 10040 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L731) chunks out of order
-* 13281 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L758) File deleted during filemd5 command
+* 10040 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L750) chunks out of order
+* 13281 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L777) File deleted during filemd5 command
 * 13455 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L137) dbexit timed out getting lock
-* 14832 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L518) specify size:<n> when capped is true", !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() || cmdObj.hasField("$nExtents
-* 15888 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L515) must pass name of collection to create
-* 16247 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L687) md5 state not correct size
-* 17240 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L699) Can't canonicalize query 
-* 17241 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L705) Can't get runner for query 
+* 14832 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L530) 
+* 15888 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L519) 
+* 16247 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L706) md5 state not correct size
+* 17240 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L718) Can't canonicalize query 
+* 17241 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/dbcommands.cpp#L724) Can't get runner for query 
 
 
 src/mongo/db/dbcommands_generic.cpp
@@ -931,7 +932,7 @@ src/mongo/db/index/s2_access_method.cpp
 
 src/mongo/db/index_rebuilder.cpp
 ----
-* 17201 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/index_rebuilder.cpp#L118) 
+* 17201 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/index_rebuilder.cpp#L111) 
 
 
 src/mongo/db/initialize_server_global_state.cpp
@@ -976,12 +977,12 @@ src/mongo/db/introspect.cpp
 
 src/mongo/db/jsobj.cpp
 ----
-* 10060 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L590) woSortOrder needs a non-empty sortKey
-* 10061 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L1266) type not supported for appendMinElementForType
-* 10311 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L110) 
-* 10312 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L295) 
-* 12579 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L984) unhandled cases in BSONObj okForStorage
-* 14853 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L1319) type not supported for appendMaxElementForType
+* 10060 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L576) woSortOrder needs a non-empty sortKey
+* 10061 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L1252) type not supported for appendMinElementForType
+* 10311 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L109) 
+* 10312 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L281) 
+* 12579 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L970) unhandled cases in BSONObj okForStorage
+* 14853 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/jsobj.cpp#L1305) type not supported for appendMaxElementForType
 
 
 src/mongo/db/json.cpp
@@ -1141,11 +1142,11 @@ src/mongo/db/pipeline/document.cpp
 ----
 * 16486 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L98) 
 * 16487 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L167) 
-* 16488 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L284) 
-* 16489 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L314) 
+* 16488 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L315) 
+* 16489 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L345) 
 * 16490 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L142) Tried to make oversized document
 * 16491 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L177) Tried to make oversized document
-* 16601 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L268) 
+* 16601 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document.cpp#L299) 
 
 
 src/mongo/db/pipeline/document_source_command_shards.cpp
@@ -1156,11 +1157,11 @@ src/mongo/db/pipeline/document_source_command_shards.cpp
 
 src/mongo/db/pipeline/document_source_cursor.cpp
 ----
-* 16028 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L124) collection or index disappeared when cursor yielded
-* 16950 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L89) Cursor deleted. Was the collection or database dropped?
-* 17135 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L170) Cursor deleted. Was the collection or database dropped?
-* 17285 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L127) cursor encountered an error
-* 17286 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L130) Unexpected return from Runner::getNext: 
+* 16028 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L128) collection or index disappeared when cursor yielded
+* 16950 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L90) Cursor deleted. Was the collection or database dropped?
+* 17135 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L218) Cursor deleted. Was the collection or database dropped?
+* 17285 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L131) cursor encountered an error
+* 17286 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.cpp#L134) Unexpected return from Runner::getNext: 
 
 
 src/mongo/db/pipeline/document_source_geo_near.cpp
@@ -1196,10 +1197,12 @@ src/mongo/db/pipeline/document_source_limit.cpp
 
 src/mongo/db/pipeline/document_source_match.cpp
 ----
-* 15959 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L292) the match filter must be an expression in an object
-* 16395 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L277) $where is not allowed inside of a $match aggregation expression
-* 16424 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L280) $near is not allowed inside of a $match aggregation expression
-* 16426 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L282) $nearSphere is not allowed inside of a $match aggregation expression
+* 15959 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L331) the match filter must be an expression in an object
+* 16395 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L316) $where is not allowed inside of a $match aggregation expression
+* 16424 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L319) $near is not allowed inside of a $match aggregation expression
+* 16426 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L321) $nearSphere is not allowed inside of a $match aggregation expression
+* 17309 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L56) Should never call getNext on a $match stage with $text clause
+* 17313 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_match.cpp#L295) $match with $text is only allowed as the first pipeline stage
 
 
 src/mongo/db/pipeline/document_source_merge_cursors.cpp
@@ -1225,15 +1228,14 @@ src/mongo/db/pipeline/document_source_out.cpp
 
 src/mongo/db/pipeline/document_source_project.cpp
 ----
-* 15969 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_project.cpp#L108) 
-* 16402 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_project.cpp#L122) parseObject() returned wrong type of Expression
-* 16403 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_project.cpp#L123) $projection requires at least one output field
+* 15969 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_project.cpp#L109) 
+* 16402 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_project.cpp#L123) parseObject() returned wrong type of Expression
+* 16403 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_project.cpp#L124) $projection requires at least one output field
 
 
 src/mongo/db/pipeline/document_source_redact.cpp
 ----
-* 17053 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_redact.cpp#L128) $redact's expression should not return anything 
-* 17054 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_redact.cpp#L146)  specification must be an object
+* 17053 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_redact.cpp#L130) $redact's expression should not return anything 
 
 
 src/mongo/db/pipeline/document_source_skip.cpp
@@ -1244,11 +1246,12 @@ src/mongo/db/pipeline/document_source_skip.cpp
 
 src/mongo/db/pipeline/document_source_sort.cpp
 ----
-* 15973 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L138)  the 
-* 15974 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L163) $sort key ordering must be specified using a number
-* 15975 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L168) $sort key ordering must be 1 (for ascending) or -1 (for descending)
-* 15976 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L175) 
-* 17196 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L213) can only mergePresorted from MergeCursors and CommandShards
+* 15973 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L144)  the 
+* 15974 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L179) $sort key ordering must be specified using a number or {$meta: 'text'}
+* 15975 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L184) $sort key ordering must be 1 (for ascending) or -1 (for descending)
+* 15976 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L190)  must have at least one sort key
+* 17196 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L228) can only mergePresorted from MergeCursors and CommandShards
+* 17312 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_sort.cpp#L170) 
 
 
 src/mongo/db/pipeline/document_source_unwind.cpp
@@ -1265,8 +1268,8 @@ src/mongo/db/pipeline/expression.cpp
 * 15990 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L230) this object is already an operator expression, and can't be used as a document expression (at '
 * 15992 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L290) 
 * 15999 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L331) invalid operator '" << opName << "'
-* 16034 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2112) 
-* 16035 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2118) 
+* 16034 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2193) 
+* 16035 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2199) 
 * 16400 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1106) 
 * 16401 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1124) 
 * 16404 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L221) $expressions are not allowed at the top-level of $project
@@ -1274,18 +1277,18 @@ src/mongo/db/pipeline/expression.cpp
 * 16406 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L282) 
 * 16407 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L930) inclusion not supported in objects nested in $expressions
 * 16417 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L433) $add resulted in a non-numeric type
-* 16418 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1640) $multiply resulted in a non-numeric type
+* 16418 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1670) $multiply resulted in a non-numeric type
 * 16419 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L181) field path must not contain embedded null characters" << prefixedField.find("\0") << ",
 * 16420 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L277) field inclusion is not allowed inside of $expressions
 * 16554 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L413) $add only supports numeric or date types, not 
-* 16555 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1628) $multiply only supports numeric types, not 
-* 16556 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2181) cant $subtract a
+* 16555 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1658) $multiply only supports numeric types, not 
+* 16556 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2262) cant $subtract a
 * 16608 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L851) can't $divide by zero
 * 16609 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L860) $divide only supports numeric types, not 
-* 16610 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1548) can't $mod by 0
-* 16611 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1576) $mod only supports numeric types, not 
+* 16610 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1578) can't $mod by 0
+* 16611 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1606) $mod only supports numeric types, not 
 * 16612 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L400) only one Date allowed in an $add expression
-* 16613 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2175) cant $subtract a 
+* 16613 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2256) cant $subtract a 
 * 16702 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L699) $concat only supports strings, not 
 * 16866 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L61) empty variable names are not allowed
 * 16867 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L68) 
@@ -1307,23 +1310,27 @@ src/mongo/db/pipeline/expression.cpp
 * 16883 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1479) input to $map must be an Array not 
 * 17040 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L446) 's argument must be an array, but is 
 * 17041 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L542) 's argument must be an array, but is 
-* 17042 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2016) both operands of $setIsSubset must be arrays. Second 
-* 17043 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2049) All operands of $setUnion must be arrays. One argument
-* 17044 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1933) All operands of $setEquals must be arrays. One 
-* 17045 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1922) $setEquals needs at least two arguments had: 
-* 17046 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2013) both operands of $setIsSubset must be arrays. First 
-* 17047 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1966) All operands of $setIntersection must be arrays. One 
-* 17048 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1893) both operands of $setDifference must be arrays. First 
-* 17049 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1896) both operands of $setDifference must be arrays. Second 
+* 17042 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2059) both operands of $setIsSubset must be arrays. Second 
+* 17043 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2130) All operands of $setUnion must be arrays. One argument
+* 17044 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1963) All operands of $setEquals must be arrays. One 
+* 17045 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1952) $setEquals needs at least two arguments had: 
+* 17046 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2056) both operands of $setIsSubset must be arrays. First 
+* 17047 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1996) All operands of $setIntersection must be arrays. One 
+* 17048 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1923) both operands of $setDifference must be arrays. First 
+* 17049 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1926) both operands of $setDifference must be arrays. Second 
 * 17064 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L316) Duplicate expression (" << key << ") detected at 
 * 17080 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L748) Missing 'if' parameter to $cond
 * 17081 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L750) Missing 'then' parameter to $cond
 * 17082 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L752) Missing 'else' parameter to $cond
 * 17083 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L743) 
-* 17124 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2069) The argument to $size must be an Array, but was of type: 
+* 17124 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2150) The argument to $size must be an Array, but was of type: 
 * 17199 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L114) can't use Variables::setValue to set ROOT
 * 17275 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L143) Can't redefine ROOT
 * 17276 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L156) Use of undefined variable: 
+* 17307 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1515) $meta only supports String arguments
+* 17308 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L1517) Unsupported argument to $meta: 
+* 17310 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2084) both operands of $setIsSubset must be arrays. First 
+* 17311 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/expression.cpp#L2105) both operands of $setIsSubset must be arrays. Second 
 
 
 src/mongo/db/pipeline/expression.h
@@ -1343,14 +1350,14 @@ src/mongo/db/pipeline/field_path.cpp
 src/mongo/db/pipeline/pipeline.cpp
 ----
 * 15942 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L178) pipeline element 
-* 16389 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L454) 
+* 16389 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L470) 
 * 16435 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L184) A pipeline stage specification object must contain exactly one field.
 * 16436 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L196) 
-* 16600 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L425) should not have an empty pipeline
+* 16600 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L441) should not have an empty pipeline
 * 16949 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L151) 
-* 16991 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L204) $out can only be the final stage in the pipeline
-* 17138 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L321) 
-* 17139 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L332) 
+* 16991 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L206) $out can only be the final stage in the pipeline
+* 17138 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L327) 
+* 17139 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/pipeline.cpp#L338) 
 
 
 src/mongo/db/pipeline/value.cpp
@@ -1359,13 +1366,13 @@ src/mongo/db/pipeline/value.cpp
 * 16004 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L387) 
 * 16005 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L406) 
 * 16006 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L422) 
-* 16007 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L512) 
-* 16378 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L525) 
+* 16007 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L507) 
+* 16378 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L520) 
 * 16421 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L440) Can't handle date values outside of time_t range
 * 16422 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L461) gmtime failed - your system doesn't support dates before 1970
 * 16423 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L464) gmtime failed to convert time_t of 
 * 16485 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L106) 
-* 16557 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L668) can't compare CodeWScope values containing a NUL byte in the code.
+* 16557 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/value.cpp#L663) can't compare CodeWScope values containing a NUL byte in the code.
 
 
 src/mongo/db/prefetch.cpp
@@ -1734,37 +1741,36 @@ src/mongo/s/cluster_client_internal.cpp
 
 src/mongo/s/commands_public.cpp
 ----
-* 10420 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1073) how could chunk manager be null!
-* 12594 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L756) how could chunk manager be null!
-* 13002 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L885) shard internal error chunk manager should never be null
-* 13091 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1144) how could chunk manager be null!
-* 13137 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L574) Source and destination collections must be on same shard
-* 13138 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L568) You can't rename a sharded collection
-* 13139 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L569) You can't rename to a sharded collection
-* 13140 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L567) Don't recognize source or target DB
-* 13343 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L888) query for sharded findAndModify must have shardkey
-* 13398 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L596) cant copy to sharded DB
-* 13399 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L604) need a fromdb argument
-* 13400 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L607) don't know where source DB is
-* 13401 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L608) cant copy from sharded DB
-* 13402 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L593) need a todb argument
-* 13405 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L943) min value " << min << " does not have shard key
-* 13406 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L945) max value " << max << " does not have shard key
-* 13407 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L935) how could chunk manager be null!
-* 13408 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L941) keyPattern must equal shard key
-* 13500 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1259) how could chunk manager be null!
-* 15920 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1467) Cannot output to a non-sharded collection, a sharded collection exists
-* 16246 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1211) Shard " + conf->getName() + " is too old to support GridFS sharded by {files_id:1, n:1}
-* 16618 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2209) 
-* 17014 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2166) aggregate command didn't return results on host: 
-* 17015 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1915) getDBConfig shouldn't return NULL
-* 17016 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2157) should only be running an aggregate command here
-* 17020 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2016) All shards must support cursors to get a cursor back from aggregation
-* 17021 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2019) All shards must support cursors to support new features in aggregation
-* 17022 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2060) 
-* 17023 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2068) 
-* 17024 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2072) 
-* 17025 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2076) 
+* 10420 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1119) how could chunk manager be null!
+* 12594 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L799) how could chunk manager be null!
+* 13002 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L931) shard internal error chunk manager should never be null
+* 13091 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1190) how could chunk manager be null!
+* 13137 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L611) Source and destination collections must be on same shard
+* 13138 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L605) You can't rename a sharded collection
+* 13139 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L606) You can't rename to a sharded collection
+* 13140 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L604) Don't recognize source or target DB
+* 13343 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L934) query for sharded findAndModify must have shardkey
+* 13398 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L633) cant copy to sharded DB
+* 13399 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L641) need a fromdb argument
+* 13400 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L644) don't know where source DB is
+* 13401 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L645) cant copy from sharded DB
+* 13402 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L630) need a todb argument
+* 13405 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L989) min value " << min << " does not have shard key
+* 13406 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L991) max value " << max << " does not have shard key
+* 13407 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L981) how could chunk manager be null!
+* 13408 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L987) keyPattern must equal shard key
+* 13500 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1305) how could chunk manager be null!
+* 15920 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1513) Cannot output to a non-sharded collection, a sharded collection exists
+* 16246 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1257) Shard " + conf->getName() + " is too old to support GridFS sharded by {files_id:1, n:1}
+* 16618 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2271) 
+* 17014 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2228) aggregate command didn't return results on host: 
+* 17015 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L1967) getDBConfig shouldn't return NULL
+* 17016 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2219) should only be running an aggregate command here
+* 17020 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2068) All shards must support cursors to get a cursor back from aggregation
+* 17021 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2071) All shards must support cursors to support new features in aggregation
+* 17023 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2130) 
+* 17024 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2134) 
+* 17025 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/s/commands_public.cpp#L2138) 
 
 
 src/mongo/s/config.cpp
@@ -2081,15 +2087,16 @@ src/mongo/tools/import.cpp
 * 13504 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L212) BSON representation of supplied JSON is too large: 
 * 15854 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L239) CSV file ends while inside quoted field
 * 16329 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L124) read error, or input line too long (max length: 
-* 16808 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L464) read error: 
-* 16809 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L513) read error: 
-* 9998 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L424) You need to specify fields or have a headerline to 
+* 16808 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L479) read error: 
+* 16809 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L522) read error: 
+* 17314 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L286) 
+* 9998 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/import.cpp#L439) You need to specify fields or have a headerline to 
 
 
 src/mongo/tools/restore.cpp
 ----
-* 15936 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L526) Creating collection " + _curns + " failed. Errmsg: " + info["errmsg
-* 16441 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L578) Error calling getLastError: " << err["errmsg
+* 15936 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L521) Creating collection " + _curns + " failed. Errmsg: " + info["errmsg
+* 16441 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L573) Error calling getLastError: " << err["errmsg
 
 
 src/mongo/tools/sniffer.cpp

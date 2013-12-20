@@ -283,7 +283,7 @@ class Import : public Tool {
 
     void throttleIfNeeded(int num, unsigned int throttleChkFreq, const int throttleBPS, 
                           int& currTBSize, unsigned long long& tStartMs) {
-        fassert(17306, throttleChkFreq != 0);
+        fassert(17314, throttleChkFreq != 0);
         if (num != 0 && num % throttleChkFreq == 0) {
             int bin_exp = static_cast<int>(log2(static_cast<float>(currTBSize) / throttleBPS));
             if (bin_exp < 0) {
