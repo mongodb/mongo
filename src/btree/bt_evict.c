@@ -976,7 +976,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		++evict;
 
 		WT_VERBOSE_RET(session, evictserver,
-		    "select: %p, size %" PRIu32, page, page->memory_footprint);
+		    "select: %p, size %" PRIu64, page, page->memory_footprint);
 	}
 
 	*slotp += (u_int)(evict - start);

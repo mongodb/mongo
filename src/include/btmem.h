@@ -361,13 +361,13 @@ struct __wt_page {
 #define	WT_READ_GEN_STEP	1000
 	uint64_t read_gen;
 
+	uint64_t memory_footprint;	/* Memory attached to the page */
+
 	/*
 	 * In-memory pages optionally reference a number of entries originally
 	 * read from disk and sizes the allocated arrays that describe the page.
 	 */
 	uint32_t entries;
-
-	uint32_t memory_footprint;	/* Memory attached to the page */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
