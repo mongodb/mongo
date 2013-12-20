@@ -566,9 +566,10 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 /* How aggressively to ramp up or down throttle due to level 0 merging */
 #define	WT_LSM_MERGE_THROTTLE_BUMP_PCT	(100 / lsm_tree->merge_max)
 /* Number of level 0 chunks that need to be present to throttle inserts */
-#define	WT_LSM_MERGE_THROTTLE_THRESHOLD	(2 * lsm_tree->merge_max)
-/* Time to wait when first throttling */
-#define	WT_LSM_THROTTLE_START		100
+#define	WT_LSM_MERGE_THROTTLE_THRESHOLD					\
+	(lsm_tree->merge_threads * lsm_tree->merge_min)
+/* Minimal throttling time */
+#define	WT_LSM_THROTTLE_START		20
 
 #define	WT_LSM_MERGE_THROTTLE_INCREASE(val)	do {			\
 	(val) += ((val) * WT_LSM_MERGE_THROTTLE_BUMP_PCT) / 100;	\
@@ -596,8 +597,10 @@ __wt_lsm_tree_throttle(
 	uint32_t i, in_memory, gen0_chunks;
 
 	/* Never throttle in small trees. */
-	if (lsm_tree->nchunks < 3)
+	if (lsm_tree->nchunks < 3) {
+		lsm_tree->ckpt_throttle = lsm_tree->merge_throttle = 0;
 		return;
+	}
 
 	cache_sz = S2C(session)->cache_size;
 
@@ -636,23 +639,9 @@ __wt_lsm_tree_throttle(
 				break;
 		}
 
-	/*
-	 * Don't throttle based on merges if there is only a single merge
-	 * thread - that thread is likely busy creating bloom filters.
-	 * Decrease throttling twice as fast when there is less that a full
-	 * level of unmerged chunks.
-	 */
-	if (lsm_tree->merge_threads < 2)
-		lsm_tree->merge_throttle = 0;
-	if (gen0_chunks < lsm_tree->merge_max)
-		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
-	if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
-		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
-	else if (!decrease_only)
-		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
-
 	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 
+	/* Checkpoint throttling, based on the number of in-memory chunks. */
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->ckpt_throttle = 0;
 	else if (decrease_only)
@@ -685,6 +674,25 @@ __wt_lsm_tree_throttle(
 		if (cache_used > cache_sz * 0.8)
 			lsm_tree->ckpt_throttle *= 5;
 	}
+
+	/*
+	 * Merge throttling, based on the number of on-disk, level 0 chunks.
+	 *
+	 * Don't throttle if there is only a single merge thread - that thread
+	 * is likely busy creating bloom filters.  Similarly, don't throttle if
+	 * the tree has less than a single level's number of chunks.
+	 */
+	if (lsm_tree->merge_threads < 2 ||
+	    lsm_tree->nchunks < lsm_tree->merge_max)
+		lsm_tree->merge_throttle = 0;
+	else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
+		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
+	else if (!decrease_only)
+		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
+
+	/* Put an upper bound of 100ms on both throttle calculations. */
+	lsm_tree->ckpt_throttle = WT_MIN(100000, lsm_tree->ckpt_throttle);
+	lsm_tree->merge_throttle = WT_MIN(100000, lsm_tree->merge_throttle);
 
 	/*
 	 * Update our estimate of how long each in-memory chunk stays active.
@@ -743,8 +751,8 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    nchunks + 1, &lsm_tree->chunk));
 
 	WT_VERBOSE_ERR(session, lsm,
-	    "Tree switch to: %" PRIu32 ", checkpoint throttle %ld, merge "
-	    "throttle %ld\n",
+	    "Tree switch to: %" PRIu32 ", checkpoint throttle %ld, "
+	    "merge throttle %ld",
 	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle);
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));

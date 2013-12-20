@@ -228,7 +228,7 @@ __wt_lsm_merge(
 
 	WT_VERBOSE_RET(session, lsm,
 	    "Merging chunks %u-%u into %u (%" PRIu64 " records)"
-	    ", generation %" PRIu32 "\n",
+	    ", generation %" PRIu32,
 	    start_chunk, end_chunk, dest_id, record_count, generation);
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
