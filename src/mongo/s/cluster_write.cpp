@@ -162,12 +162,16 @@ namespace mongo {
 
     void clusterInsert( const string& ns,
                         const BSONObj& doc,
+                        const BSONObj& writeConcern,
                         BatchedCommandResponse* response ) {
         auto_ptr<BatchedInsertRequest> insert( new BatchedInsertRequest() );
         insert->addToDocuments( doc );
 
         BatchedCommandRequest request( insert.release() );
         request.setNS( ns );
+        if ( !writeConcern.isEmpty() ) {
+            request.setWriteConcern( writeConcern );
+        }
 
         clusterWrite( request, response, false );
     }
@@ -177,6 +181,7 @@ namespace mongo {
                         const BSONObj& update,
                         bool upsert,
                         bool multi,
+                        const BSONObj& writeConcern,
                         BatchedCommandResponse* response ) {
         auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument() );
         updateDoc->setQuery( query );
@@ -187,6 +192,10 @@ namespace mongo {
         auto_ptr<BatchedUpdateRequest> updateRequest( new BatchedUpdateRequest() );
         updateRequest->addToUpdates( updateDoc.release() );
 
+        if ( !writeConcern.isEmpty() ) {
+            updateRequest->setWriteConcern( writeConcern );
+        }
+
         BatchedCommandRequest request( updateRequest.release() );
         request.setNS( ns );
 
@@ -196,6 +205,7 @@ namespace mongo {
     void clusterDelete( const string& ns,
                         const BSONObj& query,
                         int limit,
+                        const BSONObj& writeConcern,
                         BatchedCommandResponse* response ) {
         auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
         deleteDoc->setQuery( query );
@@ -203,6 +213,10 @@ namespace mongo {
 
         auto_ptr<BatchedDeleteRequest> deleteRequest( new BatchedDeleteRequest() );
         deleteRequest->addToDeletes( deleteDoc.release() );
+
+        if ( !writeConcern.isEmpty() ) {
+            deleteRequest->setWriteConcern( writeConcern );
+        }
 
         BatchedCommandRequest request( deleteRequest.release() );
         request.setNS( ns );
@@ -213,9 +227,12 @@ namespace mongo {
     void clusterCreateIndex( const string& ns,
                              BSONObj keys,
                              bool unique,
+                             const BSONObj& writeConcern,
                              BatchedCommandResponse* response) {
         clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
-                       createIndexDoc( ns, keys, unique ), response );
+                       createIndexDoc( ns, keys, unique ),
+                       writeConcern,
+                       response );
     }
 
     void clusterWrite( const BatchedCommandRequest& request,

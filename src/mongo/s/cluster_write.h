@@ -78,12 +78,15 @@ namespace mongo {
         scoped_ptr<BatchWriteExecStats> _shardStats;
     };
 
+    const BSONObj DefaultClusterWriteConcern = BSONObj();
+
     void clusterWrite( const BatchedCommandRequest& request,
                        BatchedCommandResponse* response,
                        bool autoSplit );
 
     void clusterInsert( const std::string& ns,
                         const BSONObj& doc,
+                        const BSONObj& writeConcern,
                         BatchedCommandResponse* response );
 
     void clusterUpdate( const std::string& ns,
@@ -91,16 +94,19 @@ namespace mongo {
                         const BSONObj& update,
                         bool upsert,
                         bool multi,
+                        const BSONObj& writeConcern,
                         BatchedCommandResponse* response );
 
     void clusterDelete( const std::string& ns,
                         const BSONObj& query,
                         int limit,
+                        const BSONObj& writeConcern,
                         BatchedCommandResponse* response );
 
     void clusterCreateIndex( const std::string& ns,
                              BSONObj keys,
                              bool unique,
+                             const BSONObj& writeConcern,
                              BatchedCommandResponse* response );
 
 } // namespace mongo
