@@ -512,6 +512,106 @@ namespace {
         ASSERT_EQUALS( clientResponse.sizeErrDetails(), 2u );
     }
 
+    TEST(WriteOpTests, TargetMultiOpTwoShardsEachWCError) {
+
+        //
+        // Multi-op targeting test where each op goes to both shards and both will return a
+        // write concern error.
+        //
+
+        NamespaceString nss( "foo.bar" );
+
+        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED() );
+        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED() );
+
+        vector<MockRange*> mockRanges;
+        mockRanges.push_back( new MockRange( endpointA,
+                                             nss,
+                                             BSON( "x" << MINKEY ),
+                                             BSON( "x" << 0 ) ) );
+        mockRanges.push_back( new MockRange( endpointB,
+                                             nss,
+                                             BSON( "x" << 0 ),
+                                             BSON( "x" << MAXKEY ) ) );
+
+        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
+        request.setNS( nss.ns() );
+        request.setOrdered( false );
+        request.setWriteConcern( BSONObj() );
+
+        // Each op goes to both shards
+
+        BSONObj queryA = BSON( "x" << GTE << -1 << LT << 2 );
+        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << queryA ) ) );
+        BSONObj queryB = BSON( "x" << GTE << -2 << LT << 1 );
+        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << queryB ) ) );
+
+        BatchWriteOp batchOp;
+        batchOp.initClientRequest( &request );
+        ASSERT( !batchOp.isFinished() );
+
+        MockNSTargeter targeter;
+        targeter.init( mockRanges );
+
+        OwnedPointerVector<TargetedWriteBatch> targetedOwned;
+        vector<TargetedWriteBatch*>& targeted = targetedOwned.mutableVector();
+        Status status = batchOp.targetBatch( targeter, false, &targeted );
+
+        ASSERT( status.isOK() );
+        ASSERT( !batchOp.isFinished() );
+        ASSERT_EQUALS( targeted.size(), 2u );
+        sortByEndpoint( &targeted );
+        assertEndpointsEqual( targeted.front()->getEndpoint(), endpointA );
+        assertEndpointsEqual( targeted.back()->getEndpoint(), endpointB );
+        ASSERT_EQUALS( targeted.front()->getWrites().size(), 2u );
+        ASSERT_EQUALS( targeted.back()->getWrites().size(), 2u );
+
+        // First shard write write concern fails.
+        BatchedCommandResponse response;
+        response.setOk( true );
+        response.setN( 0 );
+
+        WCErrorDetail firstShardWCError;
+        firstShardWCError.setErrCode( ErrorCodes::UnknownError );
+        string firstShardWCMsg( "s1 unknown" );
+        firstShardWCError.setErrMessage( firstShardWCMsg );
+
+        response.setWriteConcernError( firstShardWCError );
+
+        ASSERT( response.isValid( NULL ) );
+
+        batchOp.noteBatchResponse( *targeted.front(), response, NULL );
+        ASSERT( !batchOp.isFinished() );
+
+        // Second shard write write concern fails.
+        BatchedCommandResponse response2;
+        response2.setOk( true );
+        response2.setN( 0 );
+
+        WCErrorDetail secondShardWCError;
+        secondShardWCError.setErrCode( ErrorCodes::UnknownError );
+        string secondShardWCMsg( "s2 unknown" );
+        secondShardWCError.setErrMessage( secondShardWCMsg );
+        response2.setWriteConcernError( secondShardWCError );
+
+        ASSERT( response2.isValid( NULL ) );
+
+        batchOp.noteBatchResponse( *targeted.back(), response2, NULL );
+        ASSERT( batchOp.isFinished() );
+
+        BatchedCommandResponse clientResponse;
+        batchOp.buildClientResponse( &clientResponse );
+        ASSERT( clientResponse.getOk() );
+        ASSERT_FALSE( clientResponse.isErrDetailsSet() );
+
+        const WCErrorDetail* fullWCError = clientResponse.getWriteConcernError();
+        ASSERT_EQUALS( ErrorCodes::WriteConcernFailed, fullWCError->getErrCode() );
+
+        const string wcMessage( fullWCError->getErrMessage() );
+        ASSERT( wcMessage.find( firstShardWCMsg ) != string::npos );
+        ASSERT( wcMessage.find( secondShardWCMsg ) != string::npos );
+    }
+
     //
     // Test retryable errors
     //

@@ -38,6 +38,7 @@
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
 
@@ -45,6 +46,7 @@ namespace mongo {
 
     class TargetedWriteBatch;
     struct ShardError;
+    struct ShardWCError;
     class TrackedErrors;
     struct BatchWriteStats;
 
@@ -155,7 +157,7 @@ namespace mongo {
         std::set<const TargetedWriteBatch*> _targeted;
 
         // Write concern responses from all write batches so far
-        OwnedPointerVector<ShardError> _wcErrors;
+        OwnedPointerVector<ShardWCError> _wcErrors;
 
         // Upserted ids for the whole write batch
         OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
@@ -233,6 +235,22 @@ namespace mongo {
 
         const ShardEndpoint endpoint;
         WriteErrorDetail error;
+    };
+
+    /**
+     * Simple struct for storing a write concern error with an endpoint.
+     *
+     * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+     */
+    struct ShardWCError {
+
+        ShardWCError( const ShardEndpoint& endpoint, const WCErrorDetail& error ) :
+            endpoint( endpoint ) {
+            error.cloneTo( &this->error );
+        }
+
+        const ShardEndpoint endpoint;
+        WCErrorDetail error;
     };
 
     /**
