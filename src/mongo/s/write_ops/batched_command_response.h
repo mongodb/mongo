@@ -55,7 +55,6 @@ namespace mongo {
 
         static const BSONField<int> ok;
         static const BSONField<int> errCode;
-        static const BSONField<BSONObj> errInfo;
         static const BSONField<string> errMessage;
         static const BSONField<long long> n;
         static const BSONField<long long> nDocsModified;
@@ -97,11 +96,6 @@ namespace mongo {
         void unsetErrCode();
         bool isErrCodeSet() const;
         int getErrCode() const;
-
-        void setErrInfo(const BSONObj& errInfo);
-        void unsetErrInfo();
-        bool isErrInfoSet() const;
-        const BSONObj& getErrInfo() const;
 
         void setErrMessage(const StringData& errMessage);
         void unsetErrMessage();
@@ -155,10 +149,6 @@ namespace mongo {
         // (O)  whether all items in the batch applied correctly
         int _errCode;
         bool _isErrCodeSet;
-
-        // (O)  further details about the error
-        BSONObj _errInfo;
-        bool _isErrInfoSet;
 
         // (O)  whether all items in the batch applied correctly
         string _errMessage;

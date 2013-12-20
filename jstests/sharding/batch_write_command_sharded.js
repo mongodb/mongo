@@ -91,10 +91,6 @@ printjson( request = {insert : configColl.getName(),
 printjson( result = configColl.runCommand(request) );
 assert(resultNOK(result));
 assert(result.errmsg != null);
-assert(result.errInfo != null);
-assert(result.errInfo[st.config1.name] != null);
-assert(!result.errInfo[st.config1.name].ok);
-assert(result.errInfo[st.config1.name].errmsg != null);
 
 //
 // Config server update with 2nd config down.
@@ -104,9 +100,6 @@ printjson( request = {update : configColl.getName(),
                       updates: [{q: {a:1}, u: {$set: {b:2}}}]} );
 printjson( result = configColl.runCommand(request) );
 assert(resultNOK(result));
-assert(result.errInfo[st.config1.name] != null);
-assert(!result.errInfo[st.config1.name].ok);
-assert(result.errInfo[st.config1.name].errmsg != null);
 
 //
 // Config server delete with 2nd config down.
@@ -117,10 +110,6 @@ printjson( request = {delete : configColl.getName(),
 printjson( result = configColl.runCommand(request) );
 assert(!resultOK(result));
 assert(result.errmsg != null);
-assert(result.errInfo != null);
-assert(result.errInfo[st.config1.name] != null);
-assert(!result.errInfo[st.config1.name].ok);
-assert(result.errInfo[st.config1.name].errmsg != null);
 
 //
 // Config server insert with 2nd config down while bypassing fsync check.
@@ -131,16 +120,6 @@ printjson( request = { insert: configColl.getName(),
                        writeConcern: { w: 0 }} );
 printjson( result = configColl.runCommand(request) );
 assert(resultNOK(result));
-
-assert(result.errInfo[st.config0.name] != null);
-assert(result.errInfo[st.config0.name].ok);
-
-assert(result.errInfo[st.config1.name] != null);
-assert(!result.errInfo[st.config1.name].ok);
-assert(result.errInfo[st.config1.name].errmsg != null);
-
-assert(result.errInfo[st.config2.name] != null);
-assert(result.errInfo[st.config2.name].ok);
 
 //
 // Config server update with 2nd config down while bypassing fsync check.
@@ -153,16 +132,6 @@ printjson( request = { update: configColl.getName(),
 printjson( result = configColl.runCommand(request) );
 assert(resultNOK(result));
 
-assert(result.errInfo[st.config0.name] != null);
-assert(result.errInfo[st.config0.name].ok);
-
-assert(result.errInfo[st.config1.name] != null);
-assert(!result.errInfo[st.config1.name].ok);
-assert(result.errInfo[st.config1.name].errmsg != null);
-
-assert(result.errInfo[st.config2.name] != null);
-assert(result.errInfo[st.config2.name].ok);
-
 //
 // Config server update with 2nd config down while bypassing fsync check.
 configColl.remove({});
@@ -174,17 +143,6 @@ printjson( request = { delete: configColl.getName(),
 printjson( result = configColl.runCommand(request) );
 assert(resultNOK(result));
 assert(result.errmsg != null);
-assert(result.errInfo != null);
-
-assert(result.errInfo[st.config0.name] != null);
-assert(result.errInfo[st.config0.name].ok);
-
-assert(result.errInfo[st.config1.name] != null);
-assert(!result.errInfo[st.config1.name].ok);
-assert(result.errInfo[st.config1.name].errmsg != null);
-
-assert(result.errInfo[st.config2.name] != null);
-assert(result.errInfo[st.config2.name].ok);
 
 //
 // TODO: More tests to come

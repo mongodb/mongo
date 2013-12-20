@@ -107,7 +107,6 @@ namespace {
         response->setOk( false );
         response->setN( 0 );
         response->setErrCode( error.getErrCode() );
-        response->setErrInfo( error.getErrInfo() );
         response->setErrMessage( error.getErrMessage() );
         ASSERT( response->isValid( NULL ) );
     }

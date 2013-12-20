@@ -155,7 +155,6 @@ namespace mongo {
 
     void buildErrorFromResponse( const BatchedCommandResponse& response, WriteErrorDetail* error ) {
         error->setErrCode( response.getErrCode() );
-        if ( error->isErrInfoSet() ) error->setErrInfo( response.getErrInfo() );
         error->setErrMessage( response.getErrMessage() );
     }
 

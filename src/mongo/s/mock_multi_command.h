@@ -109,8 +109,6 @@ namespace mongo {
                 batchResponse->setOk( false );
                 batchResponse->setN( 0 );
                 batchResponse->setErrCode( mockEndpoint->error.getErrCode() );
-                if ( mockEndpoint->error.isErrInfoSet() ) batchResponse->setErrInfo( mockEndpoint
-                    ->error.getErrInfo() );
                 batchResponse->setErrMessage( mockEndpoint->error.getErrMessage() );
                 delete mockEndpoint;
             }

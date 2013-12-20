@@ -37,7 +37,6 @@ namespace mongo {
 
     const BSONField<int> BatchedCommandResponse::ok("ok");
     const BSONField<int> BatchedCommandResponse::errCode("code", ErrorCodes::UnknownError);
-    const BSONField<BSONObj> BatchedCommandResponse::errInfo("errInfo");
     const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
     const BSONField<long long> BatchedCommandResponse::n("n", 0);
     const BSONField<long long> BatchedCommandResponse::nDocsModified("nDocsModified", 0);
@@ -77,8 +76,6 @@ namespace mongo {
         if (_isOkSet) builder.append(ok(), _ok);
 
         if (_isErrCodeSet) builder.append(errCode(), _errCode);
-
-        if (_isErrInfoSet) builder.append(errInfo(), _errInfo);
 
         if (_isErrMessageSet) builder.append(errMessage(), _errMessage);
 
@@ -130,10 +127,6 @@ namespace mongo {
         fieldState = FieldParser::extract(source, errCode, &_errCode, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isErrCodeSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, errInfo, &_errInfo, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isErrInfoSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, errMessage, &_errMessage, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -209,9 +202,6 @@ namespace mongo {
         _errCode = 0;
         _isErrCodeSet = false;
 
-        _errInfo = BSONObj();
-        _isErrInfoSet = false;
-
         _errMessage.clear();
         _isErrMessageSet = false;
 
@@ -249,9 +239,6 @@ namespace mongo {
 
         other->_errCode = _errCode;
         other->_isErrCodeSet = _isErrCodeSet;
-
-        other->_errInfo = _errInfo;
-        other->_isErrInfoSet = _isErrInfoSet;
 
         other->_errMessage = _errMessage;
         other->_isErrMessageSet = _isErrMessageSet;
@@ -338,24 +325,6 @@ namespace mongo {
         else {
             return errCode.getDefault();
         }
-    }
-
-    void BatchedCommandResponse::setErrInfo(const BSONObj& errInfo) {
-        _errInfo = errInfo.getOwned();
-        _isErrInfoSet = true;
-    }
-
-    void BatchedCommandResponse::unsetErrInfo() {
-         _isErrInfoSet = false;
-     }
-
-    bool BatchedCommandResponse::isErrInfoSet() const {
-         return _isErrInfoSet;
-    }
-
-    const BSONObj& BatchedCommandResponse::getErrInfo() const {
-        dassert(_isErrInfoSet);
-        return _errInfo;
     }
 
     void BatchedCommandResponse::setErrMessage(const StringData& errMessage) {

@@ -331,14 +331,12 @@ namespace mongo {
     static void cloneBatchErrorTo( const BatchedCommandResponse& batchResp,
                                    WriteErrorDetail* details ) {
         details->setErrCode( batchResp.getErrCode() );
-        if ( batchResp.isErrInfoSet() ) details->setErrInfo( batchResp.getErrInfo() );
         details->setErrMessage( batchResp.getErrMessage() );
     }
 
     static void cloneBatchErrorFrom( const WriteErrorDetail& details,
                                      BatchedCommandResponse* response ) {
         response->setErrCode( details.getErrCode() );
-        if ( details.isErrInfoSet() ) response->setErrInfo( details.getErrInfo() );
         response->setErrMessage( details.getErrMessage() );
     }
 
