@@ -55,7 +55,7 @@ assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
 coll.remove({});
 printjson( request = {update : coll.getName(),
                       updates: [{q:{a:1}, u: {$set: {a:1}}, upsert:true}],
-                      writeConcern: {}} );
+                      writeConcern: {w:1}} );
 printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
 assert.eq(1, result.n);
@@ -73,7 +73,7 @@ assert.eq(0, result.nDocsModified, "missing/wrong nDocsModified")
 coll.remove({});
 printjson( request = {update : coll.getName(),
                       updates: [{q:{a:1}, u: {$set: {a:1}}, upsert:true}],
-                      writeConcern: {},
+                      writeConcern: {w:1},
                       ordered:true} );
 printjson( result = coll.runCommand(request) );
 assert(resultOK(result));

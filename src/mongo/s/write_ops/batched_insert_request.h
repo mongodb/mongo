@@ -91,13 +91,11 @@ namespace mongo {
         bool isCollNameSet() const;
         const std::string& getCollName() const;
 
-        void setDocuments(const std::vector<BSONObj>& documents);
         void addToDocuments(const BSONObj& documents);
         void unsetDocuments();
         bool isDocumentsSet() const;
         std::size_t sizeDocuments() const;
         const std::vector<BSONObj>& getDocuments() const;
-        std::vector<BSONObj>& getDocuments();
         const BSONObj& getDocumentsAt(std::size_t pos) const;
 
         void setWriteConcern(const BSONObj& writeConcern);
@@ -114,6 +112,8 @@ namespace mongo {
          * metadata ownership will be transferred to this.
          */
         void setMetadata(BatchedRequestMetadata* metadata);
+        void unsetMetadata();
+        bool isMetadataSet() const;
         BatchedRequestMetadata* getMetadata() const;
 
     private:

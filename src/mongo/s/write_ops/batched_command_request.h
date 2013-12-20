@@ -118,16 +118,7 @@ namespace mongo {
         bool isNSSet() const;
         const std::string& getNS() const;
 
-        /**
-         * Write ops are BSONObjs, whose format depends on the type of request
-         * TODO: Should be possible to further parse these ops generically if we come up with a
-         * good scheme.
-         */
-        void setWriteOps( const std::vector<BSONObj>& writeOps );
-        void unsetWriteOps();
-        bool isWriteOpsSet() const;
         std::size_t sizeWriteOps() const;
-        std::vector<BSONObj> getWriteOps() const;
 
         void setWriteConcern( const BSONObj& writeConcern );
         void unsetWriteConcern();
@@ -139,8 +130,10 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
-        BatchedRequestMetadata* getMetadata() const;
         void setMetadata(BatchedRequestMetadata* metadata);
+        void unsetMetadata();
+        bool isMetadataSet() const;
+        BatchedRequestMetadata* getMetadata() const;
 
         //
         // Helpers for auth pre-parsing
@@ -181,7 +174,6 @@ namespace mongo {
 
         BatchItemRef( const BatchedCommandRequest* request, int itemIndex ) :
             _request( request ), _itemIndex( itemIndex ) {
-            dassert( itemIndex < static_cast<int>( request->sizeWriteOps() ) );
         }
 
         const BatchedCommandRequest* getRequest() const {
@@ -196,15 +188,18 @@ namespace mongo {
             return _request->getBatchType();
         }
 
-        BSONObj getDocument() const {
+        const BSONObj& getDocument() const {
+            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getInsertRequest()->getDocumentsAt( _itemIndex );
         }
 
         const BatchedUpdateDocument* getUpdate() const {
+            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getUpdateRequest()->getUpdatesAt( _itemIndex );
         }
 
         const BatchedDeleteDocument* getDelete() const {
+            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getDeleteRequest()->getDeletesAt( _itemIndex );
         }
 

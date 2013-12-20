@@ -118,6 +118,8 @@ namespace mongo {
         * metadata ownership will be transferred to this.
         */
        void setMetadata(BatchedRequestMetadata* metadata);
+       void unsetMetadata();
+       bool isMetadataSet() const;
        BatchedRequestMetadata* getMetadata() const;
 
     private:

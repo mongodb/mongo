@@ -101,22 +101,7 @@ namespace mongo {
         BatchedCommandResponse response;
 
         if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
-
-            // Batch parse failure
-            response.setOk( false );
-            response.setN( 0 );
-            response.setErrCode( ErrorCodes::FailedToParse );
-            response.setErrMessage( errMsg );
-
-            dassert( response.isValid( &errMsg ) );
-            result.appendElements( response.toBSON() );
-
-            // TODO
-            // There's a pending issue about how to report response here. If we use
-            // the command infra-structure, we should reuse the 'errmsg' field. But
-            // we have already filed that message inside the BatchCommandResponse.
-            // return response.getOk();
-            return true;
+            return appendCommandStatus( result, Status( ErrorCodes::FailedToParse, errMsg ) );
         }
 
         // Note that this is a runCommmand, and therefore, the database and the collection name
@@ -130,26 +115,6 @@ namespace mongo {
         Status status = userAllowedWriteNS( nss );
         if ( !status.isOK() )
             return appendCommandStatus( result, status );
-
-        if ( cc().curop() )
-            cc().curop()->setNS( nss.ns() );
-
-        if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
-            // check all docs
-            BatchedInsertRequest* insertRequest = request.getInsertRequest();
-            vector<BSONObj>& docsToInsert = insertRequest->getDocuments();
-            for ( size_t i = 0; i < docsToInsert.size(); i++ ) {
-                StatusWith<BSONObj> fixed = fixDocumentForInsert( docsToInsert[i] );
-                if ( !fixed.isOK() ) {
-                    // we don't return early since each doc can be handled independantly
-                    continue;
-                }
-                if ( fixed.getValue().isEmpty() ) {
-                    continue;
-                }
-                docsToInsert[i] = fixed.getValue();
-            }
-        }
 
         BSONObj defaultWriteConcern;
         // This is really bad - it's only safe because we leak the defaults by overriding them with
@@ -170,13 +135,7 @@ namespace mongo {
         writeBatchExecutor.executeBatch( request, &response );
 
         result.appendElements( response.toBSON() );
-
-        // TODO
-        // There's a pending issue about how to report response here. If we use
-        // the command infra-structure, we should reuse the 'errmsg' field. But
-        // we have already filed that message inside the BatchCommandResponse.
-        // return response.getOk();
-        return true;
+        return response.getOk();
     }
 
     CmdInsert::CmdInsert() :

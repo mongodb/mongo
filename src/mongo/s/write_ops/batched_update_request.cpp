@@ -286,6 +286,14 @@ namespace mongo {
         _metadata.reset(metadata);
     }
 
+    void BatchedUpdateRequest::unsetMetadata() {
+        _metadata.reset();
+    }
+
+    bool BatchedUpdateRequest::isMetadataSet() const {
+        return _metadata.get();
+    }
+
     BatchedRequestMetadata* BatchedUpdateRequest::getMetadata() const {
         return _metadata.get();
     }

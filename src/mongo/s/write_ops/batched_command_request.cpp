@@ -186,65 +186,6 @@ namespace mongo {
         INVOKE( getCollName );
     }
 
-    void BatchedCommandRequest::setWriteOps( const std::vector<BSONObj>& writeOps ) {
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            _insertReq->setDocuments( writeOps );
-            return;
-        case BatchedCommandRequest::BatchType_Update:
-            _updateReq->unsetUpdates();
-            for ( std::vector<BSONObj>::const_iterator it = writeOps.begin(); it != writeOps.end();
-                    ++it ) {
-                auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument );
-                string errMsg;
-                bool parsed = updateDoc->parseBSON( *it, &errMsg ) && updateDoc->isValid( &errMsg );
-                (void) parsed; // Suppress warning in non-debug
-                dassert( parsed );
-                _updateReq->addToUpdates( updateDoc.release() );
-            }
-            return;
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            _deleteReq->unsetDeletes();
-            for ( std::vector<BSONObj>::const_iterator it = writeOps.begin(); it != writeOps.end();
-                    ++it ) {
-                auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
-                string errMsg;
-                bool parsed = deleteDoc->parseBSON( *it, &errMsg ) && deleteDoc->isValid( &errMsg );
-                (void) parsed; // Suppress warning in non-debug
-                dassert( parsed );
-                _deleteReq->addToDeletes( deleteDoc.release() );
-            }
-            return;
-        }
-    }
-
-    void BatchedCommandRequest::unsetWriteOps() {
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            _insertReq->unsetDocuments();
-            return;
-        case BatchedCommandRequest::BatchType_Update:
-            _updateReq->unsetUpdates();
-            return;
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            _deleteReq->unsetDeletes();
-        }
-    }
-
-    bool BatchedCommandRequest::isWriteOpsSet() const {
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            return _insertReq->isDocumentsSet();
-        case BatchedCommandRequest::BatchType_Update:
-            return _updateReq->isUpdatesSet();
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            return _deleteReq->isDeletesSet();
-        }
-    }
-
     std::size_t BatchedCommandRequest::sizeWriteOps() const {
         switch ( getBatchType() ) {
         case BatchedCommandRequest::BatchType_Insert:
@@ -253,27 +194,6 @@ namespace mongo {
             return _updateReq->sizeUpdates();
         default:
             return _deleteReq->sizeDeletes();
-        }
-    }
-
-    std::vector<BSONObj> BatchedCommandRequest::getWriteOps() const {
-        vector<BSONObj> writeOps;
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            return _insertReq->getDocuments();
-        case BatchedCommandRequest::BatchType_Update:
-            for ( std::vector<BatchedUpdateDocument*>::const_iterator it = _updateReq->getUpdates()
-                    .begin(); it != _updateReq->getUpdates().end(); ++it ) {
-                writeOps.push_back( ( *it )->toBSON() );
-            }
-            return writeOps;
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            for ( std::vector<BatchedDeleteDocument*>::const_iterator it = _deleteReq->getDeletes()
-                    .begin(); it != _deleteReq->getDeletes().end(); ++it ) {
-                writeOps.push_back( ( *it )->toBSON() );
-            }
-            return writeOps;
         }
     }
 
@@ -309,12 +229,20 @@ namespace mongo {
         INVOKE( getOrdered );
     }
 
-    BatchedRequestMetadata* BatchedCommandRequest::getMetadata() const {
-        INVOKE( getMetadata );
-    }
-
     void BatchedCommandRequest::setMetadata(BatchedRequestMetadata* metadata) {
         INVOKE( setMetadata, metadata );
+    }
+
+    void BatchedCommandRequest::unsetMetadata() {
+        INVOKE( unsetMetadata );
+    }
+
+    bool BatchedCommandRequest::isMetadataSet() const {
+        INVOKE( isMetadataSet );
+    }
+
+    BatchedRequestMetadata* BatchedCommandRequest::getMetadata() const {
+        INVOKE( getMetadata );
     }
 
     bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {

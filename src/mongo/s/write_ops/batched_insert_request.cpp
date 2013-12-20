@@ -210,15 +210,6 @@ namespace mongo {
         return _collName;
     }
 
-    void BatchedInsertRequest::setDocuments(const std::vector<BSONObj>& documents) {
-        for (std::vector<BSONObj>::const_iterator it = documents.begin();
-             it != documents.end();
-             ++it) {
-            addToDocuments((*it).getOwned());
-        }
-        _isDocumentsSet = documents.size() > 0;
-    }
-
     void BatchedInsertRequest::addToDocuments(const BSONObj& documents) {
         _documents.push_back(documents);
         _isDocumentsSet = true;
@@ -238,11 +229,6 @@ namespace mongo {
     }
 
     const std::vector<BSONObj>& BatchedInsertRequest::getDocuments() const {
-        dassert(_isDocumentsSet);
-        return _documents;
-    }
-
-    std::vector<BSONObj>& BatchedInsertRequest::getDocuments() {
         dassert(_isDocumentsSet);
         return _documents;
     }
@@ -295,6 +281,14 @@ namespace mongo {
 
     void BatchedInsertRequest::setMetadata(BatchedRequestMetadata* metadata) {
         _metadata.reset(metadata);
+    }
+
+    void BatchedInsertRequest::unsetMetadata() {
+        _metadata.reset();
+    }
+
+    bool BatchedInsertRequest::isMetadataSet() const {
+        return _metadata.get();
     }
 
     BatchedRequestMetadata* BatchedInsertRequest::getMetadata() const {

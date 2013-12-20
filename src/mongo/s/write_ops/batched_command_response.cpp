@@ -214,7 +214,13 @@ namespace mongo {
         _singleUpserted = BSONObj();
         _isSingleUpsertedSet = false;
 
-        _writeErrorDetails.reset();
+        if ( _upsertDetails.get() ) {
+            for ( std::vector<BatchedUpsertDetail*>::const_iterator it = _upsertDetails->begin();
+                it != _upsertDetails->end(); ++it ) {
+                delete *it;
+            };
+            _upsertDetails.reset();
+        }
 
         _lastOp = OpTime();
         _isLastOpSet = false;
