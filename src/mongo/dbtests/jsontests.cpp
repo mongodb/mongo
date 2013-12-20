@@ -454,9 +454,25 @@ namespace JsonTests {
         public:
             void run() {
                 BSONObjBuilder b;
-                b.appendCode( "x" , "function(){ return 1; }" );
+                b.appendCode( "x" , "function(arg){ var string = \"\\n\"; return 1; }" );
                 BSONObj o = b.obj();
-                ASSERT_EQUALS( "{ \"x\" : function(){ return 1; } }" , o.jsonString() );
+                ASSERT_EQUALS( "{ \"x\" : \"function(arg){ var string = \\\"\\\\n\\\"; "
+                                                          "return 1; }\" }" , o.jsonString() );
+            }
+        };
+
+        class CodeWScopeTests {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.appendCodeWScope( "x" , "function(arg){ var string = \"\\n\"; return x; }" ,
+                                           BSON("x" << 1 ) );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : "
+                                 "{ \"$code\" : "
+                                   "\"function(arg){ var string = \\\"\\\\n\\\"; return x; }\" , "
+                                   "\"$scope\" : { \"x\" : 1 } } }" ,
+                               o.jsonString() );
             }
         };
 
@@ -2594,6 +2610,7 @@ namespace JsonTests {
             add< JsonStringTests::RegexEscape >();
             add< JsonStringTests::RegexManyOptions >();
             add< JsonStringTests::CodeTests >();
+            add< JsonStringTests::CodeWScopeTests >();
             add< JsonStringTests::TimestampTests >();
             add< JsonStringTests::NullString >();
             add< JsonStringTests::AllTypes >();

@@ -260,14 +260,14 @@ namespace mongo {
         case CodeWScope: {
             BSONObj scope = codeWScopeObject();
             if ( ! scope.isEmpty() ) {
-                s << "{ \"$code\" : " << _asCode() << " , "
-                  << " \"$scope\" : " << scope.jsonString() << " }";
+                s << "{ \"$code\" : \"" << escape(_asCode()) << "\" , "
+                  << "\"$scope\" : " << scope.jsonString() << " }";
                 break;
             }
         }
 
         case Code:
-            s << _asCode();
+            s << "\"" << escape(_asCode()) << "\"";
             break;
 
         case Timestamp:
