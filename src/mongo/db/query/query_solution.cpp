@@ -146,14 +146,15 @@ namespace mongo {
 
     void AndSortedNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
-        *ss << "AND_SORTED";
+        *ss << "AND_SORTED\n";
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString() << endl;
         }
         addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
-            *ss << "Child " << i << ": ";
+            addIndent(ss, indent + 1);
+            *ss << "Child " << i << ":\n";
             children[i]->appendToString(ss, indent + 1);
         }
     }

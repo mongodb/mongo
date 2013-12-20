@@ -47,7 +47,7 @@ namespace mongo {
             NO_TABLE_SCAN = 1,
 
             // Set this if you want a collscan outputted even if there's an ixscan.
-            INCLUDE_COLLSCAN = 2,
+            INCLUDE_COLLSCAN = 1 << 1,
 
             // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
             // shouldn't be on this shard" stage before projection.
@@ -56,11 +56,14 @@ namespace mongo {
             // shardingState.needCollectionMetadata(current_namespace) in the same lock that you use
             // to build the query runner. You must also wrap the Runner in a ClientCursor within the
             // same lock. See the comment on ShardFilterStage for details.
-            INCLUDE_SHARD_FILTER = 4,
+            INCLUDE_SHARD_FILTER = 1 << 2,
 
             // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
             // provided by an index.
-            NO_BLOCKING_SORT = 8,
+            NO_BLOCKING_SORT = 1 << 3,
+
+            // Set this if you want to turn on index intersection.
+            INDEX_INTERSECTION = 1 << 4,
         };
 
         // See Options enum above.

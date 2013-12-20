@@ -304,8 +304,6 @@ namespace mongo {
             }
 
             if (hintIndexNumber == numeric_limits<size_t>::max()) {
-                // This is supposed to be an error.
-                warning() << "Can't find hint for " << hintIndex.toString();
                 return Status(ErrorCodes::BadValue, "bad hint");
             }
         }
@@ -490,10 +488,17 @@ namespace mongo {
         // If we have any relevant indices, we try to create indexed plans.
         if (0 < relevantIndices.size()) {
             // The enumerator spits out trees tagged with IndexTag(s).
-            PlanEnumerator isp(query.root(), &relevantIndices);
+            PlanEnumeratorParams enumParams;
+            enumParams.intersect = params.options & QueryPlannerParams::INDEX_INTERSECTION;
+            enumParams.root = query.root();
+            enumParams.indices = &relevantIndices;
+
+            PlanEnumerator isp(enumParams);
             isp.init();
 
             MatchExpression* rawTree;
+            // XXX: have limit on # of indexed solns we'll consider.  We could have a perverse
+            // query and index that could make n^2 very unpleasant.
             while (isp.getNext(&rawTree)) {
                 QLOG() << "about to build solntree from tagged tree:\n" << rawTree->toString()
                        << endl;

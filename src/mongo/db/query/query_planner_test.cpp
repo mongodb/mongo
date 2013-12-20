@@ -75,7 +75,8 @@ namespace {
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse, "note_to_self_dont_break_build"));
+            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse,
+                                                "note_to_self_dont_break_build"));
         }
 
         //
@@ -358,7 +359,6 @@ namespace {
         }
 
         bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln) const {
-
             //
             // leaf nodes
             //
@@ -449,7 +449,7 @@ namespace {
             // internal nodes
             //
 
-            else if (STAGE_FETCH == trueSoln->getType()) {
+            if (STAGE_FETCH == trueSoln->getType()) {
                 const FetchNode* fn = static_cast<const FetchNode*>(trueSoln);
 
                 BSONElement el = testSoln["fetch"];
@@ -479,6 +479,22 @@ namespace {
                 if (el.eoo() || !el.isABSONObj()) { return false; }
                 BSONObj orObj = el.Obj();
                 return childrenMatch(orObj, orn);
+            }
+            else if (STAGE_AND_HASH == trueSoln->getType()) {
+                const AndHashNode* ahn = static_cast<const AndHashNode*>(trueSoln);
+                BSONElement el = testSoln["andHash"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj andHashObj = el.Obj();
+                // XXX: andHashObj can have filter
+                return childrenMatch(andHashObj, ahn);
+            }
+            else if (STAGE_AND_SORTED == trueSoln->getType()) {
+                const AndSortedNode* asn = static_cast<const AndSortedNode*>(trueSoln);
+                BSONElement el = testSoln["andSorted"];
+                if (el.eoo() || !el.isABSONObj()) { return false; }
+                BSONObj andSortedObj = el.Obj();
+                // XXX: anSortedObj can have filter too
+                return childrenMatch(andSortedObj, asn);
             }
             else if (STAGE_PROJECTION == trueSoln->getType()) {
                 const ProjectionNode* pn = static_cast<const ProjectionNode*>(trueSoln);
@@ -2111,6 +2127,103 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {a: 1}}}, "
                                 "{fetch: {filter: {b: 7}, node: {ixscan: "
                                 "{filter: null, pattern: {a: 1}}}}}]}}}}");
+    }
+
+    //
+    // Index Intersection.
+    //
+    // We don't exhaustively check all plans here.  Instead we check that there exists an
+    // intersection plan.  The blending of >1 index plans and ==1 index plans is under development
+    // but we want to make sure that we create an >1 index plan when we should.
+    //
+
+    TEST_F(QueryPlannerTest, IntersectBasicTwoPred) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        runQuery(fromjson("{a:1, b:{$gt: 1}}"));
+
+        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes: ["
+                                    "{ixscan: {filter: null, pattern: {a:1}}},"
+                                    "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompound) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1 << "c" << 1));
+        addIndex(BSON("b" << 1));
+        runQuery(fromjson("{a:1, b:1, c:1}"));
+
+        // There's an andSorted not andHash because the two seeks are point intervals.
+        assertSolutionExists("{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                    "{ixscan: {filter: null, pattern: {a:1, c:1}}},"
+                                    "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdx) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("b" << 1));
+        runQuery(fromjson("{a:1, b:1}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        // We don't want to assign the 'b' predicate as a compound *and* assign it to the 'b' index.
+
+        // As for what solutions we produce, it's not wrong to intersect both indices but we
+        // currently prefer to make full use of the compound.
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {b:1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IntersectBasicMultikey) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        // True means multikey.
+        addIndex(BSON("a" << 1), true);
+        // We can't combine bounds for the multikey case so we have one scan per pred.
+        runQuery(fromjson("{a:1, a:2}"));
+        assertSolutionExists("{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                    "{ixscan: {filter: null, pattern: {a:1}}},"
+                                    "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IntersectSubtreeNodes) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+        addIndex(BSON("d" << 1));
+
+        runQuery(fromjson("{$or: [{a: 1}, {b: 1}], $or: [{c:1}, {d:1}]}"));
+        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes: ["
+                                    "{or: {nodes: [{ixscan:{filter:null, pattern:{a:1}}},"
+                                          "{ixscan:{filter:null, pattern:{b:1}}}]}},"
+                                    "{or: {nodes: [{ixscan:{filter:null, pattern:{c:1}}},"
+                                          "{ixscan:{filter:null, pattern:{d:1}}}]}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IntersectSubtreeAndPred) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+        runQuery(fromjson("{a: 1, $or: [{b:1}, {c:1}]}"));
+        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes:["
+                                    "{or: {nodes: [{ixscan:{filter:null, pattern:{b:1}}},"
+                                          "{ixscan:{filter:null, pattern:{c:1}}}]}},"
+                                    "{ixscan:{filter: null, pattern:{a:1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IntersectElemMatch) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a.b" << 1));
+        addIndex(BSON("a.c" << 1));
+        runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{b:1, c:1}}},"
+                                 "node: {andSorted: {nodes: ["
+                                         "{ixscan: {filter: null, pattern: {'a.b':1}}},"
+                                         "{ixscan: {filter: null, pattern: {'a.c':1}}}]}}}}");
     }
 
 }  // namespace

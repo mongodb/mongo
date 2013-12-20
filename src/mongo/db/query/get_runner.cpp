@@ -41,9 +41,13 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(enableIndexIntersection, bool, false);
 
     // Copied verbatim from queryutil.cpp.
     static bool isSimpleIdQuery(const BSONObj& query) {
@@ -179,6 +183,10 @@ namespace mongo {
             if (status.isOK()) {
                 // XXX: create new CachedSolutionRunner here.
             }
+        }
+
+        if (enableIndexIntersection) {
+            plannerParams.options |= QueryPlannerParams::INDEX_INTERSECTION;
         }
 
         vector<QuerySolution*> solutions;

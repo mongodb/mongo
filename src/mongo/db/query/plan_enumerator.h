@@ -38,6 +38,18 @@
 
 namespace mongo {
 
+    struct PlanEnumeratorParams {
+        PlanEnumeratorParams() : intersect(false) { }
+
+        bool intersect;
+
+        // Not owned here.
+        MatchExpression* root;
+
+        // Not owned here.
+        const vector<IndexEntry>* indices;
+    };
+
     /**
      * Provides elements from the power set of possible indices to use.  Uses the available
      * predicate information to make better decisions about what indices are best.
@@ -51,7 +63,8 @@ namespace mongo {
          *
          * Does not take ownership of any arguments.  They must outlive any calls to getNext(...).
          */
-        PlanEnumerator(MatchExpression* root, const vector<IndexEntry>* indices);
+        PlanEnumerator(const PlanEnumeratorParams& params);
+
         ~PlanEnumerator();
 
         /**
@@ -97,20 +110,6 @@ namespace mongo {
          * Returns true if the provided node uses an index, false otherwise.
          */
         bool prepMemo(MatchExpression* node);
-
-        /**
-         * Returns true if index #idx is compound, false otherwise.
-         */
-        bool isCompound(IndexID idx);
-
-        /**
-         * When we assign indices to nodes, we only assign indices to predicates that are 'first'
-         * indices (the predicate is over the first field in the index).
-         *
-         * If an assigned index is compound, checkCompound looks for predicates that are over fields
-         * in the compound index.
-         */
-        void checkCompound(string prefix, MatchExpression* node);
 
         /**
          * Traverses the memo structure and annotates the tree with IndexTags for the chosen
@@ -183,78 +182,23 @@ namespace mongo {
             IndexID index;
         };
 
+        struct AndEnumerableState {
+            vector<OneIndexAssignment> assignments;
+            vector<MemoID> subnodesToIndex;
+        };
+
         struct AndAssignment {
-            // Enumeration state
-            enum EnumerationState {
-                // First this
-                MANDATORY,
-                // Then this
-                PRED_CHOICES,
-                // Then this
-                SUBNODES,
-                // Then we have a carry and back to MANDATORY.
-            };
+            AndAssignment() : counter(0) { }
 
-            AndAssignment() : state(MANDATORY), counter(0) { }
+            vector<AndEnumerableState> choices;
 
-            // These index assignments must exist in every choice we make (GEO_NEAR and TEXT).
-            vector<OneIndexAssignment> mandatory;
-            // TODO: We really want to consider the power set of the union of predChoices, subnodes.
-            vector<OneIndexAssignment> predChoices;
-            vector<MemoID> subnodes;
-
-            // In the simplest case, an AndAssignment picks indices like a PredicateAssignment.  To
-            // be indexed we must only pick one index, which is currently what is done.
-            //
-            // Complications:
-            //
-            // Some of our child predicates cannot be answered without an index.  As such, the
-            // indices that those predicates require must always be outputted.  We store these
-            // mandatory index assignments in 'mandatory'.
-            //
-            // Some of our children may not be predicates.  We may have ORs (or array operators) as
-            // children.  If one of these subtrees provides an index, the AND is indexed.  We store
-            // these subtree choices in 'subnodes'.
-            //
-            // With the above two cases out of the way, we can focus on the remaining case: what to
-            // do with our children that are leaf predicates.
-            //
-            // Guiding principles for index assignment to leaf predicates:
-            //
-            // 1. If we assign an index to {x:{$gt: 5}} we should assign the same index to
-            //    {x:{$lt: 50}}.  That is, an index assignment should include all predicates
-            //    over its leading field.
-            //
-            // 2. If we have the index {a:1, b:1} and we assign it to {a: 5} we should assign it
-            //    to {b:7}, since with a predicate over the first field of the compound index,
-            //    the second field can be bounded as well.  We may only assign indices to predicates
-            //    if all fields to the left of the index field are constrained.
-
-            // Enumeration of an AND:
-            //
-            // If there are any mandatory indices, we assign them one at a time.  After we have
-            // assigned all of them, we stop assigning indices.
-            //
-            // Otherwise: We assign each index in predChoice.  When those are exhausted, we have
-            // each subtree enumerate its choices one at a time.  When the last subtree has
-            // enumerated its last choices, we are done.
-            //
-            void resetEnumeration() {
-                if (mandatory.size() > 0) {
-                    state = AndAssignment::MANDATORY;
-                }
-                else if (predChoices.size() > 0) {
-                    state = AndAssignment::PRED_CHOICES;
-                }
-                else {
-                    verify(subnodes.size() > 0);
-                    state = AndAssignment::SUBNODES;
-                }
-                counter = 0;
-            }
-
-            EnumerationState state;
             // We're on the counter-th member of state.
+            size_t counter;
+        };
+
+        struct ArrayAssignment {
+            ArrayAssignment() : counter(0) { }
+            vector<MemoID> subnodes;
             size_t counter;
         };
 
@@ -264,7 +208,8 @@ namespace mongo {
         struct NodeAssignment {
             scoped_ptr<PredicateAssignment> pred;
             scoped_ptr<OrAssignment> orAssignment;
-            scoped_ptr<AndAssignment> newAnd;
+            scoped_ptr<AndAssignment> andAssignment;
+            scoped_ptr<ArrayAssignment> arrayAssignment;
             string toString() const;
         };
 
@@ -276,10 +221,15 @@ namespace mongo {
          */
         void allocateAssignment(MatchExpression* expr, NodeAssignment** slot, MemoID* id);
 
-        void dumpMemo();
+        /**
+         * Try to assign predicates in 'tryCompound' to 'thisIndex' as compound assignments.
+         * Output the assignments in 'assign'.
+         */
+        void compound(const vector<MatchExpression*>& tryCompound,
+                      const IndexEntry& thisIndex,
+                      OneIndexAssignment* assign);
 
-        // Used to label nodes in the order in which we visit in a post-order traversal.
-        size_t _inOrderCount;
+        void dumpMemo();
 
         // Map from expression to its MemoID.
         unordered_map<MatchExpression*, MemoID> _nodeToId;
@@ -295,11 +245,14 @@ namespace mongo {
         // Data used by all enumeration strategies
         //
 
-        // Match expression we're planning for. Not owned by us.
+        // Match expression we're planning for.  Not owned by us.
         MatchExpression* _root;
 
-        // Indices we're allowed to enumerate with.
+        // Indices we're allowed to enumerate with.  Not owned here.
         const vector<IndexEntry>* _indices;
+
+        // Do we output >1 index per AND (index intersection)?
+        bool _ixisect;
     };
 
 } // namespace mongo
