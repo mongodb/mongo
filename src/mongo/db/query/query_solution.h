@@ -247,7 +247,7 @@ namespace mongo {
         bool fetched() const;
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return false; }
-        const BSONObjSet& getSort() const { return _sort; }
+        const BSONObjSet& getSort() const { return children.back()->getSort(); }
 
         BSONObjSet _sort;
     };

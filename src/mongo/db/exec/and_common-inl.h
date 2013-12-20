@@ -33,29 +33,29 @@ namespace mongo {
         /**
          * If src has any data dest doesn't, add that data to dest.
          */
-        static void mergeFrom(WorkingSetMember* dest, WorkingSetMember* src) {
+        static void mergeFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
             verify(dest->hasLoc());
-            verify(src->hasLoc());
-            verify(dest->loc == src->loc);
+            verify(src.hasLoc());
+            verify(dest->loc == src.loc);
 
             // This is N^2 but N is probably pretty small.  Easy enough to revisit.
             // Merge key data.
-            for (size_t i = 0; i < src->keyData.size(); ++i) {
+            for (size_t i = 0; i < src.keyData.size(); ++i) {
                 bool found = false;
                 for (size_t j = 0; j < dest->keyData.size(); ++j) {
-                    if (dest->keyData[j].indexKeyPattern == src->keyData[i].indexKeyPattern) {
+                    if (dest->keyData[j].indexKeyPattern == src.keyData[i].indexKeyPattern) {
                         found = true;
                         break;
                     }
                 }
-                if (!found) { dest->keyData.push_back(src->keyData[i]); }
+                if (!found) { dest->keyData.push_back(src.keyData[i]); }
             }
 
             // Merge computed data.
             typedef WorkingSetComputedDataType WSCD;
             for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
-                if (!dest->hasComputed(i) && src->hasComputed(i)) {
-                    dest->addComputed(src->getComputed(i)->clone());
+                if (!dest->hasComputed(i) && src.hasComputed(i)) {
+                    dest->addComputed(src.getComputed(i)->clone());
                 }
             }
         }

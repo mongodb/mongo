@@ -710,6 +710,65 @@ namespace QueryStageAnd {
         }
     };
 
+    // Verify that AND preserves the order of the last child.
+    class QueryStageAndSortedByLastChild : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << i));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL));
+
+            // Scan over foo == 1
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 1);
+            params.bounds.endKey = BSON("" << 1);
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Intersect with 7 <= bar < 10000
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            params.bounds.startKey = BSON("" << 7);
+            params.bounds.endKey = BSON("" << 10000);
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            WorkingSetID lastId = WorkingSet::INVALID_ID;
+
+            int count = 0;
+            while (!ah->isEOF()) {
+                WorkingSetID id;
+                PlanStage::StageState status = ah->work(&id);
+                if (PlanStage::ADVANCED != status) { continue; }
+                BSONObj thisObj = ws.get(id)->loc.obj();
+                ASSERT_EQUALS(7 + count, thisObj["bar"].numberInt());
+                ++count;
+                if (WorkingSet::INVALID_ID != lastId) {
+                    BSONObj lastObj = ws.get(lastId)->loc.obj();
+                    ASSERT_LESS_THAN(lastObj["bar"].woCompare(thisObj["bar"]), 0);
+                }
+                lastId = id;
+            }
+
+            ASSERT_EQUALS(count, 43);
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "query_stage_and" ) { }
@@ -725,6 +784,7 @@ namespace QueryStageAnd {
             add<QueryStageAndSortedWithNothing>();
             add<QueryStageAndSortedProducesNothing>();
             add<QueryStageAndSortedWithMatcher>();
+            add<QueryStageAndSortedByLastChild>();
         }
     }  queryStageAndAll;
 

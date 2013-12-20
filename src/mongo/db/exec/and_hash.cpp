@@ -35,8 +35,10 @@
 namespace mongo {
 
     AndHashStage::AndHashStage(WorkingSet* ws, const MatchExpression* filter)
-        : _ws(ws), _filter(filter), _resultIterator(_dataMap.end()),
-          _shouldScanChildren(true), _currentChild(0) {}
+        : _ws(ws),
+          _filter(filter),
+          _hashingChildren(true),
+          _currentChild(0) {}
 
     AndHashStage::~AndHashStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
@@ -45,8 +47,16 @@ namespace mongo {
     void AndHashStage::addChild(PlanStage* child) { _children.push_back(child); }
 
     bool AndHashStage::isEOF() {
-        if (_shouldScanChildren) { return false; }
-        return _dataMap.end() == _resultIterator;
+        // Either we're busy hashing children, in which case we're not done yet.
+        if (_hashingChildren) { return false; }
+
+        // Or we're streaming in results from the last child.
+
+        // If there's nothing to probe against, we're EOF.
+        if (_dataMap.empty()) { return true; }
+
+        // Otherwise, we're done when the last child is done.
+        return _children[_children.size() - 1]->isEOF();
     }
 
     PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
@@ -55,41 +65,73 @@ namespace mongo {
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         // An AND is either reading the first child into the hash table, probing against the hash
-        // table with subsequent children, or returning results.
+        // table with subsequent children, or checking the last child's results to see if they're
+        // in the hash table.
 
         // We read the first child into our hash table.
-        if (_shouldScanChildren && (0 == _currentChild)) {
-            return readFirstChild(out);
+        if (_hashingChildren) {
+            if (0 == _currentChild) {
+                return readFirstChild(out);
+            }
+            else if (_currentChild < _children.size() - 1) {
+                return hashOtherChildren(out);
+            }
+            else {
+                _hashingChildren = false;
+                // We don't hash our last child.  Instead, we probe the table created from the
+                // previous children, returning results in the order of the last child.
+                // Fall through to below.
+            }
         }
 
-        // Probing into our hash table with other children.
-        if (_shouldScanChildren) {
-            return hashOtherChildren(out);
+        // Returning results.  We read from the last child and return the results that are in our
+        // hash map.
+
+        // We should be EOF if we're not hashing results and the dataMap is empty.
+        verify(!_dataMap.empty());
+
+        // We probe _dataMap with the last child.
+        verify(_currentChild == _children.size() - 1);
+
+        // Work the last child.
+        StageState childStatus = _children[_children.size() - 1]->work(out);
+        if (PlanStage::ADVANCED != childStatus) {
+            return childStatus;
         }
 
-        // Returning results.
-        verify(!_shouldScanChildren);
+        // We know that we've ADVANCED.  See if the WSM is in our table.
+        WorkingSetMember* member = _ws->get(*out);
+        verify(member->hasLoc());
 
-        // Keep the thing we're returning so we can remove it from our internal map later.
-        DataMap::iterator returnedIt = _resultIterator;
-        ++_resultIterator;
-
-        WorkingSetID idToReturn = returnedIt->second;
-        _dataMap.erase(returnedIt);
-        WorkingSetMember* member = _ws->get(idToReturn);
-
-        // We should check for matching at the end so the matcher can use information in the
-        // indices of all our children.
-        if (Filter::passes(member, _filter)) {
-            *out = idToReturn;
-            ++_commonStats.advanced;
-            return PlanStage::ADVANCED;
-        }
-        else {
-            _ws->free(idToReturn);
-            // Skip over the non-matching thing we currently point at.
+        DataMap::iterator it = _dataMap.find(member->loc);
+        if (_dataMap.end() == it) {
+            // Child's output wasn't in every previous child.  Throw it out.
+            _ws->free(*out);
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
+        }
+        else {
+            // Child's output was in every previous child.  Merge any key data in
+            // the child's output and free the child's just-outputted WSM.
+            WorkingSetID hashID = it->second;
+            _dataMap.erase(it);
+
+            WorkingSetMember* olderMember = _ws->get(hashID);
+            AndCommon::mergeFrom(olderMember, *member);
+            _ws->free(*out);
+
+            // We should check for matching at the end so the matcher can use information in the
+            // indices of all our children.
+            if (Filter::passes(olderMember, _filter)) {
+                *out = hashID;
+                ++_commonStats.advanced;
+                return PlanStage::ADVANCED;
+            }
+            else {
+                _ws->free(hashID);
+                ++_commonStats.needTime;
+                return PlanStage::NEED_TIME;
+            }
         }
     }
 
@@ -115,7 +157,7 @@ namespace mongo {
 
             // If our first child was empty, don't scan any others, no possible results.
             if (_dataMap.empty()) {
-                _shouldScanChildren = false;
+                _hashingChildren = false;
                 return PlanStage::IS_EOF;
             }
 
@@ -153,7 +195,7 @@ namespace mongo {
                 // We have a hit.  Copy data into the WSM we already have.
                 _seenMap.insert(member->loc);
                 WorkingSetMember* olderMember = _ws->get(_dataMap[member->loc]);
-                AndCommon::mergeFrom(olderMember, member);
+                AndCommon::mergeFrom(olderMember, *member);
             }
             _ws->free(id);
             ++_commonStats.needTime;
@@ -183,14 +225,13 @@ namespace mongo {
 
             // If we have nothing to AND with after finishing any child, stop.
             if (_dataMap.empty()) {
-                _shouldScanChildren = false;
+                _hashingChildren = false;
                 return PlanStage::IS_EOF;
             }
 
             // We've finished scanning all children.  Return results with the next call to work().
             if (_currentChild == _children.size()) {
-                _shouldScanChildren = false;
-                _resultIterator = _dataMap.begin();
+                _hashingChildren = false;
             }
 
             ++_commonStats.needTime;
@@ -236,18 +277,13 @@ namespace mongo {
 
         _seenMap.erase(dl);
 
-        // If we're pointing at the DiskLoc, move past it.  It will be deleted.
-        if (_dataMap.end() != _resultIterator && (_resultIterator->first == dl)) {
-            ++_resultIterator;
-        }
-
         DataMap::iterator it = _dataMap.find(dl);
         if (_dataMap.end() != it) {
             WorkingSetID id = it->second;
             WorkingSetMember* member = _ws->get(id);
             verify(member->loc == dl);
 
-            if (_shouldScanChildren) {
+            if (_hashingChildren) {
                 ++_specificStats.flaggedInProgress;
             }
             else {

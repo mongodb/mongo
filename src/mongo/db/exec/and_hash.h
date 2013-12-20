@@ -79,19 +79,18 @@ namespace mongo {
         // The stages we read from.  Owned by us.
         vector<PlanStage*> _children;
 
-        // _dataMap is filled out by the first child and probed by subsequent children.
+        // _dataMap is filled out by the first child and probed by subsequent children.  This is the
+        // hash table that we create by intersecting _children and probe with the last child.
         typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;
         DataMap _dataMap;
 
         // Keeps track of what elements from _dataMap subsequent children have seen.
+        // Only used while _hashingChildren.
         typedef unordered_set<DiskLoc, DiskLoc::Hasher> SeenMap;
         SeenMap _seenMap;
 
-        // Iterator over the members of _dataMap that survive.
-        DataMap::iterator _resultIterator;
-
-        // True if we're still scanning _children for results.
-        bool _shouldScanChildren;
+        // True if we're still intersecting _children[0..._children.size()-1].
+        bool _hashingChildren;
 
         // Which child are we currently working on?
         size_t _currentChild;

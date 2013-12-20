@@ -603,6 +603,17 @@ namespace mongo {
                 AndHashNode* ahn = new AndHashNode();
                 ahn->children.swap(ixscanNodes);
                 andResult = ahn;
+                // The AndHashNode provides the sort order of its last child.  If any of the
+                // possible subnodes of AndHashNode provides the sort order we care about, we put
+                // that one last.
+                for (size_t i = 0; i < ahn->children.size(); ++i) {
+                    ahn->children[i]->computeProperties();
+                    const BSONObjSet& sorts = ahn->children[i]->getSort();
+                    if (sorts.end() != sorts.find(query.getParsed().getSort())) {
+                        std::swap(ahn->children[i], ahn->children.back());
+                        break;
+                    }
+                }
             }
         }
 
