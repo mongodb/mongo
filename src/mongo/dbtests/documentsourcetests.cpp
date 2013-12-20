@@ -33,6 +33,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/interrupt_status_mongod.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/get_runner.h"
@@ -42,6 +43,7 @@
 namespace DocumentSourceTests {
 
     static const char* const ns = "unittests.documentsourcetests";
+    static const BSONObj metaTextScore = BSON("$meta" << "textScore");
     static DBDirectClient client;
 
     BSONObj toBson( const intrusive_ptr<DocumentSource>& source ) {
@@ -74,38 +76,72 @@ namespace DocumentSourceTests {
             void run() {
                 {
                     const char* array[] = {"a", "b"}; // basic
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "b" << 1 << "_id" << 0));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
                 }
                 {
                     const char* array[] = {"a", "ab"}; // prefixed but not subfield
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "ab" << 1 << "_id" << 0));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "ab" << 1 << "_id" << 0));
                 }
                 {
                     const char* array[] = {"a", "b", "a.b"}; // a.b included by a
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "b" << 1 << "_id" << 0));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
                 }
                 {
                     const char* array[] = {"a", "_id"}; // _id now included
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
                 }
                 {
                     const char* array[] = {"a", "_id.a"}; // still include whole _id (SERVER-7502)
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
                 }
                 {
                     const char* array[] = {"a", "_id", "_id.a"}; // handle both _id and subfield
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
                 }
                 {
                     const char* array[] = {"a", "_id", "_id_a"}; // _id prefixed but non-subfield
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+                }
+                {
+                    const char* array[] = {"a"}; // fields ignored with needWholeDocument
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    deps.needWholeDocument = true;
+                    ASSERT_EQUALS(deps.toProjection(), BSONObj());
+                }
+                {
+                    const char* array[] = {"a"}; // needTextScore with needWholeDocument
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    deps.needWholeDocument = true;
+                    deps.needTextScore = true;
+                    ASSERT_EQUALS(
+                        deps.toProjection(),
+                        BSON(Document::metaFieldTextScore << metaTextScore));
+                }
+                {
+                    const char* array[] = {"a"}; // needTextScore without needWholeDocument
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    deps.needTextScore = true;
+                    ASSERT_EQUALS(deps.toProjection(),
+                                  BSON(Document::metaFieldTextScore << metaTextScore
+                                    << "a" << 1
+                                    << "_id" << 0));
                 }
             }
         };
@@ -408,9 +444,11 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createLimit( 1 );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::SEE_NEXT, limit()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 0U, dependencies.size() );
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT, limit()->getDependencies(&dependencies) );
+                ASSERT_EQUALS( 0U, dependencies.fields.size() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -855,16 +893,18 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createGroup( fromjson( "{_id:'$x',a:{$sum:'$y.z'},b:{$avg:{$add:['$u','$v']}}}" ) );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE,
-                               group()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 4U, dependencies.size() );
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE_ALL,
+                               group()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 4U, dependencies.fields.size() );
                 // Dependency from _id expression.
-                ASSERT_EQUALS( 1U, dependencies.count( "x" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "x" ) );
                 // Dependencies from accumulator expressions.
-                ASSERT_EQUALS( 1U, dependencies.count( "y.z" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "u" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "v" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "y.z" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "u" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "v" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -1027,20 +1067,23 @@ namespace DocumentSourceTests {
         class Dependencies : public Base {
         public:
             void run() {
-                createProject( fromjson( "{a:true,x:'$b',y:{$and:['$c','$d']}}" ) );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE,
-                               project()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 5U, dependencies.size() );
+                createProject(fromjson(
+                    "{a:true,x:'$b',y:{$and:['$c','$d']}, z: {$meta:'textScore'}}"));
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE_FIELDS,
+                               project()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 5U, dependencies.fields.size() );
                 // Implicit _id dependency.
-                ASSERT_EQUALS( 1U, dependencies.count( "_id" ) );                
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "_id" ) );
                 // Inclusion dependency.
-                ASSERT_EQUALS( 1U, dependencies.count( "a" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a" ) );
                 // Field path expression dependency.
-                ASSERT_EQUALS( 1U, dependencies.count( "b" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "b" ) );
                 // Nested expression dependencies.
-                ASSERT_EQUALS( 1U, dependencies.count( "c" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "d" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "c" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "d" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( true, dependencies.needTextScore );
             }
         };
         
@@ -1368,11 +1411,13 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createSort( BSON( "a" << 1 << "b.c" << -1 ) );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::SEE_NEXT, sort()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 2U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "b.c" ) );
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT, sort()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 2U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "b.c" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
         
@@ -1629,11 +1674,13 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createUnwind( "$x.y.z" );
-                set<string> dependencies;
+                DepsTracker dependencies;
                 ASSERT_EQUALS( DocumentSource::SEE_NEXT,
-                               unwind()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "x.y.z" ) );
+                               unwind()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "x.y.z" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 

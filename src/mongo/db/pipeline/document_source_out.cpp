@@ -180,4 +180,9 @@ namespace mongo {
 
         return Value(DOC(getSourceName() << _outputNs.coll()));
     }
+
+    DocumentSource::GetDepsReturn DocumentSourceOut::getDependencies(DepsTracker* deps) const {
+        deps->needWholeDocument = true;
+        return EXHAUSTIVE_ALL;
+    }
 }

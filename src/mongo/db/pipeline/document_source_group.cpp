@@ -153,7 +153,7 @@ namespace mongo {
         return Value(DOC(getSourceName() << insides.freeze()));
     }
 
-    DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(set<string>& deps) const {
+    DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
         // add the _id
         pIdExpression->addDependencies(deps);
 
@@ -163,7 +163,7 @@ namespace mongo {
             vpExpression[i]->addDependencies(deps);
         }
 
-        return EXHAUSTIVE;
+        return EXHAUSTIVE_ALL;
     }
 
     intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(

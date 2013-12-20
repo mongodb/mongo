@@ -101,44 +101,50 @@ namespace {
         }
 
 
-        /* Look for an initial simple project; we'll avoid constructing Values
-         * for fields that won't make it through the projection.
-         */
 
-        bool haveProjection = false;
-        bool needQueryProjection = false; // true if we need to send the project to query system
-        BSONObj projection;
-        DocumentSource::ParsedDeps dependencies;
+        // Find the set of fields in the source documents depended on by this pipeline.
+        DepsTracker deps; // should be considered const after the following block.
         {
-            const bool isTextQuery = DocumentSourceMatch::isTextQuery(queryObj);
-            needQueryProjection = isTextQuery;
+            bool knowAllFields = false;
+            bool knowAllMeta = false;
+            for (size_t i=0; i < sources.size() && !(knowAllFields && knowAllMeta); i++) {
+                DepsTracker localDeps;
+                DocumentSource::GetDepsReturn status = sources[i]->getDependencies(&localDeps);
 
-            set<string> deps;
-            DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
-            for (size_t i=0; i < sources.size() && status == DocumentSource::SEE_NEXT; i++) {
-                status = sources[i]->getDependencies(deps);
-                if (deps.count(string())) // empty string means we need the full doc
-                    status = DocumentSource::NOT_SUPPORTED;
+                if (status == DocumentSource::NOT_SUPPORTED) {
+                    // Assume this stage needs everything. We may still know something about our
+                    // dependencies if an earlier stage returned either EXHAUSTIVE_FIELDS or
+                    // EXHAUSTIVE_META.
+                    break;
+                }
+
+                if (!knowAllFields) {
+                    deps.fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+                    if (localDeps.needWholeDocument)
+                        deps.needWholeDocument = true;
+                    knowAllFields = status & DocumentSource::EXHAUSTIVE_FIELDS;
+                }
+
+                if (!knowAllMeta) {
+                    if (localDeps.needTextScore)
+                        deps.needTextScore = true;
+
+                    knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
+                }
             }
 
-            // If doing a text query, assume we need score since we can't prove we don't.
-            // Edge cases that make this tricky:
-            // * Need to propagate score from shards to merger even if nothing on shard needs score.
-            // * Stages that are EXHAUSTIVE for field dependencies still propagate metadata.
-            if (isTextQuery)
-                deps.insert("$textScore");
+            if (!knowAllFields)
+                deps.needWholeDocument = true; // don't know all fields we need
 
-            if (status == DocumentSource::EXHAUSTIVE) {
-                projection = DocumentSource::depsToProjection(deps);
-                dependencies = DocumentSource::parseDeps(deps);
-                haveProjection = true;
-            }
-            else if (isTextQuery) {
-                // We still need score even if we don't know what actual fields are needed.
-                projection = BSON(Document::metaFieldTextScore << BSON("$meta" << "textScore"));
-                haveProjection = true;
-            }
+            // If doing a text query, assume we need the score if we can't prove we don't.
+            if (!knowAllMeta && DocumentSourceMatch::isTextQuery(queryObj))
+                deps.needTextScore = true;
         }
+
+        // Passing query an empty projection since it is faster to use ParsedDeps::extractFields().
+        // This will need to change to support covering indexes (SERVER-12015). There is an
+        // exception for textScore since that can only be retrieved by a query projection.
+        const BSONObj projectionForQuery = deps.needTextScore ? deps.toProjection() : BSONObj();
 
         /*
           Look for an initial sort; we'll try to add this to the
@@ -201,13 +207,11 @@ namespace {
         bool sortInRunner = false;
         if (sortStage) {
             CanonicalQuery* cq;
-            // Passing an empty projection since it is faster to use documentFromBsonWithDeps.
-            // This will need to change to support covering indexes (SERVER-12015).
             Status status =
                 CanonicalQuery::canonicalize(pExpCtx->ns,
                                              queryObj,
                                              sortObj,
-                                             needQueryProjection ? projection : BSONObj(),
+                                             projectionForQuery,
                                              &cq);
             Runner* rawRunner;
             if (status.isOK() && getRunner(cq, &rawRunner, runnerOptions).isOK()) {
@@ -230,7 +234,7 @@ namespace {
                 CanonicalQuery::canonicalize(pExpCtx->ns,
                                              queryObj,
                                              noSort,
-                                             needQueryProjection ? projection : BSONObj(),
+                                             projectionForQuery,
                                              &cq));
 
             Runner* rawRunner;
@@ -258,9 +262,7 @@ namespace {
         if (sortInRunner)
             pSource->setSort(sortObj);
 
-        if (haveProjection) {
-            pSource->setProjection(projection, dependencies, needQueryProjection);
-        }
+        pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
 
         while (!sources.empty() && pSource->coalesce(sources.front())) {
             sources.pop_front();

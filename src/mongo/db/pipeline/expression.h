@@ -30,6 +30,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
@@ -176,7 +177,7 @@ namespace mongo {
          *             where {a:1} inclusion objects aren't allowed, they get
          *             NULL.
          */
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const = 0;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const = 0;
 
         /** simple expressions are just inclusion exclusion as supported by ExpressionObject */
         virtual bool isSimple() { return false; }
@@ -292,7 +293,7 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize(bool explain) const;
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
 
         /*
           Add an operand to the n-ary expression.
@@ -398,7 +399,7 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(Variables* vars) const;
         virtual Value serialize(bool explain) const;
 
@@ -470,7 +471,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual Value serialize(bool explain) const;
@@ -530,7 +531,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(Variables* vars) const;
         virtual Value serialize(bool explain) const;
 
@@ -577,16 +578,8 @@ namespace mongo {
         // Helper for evaluatePath to handle Array case
         Value evaluatePathArray(size_t index, const Value& input) const;
 
-        // A cache of string comparison of _fieldPath.getFieldName(0)
-        enum BaseVar {
-            CURRENT,
-            ROOT,
-            OTHER,
-        };
-
         const FieldPath _fieldPath;
         const Variables::Id _variable;
-        const BaseVar _baseVar; // TODO remove
     };
 
 
@@ -612,7 +605,7 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize(bool explain) const;
         virtual Value evaluateInternal(Variables* vars) const;
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
 
         static intrusive_ptr<Expression> parse(
             BSONElement expr,
@@ -645,7 +638,7 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize(bool explain) const;
         virtual Value evaluateInternal(Variables* vars) const;
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
 
         static intrusive_ptr<Expression> parse(
             BSONElement expr,
@@ -668,7 +661,7 @@ namespace mongo {
         // virtuals from Expression
         virtual Value serialize(bool explain) const;
         virtual Value evaluateInternal(Variables* vars) const;
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
 
         static intrusive_ptr<Expression> parse(
             BSONElement expr,
@@ -729,7 +722,7 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual bool isSimple();
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        virtual void addDependencies(DepsTracker* deps, vector<string>* path=NULL) const;
         /** Only evaluates non inclusion expressions.  For inclusions, use addToDocument(). */
         virtual Value evaluateInternal(Variables* vars) const;
         virtual Value serialize(bool explain) const;

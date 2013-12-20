@@ -587,7 +587,7 @@ namespace {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionCoerceToBool::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionCoerceToBool::addDependencies(DepsTracker* deps, vector<string>* path) const {
         pExpression->addDependencies(deps);
     }
 
@@ -782,7 +782,7 @@ namespace {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionConstant::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionConstant::addDependencies(DepsTracker* deps, vector<string>* path) const {
         /* nothing to do */
     }
 
@@ -901,13 +901,13 @@ namespace {
         return true;
     }
 
-    void ExpressionObject::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionObject::addDependencies(DepsTracker* deps, vector<string>* path) const {
         string pathStr;
         if (path) {
             if (path->empty()) {
                 // we are in the top level of a projection so _id is implicit
                 if (!_excludeId)
-                    deps.insert("_id");
+                    deps->fields.insert("_id");
             }
             else {
                 FieldPath f (*path);
@@ -930,7 +930,7 @@ namespace {
                 uassert(16407, "inclusion not supported in objects nested in $expressions",
                         path);
 
-                deps.insert(pathStr + it->first);
+                deps->fields.insert(pathStr + it->first);
             }
         }
     }
@@ -1201,9 +1201,6 @@ namespace {
     ExpressionFieldPath::ExpressionFieldPath(const string& theFieldPath, Variables::Id variable)
         : _fieldPath(theFieldPath)
         , _variable(variable)
-        , _baseVar(_fieldPath.getFieldName(0) == "CURRENT" ? CURRENT :
-                   _fieldPath.getFieldName(0) == "ROOT" ?    ROOT :
-                                                             OTHER)
     {}
 
     intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
@@ -1211,13 +1208,12 @@ namespace {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
-        // TODO consider state of variables
-        if (_baseVar == ROOT || _baseVar == CURRENT) {
+    void ExpressionFieldPath::addDependencies(DepsTracker* deps, vector<string>* path) const {
+        if (_variable == Variables::ROOT_ID) { // includes CURRENT when it is equivalent to ROOT.
             if (_fieldPath.getPathLength() == 1) {
-                deps.insert(""); // need full doc if just "$$ROOT" or "$$CURRENT"
+                deps->needWholeDocument = true; // need full doc if just "$$ROOT"
             } else {
-                deps.insert(_fieldPath.tail().getPath(false));
+                deps->fields.insert(_fieldPath.tail().getPath(false));
             }
         }
     }
@@ -1383,7 +1379,7 @@ namespace {
         return _subExpression->evaluateInternal(vars);
     }
 
-    void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionLet::addDependencies(DepsTracker* deps, vector<string>* path) const {
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
             it->second.expression->addDependencies(deps);
@@ -1500,7 +1496,7 @@ namespace {
         return Value::consume(output);
     }
 
-    void ExpressionMap::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionMap::addDependencies(DepsTracker* deps, vector<string>* path) const {
         _input->addDependencies(deps);
         _each->addDependencies(deps);
     }
@@ -1531,8 +1527,8 @@ namespace {
                 : Value();
     }
 
-    void ExpressionMeta::addDependencies(set<string>& deps, vector<string>* path) const {
-        deps.insert("$textScore");
+    void ExpressionMeta::addDependencies(DepsTracker* deps, vector<string>* path) const {
+        deps->needTextScore = true;
     }
 
     /* ------------------------- ExpressionMillisecond ----------------------------- */
@@ -1782,7 +1778,7 @@ namespace {
         return this;
     }
 
-    void ExpressionNary::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionNary::addDependencies(DepsTracker* deps, vector<string>* path) const {
         for(ExpressionVector::const_iterator i(vpOperand.begin());
             i != vpOperand.end(); ++i) {
             (*i)->addDependencies(deps);

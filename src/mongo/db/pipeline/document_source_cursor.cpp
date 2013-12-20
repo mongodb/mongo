@@ -97,8 +97,8 @@ namespace mongo {
         BSONObj obj;
         Runner::RunnerState state;
         while ((state = runner->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
-            if (_haveDeps && !_projectionInQuery) {
-                _currentBatch.push_back(documentFromBsonWithDeps(obj, _dependencies));
+            if (_dependencies) {
+                _currentBatch.push_back(_dependencies->extractFields(obj));
             }
             else {
                 _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
@@ -255,7 +255,6 @@ namespace {
                                                CursorId cursorId,
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
-        , _haveDeps(false)
         , _docsAddedToBatches(0)
         , _ns(ns)
         , _cursorId(cursorId)
@@ -270,11 +269,8 @@ namespace {
 
     void DocumentSourceCursor::setProjection(
             const BSONObj& projection,
-            const ParsedDeps& deps,
-            bool projectionInQuery) {
+            const boost::optional<ParsedDeps>& deps) {
         _projection = projection;
         _dependencies = deps;
-        _projectionInQuery = projectionInQuery;
-        _haveDeps = true;
     }
 }

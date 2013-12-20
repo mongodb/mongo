@@ -131,19 +131,19 @@ namespace mongo {
 
 #if defined(_DEBUG)
         if (exprObj->isSimple()) {
-            set<string> deps;
+            DepsTracker deps;
             vector<string> path;
-            exprObj->addDependencies(deps, &path);
-            pProject->_simpleProjection.init(depsToProjection(deps));
+            exprObj->addDependencies(&deps, &path);
+            pProject->_simpleProjection.init(deps.toProjection());
         }
 #endif
 
         return pProject;
     }
 
-    DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(set<string>& deps) const {
+    DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker* deps) const {
         vector<string> path; // empty == top-level
         pEO->addDependencies(deps, &path);
-        return EXHAUSTIVE;
+        return EXHAUSTIVE_FIELDS;
     }
 }

@@ -129,7 +129,7 @@ namespace mongo {
         return keyObj.freeze();
     }
 
-    DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(set<string>& deps) const {
+    DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* deps) const {
         for(size_t i = 0; i < vSortKey.size(); ++i) {
             vSortKey[i]->addDependencies(deps);
         }

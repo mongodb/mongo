@@ -521,10 +521,12 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> nested = ExpressionFieldPath::create( "a.b" );
                 intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create( nested );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a.b" ) );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
+                ASSERT_EQUALS( 1U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a.b" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -924,9 +926,11 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> expression =
                         ExpressionConstant::create( Value( 5 ) );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 0U, dependencies.size() );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
+                ASSERT_EQUALS( 0U, dependencies.fields.size() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -990,10 +994,12 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a.b" ) );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
+                ASSERT_EQUALS( 1U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a.b" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -1282,14 +1288,17 @@ namespace ExpressionTests {
         private:
             void assertDependencies( const BSONArray& expectedDependencies,
                                      const intrusive_ptr<Expression>& expression ) {
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
                 BSONArrayBuilder dependenciesBson;
-                for( set<string>::const_iterator i = dependencies.begin(); i != dependencies.end();
-                     ++i ) {
+                for( set<string>::const_iterator i = dependencies.fields.begin();
+                        i != dependencies.fields.end();
+                        ++i ) {
                     dependenciesBson << *i;
                 }
                 ASSERT_EQUALS( expectedDependencies, dependenciesBson.arr() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }                
         };
 
@@ -1450,15 +1459,18 @@ namespace ExpressionTests {
             void assertDependencies( const BSONArray& expectedDependencies,
                                      const intrusive_ptr<ExpressionObject>& expression,
                                      bool includePath = true ) const {
-                set<string> dependencies;
                 vector<string> path;
-                expression->addDependencies( dependencies, includePath ? &path : 0 );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies, includePath ? &path : 0 );
                 BSONArrayBuilder bab;
-                for( set<string>::const_iterator i = dependencies.begin(); i != dependencies.end();
-                    ++i ) {
+                for( set<string>::const_iterator i = dependencies.fields.begin();
+                        i != dependencies.fields.end();
+                        ++i ) {
                     bab << *i;
                 }
                 ASSERT_EQUALS( expectedDependencies, bab.arr() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }            
         };
 
@@ -2098,9 +2110,9 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
                 expression->includePath( "a" );
                 assertDependencies( BSON_ARRAY( "_id" << "a" ), expression, true );
-                set<string> unused;
+                DepsTracker unused;
                 // 'path' must be provided for inclusion expressions.
-                ASSERT_THROWS( expression->addDependencies( unused ), UserException );
+                ASSERT_THROWS( expression->addDependencies( &unused ), UserException );
             }
         };
 

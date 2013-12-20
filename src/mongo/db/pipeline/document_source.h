@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
@@ -128,32 +129,19 @@ namespace mongo {
         virtual void optimize();
 
         enum GetDepsReturn {
-            NOT_SUPPORTED, // This means the set should be ignored and the full object is required.
-            EXHAUSTIVE, // This means that everything needed should be in the set
-            SEE_NEXT, // Add the next Source's deps to the set
+            NOT_SUPPORTED = 0x0, // The full object and all metadata may be required
+            SEE_NEXT = 0x1, // Later stages could need either fields or metadata
+            EXHAUSTIVE_FIELDS = 0x2, // Later stages won't need more fields from input
+            EXHAUSTIVE_META = 0x4, // Later stages won't need more metadata from input
+            EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META, // Later stages won't need either
         };
 
-        /** Get the fields this operation needs to do its job.
-         *  Deps should be in "a.b.c" notation
-         *  An empty string in deps means the whole document is needed.
-         *
-         *  @param deps results are added here. NOT CLEARED
+        /**
+         * Get the dependencies this operation needs to do its job.
          */
-        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
             return NOT_SUPPORTED;
         }
-
-        /** This takes dependencies from getDependencies and
-         *  returns a projection that includes all of them
-         */
-        static BSONObj depsToProjection(const set<string>& deps);
-
-        /** These functions take the same input as depsToProjection but are able to
-         *  produce a Document from a BSONObj with the needed fields much faster.
-         */
-        typedef Document ParsedDeps; // See implementation for structure
-        static ParsedDeps parseDeps(const set<string>& deps);
-        static Document documentFromBsonWithDeps(const BSONObj& object, const ParsedDeps& deps);
 
         /**
          * In the default case, serializes the DocumentSource and adds it to the vector<Value>.
@@ -408,12 +396,9 @@ namespace mongo {
          *
          * @param projection A projection specification describing the fields needed by the rest of
          *                   the pipeline.
-         * @param deps The output of DocumentSource::parseDeps.
-         * @param projectionInQuery True if the underlying cursor will handle the projection for us.
+         * @param deps The output of DepsTracker::toParsedDeps
          */
-        void setProjection(const BSONObj& projection,
-                           const ParsedDeps& deps,
-                           bool projectionInQuery);
+        void setProjection(const BSONObj& projection, const boost::optional<ParsedDeps>& deps);
 
         /// returns -1 for no limit
         long long getLimit() const;
@@ -432,9 +417,7 @@ namespace mongo {
         BSONObj _query;
         BSONObj _sort;
         BSONObj _projection;
-        bool _haveDeps;
-        ParsedDeps _dependencies;
-        bool _projectionInQuery;
+        boost::optional<ParsedDeps> _dependencies;
         intrusive_ptr<DocumentSourceLimit> _limit;
         long long _docsAddedToBatches; // for _limit enforcement
 
@@ -450,7 +433,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void optimize();
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
         virtual void dispose();
         virtual Value serialize(bool explain = false) const;
 
@@ -687,6 +670,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual Value serialize(bool explain = false) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
@@ -735,7 +719,7 @@ namespace mongo {
         virtual void optimize();
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.
@@ -809,7 +793,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual void dispose();
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         virtual intrusive_ptr<DocumentSource> getShardSource();
         virtual intrusive_ptr<DocumentSource> getMergeSource();
@@ -923,7 +907,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
             return SEE_NEXT; // This doesn't affect needed fields
         }
 
@@ -979,7 +963,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
             return SEE_NEXT; // This doesn't affect needed fields
         }
 
@@ -1033,7 +1017,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.
