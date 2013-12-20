@@ -180,11 +180,11 @@ namespace mongo {
 
         // Set the main body of the response. We assume that, if there was an error, the error
         // code would already be set.
-
         if ( verbose ) {
             response->setN( stats.numInserted + stats.numUpserted + stats.numUpdated
                             + stats.numDeleted );
-            response->setNDocsModified(stats.numModified);
+            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update )
+                response->setNDocsModified(stats.numModified);
         }
 
         // TODO: Audit where we want to queue here - the shardingState calls may block for remote
