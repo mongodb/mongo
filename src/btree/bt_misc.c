@@ -94,7 +94,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
 
 	if (WT_PAGE_IS_ROOT(page)) {
 		buf->data = "[Root]";
-		buf->size = WT_STORE_SIZE(strlen("[Root]"));
+		buf->size = strlen("[Root]");
 		return (buf->data);
 	}
 
@@ -118,10 +118,10 @@ __wt_addr_string(
 
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
-		buf->size = WT_STORE_SIZE(strlen("[NoAddr]"));
+		buf->size = strlen("[NoAddr]");
 	} else if (bm->addr_string(bm, session, buf, addr, size) != 0) {
 		buf->data = "[Error]";
-		buf->size = WT_STORE_SIZE(strlen("[Error]"));
+		buf->size = strlen("[Error]");
 	}
 	return (buf->data);
 }

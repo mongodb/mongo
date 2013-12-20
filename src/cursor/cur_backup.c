@@ -40,7 +40,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	}
 
 	cb->iface.key.data = cb->list[cb->next].name;
-	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next].name) + 1);
+	cb->iface.key.size = strlen(cb->list[cb->next].name) + 1;
 	++cb->next;
 
 	F_SET(cursor, WT_CURSTD_KEY_INT);

@@ -364,7 +364,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 			s = maxlen;
 		WT_SIZE_CHECK(s, maxlen);
 		pv->u.item.data = *pp;
-		pv->u.item.size = WT_STORE_SIZE(s);
+		pv->u.item.size = s;
 		*pp += s;
 		break;
 	case 'b':

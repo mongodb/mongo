@@ -111,7 +111,7 @@ int
 __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	WT_RET(__wt_buf_init(session, buf, size));
-	buf->size = WT_STORE_SIZE(size);	/* Set the data length. */
+	buf->size = size;			/* Set the data length. */
 
 	return (0);
 }
@@ -218,7 +218,7 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		/* Check if there was enough space. */
 		if (len < buf->memsize) {
 			buf->data = buf->mem;
-			buf->size = WT_STORE_SIZE(len);
+			buf->size = len;
 			return (0);
 		}
 
@@ -257,7 +257,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 
 		/* Check if there was enough space. */
 		if (len < space) {
-			buf->size += WT_STORE_SIZE(len);
+			buf->size += len;
 			return (0);
 		}
 

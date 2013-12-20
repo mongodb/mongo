@@ -97,7 +97,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 					p = (uint8_t *)buf->mem + buf->size;
 					WT_RET(__pack_write(
 					    session, &pv, &p, len));
-					buf->size += WT_STORE_SIZE(len);
+					buf->size += len;
 					end = (uint8_t *)buf->mem + buf->size;
 				} else if (*proj == WT_PROJ_SKIP)
 					WT_RET(__unpack_read(session,
@@ -131,7 +131,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 					memmove(p + len, p + old_len,
 					    buf->size - (offset + old_len));
 				WT_RET(__pack_write(session, &pv, &p, len));
-				buf->size += WT_STORE_SIZE(len);
+				buf->size += len;
 				break;
 
 			default:
@@ -315,7 +315,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 					WT_RET(__pack_write(
 					    session, &pv, &p, len));
 					end = p;
-					buf->size += WT_STORE_SIZE(len);
+					buf->size += len;
 				} else
 					WT_RET(__unpack_read(session,
 					    &pv, (const uint8_t **)&p,
@@ -364,7 +364,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 					memmove(p + len, p + old_len,
 					    buf->size - (offset + old_len));
 				WT_RET(__pack_write(session, &pv, &p, len));
-				buf->size += WT_STORE_SIZE(len - old_len);
+				buf->size += len - old_len;
 				end = (uint8_t *)buf->data + buf->size;
 				break;
 			default:
@@ -457,7 +457,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				    value, value->size + len));
 				vp = (uint8_t *)value->mem + value->size;
 				WT_RET(__pack_write(session, &vpv, &vp, len));
-				value->size += WT_STORE_SIZE(len);
+				value->size += len;
 				break;
 			}
 		}
