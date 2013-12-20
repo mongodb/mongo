@@ -107,11 +107,11 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 
 	big[bytes] = '\0';
 
-	printf("%zu" "%s: %s %s\n",
+	printf("%zu" "%s: %s %s big %s\n",
 	    bytes < MEGABYTE ? bytes :
 	    (bytes < GIGABYTE ? bytes / MEGABYTE : bytes / GIGABYTE),
 	    bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"),
-	    cp->uri, cp->config);
+	    cp->uri, cp->config, bigkey ? "key" : "value");
 
 	(void)system("rm -rf WT_TEST && mkdir WT_TEST");
 
