@@ -13,8 +13,9 @@
  */
 int
 __wt_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, size_t bytes, void *buf)
+    WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, size_t len, void *buf)
 {
+	size_t chunk;
 	ssize_t nr;
 	uint8_t *addr;
 
@@ -22,7 +23,7 @@ __wt_read(
 
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: read %zu bytes at offset %" PRIuMAX,
-	    fh->name, bytes, (uintmax_t)offset);
+	    fh->name, len, (uintmax_t)offset);
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,
@@ -30,16 +31,18 @@ __wt_read(
 	    S2C(session)->buffer_alignment == 0 ||
 	    (!((uintptr_t)buf &
 	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-	    bytes >= S2C(session)->buffer_alignment &&
-	    bytes % S2C(session)->buffer_alignment == 0));
+	    len >= S2C(session)->buffer_alignment &&
+	    len % S2C(session)->buffer_alignment == 0));
 
-	for (addr = buf;
-	    bytes > 0; addr += nr, bytes -= (size_t)nr, offset += nr)
-		if ((nr = pread(fh->fd, addr, bytes, offset)) <= 0)
+	/* Break reads larger than 1GB into 1GB chunks. */
+	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
+		chunk = WT_MIN(len, WT_GIGABYTE);
+		if ((nr = pread(fh->fd, addr, chunk, offset)) <= 0)
 			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
 			    "%s read error: failed to read %zu bytes at "
 			    "offset %" PRIuMAX,
-			    fh->name, bytes, (uintmax_t)offset);
+			    fh->name, chunk, (uintmax_t)offset);
+	}
 	return (0);
 }
 
@@ -49,8 +52,9 @@ __wt_read(
  */
 int
 __wt_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, off_t offset, size_t bytes, const void *buf)
+    WT_FH *fh, off_t offset, size_t len, const void *buf)
 {
+	size_t chunk;
 	ssize_t nw;
 	const uint8_t *addr;
 
@@ -58,7 +62,7 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: write %zu bytes at offset %" PRIuMAX,
-	    fh->name, bytes, (uintmax_t)offset);
+	    fh->name, len, (uintmax_t)offset);
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,
@@ -66,15 +70,17 @@ __wt_write(WT_SESSION_IMPL *session,
 	    S2C(session)->buffer_alignment == 0 ||
 	    (!((uintptr_t)buf &
 	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
-	    bytes >= S2C(session)->buffer_alignment &&
-	    bytes % S2C(session)->buffer_alignment == 0));
+	    len >= S2C(session)->buffer_alignment &&
+	    len % S2C(session)->buffer_alignment == 0));
 
-	for (addr = buf;
-	    bytes > 0; addr += nw, bytes -= (size_t)nw, offset += nw)
-		if ((nw = pwrite(fh->fd, addr, bytes, offset)) < 0)
+	/* Break writes larger than 1GB into 1GB chunks. */
+	for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
+		chunk = WT_MIN(len, WT_GIGABYTE);
+		if ((nw = pwrite(fh->fd, addr, chunk, offset)) < 0)
 			WT_RET_MSG(session, __wt_errno(),
 			    "%s write error: failed to write %zu bytes at "
 			    "offset %" PRIuMAX,
-			    fh->name, bytes, (uintmax_t)offset);
+			    fh->name, chunk, (uintmax_t)offset);
+	}
 	return (0);
 }

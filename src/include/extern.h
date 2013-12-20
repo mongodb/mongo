@@ -1085,12 +1085,12 @@ extern int __wt_rename(WT_SESSION_IMPL *session,
 extern int __wt_read( WT_SESSION_IMPL *session,
     WT_FH *fh,
     off_t offset,
-    size_t bytes,
+    size_t len,
     void *buf);
 extern int __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh,
     off_t offset,
-    size_t bytes,
+    size_t len,
     const void *buf);
 extern void __wt_sleep(long seconds, long micro_seconds);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
