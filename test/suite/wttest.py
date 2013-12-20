@@ -148,13 +148,15 @@ class WiredTigerTestCase(unittest.TestCase):
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
         WiredTigerTestCase._parentTestdir = d
+        WiredTigerTestCase._origcwd = os.getcwd()
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
-        WiredTigerTestCase._globalSetup = True
         WiredTigerTestCase._stdout = sys.stdout
         WiredTigerTestCase._stderr = sys.stderr
+        WiredTigerTestCase._concurrent = False
+        WiredTigerTestCase._globalSetup = True
 
     def fdSetUp(self):
         self.captureout = CapturedFd('stdout.txt', 'standard output')
@@ -225,7 +227,11 @@ class WiredTigerTestCase(unittest.TestCase):
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):
             self.__class__.wt_ntests = 0
-        self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.className() + '.' + str(self.__class__.wt_ntests))
+        if WiredTigerTestCase._concurrent:
+            self.testsubdir = self.shortid() + '.' + str(self.__class__.wt_ntests)
+        else:
+            self.testsubdir = self.className() + '.' + str(self.__class__.wt_ntests)
+        self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.testsubdir)
         self.__class__.wt_ntests += 1
         if WiredTigerTestCase._verbose > 2:
             self.prhead('started in ' + self.testdir, True)
@@ -272,7 +278,7 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('preserving directory ' + self.testdir)
 
         if not passed:
-            print "ERROR"
+            print "ERROR in " + self.testsubdir
             self.pr('FAIL')
             self.prexception(excinfo)
             self.pr('preserving directory ' + self.testdir)
@@ -420,16 +426,29 @@ class WiredTigerTestCase(unittest.TestCase):
     def className(self):
         return self.__class__.__name__
 
+def runsuite(suite, parallel):
+    suite_to_run = suite
+    if parallel > 1:
+        try:
+            from concurrencytest import ConcurrentTestSuite, fork_for_tests
+        except ImportError:
+            print ('ERROR: additional python modules must be installed\n' +
+                   '       to use the "--parallel N" option.  Consult\n' +
+                   '       the WiredTiger HOWTO:RunTheTestSuite wiki page.\n')
+            raise
 
-def runsuite(suite):
+        if not WiredTigerTestCase._globalSetup:
+            WiredTigerTestCase.globalSetup()
+        WiredTigerTestCase._concurrent = True
+        suite_to_run = ConcurrentTestSuite(suite, fork_for_tests(parallel))
     try:
         return unittest.TextTestRunner(
-            verbosity=WiredTigerTestCase._verbose).run(suite)
+            verbosity=WiredTigerTestCase._verbose).run(suite_to_run)
     except BaseException as e:
         # This should not happen for regular test errors, unittest should catch everything
         print('ERROR: running test: ', e)
         raise e
 
 def run(name='__main__'):
-    result = runsuite(unittest.TestLoader().loadTestsFromName(name))
+    result = runsuite(unittest.TestLoader().loadTestsFromName(name), False)
     sys.exit(not result.wasSuccessful())

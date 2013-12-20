@@ -40,9 +40,13 @@ wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
 # Cannot import wiredtiger and supporting utils until we set up paths
 sys.path.append(os.path.join(wt_builddir, 'lang', 'python'))
 sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
-sys.path.append(os.path.join(wt_3rdpartydir, 'discover-0.4.0'))
-sys.path.append(os.path.join(wt_3rdpartydir, 'testtools-0.9.12'))
-sys.path.append(os.path.join(wt_3rdpartydir, 'testscenarios-0.2', 'lib'))
+
+# Add all 3rd party directories: some have code in subdirectories
+for d in os.listdir(wt_3rdpartydir):
+    for subdir in ('lib', 'python', ''):
+        if os.path.exists(os.path.join(wt_3rdpartydir, d, subdir)):
+            sys.path.append(os.path.join(wt_3rdpartydir, d, subdir))
+            break
 
 import wttest
 # Use the same version of unittest found by wttest.py
@@ -62,6 +66,7 @@ Options:\n\
   -d      | --debug              run with \'pdb\', the python debugger\n\
   -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
   -h      | --help               show this message\n\
+  -j N    | --parallel N         run all tests in parallel using N processes\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
@@ -200,6 +205,7 @@ if __name__ == '__main__':
 
     # Turn numbers and ranges into test module names
     preserve = timestamp = debug = gdbSub = False
+    parallel = 0
     configfile = None
     configwrite = False
     dirarg = None
@@ -221,6 +227,12 @@ if __name__ == '__main__':
                 continue
             if option == '-debug' or option == 'd':
                 debug = True
+                continue
+            if option == '-parallel' or option == 'j':
+                if parallel != 0 or len(args) == 0:
+                    usage()
+                    sys.exit(False)
+                parallel = int(args.pop(0))
                 continue
             if option == '-preserve' or option == 'p':
                 preserve = True
@@ -283,5 +295,5 @@ if __name__ == '__main__':
         import pdb
         pdb.set_trace()
 
-    result = wttest.runsuite(tests)
+    result = wttest.runsuite(tests, parallel)
     sys.exit(not result.wasSuccessful())

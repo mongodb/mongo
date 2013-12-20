@@ -41,7 +41,7 @@ class test_cursor03(TestCursorTracker):
     """
     scenarios = multiply_scenarios('.', [
             ('row', dict(tablekind='row', keysize=None, valsize=None, uri='table')),
-            ('row', dict(tablekind='row', keysize=None, valsize=None, uri='lsm')),
+            ('lsm-row', dict(tablekind='row', keysize=None, valsize=None, uri='lsm')),
             ('col', dict(tablekind='col', keysize=None, valsize=None, uri='table')),
             #('fix', dict(tablekind='fix', keysize=None, valsize=None))
             ('row.val10k', dict(tablekind='row', keysize=None, valsize=[10, 10000], uri='table')),

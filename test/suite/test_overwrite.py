@@ -27,17 +27,18 @@
 
 import wiredtiger, wttest
 from helper import key_populate, simple_populate
+from wtscenario import multiply_scenarios, number_scenarios
 
 # test_overwrite.py
 #    cursor overwrite configuration method
 class test_overwrite(wttest.WiredTigerTestCase):
     name = 'overwrite'
     scenarios = [
-        ('file', dict(type='file:',keyfmt='r')),
-        ('file', dict(type='file:',keyfmt='S')),
-        ('lsm', dict(type='lsm:',keyfmt='S')),
-        ('table', dict(type='table:',keyfmt='r')),
-        ('table', dict(type='table:',keyfmt='S')),
+        ('file-r', dict(type='file:',keyfmt='r')),
+        ('file-S', dict(type='file:',keyfmt='S')),
+        ('lsm-S', dict(type='lsm:',keyfmt='S')),
+        ('table-r', dict(type='table:',keyfmt='r')),
+        ('table-S', dict(type='table:',keyfmt='S')),
     ]
 
     # Confirm a cursor configured with/without overwrite correctly handles
