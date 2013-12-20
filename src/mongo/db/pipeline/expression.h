@@ -161,7 +161,7 @@ namespace mongo {
 
           @returns the optimized Expression
          */
-        virtual intrusive_ptr<Expression> optimize() = 0;
+        virtual intrusive_ptr<Expression> optimize() { return this; }
 
         /**
          * Add this expression's field dependencies to the set
@@ -663,6 +663,18 @@ namespace mongo {
         intrusive_ptr<Expression> _each;
     };
 
+    class ExpressionMeta : public Expression {
+    public:
+        // virtuals from Expression
+        virtual Value serialize(bool explain) const;
+        virtual Value evaluateInternal(Variables* vars) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+
+        static intrusive_ptr<Expression> parse(
+            BSONElement expr,
+            const VariablesParseState& vps);
+    };
+
     class ExpressionMillisecond : public ExpressionFixedArity<ExpressionMillisecond, 1> {
     public:
         // virtuals from ExpressionNary
@@ -869,8 +881,11 @@ namespace mongo {
     class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset, 2> {
     public:
         // virtuals from ExpressionNary
+        virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+    private:
+        class Optimized;
     };
 
 

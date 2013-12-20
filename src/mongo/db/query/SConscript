@@ -133,6 +133,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="plan_cache_test",
+    source=[
+        "plan_cache_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
     target="planner_ixselect_test",
     source=[
         "planner_ixselect_test.cpp"

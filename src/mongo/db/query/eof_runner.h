@@ -48,7 +48,7 @@ namespace mongo {
     class EOFRunner : public Runner {
     public:
 
-        /* Takes onwership */
+        /* Takes ownership */
         EOFRunner(CanonicalQuery* cq, const std::string& ns);
 
         virtual ~EOFRunner();

@@ -92,10 +92,7 @@ files.forEach(function(x) {
         'update4|' +
         'update_setOnInsert|' +
         'profile\\d*|' +
-        'max_time_ms|' + // Will be fixed when SERVER-2212 is resolved.
-        'fts_querylang|' + // Will be fixed when SERVER-9063 is resolved.
-        'fts_projection|' + // As above.
-        'fts_score_sort' + // As above.
+        'max_time_ms' + // Will be fixed when SERVER-2212 is resolved.
         ')\.js$');
 
     // These aren't supposed to get run under sharding:

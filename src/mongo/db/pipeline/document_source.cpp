@@ -84,6 +84,15 @@ namespace mongo {
                 needId = true;
                 continue;
             }
+
+            if (str::startsWith(*it, '$')) {
+                if (*it == "$textScore") {
+                    // textScore metadata
+                    bb.append(Document::metaFieldTextScore, BSON("$meta" << "textScore"));
+                    continue;
+                }
+            }
+
             if (!last.empty() && str::startsWith(*it, last)) {
                 // we are including a parent of *it so we don't need to include this field
                 // explicitly. In fact, due to SERVER-6527 if we included this field, the parent
@@ -92,6 +101,7 @@ namespace mongo {
                 // prefixes.
                 continue;
             }
+
             last = *it + '.';
             bb.append(*it, 1);
         }
@@ -121,6 +131,12 @@ namespace mongo {
 
         string last;
         for (set<string>::const_iterator it(deps.begin()), end(deps.end()); it!=end; ++it) {
+            if (str::startsWith(*it, '$')) {
+                // documentFromBsonWithDeps doesn't handle meta data
+                if (*it == "$textScore")
+                    return ParsedDeps();
+            }
+
             if (!last.empty() && str::startsWith(*it, last)) {
                 // we are including a parent of *it so we don't need to include this field
                 // explicitly. In fact, if we included this field, the parent wouldn't be fully

@@ -87,7 +87,7 @@ namespace mongo {
             dassert( errMsg == "" );
             return Status::OK();
         }
-        catch ( const DBException& ex ) {
+        catch ( const DBException& ) {
             return Status( ErrorCodes::HostNotFound,
                            string("could not contact primary for replica set ")
                            + replMonitor->getName() );

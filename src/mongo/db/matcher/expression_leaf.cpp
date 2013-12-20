@@ -397,6 +397,11 @@ namespace mongo {
         if ( e.type() == RegEx )
             return Status( ErrorCodes::BadValue, "ArrayFilterEntries equality cannot be a regex" );
 
+        if ( e.type() == Undefined ) {
+            return Status( ErrorCodes::BadValue,
+                           "ArrayFilterEntries equality cannot be undefined" );
+        }
+
         if ( e.type() == jstNULL ) {
             _hasNull = true;
         }

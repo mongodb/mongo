@@ -115,6 +115,8 @@ namespace mongo {
          *  as strings are compared, but comparing one field at a time instead
          *  of one character at a time.
          *
+         *  Note: This does not consider metadata when comparing documents.
+         *
          *  @returns an integer less than zero, zero, or an integer greater than
          *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
          *  Warning: may return values other than -1, 0, or 1
@@ -133,9 +135,25 @@ namespace mongo {
          */
         void hash_combine(size_t &seed) const;
 
-        /// Add this document to the BSONObj under construction with the given BSONObjBuilder.
+        /**
+         * Add this document to the BSONObj under construction with the given BSONObjBuilder.
+         * Does not include metadata.
+         */
         void toBson(BSONObjBuilder *pBsonObjBuilder) const;
         BSONObj toBson() const;
+
+        /**
+         * Like toBson, but includes metadata at the top-level.
+         * Output is parseable by fromBsonWithMetaData
+         */
+        BSONObj toBsonWithMetaData() const;
+
+        /**
+         * Like Document(BSONObj) but treats top-level fields with special names as metadata.
+         * Special field names are available as static constants on this class with names starting
+         * with metaField.
+         */
+        static Document fromBsonWithMetaData(const BSONObj& bson);
 
         // Support BSONObjBuilder and BSONArrayBuilder "stream" API
         friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Document& d);
@@ -154,6 +172,10 @@ namespace mongo {
          *  are cloned.
          */
         Document clone() const { return Document(storage().clone().get()); }
+
+        static const StringData metaFieldTextScore; // "$textScore"
+        bool hasTextScore() const { return storage().hasTextScore(); }
+        double getTextScore() const { return storage().getTextScore(); }
 
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused
@@ -338,6 +360,16 @@ namespace mongo {
         void setNestedField(const vector<Position>& positions, const Value& val) {
             getNestedField(positions) = val;
         }
+
+        /**
+         * Copies all metadata from source if it has any.
+         * Note: does not clear metadata from this.
+         */
+        void copyMetaDataFrom(const Document& source) {
+            storage().copyMetaDataFrom(source.storage());
+        }
+
+        void setTextScore(double score) { storage().setTextScore(score); }
 
         /** Convert to a read-only document and release reference.
          *

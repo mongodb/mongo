@@ -111,8 +111,10 @@ namespace mongo {
             return boost::optional<Document>();
         }
         else if (expressionResult == descendVal) {
+            const Document in = _variables->getDocument(_currentId);
             MutableDocument out;
-            FieldIterator fields(_variables->getDocument(_currentId));
+            out.copyMetaDataFrom(in);
+            FieldIterator fields(in);
             while (fields.more()) {
                 const Document::FieldPair field(fields.next());
 
@@ -143,10 +145,6 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
             BSONElement elem,
             const intrusive_ptr<ExpressionContext>& expCtx) {
-        uassert(17054, str::stream() << redactName << " specification must be an object",
-                elem.type() == Object);
-
-        Expression::ObjectCtx oCtx(0);
 
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
@@ -154,7 +152,7 @@ namespace mongo {
         Variables::Id decendId = vps.defineVariable("DESCEND");
         Variables::Id pruneId = vps.defineVariable("PRUNE");
         Variables::Id keepId = vps.defineVariable("KEEP");
-        intrusive_ptr<Expression> expression = Expression::parseObject(elem.Obj(), &oCtx, vps);
+        intrusive_ptr<Expression> expression = Expression::parseOperand(elem, vps);
         intrusive_ptr<DocumentSourceRedact> source = new DocumentSourceRedact(expCtx, expression);
 
         // TODO figure out how much of this belongs in constructor and how much here.

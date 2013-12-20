@@ -1118,6 +1118,9 @@ namespace mongo {
                                       res)) {
                     errmsg = "move failed";
                     result.append( "cause" , res );
+                    if ( !res["code"].eoo() ) {
+                        result.append( res["code"] );
+                    }
                     return false;
                 }
 
@@ -1499,6 +1502,7 @@ namespace mongo {
 
                 if ( Strategy::useClusterWriteCommands ) {
 
+                    // Write commands always have the error stored in the mongos last error
                     if ( le->nPrev == 1 ) {
                         le->appendSelf( result );
                     }
@@ -1506,7 +1510,13 @@ namespace mongo {
                         result.appendNull( "err" );
                     }
 
-                    return ClientInfo::get()->enforceWriteConcern( dbName, cmdObj, &errmsg );
+                    bool wcResult = ClientInfo::get()->enforceWriteConcern( dbName,
+                                                                            cmdObj,
+                                                                            &errmsg );
+
+                    // Don't forget about our last hosts, reset the client info
+                    ClientInfo::get()->disableForCommand();
+                    return wcResult;
                 }
 
                 {

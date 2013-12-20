@@ -202,6 +202,24 @@ namespace mongo {
                   << startupWarningsLog;
         }
 #endif
+
+#ifdef _WIN32
+        ProcessInfo p;
+
+        if (p.hasNumaEnabled()) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: You are running on a NUMA machine."
+                << startupWarningsLog;
+            log() << "**          We suggest disabling NUMA in the machine BIOS " 
+                << startupWarningsLog;
+            log() << "**          by enabling interleaving to avoid performance problems. " 
+                << startupWarningsLog;
+            log() << "**          See your BIOS documentation for more information." 
+                << startupWarningsLog;
+            warned = true;
+        }
+#endif // #ifdef _WIN32
+
         if (warned) {
             log() << startupWarningsLog;
         }

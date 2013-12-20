@@ -30,7 +30,12 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/interrupt_status.h"
+#include "mongo/db/interrupt_status_mongod.h"
+#include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PipelineTests {
@@ -227,6 +232,82 @@ namespace PipelineTests {
         
     } // namespace FieldPath
 
+    namespace Optimizations {
+        using namespace mongo;
+
+        namespace Sharded {
+            class Base {
+            public:
+                // These all return json arrays of pipeline operators
+                virtual string inputPipeJson() = 0;
+                virtual string shardPipeJson() = 0;
+                virtual string mergePipeJson() = 0;
+
+                BSONObj pipelineFromJsonArray(const string& array) {
+                    return fromjson("{pipeline: " + array + "}");
+                }
+                virtual void run() {
+                    const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson());
+                    const BSONObj shardPipeExpected = pipelineFromJsonArray(shardPipeJson());
+                    const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson());
+
+                    intrusive_ptr<ExpressionContext> ctx =
+                        new ExpressionContext(InterruptStatusMongod::status,
+                                              NamespaceString("a.collection"));
+                    string errmsg;
+                    intrusive_ptr<Pipeline> mergePipe =
+                        Pipeline::parseCommand(errmsg, inputBson, ctx);
+                    ASSERT_EQUALS(errmsg, "");
+                    ASSERT(mergePipe != NULL);
+
+                    intrusive_ptr<Pipeline> shardPipe = mergePipe->splitForSharded();
+                    ASSERT(shardPipe != NULL);
+
+                    ASSERT_EQUALS(shardPipe->serialize()["pipeline"],
+                                  Value(shardPipeExpected["pipeline"]));
+                    ASSERT_EQUALS(mergePipe->serialize()["pipeline"],
+                                  Value(mergePipeExpected["pipeline"]));
+                }
+
+                virtual ~Base() {};
+            };
+
+            // General test to make sure all optimizations support empty pipelines
+            class Empty : public Base {
+                string inputPipeJson() { return "[]"; }
+                string shardPipeJson() { return "[]"; }
+                string mergePipeJson() { return "[]"; }
+            };
+
+            namespace moveFinalUnwindFromShardsToMerger {
+
+                class OneUnwind : public Base {
+                    string inputPipeJson() { return "[{$unwind: '$a'}]}"; }
+                    string shardPipeJson() { return "[]}"; }
+                    string mergePipeJson() { return "[{$unwind: '$a'}]}"; }
+                };
+
+                class TwoUnwind : public Base {
+                    string inputPipeJson() { return "[{$unwind: '$a'}, {$unwind: '$b'}]}"; }
+                    string shardPipeJson() { return "[]}"; }
+                    string mergePipeJson() { return "[{$unwind: '$a'}, {$unwind: '$b'}]}"; }
+                };
+
+                class UnwindNotFinal : public Base {
+                    string inputPipeJson() { return "[{$unwind: '$a'}, {$match: {a:1}}]}"; }
+                    string shardPipeJson() { return "[{$unwind: '$a'}, {$match: {a:1}}]}"; }
+                    string mergePipeJson() { return "[]}"; }
+                };
+
+                class UnwindWithOther : public Base {
+                    string inputPipeJson() { return "[{$match: {a:1}}, {$unwind: '$a'}]}"; }
+                    string shardPipeJson() { return "[{$match: {a:1}}]}"; }
+                    string mergePipeJson() { return "[{$unwind: '$a'}]}"; }
+                };
+            } // namespace moveFinalUnwindFromShardsToMerger
+        } // namespace Sharded
+    } // namespace Optimizations
+
     class All : public Suite {
     public:
         All() : Suite( "pipeline" ) {
@@ -251,6 +332,12 @@ namespace PipelineTests {
             add<FieldPath::VectorNullCharacter>();
             add<FieldPath::Tail>();
             add<FieldPath::TailThreeFields>();
+
+            add<Optimizations::Sharded::Empty>();
+            add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::OneUnwind>();
+            add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::TwoUnwind>();
+            add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindNotFinal>();
+            add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindWithOther>();
         }
     } myall;
     

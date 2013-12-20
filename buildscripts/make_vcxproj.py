@@ -3,11 +3,12 @@
 # howto:
 #   scons --clean
 #   scons <a_target> > out
-#   python buildscripts/make_vcxproj.py < out > out1 && cat buildscripts/vcxproj.header out1 > a_target.vcxproj
+#   python buildscripts/make_vcxproj.py TARGET < out > my.vcxproj
 #
-# note: the vcxproj.header file currently references "mongod.exe" explicitly rather than being generic.
-#       this will be changed soon but gets us started.  
-#       also, directory paths are such that it is assumed the vcxproj is in the top level project directory.
+#   where TARGET is your target e.g., "mongod"
+#
+#   note:
+#       directory paths are such that it is assumed the vcxproj is in the top level project directory.
 #       this is easy and likely to change...
 #
 

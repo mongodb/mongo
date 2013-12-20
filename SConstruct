@@ -753,7 +753,6 @@ elif windows:
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
-    # /WX abort build on compiler warnings
     env.Append(CCFLAGS=["/EHsc","/W3"])
 
     # some warnings we don't like:
@@ -770,6 +769,14 @@ elif windows:
     # 'conversion' conversion from 'type1' to 'type2', possible loss of data
     #  An integer type is converted to a smaller integer type.
     env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244"] )
+
+    # some warnings we should treat as errors:
+    # c4099
+    #  identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
+    #    This warning occurs when classes and structs are declared with a mix of struct and class
+    #    which can cause linker failures
+    env.Append( CCFLAGS=["/we4099"] )
+
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
     # this would be for pre-compiled headers, could play with it later  

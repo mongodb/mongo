@@ -64,21 +64,14 @@ namespace mongo {
                 Database* db = cc().database();
                 db->namespaceIndex().getNamespaces(collNames, /* onlyCollections */ true);
             }
-            {
-                boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
-                ReplSet::rss.indexRebuildDone = true;
-                ReplSet::rss.cond.notify_all();
-            }
             checkNS(collNames);
         }
         catch (const DBException&) {
             warning() << "index rebuilding did not complete" << endl;
-            {
-                boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
-                ReplSet::rss.indexRebuildDone = true;
-                ReplSet::rss.cond.notify_all();
-            }
         }
+        boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
+        ReplSet::rss.indexRebuildDone = true;
+        ReplSet::rss.cond.notify_all();
         LOG(1) << "checking complete" << endl;
     }
 

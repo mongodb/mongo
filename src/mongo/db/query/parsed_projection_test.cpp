@@ -134,6 +134,7 @@ namespace {
         assertInvalidProjection("{a: 1}", "{'a.$.$': 1}");
         assertInvalidProjection("{a: 1, b: 1, c: 1}", "{'abc.$': 1}");
         assertInvalidProjection("{$or: [{a: 1}, {$or: [{b: 1}, {c: 1}]}]}", "{'d.$': 1}");
+        assertInvalidProjection("{a: [1, 2, 3]}", "{'.$': 1}");
     }
 
     TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
@@ -151,6 +152,27 @@ namespace {
         createParsedProjection("{$or: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
         createParsedProjection("{$and: [{$or: [{a: 1}, {$and: [{b: 1}, {c: 1}]}]}]}",
                                "{'c.d.f.$': 1}");
+        // Fields with empty name can be projected using the positional $ operator.
+        createParsedProjection("{'': [1, 2, 3]}", "{'.$': 1}");
+    }
+
+    // Some match expressions (eg. $where) do not override MatchExpression::path()
+    // In this test case, we use an internal match expression implementation ALWAYS_FALSE
+    // to achieve the same effect.
+    // Projection parser should handle this the same way as an empty path.
+    TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression) {
+        auto_ptr<MatchExpression> queryMatchExpr(new FalseMatchExpression());
+        ASSERT(NULL == queryMatchExpr->path().rawData());
+
+        ParsedProjection* out = NULL;
+        BSONObj projObj = fromjson("{'a.$': 1}");
+        Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
+        ASSERT(!status.isOK());
+
+        // Projecting onto empty field should fail.
+        BSONObj emptyFieldProjObj = fromjson("{'.$': 1}");
+        status = ParsedProjection::make(emptyFieldProjObj, queryMatchExpr.get(), &out);
+        ASSERT(!status.isOK());
     }
 
 } // unnamed namespace

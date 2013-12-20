@@ -34,6 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/type_explain.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -96,9 +97,12 @@ namespace mongo {
         BSONObj obj;
         Runner::RunnerState state;
         while ((state = runner->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
-            // TODO SERVER-11831: consider using documentFromBsonWithDeps(obj, _dependencies)
-
-            _currentBatch.push_back(Document(obj));
+            if (_haveDeps && !_projectionInQuery) {
+                _currentBatch.push_back(documentFromBsonWithDeps(obj, _dependencies));
+            }
+            else {
+                _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
+            }
 
             if (_limit) {
                 if (++_docsAddedToBatches == _limit->getLimit()) {
@@ -156,37 +160,102 @@ namespace mongo {
         return false;
     }
 
+namespace {
+    Document extractInfo(ptr<const TypeExplain> info) {
+        MutableDocument out;
+
+        if (info->isClausesSet()) {
+            vector<Value> clauses;
+            for (size_t i = 0; i < info->sizeClauses(); i++) {
+                clauses.push_back(Value(extractInfo(info->getClausesAt(i))));
+            }
+            out[TypeExplain::clauses()] = Value::consume(clauses);
+        }
+
+        if (info->isCursorSet())
+            out[TypeExplain::cursor()] = Value(info->getCursor());
+
+        if (info->isIsMultiKeySet())
+            out[TypeExplain::isMultiKey()] = Value(info->isMultiKey());
+
+        if (info->isScanAndOrderSet())
+            out[TypeExplain::scanAndOrder()] = Value(info->getScanAndOrder());
+
+#if 0 // Disabled pending SERVER-12015 since until then no aggs will be index only.
+        if (info->isIndexOnlySet())
+            out[TypeExplain::indexOnly()] = Value(info->getIndexOnly());
+#endif
+
+        if (info->isIndexBoundsSet())
+            out[TypeExplain::indexBounds()] = Value(info->getIndexBounds());
+
+        if (info->isAllPlansSet()) {
+            vector<Value> allPlans;
+            for (size_t i = 0; i < info->sizeAllPlans(); i++) {
+                allPlans.push_back(Value(extractInfo(info->getAllPlansAt(i))));
+            }
+            out[TypeExplain::allPlans()] = Value::consume(allPlans);
+        }
+
+        return out.freeze();
+    }
+} // namespace
+
     Value DocumentSourceCursor::serialize(bool explain) const {
         // we never parse a documentSourceCursor, so we only serialize for explain
         if (!explain)
             return Value();
 
-        Lock::DBRead lk(_ns);
-        Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+        Status explainStatus(ErrorCodes::InternalError, "");
+        scoped_ptr<TypeExplain> plan;
+        {
+            Lock::DBRead lk(_ns);
+            Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
 
-        ClientCursorPin pin(_cursorId);
-        ClientCursor* cursor = pin.c();
+            ClientCursorPin pin(_cursorId);
+            ClientCursor* cursor = pin.c();
 
-        uassert(17135, "Cursor deleted. Was the collection or database dropped?",
-                cursor);
+            uassert(17135, "Cursor deleted. Was the collection or database dropped?",
+                    cursor);
 
-        Runner* runner = cursor->getRunner();
-        runner->restoreState();
+            Runner* runner = cursor->getRunner();
+            runner->restoreState();
 
-        return Value(DOC(getSourceName() <<
-            DOC("query" << Value(_query)
-             << "sort" << (!_sort.isEmpty() ? Value(_sort) : Value())
-             << "limit" << (_limit ? Value(_limit->getLimit()) : Value())
-             << "fields" << (!_projection.isEmpty() ? Value(_projection) : Value())
-             // << "indexOnly" << canUseCoveredIndex(cursor)
-             // << "cursorType" << cursor->c()->toString()
-        ))); // TODO get more plan information
+            TypeExplain* explainRaw;
+            explainStatus = runner->getExplainPlan(&explainRaw);
+            if (explainStatus.isOK())
+                plan.reset(explainRaw);
+
+            runner->saveState();
+        }
+
+        MutableDocument out;
+        out["query"] = Value(_query);
+
+        if (!_sort.isEmpty())
+            out["sort"] = Value(_sort);
+
+        if (_limit)
+            out["limit"] = Value(_limit->getLimit());
+
+        if (!_projection.isEmpty())
+            out["fields"] = Value(_projection);
+
+        if (explainStatus.isOK()) {
+            out["plan"] = Value(extractInfo(plan));
+        } else {
+            out["planError"] = Value(explainStatus.toString());
+        }
+
+
+        return out.freezeToValue();
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,
                                                CursorId cursorId,
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
+        , _haveDeps(false)
         , _docsAddedToBatches(0)
         , _ns(ns)
         , _cursorId(cursorId)
@@ -199,8 +268,13 @@ namespace mongo {
         return new DocumentSourceCursor(ns, cursorId, pExpCtx);
     }
 
-    void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
+    void DocumentSourceCursor::setProjection(
+            const BSONObj& projection,
+            const ParsedDeps& deps,
+            bool projectionInQuery) {
         _projection = projection;
         _dependencies = deps;
+        _projectionInQuery = projectionInQuery;
+        _haveDeps = true;
     }
 }

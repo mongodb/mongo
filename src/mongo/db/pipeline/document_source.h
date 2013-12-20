@@ -166,7 +166,7 @@ namespace mongo {
 
         /// Returns true if doesn't require an input source (most DocumentSources do).
         virtual bool isValidInitialSource() const { return false; }
-        
+
     protected:
         /**
            Base constructor.
@@ -403,7 +403,17 @@ namespace mongo {
          */
         void setSort(const BSONObj& sort) { _sort = sort; }
 
-        void setProjection(const BSONObj& projection, const ParsedDeps& deps);
+        /**
+         * Informs this object of projection and dependency information.
+         *
+         * @param projection A projection specification describing the fields needed by the rest of
+         *                   the pipeline.
+         * @param deps The output of DocumentSource::parseDeps.
+         * @param projectionInQuery True if the underlying cursor will handle the projection for us.
+         */
+        void setProjection(const BSONObj& projection,
+                           const ParsedDeps& deps,
+                           bool projectionInQuery);
 
         /// returns -1 for no limit
         long long getLimit() const;
@@ -422,7 +432,9 @@ namespace mongo {
         BSONObj _query;
         BSONObj _sort;
         BSONObj _projection;
+        bool _haveDeps;
         ParsedDeps _dependencies;
+        bool _projectionInQuery;
         intrusive_ptr<DocumentSourceLimit> _limit;
         long long _docsAddedToBatches; // for _limit enforcement
 
@@ -569,6 +581,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual Value serialize(bool explain = false) const;
+        virtual void setSource(DocumentSource* Source);
 
         /**
           Create a filter.
@@ -597,11 +610,15 @@ namespace mongo {
          */
         BSONObj redactSafePortion() const;
 
+        static bool isTextQuery(const BSONObj& query);
+        bool isTextQuery() const { return _isTextQuery; }
+
     private:
         DocumentSourceMatch(const BSONObj &query,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         scoped_ptr<Matcher> matcher;
+        bool _isTextQuery;
     };
 
     class DocumentSourceMergeCursors :
@@ -810,7 +827,7 @@ namespace mongo {
         void addKey(const string &fieldPath, bool ascending);
 
         /// Write out a Document whose contents are the sort key.
-        Document serializeSortKey() const;
+        Document serializeSortKey(bool explain) const;
 
         /**
           Create a sorting DocumentSource from BSON.
@@ -867,8 +884,8 @@ namespace mongo {
         void populateFromBsonArrays(const vector<BSONArray>& arrays);
 
         /* these two parallel each other */
-        typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
-        SortPaths vSortKey;
+        typedef vector<intrusive_ptr<Expression> > SortKey;
+        SortKey vSortKey;
         vector<char> vAscending; // used like vector<bool> but without specialization
 
         /// Extracts the fields in vSortKey from the Document;
@@ -1055,7 +1072,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual void setSource(DocumentSource *pSource); // errors out since this must be first
+        virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual bool isValidInitialSource() const { return true; }
         virtual Value serialize(bool explain = false) const;

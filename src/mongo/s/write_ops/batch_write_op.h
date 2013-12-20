@@ -46,7 +46,7 @@ namespace mongo {
     class TargetedWriteBatch;
     struct ShardError;
     class TrackedErrors;
-    class BatchWriteStats;
+    struct BatchWriteStats;
 
     /**
      * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
