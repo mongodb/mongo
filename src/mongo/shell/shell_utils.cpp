@@ -27,7 +27,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"
-#include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 namespace mongo {
 

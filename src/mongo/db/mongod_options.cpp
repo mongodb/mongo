@@ -44,6 +44,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 namespace mongo {
 

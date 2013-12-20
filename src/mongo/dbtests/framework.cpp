@@ -47,7 +47,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/file_allocator.h"
-#include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 namespace moe = mongo::optionenvironment;
 

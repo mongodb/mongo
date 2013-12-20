@@ -37,6 +37,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 namespace mongo {
 

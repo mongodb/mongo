@@ -55,6 +55,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 #if (__cplusplus >= 201103L)
 #include <mutex>

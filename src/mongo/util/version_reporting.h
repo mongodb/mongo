@@ -26,34 +26,31 @@
 *    then also delete it in the license file.
 */
 
-#ifndef UTIL_VERSION_HEADER
-#define UTIL_VERSION_HEADER
+#pragma once
 
 #include <string>
 
-#include "mongo/bson/bsonobj.h"
-
 namespace mongo {
-    struct BSONArray;
+    class BSONObjBuilder;
 
-    // mongo version
-    extern const char versionString[];
-    extern const BSONArray versionArray;
-    std::string mongodVersion();
-
-    // Convert a version string into a numeric array
-    BSONArray toVersionArray(const char* version);
-
-    // Checks whether another version is the same major version as us
-    bool isSameMajorVersion(const char* version);
+    void appendBuildInfo(BSONObjBuilder& result);
 
     const char * gitVersion();
     const char * compiledJSEngine();
     const char * allocator();
     const char * loaderFlags();
     const char * compilerFlags();
+
+    void printGitVersion();
+
+    const std::string openSSLVersion(const std::string &prefix = "", const std::string &suffix = "");
+    void printOpenSSLVersion();
+
     std::string sysInfo();
+    void printSysInfo();
+    void printTargetMinOS();
+    void printAllocator();
+
+    void show_warnings();
 
 }  // namespace mongo
-
-#endif  // UTIL_VERSION_HEADER
