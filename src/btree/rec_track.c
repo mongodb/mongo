@@ -312,6 +312,28 @@ __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_ovfl_onpage_discard --
+ *	Discard the page's list of onpage overflow records.
+ */
+void
+__wt_ovfl_onpage_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_ONPAGE *onpage;
+	WT_PAGE_MODIFY *mod;
+	void *next;
+
+	mod = page->modify;
+	if (mod == NULL || mod->ovfl_track == NULL)
+		return;
+
+	for (onpage = mod->ovfl_track->ovfl_onpage[0];
+	    onpage != NULL; onpage = next) {
+		next = onpage->next[0];
+		__wt_free(session, onpage);
+	}
+}
+
+/*
  * __ovfl_reuse_verbose --
  *	Dump information about a reuse overflow record.
  */
@@ -675,6 +697,28 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 }
 
 /*
+ * __wt_ovfl_reuse_discard --
+ *	Discard the page's list of overflow records tracked for reuse.
+ */
+void
+__wt_ovfl_reuse_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_REUSE *reuse;
+	WT_PAGE_MODIFY *mod;
+	void *next;
+
+	mod = page->modify;
+	if (mod == NULL || mod->ovfl_track == NULL)
+		return;
+
+	for (reuse = mod->ovfl_track->ovfl_reuse[0];
+	    reuse != NULL; reuse = next) {
+		next = reuse->next[0];
+		__wt_free(session, reuse);
+	}
+}
+
+/*
  * __ovfl_txnc_verbose --
  *	Dump information about a transaction-cached overflow record.
  */
@@ -948,6 +992,28 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 		WT_RET(__ovfl_txnc_verbose(session, page, txnc, "add"));
 
 	return (0);
+}
+
+/*
+ * __wt_ovfl_txnc_discard --
+ *	Discard the page's list of transaction-cached overflow records.
+ */
+void
+__wt_ovfl_txnc_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_TXNC *txnc;
+	WT_PAGE_MODIFY *mod;
+	void *next;
+
+	mod = page->modify;
+	if (mod == NULL || mod->ovfl_track == NULL)
+		return;
+
+	for (txnc = mod->ovfl_track->ovfl_txnc[0];
+	    txnc != NULL; txnc = next) {
+		next = txnc->next[0];
+		__wt_free(session, txnc);
+	}
 }
 
 /*

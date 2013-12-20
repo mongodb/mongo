@@ -387,6 +387,7 @@ extern int __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
+extern void __wt_ovfl_onpage_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint8_t **addrp,
@@ -399,6 +400,7 @@ extern int __wt_ovfl_reuse_add(WT_SESSION_IMPL *session,
     uint32_t addr_size,
     const void *value,
     uint32_t value_size);
+extern void __wt_ovfl_reuse_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_txnc_search( WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size,
@@ -409,6 +411,7 @@ extern int __wt_ovfl_txnc_add(WT_SESSION_IMPL *session,
     uint32_t addr_size,
     const void *value,
     size_t value_size);
+extern void __wt_ovfl_txnc_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write(WT_SESSION_IMPL *session,
