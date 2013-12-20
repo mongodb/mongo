@@ -1036,7 +1036,7 @@ extern int __wt_fallocate(WT_SESSION_IMPL *session,
     off_t offset,
     off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
-extern int __wt_filesize_name( WT_SESSION_IMPL *session,
+extern int __wt_filesize_name(WT_SESSION_IMPL *session,
     const char *filename,
     off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
@@ -1367,11 +1367,11 @@ extern int __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_absolute_path(const char *path);
 extern int __wt_filename(WT_SESSION_IMPL *session,
     const char *name,
-    const char **path);
-extern int __wt_nfilename(WT_SESSION_IMPL *session,
+    char **path);
+extern int __wt_nfilename( WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
-    const char **path);
+    char **path);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);

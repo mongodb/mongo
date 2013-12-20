@@ -402,7 +402,7 @@ static int
 __backup_file_create(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_DECL_RET;
-	const char *path;
+	char *path;
 
 	/* Open the hot backup file. */
 	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));

@@ -209,7 +209,7 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
 	FILE		*stat_fp;	/* Statistics log file handle */
-	const char	*stat_path;	/* Statistics log path format */
+	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */

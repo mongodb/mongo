@@ -12,14 +12,12 @@
  *	Fsync the directory in which we created the file.
  */
 static int
-__open_directory_sync(WT_SESSION_IMPL *session)
+__open_directory_sync(WT_SESSION_IMPL *session, char *path)
 {
 #ifdef __linux__
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	int fd;
-
-	conn = S2C(session);
+	char *dir;
 
 	/*
 	 * According to the Linux fsync man page:
@@ -31,18 +29,27 @@ __open_directory_sync(WT_SESSION_IMPL *session)
 	 * Open the WiredTiger home directory and sync it, I don't want the rest
 	 * of the system to have to wonder if opening a file creates it.
 	 */
+	if ((dir = strrchr(path, '/')) == NULL)
+		path = ".";
+	else
+		*dir = '\0';
 	WT_SYSCALL_RETRY(((fd =
-	    open(conn->home, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
+	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
+	if (dir != NULL)
+		*dir = '/';
 	if (ret != 0)
-		WT_RET_MSG(session, ret, "%s: open", conn->home);
+		WT_RET_MSG(session, ret, "%s: open", path);
+
 	WT_SYSCALL_RETRY(fsync(fd), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: fsync", conn->home);
+		WT_ERR_MSG(session, ret, "%s: fsync", path);
+
 err:	WT_SYSCALL_RETRY(close(fd), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: close", conn->home);
+		WT_ERR_MSG(session, ret, "%s: close", path);
 #else
 	WT_UNUSED(session);
+	WT_UNUSED(path);
 #endif
 	return (0);
 }
@@ -60,7 +67,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_FH *fh, *tfh;
 	mode_t mode;
 	int direct_io, f, fd, matched;
-	const char *path;
+	char *path;
 
 	conn = S2C(session);
 	fh = NULL;
@@ -155,7 +162,7 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__open_directory_sync(session));
+		WT_ERR(__open_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));

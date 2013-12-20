@@ -47,7 +47,7 @@ int
 __wt_remove(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_DECL_RET;
-	const char *path;
+	char *path;
 
 	WT_VERBOSE_RET(session, fileops, "%s: remove", name);
 

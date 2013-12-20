@@ -23,20 +23,20 @@ __wt_absolute_path(const char *path)
  *	length of the file name.
  */
 int
-__wt_filename(WT_SESSION_IMPL *session, const char *name, const char **path)
+__wt_filename(WT_SESSION_IMPL *session, const char *name, char **path)
 {
 	return (__wt_nfilename(session, name, strlen(name), path));
 }
 
 /*
  * __wt_nfilename --
- *	Build a file name in a scratch buffer. If the name is already an
+ *	Build a file name in a scratch buffer.  If the name is already an
  *	absolute path duplicate it, otherwise generate a path relative to the
  *	connection home directory.
  */
 int
-__wt_nfilename(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, const char **path)
+__wt_nfilename(
+    WT_SESSION_IMPL *session, const char *name, size_t namelen, char **path)
 {
 	WT_CONNECTION_IMPL *conn;
 	size_t len;
