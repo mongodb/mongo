@@ -265,10 +265,10 @@ namespace mongo {
         scoped_ptr<CanonicalQuery> cq(cqRaw);
 
         // Canonical query needs to be normalized before generating cache key.
-        normalizeQueryForCache(cq.get());
+        PlanCache::normalizeQueryForCache(cq.get());
 
         // Generate key
-        PlanCacheKey key = getPlanCacheKey(*cq);
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
         bob->append("key", key);
 
         return Status::OK();

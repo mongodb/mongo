@@ -159,6 +159,30 @@ namespace {
         }
     }
 
+    /**
+     * Encodes parsed projection into cache key.
+     * Does a simple toString() on each projected field
+     * in the BSON object.
+     * This handles all the special projection types ($meta, $elemMatch, etc.)
+     */
+    void encodePlanCacheKeyProj(const BSONObj& projObj, ostream* os) {
+        if (projObj.isEmpty()) {
+            return;
+        }
+
+        *os << "p";
+
+        BSONObjIterator it(projObj);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            // BSONElement::toString() arguments
+            // includeFieldName - skip field name (appending after toString() result). false.
+            // full: choose less verbose representation of child/data values. false.
+            *os << elt.toString(false, false);
+            *os << elt.fieldName();
+        }
+    }
+
 } // namespace
 
 namespace mongo {
@@ -167,7 +191,7 @@ namespace mongo {
     // Cache-related functions for CanonicalQuery
     //
 
-    bool shouldCacheQuery(const CanonicalQuery& query) {
+    bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
         const LiteParsedQuery& lpq = query.getParsed();
         const MatchExpression* expr = query.root();
 
@@ -199,7 +223,7 @@ namespace mongo {
     /**
      * For every non-leaf node, sorts child nodes by (MatchType, path name).
      */
-    void normalizeQueryForCache(CanonicalQuery* queryOut) {
+    void PlanCache::normalizeQueryForCache(CanonicalQuery* queryOut) {
         // Sorting is the only normalization for now.
         PlanCache::sortTree(queryOut->root());
     }
@@ -208,10 +232,11 @@ namespace mongo {
      * Cache key is a string-ified combination of the query and sort obfuscated
      * for minimal user comprehension.
      */
-    PlanCacheKey getPlanCacheKey(const CanonicalQuery& query) {
+    PlanCacheKey PlanCache::getPlanCacheKey(const CanonicalQuery& query) {
         stringstream ss;
         encodePlanCacheKeyTree(query.root(), &ss);
         encodePlanCacheKeySort(query.getParsed().getSort(), &ss);
+        encodePlanCacheKeyProj(query.getParsed().getProj(), &ss);
         PlanCacheKey key(ss.str());
         return key;
     }

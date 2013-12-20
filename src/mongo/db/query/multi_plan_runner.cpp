@@ -276,7 +276,7 @@ namespace mongo {
             Collection* collection = db->getCollection(_query->ns());
             verify(NULL != collection);
             PlanCache* cache = collection->infoCache()->getPlanCache();
-            cache->remove(getPlanCacheKey(*_query));
+            cache->remove(PlanCache::getPlanCacheKey(*_query));
 
             _bestPlan.reset(_backupPlan);
             _backupPlan = NULL;

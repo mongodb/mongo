@@ -100,7 +100,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey queryKey = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -124,7 +124,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey queryKey = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -225,7 +225,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey queryKey = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -285,8 +285,8 @@ namespace {
         auto_ptr<CanonicalQuery> cqB(cqRaw);
 
         // Generate 2 cache keys.
-        PlanCacheKey keyA = mongo::getPlanCacheKey(*cqA);
-        PlanCacheKey keyB = mongo::getPlanCacheKey(*cqB);
+        PlanCacheKey keyA = PlanCache::getPlanCacheKey(*cqA);
+        PlanCacheKey keyB = PlanCache::getPlanCacheKey(*cqB);
 
         // Create plan cache with 2 entries.
         PlanCache planCache;
@@ -382,7 +382,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey queryKey = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -404,7 +404,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey queryKey = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -457,7 +457,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey key = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -505,7 +505,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey key = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -558,7 +558,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey key = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -615,7 +615,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey key = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -638,7 +638,7 @@ namespace {
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
         // Generate a cache key
-        PlanCacheKey key = mongo::getPlanCacheKey(*cq);
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
 
         // Plan cache with one entry
         PlanCache planCache;

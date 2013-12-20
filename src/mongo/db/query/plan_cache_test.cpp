@@ -134,7 +134,7 @@ namespace {
      * in the planner cache.
      */
     void assertShouldCacheQuery(const CanonicalQuery& query) {
-        if (shouldCacheQuery(query)) {
+        if (PlanCache::shouldCacheQuery(query)) {
             return;
         }
         stringstream ss;
@@ -143,7 +143,7 @@ namespace {
     }
 
     void assertShouldNotCacheQuery(const CanonicalQuery& query) {
-        if (!shouldCacheQuery(query)) {
+        if (!PlanCache::shouldCacheQuery(query)) {
             return;
         }
         stringstream ss;
@@ -220,7 +220,7 @@ namespace {
 
     void testNormalizeQueryForCache(const char* queryStr, const char* expectedExprStr) {
         auto_ptr<CanonicalQuery> cq(canonicalize(queryStr));
-        normalizeQueryForCache(cq.get());
+        PlanCache::normalizeQueryForCache(cq.get());
         MatchExpression* me = cq->root();
         BSONObj expectedExprObj = fromjson(expectedExprStr);
         auto_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
@@ -264,9 +264,10 @@ namespace {
      * plan cache keys as opaque.
      */
     void testGetPlanCacheKey(const char* queryStr, const char* sortStr,
+                             const char* projStr,
                              const char *expectedStr) {
-        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr, sortStr, "{}"));
-        PlanCacheKey key = getPlanCacheKey(*cq);
+        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr, sortStr, projStr));
+        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
         PlanCacheKey expectedKey(expectedStr);
         if (key == expectedKey) {
             return;
@@ -280,12 +281,19 @@ namespace {
     TEST(PlanCacheTest, getPlanCacheKey) {
         // Generated cache keys should be treated as opaque to the user.
         // No sorts
-        testGetPlanCacheKey("{}", "{}", "an");
-        testGetPlanCacheKey("{$or: [{a: 1}, {b: 2}]}", "{}", "oreqaeqb");
+        testGetPlanCacheKey("{}", "{}", "{}", "an");
+        testGetPlanCacheKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "oreqaeqb");
         // With sort
-        testGetPlanCacheKey("{}", "{a: 1}", "anaa");
-        testGetPlanCacheKey("{}", "{a: -1}", "anda");
-        testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "anta");
+        testGetPlanCacheKey("{}", "{a: 1}", "{}", "anaa");
+        testGetPlanCacheKey("{}", "{a: -1}", "{}", "anda");
+        testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "{}", "anta");
+        // With projection
+        testGetPlanCacheKey("{}", "{}", "{a: 1}", "anp1a");
+        testGetPlanCacheKey("{}", "{}", "{a: 0}", "anp0a");
+        testGetPlanCacheKey("{}", "{}", "{a: 99}", "anp99a");
+        testGetPlanCacheKey("{}", "{}", "{a: 'foo'}", "anp\"foo\"a");
+        testGetPlanCacheKey("{}", "{}", "{a: {$slice: [3, 5]}}", "anp{ $slice: [ 3, 5 ] }a");
+        testGetPlanCacheKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "anp{ $elemMatch: { x: 2 } }a");
     }
 
     /**
