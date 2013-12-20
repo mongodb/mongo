@@ -59,11 +59,12 @@ namespace mongo {
     FieldRefSet::FieldRefSet() {
     }
 
-    void FieldRefSet::getConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {
+    bool FieldRefSet::findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {
+        bool foundConflict = false;
 
         // If the set is empty, there is no work to do.
         if (_fieldSet.empty())
-            return;
+            return foundConflict;
 
         StringData prefixStr = safeFirstPart(toCheck);
         FieldRef prefixField;
@@ -75,10 +76,16 @@ namespace mongo {
         while (it != _fieldSet.end() && safeFirstPart(*it) == prefixStr) {
             size_t common = (*it)->commonPrefixSize(*toCheck);
             if ((*it)->numParts() == common || toCheck->numParts() == common) {
+                if (!conflicts)
+                    return true;
+
                 conflicts->_fieldSet.insert(*it);
+                foundConflict = true;
             }
             ++it;
         }
+
+        return foundConflict;
     }
 
     void FieldRefSet::keepShortest(const FieldRef* toInsert) {

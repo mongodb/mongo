@@ -94,8 +94,10 @@ namespace mongo {
         /**
          * Find all inserted fields which conflict with the FieldRef 'toCheck' by the semantics
          * of 'insert', and add those fields to the 'conflicts' set.
+         *
+         * Return true if conflicts were found.
          */
-        void getConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
+        bool findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
 
         void clear() {
             _fieldSet.clear();

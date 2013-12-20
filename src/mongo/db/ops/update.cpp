@@ -266,19 +266,26 @@ namespace mongo {
                             return s;
                     }
                     // Check if the updated field conflicts with immutable fields
-                    immutableFieldRef.getConflicts(&current, &changedImmutableFields);
+                    immutableFieldRef.findConflicts(&current, &changedImmutableFields);
                 }
+            }
+
+            FieldRef idFR;
+            idFR.parse(idFieldName);
+            const bool idChanged = updatedFields.findConflicts(&idFR, NULL);
+
+            // Add _id to fields to check since it too is immutable
+            if (idChanged)
+                changedImmutableFields.keepShortest(&idFR);
+            else if (changedImmutableFields.empty()) {
+                // Return early if nothing changed which is immutable
+                return Status::OK();
             }
 
             LOG(4) << "Changed immutable fields: " << changedImmutableFields;
             // 2.) Now compare values of the changed immutable fields (to make sure they haven't)
 
             const mutablebson::ConstElement newIdElem = updated.root()[idFieldName];
-
-            // Add _id to fields to check since it too is immutable
-            FieldRef idFR;
-            idFR.parse(idFieldName);
-            changedImmutableFields.keepShortest(&idFR);
 
             FieldRefSet::const_iterator where = changedImmutableFields.begin();
             const FieldRefSet::const_iterator end = changedImmutableFields.end();
