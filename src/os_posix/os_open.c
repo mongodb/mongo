@@ -30,7 +30,7 @@ __open_directory_sync(WT_SESSION_IMPL *session, char *path)
 	 * of the system to have to wonder if opening a file creates it.
 	 */
 	if ((dir = strrchr(path, '/')) == NULL)
-		path = ".";
+		path = (char *)".";
 	else
 		*dir = '\0';
 	WT_SYSCALL_RETRY(((fd =
