@@ -686,7 +686,7 @@ __ckpt_update(
 	WT_RET(__wt_buf_init(session, &ckpt->raw, WT_BTREE_MAX_ADDR_COOKIE));
 	endp = ckpt->raw.mem;
 	WT_RET(__wt_block_ckpt_to_buffer(session, block, &endp, ci));
-	ckpt->raw.size = WT_PTRDIFF32(endp, ckpt->raw.mem);
+	ckpt->raw.size = WT_PTRDIFF(endp, ckpt->raw.mem);
 
 	if (WT_VERBOSE_ISSET(session, ckpt)) {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));

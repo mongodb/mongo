@@ -1134,9 +1134,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_EXTLIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
 	WT_EXTLIST_WRITE(p, 0);
 
-	dsk->u.datalen =
-	    WT_STORE_SIZE(WT_PTRDIFF32(p, WT_BLOCK_HEADER_BYTE(dsk)));
-	dsk->mem_size = WT_STORE_SIZE(tmp->size = WT_PTRDIFF32(p, dsk));
+	dsk->u.datalen = WT_PTRDIFF32(p, WT_BLOCK_HEADER_BYTE(dsk));
+	tmp->size = dsk->mem_size = WT_PTRDIFF32(p, dsk);
 
 #ifdef HAVE_DIAGNOSTIC
 	/*

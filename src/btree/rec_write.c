@@ -1001,7 +1001,7 @@ __rec_dict_replace(
 	if (dp->cell == NULL)
 		dp->cell = r->first_free;
 	else {
-		offset = WT_PTRDIFF32(r->first_free, dp->cell);
+		offset = WT_PTRDIFF(r->first_free, dp->cell);
 		val->len = val->cell_len =
 		   __wt_cell_pack_copy(&val->cell, rle, offset);
 		val->buf.data = NULL;

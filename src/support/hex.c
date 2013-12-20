@@ -40,7 +40,7 @@ __wt_raw_to_hex(
 	WT_RET(__wt_buf_init(session, to, len));
 
 	FILL_HEX(from, size, to->mem, len);
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }
 
@@ -97,7 +97,7 @@ __wt_raw_to_esc_hex(
 			*t++ = hex[*p & 0x0f];
 		}
 	*t++ = '\0';
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }
 
@@ -195,7 +195,7 @@ __wt_nhex_to_raw(
 		if (hex2byte(p, t))
 			return (__hex_fmterr(session));
 
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }
 
@@ -221,6 +221,6 @@ __wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 			++p;
 		}
 	}
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }
