@@ -43,7 +43,7 @@ namespace mongo {
     const BSONField<long long> BatchedCommandResponse::nDocsModified("nDocsModified", 0);
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
-    const BSONField<Date_t> BatchedCommandResponse::lastOp("lastOp");
+    const BSONField<OpTime> BatchedCommandResponse::lastOp("lastOp");
     const BSONField<std::vector<WriteErrorDetail*> >
         BatchedCommandResponse::writeErrors("writeErrors");
     const BSONField<BSONObj> BatchedCommandResponse::writeConcernError("writeConcernError");
@@ -176,8 +176,7 @@ namespace mongo {
         if ( fieldState == FieldParser::FIELD_INVALID ) return false;
         if ( fieldState == FieldParser::FIELD_SET ) _upsertDetails.reset( tempUpsertDetails );
 
-        fieldState = FieldParser::extract(source, lastOp, 
-                                          reinterpret_cast<Date_t*>(&_lastOp), errMsg);
+        fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isLastOpSet = fieldState == FieldParser::FIELD_SET;
 

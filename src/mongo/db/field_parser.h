@@ -87,6 +87,11 @@ namespace mongo {
                             string* errMsg = NULL);
 
         static FieldState extract(BSONObj doc,
+                            const BSONField<OpTime>& field,
+                            OpTime* out,
+                            string* errMsg = NULL);
+
+        static FieldState extract(BSONObj doc,
                             const BSONField<string>& field,
                             string* out,
                             string* errMsg = NULL);

@@ -60,7 +60,7 @@ namespace mongo {
         static const BSONField<long long> n;
         static const BSONField<long long> nDocsModified;
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
-        static const BSONField<Date_t> lastOp;
+        static const BSONField<OpTime> lastOp;
         static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
         static const BSONField<BSONObj> writeConcernError;
 

@@ -129,7 +129,32 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "date or timestamp", errMsg);
+        _genFieldErrMsg(doc, field, "date", errMsg);
+        return FIELD_INVALID;
+    }
+
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                              const BSONField<OpTime>& field,
+                              OpTime* out,
+                              string* errMsg)
+    {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if (elem.type() == Timestamp) {
+            *out = elem._opTime();
+            return FIELD_SET;
+        }
+
+        _genFieldErrMsg(doc, field, "timestamp", errMsg);
         return FIELD_INVALID;
     }
 
