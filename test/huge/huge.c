@@ -212,5 +212,7 @@ main(int argc, char *argv[])
 		}
 	}
 
+	(void)system("rm -rf WT_TEST && mkdir WT_TEST");
+
 	return (EXIT_SUCCESS);
 }
