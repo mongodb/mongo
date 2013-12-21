@@ -268,41 +268,39 @@ namespace mongo {
             }
             clearSinceLastGetError();
 
-            LOG(4) << "checking " << writebacks.size() << " writebacks for"
-                   << " gle (" << theShard << ")" << endl;
+            // We never need to handle writebacks if we're coming from the wbl itself
+            if ( writebacks.size() && !fromWriteBackListener ){
 
-            if ( writebacks.size() ){
-                vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
-                if ( v.size() == 0 && fromWriteBackListener ) {
-                    // ok
+                LOG(4) << "checking " << writebacks.size() << " writebacks for"
+                       << " gle (" << theShard << ")" << endl;
+
+                vector<BSONObj> v = _handleWriteBacks( writebacks , false );
+
+                // this will usually be 1
+                // it can be greater than 1 if a write to a different shard
+                // than the last write op had a writeback
+                // all we're going to report is the first
+                // since that's the current write
+                // but we block for all
+                verify( v.size() >= 1 );
+
+                if ( res["writebackSince"].numberInt() > 0 ) {
+                    // got writeback from older op
+                    // ignore the result from it, just needed to wait
+                    result.appendElements( res );
+                }
+                else if ( writebacks[0].fromLastOperation ) {
+                    result.appendElements( v[0] );
+                    result.appendElementsUnique( res );
+                    result.append( "writebackGLE" , v[0] );
+                    result.append( "initialGLEHost" , theShard );
+                    result.append( "initialGLE", res );
                 }
                 else {
-                    // this will usually be 1
-                    // it can be greater than 1 if a write to a different shard
-                    // than the last write op had a writeback
-                    // all we're going to report is the first
-                    // since that's the current write
-                    // but we block for all
-                    verify( v.size() >= 1 );
-
-                    if ( res["writebackSince"].numberInt() > 0 ) {
-                        // got writeback from older op
-                        // ignore the result from it, just needed to wait
-                        result.appendElements( res );
-                    }
-                    else if ( writebacks[0].fromLastOperation ) {
-                        result.appendElements( v[0] );
-                        result.appendElementsUnique( res );
-                        result.append( "writebackGLE" , v[0] );
-                        result.append( "initialGLEHost" , theShard );
-                        result.append( "initialGLE", res );
-                    }
-                    else {
-                        // there was a writeback
-                        // but its from an old operations
-                        // so all that's important is that we block, not that we return stats
-                        result.appendElements( res );
-                    }
+                    // there was a writeback
+                    // but its from an old operations
+                    // so all that's important is that we block, not that we return stats
+                    result.appendElements( res );
                 }
             }
             else {
@@ -405,6 +403,10 @@ namespace mongo {
 
         LOG(4) << "checking " << writebacks.size() << " writebacks for"
                 << " gle (" << shards->size() << " shards)" << endl;
+
+        // Multi-shard results from the writeback listener implicitly means that:
+        // A) no versioning was used (multi-update/delete)
+        // B) internal GLE was used (bulk insert)
 
         if ( errors.size() == 0 ) {
             result.appendNull( "err" );
