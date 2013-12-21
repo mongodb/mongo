@@ -24,6 +24,36 @@
 namespace mongo {
     namespace fts {
 
+        const BSONObj makeFixedSpec( int textIndexVersion ) {
+            return BSON( "v" << 1 <<
+                         "key" << BSON( "_fts" << "text" <<
+                                        "_ftsx" << 1 ) <<
+                         "name" << "a_text" <<
+                         "ns" << "test.foo" <<
+                         "weights" << BSON( "a" << 1 ) <<
+                         "default_language" << "english" <<
+                         "language_override" << "language" <<
+                         "textIndexVersion" << textIndexVersion );
+        }
+
+        TEST( FTSSpec, TextIndexVersionCheck1 ) {
+            const int currentVersion = 1;
+            const int unsupportedVersion = 2;
+
+            // Constructing an FTSSpec with the current textIndexVersion should succeed.
+            BSONObj validTextSpec = makeFixedSpec( currentVersion );
+            try {
+                FTSSpec spec( validTextSpec );
+            }
+            catch ( UserException& e ) {
+                ASSERT( false );
+            }
+
+            // Constructing an FTSSpec with an unsupported textIndexVersion should fail.
+            BSONObj invalidTextSpec = makeFixedSpec( unsupportedVersion );
+            ASSERT_THROWS( FTSSpec spec( invalidTextSpec ), UserException );
+        }
+
         TEST( FTSSpec, Fix1 ) {
             BSONObj user = BSON( "key" << BSON( "title" << "fts" <<
                                                 "text" << "fts" ) <<

@@ -30,10 +30,25 @@ namespace mongo {
 
         const double MAX_WEIGHT = 1000000000.0;
         const double MAX_WORD_WEIGHT = MAX_WEIGHT / 10000;
+        const int TEXT_INDEX_VERSION = 1;
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
-            massert( 16739, "found invalid spec for text index",
+            // indexInfo is a text index spec.  Text index specs pass through fixSpec() before
+            // being saved to the system.indexes collection.  fixSpec() enforces a schema, such that
+            // required fields must exist and be of the correct type (e.g. weights,
+            // textIndexVersion).
+            massert( 16739,
+                     "found invalid spec for text index, expected object for weights",
                      indexInfo["weights"].isABSONObj() );
+            BSONElement textIndexVersionElt = indexInfo["textIndexVersion"];
+            massert( 17287,
+                     "found invalid spec for text index, expected number for textIndexVersion",
+                     textIndexVersionElt.isNumber() );
+            massert( 17288,
+                     str::stream() << "attempt to use unsupported textIndexVersion " <<
+                         textIndexVersionElt.numberInt() << ", only textIndexVersion " <<
+                         TEXT_INDEX_VERSION << " supported",
+                     textIndexVersionElt.numberInt() == TEXT_INDEX_VERSION );
 
             _defaultLanguage = indexInfo["default_language"].valuestrsafe();
             _languageOverrideField = indexInfo["language_override"].valuestrsafe();
@@ -357,7 +372,7 @@ namespace mongo {
                 language_override = "language";
 
             int version = -1;
-            int textIndexVersion = 1;
+            int textIndexVersion = TEXT_INDEX_VERSION;
 
             BSONObjBuilder b;
             BSONObjIterator i( spec );
@@ -385,7 +400,7 @@ namespace mongo {
                     textIndexVersion = e.numberInt();
                     uassert( 16730,
                              str::stream() << "bad textIndexVersion: " << textIndexVersion,
-                             textIndexVersion == 1 );
+                             textIndexVersion == TEXT_INDEX_VERSION );
                 }
                 else {
                     b.append( e );
