@@ -82,9 +82,9 @@ namespace mongo {
                     continue;
                 }
                 if (!idx[secondsExpireField].isNumber()) {
-                    log() << "ttl indexes require the " << secondsExpireField << " field to be "
+                    error() << "ttl indexes require the " << secondsExpireField << " field to be "
                           << "numeric but received a type of: "
-                          << typeName(idx[secondsExpireField].type());
+                          << typeName(idx[secondsExpireField].type()) << endl;
                     continue;
                 }
 
