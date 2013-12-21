@@ -27,7 +27,9 @@ checkDedup({$or: [{a:{$gte:0,$lte:2},b:{$gte:0,$lte:2}},
 
 // Deduping multikey
 t.drop();
-t.ensureIndex({a: 1, b: 1});
 t.save({_id: 1, a: [1, 2, 3], b: [4, 5, 6]});
 t.save({_id: 2, a: [1, 2, 3], b: [4, 5, 6]});
+assert.eq( 2, t.count() );
+checkDedup({$or: [{a: {$in: [1, 2]}}, {b: {$in: [4, 5]}}]}, [1, 2]);
+t.ensureIndex( { a : 1 } );
 checkDedup({$or: [{a: {$in: [1, 2]}}, {b: {$in: [4, 5]}}]}, [1, 2]);
