@@ -1,6 +1,6 @@
 // don't allow regex as _id: SERVER-9502
 
-function assertNotOkForStorage(gleCmd) {
+function assertNotOkForStorage() {
     var gle = master.getDB("test").runCommand({getLastError : 1, w : 2, wtimeout : 60000});
     failed = gle.code > 0;
     assert(failed, tojson(gle));
@@ -16,10 +16,8 @@ var gle = master.getDB("test").runCommand({getLastError : 1, w : 2, wtimeout : 6
 assert(gle.err === null);
 
 mdb.foo.insert({ _id: /^A/ });
-assertNotOkForStorage(master.getDB("test").runCommand({getLastError : 1, w : 2, wtimeout : 60000}));
 assertNotOkForStorage();
 
 // _id doesn't have to be first; still disallowed
 mdb.foo.insert({ xxx: "ABCDEF", _id: /ABCDEF/ });
-assertNotOkForStorage(master.getDB("test").runCommand({getLastError : 1, w : 2, wtimeout : 60000}));
 assertNotOkForStorage();
