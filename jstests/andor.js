@@ -102,4 +102,5 @@ t.drop();
 t.ensureIndex( {a:1} );
 var e = t.find( {$and:[{a:1}]} ).explain();
 // nested non singleton $or clauses currently ignored for indexing
-assert.eq( e.indexBounds, t.find( {$and:[{a:1,$or:[{a:2},{a:3}]}]} ).explain().indexBounds );
+// QUERY_MIGRATION: no particular plan is better than any other plan
+// assert.eq( e.indexBounds, t.find( {$and:[{a:1,$or:[{a:2},{a:3}]}]} ).explain().indexBounds );
