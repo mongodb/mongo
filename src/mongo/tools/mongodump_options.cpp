@@ -72,6 +72,19 @@ namespace mongo {
         options->addOptionChaining("forceTableScan", "forceTableScan", moe::Switch,
                 "force a table scan (do not use $snapshot)");
 
+        options->addOptionChaining("listExtents", "listExtents", moe::Switch,
+                "list extents for given db collection").requires("dbpath")
+                                  .requires("collection").requires("db").hidden();
+
+        options->addOptionChaining("dumpExtent", "dumpExtent", moe::Switch,
+                "dump one extent specified by --diskLoc fn:offset")
+                                  .requires("diskLoc").requires("dbpath")
+                                  .requires("collection").requires("db").hidden();
+
+        options->addOptionChaining("diskLoc", "diskLoc", moe::String,
+                "extent diskLoc formatted as: 'fn:offset'")
+                                  .format("[0-9]+:[0-9a-fA-F]+", "[file]:[hex offset]")
+                                  .requires("dbpath").requires("dumpExtent").hidden();
 
         return Status::OK();
     }
@@ -123,6 +136,9 @@ namespace mongo {
         if (!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) {
             mongoDumpGlobalParams.snapShotQuery = true;
         }
+        mongoDumpGlobalParams.listExtents = hasParam("listExtents");
+        mongoDumpGlobalParams.dumpExtent = hasParam("dumpExtent");
+        mongoDumpGlobalParams.diskLoc = getParam("diskLoc");
 
         // Make the default db "" if it was not explicitly set
         if (!params.count("db")) {

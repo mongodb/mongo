@@ -43,6 +43,9 @@ namespace mongo {
         bool useOplog;
         bool repair;
         bool snapShotQuery;
+        bool listExtents;
+        bool dumpExtent;
+        std::string diskLoc;
     };
 
     extern MongoDumpGlobalParams mongoDumpGlobalParams;

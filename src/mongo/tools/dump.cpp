@@ -238,11 +238,145 @@ public:
 
     }
 
+    /**
+    * List all extents for a collection in the format 'diskLoc,size', e.g. '4:d587000,20480'
+    * Default file location is 'dump/dbName/collName.extents', e.g. 'dump/test/foo.extents'
+    * mongodump --dbpath /data/db/ -d test -c foo --listExtents
+    */
+    int listExtents() {
+        string ns = getNS();
+        toolInfoLog() << "listing extents for namespace: " << ns << endl;
+        Client::ReadContext cx(ns);
+        const NamespaceDetails* nsd = nsdetails(ns);
+        if (!nsd) {
+            toolError() << "error creating namespace"  << endl;
+            return -1;
+        }
+        Database* db = cx.ctx().db();
+        ExtentManager& em = db->getExtentManager();
+        DiskLoc extentLoc = nsd->firstExtent();
+        if (extentLoc.isNull()) {
+            toolError() << "first extent in NULL" << endl;
+            return -1;
+        }
+        if (!extentLoc.isValid()) {
+            toolError() << "first extent not valid" << endl;
+            return -1;
+        }
+
+        boost::filesystem::path root = mongoDumpGlobalParams.outputDirectory;
+        root /= toolGlobalParams.db;
+        boost::filesystem::create_directories(root);
+        root /= toolGlobalParams.coll + ".extents";
+
+        // check if we're outputting to stdout
+        FilePtr out((mongoDumpGlobalParams.outputDirectory == "-") ?
+                    stdout : fopen(root.c_str(), "wb"));
+
+        Extent* extent = em.getExtent(extentLoc);
+        while (extent != NULL) {
+            extentLoc = extent->myLoc;
+            if (extentLoc.isNull()) {
+                toolError() << "extent is NULL" << endl;
+                return -1;
+            }
+            if (!extentLoc.isValid()) {
+                toolError() << extentLoc << ": extent not valid" << endl;
+                return -1;
+            }
+            fprintf(out, "%s,%d\n", extentLoc.toString().c_str(), extent->length);
+            extent = em.getNextExtent(extent);
+        }
+        return 0;
+    }
+
+    /**
+    * Dump all documents for a single extent to a BSON file or stdout.
+    * Default file location is 'dump/dbName/collName-fileNum-offset.bson', e.g. 'dump/test/foo-4-2400.bson'
+    * mongodump --dbpath /data/db/ -d test -c foo --dumpExtent --diskLoc 4:d587000
+    */
+    int dumpExtent() {
+
+        string::size_type n = mongoDumpGlobalParams.diskLoc.find(':');
+        if (n == string::npos) {
+            toolError() << "expecting 'fn:offset' as value for extent DiskLoc." << endl;
+            return -1;
+        }
+        toolInfoLog() << "dumping BSON objects from extent: " << mongoDumpGlobalParams.diskLoc;
+        uint32_t fn  = strtoul(mongoDumpGlobalParams.diskLoc.c_str(), NULL, 10);
+        uint32_t ofs = strtoul(mongoDumpGlobalParams.diskLoc.c_str() + n + 1, NULL, 16);
+        DiskLoc extentLoc(fn, ofs);
+
+        // set up the file name and directory for the output file
+        boost::filesystem::path root = mongoDumpGlobalParams.outputDirectory;
+        root /= toolGlobalParams.db;
+        boost::filesystem::create_directories(root);
+        string fname = mongoDumpGlobalParams.diskLoc;
+        replace(fname.begin(), fname.end(), ':', '-');
+        root /= toolGlobalParams.coll + "-" + fname + ".bson";
+
+        // check if we're outputting to stdout
+        FilePtr out ((mongoDumpGlobalParams.outputDirectory == "-") ?
+                     stdout : fopen(root.c_str(), "wb"));
+        string ns = getNS();
+        Client::ReadContext cx( ns );
+        Database* db = cx.ctx().db();
+
+        return _dumpExtent(db, extentLoc, out);
+     }
+
+
+    int _dumpExtent(Database* db, DiskLoc extentLoc, FILE* out) {
+
+        if (extentLoc.getOfs() <= 0) {
+            toolError() << "invalid extent offset: " << extentLoc.getOfs() << endl;
+            return -1;
+        }
+
+        Extent* e = db->getExtentManager().getExtent(extentLoc, false);
+        if (!e->isOk()) {
+            toolError() << "Extent not ok, magic: " << e->magic << endl;
+            return -1;
+        }
+
+        set<DiskLoc> seen;
+        DiskLoc loc = e->firstRecord;
+
+        Writer writer(out, NULL);
+        while (!loc.isNull()) {
+            if (!seen.insert(loc).second) {
+                toolError() << "infinite loop in extent, seen: " << loc << " before" << endl;
+                return -1;
+            }
+            if (loc.getOfs() <= 0) {
+                toolError() << "offset is 0 for record which should be impossible" << endl;
+                return -1;
+            }
+
+            Record* rec = loc.rec();
+            BSONObj obj;
+            try {
+                obj = loc.obj();
+                verify(obj.valid());
+                writer(obj);
+            }
+            catch (std::exception& e) {
+                toolError() << "found invalid document @ " << loc << " " << e.what() << endl;
+                return -1;
+            }
+            loc = rec->getNext(loc);
+
+            // break when new loc is outside current extent boundary
+            if (loc.compare(e->lastRecord) > 0) break;
+        }
+        return 0;
+    }
+
     int repair() {
         toolInfoLog() << "going to try and recover data from: " << toolGlobalParams.db << std::endl;
         return _repair(toolGlobalParams.db);
     }
-    
+
     DiskLoc _repairExtent( Database* db , string ns, bool forward , DiskLoc eLoc , Writer& w ){
         LogIndentLevel lil;
         
@@ -315,10 +449,6 @@ public:
         return forward ? e->xnext : e->xprev;
     }
 
-    /*
-     * NOTE: The "outfile" parameter passed in should actually represent a directory, but it is
-     * called "outfile" because we append the filename and use it as our output file.
-     */
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
         Collection* collection = db->getCollection( ns );
         const NamespaceDetails * nsd = collection->details();
@@ -421,6 +551,14 @@ public:
     int run() {
         if (mongoDumpGlobalParams.repair){
             return repair();
+        }
+
+        if (mongoDumpGlobalParams.listExtents) {
+            return listExtents();
+        }
+
+        if (mongoDumpGlobalParams.dumpExtent) {
+            return dumpExtent();
         }
 
         {
