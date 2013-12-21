@@ -36,6 +36,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/pagefault.h"
@@ -503,7 +504,16 @@ namespace mongo {
                 }
             }
 
-            StatusWith<DiskLoc> status = collection->insertDocument( insertOp, true );
+            StatusWith<BSONObj> fixed = fixDocumentForInsert( insertOp );
+            if ( !fixed.isOK() ) {
+                error->setErrMessage( fixed.getStatus().toString() );
+                error->setErrCode( fixed.getStatus().code() );
+                return false;
+            }
+
+            const BSONObj& toInsert = fixed.getValue().isEmpty() ? insertOp : fixed.getValue();
+
+            StatusWith<DiskLoc> status = collection->insertDocument( toInsert, true );
             logOp( "i", ns.c_str(), insertOp );
             getDur().commitIfNeeded();
             if ( !status.isOK() ) {

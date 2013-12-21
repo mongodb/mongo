@@ -141,10 +141,12 @@ namespace mongo {
             for ( size_t i = 0; i < docsToInsert.size(); i++ ) {
                 StatusWith<BSONObj> fixed = fixDocumentForInsert( docsToInsert[i] );
                 if ( !fixed.isOK() ) {
-                    return appendCommandStatus( result, fixed.getStatus() );
-                }
-                if ( fixed.getValue().isEmpty() )
+                    // we don't return early since each doc can be handled independantly
                     continue;
+                }
+                if ( fixed.getValue().isEmpty() ) {
+                    continue;
+                }
                 docsToInsert[i] = fixed.getValue();
             }
         }
