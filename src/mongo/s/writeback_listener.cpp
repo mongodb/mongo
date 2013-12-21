@@ -344,6 +344,9 @@ namespace mongo {
                                 gle = b.obj();
                             }
 
+                            dassert( !gle.isEmpty() );
+                            verify( !gle.isEmpty() );
+
                             if ( gle["code"].numberInt() == 9517 ) {
 
                                 log() << "new version change detected, "
