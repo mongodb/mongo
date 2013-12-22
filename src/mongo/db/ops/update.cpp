@@ -509,7 +509,8 @@ namespace mongo {
         opDebug->nscanned = 0;
         opDebug->nDocsModified = 0;
 
-        mutablebson::Document doc;
+        // Get the cached document from the update driver.
+        mutablebson::Document& doc = driver->getDocument();
         mutablebson::DamageVector damages;
 
         // Used during iteration of docs

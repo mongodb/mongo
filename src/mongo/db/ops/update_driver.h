@@ -124,6 +124,14 @@ namespace mongo {
         ModifierInterface::ExecInfo::UpdateContext context() const;
         void setContext(ModifierInterface::ExecInfo::UpdateContext context);
 
+        mutablebson::Document& getDocument() {
+            return _objDoc;
+        }
+
+        const mutablebson::Document& getDocument() const {
+            return _objDoc;
+        }
+
     private:
 
         /** Resets the state of the class associated with mods (not the error state) */
@@ -172,6 +180,10 @@ namespace mongo {
         // Is this update going to be an upsert?
         ModifierInterface::ExecInfo::UpdateContext _context;
 
+        // The document used to represent or store the object being updated.
+        mutablebson::Document _objDoc;
+
+        // The document used to build the oplog entry for the update.
         mutablebson::Document _logDoc;
     };
 
