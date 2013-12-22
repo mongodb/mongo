@@ -144,7 +144,7 @@ struct __wt_cell_unpack {
 	const void *data;		/* Data */
 	uint32_t    size;		/* Data size */
 
-	uint32_t __len;			/* Cell + data length (usually) */
+	size_t __len;			/* Cell + data length (usually) */
 
 	uint8_t prefix;			/* Cell prefix length */
 
@@ -417,7 +417,7 @@ __wt_cell_rle(WT_CELL_UNPACK *unpack)
  * __wt_cell_total_len --
  *	Return the cell's total length, including data.
  */
-static inline uint32_t
+static inline size_t
 __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 {
 	/*
@@ -489,11 +489,10 @@ __wt_cell_type_raw(WT_CELL *cell)
 static inline int
 __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
-	uint64_t v;
-	const uint8_t *p;
-	uint32_t saved_len;
-	uint64_t saved_v;
+	size_t saved_len;
+	uint64_t saved_v, v;
 	int copied;
+	const uint8_t *p;
 
 	copied = 0;
 	saved_len = 0;
@@ -612,11 +611,11 @@ restart:
 
 		unpack->data = p;
 		unpack->size = WT_STORE_SIZE(v);
-		unpack->__len = WT_PTRDIFF32(p + unpack->size, cell);
+		unpack->__len = WT_PTRDIFF(p + unpack->size, cell);
 		break;
 
 	case WT_CELL_DEL:
-		unpack->__len = WT_PTRDIFF32(p, cell);
+		unpack->__len = WT_PTRDIFF(p, cell);
 		break;
 	default:
 		return (WT_ERROR);			/* Unknown cell type. */
