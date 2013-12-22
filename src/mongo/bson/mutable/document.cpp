@@ -549,8 +549,14 @@ namespace mutablebson {
             , _damages()
             , _inPlaceMode(inPlaceMode) {
 
-            // We always have a BSONObj for the leaves, so reserve one.
-            _objects.reserve(1);
+            // We always have a BSONObj for the leaves, and we often have
+            // one for our base document, so reserve 2.
+            _objects.reserve(2);
+
+            // We always have at least one byte for the root field name, and we would like
+            // to be able to hold a few short field names without reallocation.
+            _fieldNames.reserve(8);
+
             // We need an object at _objects[0] so that we can access leaf elements we
             // construct with the leaf builder in the same way we access elements serialized in
             // other BSONObjs. So we call asTempObj on the builder and store the result in slot
