@@ -35,8 +35,14 @@
 
 namespace mongo {
 
-    void FieldRef::parse(const StringData& dottedField) {
-        if (dottedField.size() == 0) {
+    FieldRef::FieldRef() : _size(0) {}
+
+    FieldRef::FieldRef(const StringData& path) : _size(0) {
+        parse(path);
+    }
+
+    void FieldRef::parse(const StringData& path) {
+        if (path.size() == 0) {
             return;
         }
 
@@ -47,7 +53,7 @@ namespace mongo {
         // We guarantee that accesses through getPart() will be valid while 'this' is. So we
         // keep a copy in a local sting.
 
-        _dotted = dottedField.toString();
+        _dotted = path.toString();
 
         // Separate the field parts using '.' as a delimiter.
         std::string::iterator beg = _dotted.begin();

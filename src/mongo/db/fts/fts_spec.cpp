@@ -432,8 +432,7 @@ namespace mongo {
                     if ( str::equals( e.fieldName(), "$**" ) ) {
                         continue;
                     }
-                    FieldRef keyField;
-                    keyField.parse( e.fieldName() );
+                    FieldRef keyField( e.fieldName() );
                     uassert( 17294,
                              "weight cannot be on an empty field",
                              keyField.numParts() != 0 );

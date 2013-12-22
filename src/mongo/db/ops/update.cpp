@@ -60,6 +60,7 @@ namespace mongo {
     namespace {
 
         const char idFieldName[] = "_id";
+        const FieldRef idFieldRef(idFieldName);
 
         // TODO: Make this a function on NamespaceString, or make it cleaner.
         inline void validateUpdate(const char* ns ,
@@ -270,13 +271,11 @@ namespace mongo {
                 }
             }
 
-            FieldRef idFR;
-            idFR.parse(idFieldName);
-            const bool idChanged = updatedFields.findConflicts(&idFR, NULL);
+            const bool idChanged = updatedFields.findConflicts(&idFieldRef, NULL);
 
             // Add _id to fields to check since it too is immutable
             if (idChanged)
-                changedImmutableFields.keepShortest(&idFR);
+                changedImmutableFields.keepShortest(&idFieldRef);
             else if (changedImmutableFields.empty()) {
                 // Return early if nothing changed which is immutable
                 return Status::OK();

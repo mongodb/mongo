@@ -27,21 +27,18 @@ namespace {
     TEST(EmptySet, Normal) {
         // insert "b"
         FieldRefSet fieldSet;
-        FieldRef bSimple;
-        bSimple.parse("b");
+        FieldRef bSimple("b");
         const FieldRef* conflict;
         ASSERT_TRUE(fieldSet.insert(&bSimple, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "a", OK
-        FieldRef aSimple;
-        aSimple.parse("a");
+        FieldRef aSimple("a");
         ASSERT_TRUE(fieldSet.insert(&aSimple, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "c", OK
-        FieldRef cSimple;
-        cSimple.parse("c");
+        FieldRef cSimple("c");
         ASSERT_TRUE(fieldSet.insert(&cSimple, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
     }
@@ -49,21 +46,18 @@ namespace {
     TEST(EmptySet, Conflict) {
         // insert "a.b"
         FieldRefSet fieldSet;
-        FieldRef aDotB;
-        aDotB.parse("a.b");
+        FieldRef aDotB("a.b");
         const FieldRef* conflict;
         ASSERT_TRUE(fieldSet.insert(&aDotB, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "a", conflicts with "a.b"
-        FieldRef prefix;
-        prefix.parse("a");
+        FieldRef prefix("a");
         ASSERT_FALSE(fieldSet.insert(&prefix, &conflict));
         ASSERT_EQUALS(aDotB, *conflict);
 
         // insert "a.b.c", conflicts with "a.b"
-        FieldRef superSet;
-        superSet.parse("a.b.c");
+        FieldRef superSet("a.b.c");
         ASSERT_FALSE(fieldSet.insert(&superSet, &conflict));
         ASSERT_EQUALS(aDotB, *conflict);
     }
@@ -84,10 +78,8 @@ namespace {
     TEST(NotEmptySet, Normal) {
         // insert "b.c" and "b.e"
         FieldRefSet fieldSet;
-        FieldRef bDotC;
-        bDotC.parse("b.c");
-        FieldRef bDotE;
-        bDotE.parse("b.e");
+        FieldRef bDotC("b.c");
+        FieldRef bDotE("b.e");
         const FieldRef* conflict;
         ASSERT_TRUE(fieldSet.insert(&bDotC, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
@@ -95,20 +87,17 @@ namespace {
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "a" before, OK
-        FieldRef aSimple;
-        aSimple.parse("a");
+        FieldRef aSimple("a");
         ASSERT_TRUE(fieldSet.insert(&aSimple, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "b.d" in the middle, OK
-        FieldRef bDotD;
-        bDotD.parse("b.d");
+        FieldRef bDotD("b.d");
         ASSERT_TRUE(fieldSet.insert(&bDotD, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "c" after, OK
-        FieldRef cSimple;
-        cSimple.parse("c");
+        FieldRef cSimple("c");
         ASSERT_TRUE(fieldSet.insert(&cSimple, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
     }
@@ -116,10 +105,8 @@ namespace {
     TEST(NotEmpty, Conflict) {
        // insert "b.c" and "b.e"
         FieldRefSet fieldSet;
-        FieldRef bDotC;
-        bDotC.parse("b.c");
-        FieldRef bDotE;
-        bDotE.parse("b.e");
+        FieldRef bDotC("b.c");
+        FieldRef bDotE("b.e");
         const FieldRef* conflict;
         ASSERT_TRUE(fieldSet.insert(&bDotC, &conflict));
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
@@ -127,20 +114,17 @@ namespace {
         ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
 
         // insert "b" before, conflicts "b.c"
-        FieldRef bSimple;
-        bSimple.parse("b");
+        FieldRef bSimple("b");
         ASSERT_FALSE(fieldSet.insert(&bSimple, &conflict));
         ASSERT_EQUALS(bDotC, *conflict);
 
         // insert: "b.c.d" in the "middle", conflicts "b.c"
-        FieldRef bDotCDotD;
-        bDotCDotD.parse("b.c.d");
+        FieldRef bDotCDotD("b.c.d");
         ASSERT_FALSE(fieldSet.insert(&bDotCDotD, &conflict));
         ASSERT_EQUALS(bDotC, *conflict);
 
         // insert: "b.e.f" at the end, conflicts "b.e"
-        FieldRef bDotEDotF;
-        bDotEDotF.parse("b.e.f");
+        FieldRef bDotEDotF("b.e.f");
         ASSERT_FALSE(fieldSet.insert(&bDotEDotF, &conflict));
         ASSERT_EQUALS(bDotE, *conflict);
     }

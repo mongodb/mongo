@@ -395,8 +395,7 @@ namespace mongo {
                     }
 
                     // All fields parts must be valid.
-                    FieldRef sortField;
-                    sortField.parse(sortPatternElem.fieldName());
+                    FieldRef sortField(sortPatternElem.fieldName());
                     if (sortField.numParts() == 0) {
                         return Status(ErrorCodes::BadValue,
                                       "The $sort field cannot be empty");

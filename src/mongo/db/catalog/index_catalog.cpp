@@ -437,8 +437,7 @@ namespace mongo {
         BSONObjIterator it( key );
         while ( it.more() ) {
             BSONElement keyElement = it.next();
-            FieldRef keyField;
-            keyField.parse( keyElement.fieldName() );
+            FieldRef keyField( keyElement.fieldName() );
 
             const size_t numParts = keyField.numParts();
             if ( numParts == 0 ) {
