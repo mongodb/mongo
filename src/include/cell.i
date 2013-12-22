@@ -575,7 +575,7 @@ restart:
 		 */
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
-		saved_len = WT_PTRDIFF32(p, cell);
+		saved_len = WT_PTRDIFF(p, cell);
 		saved_v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
 		copied = 1;
