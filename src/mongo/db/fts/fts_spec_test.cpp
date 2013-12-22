@@ -45,13 +45,13 @@ namespace mongo {
             try {
                 FTSSpec spec( validTextSpec );
             }
-            catch ( UserException& e ) {
+            catch ( DBException& e ) {
                 ASSERT( false );
             }
 
             // Constructing an FTSSpec with an unsupported textIndexVersion should fail.
             BSONObj invalidTextSpec = makeFixedSpec( unsupportedVersion );
-            ASSERT_THROWS( FTSSpec spec( invalidTextSpec ), UserException );
+            ASSERT_THROWS( FTSSpec spec( invalidTextSpec ), DBException );
         }
 
         TEST( FTSSpec, Fix1 ) {
