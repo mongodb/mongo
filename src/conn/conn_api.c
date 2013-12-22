@@ -598,7 +598,7 @@ __conn_config_file(
 	WT_DECL_RET;
 	WT_FH *fh;
 	off_t size;
-	uint32_t len;
+	size_t len;
 	int exist, quoted;
 	uint8_t *p, *t;
 
@@ -627,7 +627,7 @@ __conn_config_file(
 	 */
 	if (size > 100 * 1024)
 		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
-	len = (uint32_t)size;
+	len = (size_t)size;
 
 	/*
 	 * Copy the configuration file into memory, with a little slop, I'm not
@@ -638,8 +638,8 @@ __conn_config_file(
 	 * what we're doing.
 	 */
 	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
-	WT_ERR(__wt_read(
-	    session, fh, (off_t)0, (size_t)len, ((uint8_t *)cbuf->mem) + 1));
+	WT_ERR(
+	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
 	cbuf->size = len + 1;
 
