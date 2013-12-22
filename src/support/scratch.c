@@ -275,8 +275,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc_func(WT_SESSION_IMPL *session,
-    size_t size, WT_ITEM **scratchp
+__wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -439,8 +438,7 @@ __wt_ext_scr_alloc(
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
 		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
-	return (__wt_scr_alloc(
-	    session, (uint32_t)size, &buf) == 0 ? buf->mem : NULL);
+	return (__wt_scr_alloc(session, size, &buf) == 0 ? buf->mem : NULL);
 }
 
 /*
