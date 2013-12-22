@@ -131,6 +131,13 @@ def has_option( name ):
 def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
 
+# Returns true if we have been configured to use a system version of any C++ library. If you
+# add a new C++ library dependency that may be shimmed out to the system, add it to the below
+# list.
+def using_system_version_of_cxx_libraries():
+    cxx_library_names = ["tcmalloc", "boost", "v8"]
+    return True in [use_system_version_of_library(x) for x in cxx_library_names]
+
 def get_variant_dir():
     if has_option('variant-dir'):
         return "#build/" + get_option('variant-dir') 
@@ -1228,6 +1235,7 @@ def doConfigure(myenv):
             Exit(1)
         myenv.AppendUnique(LINKFLAGS=[min_version_flag])
 
+    usingLibStdCxx = False
     if has_option('libc++'):
         if not using_clang():
             print( 'libc++ is currently only supported for clang')
@@ -1239,29 +1247,46 @@ def doConfigure(myenv):
         else:
             print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
             Exit(1)
+    else:
+        def CheckLibStdCxx(context):
+            test_body = """
+            #include <vector>
+            #if !defined(__GLIBCXX__)
+            #error
+            #endif
+            """
 
-    # Check to see if we are trying to use an outdated libstdc++ in C++11 mode. This is
-    # primarly to help people using clang in C++11 mode on OS X but forgetting to use
-    # --libc++. We would, ideally, check the __GLIBCXX__ version, but for various reasons this
-    # is not workable. Instead, we switch on the fact that std::is_nothrow_constructible wasn't
-    # introduced until libstdc++ 4.6.0. Earlier versions of libstdc++ than 4.6 are unlikely to
-    # work well anyway.
-    if has_option('c++11') and not has_option('libc++'):
+            context.Message('Checking if we are using libstdc++... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckLibStdCxx' : CheckLibStdCxx,
+        })
+        usingLibStdCxx = conf.CheckLibStdCxx()
+        conf.Finish()
+
+    # Check to see if we are trying to use an elderly libstdc++, which we arbitrarily define as
+    # 4.6.0. This is primarly to help people using clang in C++11 mode on OS X but forgetting
+    # to use --libc++. We also use it to decide if we trust the libstdc++ debug mode. We would,
+    # ideally, check the __GLIBCXX__ version, but for various reasons this is not
+    # workable. Instead, we switch on the fact that _GLIBCXX_BEGIN_NAMESPACE_VERSION wasn't
+    # introduced until libstdc++ 4.6.0.
+
+    haveGoodLibStdCxx = False
+    if usingLibStdCxx:
 
         def CheckModernLibStdCxx(context):
 
             test_body = """
             #include <vector>
-            #include <cstdlib>
-            #if defined(__GLIBCXX__)
-            #include <type_traits>
-            int main() {
-                return std::is_nothrow_constructible<int>::value ? EXIT_SUCCESS : EXIT_FAILURE;
-            }
+            #if !defined(_GLIBCXX_BEGIN_NAMESPACE_VERSION)
+            #error libstdcxx older than 4.6.0
             #endif
             """
 
-            context.Message('Checking for libstdc++ 4.6.0 or better (for C++11 support)... ')
+            context.Message('Checking for libstdc++ 4.6.0 or better... ')
             ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
             context.Result(ret)
             return ret
@@ -1272,11 +1297,18 @@ def doConfigure(myenv):
         haveGoodLibStdCxx = conf.CheckModernLibStdCxx()
         conf.Finish()
 
-        if not haveGoodLibStdCxx:
-            print( 'Detected libstdc++ is too old to support C++11 mode' )
-            if darwin:
-                print( 'Try building with --libc++ and --osx-version-min=10.7 or higher' )
-            Exit(1)
+    if has_option('c++11') and usingLibStdCxx and not haveGoodLibStdCxx:
+        print( 'Detected libstdc++ is too old to support C++11 mode' )
+        if darwin:
+            print( 'Try building with --libc++ and --osx-version-min=10.7 or higher' )
+        Exit(1)
+
+    # If we are using a modern libstdc++ and this is a debug build and we control all C++
+    # dependencies, then turn on the debugging features in libstdc++.
+    if debugBuild and usingLibStdCxx and haveGoodLibStdCxx:
+        # We can't do this if we are using any system C++ libraries.
+        if (not using_system_version_of_cxx_libraries()):
+            myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
 
     if has_option('sanitize'):
         if not (using_clang() or using_gcc()):
