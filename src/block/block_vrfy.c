@@ -30,16 +30,7 @@ __wt_block_verify_start(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	WT_CKPT *ckpt;
-	WT_FH *fh;
-
-	/*
-	 * We're done if the file has no data pages (this happens if we verify
-	 * a file immediately after creation).  Otherwise, verify doesn't make
-	 * sense if we don't have a checkpoint.
-	 */
-	fh = block->fh;
-	if (fh->size == block->allocsize)
-		return (0);
+	off_t size;
 
 	/*
 	 * Find the last checkpoint in the list: if there are none, or the only
@@ -58,8 +49,17 @@ __wt_block_verify_start(
 	/* Truncate the file to the size of the last checkpoint. */
 	WT_RET(__verify_last_truncate(session, block, ckpt));
 
+	/*
+	 * We're done if the file has no data pages (this happens if we verify
+	 * a file immediately after creation or the checkpoint doesn't reflect
+	 * any of the data pages).
+	 */
+	size = block->fh->size;
+	if (size <= block->allocsize)
+		return (0);
+
 	/* The file size should be a multiple of the allocation size. */
-	if (fh->size % block->allocsize != 0)
+	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the file size is not a multiple of the allocation size");
 
@@ -80,7 +80,7 @@ __wt_block_verify_start(
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
 	 */
-	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->size);
+	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
