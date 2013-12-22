@@ -168,9 +168,8 @@ struct __wt_cell_unpack {
  * __wt_cell_pack_addr --
  *	Pack an address cell.
  */
-static inline uint32_t
-__wt_cell_pack_addr(
-    WT_CELL *cell, u_int cell_type, uint64_t recno, uint32_t size)
+static inline size_t
+__wt_cell_pack_addr(WT_CELL *cell, u_int cell_type, uint64_t recno, size_t size)
 {
 	uint8_t *p;
 
@@ -183,15 +182,15 @@ __wt_cell_pack_addr(
 		(void)__wt_vpack_uint(&p, 0, recno);	/* Record number */
 	}
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*
  * __wt_cell_pack_data --
  *	Set a data item's WT_CELL contents.
  */
-static inline uint32_t
-__wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
+static inline size_t
+__wt_cell_pack_data(WT_CELL *cell, uint64_t rle, size_t size)
 {
 	uint8_t byte, *p;
 
@@ -215,7 +214,7 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
 	}
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*
@@ -275,7 +274,7 @@ __wt_cell_pack_data_match(
  * __wt_cell_pack_copy --
  *	Write a copy value cell.
  */
-static inline uint32_t
+static inline size_t
 __wt_cell_pack_copy(WT_CELL *cell, uint64_t rle, uint64_t v)
 {
 	uint8_t *p;
@@ -289,14 +288,14 @@ __wt_cell_pack_copy(WT_CELL *cell, uint64_t rle, uint64_t v)
 		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
 	}
 	(void)__wt_vpack_uint(&p, 0, v);		/* Copy offset */
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*
  * __wt_cell_pack_del --
  *	Write a deleted value cell.
  */
-static inline uint32_t
+static inline size_t
 __wt_cell_pack_del(WT_CELL *cell, uint64_t rle)
 {
 	uint8_t *p;
@@ -309,15 +308,15 @@ __wt_cell_pack_del(WT_CELL *cell, uint64_t rle)
 							/* Type */
 	cell->__chunk[0] = WT_CELL_DEL | WT_CELL_64V;
 	(void)__wt_vpack_uint(&p, 0, rle);		/* RLE */
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*
  * __wt_cell_pack_int_key --
  *	Set a row-store internal page key's WT_CELL contents.
  */
-static inline uint32_t
-__wt_cell_pack_int_key(WT_CELL *cell, uint32_t size)
+static inline size_t
+__wt_cell_pack_int_key(WT_CELL *cell, size_t size)
 {
 	uint8_t byte, *p;
 
@@ -335,15 +334,15 @@ __wt_cell_pack_int_key(WT_CELL *cell, uint32_t size)
 	size -= WT_CELL_SIZE_ADJUST;
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
 
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*
  * __wt_cell_pack_leaf_key --
  *	Set a row-store leaf page key's WT_CELL contents.
  */
-static inline uint32_t
-__wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
+static inline size_t
+__wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
 {
 	uint8_t byte, *p;
 
@@ -376,14 +375,14 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 	size -= WT_CELL_SIZE_ADJUST;
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
 
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*
  * __wt_cell_pack_ovfl --
  *	Pack an overflow cell.
  */
-static inline uint32_t
+static inline size_t
 __wt_cell_pack_ovfl(WT_CELL *cell, uint8_t type, uint64_t rle, size_t size)
 {
 	uint8_t *p;
@@ -396,7 +395,7 @@ __wt_cell_pack_ovfl(WT_CELL *cell, uint8_t type, uint64_t rle, size_t size)
 		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
 	}
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
-	return (WT_PTRDIFF32(p, cell));
+	return (WT_PTRDIFF(p, cell));
 }
 
 /*

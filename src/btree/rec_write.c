@@ -175,7 +175,7 @@ typedef struct {
 	uint64_t recno;			/* Current record number */
 	uint32_t entries;		/* Current number of entries */
 	uint8_t *first_free;		/* Current first free byte */
-	uint32_t space_avail;		/* Remaining space in this chunk */
+	size_t	 space_avail;		/* Remaining space in this chunk */
 
 	/*
 	 * We don't need to keep the 0th key around on internal pages, the
@@ -211,8 +211,8 @@ typedef struct {
 	struct __rec_kv {
 		WT_ITEM	 buf;		/* Data */
 		WT_CELL	 cell;		/* Cell and cell's length */
-		uint32_t cell_len;
-		uint32_t len;		/* Total length of cell + data */
+		size_t cell_len;
+		size_t len;		/* Total length of cell + data */
 	} k, v;				/* Key/Value being built */
 
 	WT_ITEM *cur, _cur;		/* Key/Value being built */
@@ -231,13 +231,13 @@ typedef struct {
 static void __rec_cell_build_addr(
 		WT_RECONCILE *, const void *, uint32_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, uint32_t, int *);
+		WT_RECONCILE *, const void *, size_t, int *);
 static int  __rec_cell_build_leaf_key(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, uint32_t, int *);
+		WT_RECONCILE *, const void *, size_t, int *);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, uint32_t, uint64_t);
+		WT_RECONCILE *, const void *, size_t, uint64_t);
 static int  __rec_child_deleted(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -915,7 +915,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
  *	Update the memory tracking structure for a set of new entries.
  */
 static inline void
-__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
+__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size)
 {
 	/*
 	 * The buffer code is fragile and prone to off-by-one errors -- check
@@ -937,7 +937,7 @@ __rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
 static inline void
 __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 {
-	uint32_t len;
+	size_t len;
 	uint8_t *p, *t;
 
 	/*
@@ -1003,7 +1003,7 @@ __rec_dict_replace(
 	else {
 		offset = WT_PTRDIFF(r->first_free, dp->cell);
 		val->len = val->cell_len =
-		   __wt_cell_pack_copy(&val->cell, rle, offset);
+		    __wt_cell_pack_copy(&val->cell, rle, offset);
 		val->buf.data = NULL;
 		val->buf.size = 0;
 	}
@@ -1490,9 +1490,9 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
-	size_t corrected_page_size, result_len;
+	size_t corrected_page_size, len, result_len;
 	uint64_t recno;
-	uint32_t entry, i, len, result_slots, slots;
+	uint32_t entry, i, result_slots, slots;
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
@@ -1600,8 +1600,9 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * 1KB of data, anybody splitting a smaller than 1KB piece
 		 * (as calculated before compression), is doing us wrong.
 		 */
-		if ((len = WT_PTRDIFF32(cell, dsk)) > 1024)
-			r->raw_offsets[++slots] = len - WT_BLOCK_COMPRESS_SKIP;
+		if ((len = WT_PTRDIFF(cell, dsk)) > 1024)
+			r->raw_offsets[++slots] =
+			    WT_STORE_SIZE(len - WT_BLOCK_COMPRESS_SKIP);
 
 		if (dsk->type == WT_PAGE_COL_INT ||
 		    dsk->type == WT_PAGE_COL_VAR)
@@ -1620,7 +1621,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 
 	/* The slot at array's end is the total length of the data. */
 	r->raw_offsets[++slots] =
-	    WT_PTRDIFF32(cell, dsk) - WT_BLOCK_COMPRESS_SKIP;
+	    WT_STORE_SIZE(WT_PTRDIFF(cell, dsk) - WT_BLOCK_COMPRESS_SKIP);
 
 	/*
 	 * Allocate a destination buffer.  If there's a pre-size function, use
@@ -1682,8 +1683,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * compressed; copy it down to the start of the working buffer
 		 * and update the starting record number, free space and so on.
 		 */
-		len = WT_PTRDIFF32(r->first_free,
-		    (uint8_t *)dsk +
+		len = WT_PTRDIFF(r->first_free, (uint8_t *)dsk +
 		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP);
 		dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 		(void)memcpy(dsk_start, (uint8_t *)r->first_free - len, len);
@@ -1741,7 +1741,7 @@ more_rows:	/*
 		 * Compression failed, increase the size of the "page" and try
 		 * again after we accumulate some more rows.
 		 */
-		len = WT_PTRDIFF32(r->first_free, r->dsk.mem);
+		len = WT_PTRDIFF(r->first_free, r->dsk.mem);
 		corrected_page_size = r->page_size * 2;
 		WT_ERR(bm->write_size(bm, session, &corrected_page_size));
 		WT_ERR(__wt_buf_grow(session, &r->dsk, corrected_page_size));
@@ -2046,7 +2046,8 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	case BTREE_COL_FIX:
 		if (cbulk->entry != 0)
 			__rec_incr(session, r, cbulk->entry,
-			    __bitstr_size(cbulk->entry * btree->bitcnt));
+			    __bitstr_size(
+			    (size_t)cbulk->entry * btree->bitcnt));
 		break;
 	case BTREE_COL_VAR:
 		if (cbulk->rle != 0)
@@ -2093,9 +2094,9 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	key = &r->k;
 	val = &r->v;
 	WT_RET(__rec_cell_build_leaf_key(session, r,	/* Build key cell */
-	    cursor->key.data, (uint32_t)cursor->key.size, &ovfl_key));
+	    cursor->key.data, cursor->key.size, &ovfl_key));
 	WT_RET(__rec_cell_build_val(session, r,		/* Build value cell */
-	    cursor->value.data, (uint32_t)cursor->value.size, (uint64_t)0));
+	    cursor->value.data, cursor->value.size, (uint64_t)0));
 
 	/*
 	 * Boundary: split or write the page.
@@ -2134,7 +2135,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	return (0);
 }
 
-#define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
+#define	WT_FIX_ENTRIES(btree, bytes)					\
+    ((uint32_t)((((bytes) * 8) / (btree)->bitcnt)))
 
 /*
  * __rec_col_fix_bulk_insert_split_check --
@@ -2160,7 +2162,8 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 			 * Boundary: split or write the page.
 			 */
 			__rec_incr(session, r, cbulk->entry,
-			    __bitstr_size(cbulk->entry * btree->bitcnt));
+			    __bitstr_size(
+			    (size_t)cbulk->entry * btree->bitcnt));
 			WT_RET(__rec_split(session, r));
 		}
 		cbulk->entry = 0;
@@ -2236,8 +2239,8 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 	btree = S2BT(session);
 
 	val = &r->v;
-	WT_RET(__rec_cell_build_val(session,
-	    r, cbulk->cmp.data, (uint32_t)cbulk->cmp.size, cbulk->rle));
+	WT_RET(__rec_cell_build_val(
+	    session, r, cbulk->cmp.data, cbulk->cmp.size, cbulk->rle));
 
 	/* Boundary: split or write the page. */
 	while (val->len > r->space_avail)
@@ -2373,7 +2376,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			val->buf.data = ref->addr;
 			val->buf.size = __wt_cell_total_len(unpack);
 			val->cell_len = 0;
-			val->len = (uint32_t)val->buf.size;
+			val->len = val->buf.size;
 		} else
 			__rec_cell_build_addr(r, addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
@@ -2423,7 +2426,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Copy the updated, disk-image bytes into place. */
 	memcpy(r->first_free, page->u.col_fix.bitf,
-	    __bitstr_size(page->entries * btree->bitcnt));
+	    __bitstr_size((size_t)page->entries * btree->bitcnt));
 
 	/* Calculate the number of entries per page remainder. */
 	entry = page->entries;
@@ -2462,8 +2465,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 *
 			 * Boundary: split or write the page.
 			 */
-			__rec_incr(session,
-			    r, entry, __bitstr_size(entry * btree->bitcnt));
+			__rec_incr(session, r, entry,
+			    __bitstr_size((size_t)entry * btree->bitcnt));
 			WT_RET(__rec_split(session, r));
 
 			/* Calculate the number of entries per page. */
@@ -2473,7 +2476,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 
 	/* Update the counters. */
-	__rec_incr(session, r, entry, __bitstr_size(entry * btree->bitcnt));
+	__rec_incr(
+	    session, r, entry, __bitstr_size((size_t)entry * btree->bitcnt));
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
@@ -2527,8 +2531,8 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 				(uint32_t)page_start, btree->bitcnt));
 
 		r->recno += entry;
-		__rec_incr(
-		    session, r, entry, __bitstr_size(entry * btree->bitcnt));
+		__rec_incr(session, r, entry,
+		    __bitstr_size((size_t)entry * btree->bitcnt));
 
 		/*
 		 * If everything didn't fit, then we have to force a split and
@@ -2602,10 +2606,10 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    &val->cell, WT_CELL_VALUE_OVFL, rle, value->size);
 		val->buf.data = value->data;
 		val->buf.size = value->size;
-		val->len = val->cell_len + (uint32_t)value->size;
+		val->len = val->cell_len + value->size;
 	} else
 		WT_RET(__rec_cell_build_val(
-		    session, r, value->data, (uint32_t)value->size, rle));
+		    session, r, value->data, value->size, rle));
 
 	/* Boundary: split or write the page. */
 	while (val->len > r->space_avail)
@@ -3157,12 +3161,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
-			key->len = (uint32_t)key->buf.size;
+			key->len = key->buf.size;
 			ovfl_key = 1;
 		} else {
 			__wt_ref_key(page, ref, &p, &klen);
-			WT_RET(__rec_cell_build_int_key(session, r,
-			    p, r->cell_zero ? 1 : (uint32_t)klen, &ovfl_key));
+			WT_RET(__rec_cell_build_int_key(
+			    session, r, p, r->cell_zero ? 1 : klen, &ovfl_key));
 		}
 		r->cell_zero = 0;
 
@@ -3291,8 +3295,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
 		__wt_ref_key(page, ref, &p, &klen);
-		WT_RET(__rec_cell_build_int_key(session, r,
-		    p, r->cell_zero ? 1 : (uint32_t)klen, &ovfl_key));
+		WT_RET(__rec_cell_build_int_key(
+		    session, r, p, r->cell_zero ? 1 : klen, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -3336,8 +3340,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	WT_KV *key, *val;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
+	size_t size;
 	uint64_t slvg_skip;
-	uint32_t i, size;
+	uint32_t i;
 	int dictionary, onpage_ovfl, ovfl_key;
 	const void *p;
 
@@ -3423,7 +3428,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					    unpack->data, unpack->size,
 					    tmpval));
 					p = tmpval->data;
-					size = (uint32_t)tmpval->size;
+					size = tmpval->size;
 				}
 				WT_ERR(__rec_cell_build_val(
 				    session, r, p, size, (uint64_t)0));
@@ -3432,7 +3437,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				val->buf.data = val_cell;
 				val->buf.size = __wt_cell_total_len(unpack);
 				val->cell_len = 0;
-				val->len = (uint32_t)val->buf.size;
+				val->len = val->buf.size;
 
 				/* Track if page has overflow items. */
 				if (unpack->ovfl)
@@ -3542,7 +3547,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(unpack);
 			key->cell_len = 0;
-			key->len = (uint32_t)key->buf.size;
+			key->len = key->buf.size;
 			ovfl_key = 1;
 
 			/*
@@ -3607,7 +3612,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				    session, page, rip, tmpkey));
 
 			WT_ERR(__rec_cell_build_leaf_key(session, r,
-			    tmpkey->data, (uint32_t)tmpkey->size, &ovfl_key));
+			    tmpkey->data, tmpkey->size, &ovfl_key));
 		}
 
 		/*
@@ -4268,7 +4273,7 @@ err:	if (page != NULL)
  */
 static int
 __rec_cell_build_int_key(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, const void *data, uint32_t size, int *is_ovflp)
+    WT_RECONCILE *r, const void *data, size_t size, int *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
@@ -4291,9 +4296,8 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
 		    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 	}
 
-	key->cell_len =
-	    __wt_cell_pack_int_key(&key->cell, (uint32_t)key->buf.size);
-	key->len = key->cell_len + (uint32_t)key->buf.size;
+	key->cell_len = __wt_cell_pack_int_key(&key->cell, key->buf.size);
+	key->len = key->cell_len + key->buf.size;
 
 	return (0);
 }
@@ -4305,7 +4309,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
  */
 static int
 __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, const void *data, uint32_t size, int *is_ovflp)
+    WT_RECONCILE *r, const void *data, size_t size, int *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
@@ -4390,9 +4394,8 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 		    __rec_cell_build_leaf_key(session, r, NULL, 0, is_ovflp));
 	}
 
-	key->cell_len =
-	    __wt_cell_pack_leaf_key(&key->cell, pfx, (uint32_t)key->buf.size);
-	key->len = key->cell_len + (uint32_t)key->buf.size;
+	key->cell_len = __wt_cell_pack_leaf_key(&key->cell, pfx, key->buf.size);
+	key->len = key->cell_len + key->buf.size;
 
 	return (0);
 }
@@ -4425,9 +4428,9 @@ __rec_cell_build_addr(WT_RECONCILE *r,
 	 */
 	val->buf.data = addr;
 	val->buf.size = size;
-	val->cell_len = __wt_cell_pack_addr(
-	    &val->cell, cell_type, recno, (uint32_t)val->buf.size);
-	val->len = val->cell_len + (uint32_t)val->buf.size;
+	val->cell_len =
+	    __wt_cell_pack_addr(&val->cell, cell_type, recno, val->buf.size);
+	val->len = val->cell_len + val->buf.size;
 }
 
 /*
@@ -4437,7 +4440,7 @@ __rec_cell_build_addr(WT_RECONCILE *r,
  */
 static int
 __rec_cell_build_val(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, const void *data, uint32_t size, uint64_t rle)
+    WT_RECONCILE *r, const void *data, size_t size, uint64_t rle)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
@@ -4468,9 +4471,8 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 			    session, r, val, WT_CELL_VALUE_OVFL, rle));
 		}
 	}
-	val->cell_len =
-	    __wt_cell_pack_data(&val->cell, rle, (uint32_t)val->buf.size);
-	val->len = val->cell_len + (uint32_t)val->buf.size;
+	val->cell_len = __wt_cell_pack_data(&val->cell, rle, val->buf.size);
+	val->len = val->cell_len + val->buf.size;
 
 	return (0);
 }
@@ -4540,7 +4542,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 	/* Build the cell and return. */
 	kv->cell_len = __wt_cell_pack_ovfl(&kv->cell, type, rle, kv->buf.size);
-	kv->len = kv->cell_len + (uint32_t)kv->buf.size;
+	kv->len = kv->cell_len + kv->buf.size;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
