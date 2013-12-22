@@ -271,7 +271,7 @@ public:
 
         // check if we're outputting to stdout
         FilePtr out((mongoDumpGlobalParams.outputDirectory == "-") ?
-                    stdout : fopen(root.c_str(), "wb"));
+                    stdout : fopen(root.string().c_str(), "wb"));
 
         Extent* extent = em.getExtent(extentLoc);
         while (extent != NULL) {
@@ -317,7 +317,7 @@ public:
 
         // check if we're outputting to stdout
         FilePtr out ((mongoDumpGlobalParams.outputDirectory == "-") ?
-                     stdout : fopen(root.c_str(), "wb"));
+                     stdout : fopen(root.string().c_str(), "wb"));
         string ns = getNS();
         Client::ReadContext cx( ns );
         Database* db = cx.ctx().db();
