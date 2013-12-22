@@ -566,6 +566,10 @@ namespace mutablebson {
             dassert(_leafBuf.len() != 0);
         }
 
+        ~Impl() {
+            _leafBuilder.abandon();
+        }
+
         void reset(Document::InPlaceMode inPlaceMode) {
             // Clear out the state in the vectors.
             _slowElements.clear();
@@ -576,6 +580,7 @@ namespace mutablebson {
 
             // There is no way to reset the state of a BSONObjBuilder, so we need to call its
             // dtor, reset the underlying buf, and re-invoke the constructor in-place.
+            _leafBuilder.abandon();
             _leafBuilder.~BSONObjBuilder();
             _leafBuf.reset();
             new (&_leafBuilder) BSONObjBuilder(_leafBuf);

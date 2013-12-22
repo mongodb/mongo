@@ -367,8 +367,8 @@ dodouble:
         if ( haveSubobj() ) {
             verify( _fieldName.rawData() );
             _builder->append( _fieldName, subobj()->done() );
+            _subobj.reset();
         }
-        _subobj.reset();
         _fieldName = nextFieldName;
     }
 

@@ -604,6 +604,17 @@ namespace mongo {
             return temp;
         }
 
+        /** Make it look as if "done" has been called, so that our destructor is a no-op. Do
+         *  this if you know that you don't care about the contents of the builder you are
+         *  destroying.
+         *
+         *  Note that it is invalid to call any method other than the destructor after invoking
+         *  this method.
+         */
+        void abandon() {
+            _doneCalled = true;
+        }
+
         void decouple() {
             _b.decouple();    // post done() call version.  be sure jsobj frees...
         }
