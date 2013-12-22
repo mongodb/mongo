@@ -461,8 +461,8 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 	WT_IKEY *ikey;
 
 	/*
-	 * Allocate the WT_IKEY structure and room for the value, then copy
-	 * the value into place.
+	 * Allocate memory for the WT_IKEY structure and the key, then copy
+	 * the key into place.
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_IKEY) + size, &ikey));
 	ikey->size = (uint32_t)size;
