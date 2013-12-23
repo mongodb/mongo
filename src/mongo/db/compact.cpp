@@ -284,13 +284,15 @@ namespace mongo {
         pm.finished();
 
         // build indexes
-        NamespaceString s(ns);
-        string si = s.db().toString() + ".system.indexes";
         for( int i = 0; i < nidx; i++ ) {
             killCurrentOp.checkForInterrupt(false);
             BSONObj info = indexSpecs[i];
             log() << "compact create index " << info["key"].Obj().toString() << endl;
-            theDataFileMgr.insert(si.c_str(), info.objdata(), info.objsize());
+            Status status = collection->getIndexCatalog()->createIndex( info, false );
+            if ( !status.isOK() ) {
+                log() << "failed to create index: " << status.toString();
+                uassertStatusOK( status );
+            }
         }
 
         return true;
