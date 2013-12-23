@@ -126,14 +126,14 @@ namespace mongo {
                 // the index will be lost forever.  Thus, we're assuming no journaling will happen
                 // between now and the entry being re-written.
 
-                try {
-                    // TODO
-                    const std::string ns = collection->ns().getSystemIndexesCollection();
-                    theDataFileMgr.insert(ns.c_str(), indexObj.objdata(), indexObj.objsize(), false, true);
+                Status status = indexCatalog->createIndex( indexObj, false );
+                if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
+                    // no-op
                 }
-                catch (const DBException& e) {
-                    log() << "building index failed: " << e.what() << " (" << e.getCode() << ")";
+                else if ( !status.isOK() ) {
+                    log() << "building index failed: " << status.toString() << " index: " << indexObj;
                 }
+
             }
         }
     }

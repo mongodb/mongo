@@ -92,8 +92,7 @@ namespace mongo {
         }
 
         virtual void restoreIndexBuildsOnSource(std::vector<BSONObj> indexesInProg, std::string source) {
-            string sourceIndexes = nsToDatabase( source ) + ".system.indexes";
-            IndexBuilder::restoreIndexes( sourceIndexes, indexesInProg );
+            IndexBuilder::restoreIndexes( indexesInProg );
         }
 
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

@@ -435,7 +435,7 @@ namespace mongo {
                 }
                 log() << "compact " << ns << " end" << endl;
 
-                IndexBuilder::restoreIndexes(db+".system.indexes", indexesInProg);
+                IndexBuilder::restoreIndexes(indexesInProg);
             }
 
             return ok;

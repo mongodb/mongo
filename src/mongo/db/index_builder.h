@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/background.h"
 
@@ -40,13 +41,17 @@ namespace mongo {
 
     class IndexBuilder : public BackgroundJob {
     public:
-        IndexBuilder(const std::string ns, const BSONObj index);
+        IndexBuilder(const BSONObj& index);
         virtual ~IndexBuilder();
 
         virtual void run();
+
+        /**
+         * name of the builder, not the index
+         */
         virtual std::string name() const;
 
-        void build() const;
+        void build( Client::Context& context ) const;
 
         /**
          * Kill all in-progress indexes matching criteria and, optionally, store them in the
@@ -59,12 +64,11 @@ namespace mongo {
          * not match the ns field in the indexes list, the BSONObj's ns field is changed before the
          * index is built (to handle rename).
          */
-        static void restoreIndexes(const std::string& ns, const std::vector<BSONObj>& indexes);
+        static void restoreIndexes(const std::vector<BSONObj>& indexes);
 
     private:
-        const std::string _ns;
         const BSONObj _index;
-        std::string _name;
+        std::string _name; // name of this builder, not related to the index
         static AtomicUInt _indexBuildCount;
     };
 

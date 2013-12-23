@@ -249,7 +249,7 @@ namespace mongo {
             result.append( "nIndexes" , (int)all.size() );
             result.appendArray( "indexes" , b.obj() );
 
-            IndexBuilder::restoreIndexes(dbname + ".system.indexes", indexesInProg);
+            IndexBuilder::restoreIndexes(indexesInProg);
             return true;
         }
     } cmdReIndex;

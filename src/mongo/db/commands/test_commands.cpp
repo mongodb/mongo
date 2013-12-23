@@ -190,7 +190,7 @@ namespace mongo {
 
             nsd->emptyCappedCollection( ns.c_str() );
 
-            IndexBuilder::restoreIndexes(dbname + ".system.indexes", indexes);
+            IndexBuilder::restoreIndexes(indexes);
 
             return true;
         }

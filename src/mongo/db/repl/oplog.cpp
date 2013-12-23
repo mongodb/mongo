@@ -503,14 +503,12 @@ namespace mongo {
             const char *p = strchr(ns, '.');
             if ( p && strcmp(p, ".system.indexes") == 0 ) {
                 if (o["background"].trueValue()) {
-                    IndexBuilder* builder = new IndexBuilder(ns, o);
+                    IndexBuilder* builder = new IndexBuilder(o);
                     // This spawns a new thread and returns immediately.
                     builder->go();
                 }
                 else {
-                    IndexBuilder builder(ns, o);
-                    // Finish the foreground build before returning
-                    builder.build();
+                    uassertStatusOK( collection->getIndexCatalog()->createIndex( o, true ) );
                 }
             }
             else {

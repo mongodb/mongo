@@ -247,7 +247,7 @@ namespace mongo {
             bool ok =
                 repairDatabase( dbname, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
 
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexesInProg);
+            IndexBuilder::restoreIndexes(indexesInProg);
 
             return ok;
         }

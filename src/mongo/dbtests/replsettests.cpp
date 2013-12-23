@@ -571,7 +571,7 @@ namespace ReplSetTests {
             t4.finish();
 
             // Build indexes
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            IndexBuilder::restoreIndexes(indexes);
 
             DBDirectClient cli;
             time_t max = time(0)+10;
@@ -618,7 +618,7 @@ namespace ReplSetTests {
                 Lock::DBWrite lk(ns());
                 std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
                 ASSERT_EQUALS(1U, indexes.size());
-                IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+                IndexBuilder::restoreIndexes(indexes);
             }
             ASSERT(!t2.finished());
             t2.finish();
@@ -700,7 +700,7 @@ namespace ReplSetTests {
             {
                 Lock::DBWrite lk(ns());
                 std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
-                IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+                IndexBuilder::restoreIndexes(indexes);
             }
             ASSERT(!t2.finished());
             t2.finish();
@@ -774,7 +774,7 @@ namespace ReplSetTests {
             ASSERT(!t4.finished());
             ASSERT(!t5.finished());
 
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            IndexBuilder::restoreIndexes(indexes);
 
             ASSERT(!t3.finished());
             ASSERT(!t4.finished());
