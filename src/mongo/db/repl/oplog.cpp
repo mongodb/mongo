@@ -63,15 +63,23 @@
 namespace mongo {
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
-    static NamespaceDetails *localOplogMainDetails = 0;
-    static Database *localDB = 0;
-    static NamespaceDetails *rsOplogDetails = 0;
-    void oplogCheckCloseDatabase( Database * db ) {
+    static Database* localDB = NULL;
+    static Collection* localOplogMainCollection = 0;
+    static Collection* localOplogRSCollection = 0;
+
+    void oplogCheckCloseDatabase( Database* db ) {
         verify( Lock::isW() );
-        localDB = 0;
-        localOplogMainDetails = 0;
-        rsOplogDetails = 0;
+        localDB = NULL;
+        localOplogMainCollection = NULL;
+        localOplogRSCollection = NULL;
         resetSlaveCache();
+    }
+
+    // so we can fail the same way
+    void checkOplogInsert( StatusWith<DiskLoc> result ) {
+        massert( 17318,
+                 str::stream() << "write to oplog failed: " << result.getStatus().toString(),
+                 result.isOK() );
     }
 
     static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
@@ -88,20 +96,18 @@ namespace mongo {
         long long h = op["h"].numberLong();
 
         {
-            const char *logns = rsoplog;
-            if ( rsOplogDetails == 0 ) {
-                Client::Context ctx(logns, storageGlobalParams.dbpath);
+            if ( localOplogRSCollection == 0 ) {
+                Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
                 localDB = ctx.db();
                 verify( localDB );
-                rsOplogDetails = nsdetails(logns);
-                massert(13389, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
+                localOplogRSCollection = localDB->getCollection( rsoplog );
+                massert(13389,
+                        "local.oplog.rs missing. did you drop it? if so restart server",
+                        localOplogRSCollection);
             }
-            Client::Context ctx(logns , localDB);
-            {
-                int len = op.objsize();
-                Record *r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
-                memcpy(getDur().writingPtr(r->data(), len), op.objdata(), len);
-            }
+            Client::Context ctx(rsoplog, localDB);
+            checkOplogInsert( localOplogRSCollection->insertDocument( op, false ) );
+
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
                      */
@@ -128,35 +134,40 @@ namespace mongo {
         OpTime::setLast( ts );
     }
 
-    /** given a BSON object, create a new one at dst which is the existing (partial) object
-        with a new object element appended at the end with fieldname "o".
+    class OplogDocWriter : public Collection::DocWriter {
+    public:
+        OplogDocWriter( const BSONObj& frame, const BSONObj& oField )
+            : _frame( frame ), _oField( oField ) {
+        }
 
-        @param partial already build object with everything except the o member.  e.g. something like:
-               { ts:..., ns:..., os2:... }
-        @param o a bson object to be added with fieldname "o"
-        @dst   where to put the newly built combined object.  e.g. ends up as something like:
-               { ts:..., ns:..., os2:..., o:... }
-    */
-    void append_O_Obj(char *dst, const BSONObj& partial, const BSONObj& o) {
-        const int size1 = partial.objsize() - 1;  // less the EOO char
-        const int oOfs = size1+3;                 // 3 = byte BSONOBJTYPE + byte 'o' + byte \0
+        ~OplogDocWriter(){}
 
-        void *p = getDur().writingPtr(dst, oOfs+o.objsize()+1);
+        void writeDocument( char* start ) const {
+            char* buf = start;
 
-        memcpy(p, partial.objdata(), size1);
+            memcpy( buf, _frame.objdata(), _frame.objsize() -1 ); // don't copy final EOO
 
-        // adjust overall bson object size for the o: field
-        *(static_cast<unsigned*>(p)) += o.objsize() + 1/*fieldtype byte*/ + 2/*"o" fieldname*/;
+            reinterpret_cast<int*>( buf )[0] = documentSize();
 
-        char *b = static_cast<char *>(p);
-        b += size1;
-        *b++ = (char) Object;
-        *b++ = 'o'; // { o : ... }
-        *b++ = 0;   // null terminate "o" fieldname
-        memcpy(b, o.objdata(), o.objsize());
-        b += o.objsize();
-        *b = EOO;
-    }
+            buf += ( _frame.objsize() - 1 );
+            buf[0] = (char)Object;
+            buf[1] = 'o';
+            buf[2] = 0;
+            memcpy( buf+3, _oField.objdata(), _oField.objsize() );
+            buf += 3 + _oField.objsize();
+            buf[0] = EOO;
+
+            verify( static_cast<size_t>( ( buf + 1 ) - start ) == documentSize() ); // DEV?
+        }
+
+        size_t documentSize() const {
+            return _frame.objsize() + _oField.objsize() + 1 /* type */ + 2 /* "o" */;
+        }
+
+    private:
+        BSONObj _frame;
+        BSONObj _oField;
+    };
 
     /* we write to local.oplog.rs:
          { ts : ..., h: ..., v: ..., op: ..., etc }
@@ -223,46 +234,41 @@ namespace mongo {
         if ( o2 )
             b.append("o2", *o2);
         BSONObj partial = b.done();
-        int posz = partial.objsize();
-        int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
-        Record *r;
-        DEV verify( logNS == 0 );
-        {
-            const char *logns = rsoplog;
-            if ( rsOplogDetails == 0 ) {
-                Client::Context ctx(logns, storageGlobalParams.dbpath);
-                localDB = ctx.db();
-                verify( localDB );
-                rsOplogDetails = nsdetails(logns);
-                massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
-            }
-            Client::Context ctx(logns , localDB);
-            r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
-            /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
-                     this code (or code in now() maybe) should be improved.
-                     */
-            if( theReplSet ) {
-                if( !(theReplSet->lastOpTimeWritten<ts) ) {
-                    log() << "replication oplog stream went back in time. previous timestamp: "
-                          << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
-                          << ". attempting to sync directly from primary." << endl;
-                    std::string errmsg;
-                    BSONObjBuilder result;
-                    if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
-                                                   errmsg, result)) {
-                        log() << "Can't sync from primary: " << errmsg << endl;
-                    }
-                }
-                theReplSet->lastOpTimeWritten = ts;
-                theReplSet->lastH = hashNew;
-                ctx.getClient()->setLastOp( ts );
-            }
+        DEV verify( logNS == 0 ); // check this was never a master/slave master
+
+        if ( localOplogRSCollection == 0 ) {
+            Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
+            localDB = ctx.db();
+            verify( localDB );
+            localOplogRSCollection = localDB->getCollection( rsoplog );
+            massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", localOplogRSCollection);
         }
 
-        append_O_Obj(r->data(), partial, obj);
+        Client::Context ctx(rsoplog, localDB);
+        OplogDocWriter writer( partial, obj );
+        checkOplogInsert( localOplogRSCollection->insertDocument( &writer, false ) );
 
-        LOG( 6 ) << "logOp:" << BSONObj::make(r) << endl;
+        /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
+           this code (or code in now() maybe) should be improved.
+        */
+        if( theReplSet ) {
+            if( !(theReplSet->lastOpTimeWritten<ts) ) {
+                log() << "replication oplog stream went back in time. previous timestamp: "
+                      << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
+                      << ". attempting to sync directly from primary." << endl;
+                std::string errmsg;
+                BSONObjBuilder result;
+                if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+                                               errmsg, result)) {
+                    log() << "Can't sync from primary: " << errmsg << endl;
+                }
+            }
+            theReplSet->lastOpTimeWritten = ts;
+            theReplSet->lastH = hashNew;
+            ctx.getClient()->setLastOp( ts );
+        }
+
     }
 
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
@@ -298,35 +304,24 @@ namespace mongo {
             b.append("o2", *o2);
         BSONObj partial = b.done(); // partial is everything except the o:... part.
 
-        int po_sz = partial.objsize();
-        int len = po_sz + obj.objsize() + 1 + 2 /*o:*/;
-
-        Record *r;
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
-            if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx(logNS, storageGlobalParams.dbpath);
-                localDB = ctx.db();
-                verify( localDB );
-                localOplogMainDetails = nsdetails(logNS);
-                verify( localOplogMainDetails );
-            }
-            Client::Context ctx(logNS , localDB);
-            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
-        }
-        else {
-            Client::Context ctx(logNS, storageGlobalParams.dbpath);
-            verify( nsdetails( logNS ) );
-            // first we allocate the space, then we fill it below.
-            r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
-        append_O_Obj(r->data(), partial, obj);
+        if ( localOplogMainCollection == 0 ) {
+            Client::Context ctx(logNS, storageGlobalParams.dbpath);
+            localDB = ctx.db();
+            verify( localDB );
+            localOplogMainCollection = localDB->getCollection(logNS);
+            verify( localOplogMainCollection );
+        }
+
+        Client::Context ctx(logNS , localDB);
+        OplogDocWriter writer( partial, obj );
+        checkOplogInsert( localOplogMainCollection->insertDocument( &writer, false ) );
 
         context.getClient()->setLastOp( ts );
-
-        LOG( 6 ) << "logging op:" << BSONObj::make(r) << endl;
-    } 
+    }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;
     void newReplUp() {

@@ -698,56 +698,6 @@ namespace mongo {
         return loc;
     }
 
-    /* special version of insert for transaction logging -- streamlined a bit.
-       assumes ns is capped and no indexes
-    */
-    Record* DataFileMgr::fast_oplog_insert(NamespaceDetails *d, const char *ns, int len) {
-        verify( d );
-        RARELY verify( d == nsdetails(ns) );
-        DEV verify( d == nsdetails(ns) );
-
-        massert( 16509,
-                 str::stream()
-                 << "fast_oplog_insert requires a capped collection "
-                 << " but " << ns << " is not capped",
-                 d->isCapped() );
-
-        //record timing on oplog inserts
-        boost::optional<TimerHolder> insertTimer;
-        //skip non-oplog collections
-        if (NamespaceString::oplog(ns)) {
-            insertTimer = boost::in_place(&oplogInsertStats);
-            oplogInsertBytesStats.increment(len); //record len of inserted records for oplog
-        }
-
-        int lenWHdr = len + Record::HeaderSize;
-        DiskLoc loc = d->alloc(ns, lenWHdr);
-        verify( !loc.isNull() );
-
-        Record *r = loc.rec();
-        verify( r->lengthWithHeaders() >= lenWHdr );
-
-        Extent *e = r->myExtent(loc);
-        if ( e->lastRecord.isNull() ) {
-            Extent::FL *fl = getDur().writing( e->fl() );
-            fl->firstRecord = fl->lastRecord = loc;
-
-            Record::NP *np = getDur().writing(r->np());
-            np->nextOfs = np->prevOfs = DiskLoc::NullOfs;
-        }
-        else {
-            Record *oldlast = e->lastRecord.rec();
-            Record::NP *np = getDur().writing(r->np());
-            np->prevOfs = e->lastRecord.getOfs();
-            np->nextOfs = DiskLoc::NullOfs;
-            getDur().writingInt( oldlast->nextOfs() ) = loc.getOfs();
-            e->lastRecord.writing() = loc;
-        }
-
-        d->incrementStats( r->netLength(), 1 );
-        return r;
-    }
-
 } // namespace mongo
 
 #include "clientcursor.h"

@@ -107,6 +107,33 @@ namespace mongo {
         return BSONObj::make( rec->accessed() );
     }
 
+    StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
+        verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
+
+        int lenWHdr = _details->getRecordAllocationSize( doc->documentSize() + Record::HeaderSize );
+
+        // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
+        //       under the RecordStore, this feels broken since that should be a
+        //       collection access method probably
+        StatusWith<DiskLoc> loc = _recordStore.allocRecord( lenWHdr,
+                                                            enforceQuota ? largestFileNumberInQuota() : 0 );
+        if ( !loc.isOK() )
+            return loc;
+
+        Record *r = loc.getValue().rec();
+        fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
+
+        // copy the data
+        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
+        doc->writeDocument( r->data() );
+
+        addRecordToRecListInExtent(r, loc.getValue()); // XXX move down into record store
+
+        _details->incrementStats( r->netLength(), 1 );
+
+        return StatusWith<DiskLoc>( loc );
+    }
+
     StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
         if ( _indexCatalog.findIdIndex() ) {
             if ( docToInsert["_id"].eoo() ) {

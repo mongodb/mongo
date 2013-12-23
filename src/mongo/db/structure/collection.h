@@ -99,6 +99,15 @@ namespace mongo {
          */
         StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota );
 
+        class DocWriter {
+        public:
+            virtual ~DocWriter() {}
+            virtual void writeDocument( char* buf ) const = 0;
+            virtual size_t documentSize() const = 0;
+        };
+
+        StatusWith<DiskLoc> insertDocument( const DocWriter* doc, bool enforceQuota );
+
         /**
          * updates the document @ oldLocation with newDoc
          * if the document fits in the old space, it is put there

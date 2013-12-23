@@ -92,12 +92,6 @@ namespace mongo {
                        bool mayAddIndex = true,
                        bool* addedID = 0);
 
-        /* special version of insert for transaction logging -- streamlined a bit.
-           assumes ns is capped and no indexes
-           no _id field check
-        */
-        Record* fast_oplog_insert(NamespaceDetails *d, const char *ns, int len);
-
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
         static DeletedRecord* getDeletedRecord(const DiskLoc& dl);
