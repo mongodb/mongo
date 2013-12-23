@@ -444,16 +444,6 @@ namespace mongo {
     };
 #pragma pack()
 
-    /** @param o the object to insert. can be modified to add _id and thus be an in/out param
-     */
-    DiskLoc DataFileMgr::insertWithObjMod(const char* ns, BSONObj& o, bool mayInterrupt, bool god) {
-        bool addedID = false;
-        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), mayInterrupt, god, true, &addedID );
-        if( addedID && !loc.isNull() )
-            o = BSONObj::make( loc.rec() );
-        return loc;
-    }
-
     /** add a record to the end of the linked list chain within this extent. 
         require: you must have already declared write intent for the record header.        
     */

@@ -74,18 +74,6 @@ namespace mongo {
         DataFileMgr();
 
         /**
-         * insert() will add an _id to the object if not present.  If you would like to see the
-         * final object after such an addition, use this method.
-         * note: does NOT put on oplog
-         * @param o both and in and out param
-         * @param mayInterrupt When true, killop may interrupt the function call.
-         */
-        DiskLoc insertWithObjMod(const char* ns,
-                                 BSONObj& /*out*/o,
-                                 bool mayInterrupt = false,
-                                 bool god = false);
-
-        /**
          * Insert the contents of @param buf with length @param len into namespace @param ns.
          * note: does NOT put on oplog
          * @param mayInterrupt When true, killop may interrupt the function call.
