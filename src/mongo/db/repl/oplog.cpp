@@ -496,17 +496,17 @@ namespace mongo {
             opCounters->gotInsert();
 
             const char *p = strchr(ns, '.');
-            if ( p && strcmp(p, ".system.indexes") == 0 ) {
+            if ( p && nsToCollectionSubstring( p ) == "system.indexes" ) {
                 if (o["background"].trueValue()) {
                     IndexBuilder* builder = new IndexBuilder(o);
                     // This spawns a new thread and returns immediately.
                     builder->go();
                 }
                 else {
-                    Status status = collection->getIndexCatalog()->createIndex( o, true );
-                    if ( status.code() != ErrorCodes::IndexAlreadyExists ) {
-                        uassertStatusOK( status );
-                    }
+                    Client::Context* ctx = cc().getContext();
+                    verify( ctx );
+                    IndexBuilder builder(o);
+                    uassertStatusOK( builder.build( *ctx ) );
                 }
             }
             else {

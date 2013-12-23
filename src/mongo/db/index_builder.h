@@ -51,7 +51,7 @@ namespace mongo {
          */
         virtual std::string name() const;
 
-        void build( Client::Context& context ) const;
+        Status build( Client::Context& context ) const;
 
         /**
          * Kill all in-progress indexes matching criteria and, optionally, store them in the

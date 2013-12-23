@@ -58,12 +58,15 @@ namespace mongo {
 
         Client::WriteContext ctx(ns);
 
-        build( ctx.ctx() );
+        Status status = build( ctx.ctx() );
+        if ( !status.isOK() ) {
+            log() << "IndexBuilder could not build index: " << status.toString();
+        }
 
         cc().shutdown();
     }
 
-    void IndexBuilder::build( Client::Context& context ) const {
+    Status IndexBuilder::build( Client::Context& context ) const {
         string ns = _index["ns"].String();
         Database* db = context.db();
         Collection* c = db->getCollection( ns );
@@ -72,9 +75,9 @@ namespace mongo {
             verify(c);
         }
         Status status = c->getIndexCatalog()->createIndex( _index, true );
-        if ( !status.isOK() ) {
-            log() << "IndexBuilder could not build index: " << status.toString();
-        }
+        if ( status.code() == ErrorCodes::IndexAlreadyExists )
+            return Status::OK();
+        return status;
     }
 
     std::vector<BSONObj> IndexBuilder::killMatchingIndexBuilds(const BSONObj& criteria) {
