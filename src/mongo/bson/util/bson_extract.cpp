@@ -67,17 +67,20 @@ namespace mongo {
         Status status = bsonExtractField(object, fieldName, &value);
         if (status == ErrorCodes::NoSuchKey) {
             *out = defaultValue;
+            return Status::OK();
         }
         else if (!status.isOK()) {
             return status;
         }
         else if (!value.isNumber() && !value.isBoolean()) {
-            return Status(ErrorCodes::TypeMismatch, "Expected boolean or number type");
+            return Status(ErrorCodes::TypeMismatch, mongoutils::str::stream() <<
+                          "Expected boolean or number type for field \"" << fieldName <<
+                          "\", found " << typeName(value.type()));
         }
         else {
             *out = value.trueValue();
+            return Status::OK();
         }
-        return Status::OK();
     }
 
     Status bsonExtractStringField(const BSONObj& object,
@@ -103,6 +106,41 @@ namespace mongo {
             return status;
         }
         return Status::OK();
+    }
+
+    Status bsonExtractIntegerField(const BSONObj& object,
+                                   const StringData& fieldName,
+                                   long long* out) {
+        BSONElement value;
+        Status status = bsonExtractField(object, fieldName, &value);
+        if (!status.isOK())
+            return status;
+        if (!value.isNumber()) {
+            return Status(ErrorCodes::TypeMismatch, mongoutils::str::stream() <<
+                          "Expected field \"" << fieldName <<
+                          "\" to have numeric type, but found " << typeName(value.type()));
+        }
+        long long result = value.safeNumberLong();
+        if (result != value.numberDouble()) {
+            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                          "Expected field \"" << fieldName << " to have an value "
+                          "exactly representable as a 64-bit integer, but found " <<
+                          value);
+        }
+        *out = result;
+        return Status::OK();
+    }
+
+    Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
+                                              const StringData& fieldName,
+                                              long long defaultValue,
+                                              long long* out) {
+        Status status = bsonExtractIntegerField(object, fieldName, out);
+        if (status == ErrorCodes::NoSuchKey) {
+            *out = defaultValue;
+            status = Status::OK();
+        }
+        return status;
     }
 
 }  // namespace mongo

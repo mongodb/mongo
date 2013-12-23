@@ -62,6 +62,20 @@ namespace mongo {
                                    bool* out);
 
     /**
+     * Finds an element named "fieldName" in "object" that represents an integral value.
+     *
+     * Returns Status::OK() and sets *out to the element's 64-bit integer value representation on
+     * success.  Returns ErrorCodes::NoSuchKey if there are no matches for "fieldName".  Returns
+     * ErrorCodes::TypeMismatch if the value of the matching element is not of a numeric type.
+     * Returns ErrorCodes::BadValue if the value does not have an exact 64-bit integer
+     * representation.  For return values other than Status::OK(), the resulting value of "*out" is
+     * undefined.
+     */
+    Status bsonExtractIntegerField(const BSONObj& object,
+                                   const StringData& fieldName,
+                                   long long* out);
+
+    /**
      * Finds a string-typed element named "fieldName" in "object" and stores its value in "out".
      *
      * Returns Status::OK() and sets *out to the found element's string value on success.  Returns
@@ -87,6 +101,21 @@ namespace mongo {
                                               const StringData& fieldName,
                                               bool defaultValue,
                                               bool* out);
+
+    /**
+     * Finds an element named "fieldName" in "object" that represents an integral value.
+     *
+     * If a field named "fieldName" is present and is a value of numeric type with an exact 64-bit
+     * integer representation, returns that representation in *out and returns Status::OK().  If
+     * there is no field named "fieldName", stores defaultValue into *out and returns Status::OK().
+     * If the field is found, but has non-numeric type, returns ErrorCodes::TypeMismatch.  If the
+     * value has numeric type, but cannot be represented as a 64-bit integer, returns
+     * ErrorCodes::BadValue.
+     */
+    Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
+                                              const StringData& fieldName,
+                                              long long defaultValue,
+                                              long long* out);
 
     /**
      * Finds a string element named "fieldName" in "object".
