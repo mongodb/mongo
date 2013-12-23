@@ -685,8 +685,8 @@ namespace {
             else if (iterator->_dottedName == "diaglog") {
                 ASSERT_EQUALS(iterator->_singleName, "diaglog");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
-                ASSERT_EQUALS(iterator->_description, "0=off 1=W 2=R 3=both 7=W+some reads");
-                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_EQUALS(iterator->_description, "DEPRECATED: 0=off 1=W 2=R 3=both 7=W+some reads");
+                ASSERT_EQUALS(iterator->_isVisible, false);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
