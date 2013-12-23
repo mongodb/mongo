@@ -145,7 +145,8 @@ namespace mongo {
         string duplicate = duplicateUncasedName(inholderlock, _name, _path );
         if ( !duplicate.empty() ) {
             stringstream ss;
-            ss << "db already exists with different case other: [" << duplicate << "] me [" << _name << "]";
+            ss << "db already exists with different case already have: [" << duplicate
+               << "] trying to create [" << _name << "]";
             uasserted( DatabaseDifferCaseCode , ss.str() );
         }
     }

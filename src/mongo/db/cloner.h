@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -52,14 +53,10 @@ namespace mongo {
         void setConnection( DBClientBase *c ) { _conn.reset( c ); }
 
         /** copy the entire database */
-        bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl,
-                bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield,
-                bool mayBeInterrupted, int *errCode = 0);
-
-        bool go(const char *masterHost, const CloneOptions& opts, set<string>& clonedColls,
+        bool go(Client::Context& ctx,
+                const string& masterHost, const CloneOptions& opts,
+                set<string>* clonedColls,
                 string& errmsg, int *errCode = 0);
-
-        bool go(const char *masterHost, const CloneOptions& opts, string& errmsg, int *errCode = 0);
 
         bool copyCollection(const string& ns, const BSONObj& query, string& errmsg,
                             bool mayYield, bool mayBeInterrupted, bool copyIndexes = true,
@@ -75,22 +72,12 @@ namespace mongo {
 
         /**
          * @param errmsg out  - Error message (if encountered).
-         * @param slaveOk     - if true it is ok if the source of the data is !ismaster.
-         * @param useReplAuth - use the credentials we normally use as a replication slave for the
-         *                      cloning.
-         * @param snapshot    - use $snapshot mode for copying collections.  note this should not be
-         *                      used when it isn't required, as it will be slower.  for example
-         *                      repairDatabase need not use it.
          * @param errCode out - If provided, this will be set on error to the server's error code.
          *                      Currently this will only be set if there is an error in the initial
          *                      system.namespaces query.
          */
-        static bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb,
-                              bool logForReplication, bool slaveOk, bool useReplAuth,
-                              bool snapshot, bool mayYield, bool mayBeInterrupted,
-                              int *errCode = 0);
-
-        static bool cloneFrom(const string& masterHost, const CloneOptions& options,
+        static bool cloneFrom(Client::Context& context,
+                              const string& masterHost, const CloneOptions& options,
                               string& errmsg, int* errCode = 0,
                               set<string>* clonedCollections = 0);
 
@@ -100,7 +87,8 @@ namespace mongo {
         static bool copyCollectionFromRemote(const string& host, const string& ns, string& errmsg);
 
     private:
-        void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
+        void copy(Client::Context& ctx,
+                  const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
                   bool masterSameProcess, bool slaveOk, bool mayYield, bool mayBeInterrupted,
                   Query q);
 
@@ -121,7 +109,7 @@ namespace mongo {
             syncData = true;
             syncIndexes = true;
         }
-            
+
         string fromDB;
         set<string> collsToIgnore;
 

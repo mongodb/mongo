@@ -337,7 +337,7 @@ namespace mongo {
             if ( !e.embeddedObject().getBoolField( "empty" ) ) {
                 if ( name != "local" ) {
                     if ( only.empty() || only == name ) {
-                        resyncDrop( name.c_str(), requester );
+                        resyncDrop( name );
                     }
                 }
             }
@@ -347,29 +347,35 @@ namespace mongo {
         save();
     }
 
-    string ReplSource::resyncDrop( const char *db, const char *requester ) {
-        log() << "resync: dropping database " << db << endl;
+    void ReplSource::resyncDrop( const string& db ) {
+        log() << "resync: dropping database " << db;
         Client::Context ctx(db);
         dropDatabase(db);
-        return db;
     }
 
     /* grab initial copy of a database from the master */
     void ReplSource::resync(const std::string& dbName) {
         const std::string db(dbName);   // need local copy of the name, we're dropping the original
-        string dummyNs = resyncDrop( db.c_str(), "internal" );
-        Client::Context ctx( dummyNs );
+        resyncDrop( db );
+        Client::Context ctx( db );
         {
             log() << "resync: cloning database " << db << " to get an initial copy" << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
             int errCode = 0;
-            bool ok = Cloner::cloneFrom(hostName.c_str(), errmsg, cc().database()->name(), false,
-                                        /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false,
-                                        /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
+            CloneOptions cloneOptions;
+            cloneOptions.fromDB = db;
+            cloneOptions.logForRepl = false;
+            cloneOptions.slaveOk = true;
+            cloneOptions.useReplAuth = true;
+            cloneOptions.snapshot = true;
+            cloneOptions.mayYield = true;
+            cloneOptions.mayBeInterrupted = false;
+            bool ok = Cloner::cloneFrom(ctx,hostName, cloneOptions, errmsg, &errCode);
+
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
-                    resyncDrop( db.c_str(), "internal" );
+                    resyncDrop( db );
                     log() << "resync: database " << db << " not valid on the master due to a name conflict, dropping." << endl;
                     return;
                 }

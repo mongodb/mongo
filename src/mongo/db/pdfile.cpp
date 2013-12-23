@@ -947,11 +947,17 @@ namespace mongo {
             Client::Context ctx( dbName, reservedPathString );
             verify( ctx.justCreated() );
 
-            res = Cloner::cloneFrom(localhost.c_str(), errmsg, dbName,
-                                    /*logForReplication=*/false, /*slaveOk*/false,
-                                    /*replauth*/false, /*snapshot*/false, /*mayYield*/false,
-                                    /*mayBeInterrupted*/true);
- 
+
+            CloneOptions cloneOptions;
+            cloneOptions.fromDB = dbName;
+            cloneOptions.logForRepl = false;
+            cloneOptions.slaveOk = false;
+            cloneOptions.useReplAuth = false;
+            cloneOptions.snapshot = false;
+            cloneOptions.mayYield = false;
+            cloneOptions.mayBeInterrupted = true;
+            res = Cloner::cloneFrom(ctx, localhost, cloneOptions, errmsg );
+
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 

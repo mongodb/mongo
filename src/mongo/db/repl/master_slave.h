@@ -98,7 +98,7 @@ namespace mongo {
         ReplSource();
 
         // returns the dummy ns used to do the drop
-        string resyncDrop( const char *db, const char *requester );
+        void resyncDrop( const string& db );
         // call without the db mutex
         void syncToTailOfRemoteLog();
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }

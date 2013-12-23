@@ -109,7 +109,7 @@ namespace mongo {
             options.syncData = dataPass;
             options.syncIndexes = ! dataPass;
 
-            if (!cloner.go(master, options, err, &errCode)) {
+            if (!cloner.go(ctx.ctx(), master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
                                        << (dataPass ? "cloning " : "indexing ") << db
                                        << ".  " << (err.empty() ? "" : err + ".  ")
