@@ -74,7 +74,7 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 int
 __wt_block_salvage_next(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
+    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, int *eofp)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);
@@ -142,7 +142,7 @@ skip:		WT_VERBOSE_ERR(session, salvage,
 	/* Re-create the address cookie that should reference this block. */
 	endp = addr;
 	WT_ERR(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
-	*addr_sizep = WT_PTRDIFF32(endp, addr);
+	*addr_sizep = WT_PTRDIFF(endp, addr);
 
 done:
 err:	__wt_scr_free(&tmp);
@@ -155,7 +155,7 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_block_salvage_valid(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, uint32_t addr_size)
+    WT_BLOCK *block, uint8_t *addr, size_t addr_size)
 {
 	off_t offset;
 	uint32_t size, cksum;

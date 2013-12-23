@@ -89,7 +89,7 @@ __wt_cell_type_string(uint8_t type)
 const char *
 __wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
 {
-	uint32_t size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	if (WT_PAGE_IS_ROOT(page)) {
@@ -99,8 +99,8 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
 	}
 
 	(void)__wt_ref_info(
-	    session, page->parent, page->ref, &addr, &size, NULL);
-	return (__wt_addr_string(session, buf, addr, size));
+	    session, page->parent, page->ref, &addr, &addr_size, NULL);
+	return (__wt_addr_string(session, buf, addr, addr_size));
 }
 
 /*
@@ -109,8 +109,8 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
  * address.
  */
 const char *
-__wt_addr_string(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, uint32_t size)
+__wt_addr_string(WT_SESSION_IMPL *session,
+    WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	WT_BM *bm;
 
@@ -119,7 +119,7 @@ __wt_addr_string(
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
 		buf->size = strlen("[NoAddr]");
-	} else if (bm->addr_string(bm, session, buf, addr, size) != 0) {
+	} else if (bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
 		buf->data = "[Error]";
 		buf->size = strlen("[Error]");
 	}

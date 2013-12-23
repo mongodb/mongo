@@ -30,7 +30,7 @@ typedef struct {
 static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
 static int  __verify_overflow(
-	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
+	WT_SESSION_IMPL *, const uint8_t *, size_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
 	WT_SESSION_IMPL *, WT_PAGE *, int *, WT_VSTUFF *);
 static int  __verify_row_int_key_order(
@@ -51,7 +51,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
 	WT_VSTUFF *vs, _vstuff;
-	uint32_t root_addr_size;
+	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 	int bm_start;
 
@@ -97,7 +97,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
-		    ckpt->raw.data, (uint32_t)ckpt->raw.size,
+		    ckpt->raw.data, ckpt->raw.size,
 		    root_addr, &root_addr_size, 1));
 
 		/*
@@ -606,7 +606,7 @@ err:	WT_RET_MSG(session, ret,
  */
 static int
 __verify_overflow(WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, WT_VSTUFF *vs)
+    const uint8_t *addr, size_t addr_size, WT_VSTUFF *vs)
 {
 	WT_BM *bm;
 	WT_PAGE_HEADER *dsk;

@@ -155,7 +155,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 
 			/* Check if there was enough space. */
 			if (len < space) {
-				msg->size += (uint32_t)len;
+				msg->size += len;
 				break;
 			}
 
@@ -187,7 +187,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
  */
 int
 __wt_debug_addr(WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, const char *ofile)
+    const uint8_t *addr, size_t addr_size, const char *ofile)
 {
 	WT_BM *bm;
 	WT_DECL_ITEM(buf);
@@ -790,7 +790,7 @@ static int
 __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 {
 	WT_SESSION_IMPL *session;
-	uint32_t size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	session = ds->session;
@@ -818,9 +818,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
-	__dmsg(ds, " %s\n", addr == NULL ? "[NoAddr]" :
-	    __wt_addr_string(session, ds->tmp, addr, size));
+	WT_RET(__wt_ref_info(session, page, ref, &addr, &addr_size, NULL));
+	__dmsg(ds, " %s\n",
+	    __wt_addr_string(session, ds->tmp, addr, addr_size));
 
 	return (0);
 }

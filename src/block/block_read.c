@@ -13,7 +13,7 @@
  */
 int
 __wt_bm_preload(WT_BM *bm,
-    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	WT_BLOCK *block;
 	WT_DECL_RET;
@@ -23,7 +23,7 @@ __wt_bm_preload(WT_BM *bm,
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
-	ret = EINVAL; /* Play games due to conditional compilation */
+	ret = EINVAL;		/* Play games due to conditional compilation */
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
@@ -59,7 +59,7 @@ __wt_bm_preload(WT_BM *bm,
  */
 int
 __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	WT_BLOCK *block;
 	int mapped;

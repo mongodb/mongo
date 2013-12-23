@@ -284,7 +284,7 @@ __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 int
 __wt_block_verify_addr(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
 	off_t offset;
 	uint32_t cksum, size;

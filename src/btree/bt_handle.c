@@ -29,7 +29,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	uint32_t root_addr_size;
+	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 	int creation, forced_salvage, readonly;
 	const char *filename;
@@ -99,7 +99,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		 * checkpoint is for an empty file).
 		 */
 		WT_ERR(bm->checkpoint_load(bm, session,
-		    ckpt.raw.data, (uint32_t)ckpt.raw.size,
+		    ckpt.raw.data, ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
 		if (creation || root_addr_size == 0)
 			WT_ERR(__btree_tree_open_empty(session, creation));
@@ -322,7 +322,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
  */
 int
 __wt_btree_tree_open(
-    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -539,7 +539,8 @@ __btree_preload(WT_SESSION_IMPL *session)
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_REF *ref;
-	uint32_t addr_size, i;
+	size_t addr_size;
+	uint32_t i;
 	const uint8_t *addr;
 
 	btree = S2BT(session);

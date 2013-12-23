@@ -119,7 +119,7 @@ err:	__wt_spin_unlock(session, &block->live_lock);
  */
 int
 __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size, int *skipp)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int *skipp)
 {
 	WT_DECL_RET;
 	WT_EXT *ext;

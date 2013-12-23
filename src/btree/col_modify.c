@@ -212,10 +212,10 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 void
 __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	uint32_t i;
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
+	uint32_t i;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:

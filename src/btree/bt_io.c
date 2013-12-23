@@ -13,7 +13,7 @@
  */
 int
 __wt_bt_read(WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -127,7 +127,7 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
-    uint8_t *addr, uint32_t *addr_size, int checkpoint, int compressed)
+    uint8_t *addr, size_t *addr_sizep, int checkpoint, int compressed)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -144,8 +144,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
-	    (checkpoint == 0 && addr != NULL && addr_size != NULL) ||
-	    (checkpoint == 1 && addr == NULL && addr_size == NULL));
+	    (checkpoint == 0 && addr != NULL && addr_sizep != NULL) ||
+	    (checkpoint == 1 && addr == NULL && addr_sizep == NULL));
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -287,7 +287,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
 	    bm->checkpoint(bm, session, ip, btree->ckpt, data_cksum) :
-	    bm->write(bm, session, ip, addr, addr_size, data_cksum));
+	    bm->write(bm, session, ip, addr, addr_sizep, data_cksum));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_write);
 	WT_STAT_FAST_DATA_INCR(session, cache_write);

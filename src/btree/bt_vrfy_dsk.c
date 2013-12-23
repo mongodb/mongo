@@ -94,8 +94,8 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 		break;
 	default:
 		WT_RET_VRFY(session,
-		    "page at %s has an invalid flags value of 0x%" PRIx32,
-		    addr, (uint32_t)dsk->flags);
+		    "page at %s has an invalid flags value of 0x%" PRIx8,
+		    addr, dsk->flags);
 	}
 
 	/* Unused bytes */

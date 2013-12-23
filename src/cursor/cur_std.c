@@ -202,7 +202,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			key->data = cursor->raw_recno_buf;
 			WT_ERR(__wt_struct_size(
 			    session, &size, "q", cursor->recno));
-			key->size = (uint32_t)size;
+			key->size = size;
 			ret = __wt_struct_pack(session, cursor->raw_recno_buf,
 			    sizeof(cursor->raw_recno_buf), "q", cursor->recno);
 		} else

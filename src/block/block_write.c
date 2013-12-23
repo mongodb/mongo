@@ -50,27 +50,25 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  */
 int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int data_cksum)
+    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum)
 {
 	off_t offset;
 	uint32_t size, cksum;
 	uint8_t *endp;
-
-	WT_UNUSED(addr_size);
 
 	WT_RET(__wt_block_write_off(
 	    session, block, buf, &offset, &size, &cksum, data_cksum, 0));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
-	*addr_size = WT_PTRDIFF32(endp, addr);
+	*addr_sizep = WT_PTRDIFF(endp, addr);
 
 	return (0);
 }
 
 /*
  * __wt_block_write_off --
- *	Write a buffer into a block, returning the block's addr/size and
+ *	Write a buffer into a block, returning the block's offset, size and
  * checksum.
  */
 int
@@ -120,7 +118,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * Set the disk size so we don't have to incrementally read blocks
 	 * during salvage.
 	 */
-	blk->disk_size = (uint32_t)align_size;
+	blk->disk_size = WT_STORE_SIZE(align_size);
 
 	/*
 	 * Update the block's checksum: if our caller specifies, checksum the
@@ -214,7 +212,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum);
 
 	*offsetp = offset;
-	*sizep = (uint32_t)align_size;
+	*sizep = WT_STORE_SIZE(align_size);
 	*cksump = blk->cksum;
 
 	return (ret);

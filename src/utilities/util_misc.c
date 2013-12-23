@@ -43,8 +43,8 @@ util_err(int e, const char *fmt, ...)
 int
 util_read_line(ULINE *l, int eof_expected, int *eofp)
 {
-	static unsigned long long line = 0;
-	uint32_t len;
+	static uint64_t line = 0;
+	size_t len;
 	int ch;
 
 	++line;
@@ -63,10 +63,11 @@ util_read_line(ULINE *l, int eof_expected, int *eofp)
 					return (0);
 				}
 				return (util_err(0,
-				    "line %llu: unexpected end-of-file", line));
+				    "line %" PRIu64 ": unexpected end-of-file",
+				    line));
 			}
 			return (util_err(0,
-			    "line %llu: no newline terminator", line));
+			    "line %" PRIu64 ": no newline terminator", line));
 		}
 		if (ch == '\n')
 			break;

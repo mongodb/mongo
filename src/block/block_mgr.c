@@ -27,7 +27,7 @@ __bm_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_addr_string(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	return (
 	    __wt_block_addr_string(session, bm->block, buf, addr, addr_size));
@@ -39,7 +39,7 @@ __bm_addr_string(WT_BM *bm, WT_SESSION_IMPL *session,
  */
 static int
 __bm_addr_valid(WT_BM *bm,
-    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	return (__wt_block_addr_valid(session, bm->block, addr, addr_size));
 }
@@ -82,8 +82,8 @@ __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size,
-    uint8_t *root_addr, uint32_t *root_addr_size, int checkpoint)
+    const uint8_t *addr, size_t addr_size,
+    uint8_t *root_addr, size_t *root_addr_sizep, int checkpoint)
 {
 	WT_CONNECTION_IMPL *conn;
 
@@ -92,7 +92,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 	/* If not opening a checkpoint, we're opening the live system. */
 	bm->is_live = !checkpoint;
 	WT_RET(__wt_block_checkpoint_load(session, bm->block,
-	    addr, addr_size, root_addr, root_addr_size, checkpoint));
+	    addr, addr_size, root_addr, root_addr_sizep, checkpoint));
 
 	if (checkpoint) {
 		/*
@@ -179,7 +179,7 @@ __bm_compact_start(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_compact_page_skip(WT_BM *bm, WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, int *skipp)
+    const uint8_t *addr, size_t addr_size, int *skipp)
 {
 	return (__wt_block_compact_page_skip(
 	    session, bm->block, addr, addr_size, skipp));
@@ -211,7 +211,7 @@ __bm_compact_end(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_free(WT_BM *bm,
-    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	return (__wt_block_free(session, bm->block, addr, addr_size));
 }
@@ -233,10 +233,10 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  */
 static int
 __bm_write(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int data_cksum)
+    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum)
 {
 	return (__wt_block_write(
-	    session, bm->block, buf, addr, addr_size, data_cksum));
+	    session, bm->block, buf, addr, addr_sizep, data_cksum));
 }
 
 /*
@@ -265,7 +265,7 @@ __bm_salvage_start(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_salvage_valid(WT_BM *bm,
-    WT_SESSION_IMPL *session, uint8_t *addr, uint32_t addr_size)
+    WT_SESSION_IMPL *session, uint8_t *addr, size_t addr_size)
 {
 	return (__wt_block_salvage_valid(session, bm->block, addr, addr_size));
 }
@@ -276,7 +276,7 @@ __bm_salvage_valid(WT_BM *bm,
  */
 static int
 __bm_salvage_next(WT_BM *bm,
-    WT_SESSION_IMPL *session, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
+    WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, int *eofp)
 {
 	return (__wt_block_salvage_next(
 	    session, bm->block, addr, addr_sizep, eofp));
@@ -308,7 +308,7 @@ __bm_verify_start(WT_BM *bm, WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
  */
 static int
 __bm_verify_addr(WT_BM *bm,
-    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	return (__wt_block_verify_addr(session, bm->block, addr, addr_size));
 }
@@ -344,30 +344,30 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->compact_end =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->compact_page_skip = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    const uint8_t *, uint32_t, int *))__bm_readonly;
+		    const uint8_t *, size_t, int *))__bm_readonly;
 		bm->compact_skip = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *, int *))__bm_readonly;
 		bm->compact_start =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,
-		    WT_SESSION_IMPL *, const uint8_t *, uint32_t))__bm_readonly;
+		    WT_SESSION_IMPL *, const uint8_t *, size_t))__bm_readonly;
 		bm->preload = __wt_bm_preload;
 		bm->read = __wt_bm_read;
 		bm->salvage_end = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_next = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    uint8_t *, uint32_t *, int *))__bm_readonly;
+		    uint8_t *, size_t *, int *))__bm_readonly;
 		bm->salvage_start = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_valid = (int (*)(WT_BM *,
-		    WT_SESSION_IMPL *, uint8_t *, uint32_t))__bm_readonly;
+		    WT_SESSION_IMPL *, uint8_t *, size_t))__bm_readonly;
 		bm->stat = __bm_stat;
 		bm->sync = (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;
 		bm->write = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    WT_ITEM *, uint8_t *, uint32_t *, int))__bm_readonly;
+		    WT_ITEM *, uint8_t *, size_t *, int))__bm_readonly;
 		bm->write_size = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *, size_t *))__bm_readonly;
 	} else {

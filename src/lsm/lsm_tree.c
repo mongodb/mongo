@@ -343,15 +343,15 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 
 	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len,
-	    &lsm_tree->key_format));
+	WT_ERR(__wt_strndup(
+	    session, cval.str, cval.len, &lsm_tree->key_format));
 	WT_ERR(__wt_config_gets(session, cfg, "value_format", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len,
-	    &lsm_tree->value_format));
+	WT_ERR(__wt_strndup(
+	    session, cval.str, cval.len, &lsm_tree->value_format));
 
 	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len,
-	    &lsm_tree->collator_name));
+	WT_ERR(__wt_strndup(
+	    session, cval.str, cval.len, &lsm_tree->collator_name));
 
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.auto_throttle", &cval));
 	if (cval.val)
@@ -376,8 +376,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		cval.str++;
 		cval.len -= 2;
 	}
-	WT_ERR(__wt_strndup(session, cval.str, cval.len,
-	    &lsm_tree->bloom_config));
+	WT_ERR(__wt_strndup(
+	    session, cval.str, cval.len, &lsm_tree->bloom_config));
 
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;

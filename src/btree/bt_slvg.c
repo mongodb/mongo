@@ -123,13 +123,13 @@ static int  __slvg_trk_compare_gen(const void *, const void *);
 static int  __slvg_trk_compare_key(const void *, const void *);
 static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, uint32_t);
 static int  __slvg_trk_init(WT_SESSION_IMPL *, uint8_t *,
-		uint32_t, uint32_t, uint64_t, WT_STUFF *, WT_TRACK **);
+		size_t, uint32_t, uint64_t, WT_STUFF *, WT_TRACK **);
 static int  __slvg_trk_leaf(WT_SESSION_IMPL *,
-		WT_PAGE_HEADER *, uint8_t *, uint32_t, WT_STUFF *);
+		WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
 static int  __slvg_trk_leaf_ovfl(
 		WT_SESSION_IMPL *, WT_PAGE_HEADER *, WT_TRACK *);
 static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
-		WT_PAGE_HEADER *, uint8_t *, uint32_t, WT_STUFF *);
+		WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
 
 /*
  * __wt_bt_salvage --
@@ -315,8 +315,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
-	uint32_t addrbuf_size;
-	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
+	size_t addr_size;
+	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
 
 	bm = S2BT(session)->bm;
@@ -325,8 +325,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 	for (;;) {
 		/* Get the next block address from the block manager. */
-		WT_ERR(bm->salvage_next(
-		    bm, session, addrbuf, &addrbuf_size, &eof));
+		WT_ERR(bm->salvage_next(bm, session, addr, &addr_size, &eof));
 		if (eof)
 			break;
 
@@ -340,14 +339,14 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * configured, else we may be relying on compression.  If the
 		 * read fails, simply move to the next potential block.
 		 */
-		if (__wt_bt_read(session, buf, addrbuf, addrbuf_size) != 0)
+		if (__wt_bt_read(session, buf, addr, addr_size) != 0)
 			continue;
 
 		/* Tell the block manager we're taking this one. */
-		WT_ERR(bm->salvage_valid(bm, session, addrbuf, addrbuf_size));
+		WT_ERR(bm->salvage_valid(bm, session, addr, addr_size));
 
 		/* Create a printable version of the address. */
-		WT_ERR(bm->addr_string(bm, session, as, addrbuf, addrbuf_size));
+		WT_ERR(bm->addr_string(bm, session, as, addr, addr_size));
 
 		/*
 		 * Make sure it's an expected page type for the file.
@@ -367,7 +366,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			    "%s page ignored %s",
 			    __wt_page_type_string(dsk->type),
 			    (const char *)as->data);
-			WT_ERR(bm->free(bm, session, addrbuf, addrbuf_size));
+			WT_ERR(bm->free(bm, session, addr, addr_size));
 			continue;
 		}
 
@@ -385,7 +384,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			    "%s page failed verify %s",
 			    __wt_page_type_string(dsk->type),
 			    (const char *)as->data);
-			WT_ERR(bm->free(bm, session, addrbuf, addrbuf_size));
+			WT_ERR(bm->free(bm, session, addr, addr_size));
 			continue;
 		}
 
@@ -408,11 +407,11 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 				    __wt_page_type_string(dsk->type));
 
 			WT_ERR(__slvg_trk_leaf(
-			    session, dsk, addrbuf, addrbuf_size, ss));
+			    session, dsk, addr, addr_size, ss));
 			break;
 		case WT_PAGE_OVFL:
 			WT_ERR(__slvg_trk_ovfl(
-			    session, dsk, addrbuf, addrbuf_size, ss));
+			    session, dsk, addr, addr_size, ss));
 			break;
 		}
 	}
@@ -429,7 +428,7 @@ err:	__wt_scr_free(&as);
  */
 static int
 __slvg_trk_init(WT_SESSION_IMPL *session,
-    uint8_t *addr, uint32_t addr_size,
+    uint8_t *addr, size_t addr_size,
     uint32_t size, uint64_t gen, WT_STUFF *ss, WT_TRACK **retp)
 {
 	WT_DECL_RET;
@@ -440,8 +439,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &trk));
 	trk->ss = ss;
 
-	WT_ERR(__wt_strndup(session, (char *)addr, addr_size, &trk->addr.addr));
-	trk->addr.size = addr_size;
+	WT_ERR(__wt_strndup(session, addr, addr_size, &trk->addr.addr));
+	trk->addr.size = (uint8_t)addr_size;
 	trk->size = size;
 	trk->gen = gen;
 
@@ -459,7 +458,7 @@ err:	__wt_free(session, trk->addr.addr);
  */
 static int
 __slvg_trk_leaf(WT_SESSION_IMPL *session,
-    WT_PAGE_HEADER *dsk, uint8_t *addr, uint32_t size, WT_STUFF *ss)
+    WT_PAGE_HEADER *dsk, uint8_t *addr, size_t addr_size, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -481,7 +480,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
 	WT_RET(__slvg_trk_init(
-	    session, addr, size, dsk->mem_size, dsk->write_gen, ss, &trk));
+	    session, addr, addr_size, dsk->mem_size, dsk->write_gen, ss, &trk));
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -576,7 +575,7 @@ err:		__wt_free(session, trk);
  */
 static int
 __slvg_trk_ovfl(WT_SESSION_IMPL *session,
-    WT_PAGE_HEADER *dsk, uint8_t *addr, uint32_t size, WT_STUFF *ss)
+    WT_PAGE_HEADER *dsk, uint8_t *addr, size_t addr_size, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
 
@@ -588,7 +587,7 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session,
 	    session, &ss->ovfl_allocated, ss->ovfl_next + 1, &ss->ovfl));
 
 	WT_RET(__slvg_trk_init(
-	    session, addr, size, dsk->mem_size, dsk->write_gen, ss, &trk));
+	    session, addr, addr_size, dsk->mem_size, dsk->write_gen, ss, &trk));
 	ss->ovfl[ss->ovfl_next++] = trk;
 
 	return (0);
@@ -632,7 +631,7 @@ __slvg_trk_leaf_ovfl(
 		if (unpack->ovfl) {
 			WT_RET(__wt_strndup(session, unpack->data,
 			    unpack->size, &trk->ovfl[ovfl_cnt].addr));
-			trk->ovfl[ovfl_cnt].size = unpack->size;
+			trk->ovfl[ovfl_cnt].size = (uint8_t)unpack->size;
 
 			WT_VERBOSE_RET(session, salvage,
 			    "%s overflow reference %s",
@@ -1092,8 +1091,8 @@ __slvg_col_build_internal(
 			continue;
 
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
-		WT_ERR(__wt_strndup(session,
-		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
+		WT_ERR(__wt_strndup(
+		    session, trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
 		addr->type =
 		    trk->ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1672,8 +1671,8 @@ __slvg_row_build_internal(
 			continue;
 
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
-		WT_ERR(__wt_strndup(session,
-		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
+		WT_ERR(__wt_strndup(
+		    session, trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
 		addr->type =
 		    trk->ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
@@ -1952,7 +1951,7 @@ __slvg_trk_compare_addr(const void *a, const void *b)
 {
 	WT_DECL_RET;
 	WT_TRACK *a_trk, *b_trk;
-	uint32_t len;
+	size_t len;
 
 	a_trk = *(WT_TRACK **)a;
 	b_trk = *(WT_TRACK **)b;
@@ -1979,7 +1978,7 @@ __slvg_ovfl_compare(const void *a, const void *b)
 	WT_ADDR *addr;
 	WT_DECL_RET;
 	WT_TRACK *trk;
-	uint32_t len;
+	size_t len;
 
 	addr = (WT_ADDR *)a;
 	trk = *(WT_TRACK **)b;

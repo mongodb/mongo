@@ -465,7 +465,7 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 	 * the key into place.
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_IKEY) + size, &ikey));
-	ikey->size = (uint32_t)size;
+	ikey->size = WT_STORE_SIZE(size);
 	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 

@@ -451,7 +451,7 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
  */
 static inline int
 __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
-    WT_REF *ref, const uint8_t **addrp, uint32_t *sizep, u_int *typep)
+    WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;

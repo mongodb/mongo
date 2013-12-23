@@ -229,7 +229,7 @@ typedef struct {
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
-		WT_RECONCILE *, const void *, uint32_t, u_int, uint64_t);
+		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, int *);
 static int  __rec_cell_build_leaf_key(WT_SESSION_IMPL *,
@@ -841,7 +841,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
 {
 	WT_BM *bm;
-	uint32_t size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	bm = S2BT(session)->bm;
@@ -892,8 +892,9 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	if (ref->addr != NULL &&
 	    (ref->txnid == WT_TXN_NONE ||
 	    __wt_txn_visible_all(session, ref->txnid))) {
-		WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
-		WT_RET(bm->free(bm, session, addr, size));
+		WT_RET(
+		    __wt_ref_info(session, page, ref, &addr, &addr_size, NULL));
+		WT_RET(bm->free(bm, session, addr, addr_size));
 
 		if (__wt_off_page(page, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
@@ -1962,14 +1963,14 @@ __rec_split_write(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
-	uint32_t addr_size;
+	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	/* Write the chunk and save the location information. */
 	WT_RET(__wt_bt_write(
 	    session, buf, addr, &addr_size, 0, bnd->already_compressed));
-	WT_RET(__wt_strndup(session, (char *)addr, addr_size, &bnd->addr.addr));
-	bnd->addr.size = addr_size;
+	WT_RET(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
+	bnd->addr.size = (uint8_t)addr_size;
 
 	dsk = buf->mem;
 	switch (dsk->type) {
@@ -3816,7 +3817,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
-	uint32_t size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	btree = S2BT(session);
@@ -3851,8 +3852,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * it twice).
 			 */
 			WT_RET(__wt_ref_info(session,
-			    page->parent, ref, &addr, &size, NULL));
-			WT_RET(bm->free(bm, session, addr, size));
+			    page->parent, ref, &addr, &addr_size, NULL));
+			WT_RET(bm->free(bm, session, addr, addr_size));
 			if (__wt_off_page(page->parent, ref->addr)) {
 				__wt_free(
 				    session, ((WT_ADDR *)ref->addr)->addr);
@@ -4407,7 +4408,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
  */
 static void
 __rec_cell_build_addr(WT_RECONCILE *r,
-    const void *addr, uint32_t size, u_int cell_type, uint64_t recno)
+    const void *addr, size_t size, u_int cell_type, uint64_t recno)
 {
 	WT_KV *val;
 
@@ -4491,8 +4492,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
-	size_t alloc_size;
-	uint32_t size;
+	size_t size;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = S2BT(session);
@@ -4507,11 +4507,11 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	 * possible.  Else, write a new overflow record.
 	 */
 	if (!__wt_ovfl_reuse_search(session, page,
-	    &addr, &size, kv->buf.data, (uint32_t)kv->buf.size)) {
+	    &addr, &size, kv->buf.data, kv->buf.size)) {
 		/* Allocate a buffer big enough to write the overflow record. */
-		alloc_size = kv->buf.size;
-		WT_RET(bm->write_size(bm, session, &alloc_size));
-		WT_RET(__wt_scr_alloc(session, alloc_size, &tmp));
+		size = kv->buf.size;
+		WT_RET(bm->write_size(bm, session, &size));
+		WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 		/* Initialize the buffer: disk header and overflow record. */
 		dsk = tmp->mem;
@@ -4525,7 +4525,6 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 		/* Write the buffer. */
 		addr = buf;
-		size = (uint32_t)alloc_size;
 		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
 		/*
@@ -4534,7 +4533,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 		 */
 		if (!r->bulk_load)
 			WT_ERR(__wt_ovfl_reuse_add(session, page,
-			    addr, size, kv->buf.data, (uint32_t)kv->buf.size));
+			    addr, size, kv->buf.data, kv->buf.size));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */

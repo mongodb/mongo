@@ -312,10 +312,10 @@ __curindex_open_colgroups(
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
+	u_long arg;
 	/* Child cursors are opened with dump disabled. */
 	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
 	char *proj;
-	uint32_t arg;
 
 	table = cindex->table;
 	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &cp));
@@ -323,7 +323,7 @@ __curindex_open_colgroups(
 
 	/* Work out which column groups we need. */
 	for (proj = (char *)cindex->value_plan; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 		if ((*proj != WT_PROJ_KEY && *proj != WT_PROJ_VALUE) ||
 		    cp[arg] != NULL)
 			continue;

@@ -530,7 +530,7 @@ done:	/* Add the newly allocated extent to the list of allocations. */
  */
 int
 __wt_block_free(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
 	WT_DECL_RET;
 	off_t offset;

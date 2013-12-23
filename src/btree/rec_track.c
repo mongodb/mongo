@@ -73,7 +73,7 @@ __ovfl_onpage_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static WT_OVFL_ONPAGE *
 __ovfl_onpage_skip_search(
-    WT_OVFL_ONPAGE **head, const void *addr, uint32_t addr_size)
+    WT_OVFL_ONPAGE **head, const void *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **e;
 	size_t len;
@@ -120,7 +120,7 @@ __ovfl_onpage_skip_search(
  */
 static void
 __ovfl_onpage_skip_search_stack(WT_OVFL_ONPAGE **head,
-    WT_OVFL_ONPAGE ***stack, const void *addr, uint32_t addr_size)
+    WT_OVFL_ONPAGE ***stack, const void *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **e;
 	size_t len;
@@ -240,7 +240,7 @@ __ovfl_onpage_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
  * on-page overflow records.
  */
 int
-__wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
+__wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **head;
 
@@ -260,7 +260,7 @@ __wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
  */
 int
 __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
-    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
+    WT_PAGE *page, const uint8_t *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **head, *onpage, **stack[WT_SKIP_MAXDEPTH];
 	size_t size;
@@ -386,7 +386,7 @@ __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static WT_OVFL_REUSE *
 __ovfl_reuse_skip_search(
-    WT_OVFL_REUSE **head, const void *value, uint32_t value_size)
+    WT_OVFL_REUSE **head, const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **e;
 	size_t len;
@@ -433,7 +433,7 @@ __ovfl_reuse_skip_search(
  */
 static void
 __ovfl_reuse_skip_search_stack(WT_OVFL_REUSE **head,
-    WT_OVFL_REUSE ***stack, const void *value, uint32_t value_size)
+    WT_OVFL_REUSE ***stack, const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **e;
 	size_t len;
@@ -598,8 +598,8 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
-    uint8_t **addrp, uint32_t *addr_sizep,
-    const void *value, uint32_t value_size)
+    uint8_t **addrp, size_t *addr_sizep,
+    const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **head, *reuse;
 
@@ -643,8 +643,8 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 int
 __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const uint8_t *addr, uint32_t addr_size,
-    const void *value, uint32_t value_size)
+    const uint8_t *addr, size_t addr_size,
+    const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **head, *reuse, **stack[WT_SKIP_MAXDEPTH];
 	size_t size;
@@ -679,7 +679,7 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	reuse->value_offset = WT_PTRDIFF32(p, reuse);
-	reuse->value_size = value_size;
+	reuse->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
 	F_SET(reuse, WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
 
@@ -767,8 +767,7 @@ __ovfl_txnc_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Return the first matching addr in the overflow transaction-cache list.
  */
 static WT_OVFL_TXNC *
-__ovfl_txnc_skip_search(
-    WT_OVFL_TXNC **head, const void *addr, uint32_t addr_size)
+__ovfl_txnc_skip_search(WT_OVFL_TXNC **head, const void *addr, size_t addr_size)
 {
 	WT_OVFL_TXNC **e;
 	size_t len;
@@ -816,7 +815,7 @@ __ovfl_txnc_skip_search(
  */
 static void
 __ovfl_txnc_skip_search_stack(WT_OVFL_TXNC **head,
-    WT_OVFL_TXNC ***stack, const void *addr, uint32_t addr_size)
+    WT_OVFL_TXNC ***stack, const void *addr, size_t addr_size)
 {
 	WT_OVFL_TXNC **e;
 	size_t len;
@@ -914,7 +913,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_ovfl_txnc_search(
-    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size, WT_ITEM *store)
+    WT_PAGE *page, const uint8_t *addr, size_t addr_size, WT_ITEM *store)
 {
 	WT_OVFL_TXNC **head, *txnc;
 
@@ -938,7 +937,7 @@ __wt_ovfl_txnc_search(
  */
 int
 __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const uint8_t *addr, uint32_t addr_size,
+    const uint8_t *addr, size_t addr_size,
     const void *value, size_t value_size)
 {
 	WT_OVFL_TXNC **head, **stack[WT_SKIP_MAXDEPTH], *txnc;
@@ -974,7 +973,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	txnc->value_offset = WT_PTRDIFF32(p, txnc);
-	txnc->value_size = (uint32_t)value_size;
+	txnc->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
 	txnc->current = S2C(session)->txn_global.current;
 

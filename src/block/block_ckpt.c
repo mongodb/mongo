@@ -40,8 +40,8 @@ __wt_block_ckpt_init(
  */
 int
 __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    const uint8_t *addr, uint32_t addr_size,
-    uint8_t *root_addr, uint32_t *root_addr_size, int checkpoint)
+    const uint8_t *addr, size_t addr_size,
+    uint8_t *root_addr, size_t *root_addr_sizep, int checkpoint)
 {
 	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_ITEM(tmp);
@@ -56,7 +56,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * or the checkpoint was empty).  In that case we return an empty root
 	 * address, set that up now.
 	 */
-	*root_addr_size = 0;
+	*root_addr_sizep = 0;
 
 	if (WT_VERBOSE_ISSET(session, ckpt)) {
 		if (addr != NULL) {
@@ -106,7 +106,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			endp = root_addr;
 			WT_ERR(__wt_block_addr_to_buffer(block, &endp,
 			    ci->root_offset, ci->root_size, ci->root_cksum));
-			*root_addr_size = WT_PTRDIFF32(endp, root_addr);
+			*root_addr_sizep = WT_PTRDIFF(endp, root_addr);
 		}
 
 		/*

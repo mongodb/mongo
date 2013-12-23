@@ -14,13 +14,13 @@
  */
 int
 __wt_direct_io_size_check(WT_SESSION_IMPL *session,
-    const char **cfg, const char *config_name, uint32_t *sizep)
+    const char **cfg, const char *config_name, uint32_t *allocsizep)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	int64_t align;
 
-	*sizep = 0;
+	*allocsizep = 0;
 
 	conn = S2C(session);
 
@@ -42,7 +42,7 @@ __wt_direct_io_size_check(WT_SESSION_IMPL *session,
 			    "well as a multiple of the buffer alignment",
 			    config_name);
 	}
-	*sizep = (uint32_t)cval.val;
+	*allocsizep = (uint32_t)cval.val;
 	return (0);
 }
 
