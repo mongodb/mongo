@@ -854,7 +854,12 @@ namespace mongo {
                 verify( collection );
             }
 
+            // Only permit interrupting an (index build) insert if the
+            // insert comes from a socket client request rather than a
+            // parent operation using the client interface.  The parent
+            // operation might not support interrupts.
             bool mayInterrupt = cc().curop()->parent() == NULL;
+
             Status status = collection->getIndexCatalog()->createIndex( js, mayInterrupt );
 
             if ( status.code() == ErrorCodes::IndexAlreadyExists )
