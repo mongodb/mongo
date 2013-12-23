@@ -508,7 +508,10 @@ namespace mongo {
                     builder->go();
                 }
                 else {
-                    uassertStatusOK( collection->getIndexCatalog()->createIndex( o, true ) );
+                    Status status = collection->getIndexCatalog()->createIndex( o, true );
+                    if ( status.code() != ErrorCodes::IndexAlreadyExists ) {
+                        uassertStatusOK( status );
+                    }
                 }
             }
             else {
