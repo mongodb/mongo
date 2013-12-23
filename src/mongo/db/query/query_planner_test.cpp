@@ -2160,6 +2160,7 @@ namespace {
                                     "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
     }
 
+#if 0 // SERVER-12196
     TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdx) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
         addIndex(BSON("a" << 1 << "b" << 1));
@@ -2176,6 +2177,7 @@ namespace {
         assertSolutionExists("{fetch: {filter: {a:1}, node: "
                                  "{ixscan: {filter: null, pattern: {b:1}}}}}");
     }
+#endif
 
     TEST_F(QueryPlannerTest, IntersectBasicMultikey) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
