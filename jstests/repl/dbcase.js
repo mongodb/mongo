@@ -53,8 +53,7 @@ function force( cmd ) {
     print( "cmd: " + cmd );
     eval( cmd );
     while( m1.getLastError() ) {
-        sleep( 100 );
-    	m1.dropDatabase();
+        m1.dropDatabase();
         m2.dropDatabase();
         eval( cmd );
     }
@@ -64,9 +63,11 @@ m1 = m.getDB( n1 );
 m2 = m.getDB( n2 );
 
 m1.c.save( {} );
+assert( m1.getLastError() == null );
 m2.c.save( {} ); // will fail due to conflict
-m1.getLastError(); // Wait for write operations to complete.
+assert( m2.getLastError() != null );
 check( n1 );
+
 
 m1.dropDatabase();
 force( "m2.c.save( {} );" ); // will now succeed
@@ -77,11 +78,12 @@ force( "m1.c.save( {} );" );
 check( n1 );
 
 for( i = 0; i < 5; ++i ) {
- 	m1.dropDatabase();
+    m1.dropDatabase();
     force( "m2.c.save( {} );" );
     m2.dropDatabase();
     force( "m1.c.save( {} );" );
 }
+
 checkTwice( n1 );
 
 m1.dropDatabase();
@@ -90,7 +92,7 @@ force( "m2.c.save( {} );" );
 for( i = 0; i < 5; ++i ) {
     m2.dropDatabase();
     force( "m1.c.save( {} );" );
- 	m1.dropDatabase();
+    m1.dropDatabase();
     force( "m2.c.save( {} );" );
 }
 checkTwice( n2 );
