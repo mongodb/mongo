@@ -28,8 +28,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 

@@ -37,7 +37,10 @@ namespace mongo {
 
     StatusWith<BSONObj> fixDocumentForInsert( const BSONObj& doc ) {
         if ( doc.objsize() > BSONObjMaxUserSize )
-            return StatusWith<BSONObj>( ErrorCodes::BadValue, "object to insert too large" );
+            return StatusWith<BSONObj>( ErrorCodes::BadValue,
+                                        str::stream()
+                                        << "object to insert too large"
+                                        << doc.objsize() );
 
         bool firstElementIsId = doc.firstElement().fieldNameStringData() == "_id";
         bool hasTimestampToFix = false;
@@ -47,6 +50,8 @@ namespace mongo {
                 BSONElement e = i.next();
 
                 if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
+                    // we replace Timestamp(0,0) at the top level with a correct value
+                    // in the fast pass, we just mark that we want to swap
                     hasTimestampToFix = true;
                     break;
                 }
@@ -73,7 +78,7 @@ namespace mongo {
                     }
                     if ( e.type() == Array ) {
                         return StatusWith<BSONObj>( ErrorCodes::BadValue,
-                                                    "can't use a array for _id" );
+                                                    "can't use an array for _id" );
                     }
                 }
 
@@ -86,13 +91,11 @@ namespace mongo {
         bool hadId = firstElementIsId;
 
         BSONObjIterator i( doc );
-        int pos = 0;
 
         BSONObjBuilder b( doc.objsize() + 16 );
         if ( firstElementIsId ) {
             b.append( doc.firstElement() );
             i.next();
-            pos++;
         }
         else {
             BSONElement e = doc["_id"];
@@ -117,7 +120,6 @@ namespace mongo {
             else {
                 b.append( e );
             }
-            pos++;
         }
         return StatusWith<BSONObj>( b.obj() );
     }
@@ -134,7 +136,7 @@ namespace mongo {
         // validity checking
 
         if ( db.size() == 0 )
-            return Status( ErrorCodes::BadValue, "collection cannot be blank" );
+            return Status( ErrorCodes::BadValue, "db cannot be blank" );
 
         if ( !NamespaceString::validDBName( db ) )
             return Status( ErrorCodes::BadValue, "invalid db name" );
