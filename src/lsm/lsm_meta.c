@@ -156,6 +156,14 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
+	/*
+	 * If the default merge_min was not overridden, calculate it now.  We
+	 * do this here so that trees created before merge_min was added get a
+	 * sane value.
+	 */
+	if (lsm_tree->merge_min < 2)
+		lsm_tree->merge_min = WT_MAX(2, lsm_tree->merge_max / 2);
+
 err:	__wt_free(session, lsmconfig);
 	return (ret);
 }
