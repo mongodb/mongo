@@ -213,6 +213,16 @@ namespace mongo {
             ChunkVersion shardVersion;
             Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
             if ( !status.isOK() ) {
+                if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
+                    warning() << "orphaned cleanup needs to be retried, "
+                              << "collection metadata at shard version " << shardVersion
+                              << " changed during reload" << endl;
+                    // Version changed and is not yet in steady state, return the same starting
+                    // key so the client can retry again.
+                    result.append( stoppedAtKeyField(), startingFromKey );
+                    return true;
+                }
+
                 errmsg = str::stream() << "failed to refresh shard metadata: " << status.reason();
                 return false;
             }
