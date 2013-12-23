@@ -52,7 +52,7 @@ namespace mongo {
      *
      * @param   db      Database in which to create the profile collection
      * @param   force   Always create the collection if it does not exist
-     * @return  NamespaceDetails for the newly created collection, or NULL on error
+     * @return  Collection for the newly created collection, or NULL on error
     **/
     Collection* getOrCreateProfileCollection(Database *db,
                                              bool force = false,
