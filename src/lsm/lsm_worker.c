@@ -149,7 +149,12 @@ __wt_lsm_merge_worker(void *vargs)
 			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
-			stallms += 100;
+			/*
+			 * Randomize the tracking of stall time so that with
+			 * multiple LSM trees open, they don't all get
+			 * aggressive in lock-step.
+			 */
+			stallms += __wt_random() % 200;
 
 			/*
 			 * Get aggressive if more than enough chunks for a
