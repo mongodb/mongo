@@ -24,8 +24,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#if defined(__freebsd__) || defined(__openbsd__)
-#   include <sys/stat.h>
+#if defined(__freebsd__)
+#   include <sys/param.h>
+#   include <sys/mount.h>
 #endif
 
 #if defined(__linux__)
@@ -137,19 +138,28 @@ namespace mongo {
 
     // TODO: pull this out to per-OS files once they exist
     static bool useSparseFiles(int fd) {
+
+#if defined(__linux__) || defined(__freebsd__)
+        struct statfs fs_stats;
+        int ret = fstatfs(fd, &fs_stats);
+        uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
+#endif
+
 #if defined(__linux__)
 // these are from <linux/magic.h> but that isn't available on all systems
 # define NFS_SUPER_MAGIC 0x6969
 
-        struct statfs fs_stats;
-        int ret = fstatfs(fd, &fs_stats);
-        uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
-
         return (fs_stats.f_type == NFS_SUPER_MAGIC);
 
-#elif defined(__freebsd__) || defined(__sunos__)
+#elif defined(__freebsd__)
+
+        return (str::equals(fs_stats.f_fstypename, "zfs") ||
+            str::equals(fs_stats.f_fstypename, "nfs") ||
+            str::equals(fs_stats.f_fstypename, "oldnfs"));
+
+#elif defined(__sunos__)
         // assume using ZFS which is copy-on-write so no benefit to zero-filling
-        // TODO: check which fs we are using like we do on linux
+        // TODO: check which fs we are using like we do elsewhere
         return true;
 #else
         return false;
