@@ -218,6 +218,7 @@ namespace {
 
         // clusterManager role actions that target the cluster resource
         clusterManagerRoleClusterActions
+            << ActionType::appendOplogNote // backup gets this also
             << ActionType::applicationMessage // hostManager gets this also
             << ActionType::replSetConfigure
             << ActionType::replSetGetStatus // clusterMonitor gets this also
@@ -464,9 +465,11 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
 
+        ActionSet clusterActions;
+        clusterActions << ActionType::listDatabases
+                       << ActionType::appendOplogNote;
         Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
+                privileges, Privilege(ResourcePattern::forClusterResource(), clusterActions));
 
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,

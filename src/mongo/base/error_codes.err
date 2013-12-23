@@ -75,6 +75,7 @@ error_code("InvalidOptions", 72)
 error_code("InvalidNamespace", 73)
 error_code("NodeNotFound", 74)
 error_code("WriteConcernLegacyOK", 75)
+error_code("NoReplicationEnabled", 76)
 
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)

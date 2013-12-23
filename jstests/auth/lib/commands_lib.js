@@ -308,6 +308,29 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "appendOplogNote",
+            command: {appendOplogNote: 1, data: {a: 1}},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles:  {
+                        backup: 1,
+                        clusterManager: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["appendOplogNote"] }
+                    ],
+                    expectFail: true, // because no replication enabled
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
             testname: "buildInfo",
             command: {buildInfo: 1},
             testcases: [

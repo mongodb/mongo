@@ -6,6 +6,7 @@
 # also may change between versions.
 ["addShard",
 "anyAction", # Special ActionType that represents *all* actions
+"appendOplogNote",
 "applicationMessage",  # Not used for permissions checks, but to id the event in logs.
 "auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
