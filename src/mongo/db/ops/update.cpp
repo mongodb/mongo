@@ -361,7 +361,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        Status recoverFromYield(const UpdateLifecycle* lifecycle,
+        Status recoverFromYield(UpdateLifecycle* lifecycle,
                                 UpdateDriver* driver,
                                 Collection* collection,
                                 const NamespaceString& nsString) {
@@ -401,15 +401,16 @@ namespace mongo {
                               "IndexCatalog not ok().");
 
             if (lifecycle) {
+
+                lifecycle->setCollection(collection);
+
                 if (!lifecycle->canContinue()) {
                     return Status(ErrorCodes::IllegalOperation,
                                   "Update aborted due to invalid state transitions after yield.",
                                   17270);
                 }
 
-                IndexPathSet indexes;
-                lifecycle->getIndexKeys(&indexes);
-                driver->refreshIndexKeys(indexes);
+                driver->refreshIndexKeys(lifecycle->getIndexKeys());
             }
 
             return Status::OK();
@@ -448,7 +449,7 @@ namespace mongo {
         LOG(3) << "processing update : " << request;
 
         const NamespaceString& nsString = request.getNamespaceString();
-        const UpdateLifecycle* lifecycle = request.getLifecycle();
+        UpdateLifecycle* lifecycle = request.getLifecycle();
         const CurOp* curOp = cc().curop();
         Collection* collection = cc().database()->getCollection(nsString.ns());
 
@@ -459,9 +460,8 @@ namespace mongo {
         opDebug->updateobj = request.getUpdates();
 
         if (lifecycle) {
-            IndexPathSet indexes;
-            lifecycle->getIndexKeys(&indexes);
-            driver->refreshIndexKeys(indexes);
+            lifecycle->setCollection(collection);
+            driver->refreshIndexKeys(lifecycle->getIndexKeys());
         }
 
         CanonicalQuery* cq;
@@ -470,7 +470,7 @@ namespace mongo {
         }
 
         Runner* rawRunner;
-        if (!getRunner(cq, &rawRunner).isOK()) {
+        if (!getRunner(collection, cq, &rawRunner).isOK()) {
             uasserted(17243, "could not get runner " + request.getQuery().toString());
         }
 

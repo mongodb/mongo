@@ -52,16 +52,19 @@ namespace mongo {
             ChunkVersion::IGNORED()) {
     }
 
-    const bool UpdateLifecycleImpl::canContinue() const {
-        // Collection needs to exist to continue
-        Collection* coll = cc().database()->getCollection(_nsString.ns());
-        return coll;
+    void UpdateLifecycleImpl::setCollection(Collection* collection) {
+        _collection = collection;
     }
 
-    const void UpdateLifecycleImpl::getIndexKeys(IndexPathSet* returnedIndexPathSet) const {
-        Collection* coll = cc().database()->getCollection(_nsString.ns());
-        if (coll)
-            *returnedIndexPathSet = coll->infoCache()->indexKeys();
+    bool UpdateLifecycleImpl::canContinue() const {
+        // Collection needs to exist to continue
+        return _collection;
+    }
+
+    const IndexPathSet* UpdateLifecycleImpl::getIndexKeys() const {
+        if (_collection)
+            return &_collection->infoCache()->indexKeys();
+        return NULL;
     }
 
     const std::vector<FieldRef*>* UpdateLifecycleImpl::getImmutableFields() const {

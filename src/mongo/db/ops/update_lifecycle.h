@@ -40,18 +40,23 @@ namespace mongo {
         virtual ~UpdateLifecycle() {}
 
         /**
+         * Update the cached collection pointer that this lifecycle object uses.
+         */
+        virtual void setCollection(Collection* collection) = 0;
+
+        /**
          * Can the update continue?
          *
          * The (only) implementation will check the following:
          *  1.) Collection still exists
          *  2.) Shard version has not changed (indicating that the query/update is not valid
          */
-        virtual const bool canContinue() const = 0;
+        virtual bool canContinue() const = 0;
 
         /**
-         * Set the out parameter if there is a collection and it has indexes
+         * Return a pointer to any indexes if there is a collection.
          */
-        virtual const void getIndexKeys(IndexPathSet* returnedIndexPathSet) const = 0;
+        virtual const IndexPathSet* getIndexKeys() const = 0;
 
         /**
          * Returns the shard keys as immutable fields

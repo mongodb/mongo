@@ -48,6 +48,7 @@ namespace mongo {
 
     UpdateDriver::UpdateDriver(const Options& opts)
         : _replacementMode(false)
+        , _indexedFields(NULL)
         , _multi(opts.multi)
         , _upsert(opts.upsert)
         , _logOp(opts.logOp)
@@ -343,7 +344,8 @@ namespace mongo {
                 // TODO: make mightBeIndexed and fieldRef like each other.
                 if (!_affectIndices &&
                     !execInfo.noOp &&
-                    _indexedFields.mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
+                    _indexedFields &&
+                    _indexedFields->mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
                     _affectIndices = true;
                     doc->disableInPlaceUpdates();
                 }
@@ -384,7 +386,7 @@ namespace mongo {
         return _affectIndices;
     }
 
-    void UpdateDriver::refreshIndexKeys(const IndexPathSet& indexedFields) {
+    void UpdateDriver::refreshIndexKeys(const IndexPathSet* indexedFields) {
         _indexedFields = indexedFields;
     }
 
@@ -451,7 +453,7 @@ namespace mongo {
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             delete *it;
         }
-        _indexedFields.clear();
+        _indexedFields = NULL;
         _replacementMode = false;
     }
 

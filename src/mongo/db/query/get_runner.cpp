@@ -89,14 +89,26 @@ namespace mongo {
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
      */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions) {
+    Status getRunner(CanonicalQuery* rawCanonicalQuery,
+                     Runner** out, size_t plannerOptions) {
+        verify(rawCanonicalQuery);
+        Database* db = cc().database();
+        verify(db);
+        return getRunner(db->getCollection(rawCanonicalQuery->ns()),
+                         rawCanonicalQuery,
+                         out,
+                         plannerOptions);
+    }
+
+    /**
+     * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
+     * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
+     */
+    Status getRunner(Collection* collection, CanonicalQuery* rawCanonicalQuery,
+                     Runner** out, size_t plannerOptions) {
+
         verify(rawCanonicalQuery);
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
-
-        // Get the indices that we could possibly use.
-        Database* db = cc().database();
-        verify( db );
-        Collection* collection = db->getCollection( canonicalQuery->ns() );
 
         // This can happen as we're called by internal clients as well.
         if (NULL == collection) {

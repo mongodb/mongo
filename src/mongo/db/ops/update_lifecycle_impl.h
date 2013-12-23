@@ -48,11 +48,16 @@ namespace mongo {
          */
         UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsString);
 
-        virtual const bool canContinue() const;
-        virtual const void getIndexKeys(IndexPathSet* returnedIndexPathSet) const;
+        virtual void setCollection(Collection* collection);
+
+        virtual bool canContinue() const;
+
+        virtual const IndexPathSet* getIndexKeys() const;
+
         virtual const std::vector<FieldRef*>* getImmutableFields() const;
 
     private:
+        Collection* _collection;
         const NamespaceString& _nsString;
         ChunkVersion _shardVersion;
     };

@@ -31,6 +31,8 @@
 
 namespace mongo {
 
+    class Collection;
+
     /**
      * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
      *
@@ -41,6 +43,16 @@ namespace mongo {
      * rawCanonicalQuery.
      */
     Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions = 0);
+
+    /**
+     * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
+     *
+     * As 'getRunner' above, but takes a Collection* as the first argument, for cases where the
+     * work to obtain the Collection has already been done by the caller. The 'collection'
+     * argument may be NULL.
+     */
+    Status getRunner(Collection* collection, CanonicalQuery* rawCanonicalQuery,
+                     Runner** out, size_t plannerOptions = 0);
 
     /**
      * RAII approach to ensuring that runners are deregistered in newRunQuery.
