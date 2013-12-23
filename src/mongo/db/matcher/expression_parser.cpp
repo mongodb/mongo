@@ -135,7 +135,14 @@ namespace mongo {
                 size = 0;
             }
             else if ( e.type() == NumberInt || e.type() == NumberLong ) {
-                size = e.numberInt();
+                if (e.numberLong() < 0) {
+                    // SERVER-11952. Setting 'size' to -1 means that no documents
+                    // should match this $size expression.
+                    size = -1;
+                }
+                else {
+                    size = e.numberInt();
+                }
             }
             else if ( e.type() == NumberDouble ) {
                 if ( e.numberInt() == e.numberDouble() ) {
