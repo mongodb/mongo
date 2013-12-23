@@ -31,11 +31,15 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include <string>
+
+#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
+
+    class Collection;
+    class Database;
 
     /* --- profiling --------------------------------------------
        do when database->profile is set
@@ -50,6 +54,8 @@ namespace mongo {
      * @param   force   Always create the collection if it does not exist
      * @return  NamespaceDetails for the newly created collection, or NULL on error
     **/
-    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force = false, string* errmsg = NULL);
+    Collection* getOrCreateProfileCollection(Database *db,
+                                             bool force = false,
+                                             std::string* errmsg = NULL);
 
 } // namespace mongo

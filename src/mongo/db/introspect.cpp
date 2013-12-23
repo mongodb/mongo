@@ -40,6 +40,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/goodies.h"
 
 namespace {
@@ -81,7 +82,6 @@ namespace {
     static void _profile(const Client& c, CurOp& currentOp, BufBuilder& profileBufBuilder) {
         Database *db = c.database();
         DEV verify( db );
-        const char *ns = db->getProfilingNS();
 
         // build object
         BSONObjBuilder b(profileBufBuilder);
@@ -120,11 +120,9 @@ namespace {
 
         // write: not replicated
         // get or create the profiling collection
-        NamespaceDetails *details = getOrCreateProfileCollection(db);
-        if (details) {
-            int len = p.objsize();
-            Record *r = theDataFileMgr.fast_oplog_insert(details, ns, len);
-            memcpy(getDur().writingPtr(r->data(), len), p.objdata(), len);
+        Collection* profileCollection = getOrCreateProfileCollection(db);
+        if ( profileCollection ) {
+            profileCollection->insertDocument( p, false );
         }
     }
 
@@ -151,41 +149,49 @@ namespace {
         }
     }
 
-    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force, string* errmsg ) {
+    Collection* getOrCreateProfileCollection(Database *db, bool force, string* errmsg ) {
         fassert(16372, db);
         const char* profileName = db->getProfilingNS();
-        NamespaceDetails* details = db->namespaceIndex().details(profileName);
-        if (!details && (serverGlobalParams.defaultProfile || force)) {
-            // system.profile namespace doesn't exist; create it
-            log() << "creating profile collection: " << profileName << endl;
-            string myerrmsg;
-            if (!userCreateNS(profileName,
-                              BSON("capped" << true << "size" << 1024 * 1024), myerrmsg , false)) {
-                myerrmsg = str::stream() << "could not create ns " << profileName << ": " << myerrmsg;
+        Collection* collection = db->getCollection( profileName );
+
+        if ( collection ) {
+            if ( !collection->isCapped() ) {
+                string myerrmsg = str::stream() << profileName << " exists but isn't capped";
                 log() << myerrmsg << endl;
                 if ( errmsg )
                     *errmsg = myerrmsg;
                 return NULL;
             }
-            details = db->namespaceIndex().details(profileName);
+            return collection;
         }
-        else if ( details && !details->isCapped() ) {
-            string myerrmsg = str::stream() << profileName << " exists but isn't capped";
+
+        // does not exist!
+
+        if ( force == false && serverGlobalParams.defaultProfile == false ) {
+            // we don't want it, so why are we here?
+            static time_t last = time(0) - 10;  // warn the first time
+            if( time(0) > last+10 ) {
+                log() << "profile: warning ns " << profileName << " does not exist" << endl;
+                last = time(0);
+            }
+            return NULL;
+        }
+
+        // system.profile namespace doesn't exist; create it
+        log() << "creating profile collection: " << profileName << endl;
+        string myerrmsg;
+        if (!userCreateNS(profileName,
+                          BSON("capped" << true << "size" << 1024 * 1024), myerrmsg , false)) {
+            myerrmsg = str::stream() << "could not create ns " << profileName << ": " << myerrmsg;
             log() << myerrmsg << endl;
             if ( errmsg )
                 *errmsg = myerrmsg;
             return NULL;
         }
 
-        if (!details) {
-            // failed to get or create profile collection
-            static time_t last = time(0) - 10;  // warn the first time
-            if( time(0) > last+10 ) {
-                log() << "profile: warning ns " << profileName << " does not exist" << endl;
-                last = time(0);
-            }
-        }
-        return details;
+        collection = db->getCollection( profileName );
+        verify( collection );
+        return collection;
     }
 
 } // namespace mongo
