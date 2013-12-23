@@ -261,7 +261,10 @@ namespace mongo {
             verify( idxNo >= 0 );
             _deleteCacheEntry( idxNo );
 
-            return Status( ErrorCodes::InternalError, e.what(), e.getCode() );
+            ErrorCodes::Error codeToUse = ErrorCodes::fromInt( e.getCode() );
+            if ( codeToUse == ErrorCodes::UnknownError )
+                return Status( ErrorCodes::InternalError, e.what(), e.getCode() );
+            return Status( codeToUse, e.what() );
         }
 
 
