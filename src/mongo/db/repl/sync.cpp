@@ -35,6 +35,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -120,8 +121,12 @@ namespace mongo {
             return false;
         }
         else {
-            DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
-            uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
+            Collection* collection = ctx.db()->getOrCreateCollection( ns );
+            verify( collection ); // should never happen
+            StatusWith<DiskLoc> result = collection->insertDocument( missingObj, true );
+            uassert(15917,
+                    str::stream() << "failed to insert missing doc: " << result.toString(),
+                    result.isOK() );
 
             LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
             return true;
