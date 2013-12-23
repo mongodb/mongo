@@ -538,12 +538,7 @@ namespace {
         }
 
         void upgradeAuthCollections() {
-            bool done = false;
-            int iters = 0;
-            while (!done) {
-                ASSERT_OK(authzManager->upgradeSchemaStep(BSONObj(), &done));
-                ASSERT_LESS_THAN(iters++, 10);
-            }
+            ASSERT_OK(authzManager->upgradeSchema(10, BSONObj()));
         }
     };
 
@@ -554,6 +549,14 @@ namespace {
 
         validateV2UserData();
         validateV1AdminUserData(AuthorizationManager::usersBackupCollectionNamespace);
+    }
+
+    TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2TakesTwoSteps) {
+        externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
+        setUpV1UserData();
+        ASSERT_EQUALS(ErrorCodes::OperationIncomplete,
+                      authzManager->upgradeSchema(1, BSONObj()));
+        ASSERT_OK(authzManager->upgradeSchema(1, BSONObj()));
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2WithSysVerDoc) {

@@ -1290,6 +1290,25 @@ namespace {
         }
     }
 
+    Status AuthorizationManager::upgradeSchema(int maxSteps, const BSONObj& writeConcern) {
+
+        if (maxSteps < 1) {
+            return Status(ErrorCodes::BadValue,
+                          "Minimum value for maxSteps parameter to upgradeSchema is 1");
+        }
+        invalidateUserCache();
+        for (int i = 0; i < maxSteps; ++i) {
+            bool isDone;
+            Status status = upgradeSchemaStep(writeConcern, &isDone);
+            invalidateUserCache();
+            if (!status.isOK() || isDone) {
+                return status;
+            }
+        }
+        return Status(ErrorCodes::OperationIncomplete, mongoutils::str::stream() <<
+                      "Auth schema upgrade incomplete after " << maxSteps << " successful steps.");
+    }
+
 namespace {
     bool isAuthzNamespace(const StringData& ns) {
         return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||

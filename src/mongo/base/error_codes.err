@@ -76,6 +76,8 @@ error_code("InvalidNamespace", 73)
 error_code("NodeNotFound", 74)
 error_code("WriteConcernLegacyOK", 75)
 error_code("NoReplicationEnabled", 76)
+error_code("OperationIncomplete", 77)
+error_code("CommandResultSchemaViolation", 78)
 
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)

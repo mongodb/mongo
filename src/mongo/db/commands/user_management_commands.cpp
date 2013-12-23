@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/commands/user_management_commands.h"
+
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <string>
@@ -2420,67 +2424,27 @@ namespace mongo {
 
     } cmdInvalidateUserCache;
 
-    class CmdAuthSchemaUpgradeStep : public Command {
-    public:
-        CmdAuthSchemaUpgradeStep() : Command("authSchemaUpgradeStep") {}
+    CmdAuthSchemaUpgrade::CmdAuthSchemaUpgrade() : Command("authSchemaUpgrade") {}
+    CmdAuthSchemaUpgrade::~CmdAuthSchemaUpgrade() {}
 
-        virtual bool slaveOk() const { return false; }
-        virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+    bool CmdAuthSchemaUpgrade::slaveOk() const { return false; }
+    bool CmdAuthSchemaUpgrade::adminOnly() const { return true; }
+    Command::LockType CmdAuthSchemaUpgrade::locktype() const { return NONE; }
 
-        virtual void help(stringstream& ss) const {
-            ss << "Performs the next step in the process of upgrading the auth schema.";
+    void CmdAuthSchemaUpgrade::help(stringstream& ss) const {
+        ss << "Upgrades the auth data storage schema";
+    }
+
+    Status CmdAuthSchemaUpgrade::checkAuthForCommand(ClientBasic* client,
+                                                         const std::string& dbname,
+                                                         const BSONObj& cmdObj) {
+
+        AuthorizationSession* authzSession = client->getAuthorizationSession();
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
+            return Status(ErrorCodes::Unauthorized,
+                          "Not authorized to run authSchemaUpgrade command.");
         }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-
-            AuthorizationSession* authzSession = client->getAuthorizationSession();
-            if (!authzSession->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
-                return Status(ErrorCodes::Unauthorized,
-                              "Not authorized to run authSchemaUpgradeStep command.");
-            }
-            return Status::OK();
-        }
-
-        virtual bool run(
-                const string& dbname,
-                BSONObj& cmdObj,
-                int options,
-                string& errmsg,
-                BSONObjBuilder& result,
-                bool fromRepl) {
-
-            BSONObj writeConcern;
-            Status status = auth::parseAuthSchemaUpgradeStepCommand(cmdObj, dbname, &writeConcern);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("auth schema upgrade")) {
-                return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-            }
-            authzManager->invalidateUserCache();
-
-            bool done;
-            status = authzManager->upgradeSchemaStep(writeConcern, &done);
-            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-            authzManager->invalidateUserCache();
-            if (!status.isOK()) {
-                appendCommandStatus(result, status);
-                return false;
-            }
-
-            result.append("done", done);
-            return true;
-        }
-
-    } cmdAuthSchemaUpgradeStep;
+        return Status::OK();
+    }
 }

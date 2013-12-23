@@ -226,6 +226,31 @@ namespace mongo {
         }
     }
 
+    Status Command::getStatusFromCommandResult(const BSONObj& result) {
+        BSONElement okElement = result["ok"];
+        BSONElement codeElement = result["code"];
+        BSONElement errmsgElement = result["errmsg"];
+        if (okElement.eoo()) {
+            return Status(ErrorCodes::CommandResultSchemaViolation,
+                          mongoutils::str::stream() << "No \"ok\" field in command result " <<
+                          result);
+        }
+        if (okElement.trueValue()) {
+            return Status::OK();
+        }
+        int code = codeElement.numberInt();
+        if (0 == code)
+            code = ErrorCodes::UnknownError;
+        std::string errmsg;
+        if (errmsgElement.type() == String) {
+            errmsg = errmsgElement.String();
+        }
+        else if (!errmsgElement.eoo()) {
+            errmsg = errmsgElement.toString();
+        }
+        return Status(ErrorCodes::Error(code), errmsg);
+    }
+
     Status Command::checkAuthForCommand(ClientBasic* client,
                                         const std::string& dbname,
                                         const BSONObj& cmdObj) {

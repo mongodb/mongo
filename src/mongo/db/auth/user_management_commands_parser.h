@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#pragma once
+
 #include <string>
 #include <vector>
 
@@ -180,11 +182,14 @@ namespace auth {
                                                 BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "authSchemaUpgradeStep" command and
-     * parses out the write concern.
+     * Takes a command object describing an invocation of the "authSchemaUpgrade" command and
+     * parses out the write concern, maximum steps to take and whether or not shard servers should
+     * also be upgraded, in the sharded deployment case.
      */
     Status parseAuthSchemaUpgradeStepCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
+                                             int* maxSteps,
+                                             bool* shouldUpgradeShards,
                                              BSONObj* parsedWriteConcern);
     /**
      * Parses the privileges described in "privileges" into a vector of Privilege objects.
