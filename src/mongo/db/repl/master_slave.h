@@ -97,7 +97,6 @@ namespace mongo {
 
         ReplSource();
 
-        // returns the dummy ns used to do the drop
         void resyncDrop( const string& db );
         // call without the db mutex
         void syncToTailOfRemoteLog();
