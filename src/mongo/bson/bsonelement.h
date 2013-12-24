@@ -376,9 +376,6 @@ namespace mongo {
         /** Constructs an empty element */
         BSONElement();
 
-        /** Check that data is internally consistent. */
-        void validate() const;
-
         /** True if this element may contain subobjects. */
         bool mayEncapsulate() const {
             switch ( type() ) {

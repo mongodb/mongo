@@ -474,7 +474,6 @@ dodouble:
             int offset = (int) (e.rawdata() - this->objdata());
             massert( 10330 ,  "Element extends past end of object",
                      e.size() + offset <= this->objsize() );
-            e.validate();
             bool end = ( e.size() + offset == this->objsize() );
             if ( e.eoo() ) {
                 massert( 10331 ,  "EOO Before end of object", end );
@@ -487,45 +486,6 @@ dodouble:
             e.toString( s, !isArray, full, depth );
         }
         s << ( isArray ? " ]" : " }" );
-    }
-
-    inline void BSONElement::validate() const {
-        const BSONType t = type();
-
-        switch( t ) {
-        case DBRef:
-        case Code:
-        case Symbol:
-        case mongo::String: {
-            unsigned x = (unsigned) valuestrsize();
-            bool lenOk = x > 0 && x < (unsigned) BSONObjMaxInternalSize;
-            if( lenOk && valuestr()[x-1] == 0 )
-                return;
-            StringBuilder buf;
-            buf <<  "Invalid dbref/code/string/symbol size: " << x;
-            if( lenOk )
-                buf << " strnlen:" << mongo::strnlen( valuestr() , x );
-            msgasserted( 10321 , buf.str() );
-            break;
-        }
-        case CodeWScope: {
-            int totalSize = *( int * )( value() );
-            massert( 10322 ,  "Invalid CodeWScope size", totalSize >= 8 );
-            int strSizeWNull = *( int * )( value() + 4 );
-            massert( 10323 ,  "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
-            massert( 10324 ,  "Invalid CodeWScope string size",
-                     strSizeWNull > 0 &&
-                     (strSizeWNull - 1) == mongo::strnlen( codeWScopeCode(), strSizeWNull ) );
-            massert( 10325 ,  "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
-            int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
-            massert( 10326 ,  "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
-            // Subobject validation handled elsewhere.
-        }
-        case Object:
-            // We expect Object size validation to be handled elsewhere.
-        default:
-            break;
-        }
     }
 
     inline int BSONElement::size( int maxLen ) const {

@@ -266,24 +266,15 @@ namespace mongo {
 
                         if (full){
                             BSONObj obj = BSONObj::make(r);
-                            if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
+                            const Status status = validateBSON(obj.objdata(), obj.objsize());
+                            if (!status.isOK()) {
                                 valid = false;
                                 if (nInvalid == 0) // only log once;
                                     errors << "invalid bson object detected (see logs for more info)";
 
                                 nInvalid++;
-                                if (strcmp("_id", obj.firstElementFieldName()) == 0){
-                                    try {
-                                        obj.firstElement().validate(); // throws on error
-                                        log() << "Invalid bson detected in " << ns << " with _id: " << obj.firstElement().toString(false) << endl;
-                                    }
-                                    catch(...){
-                                        log() << "Invalid bson detected in " << ns << " with corrupt _id" << endl;
-                                    }
-                                }
-                                else {
-                                    log() << "Invalid bson detected in " << ns << " and couldn't find _id" << endl;
-                                }
+                                log() << "Invalid bson detected in " << ns
+                                      << ": " << status.reason();
                             }
                             else {
                                 bsonLen += obj.objsize();

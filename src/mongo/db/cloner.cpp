@@ -154,18 +154,10 @@ namespace mongo {
                 BSONObj tmp = i.nextSafe();
 
                 /* assure object is valid.  note this will slow us down a little. */
-                if ( !tmp.valid() ) {
-                    stringstream ss;
-                    ss << "Cloner: skipping corrupt object from " << from_collection;
-                    BSONElement e = tmp.firstElement();
-                    try {
-                        e.validate();
-                        ss << " firstElement: " << e;
-                    }
-                    catch( ... ) {
-                        ss << " firstElement corrupt";
-                    }
-                    out() << ss.str() << endl;
+                const Status status = validateBSON(tmp.objdata(), tmp.objsize());
+                if (!status.isOK()) {
+                    out() << "Cloner: skipping corrupt object from " << from_collection
+                          << ": " << status.reason();
                     continue;
                 }
 
