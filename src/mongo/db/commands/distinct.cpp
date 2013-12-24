@@ -88,11 +88,9 @@ namespace mongo {
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
 
-            NamespaceDetails * d = nsdetails( ns );
+            Collection* collection = cc().database()->getCollection( ns );
 
-            string cursorName;
-
-            if (!d) {
+            if (!collection) {
                 result.appendArray( "values" , BSONObj() );
                 result.append("stats", BSON("n" << 0 <<
                                             "nscanned" << 0 <<
@@ -119,6 +117,7 @@ namespace mongo {
             runner->setYieldPolicy(Runner::YIELD_AUTO);
             safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
+            string cursorName;
             BSONObj obj;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
