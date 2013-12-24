@@ -294,9 +294,6 @@ namespace mongo {
          */
         IndexDetails& getNextIndexDetails(const char* thisns);
 
-        /* returns index of the first index in which the field is present. -1 if not present. */
-        int fieldIsIndexed(const char *fieldName);
-
         /**
          * @return the actual size to create
          *         will be >= oldRecordSize

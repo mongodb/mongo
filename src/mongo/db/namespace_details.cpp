@@ -484,21 +484,6 @@ namespace mongo {
         }
     }
 
-    /* returns index of the first index in which the field is present. -1 if not present.
-       (aug08 - this method not currently used)
-    */
-    int NamespaceDetails::fieldIsIndexed(const char *fieldName) {
-        massert( 10346 , "not implemented", false);
-        /*
-        for ( int i = 0; i < nIndexes; i++ ) {
-            IndexDetails& idx = indexes[i];
-            BSONObj idxKey = idx.info.obj().getObjectField("key"); // e.g., { ts : -1 }
-            if ( !idxKey.getField(fieldName).eoo() )
-                return i;
-        }*/
-        return -1;
-    }
-
     NamespaceDetails *NamespaceDetails::writingWithExtra() {
         vector< pair< long long, unsigned > > writeRanges;
         writeRanges.push_back( make_pair( 0, sizeof( NamespaceDetails ) ) );
