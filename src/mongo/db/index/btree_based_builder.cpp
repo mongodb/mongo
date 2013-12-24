@@ -28,7 +28,7 @@
 
 #include "mongo/db/index/btree_based_builder.h"
 
-#include "mongo/db/btreebuilder.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"

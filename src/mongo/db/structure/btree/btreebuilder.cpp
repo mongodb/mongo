@@ -30,9 +30,9 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/btreebuilder.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop-inl.h"

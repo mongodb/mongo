@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 
@@ -38,7 +38,7 @@ namespace mongo {
      * We have two Btree on-disk formats which support identical operations.  We hide this as much
      * as possible by having one implementation of this interface per format.
      *
-     * For documentation on all of the methods here, look at mongo/db/btree.h
+     * For documentation on all of the methods here, look at mongo/db/structure/btree/btree.h
      */
     class BtreeInterface {
     public:

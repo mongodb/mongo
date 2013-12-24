@@ -31,7 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/btree_stats.h"
+#include "mongo/db/structure/btree/btree_stats.h"
 
 namespace mongo {
 

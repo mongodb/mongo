@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/key.h"
+#include "mongo/db/structure/btree/key.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/float_utils.h"

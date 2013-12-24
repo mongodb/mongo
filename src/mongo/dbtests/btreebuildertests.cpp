@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/btreebuilder.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/pdfile.h"

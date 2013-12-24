@@ -31,7 +31,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/btree_access_method_internal.h"

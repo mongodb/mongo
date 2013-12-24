@@ -44,7 +44,7 @@
 #include "mongo/db/dur_stats.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/key.h"
+#include "mongo/db/structure/btree/key.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/taskqueue.h"
 #include "mongo/dbtests/dbtests.h"

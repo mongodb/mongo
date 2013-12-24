@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 
 namespace mongo {
 

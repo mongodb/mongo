@@ -28,7 +28,7 @@
 
 #include "mongo/db/query_runner.h"
 
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"

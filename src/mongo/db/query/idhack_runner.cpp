@@ -28,7 +28,7 @@
 
 #include "mongo/db/query/idhack_runner.h"
 
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/projection_exec.h"

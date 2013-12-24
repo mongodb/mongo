@@ -29,10 +29,10 @@
 */
 
 #pragma once
- 
-#include "jsobj.h"
 
-namespace mongo { 
+#include "mongo/db/jsobj.h"
+
+namespace mongo {
 
     /** Key class for precomputing a small format index key that is denser than a traditional BSONObj. 
 

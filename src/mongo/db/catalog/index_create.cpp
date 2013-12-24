@@ -33,7 +33,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
-#include "mongo/db/btreebuilder.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/storage/index_details.h"

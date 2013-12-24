@@ -30,10 +30,10 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 
-#include "mongo/db/btree_stats.h"
-#include "mongo/db/btreebuilder.h"
+#include "mongo/db/structure/btree/btree_stats.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop-inl.h"
@@ -1861,13 +1861,6 @@ namespace mongo {
             return DiskLoc();
         return kn.recordLoc;
     }
-
-} // namespace mongo
-
-#include "db.h"
-#include "dbhelpers.h"
-
-namespace mongo {
 
     template< class V >
     void BtreeBucket<V>::a_test(IndexDetails& id) {
