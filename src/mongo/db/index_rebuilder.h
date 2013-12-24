@@ -28,7 +28,9 @@
 
 #pragma once
 
-#include "mongo/db/namespace_details.h"
+#include <list>
+#include <string>
+
 #include "mongo/util/background.h"
 
 namespace mongo {

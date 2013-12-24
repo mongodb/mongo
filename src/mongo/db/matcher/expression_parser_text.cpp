@@ -34,7 +34,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/namespace_details.h"
 
 namespace mongo {
 

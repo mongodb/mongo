@@ -29,12 +29,14 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/namespace_details.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
+
+    class NamespaceDetails;
 
     /**
      * OplogStart walks a collection backwards to find the first object in the collection that

@@ -32,7 +32,6 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_details.h"
 
 namespace mongo {
 
