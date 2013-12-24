@@ -184,17 +184,6 @@ namespace mongo {
         return allocationSize;
     }
 
-    /* predetermine location of the next alloc without actually doing it.
-        if cannot predetermine returns null (so still call alloc() then)
-    */
-    DiskLoc NamespaceDetails::allocWillBeAt(const char *ns, int lenToAlloc) {
-        if ( ! isCapped() ) {
-            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
-            return __stdAlloc(lenToAlloc, true);
-        }
-        return DiskLoc();
-    }
-
     /** allocate space for a new record from deleted lists.
         @param lenToAlloc is WITH header
         @return null diskloc if no room - allocate a new extent then

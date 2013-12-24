@@ -429,11 +429,6 @@ namespace mongo {
          * Quantize 'allocSize' to the nearest bucketSize (or nearest 1mb boundary for large sizes).
          */
         static int quantizePowerOf2AllocationSpace(int allocSize);
-        
-        /* predetermine location of the next alloc without actually doing it. 
-           if cannot predetermine returns null (so still call alloc() then)
-        */
-        DiskLoc allocWillBeAt(const char *ns, int lenToAlloc);
 
         /** allocate space for a new record from deleted lists.
             @param lenToAlloc is WITH header
