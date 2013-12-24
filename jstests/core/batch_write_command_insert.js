@@ -146,3 +146,17 @@ assert.eq('string', typeof result.writeErrors[0].errmsg);
 
 assert.eq(coll.count(), 1);
 
+coll.remove({});
+printjson( request = {insert : coll.getName(), documents: [{a:1}, {a:2,_id:2}] } );
+printjson( result = coll.runCommand(request) );
+assert.eq(2, coll.count() );
+coll.find().forEach(
+    function(z) {
+        var firstKey;
+        for ( var key in z ) {
+            firstKey = key;
+            break;
+        }
+        assert.eq( "_id", firstKey, tojson(z) );
+    }
+);
