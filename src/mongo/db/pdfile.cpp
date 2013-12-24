@@ -85,16 +85,6 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
-    //The oplog entries inserted
-    static TimerStats oplogInsertStats;
-    static ServerStatusMetricField<TimerStats> displayInsertedOplogEntries(
-                                                    "repl.oplog.insert",
-                                                    &oplogInsertStats );
-    static Counter64 oplogInsertBytesStats;
-    static ServerStatusMetricField<Counter64> displayInsertedOplogEntryBytes(
-                                                    "repl.oplog.insertBytes",
-                                                    &oplogInsertBytesStats );
-
     bool isValidNS( const StringData& ns ) {
         // TODO: should check for invalid characters
 
