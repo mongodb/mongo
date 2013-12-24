@@ -839,7 +839,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 
 	session = ds->session;
 
-	__dmsg(ds, "\t%s: len %" PRIu32,
+	__dmsg(ds, "\t%s: len %zu",
 	    __wt_cell_type_string(unpack->raw), unpack->size);
 
 	/* Dump cell's per-disk page type information. */

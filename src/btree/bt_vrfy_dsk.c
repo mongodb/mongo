@@ -452,7 +452,8 @@ __verify_dsk_col_var(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	uint32_t cell_num, cell_type, i, last_size;
+	size_t last_size;
+	uint32_t cell_num, cell_type, i;
 	int last_deleted;
 	const uint8_t *last_data;
 	uint8_t *end;

@@ -142,7 +142,7 @@ struct __wt_cell_unpack {
 	uint64_t v;			/* RLE count or recno */
 
 	const void *data;		/* Data */
-	uint32_t    size;		/* Data size */
+	size_t      size;		/* Data size */
 
 	size_t __len;			/* Cell + data length (usually) */
 
@@ -610,7 +610,7 @@ restart:
 			v += WT_CELL_SIZE_ADJUST;
 
 		unpack->data = p;
-		unpack->size = WT_STORE_SIZE(v);
+		unpack->size = (size_t)v;
 		unpack->__len = WT_PTRDIFF(p + unpack->size, cell);
 		break;
 

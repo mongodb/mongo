@@ -2994,8 +2994,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_REF *ref;
-	size_t klen;
-	uint32_t i, size;
+	size_t size;
+	uint32_t i;
 	u_int vtype;
 	int onpage_ovfl, ovfl_key, state;
 	const void *p;
@@ -3165,9 +3165,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			key->len = key->buf.size;
 			ovfl_key = 1;
 		} else {
-			__wt_ref_key(page, ref, &p, &klen);
+			__wt_ref_key(page, ref, &p, &size);
 			WT_RET(__rec_cell_build_int_key(
-			    session, r, p, r->cell_zero ? 1 : klen, &ovfl_key));
+			    session, r, p, r->cell_zero ? 1 : size, &ovfl_key));
 		}
 		r->cell_zero = 0;
 
@@ -3218,8 +3218,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_REF *ref;
-	size_t klen;
-	uint32_t i, size;
+	size_t size;
+	uint32_t i;
 	u_int vtype;
 	int ovfl_key, state;
 	const void *p;
@@ -3295,9 +3295,9 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Build the key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		__wt_ref_key(page, ref, &p, &klen);
+		__wt_ref_key(page, ref, &p, &size);
 		WT_RET(__rec_cell_build_int_key(
-		    session, r, p, r->cell_zero ? 1 : klen, &ovfl_key));
+		    session, r, p, r->cell_zero ? 1 : size, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
