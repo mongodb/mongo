@@ -145,7 +145,7 @@ namespace mongo {
         void writeDocument( char* start ) const {
             char* buf = start;
 
-            memcpy( buf, _frame.objdata(), _frame.objsize() -1 ); // don't copy final EOO
+            memcpy( buf, _frame.objdata(), _frame.objsize() - 1 ); // don't copy final EOO
 
             reinterpret_cast<int*>( buf )[0] = documentSize();
 
