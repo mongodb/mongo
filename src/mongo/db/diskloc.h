@@ -176,8 +176,6 @@ namespace mongo {
         template< class V >
         BtreeBucket<V> * btreemod() const;
 
-        /*DataFile& pdf() const;*/
-
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused
         void serializeForSorter(BufBuilder& buf) const { buf.appendStruct(*this); }
