@@ -28,10 +28,13 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/database.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_cache.h"

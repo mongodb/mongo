@@ -1,5 +1,7 @@
+// state-inl.h
+
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2008 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,18 +28,18 @@
 *    it in the license file.
 */
 
-#pragma once
-
-#include "mongo/db/diskloc.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/pdfile.h" // XXX-ERH :(
+#include "mongo/db/structure/btree/state.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 
-    class BSONObj;
-    class IndexDetails;
+    template< class V >
+    const BtreeBucket<V>* BtreeInMemoryState::getBucket( const DiskLoc& loc ) const {
+        Record* record = _recordStore->recordFor( loc );
+        memconcept::is(record, memconcept::concept::btreebucket, "", 8192);
+        return reinterpret_cast<const BtreeBucket<V>*>( record->data() );
+    }
 
-    class QueryRunner {
-    public:
-        static DiskLoc fastFindSingle(const IndexDetails &indexdetails, const BSONObj& key);
-    };
-
-}  // namespace mongo
+}

@@ -33,14 +33,15 @@
 #include <string>
 
 namespace mongo {
+
+    class BtreeInMemoryState;
     class Collection;
-    class IndexDescriptor;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
     // If background is true, uses background index builder; blocks until done.
     void buildAnIndex( Collection* collection,
-                       IndexDescriptor* idx,
+                       BtreeInMemoryState* btreeState,
                        bool mayInterrupt );
 
 } // namespace mongo

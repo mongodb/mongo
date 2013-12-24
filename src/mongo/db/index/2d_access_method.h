@@ -32,6 +32,7 @@
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/btree_access_method_internal.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
@@ -67,12 +68,11 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
         using BtreeBasedAccessMethod::_interface;
-        using BtreeBasedAccessMethod::_ordering;
 
-        TwoDAccessMethod(IndexDescriptor* descriptor);
+        TwoDAccessMethod(BtreeInMemoryState* btreeState);
         virtual ~TwoDAccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out);
+        virtual Status newCursor(IndexCursor** out) const;
 
     private:
         friend class TwoDIndexCursor;
@@ -97,7 +97,7 @@ namespace mongo {
         friend class twod_internal::TwoDGeoNearRunner;
 
         BtreeInterface* getInterface() { return _interface; }
-        IndexDescriptor* getDescriptor() { return _descriptor; }
+        const IndexDescriptor* getDescriptor() { return _descriptor; }
         TwoDIndexingParams& getParams() { return _params; }
 
         // This really gets the 'locs' from the provided obj.

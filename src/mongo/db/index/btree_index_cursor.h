@@ -36,6 +36,7 @@
 #include "mongo/db/index/btree_interface.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
@@ -85,7 +86,7 @@ namespace mongo {
         static SimpleMutex _activeCursorsMutex;
 
         // Go forward by default.
-        BtreeIndexCursor(IndexDescriptor *descriptor, Ordering ordering, BtreeInterface *interface);
+        BtreeIndexCursor(const BtreeInMemoryState* btreeState, BtreeInterface *interface);
 
         void skipUnusedKeys();
 
@@ -101,8 +102,7 @@ namespace mongo {
         BSONObj _emptyObj;
 
         int _direction;
-        IndexDescriptor* _descriptor;
-        Ordering _ordering;
+        const BtreeInMemoryState* _btreeState; // not-owned
         BtreeInterface* _interface;
 
         // What are we looking at RIGHT NOW?  We look at a bucket.

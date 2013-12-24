@@ -86,7 +86,7 @@ namespace mongo {
         /**
          * Return an index scan.  Caller owns returned pointer.
          */
-        static Runner* indexScan(IndexDescriptor* descriptor,
+        static Runner* indexScan(const IndexDescriptor* descriptor,
                                  const BSONObj& startKey, const BSONObj& endKey,
                                  bool endKeyInclusive, Direction direction = FORWARD,
                                  int options = 0) {

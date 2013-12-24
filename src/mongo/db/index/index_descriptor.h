@@ -148,7 +148,7 @@ namespace mongo {
 
         // Allow access to arbitrary fields in the per-index info object.  Some indices stash
         // index-specific data there.
-        BSONElement getInfoElement(const string& name) { return _infoObj[name]; }
+        BSONElement getInfoElement(const string& name) const { return _infoObj[name]; }
 
         //
         // "Internals" of accessing the index, used by IndexAccessMethod(s).

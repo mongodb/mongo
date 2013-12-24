@@ -41,6 +41,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
@@ -599,7 +600,7 @@ namespace mongo {
                     // thus this is not ideal.
                     else {
                         if (nsd == NULL ||
-                            (nsd->findIdIndex() >= 0 && Helpers::findById(nsd, updateCriteria).isNull()) ||
+                            (nsd->findIdIndex() >= 0 && Helpers::findById(collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
                             (nsd->findIdIndex() < 0 && Helpers::findOne(ns, updateCriteria, false).isNull())) {
                             failedUpdate = true;

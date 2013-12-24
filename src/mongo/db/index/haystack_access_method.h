@@ -55,11 +55,11 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HaystackAccessMethod(IndexDescriptor* descriptor);
+        HaystackAccessMethod(BtreeInMemoryState* btreeState);
         virtual ~HaystackAccessMethod() { }
 
         // Not implemented.
-        virtual Status newCursor(IndexCursor** out);
+        virtual Status newCursor(IndexCursor** out) const;
 
     protected:
         friend class GeoHaystackSearchCommand;

@@ -39,6 +39,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/type_explain.h"

@@ -39,13 +39,13 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
+#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/pagefault.h"
-#include "mongo/db/query_runner.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
@@ -114,40 +114,43 @@ namespace mongo {
     }
 
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
-                           bool * nsFound , bool * indexFound ) {
+                           bool* nsFound , bool* indexFound ) {
         Lock::assertAtLeastReadLocked(ns);
         Database *database = c.database();
         verify( database );
-        NamespaceDetails *d = database->namespaceIndex().details(ns);
-        if ( ! d )
-            return false;
-        if ( nsFound )
-            *nsFound = 1;
 
-        int idxNo = d->findIdIndex();
-        if ( idxNo < 0 )
+        Collection* collection = database->getCollection( ns );
+        if ( !collection ) {
             return false;
+        }
+
+        if ( nsFound )
+            *nsFound = true;
+
+        IndexCatalog* catalog = collection->getIndexCatalog();
+        const IndexDescriptor* desc = catalog->findIdIndex();
+
+        if ( !desc )
+            return false;
+
         if ( indexFound )
             *indexFound = 1;
 
-        IndexDetails& i = d->idx( idxNo );
-
-        BSONObj key = i.getKeyFromQuery( query );
-
-        DiskLoc loc = QueryRunner::fastFindSingle(i, key);
+        BtreeBasedAccessMethod* accessMethod = catalog->getBtreeBasedIndex( desc );
+        DiskLoc loc = accessMethod->findSingle( query["_id"].wrap() );
         if ( loc.isNull() )
             return false;
-        result = loc.obj();
+        result = collection->docFor( loc );
         return true;
     }
 
-    DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
-        verify(d);
-        int idxNo = d->findIdIndex();
-        uassert(13430, "no _id index", idxNo>=0);
-        IndexDetails& i = d->idx( idxNo );
-        BSONObj key = i.getKeyFromQuery( idquery );
-        return QueryRunner::fastFindSingle(i, key);
+    DiskLoc Helpers::findById(Collection* collection, const BSONObj& idquery) {
+        verify(collection);
+        IndexCatalog* catalog = collection->getIndexCatalog();
+        const IndexDescriptor* desc = catalog->findIdIndex();
+        uassert(13430, "no _id index", desc);
+        BtreeBasedAccessMethod* accessMethod = catalog->getBtreeBasedIndex( desc );
+        return accessMethod->findSingle( idquery["_id"].wrap() );
     }
 
     vector<BSONObj> Helpers::findAll( const string& ns , const BSONObj& query ) {

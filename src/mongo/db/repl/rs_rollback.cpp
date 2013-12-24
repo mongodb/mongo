@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"

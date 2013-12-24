@@ -359,7 +359,8 @@ namespace mongo {
                 uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
 
                 IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
-                auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
+                FTSAccessMethod* fam =
+                    reinterpret_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
                 TextStageParams params(fam->getSpec());
                 params.ns = ns;
                 params.index = index;

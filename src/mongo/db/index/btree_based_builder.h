@@ -44,6 +44,7 @@ namespace mongo {
 
     class Collection;
     class BSONObjExternalSorter;
+    class BtreeInMemoryState;
     class ExternalSortComparison;
     class IndexDescriptor;
     class IndexDetails;
@@ -57,10 +58,14 @@ namespace mongo {
         /**
          * Want to build an index?  Call this.  Throws DBException.
          */
-        static uint64_t fastBuildIndex(Collection* collection, IndexDescriptor* descriptor,
+        static uint64_t fastBuildIndex(Collection* collection,
+                                       BtreeInMemoryState* descriptor,
                                        bool mayInterrupt);
-        static DiskLoc makeEmptyIndex(const IndexDetails& idx);
-        static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
+
+        static DiskLoc makeEmptyIndex(BtreeInMemoryState* idx);
+
+        static ExternalSortComparison* getComparison(int version,
+                                                     const BSONObj& keyPattern);
 
     private:
         friend class IndexUpdateTests::AddKeysToPhaseOne;
@@ -69,18 +74,22 @@ namespace mongo {
         friend class IndexUpdateTests::InterruptDoDropDups;
 
 
-        static void addKeysToPhaseOne(Collection* collection, IndexDescriptor* idx,
-                                      const BSONObj& order, SortPhaseOne* phaseOne,
-                                      ProgressMeter* progressMeter, bool mayInterrupt );
+        static void addKeysToPhaseOne(Collection* collection,
+                                      const IndexDescriptor* idx,
+                                      const BSONObj& order,
+                                      SortPhaseOne* phaseOne,
+                                      ProgressMeter* progressMeter,
+                                      bool mayInterrupt );
 
-        static void doDropDups(Collection* collection, const set<DiskLoc>& dupsToDrop,
+        static void doDropDups(Collection* collection,
+                               const set<DiskLoc>& dupsToDrop,
                                bool mayInterrupt );
     };
 
     // Exposed for testing purposes.
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   IndexDescriptor* idx,
+                                   BtreeInMemoryState* btreeState,
                                    BSONObjExternalSorter& sorter,
                                    bool dropDups,
                                    set<DiskLoc>& dupsToDrop,

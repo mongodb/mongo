@@ -1,5 +1,7 @@
+// state.cpp
+
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2008 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,24 +28,34 @@
 *    it in the license file.
 */
 
-#include "mongo/db/query_runner.h"
+#include "mongo/db/structure/btree/state.h"
 
-#include "mongo/db/structure/btree/btree.h"
-#include "mongo/db/storage/index_details.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 
-    // static
-    DiskLoc QueryRunner::fastFindSingle(const IndexDetails &indexdetails, const BSONObj& key) {
-        const int version = indexdetails.version();
-        if (0 == version) {
-            return indexdetails.head.btree<V0>()->findSingle(indexdetails, indexdetails.head, key);
-        } else {
-            verify(1 == version);
-            return indexdetails.head.btree<V1>()->findSingle(indexdetails, indexdetails.head, key);
-        }
+    BtreeInMemoryState::BtreeInMemoryState( Collection* collection,
+                                            const IndexDescriptor* descriptor,
+                                            RecordStore* recordStore,
+                                            IndexDetails* details )
+        : _collection( collection ),
+          _descriptor( descriptor ),
+          _recordStore( recordStore ),
+          _indexDetails( details ),
+          _ordering( Ordering::make( descriptor->keyPattern() ) ) {
     }
 
-}  // namespace mongo
+    const DiskLoc& BtreeInMemoryState::head() const { return _indexDetails->head; }
+
+    void BtreeInMemoryState::setHead( DiskLoc newHead ) {
+        _indexDetails->head.writing() = newHead;
+    }
+
+    void BtreeInMemoryState::setMultikey() {
+        _collection->getIndexCatalog()->markMultikey( _descriptor, true );
+    }
+
+}

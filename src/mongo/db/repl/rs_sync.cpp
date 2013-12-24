@@ -35,6 +35,7 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_string.h"

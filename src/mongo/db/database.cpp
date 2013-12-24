@@ -40,6 +40,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/database_holder.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"

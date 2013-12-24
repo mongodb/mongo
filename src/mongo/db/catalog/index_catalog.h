@@ -40,6 +40,7 @@ namespace mongo {
     class Collection;
     class NamespaceDetails;
 
+    class BtreeInMemoryState;
     class IndexDescriptor;
     class IndexDetails;
     class IndexAccessMethod;
@@ -95,11 +96,11 @@ namespace mongo {
         IndexDescriptor* getDescriptor( int idxNo );
 
         // never returns NULL
-        IndexAccessMethod* getIndex( IndexDescriptor* desc );
+        IndexAccessMethod* getIndex( const IndexDescriptor* desc );
 
-        BtreeBasedAccessMethod* getBtreeBasedIndex( IndexDescriptor* desc );
+        BtreeBasedAccessMethod* getBtreeBasedIndex( const IndexDescriptor* desc );
 
-        IndexAccessMethod* getBtreeIndex( IndexDescriptor* desc );
+        IndexAccessMethod* getBtreeIndex( const IndexDescriptor* desc );
 
         class IndexIterator {
         public:
@@ -149,7 +150,7 @@ namespace mongo {
          */
         BSONObj prepOneUnfinishedIndex();
 
-        void markMultikey( IndexDescriptor* idx, bool isMultikey = true );
+        void markMultikey( const IndexDescriptor* idx, bool isMultikey = true );
 
         // --- these probably become private?
 
@@ -201,6 +202,8 @@ namespace mongo {
         static BSONObj fixIndexKey( const BSONObj& key );
 
     private:
+
+        BtreeInMemoryState* createInMemory( const IndexDescriptor* descriptor );
 
         void _deleteCacheEntry( unsigned i );
         void _fixDescriptorCacheNumbers();

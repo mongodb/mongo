@@ -33,7 +33,6 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher.h"
@@ -48,6 +47,9 @@ namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     class ClientCursor;
+    class CurOp;
+    class Database;
+    class NamespaceDetails;
     class ParsedQuery;
 
     typedef long long CursorId; /* passed to the client so it can send back on getMore */

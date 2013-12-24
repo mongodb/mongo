@@ -30,12 +30,14 @@
 
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index/btree_interface.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
@@ -48,8 +50,10 @@ namespace mongo {
      * 3. override getKeys.
      */
     class BtreeBasedAccessMethod : public IndexAccessMethod {
+        MONGO_DISALLOW_COPYING( BtreeBasedAccessMethod );
     public:
-        BtreeBasedAccessMethod(IndexDescriptor *descriptor);
+        BtreeBasedAccessMethod( BtreeInMemoryState* btreeState );
+
         virtual ~BtreeBasedAccessMethod() { }
 
         virtual Status insert(const BSONObj& obj,
@@ -70,11 +74,13 @@ namespace mongo {
 
         virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated);
 
-        virtual Status newCursor(IndexCursor **out) = 0;
+        virtual Status newCursor(IndexCursor **out) const = 0;
 
         virtual Status touch(const BSONObj& obj);
 
         virtual Status validate(int64_t* numKeys);
+
+        virtual DiskLoc findSingle( const BSONObj& key );
 
     protected:
         // Friends who need getKeys.
@@ -85,8 +91,8 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
-        IndexDescriptor* _descriptor;
-        Ordering _ordering;
+        scoped_ptr<BtreeInMemoryState> _btreeState; // OWNED HERE
+        const IndexDescriptor* _descriptor;
 
         // There are 2 types of Btree disk formats.  We put them both behind one interface.
         BtreeInterface* _interface;

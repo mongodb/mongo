@@ -224,7 +224,7 @@ namespace twod_exec {
     // The only time these may be equal is when we actually equal the location
     // itself, otherwise our expanding algorithm will fail.
     // static
-    bool BtreeLocation::initial(IndexDescriptor* descriptor, const TwoDIndexingParams& params,
+    bool BtreeLocation::initial(const IndexDescriptor* descriptor, const TwoDIndexingParams& params,
             BtreeLocation& min, BtreeLocation& max, GeoHash start) {
         verify(descriptor);
 

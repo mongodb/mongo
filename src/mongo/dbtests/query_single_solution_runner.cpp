@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"

@@ -38,14 +38,16 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    static int configValueWithDefault(IndexDescriptor *desc, const string& name, int def) {
+    static int configValueWithDefault(const IndexDescriptor *desc, const string& name, int def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberInt(); }
         return def;
     }
 
-    S2AccessMethod::S2AccessMethod(IndexDescriptor *descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    S2AccessMethod::S2AccessMethod(BtreeInMemoryState* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         // Set up basic params.
         _params.maxKeysPerInsert = 200;
@@ -83,7 +85,7 @@ namespace mongo {
                 geoFields >= 1);
     }
 
-    Status S2AccessMethod::newCursor(IndexCursor** out) {
+    Status S2AccessMethod::newCursor(IndexCursor** out) const {
         return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2");
     }
 

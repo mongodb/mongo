@@ -33,6 +33,8 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/accumulator.h"

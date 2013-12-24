@@ -32,7 +32,6 @@
 
 #include "mongo/db/structure/btree/btreebuilder.h"
 
-#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop-inl.h"
@@ -44,26 +43,26 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/structure/btree/btree.h"
+#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
     /* --- BtreeBuilder --- */
 
     template<class V>
-    BtreeBuilder<V>::BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx) :
-        dupsAllowed(_dupsAllowed),
-        idx(_idx),
-        n(0),
-        order( idx.keyPattern() ),
-        ordering( Ordering::make(idx.keyPattern()) ) {
-        first = cur = BtreeBucket<V>::addBucket(idx);
+    BtreeBuilder<V>::BtreeBuilder(bool dupsAllowed, BtreeInMemoryState* btreeState ):
+        _dupsAllowed(dupsAllowed),
+        _btreeState(btreeState),
+        _numAdded(0) {
+        first = cur = BtreeBucket<V>::addBucket(btreeState);
         b = cur.btreemod<V>();
         committed = false;
     }
 
     template<class V>
     void BtreeBuilder<V>::newBucket() {
-        DiskLoc L = BtreeBucket<V>::addBucket(idx);
+        DiskLoc L = BtreeBucket<V>::addBucket(_btreeState);
         b->setTempNext(L);
         cur = L;
         b = cur.btreemod<V>();
@@ -78,11 +77,10 @@ namespace mongo {
 
     template<class V>
     void BtreeBuilder<V>::addKey(BSONObj& _key, DiskLoc loc) {
-
         auto_ptr< KeyOwned > key( new KeyOwned(_key) );
         if ( key->dataSize() > BtreeBucket<V>::KeyMax ) {
             string msg = str::stream() << "Btree::insert: key too large to index, failing "
-                                       << idx.indexNamespace()
+                                       << _btreeState->descriptor()->indexNamespace()
                                        << ' ' << key->dataSize() << ' ' << key->toString();
             problem() << msg << endl;
             if ( isMaster( NULL ) ) {
@@ -91,24 +89,25 @@ namespace mongo {
             return;
         }
 
-        if( !dupsAllowed ) {
-            if( n > 0 ) {
-                int cmp = keyLast->woCompare(*key, ordering);
+        if( !_dupsAllowed ) {
+            if( _numAdded > 0 ) {
+                int cmp = keyLast->woCompare(*key, _btreeState->ordering());
                 massert( 10288 ,  "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
                 if( cmp == 0 ) {
                     //if( !dupsAllowed )
-                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket<V>::dupKeyError( idx , *keyLast ) );
+                    uasserted( ASSERT_ID_DUPKEY, BtreeBucket<V>::dupKeyError( _btreeState->descriptor(),
+                                                                              *keyLast ) );
                 }
             }
         }
 
-        if ( ! b->_pushBack(loc, *key, ordering, DiskLoc()) ) {
+        if ( ! b->_pushBack(loc, *key, _btreeState->ordering(), DiskLoc()) ) {
             // bucket was full
             newBucket();
-            b->pushBack(loc, *key, ordering, DiskLoc());
+            b->pushBack(loc, *key, _btreeState->ordering(), DiskLoc());
         }
         keyLast = key;
-        n++;
+        _numAdded++;
         mayCommitProgressDurably();
     }
 
@@ -118,12 +117,12 @@ namespace mongo {
         while( 1 ) {
             if( loc.btree<V>()->tempNext().isNull() ) {
                 // only 1 bucket at this level. we are done.
-                getDur().writingDiskLoc(idx.head) = loc;
+                _btreeState->setHead( loc );
                 break;
             }
             levels++;
 
-            DiskLoc upLoc = BtreeBucket<V>::addBucket(idx);
+            DiskLoc upLoc = BtreeBucket<V>::addBucket(_btreeState);
             DiskLoc upStart = upLoc;
             BtreeBucket<V> *up = upLoc.btreemod<V>();
 
@@ -143,13 +142,13 @@ namespace mongo {
                 bool keepX = ( x->n != 0 );
                 DiskLoc keepLoc = keepX ? xloc : x->nextChild;
 
-                if ( ! up->_pushBack(r, k, ordering, keepLoc) ) {
+                if ( ! up->_pushBack(r, k, _btreeState->ordering(), keepLoc) ) {
                     // current bucket full
-                    DiskLoc n = BtreeBucket<V>::addBucket(idx);
+                    DiskLoc n = BtreeBucket<V>::addBucket(_btreeState);
                     up->setTempNext(n);
                     upLoc = n;
                     up = upLoc.btreemod<V>();
-                    up->pushBack(r, k, ordering, keepLoc);
+                    up->pushBack(r, k, _btreeState->ordering(), keepLoc);
                 }
 
                 DiskLoc nextLoc = x->tempNext(); // get next in chain at current level
@@ -162,7 +161,7 @@ namespace mongo {
                         ll.btreemod<V>()->parent = upLoc;
                         //(x->nextChild.btreemod<V>())->parent = upLoc;
                     }
-                    x->deallocBucket( xloc, idx );
+                    x->deallocBucket( _btreeState, xloc );
                 }
                 xloc = nextLoc;
             }

@@ -28,7 +28,9 @@
 
 #include "mongo/db/ops/delete.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/database.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner_common.h"

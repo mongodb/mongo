@@ -39,8 +39,10 @@ namespace mongo {
 
     static const string GEOSEARCHNAME = "geoHaystack";
 
-    HaystackAccessMethod::HaystackAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    HaystackAccessMethod::HaystackAccessMethod(BtreeInMemoryState* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         BSONElement e = descriptor->getInfoElement("bucketSize");
         uassert(16777, "need bucketSize", e.isNumber());
@@ -135,7 +137,7 @@ namespace mongo {
         keys->insert(buf.obj());
     }
 
-    Status HaystackAccessMethod::newCursor(IndexCursor** out) {
+    Status HaystackAccessMethod::newCursor(IndexCursor** out) const {
         return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on Haystack");
     }
 

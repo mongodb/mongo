@@ -43,10 +43,10 @@ namespace mongo {
     SimpleMutex BtreeIndexCursor::_activeCursorsMutex("active_btree_index_cursors");
 
     // Go forward by default.
-    BtreeIndexCursor::BtreeIndexCursor(IndexDescriptor *descriptor, Ordering ordering,
+    BtreeIndexCursor::BtreeIndexCursor(const BtreeInMemoryState* btreeState,
                                        BtreeInterface *interface)
-        : _direction(1), _descriptor(descriptor), _ordering(ordering), _interface(interface),
-          _bucket(descriptor->getHead()), _keyOffset(0) {
+        : _direction(1), _btreeState(btreeState), _interface(interface),
+          _bucket(btreeState->head()), _keyOffset(0) {
 
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);
         _activeCursors.insert(this);
@@ -90,15 +90,13 @@ namespace mongo {
         // Unused out parameter.
         bool found;
 
-        _bucket = _interface->locate(
-                _descriptor->getOnDisk(),
-                _descriptor->getHead(),
-                position,
-                _ordering,
-                _keyOffset,
-                found,
-                1 == _direction ? minDiskLoc : maxDiskLoc,
-                _direction);
+        _bucket = _interface->locate( _btreeState,
+                                      _btreeState->head(),
+                                      position,
+                                      _keyOffset,
+                                      found,
+                                      1 == _direction ? minDiskLoc : maxDiskLoc,
+                                      _direction);
 
         skipUnusedKeys();
 
@@ -111,20 +109,18 @@ namespace mongo {
 
         // Bucket is modified by customLocate.  Seeks start @ the root, so we set _bucket to the
         // root here.
-        _bucket = _descriptor->getHead();
+        _bucket = _btreeState->head();
         _keyOffset = 0;
 
-        _interface->customLocate(
-                _bucket,
-                _keyOffset,
-                _emptyObj,
-                0,
-                false,
-                position,
-                inclusive,
-                _ordering,
-                (int)_direction,
-                ignored);
+        _interface->customLocate(_btreeState,
+                                 _bucket,
+                                 _keyOffset,
+                                 _emptyObj,
+                                 0, false,
+                                 position,
+                                 inclusive,
+                                 (int)_direction,
+                                 ignored);
 
         skipUnusedKeys();
 
@@ -134,16 +130,15 @@ namespace mongo {
     Status BtreeIndexCursor::skip(const BSONObj &keyBegin, int keyBeginLen, bool afterKey,
                                   const vector<const BSONElement*>& keyEnd,
                                   const vector<bool>& keyEndInclusive) {
-        _interface->advanceTo(
-            _bucket,
-            _keyOffset,
-            keyBegin,
-            keyBeginLen,
-            afterKey,
-            keyEnd,
-            keyEndInclusive,
-            _ordering,
-            (int)_direction);
+        _interface->advanceTo(_btreeState,
+                              _bucket,
+                              _keyOffset,
+                              keyBegin,
+                              keyBeginLen,
+                              afterKey,
+                              keyEnd,
+                              keyEndInclusive,
+                              (int)_direction);
 
         skipUnusedKeys();
         return Status::OK();
@@ -206,15 +201,13 @@ namespace mongo {
         bool found;
 
         // Why don't we just call seek?  Because we want to pass _savedLoc.
-        _bucket = _interface->locate(
-                _descriptor->getOnDisk(),
-                _descriptor->getHead(),
-                _savedKey,
-                _ordering,
-                _keyOffset,
-                found, 
-                _savedLoc,
-                _direction);
+        _bucket = _interface->locate(_btreeState,
+                                     _btreeState->head(),
+                                     _savedKey,
+                                     _keyOffset,
+                                     found,
+                                     _savedLoc,
+                                     _direction);
 
         skipUnusedKeys();
 
@@ -256,7 +249,7 @@ namespace mongo {
 
     // Move to the next/prev. key.  Used by normal getNext and also skipping unused keys.
     void BtreeIndexCursor::advance(const char* caller) {
-        _bucket = _interface->advance(_bucket, _keyOffset, _direction, caller);
+        _bucket = _interface->advance(_btreeState, _bucket, _keyOffset, _direction, caller);
     }
 
 }  // namespace mongo

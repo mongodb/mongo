@@ -53,12 +53,11 @@ namespace mongo {
         // superclass and subclasses (like this) can use them.
         using BtreeBasedAccessMethod::_descriptor;
         using BtreeBasedAccessMethod::_interface;
-        using BtreeBasedAccessMethod::_ordering;
 
-        BtreeAccessMethod(IndexDescriptor* descriptor);
+        BtreeAccessMethod(BtreeInMemoryState* btreeState );
         virtual ~BtreeAccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out);
+        virtual Status newCursor(IndexCursor** out) const;
 
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);

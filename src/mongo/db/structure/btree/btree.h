@@ -39,6 +39,9 @@
 
 namespace mongo {
 
+    class BtreeInMemoryState;
+    class IndexDescriptor;
+
     /**
      * Our btree implementation generally follows the standard btree algorithm,
      * which is described in many places.  The nodes of our btree are referred to
@@ -666,17 +669,17 @@ namespace mongo {
          * likewise below in bt_insert() etc.
          */
     private:
-        bool exists(const IndexDetails& idx, const DiskLoc &thisLoc, const Key& key, const Ordering& order) const;
+        bool exists(const BtreeInMemoryState* btreeState, const DiskLoc &thisLoc, const Key& key ) const;
     public:
 
         /**
          * @param self - Don't complain about ourself already being in the index case.
          * @return true = There is a duplicate used key.
          */
-        bool wouldCreateDup(
-            const IndexDetails& idx, const DiskLoc &thisLoc,
-            const Key& key, const Ordering& order,
-            const DiskLoc &self) const;
+        bool wouldCreateDup(const BtreeInMemoryState* btreeState,
+                            const DiskLoc& thisLoc,
+                            const Key& key,
+                            const DiskLoc& self) const;
 
         /**
          * Preconditions: none
@@ -684,7 +687,7 @@ namespace mongo {
          *  and init()-ed.  This bucket is suitable to for use as a new root
          *  or any other new node in the tree.
          */
-        static DiskLoc addBucket(const IndexDetails&);
+        static DiskLoc addBucket(BtreeInMemoryState* btreeState);
 
         /**
          * Preconditions: none
@@ -693,7 +696,7 @@ namespace mongo {
          *    deallocated from pdfile storage.
          *  - The memory at thisLoc is invalidated, and 'this' is invalidated.
          */
-        void deallocBucket(const DiskLoc thisLoc, const IndexDetails &id);
+        void deallocBucket(BtreeInMemoryState* btreeState, const DiskLoc thisLoc );
 
         /**
          * Preconditions:
@@ -709,10 +712,12 @@ namespace mongo {
          *    and @return 0.  The root of the btree may be changed, so
          *    'this'/thisLoc may no longer be the root upon return.
          */
-        int bt_insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
-                      const BSONObj& key, const Ordering &order, bool dupsAllowed,
-                      IndexDetails& idx, bool toplevel = true) const;
-
+        int bt_insert(BtreeInMemoryState* btreeState,
+                      const DiskLoc thisLoc,
+                      const DiskLoc recordLoc,
+                      const BSONObj& key,
+                      bool dupsallowed,
+                      bool toplevel) const;
         /**
          * Preconditions:
          *  - 'key' has a valid schema for this index, and may have objsize() > KeyMax.
@@ -722,7 +727,10 @@ namespace mongo {
          *    invalidate 'this' / thisLoc and change the head.
          *  - If key / recordLoc are not in the btree, @return false and do nothing.
          */
-        bool unindex(const DiskLoc thisLoc, IndexDetails& id, const BSONObj& key, const DiskLoc recordLoc) const;
+        bool unindex(BtreeInMemoryState* btreeState,
+                     const DiskLoc thisLoc,
+                     const BSONObj& key,
+                     const DiskLoc recordLoc) const;
 
         /**
          * locate may return an "unused" key that is just a marker.  so be careful.
@@ -731,10 +739,21 @@ namespace mongo {
          * @found - returns true if exact match found.  note you can get back a position
          *          result even if found is false.
          */
-        DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
-                       int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) const;
-        DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const Key& key, const Ordering &order,
-                       int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) const;
+        DiskLoc locate(const BtreeInMemoryState* btreeState,
+                       const DiskLoc& thisLoc,
+                       const BSONObj& key,
+                       int& pos,
+                       bool& found,
+                       const DiskLoc& recordLoc,
+                       int direction=1) const;
+
+        DiskLoc locate(const BtreeInMemoryState* btreeState,
+                       const DiskLoc& thisLoc,
+                       const Key& key,
+                       int& pos,
+                       bool& found,
+                       const DiskLoc& recordLoc,
+                       int direction=1) const;
 
         /**
          * find the first instance of the key
@@ -743,7 +762,9 @@ namespace mongo {
          *          findSingle code.
          * @return the record location of the first match
          */
-        DiskLoc findSingle( const IndexDetails &indexdetails , const DiskLoc& thisLoc, const BSONObj& key ) const;
+        DiskLoc findSingle( const BtreeInMemoryState* btreeState,
+                            const DiskLoc& thisLoc,
+                            const BSONObj& key ) const;
 
         /**
          * Advance to next or previous key in the index.
@@ -752,18 +773,32 @@ namespace mongo {
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) const;
 
         /** Advance in specified direction to the specified key */
-        void advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) const;
+        void advanceTo(const BtreeInMemoryState* btreeState,
+                       DiskLoc &thisLoc,
+                       int &keyOfs,
+                       const BSONObj &keyBegin,
+                       int keyBeginLen,
+                       bool afterKey,
+                       const vector<const BSONElement*>& keyEnd,
+                       const vector<bool>& keyEndInclusive,
+                       int direction) const;
 
         /** Locate a key with fields comprised of a combination of keyBegin fields and keyEnd fields. */
-        static void customLocate(DiskLoc &locInOut, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, pair< DiskLoc, int > &bestParent ) ;
+        static void customLocate(const BtreeInMemoryState* btreeState,
+                                 DiskLoc& locInOut,
+                                 int& keyOfs,
+                                 const BSONObj& keyBegin,
+                                 int keyBeginLen, bool afterVersion,
+                                 const vector<const BSONElement*>& keyEnd,
+                                 const vector<bool>& keyEndInclusive,
+                                 int direction,
+                                 pair<DiskLoc, int>& bestParent);
 
         /** @return head of the btree by traversing from current bucket. */
         const DiskLoc getHead(const DiskLoc& thisLoc) const;
 
         /** get tree shape */
         void shape(stringstream&) const;
-
-        static void a_test(IndexDetails&);
 
         static int getKeyMax();
 
@@ -788,7 +823,7 @@ namespace mongo {
          *  - This bucket is deallocated from pdfile storage.
          *  - 'this' and thisLoc are invalidated.
          */
-        void delBucket(const DiskLoc thisLoc, const IndexDetails&);
+        void delBucket(BtreeInMemoryState* btreeState, const DiskLoc thisLoc );
 
         /**
          * Preconditions: 0 <= p < n
@@ -797,7 +832,9 @@ namespace mongo {
          *  - 'this' and thisLoc may be invalidated.
          *  - The tree head may change.
          */
-        void delKeyAtPos(const DiskLoc thisLoc, IndexDetails& id, int p, const Ordering &order);
+        void delKeyAtPos(BtreeInMemoryState* btreeSate,
+                         const DiskLoc thisLoc,
+                         int p );
 
         /**
          * Preconditions:
@@ -809,7 +846,7 @@ namespace mongo {
          *    or merge with them and return true.  Also, 'this' and thisLoc may
          *    be invalidated and the tree head may change.
          */
-        bool mayBalanceWithNeighbors(const DiskLoc thisLoc, IndexDetails &id, const Ordering &order) const;
+        bool mayBalanceWithNeighbors(BtreeInMemoryState* btreeState, const DiskLoc thisLoc);
 
         /**
          * Preconditions:
@@ -822,7 +859,7 @@ namespace mongo {
          *  - Otherwise, balance keys between the leftIndex child and the
          *    leftIndex + 1 child, return true, and possibly change the tree head.
          */
-        bool tryBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order ) const;
+        bool tryBalanceChildren(BtreeInMemoryState* btreeState, const DiskLoc thisLoc, int leftIndex) const;
 
         /**
          * Preconditions:
@@ -833,7 +870,7 @@ namespace mongo {
          *    child such that neither child has fewer than lowWaterMark bytes.
          *    The tree head may change.
          */
-        void doBalanceChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order );
+        void doBalanceChildren( BtreeInMemoryState* btreeState, const DiskLoc thisLoc, int leftIndex );
         
         /**
          * Preconditions:
@@ -847,10 +884,10 @@ namespace mongo {
          *    The previous key in thisLoc at index leftIndex and all keys with
          *    indexes greater than split in lchild are moved to rchild.
          */
-        void doBalanceLeftToRight( const DiskLoc thisLoc, int leftIndex, int split,
+        void doBalanceLeftToRight( BtreeInMemoryState* btreeState,
+                                   const DiskLoc thisLoc, int leftIndex, int split,
                                    BtreeBucket<V> *l, const DiskLoc lchild,
-                                   BtreeBucket<V> *r, const DiskLoc rchild,
-                                   IndexDetails &id, const Ordering &order );
+                                   BtreeBucket<V> *r, const DiskLoc rchild );
         /**
          * Preconditions:
          *  - All preconditions of doBalanceChildren
@@ -863,11 +900,11 @@ namespace mongo {
          *    head.  The previous key in thisLoc at index leftIndex and all keys
          *    with indexes less than split - l->n - 1 in rchild are moved to
          *    lchild.
-         */        
-        void doBalanceRightToLeft( const DiskLoc thisLoc, int leftIndex, int split,
+         */
+        void doBalanceRightToLeft( BtreeInMemoryState* btreeState,
+                                   const DiskLoc thisLoc, int leftIndex, int split,
                                    BtreeBucket<V> *l, const DiskLoc lchild,
-                                   BtreeBucket<V> *r, const DiskLoc rchild,
-                                   IndexDetails &id, const Ordering &order );
+                                   BtreeBucket<V> *r, const DiskLoc rchild );
 
         /**
          * Preconditions:
@@ -878,7 +915,7 @@ namespace mongo {
          *  - The tree may be updated recursively, resulting in 'this' and
          *    thisLoc being invalidated and the tree head being changed.
          */
-        void doMergeChildren( const DiskLoc thisLoc, int leftIndex, IndexDetails &id, const Ordering &order);
+        void doMergeChildren(BtreeInMemoryState* btreeState,const DiskLoc thisLoc, int leftIndex );
 
         /**
          * Preconditions:
@@ -889,7 +926,7 @@ namespace mongo {
          *    to them are updated, and the tree head may change.
          *  - nextChild replaces thisLoc in the btree structure.
          */
-        void replaceWithNextChild( const DiskLoc thisLoc, IndexDetails &id );
+        void replaceWithNextChild( BtreeInMemoryState* btreeState, const DiskLoc thisLoc );
 
         /**
          * @return true iff the leftIndex and leftIndex + 1 children both exist,
@@ -936,9 +973,10 @@ namespace mongo {
          *    into one of the split buckets, and lchild/rchild set appropriately.
          *    Splitting may occur recursively, possibly changing the tree head.
          */
-        void split(const DiskLoc thisLoc, int keypos,
+        void split(BtreeInMemoryState* btreeState,
+                   const DiskLoc thisLoc, int keypos,
                    const DiskLoc recordLoc, const Key& key,
-                   const Ordering& order, const DiskLoc lchild, const DiskLoc rchild, IndexDetails& idx);
+                   const DiskLoc lchild, const DiskLoc rchild);
 
         /**
          * Preconditions:
@@ -956,16 +994,23 @@ namespace mongo {
          * This function will always modify thisLoc, but it's marked const because
          * it commonly relies on the specialized writ]e intent mechanism of basicInsert().
          */
-        void insertHere(const DiskLoc thisLoc, int keypos,
-                        const DiskLoc recordLoc, const Key& key, const Ordering &order,
-                        const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx) const;
+        void insertHere(BtreeInMemoryState* btreeState,
+                        const DiskLoc thisLoc, int keypos,
+                        const DiskLoc recordLoc, const Key& key,
+                        const DiskLoc lchild, const DiskLoc rchild ) const;
 
         /** bt_insert() is basically just a wrapper around this. */
-        int _insert(const DiskLoc thisLoc, const DiskLoc recordLoc,
-                    const Key& key, const Ordering &order, bool dupsAllowed,
-                    const DiskLoc lChild, const DiskLoc rChild, IndexDetails &idx) const;
+        int _insert(BtreeInMemoryState* btreeState,
+                    const DiskLoc thisLoc, const DiskLoc recordLoc,
+                    const Key& key, bool dupsallowed,
+                    const DiskLoc lChild, const DiskLoc rChild ) const;
 
-        bool find(const IndexDetails& idx, const Key& key, const DiskLoc &recordLoc, const Ordering &order, int& pos, bool assertIfDup) const;        
+        bool find(const BtreeInMemoryState* btreeState,
+                  const Key& key,
+                  const DiskLoc &recordLoc,
+                  int& pos,
+                  bool assertIfDup) const;
+
         static bool customFind( int l, int h, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction, DiskLoc &thisLoc, int &keyOfs, pair< DiskLoc, int > &bestParent ) ;
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
         static int customBSONCmp( const BSONObj &l, const BSONObj &rBegin, int rBeginLen, bool rSup, const vector< const BSONElement * > &rEnd, const vector< bool > &rEndInclusive, const Ordering &o, int direction );
@@ -987,9 +1032,13 @@ namespace mongo {
          *    head.
          *  - childForPos( keypos ) will be orphaned.
          */
-        void setInternalKey( const DiskLoc thisLoc, int keypos,
-                             const DiskLoc recordLoc, const Key &key, const Ordering &order,
-                             const DiskLoc lchild, const DiskLoc rchild, IndexDetails &idx);
+        void setInternalKey( BtreeInMemoryState* btreeState,
+                             const DiskLoc thisLoc,
+                             int keypos,
+                             const DiskLoc recordLoc,
+                             const Key &key,
+                             const DiskLoc lchild,
+                             const DiskLoc rchild );
 
         /**
          * Preconditions:
@@ -1004,10 +1053,10 @@ namespace mongo {
          *  - If the key cannot be replaced, it will be marked as unused.  This
          *    is only expected in legacy btrees.
          */
-        void deleteInternalKey( const DiskLoc thisLoc, int keypos, IndexDetails &id, const Ordering &order );
+        void deleteInternalKey( BtreeInMemoryState* btreeState, const DiskLoc thisLoc, int keypos );
     public:
         /** simply builds and returns a dup key error message string */
-        static string dupKeyError( const IndexDetails& idx , const Key& key );
+        static string dupKeyError( const IndexDescriptor* idx , const Key& key );
     };
 #pragma pack()
 

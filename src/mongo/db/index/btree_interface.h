@@ -28,11 +28,12 @@
 
 #pragma once
 
-#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+    class BtreeInMemoryState;
 
     /**
      * We have two Btree on-disk formats which support identical operations.  We hide this as much
@@ -50,63 +51,64 @@ namespace mongo {
         // was deleted.  Calling code needs to be able to recognize this and possibly ignore it.
         static const int deletedBucketCode = 16738;
 
-        virtual int bt_insert(const DiskLoc thisLoc,
+        virtual int bt_insert(BtreeInMemoryState* btreeState,
+                              const DiskLoc thisLoc,
                               const DiskLoc recordLoc,
                               const BSONObj& key,
-                              const Ordering &order,
-                              bool dupsAllowed,
-                              IndexDetails& idx,
-                              bool toplevel = true) const = 0;
+                              bool dupsallowed,
+                              bool toplevel = true) = 0;
 
-        virtual bool unindex(const DiskLoc thisLoc,
-                             IndexDetails& id,
+        virtual bool unindex(BtreeInMemoryState* btreeState,
+                             const DiskLoc thisLoc,
                              const BSONObj& key,
-                             const DiskLoc recordLoc) const = 0;
+                             const DiskLoc recordLoc) = 0;
 
-        virtual DiskLoc locate(const IndexDetails& idx,
+        virtual DiskLoc locate(const BtreeInMemoryState* btreeState,
                                const DiskLoc& thisLoc,
                                const BSONObj& key,
-                               const Ordering& order,
-                               int& pos,
-                               bool& found,
-                               const DiskLoc& recordLoc,
+                               int& pos, // out
+                               bool& found, // out
+                               const DiskLoc& recordLoc, // out
                                int direction = 1) const = 0;
 
-        virtual bool wouldCreateDup(const IndexDetails& idx,
+        virtual bool wouldCreateDup(const BtreeInMemoryState* btreeState,
                                     const DiskLoc& thisLoc,
                                     const BSONObj& key,
-                                    const Ordering& order,
                                     const DiskLoc& self) const = 0;
 
-        virtual void customLocate(DiskLoc& locInOut,
+        virtual void customLocate(const BtreeInMemoryState* btreeState,
+                                  DiskLoc& locInOut,
                                   int& keyOfs,
                                   const BSONObj& keyBegin,
                                   int keyBeginLen, bool afterKey,
                                   const vector<const BSONElement*>& keyEnd,
                                   const vector<bool>& keyEndInclusive,
-                                  const Ordering& order,
                                   int direction,
-                                  pair<DiskLoc, int>& bestParent) = 0 ;
+                                  pair<DiskLoc, int>& bestParent) const = 0 ;
 
-        virtual void advanceTo(DiskLoc &thisLoc,
+        virtual void advanceTo(const BtreeInMemoryState* btreeState,
+                               DiskLoc &thisLoc,
                                int &keyOfs,
                                const BSONObj &keyBegin,
                                int keyBeginLen,
                                bool afterKey,
                                const vector<const BSONElement*>& keyEnd,
                                const vector<bool>& keyEndInclusive,
-                               const Ordering& order, int direction) const = 0;
+                               int direction) const = 0;
 
-        virtual string dupKeyError(DiskLoc bucket,
-                                   const IndexDetails &idx,
+        virtual string dupKeyError(const BtreeInMemoryState* btreeState,
+                                   DiskLoc bucket,
                                    const BSONObj& keyObj) const =0;
 
-        virtual DiskLoc advance(const DiskLoc& thisLoc,
+        virtual DiskLoc advance(const BtreeInMemoryState* btreeState,
+                                const DiskLoc& thisLoc,
                                 int& keyOfs,
                                 int direction,
                                 const char* caller) const = 0;
 
-        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj& keyPattern) = 0;
+        virtual long long fullValidate(const BtreeInMemoryState* btreeState,
+                                       const DiskLoc& thisLoc,
+                                       const BSONObj& keyPattern) = 0;
 
         /**
          * These methods are here so that the BtreeCursor doesn't need to do any templating for the

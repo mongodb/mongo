@@ -45,6 +45,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"

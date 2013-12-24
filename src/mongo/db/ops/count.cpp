@@ -30,7 +30,9 @@
 
 #include "mongo/db/ops/count.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
 
 namespace mongo {

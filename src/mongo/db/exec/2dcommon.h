@@ -131,8 +131,8 @@ namespace twod_exec {
         // Returns the min and max keys which bound a particular location.
         // The only time these may be equal is when we actually equal the location
         // itself, otherwise our expanding algorithm will fail.
-        static bool initial(IndexDescriptor* descriptor, const TwoDIndexingParams& params,
-                             BtreeLocation& min, BtreeLocation& max, GeoHash start);
+        static bool initial(const IndexDescriptor* descriptor, const TwoDIndexingParams& params,
+                            BtreeLocation& min, BtreeLocation& max, GeoHash start);
     };
 
     //
@@ -268,7 +268,7 @@ namespace twod_exec {
 
         shared_ptr<GeoHash> _expPrefix;
         mutable vector<GeoHash> _expPrefixes;
-        IndexDescriptor* _descriptor;
+        const IndexDescriptor* _descriptor;
         shared_ptr<GeoHashConverter> _converter;
         TwoDIndexingParams _params;
     };

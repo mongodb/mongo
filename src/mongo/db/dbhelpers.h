@@ -40,6 +40,7 @@ namespace mongo {
 
     extern const BSONObj reverseNaturalObj; // {"$natural": -1 }
 
+    class Collection;
     class Cursor;
 
     /**
@@ -90,9 +91,10 @@ namespace mongo {
         static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result ,
                              bool * nsFound = 0 , bool * indexFound = 0 );
 
-        /* uasserts if no _id index.
-           @return null loc if not found */
-        static DiskLoc findById(NamespaceDetails *d, BSONObj query);
+        /* TODO: should this move into Collection?
+         * uasserts if no _id index.
+         * @return null loc if not found */
+        static DiskLoc findById(Collection* collection, const BSONObj& query);
 
         /** Get/put the first (or last) object from a collection.  Generally only useful if the collection
             only ever has a single object -- which is a "singleton collection".

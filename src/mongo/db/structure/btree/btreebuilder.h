@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    class BtreeInMemoryState;
+
     /**
      * build btree from the bottom up
      */
@@ -39,15 +41,15 @@ namespace mongo {
     class BtreeBuilder {
         typedef typename V::KeyOwned KeyOwned;
         typedef typename V::Key Key;
-        
-        bool dupsAllowed;
-        IndexDetails& idx;
+
+        bool _dupsAllowed;
+        BtreeInMemoryState* _btreeState;
         /** Number of keys added to btree. */
-        unsigned long long n;
+        unsigned long long _numAdded;
+
         /** Last key passed to addKey(). */
         auto_ptr< typename V::KeyOwned > keyLast;
-        BSONObj order;
-        Ordering ordering;
+
         /** true iff commit() completed successfully. */
         bool committed;
 
@@ -59,7 +61,7 @@ namespace mongo {
         void mayCommitProgressDurably();
 
     public:
-        BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx);
+        BtreeBuilder(bool dupsAllowed, BtreeInMemoryState* idx);
 
         /**
          * Preconditions: 'key' is > or >= last key passed to this function (depends on _dupsAllowed)
@@ -73,7 +75,7 @@ namespace mongo {
          */
         void commit(bool mayInterrupt);
 
-        unsigned long long getn() { return n; }
+        unsigned long long getn() { return _numAdded; }
     };
 
 }

@@ -48,6 +48,8 @@ namespace mongo {
                    ExtentManager* em,
                    bool isSystemIndexes );
 
+        Record* recordFor( const DiskLoc& loc ) const;
+
         void deleteRecord( const DiskLoc& dl );
 
         StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax );

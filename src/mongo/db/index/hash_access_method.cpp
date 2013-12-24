@@ -37,8 +37,10 @@ namespace mongo {
         return BSONElementHasher::hash64(e, seed);
     }
 
-    HashAccessMethod::HashAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    HashAccessMethod::HashAccessMethod(BtreeInMemoryState* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         const string HASHED_INDEX_TYPE_IDENTIFIER = "hashed";
 
@@ -76,7 +78,7 @@ namespace mongo {
         _hashedField = firstElt.fieldName();
     }
 
-    Status HashAccessMethod::newCursor(IndexCursor** out) {
+    Status HashAccessMethod::newCursor(IndexCursor** out) const {
         return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on hash");
     }
 

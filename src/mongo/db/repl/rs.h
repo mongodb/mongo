@@ -738,7 +738,7 @@ namespace mongo {
             _hbinfo.health = 1.0;
     }
 
-    inline bool ignoreUniqueIndex(IndexDescriptor* idx) {
+    inline bool ignoreUniqueIndex(const IndexDescriptor* idx) {
         if (!idx->unique()) {
             return false;
         }

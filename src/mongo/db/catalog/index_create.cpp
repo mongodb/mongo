@@ -54,7 +54,7 @@ namespace mongo {
     /**
      * Add the provided (obj, dl) pair to the provided index.
      */
-    static void addKeysToIndex( Collection* collection, IndexDescriptor* desc,
+    static void addKeysToIndex( Collection* collection, const IndexDescriptor* desc,
                                 const BSONObj& obj, const DiskLoc &recordLoc ) {
 
         verify( desc );
@@ -81,11 +81,11 @@ namespace mongo {
             : BackgroundOperation(ns) {
         }
 
-        unsigned long long go( Collection* collection, IndexDescriptor* idx );
+        unsigned long long go( Collection* collection, BtreeInMemoryState* idx );
 
     private:
         unsigned long long addExistingToIndex( Collection* collection,
-                                               IndexDescriptor* idx );
+                                               const IndexDescriptor* idx );
 
         void prep(const StringData& ns ) {
             Lock::assertWriteLocked(ns);
@@ -102,7 +102,8 @@ namespace mongo {
 
     };
 
-    unsigned long long BackgroundIndexBuildJob::go( Collection* collection, IndexDescriptor* idx) {
+    unsigned long long BackgroundIndexBuildJob::go( Collection* collection,
+                                                    BtreeInMemoryState* btreeState) {
 
         string ns = collection->ns().ns();
 
@@ -113,8 +114,9 @@ namespace mongo {
         prep( ns );
 
         try {
-            idx->getOnDisk().head.writing() = BtreeBasedBuilder::makeEmptyIndex( idx->getOnDisk() );
-            unsigned long long n = addExistingToIndex( collection, idx );
+            //idx->getOnDisk().head.writing() = BtreeBasedBuilder::makeEmptyIndex( idx->getOnDisk() );
+            btreeState->setHead( BtreeBasedBuilder::makeEmptyIndex( btreeState ) );
+            unsigned long long n = addExistingToIndex( collection, btreeState->descriptor() );
             // idx may point at an invalid index entry at this point
             done( ns );
             return n;
@@ -126,7 +128,7 @@ namespace mongo {
     }
 
     unsigned long long BackgroundIndexBuildJob::addExistingToIndex( Collection* collection,
-                                                                    IndexDescriptor* idx ) {
+                                                                    const IndexDescriptor* idx ) {
 
         string ns = collection->ns().ns(); // our copy for sanity
 
@@ -225,10 +227,12 @@ namespace mongo {
 
     // throws DBException
     void buildAnIndex( Collection* collection,
-                       IndexDescriptor* idx,
+                       BtreeInMemoryState* btreeState,
                        bool mayInterrupt ) {
 
         string ns = collection->ns().ns(); // our copy
+
+        const IndexDescriptor* idx = btreeState->descriptor();
 
         const BSONObj& idxInfo = idx->infoObj();
 
@@ -243,12 +247,12 @@ namespace mongo {
         verify( Lock::isWriteLocked( ns ) );
 
         if( inDBRepair || !idxInfo["background"].trueValue() ) {
-            n = BtreeBasedBuilder::fastBuildIndex( collection, idx, mayInterrupt );
+            n = BtreeBasedBuilder::fastBuildIndex( collection, btreeState, mayInterrupt );
             verify( !idx->getHead().isNull() );
         }
         else {
             BackgroundIndexBuildJob j( ns );
-            n = j.go( collection, idx );
+            n = j.go( collection, btreeState );
         }
         MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. "
                       << t.millis() / 1000.0 << " secs" << endl;

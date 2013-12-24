@@ -50,6 +50,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dur_commitjob.h"
 #include "mongo/db/dur_journal.h"

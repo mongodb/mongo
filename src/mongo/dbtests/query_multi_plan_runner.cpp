@@ -26,6 +26,7 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/db/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"

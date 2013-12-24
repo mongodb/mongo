@@ -37,14 +37,15 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pdfile_private.h"
+#include "mongo/db/structure/btree/state-inl.h"
 
 namespace mongo {
 
-    BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexDescriptor *descriptor)
-        : _descriptor(descriptor), _ordering(Ordering::make(_descriptor->keyPattern())) {
+    BtreeBasedAccessMethod::BtreeBasedAccessMethod(BtreeInMemoryState* btreeState)
+        : _btreeState(btreeState), _descriptor(btreeState->descriptor()) {
 
-        verify(0 == descriptor->version() || 1 == descriptor->version());
-        _interface = BtreeInterface::interfaces[descriptor->version()];
+        verify(0 == _descriptor->version() || 1 == _descriptor->version());
+        _interface = BtreeInterface::interfaces[_descriptor->version()];
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
@@ -61,8 +62,12 @@ namespace mongo {
 
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
             try {
-                _interface->bt_insert(_descriptor->getHead(), loc, *i, _ordering,
-                                      options.dupsAllowed, _descriptor->getOnDisk(), true);
+                _interface->bt_insert(_btreeState.get(),
+                                      _btreeState->head(),
+                                      loc,
+                                      *i,
+                                      options.dupsAllowed,
+                                      true);
                 ++*numInserted;
             } catch (AssertionException& e) {
                 if (10287 == e.getCode() && _descriptor->isBackgroundIndex()) {
@@ -86,7 +91,7 @@ namespace mongo {
         }
 
         if (*numInserted > 1) {
-            _descriptor->setMultikey();
+            _btreeState->setMultikey();
         }
 
         return ret;
@@ -96,7 +101,10 @@ namespace mongo {
         bool ret = false;
 
         try {
-            ret = _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), key, loc);
+            ret = _interface->unindex(_btreeState.get(),
+                                      _btreeState->head(),
+                                      key,
+                                      loc);
         } catch (AssertionException& e) {
             problem() << "Assertion failure: _unindex failed "
                 << _descriptor->indexNamespace() << endl;
@@ -160,15 +168,37 @@ namespace mongo {
             int unusedPos;
             bool unusedFound;
             DiskLoc unusedDiskLoc;
-            _interface->locate(_descriptor->getOnDisk(), _descriptor->getHead(), *i, _ordering,
-                               unusedPos, unusedFound, unusedDiskLoc, 1);
+            _interface->locate(_btreeState.get(),
+                               _descriptor->getHead(),
+                               *i,
+                               unusedPos,
+                               unusedFound,
+                               unusedDiskLoc,
+                               1);
         }
 
         return Status::OK();
     }
 
+    DiskLoc BtreeBasedAccessMethod::findSingle( const BSONObj& key ) {
+        if ( 0 == _descriptor->version() ) {
+            return _btreeState->getHeadBucket<V0>()->findSingle( _btreeState.get(),
+                                                                 _btreeState->head(),
+                                                                 key );
+        }
+        if ( 1 == _descriptor->version() ) {
+            return _btreeState->getHeadBucket<V1>()->findSingle( _btreeState.get(),
+                                                                 _btreeState->head(),
+                                                                 key );
+        }
+        verify( 0 );
+    }
+
+
     Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
-        *numKeys = _interface->fullValidate(_descriptor->getHead(), _descriptor->keyPattern());
+        *numKeys = _interface->fullValidate(_btreeState.get(),
+                                            _descriptor->getHead(),
+                                            _descriptor->keyPattern());
         return Status::OK();
     }
 
@@ -193,12 +223,13 @@ namespace mongo {
 
         if (checkForDups) {
             for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                if (_interface->wouldCreateDup(_descriptor->getOnDisk(), _descriptor->getHead(),
-                                               **i, _ordering, record)) {
+                if (_interface->wouldCreateDup(_btreeState.get(),
+                                               _btreeState->head(),
+                                               **i, record)) {
                     status->_isValid = false;
                     return Status(ErrorCodes::DuplicateKey,
-                                  _interface->dupKeyError(_descriptor->getHead(),
-                                                          _descriptor->getOnDisk(),
+                                  _interface->dupKeyError(_btreeState.get(),
+                                                          _btreeState->head(),
                                                           **i));
                 }
             }
@@ -218,16 +249,22 @@ namespace mongo {
             static_cast<BtreeBasedPrivateUpdateData*>(ticket._indexSpecificUpdateData.get());
 
         if (data->oldKeys.size() + data->added.size() - data->removed.size() > 1) {
-            _descriptor->setMultikey();
+            _btreeState->setMultikey();
         }
 
         for (size_t i = 0; i < data->added.size(); ++i) {
-            _interface->bt_insert(_descriptor->getHead(), data->loc, *data->added[i], _ordering,
-                                  data->dupsAllowed, _descriptor->getOnDisk(), true);
+            _interface->bt_insert(_btreeState.get(),
+                                  _btreeState->head(),
+                                  data->loc,
+                                  *data->added[i],
+                                  data->dupsAllowed,
+                                  true);
         }
 
         for (size_t i = 0; i < data->removed.size(); ++i) {
-            _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), *data->removed[i],
+            _interface->unindex(_btreeState.get(),
+                                _btreeState->head(),
+                                *data->removed[i],
                                 data->loc);
         }
 
@@ -237,8 +274,8 @@ namespace mongo {
     }
 
     // Standard Btree implementation below.
-    BtreeAccessMethod::BtreeAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    BtreeAccessMethod::BtreeAccessMethod(BtreeInMemoryState* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
 
         // The key generation wants these values.
         vector<const char*> fieldNames;
@@ -251,10 +288,10 @@ namespace mongo {
             fixed.push_back(BSONElement());
         }
 
-        if (0 == descriptor->version()) {
+        if (0 == _descriptor->version()) {
             _keyGenerator.reset(new BtreeKeyGeneratorV0(fieldNames, fixed,
                 _descriptor->isSparse()));
-        } else if (1 == descriptor->version()) {
+        } else if (1 == _descriptor->version()) {
             _keyGenerator.reset(new BtreeKeyGeneratorV1(fieldNames, fixed,
                 _descriptor->isSparse()));
         } else {
@@ -266,8 +303,8 @@ namespace mongo {
         _keyGenerator->getKeys(obj, keys);
     }
 
-    Status BtreeAccessMethod::newCursor(IndexCursor** out) {
-        *out = new BtreeIndexCursor(_descriptor, _ordering, _interface);
+    Status BtreeAccessMethod::newCursor(IndexCursor** out) const {
+        *out = new BtreeIndexCursor(_btreeState.get(), _interface);
         return Status::OK();
     }
 

@@ -38,13 +38,13 @@ namespace mongo {
 
     class FTSAccessMethod : public BtreeBasedAccessMethod {
     public:
-        FTSAccessMethod(IndexDescriptor* descriptor);
+        FTSAccessMethod(BtreeInMemoryState* btreeState );
         virtual ~FTSAccessMethod() { }
 
         // Not implemented:
-        virtual Status newCursor(IndexCursor** out);
+        virtual Status newCursor(IndexCursor** out) const;
 
-        fts::FTSSpec& getSpec() { return _ftsSpec; }
+        const fts::FTSSpec& getSpec() const { return _ftsSpec; }
 
     private:
         // Implemented:

@@ -36,6 +36,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index/2d_access_method.h"
@@ -239,7 +240,8 @@ namespace mongo {
 
             scoped_ptr<IndexDescriptor> desc( new IndexDescriptor( _collection, idxNo,
                                                                    id, id->info.obj().getOwned() ) );
-            buildAnIndex( _collection, desc.get(), mayInterrupt );
+            auto_ptr<BtreeInMemoryState> btreeState( createInMemory( desc.get() ) );
+            buildAnIndex( _collection, btreeState.get(), mayInterrupt );
             indexBuildBlock.success();
 
             // in case we got any access methods or something like that
@@ -774,7 +776,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void IndexCatalog::markMultikey( IndexDescriptor* idx, bool isMultikey ) {
+    void IndexCatalog::markMultikey( const IndexDescriptor* idx, bool isMultikey ) {
         if ( _details->setIndexIsMultikey( idx->_indexNumber, isMultikey ) )
             _collection->infoCache()->clearQueryCache();
     }
@@ -851,7 +853,7 @@ namespace mongo {
         return _descriptorCache[idxNo];
     }
 
-    IndexAccessMethod* IndexCatalog::getBtreeIndex( IndexDescriptor* desc ) {
+    IndexAccessMethod* IndexCatalog::getBtreeIndex( const IndexDescriptor* desc ) {
         _checkMagic();
         int idxNo = desc->getIndexNumber();
 
@@ -859,12 +861,12 @@ namespace mongo {
             return _forcedBtreeAccessMethodCache[idxNo];
         }
 
-        BtreeAccessMethod* newlyCreated = new BtreeAccessMethod( desc );
+        BtreeAccessMethod* newlyCreated = new BtreeAccessMethod( createInMemory( desc ) );
         _forcedBtreeAccessMethodCache[idxNo] = newlyCreated;
         return newlyCreated;
     }
 
-    BtreeBasedAccessMethod* IndexCatalog::getBtreeBasedIndex( IndexDescriptor* desc ) {
+    BtreeBasedAccessMethod* IndexCatalog::getBtreeBasedIndex( const IndexDescriptor* desc ) {
 
         string type = _getAccessMethodName(desc->keyPattern());
 
@@ -884,7 +886,7 @@ namespace mongo {
     }
 
 
-    IndexAccessMethod* IndexCatalog::getIndex( IndexDescriptor* desc ) {
+    IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) {
         _checkMagic();
         int idxNo = desc->getIndexNumber();
 
@@ -892,27 +894,29 @@ namespace mongo {
             return _accessMethodCache[idxNo];
         }
 
+        auto_ptr<BtreeInMemoryState> state( createInMemory( desc ) );
+
         IndexAccessMethod* newlyCreated = 0;
 
         string type = _getAccessMethodName(desc->keyPattern());
 
         if (IndexNames::HASHED == type) {
-            newlyCreated = new HashAccessMethod(desc);
+            newlyCreated = new HashAccessMethod( state.release() );
         }
         else if (IndexNames::GEO_2DSPHERE == type) {
-            newlyCreated = new S2AccessMethod(desc);
+            newlyCreated = new S2AccessMethod( state.release() );
         }
         else if (IndexNames::TEXT == type) {
-            newlyCreated = new FTSAccessMethod(desc);
+            newlyCreated = new FTSAccessMethod( state.release() );
         }
         else if (IndexNames::GEO_HAYSTACK == type) {
-            newlyCreated =  new HaystackAccessMethod(desc);
+            newlyCreated =  new HaystackAccessMethod( state.release() );
         }
         else if ("" == type) {
-            newlyCreated =  new BtreeAccessMethod(desc);
+            newlyCreated =  new BtreeAccessMethod( state.release() );
         }
         else if (IndexNames::GEO_2D == type) {
-            newlyCreated = new TwoDAccessMethod(desc);
+            newlyCreated = new TwoDAccessMethod( state.release() );
         }
         else {
             log() << "Can't find index for keypattern " << desc->keyPattern();
@@ -923,6 +927,29 @@ namespace mongo {
         _accessMethodCache[idxNo] = newlyCreated;
 
         return newlyCreated;
+    }
+
+    BtreeInMemoryState* IndexCatalog::createInMemory( const IndexDescriptor* descriptor ) {
+        int idxNo = _details->findIndexByName( descriptor->indexName(), true );
+        verify( idxNo >= 0 );
+
+        Database* db =  _collection->_database;
+        NamespaceDetails* nsd = db->namespaceIndex().details( descriptor->indexNamespace() );
+        if ( !nsd ) {
+            // have to create!
+            db->namespaceIndex().add_ns( descriptor->indexNamespace(), DiskLoc(), false );
+            nsd = db->namespaceIndex().details( descriptor->indexNamespace() );
+            db->_addNamespaceToCatalog( descriptor->indexNamespace(), NULL );
+            verify(nsd);
+        }
+
+        RecordStore* rs = new RecordStore( descriptor->indexNamespace() );
+        rs->init( nsd, _collection->getExtentManager(), false );
+
+        return new BtreeInMemoryState( _collection,
+                                       descriptor,
+                                       rs,
+                                       &_details->idx( idxNo ) );
     }
 
     // ---------------------------
@@ -936,7 +963,7 @@ namespace mongo {
         InsertDeleteOptions options;
         options.logIfError = false;
         options.dupsAllowed =
-            ignoreUniqueIndex( desc->getOnDisk() ) ||
+            ignoreUniqueIndex( desc ) ||
             ( !KeyPattern::isIdKeyPattern(desc->keyPattern()) && !desc->unique() );
 
         int64_t inserted;

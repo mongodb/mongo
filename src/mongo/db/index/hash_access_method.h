@@ -45,10 +45,10 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HashAccessMethod(IndexDescriptor* descriptor);
+        HashAccessMethod(BtreeInMemoryState* btreeState);
         virtual ~HashAccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out);
+        virtual Status newCursor(IndexCursor** out) const;
 
         // This is a NO-OP.
         virtual Status setOptions(const CursorOptions& options) {

@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"

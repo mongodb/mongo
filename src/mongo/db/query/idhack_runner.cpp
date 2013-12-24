@@ -32,8 +32,10 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/projection_exec.h"
+#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
@@ -58,23 +60,18 @@ namespace mongo {
         IndexCatalog* catalog = _collection->getIndexCatalog();
 
         // Find the index we use.
-        IndexDescriptor* idDesc = catalog->findIdIndex();
+        const IndexDescriptor* idDesc = catalog->findIdIndex();
         if (NULL == idDesc) {
             _done = true;
             return Runner::RUNNER_EOF;
         }
 
-        // Create the key that we need to perform a lookup.
-        IndexDetails& id = idDesc->getOnDisk();
-        BSONObj key = id.getKeyFromQuery(_query->getQueryObj());
+        BtreeBasedAccessMethod* accessMethod = catalog->getBtreeBasedIndex( idDesc );
+
+        BSONObj key = _query->getQueryObj()["_id"].wrap();
 
         // Look up the key by going directly to the Btree.
-        DiskLoc loc;
-        if (0 == id.version()) {
-            loc = id.head.btree<V0>()->findSingle(id, id.head, key);
-        } else {
-            loc = id.head.btree<V1>()->findSingle(id, id.head, key);
-        }
+        DiskLoc loc = accessMethod->findSingle( key );
 
         _done = true;
 

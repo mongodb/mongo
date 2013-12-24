@@ -75,7 +75,7 @@ namespace mongo {
 
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   IndexDescriptor* idx,
+                                   BtreeInMemoryState* btreeState,
                                    BSONObjExternalSorter& sorter,
                                    bool dropDups,
                                    set<DiskLoc>& dupsToDrop,
@@ -84,7 +84,7 @@ namespace mongo {
                                    ProgressMeterHolder& pm,
                                    Timer& t,
                                    bool mayInterrupt ) {
-        BtreeBuilder<V> btBuilder(dupsAllowed, idx->getOnDisk());
+        BtreeBuilder<V> btBuilder(dupsAllowed, btreeState);
         BSONObj keyLast;
         auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
         // verifies that pm and op refer to the same ProgressMeter
@@ -136,8 +136,8 @@ namespace mongo {
         }
     }
 
-    DiskLoc BtreeBasedBuilder::makeEmptyIndex(const IndexDetails& idx) {
-        if (0 == idx.version()) {
+    DiskLoc BtreeBasedBuilder::makeEmptyIndex(BtreeInMemoryState* idx) {
+        if (0 == idx->descriptor()->version()) {
             return BtreeBucket<V0>::addBucket(idx);
         } else {
             return BtreeBucket<V1>::addBucket(idx);
@@ -155,7 +155,7 @@ namespace mongo {
     }
 
     void BtreeBasedBuilder::addKeysToPhaseOne(Collection* collection,
-                                              IndexDescriptor* idx,
+                                              const IndexDescriptor* idx,
                                               const BSONObj& order,
                                               SortPhaseOne* phaseOne,
                                               ProgressMeter* progressMeter,
@@ -189,19 +189,25 @@ namespace mongo {
     }
 
     uint64_t BtreeBasedBuilder::fastBuildIndex( Collection* collection,
-                                                IndexDescriptor* idx,
+                                                BtreeInMemoryState* btreeState,
                                                 bool mayInterrupt ) {
         CurOp * op = cc().curop();
-
         Timer t;
 
-        MONGO_TLOG(1) << "fastBuildIndex " << collection->ns() << ' ' << idx->toString() << endl;
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
-        bool dupsAllowed = !idx->unique() || ignoreUniqueIndex(idx->getOnDisk());
-        bool dropDups = idx->dropDups() || inDBRepair;
-        BSONObj order = idx->keyPattern();
+        MONGO_TLOG(1) << "fastBuildIndex " << collection->ns() << ' ' << descriptor->toString();
 
-        getDur().writingDiskLoc(idx->getOnDisk().head).Null();
+        bool dupsAllowed = !descriptor->unique() || ignoreUniqueIndex(descriptor);
+        bool dropDups = descriptor->dropDups() || inDBRepair;
+        BSONObj order = descriptor->keyPattern();
+
+        {
+            DiskLoc myNull;
+            myNull.Null();
+            btreeState->setHead( myNull );
+            //getDur().writingDiskLoc(idx->getOnDisk().head).Null();
+        }
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
             printMemInfo( "before index start" );
@@ -212,13 +218,13 @@ namespace mongo {
                                               collection->numRecords(),
                                               10));
         SortPhaseOne phase1;
-        addKeysToPhaseOne(collection, idx, order, &phase1, pm.get(), mayInterrupt );
+        addKeysToPhaseOne(collection, descriptor, order, &phase1, pm.get(), mayInterrupt );
         pm.finished();
 
         BSONObjExternalSorter& sorter = *(phase1.sorter);
 
         if( phase1.multi ) {
-            collection->getIndexCatalog()->markMultikey( idx );
+            btreeState->setMultikey();
         }
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
@@ -233,9 +239,9 @@ namespace mongo {
         set<DiskLoc> dupsToDrop;
 
         /* build index --- */
-        if( idx->version() == 0 )
+        if( descriptor->version() == 0 )
             buildBottomUpPhases2And3<V0>(dupsAllowed,
-                                         idx,
+                                         btreeState,
                                          sorter,
                                          dropDups,
                                          dupsToDrop,
@@ -244,9 +250,9 @@ namespace mongo {
                                          pm,
                                          t,
                                          mayInterrupt);
-        else if( idx->version() == 1 )
+        else if( descriptor->version() == 1 )
             buildBottomUpPhases2And3<V1>(dupsAllowed,
-                                         idx,
+                                         btreeState,
                                          sorter,
                                          dropDups,
                                          dupsToDrop,

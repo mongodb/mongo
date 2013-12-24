@@ -39,14 +39,16 @@
 
 namespace mongo {
 
-    static double configValueWithDefault(IndexDescriptor *desc, const string& name, double def) {
+    static double configValueWithDefault(const IndexDescriptor *desc, const string& name, double def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberDouble(); }
         return def;
     }
 
-    TwoDAccessMethod::TwoDAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    TwoDAccessMethod::TwoDAccessMethod(BtreeInMemoryState* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         BSONObjIterator i(descriptor->keyPattern());
         while (i.more()) {
@@ -65,13 +67,13 @@ namespace mongo {
         }
         uassert(16802, "no geo field specified", _params.geo.size());
 
-        double bits =  configValueWithDefault(_descriptor, "bits", 26);  // for lat/long, ~ 1ft
+        double bits =  configValueWithDefault(descriptor, "bits", 26);  // for lat/long, ~ 1ft
         uassert(16803, "bits in geo index must be between 1 and 32", bits > 0 && bits <= 32);
 
         GeoHashConverter::Parameters params;
         params.bits = static_cast<unsigned>(bits);
-        params.max = configValueWithDefault(_descriptor, "max", 180.0);
-        params.min = configValueWithDefault(_descriptor, "min", -180.0);
+        params.max = configValueWithDefault(descriptor, "max", 180.0);
+        params.min = configValueWithDefault(descriptor, "min", -180.0);
         double numBuckets = (1024 * 1024 * 1024 * 4.0);
         params.scaling = numBuckets / (params.max - params.min);
 
@@ -189,7 +191,7 @@ namespace mongo {
         }
     }
 
-    Status TwoDAccessMethod::newCursor(IndexCursor** out) {
+    Status TwoDAccessMethod::newCursor(IndexCursor** out) const {
         return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2");
     }
 

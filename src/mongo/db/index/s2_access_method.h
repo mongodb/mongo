@@ -43,10 +43,10 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        S2AccessMethod(IndexDescriptor* descriptor);
+        S2AccessMethod(BtreeInMemoryState* btreeState);
         virtual ~S2AccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out);
+        virtual Status newCursor(IndexCursor** out) const;
 
     private:
         friend class Geo2dFindNearCmd;

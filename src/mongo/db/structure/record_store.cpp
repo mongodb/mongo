@@ -52,6 +52,10 @@ namespace mongo {
         _isSystemIndexes = isSystemIndexes;
     }
 
+    Record* RecordStore::recordFor( const DiskLoc& loc ) const {
+        return _extentManager->recordFor( loc );
+    }
+
     StatusWith<DiskLoc> RecordStore::insertRecord( const DocWriter* doc, int quotaMax ) {
         int lenWHdr = _details->getRecordAllocationSize( doc->documentSize() + Record::HeaderSize );
 
@@ -59,7 +63,7 @@ namespace mongo {
         if ( !loc.isOK() )
             return loc;
 
-        Record *r = _extentManager->recordFor( loc.getValue() );
+        Record *r = recordFor( loc.getValue() );
         fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
 
         r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
@@ -81,7 +85,7 @@ namespace mongo {
         if ( !loc.isOK() )
             return loc;
 
-        Record *r = _extentManager->recordFor( loc.getValue() );
+        Record *r = recordFor( loc.getValue() );
         fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
 
         // copy the data
@@ -140,19 +144,19 @@ namespace mongo {
 
     void RecordStore::deleteRecord( const DiskLoc& dl ) {
 
-        Record* todelete = _extentManager->recordFor( dl );
+        Record* todelete = recordFor( dl );
 
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
                 DiskLoc prev = _extentManager->getPrevRecordInExtent( dl );
-                Record* prevRecord = _extentManager->recordFor( prev );
+                Record* prevRecord = recordFor( prev );
                 getDur().writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
                 DiskLoc next = _extentManager->getNextRecord( dl );
-                Record* nextRecord = _extentManager->recordFor( next );
+                Record* nextRecord = recordFor( next );
                 getDur().writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
         }

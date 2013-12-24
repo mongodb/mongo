@@ -53,7 +53,7 @@ namespace mongo {
                             maxScan(0),
                             addKeyMetadata(false) { }
 
-        IndexDescriptor* descriptor;
+        const IndexDescriptor* descriptor;
 
         IndexBounds bounds;
 
@@ -103,9 +103,9 @@ namespace mongo {
         WorkingSet* _workingSet;
 
         // Index access.
-        IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
+        const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
         scoped_ptr<IndexCursor> _indexCursor;
-        IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
+        const IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
 
         // Have we hit the end of the index scan?
         bool _hitEnd;
