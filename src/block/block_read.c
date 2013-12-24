@@ -176,12 +176,14 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	page_cksum = __wt_cksum(buf->mem,
 	    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP);
 	if (cksum != page_cksum) {
-		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
+		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)) {
 			__wt_errx(session,
 			    "read checksum error [%"
 			    PRIu32 "B @ %" PRIuMAX ", %"
 			    PRIu32 " != %" PRIu32 "]",
 			    size, (uintmax_t)offset, cksum, page_cksum);
+			WT_ASSERT(session, cksum == page_cksum);
+		}
 		return (WT_ERROR);
 	}
 
