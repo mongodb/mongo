@@ -110,26 +110,10 @@ namespace mongo {
     StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
         verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
 
-        int lenWHdr = _details->getRecordAllocationSize( doc->documentSize() + Record::HeaderSize );
-
-        // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
-        //       under the RecordStore, this feels broken since that should be a
-        //       collection access method probably
-        StatusWith<DiskLoc> loc = _recordStore.allocRecord( lenWHdr,
-                                                            enforceQuota ? largestFileNumberInQuota() : 0 );
+        StatusWith<DiskLoc> loc = _recordStore.insertRecord( doc,
+                                                             enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
             return loc;
-
-        Record *r = loc.getValue().rec();
-        fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
-
-        // copy the data
-        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
-        doc->writeDocument( r->data() );
-
-        addRecordToRecListInExtent(r, loc.getValue()); // XXX move down into record store
-
-        _details->incrementStats( r->netLength(), 1 );
 
         return StatusWith<DiskLoc>( loc );
     }
@@ -159,27 +143,15 @@ namespace mongo {
 
     StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
 
-        int lenWHdr = _details->getRecordAllocationSize( docToInsert.objsize() + Record::HeaderSize );
-        fassert( 17208, lenWHdr >= ( docToInsert.objsize() + Record::HeaderSize ) );
-
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
-        StatusWith<DiskLoc> loc = _recordStore.allocRecord( lenWHdr,
+
+        StatusWith<DiskLoc> loc = _recordStore.insertRecord( docToInsert.objdata(),
+                                                             docToInsert.objsize(),
                                                             enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
             return loc;
-
-        Record *r = loc.getValue().rec();
-        fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
-
-        // copy the data
-        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
-        memcpy( r->data(), docToInsert.objdata(), docToInsert.objsize() );
-
-        addRecordToRecListInExtent(r, loc.getValue()); // XXX move down into record store
-
-        _details->incrementStats( r->netLength(), 1 );
 
         _infoCache.notifyOfWriteOp();
 
@@ -196,7 +168,7 @@ namespace mongo {
 
             // indexRecord takes care of rolling back indexes
             // so we just have to delete the main storage
-            _recordStore.deallocRecord( loc.getValue(), r );
+            _recordStore.deleteRecord( loc.getValue() );
             return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
         }
 
@@ -223,11 +195,9 @@ namespace mongo {
         /* check if any cursors point to us.  if so, advance them. */
         ClientCursor::aboutToDelete(_ns.ns(), _details, loc);
 
-        Record* rec = getExtentManager()->recordFor( loc );
-
         _indexCatalog.unindexRecord( doc, loc, noWarn);
 
-        _recordStore.deallocRecord( loc, rec );
+        _recordStore.deleteRecord( loc );
 
         _infoCache.notifyOfWriteOp();
     }
@@ -310,7 +280,7 @@ namespace mongo {
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location
                 // remember its already unindexed
-                _recordStore.deallocRecord( oldLocation, oldRecord );
+                _recordStore.deleteRecord( oldLocation );
             }
             else {
                 // new doc insert failed, so lets re-index the old document and location

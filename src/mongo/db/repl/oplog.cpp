@@ -134,7 +134,7 @@ namespace mongo {
         OpTime::setLast( ts );
     }
 
-    class OplogDocWriter : public Collection::DocWriter {
+    class OplogDocWriter : public DocWriter {
     public:
         OplogDocWriter( const BSONObj& frame, const BSONObj& oField )
             : _frame( frame ), _oField( oField ) {

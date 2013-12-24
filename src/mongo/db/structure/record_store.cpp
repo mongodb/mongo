@@ -31,6 +31,8 @@
 #include "mongo/db/structure/record_store.h"
 
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/structure/collection.h"
+
 
 #include "mongo/db/pdfile.h" // XXX-ERH
 
@@ -49,6 +51,50 @@ namespace mongo {
         _extentManager = em;
         _isSystemIndexes = isSystemIndexes;
     }
+
+    StatusWith<DiskLoc> RecordStore::insertRecord( const DocWriter* doc, int quotaMax ) {
+        int lenWHdr = _details->getRecordAllocationSize( doc->documentSize() + Record::HeaderSize );
+
+        StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
+        if ( !loc.isOK() )
+            return loc;
+
+        Record *r = _extentManager->recordFor( loc.getValue() );
+        fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
+
+        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
+        doc->writeDocument( r->data() );
+
+        addRecordToRecListInExtent(r, loc.getValue()); // XXX move code here from pdfile
+
+        _details->incrementStats( r->netLength(), 1 );
+
+        return loc;
+    }
+
+
+    StatusWith<DiskLoc> RecordStore::insertRecord( const char* data, int len, int quotaMax ) {
+        int lenWHdr = _details->getRecordAllocationSize( len + Record::HeaderSize );
+        fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
+
+        StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
+        if ( !loc.isOK() )
+            return loc;
+
+        Record *r = _extentManager->recordFor( loc.getValue() );
+        fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
+
+        // copy the data
+        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
+        memcpy( r->data(), data, len );
+
+        addRecordToRecListInExtent(r, loc.getValue()); // XXX move code here from pdfile
+
+        _details->incrementStats( r->netLength(), 1 );
+
+        return loc;
+    }
+
 
     StatusWith<DiskLoc> RecordStore::allocRecord( int lengthWithHeaders, int quotaMax ) {
         DiskLoc loc = _details->alloc( _ns, lengthWithHeaders );
@@ -92,7 +138,9 @@ namespace mongo {
         return StatusWith<DiskLoc>( ErrorCodes::InternalError, "cannot allocate space" );
     }
 
-    void RecordStore::deallocRecord( const DiskLoc& dl, Record* todelete ) {
+    void RecordStore::deleteRecord( const DiskLoc& dl ) {
+
+        Record* todelete = _extentManager->recordFor( dl );
 
         /* remove ourself from the record next/prev chain */
         {

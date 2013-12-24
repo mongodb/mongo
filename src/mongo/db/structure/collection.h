@@ -54,6 +54,13 @@ namespace mongo {
 
     class OpDebug;
 
+    class DocWriter {
+    public:
+        virtual ~DocWriter() {}
+        virtual void writeDocument( char* buf ) const = 0;
+        virtual size_t documentSize() const = 0;
+    };
+
     /**
      * this is NOT safe through a yield right now
      * not sure if it will be, or what yet
@@ -98,13 +105,6 @@ namespace mongo {
          * i.e. will not add an _id field for documents that are missing it
          */
         StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota );
-
-        class DocWriter {
-        public:
-            virtual ~DocWriter() {}
-            virtual void writeDocument( char* buf ) const = 0;
-            virtual size_t documentSize() const = 0;
-        };
 
         StatusWith<DiskLoc> insertDocument( const DocWriter* doc, bool enforceQuota );
 

@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    class Collection;
+    class DocWriter;
     class ExtentManager;
     class NamespaceDetails;
     class Record;
@@ -46,8 +48,13 @@ namespace mongo {
                    ExtentManager* em,
                    bool isSystemIndexes );
 
-        void deallocRecord( const DiskLoc& dl, Record* todelete );
+        void deleteRecord( const DiskLoc& dl );
 
+        StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax );
+
+        StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax );
+
+    protected:
         StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
     private:
