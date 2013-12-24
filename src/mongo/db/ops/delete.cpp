@@ -57,14 +57,14 @@ namespace mongo {
             }
         }
 
-        NamespaceDetails *d = nsdetails(ns);
-        if (NULL == d) {
+        Collection* collection = currentClient.get()->database()->getCollection(ns);
+        if (NULL == collection) {
             return 0;
         }
 
         uassert(10101,
                 str::stream() << "can't remove from a capped collection: " << ns,
-                !d->isCapped());
+                !collection->isCapped());
 
         string nsForLogOp = ns.toString(); // XXX-ERH
 
@@ -96,38 +96,38 @@ namespace mongo {
         DiskLoc rloc;
         Runner::RunnerState state;
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &rloc))) {
-            if (logop) {
-                BSONElement idElt;
-                if (BSONObj::make(rloc.rec()).getObjectID(idElt)) {
-                    BSONObjBuilder bob;
-                    bob.append(idElt);
-                    bool replJustOne = true;
-                    logOp("d", nsForLogOp.c_str(), bob.done(), 0, &replJustOne);
-                }
-                else {
-                    problem() << "deleted object without id, not logging" << endl;
-                }
-            }
+
+            BSONObj toDelete;
 
             // XXX: do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
             runner->saveState();
-            Collection* collection = currentClient.get()->database()->getCollection(ns);
-            verify( collection );
-            collection->deleteDocument(rloc);
+            collection->deleteDocument(rloc, false, false, logop ? &toDelete : NULL );
             runner->restoreState();
 
             nDeleted++;
 
-            if (justOne) { break; }
+            if (logop) {
+                if ( toDelete.isEmpty() ) {
+                    problem() << "deleted object without id, not logging" << endl;
+                }
+                else {
+                    bool replJustOne = true;
+                    logOp("d", nsForLogOp.c_str(), toDelete, 0, &replJustOne);
+                }
+            }
+
+            if (justOne) {
+                break;
+            }
 
             if (!god) {
                 getDur().commitIfNeeded();
             }
 
             if (debug && god && nDeleted == 100) {
-                // TODO: why does this use significant memory??
-                log() << "warning high number of deletes with god=true which could use significant memory" << endl;
+                log() << "warning high number of deletes with god=true "
+                      << " which could use significant memory b/c we don't commit journal";
             }
         }
 
