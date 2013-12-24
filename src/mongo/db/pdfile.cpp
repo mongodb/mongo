@@ -384,7 +384,7 @@ namespace mongo {
 
         if ( d->isCapped() && !cappedOK ) {
             out() << "failing remove on a capped ns " << ns << endl;
-            uassert( 10089 ,  "can't remove from a capped collection" , 0 );
+            verify( false ); // impossible now
             return;
         }
 

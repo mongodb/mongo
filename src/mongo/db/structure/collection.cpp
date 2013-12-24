@@ -207,7 +207,7 @@ namespace mongo {
                                      BSONObj* deletedId ) {
         if ( _details->isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
-            uasserted( 17115,  "cannot remove from a capped collection" ); // XXX 10089
+            uasserted( 10089,  "cannot remove from a capped collection" );
             return;
         }
 
