@@ -80,11 +80,6 @@ namespace mongo {
             _magic = 555;
         }
 
-        // XXX this is terrible
-        IndexDescriptor* clone() const {
-            return new IndexDescriptor(_collection, _indexNumber,_infoObj);
-        }
-
         //
         // Information about the key pattern.
         //

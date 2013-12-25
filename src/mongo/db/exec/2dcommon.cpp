@@ -237,7 +237,7 @@ namespace twod_exec {
         IndexScanParams minParams;
         minParams.direction = -1;
         minParams.forceBtreeAccessMethod = true;
-        minParams.descriptor = descriptor->clone();
+        minParams.descriptor = descriptor;
         minParams.bounds.fields.resize(descriptor->keyPattern().nFields());
         minParams.doNotDedup = true;
         // First field of start key goes (MINKEY, start] (in reverse)
@@ -249,7 +249,7 @@ namespace twod_exec {
         IndexScanParams maxParams;
         maxParams.forceBtreeAccessMethod = true;
         maxParams.direction = 1;
-        maxParams.descriptor = descriptor->clone();
+        maxParams.descriptor = descriptor;
         maxParams.bounds.fields.resize(descriptor->keyPattern().nFields());
         // Don't have the ixscan dedup since we want dup DiskLocs because of multi-point docs.
         maxParams.doNotDedup = true;
