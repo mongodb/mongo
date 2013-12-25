@@ -600,7 +600,7 @@ namespace {
         dateStruct.tm_wday = 0;
         dateStruct.tm_yday = 0;
 
-        resultMillis = (1000 * timegm(&dateStruct)) + millis;
+        resultMillis = (1000 * static_cast<unsigned long long>(timegm(&dateStruct))) + millis;
 #endif
 
         resultMillis += (tzAdjSecs * 1000);
