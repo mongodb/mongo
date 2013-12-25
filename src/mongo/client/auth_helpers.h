@@ -16,6 +16,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
 namespace auth {
@@ -24,7 +25,7 @@ namespace auth {
      * Hashes the password so that it can be stored in a user object or used for MONGODB-CR
      * authentication.
      */
-    std::string createPasswordDigest(const StringData& username,
+    std::string MONGO_CLIENT_API createPasswordDigest(const StringData& username,
                                      const StringData& clearTextPassword);
 
 }  // namespace auth

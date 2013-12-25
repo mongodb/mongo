@@ -23,6 +23,7 @@
 
 #include <boost/thread/xtime.hpp>
 
+#include "mongo/client/export_macros.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/goodies.h"
 
@@ -31,17 +32,17 @@ namespace mongo {
     extern const size_t g_minOSPageSizeBytes;
     void minOSPageSizeBytesTest(size_t minOSPageSizeBytes);  // lame-o
 
-    class MAdvise { 
+    class MAdvise {
         void *_p;
         unsigned _len;
     public:
         enum Advice { Sequential=1 , Random=2 };
-        MAdvise(void *p, unsigned len, Advice a); 
+        MAdvise(void *p, unsigned len, Advice a);
         ~MAdvise(); // destructor resets the range to MADV_NORMAL
     };
 
     // lock order: lock dbMutex before this if you lock both
-    class LockMongoFilesShared { 
+    class MONGO_CLIENT_API LockMongoFilesShared {
         friend class LockMongoFilesExclusive;
         static RWLockRecursiveNongreedy mmmutex;
         static unsigned era;
@@ -49,10 +50,10 @@ namespace mongo {
     public:
         LockMongoFilesShared() : lk(mmmutex) { }
 
-        /** era changes anytime memory maps come and go.  thus you can use this as a cheap way to check 
-            if nothing has changed since the last time you locked.  Of course you must be shared locked 
-            at the time of this call, otherwise someone could be in progress.  
-            
+        /** era changes anytime memory maps come and go.  thus you can use this as a cheap way to check
+            if nothing has changed since the last time you locked.  Of course you must be shared locked
+            at the time of this call, otherwise someone could be in progress.
+
             This is used for yielding; see PageFaultException::touch().
         */
         static unsigned getEra() { return era; }
@@ -61,10 +62,10 @@ namespace mongo {
         static void assertAtLeastReadLocked() { mmmutex.assertAtLeastReadLocked(); }
     };
 
-    class LockMongoFilesExclusive { 
+    class MONGO_CLIENT_API LockMongoFilesExclusive {
         RWLockRecursive::Exclusive lk;
     public:
-        LockMongoFilesExclusive() : lk(LockMongoFilesShared::mmmutex) { 
+        LockMongoFilesExclusive() : lk(LockMongoFilesShared::mmmutex) {
             LockMongoFilesShared::era++;
         }
     };
@@ -92,7 +93,7 @@ namespace mongo {
         template < class F >
         static void forEach( F fun );
 
-        /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. 
+        /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically.
 */
         static std::set<MongoFile*>& getAllFiles();
 
@@ -128,7 +129,7 @@ namespace mongo {
            safe to call more than once, albeit might be wasted work
            ideal to call close to the close, if the close is well before object destruction
         */
-        void destroyed(); 
+        void destroyed();
 
         virtual unsigned long long length() const = 0;
     };
@@ -139,7 +140,7 @@ namespace mongo {
           DurableMappedFile *a = finder.find("file_name_a");
           DurableMappedFile *b = finder.find("file_name_b");
     */
-    class MongoFileFinder : boost::noncopyable {
+    class MONGO_CLIENT_API MongoFileFinder : boost::noncopyable {
     public:
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
@@ -152,7 +153,7 @@ namespace mongo {
 
     class MemoryMappedFile : public MongoFile {
     protected:
-        virtual void* viewForFlushing() { 
+        virtual void* viewForFlushing() {
             if( views.size() == 0 )
                 return 0;
             verify( views.size() == 1 );
@@ -171,7 +172,7 @@ namespace mongo {
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map(const char *filename);
 
-        /** @param options see MongoFile::Options 
+        /** @param options see MongoFile::Options
         */
         void* mapWithOptions(const char *filename, int options);
 
@@ -213,7 +214,7 @@ namespace mongo {
         HANDLE maphandle;
         std::vector<void *> views;
         unsigned long long len;
-        
+
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
         void clearWritableBits(void *privateView);
@@ -239,25 +240,25 @@ namespace mongo {
             p(*i);
     }
 
-#if defined(_WIN32)    
+#if defined(_WIN32)
     class ourbitset {
         volatile unsigned bits[MemoryMappedFile::NChunks]; // volatile as we are doing double check locking
     public:
-        ourbitset() { 
+        ourbitset() {
             memset((void*) bits, 0, sizeof(bits));
         }
-        bool get(unsigned i) const { 
+        bool get(unsigned i) const {
             unsigned x = i / 32;
             verify( x < MemoryMappedFile::NChunks );
             return (bits[x] & (1 << (i%32))) != 0;
         }
-        void set(unsigned i) { 
+        void set(unsigned i) {
             unsigned x = i / 32;
             wassert( x < (MemoryMappedFile::NChunks*2/3) ); // warn if getting close to limit
             verify( x < MemoryMappedFile::NChunks );
             bits[x] |= (1 << (i%32));
         }
-        void clear(unsigned i) { 
+        void clear(unsigned i) {
             unsigned x = i / 32;
             verify( x < MemoryMappedFile::NChunks );
             bits[x] &= ~(1 << (i%32));
