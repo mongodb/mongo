@@ -646,7 +646,7 @@ namespace {
         }
 #endif // _WIN32
 
-        serverGlobalParams.logAppend = params.count("systemLog.logappend");
+        serverGlobalParams.logAppend = params.count("systemLog.logAppend");
         if (!serverGlobalParams.logpath.empty() && serverGlobalParams.logWithSyslog) {
             return Status(ErrorCodes::BadValue, "Cant use both a logpath and syslog ");
         }
