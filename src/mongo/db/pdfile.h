@@ -73,7 +73,6 @@ namespace mongo {
     public:
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
-        static DeletedRecord* getDeletedRecord(const DiskLoc& dl);
     };
 
 #pragma pack(1)
@@ -270,12 +269,7 @@ namespace mongo {
     inline BSONObj DiskLoc::obj() const {
         return BSONObj::make(rec()->accessed());
     }
-    inline DeletedRecord* DiskLoc::drec() const {
-        verify( _a != -1 );
-        DeletedRecord* dr = (DeletedRecord*) rec();
-        memconcept::is(dr, memconcept::concept::deletedrecord);
-        return dr;
-    }
+
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
     }
@@ -321,16 +315,7 @@ namespace mongo {
         return cc().database()->getExtentManager().getExtent(dl);
     }
 
-    inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
-        verify(dl.a() != -1);
-        return cc().database()->getExtentManager().recordFor( dl );
-    }
-
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
-
-    inline DeletedRecord* DataFileMgr::getDeletedRecord(const DiskLoc& dl) {
-        return reinterpret_cast<DeletedRecord*>(getRecord(dl));
-    }
 
     inline BSONObj BSONObj::make(const Record* r ) {
         return BSONObj( r->data() );

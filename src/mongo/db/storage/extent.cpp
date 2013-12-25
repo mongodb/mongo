@@ -151,7 +151,7 @@ namespace mongo {
         extent_getEmptyLoc(nsname, myLoc, length, capped, emptyLoc, delRecLength);
 
         // todo: some dup code here and below in Extent::init
-        DeletedRecord* empty = getDur().writing(DataFileMgr::getDeletedRecord(emptyLoc));
+        DeletedRecord* empty = getDur().writing(getDeletedRecord(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = myLoc.getOfs();
         empty->nextDeleted().Null();
@@ -173,7 +173,7 @@ namespace mongo {
         int delRecLength;
         extent_getEmptyLoc(nsname, myLoc, _length, capped, emptyLoc, delRecLength);
 
-        DeletedRecord* empty = getDur().writing(DataFileMgr::getDeletedRecord(emptyLoc));
+        DeletedRecord* empty = getDur().writing(getDeletedRecord(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = myLoc.getOfs();
         empty->nextDeleted().Null();

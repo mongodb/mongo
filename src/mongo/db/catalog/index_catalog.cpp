@@ -190,6 +190,15 @@ namespace mongo {
          *
          * size: 0 - we build index in foreground
          * size > 0 - do either fore or back based on ask
+         *
+         *
+         * what it means to create an index
+         *  not in an order
+         * * system.indexes
+         * * entry in collection's NamespaceDetails (IndexDetails)
+         * * entry for NamespaceDetails in .ns file for record store
+         * * entry in system.namespaces for record store
+         * * head entry in IndexDetails populated (?is this required)
          */
 
         // 1) add entry in system.indexes

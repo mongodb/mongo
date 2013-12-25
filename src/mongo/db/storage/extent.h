@@ -87,6 +87,10 @@ namespace mongo {
             return (Record *) (((char *) this) + x);
         }
 
+        DeletedRecord* getDeletedRecord(const DiskLoc& dl ) {
+            return reinterpret_cast<DeletedRecord*>( getRecord( dl ) );
+        }
+
         static int maxSize();
         static int minSize() { return 0x1000; }
         /**

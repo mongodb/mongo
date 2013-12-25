@@ -522,13 +522,21 @@ namespace mongo {
 
         return this;
     }
-    
+
     Record* DiskLoc::rec() const {
-        Record *r = DataFileMgr::getRecord(*this);
+        // XXX-ERH
+        verify(a() != -1);
+        Record *r = cc().database()->getExtentManager().recordFor( *this );
         memconcept::is(r, memconcept::concept::record);
         return r;
     }
 
+    DeletedRecord* DiskLoc::drec() const {
+        verify( _a != -1 );
+        DeletedRecord* dr = reinterpret_cast<DeletedRecord*>(rec());
+        memconcept::is(dr, memconcept::concept::deletedrecord);
+        return dr;
+    }
     void Record::_accessing() const {
         if ( likelyInPhysicalMemory() )
             return;
