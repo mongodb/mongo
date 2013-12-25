@@ -52,6 +52,12 @@
 
 namespace mongo {
 
+    void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
+        massert( 17320,
+                 str::stream() << "cannot do " << caller
+                 << " on namespace with a $ in it: " << ns,
+                 ns.find( '$' ) == string::npos );
+    }
 
     Database::~Database() {
         verify( Lock::isW() );
@@ -265,6 +271,7 @@ namespace mongo {
 
     Status Database::dropCollection( const StringData& fullns ) {
         LOG(1) << "dropCollection: " << fullns << endl;
+        massertNamespaceNotIndex( fullns, "dropCollection" );
 
         Collection* collection = getCollection( fullns );
         if ( !collection ) {
@@ -555,6 +562,7 @@ namespace mongo {
     Collection* Database::createCollection( const StringData& ns, bool capped,
                                             const BSONObj* options, bool allocateDefaultSpace ) {
         verify( _namespaceIndex.details( ns ) == NULL );
+        massertNamespaceNotIndex( ns, "createCollection" );
 
         if ( serverGlobalParams.configsvr &&
              !( ns.startsWith( "config." ) ||
