@@ -856,8 +856,7 @@ namespace mongo {
         this->n = this->INVALID_N_SENTINEL;
         // defensive:
         this->parent.Null();
-        string ns = btreeState->descriptor()->indexNamespace();
-        theDataFileMgr._deleteRecord(nsdetails(ns), ns.c_str(), thisLoc.rec(), thisLoc);
+        btreeState->recordStore()->deleteRecord( thisLoc );
     }
 
     /** note: may delete the entire bucket!  this invalid upon return sometimes. */
@@ -1472,14 +1471,24 @@ namespace mongo {
             out() << "     split end " << hex << thisLoc.getOfs() << dec << endl;
     }
 
+    class DummyDocWriter : public DocWriter {
+    public:
+        DummyDocWriter( size_t sz ) : _sz( sz ){}
+        virtual void writeDocument( char* buf ) const { /* no-op */ }
+        virtual size_t documentSize() const { return _sz; }
+    private:
+        size_t _sz;
+    };
+
     /** start a new index off, empty */
     template< class V >
     DiskLoc BtreeBucket<V>::addBucket(BtreeInMemoryState* btreeState) {
-        string ns = btreeState->descriptor()->indexNamespace();
-        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, V::BucketSize, false, true);
-        BtreeBucket *b = BTREEMOD(loc);
+        DummyDocWriter docWriter( V::BucketSize );
+        StatusWith<DiskLoc> loc = btreeState->recordStore()->insertRecord( &docWriter, 0 );
+        uassertStatusOK( loc.getStatus() );
+        BtreeBucket *b = BTREEMOD(loc.getValue());
         b->init();
-        return loc;
+        return loc.getValue();
     }
 
     template< class V >
