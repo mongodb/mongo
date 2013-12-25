@@ -183,6 +183,14 @@ namespace mongo {
     }
 
     Status IndexCatalog::createIndex( BSONObj spec, bool mayInterrupt ) {
+        /**
+         * There are 2 main variables so(4 possibilies) for how we build indexes
+         * variable 1 - size of collection
+         * variable 2 - foreground or background
+         *
+         * size: 0 - we build index in foreground
+         * size > 0 - do either fore or back based on ask
+         */
 
         // 1) add entry in system.indexes
         // 2) call into buildAnIndex?
