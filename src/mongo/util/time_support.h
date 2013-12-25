@@ -22,7 +22,7 @@
 #include <boost/thread/xtime.hpp>
 #include <boost/version.hpp>
 
-#include "base/status_with.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo {
 
