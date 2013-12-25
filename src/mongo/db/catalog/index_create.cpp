@@ -114,7 +114,6 @@ namespace mongo {
         prep( ns );
 
         try {
-            //idx->getOnDisk().head.writing() = BtreeBasedBuilder::makeEmptyIndex( idx->getOnDisk() );
             btreeState->setHead( BtreeBasedBuilder::makeEmptyIndex( btreeState ) );
             unsigned long long n = addExistingToIndex( collection, btreeState->descriptor() );
             // idx may point at an invalid index entry at this point
@@ -248,7 +247,7 @@ namespace mongo {
 
         if( inDBRepair || !idxInfo["background"].trueValue() ) {
             n = BtreeBasedBuilder::fastBuildIndex( collection, btreeState, mayInterrupt );
-            verify( !idx->getHead().isNull() );
+            verify( !btreeState->head().isNull() );
         }
         else {
             BackgroundIndexBuildJob j( ns );

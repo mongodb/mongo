@@ -42,14 +42,6 @@ namespace mongo {
     class IndexCatalog;
 
     /**
-     * OnDiskIndexData (aka IndexDetails) is memory-mapped on-disk index data.
-     * It contains two DiskLocs:
-     * The first points to the head of the index.  This is currently turned into a Btree node.
-     * The second points to a BSONObj which describes the index.
-     */
-    typedef IndexDetails OnDiskIndexData;
-
-    /**
      * A cache of information computed from the memory-mapped per-index data (OnDiskIndexData).
      * Contains accessors for the various immutable index parameters, and an accessor for the
      * mutable "head" pointer which is index-specific.
@@ -62,10 +54,9 @@ namespace mongo {
          * OnDiskIndexData is a pointer to the memory mapped per-index data.
          * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
          */
-        IndexDescriptor(Collection* collection, int indexNumber, OnDiskIndexData* data,
-                        BSONObj infoObj)
+        IndexDescriptor(Collection* collection, int indexNumber,BSONObj infoObj)
             : _magic(123987),
-              _collection(collection), _indexNumber(indexNumber), _onDiskData(data),
+              _collection(collection), _indexNumber(indexNumber),
               _infoObj(infoObj.getOwned()),
               _numFields(infoObj.getObjectField("key").nFields()),
               _keyPattern(infoObj.getObjectField("key").getOwned()),
@@ -91,7 +82,7 @@ namespace mongo {
 
         // XXX this is terrible
         IndexDescriptor* clone() const {
-            return new IndexDescriptor(_collection, _indexNumber, _onDiskData, _infoObj);
+            return new IndexDescriptor(_collection, _indexNumber,_infoObj);
         }
 
         //
@@ -154,12 +145,6 @@ namespace mongo {
         // "Internals" of accessing the index, used by IndexAccessMethod(s).
         //
 
-        // Return the memory-mapped index data block.
-        OnDiskIndexData& getOnDisk() { _checkOk(); return *_onDiskData; }
-
-        // Return the mutable head of the index.
-        const DiskLoc& getHead() const { _checkOk(); return _onDiskData->head; }
-
         // Return a (rather compact) string representation.
         string toString() const { _checkOk(); return _infoObj.toString(); }
 
@@ -201,8 +186,6 @@ namespace mongo {
         // What # index are we in the catalog represented by _namespaceDetails?  Needed for setting
         // and getting multikey.
         int _indexNumber;
-
-        OnDiskIndexData* _onDiskData;
 
         // The BSONObj describing the index.  Accessed through the various members above.
         const BSONObj _infoObj;

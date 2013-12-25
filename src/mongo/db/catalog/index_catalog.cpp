@@ -247,7 +247,7 @@ namespace mongo {
             IndexDetails* id = &_details->idx(idxNo);
 
             scoped_ptr<IndexDescriptor> desc( new IndexDescriptor( _collection, idxNo,
-                                                                   id, id->info.obj().getOwned() ) );
+                                                                   id->info.obj().getOwned() ) );
             auto_ptr<BtreeInMemoryState> btreeState( createInMemory( desc.get() ) );
             buildAnIndex( _collection, btreeState.get(), mayInterrupt );
             indexBuildBlock.success();
@@ -727,7 +727,6 @@ namespace mongo {
             IndexDetails& id = _details->idx( i );
             fassert( 17227, _descriptorCache[i]->_indexNumber == static_cast<int>( i ) );
             fassert( 17228, id.info.obj() == _descriptorCache[i]->_infoObj );
-            fassert( 17229, &id == _descriptorCache[i]->_onDiskData );
         }
 
     }
@@ -857,7 +856,7 @@ namespace mongo {
             _descriptorCache.resize( idxNo + 1 );
 
         _descriptorCache[idxNo] = new IndexDescriptor( _collection, idxNo,
-                                                       id, id->info.obj().getOwned());
+                                                       id->info.obj().getOwned());
         return _descriptorCache[idxNo];
     }
 

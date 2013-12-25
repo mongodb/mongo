@@ -169,7 +169,7 @@ namespace mongo {
             bool unusedFound;
             DiskLoc unusedDiskLoc;
             _interface->locate(_btreeState.get(),
-                               _descriptor->getHead(),
+                               _btreeState->head(),
                                *i,
                                unusedPos,
                                unusedFound,
@@ -197,7 +197,7 @@ namespace mongo {
 
     Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
         *numKeys = _interface->fullValidate(_btreeState.get(),
-                                            _descriptor->getHead(),
+                                            _btreeState->head(),
                                             _descriptor->keyPattern());
         return Status::OK();
     }

@@ -206,7 +206,6 @@ namespace mongo {
             DiskLoc myNull;
             myNull.Null();
             btreeState->setHead( myNull );
-            //getDur().writingDiskLoc(idx->getOnDisk().head).Null();
         }
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2) ) )
