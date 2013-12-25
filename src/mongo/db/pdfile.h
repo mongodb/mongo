@@ -71,38 +71,10 @@ namespace mongo {
 
     class DataFileMgr {
     public:
-        DataFileMgr();
-
-        /**
-         * Insert the contents of @param buf with length @param len into namespace @param ns.
-         * note: does NOT put on oplog
-         * @param mayInterrupt When true, killop may interrupt the function call.
-         * @param god if true, you may pass in obuf of NULL and then populate the returned DiskLoc
-         *     after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
-         * @param mayAddIndex almost always true, except for invocation from rename namespace
-         *     command.
-         * @param addedID if not null, set to true if adding _id element.  You must assure false
-         *     before calling if using.
-         */
-        DiskLoc insert(const char* ns,
-                       const void* buf,
-                       int32_t len,
-                       bool mayInterrupt = false,
-                       bool god = false,
-                       bool mayAddIndex = true,
-                       bool* addedID = 0);
-
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
         static DeletedRecord* getDeletedRecord(const DiskLoc& dl);
-
-        void deleteRecord(NamespaceDetails* d, const StringData& ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
-
-        /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
-        void _deleteRecord(NamespaceDetails *d, const StringData& ns, Record *todelete, const DiskLoc& dl);
     };
-
-    extern DataFileMgr theDataFileMgr;
 
 #pragma pack(1)
 

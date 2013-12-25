@@ -284,7 +284,7 @@ namespace mongo {
             }
 
             DiskLoc fr = theCapExtent()->firstRecord;
-            theDataFileMgr.deleteRecord(this, ns, fr.rec(), fr, true); // ZZZZZZZZZZZZ
+            cc().database()->getCollection( ns )->deleteDocument( fr, true );
             compact();
             if( ++passes > maxPasses ) {
                 StringBuilder sb;
@@ -384,7 +384,7 @@ namespace mongo {
 
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            theDataFileMgr.deleteRecord(this, ns, curr.rec(), curr, true);
+            cc().database()->getCollection( ns )->deleteDocument( curr, true );
             compact();
 
             // This is the case where we have not yet had to remove any
