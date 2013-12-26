@@ -537,6 +537,12 @@ namespace mongo {
         memconcept::is(dr, memconcept::concept::deletedrecord);
         return dr;
     }
+
+    Extent* DiskLoc::ext() const {
+        verify( a() != -1 );
+        return cc().database()->getExtentManager().getExtent(*this);
+    }
+
     void Record::_accessing() const {
         if ( likelyInPhysicalMemory() )
             return;

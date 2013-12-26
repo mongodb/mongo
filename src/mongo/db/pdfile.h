@@ -69,12 +69,6 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    class DataFileMgr {
-    public:
-        static Extent* getExtent(const DiskLoc& dl);
-        static Record* getRecord(const DiskLoc& dl);
-    };
-
 #pragma pack(1)
 
     class DeletedRecord {
@@ -95,7 +89,7 @@ namespace mongo {
         }
         Extent* myExtent(const DiskLoc& myLoc) {
             _accessing();
-            return DataFileMgr::getExtent(DiskLoc(myLoc.a(), _extentOfs));
+            return DiskLoc(myLoc.a(), _extentOfs).ext();
         }
     private:
 
@@ -144,7 +138,7 @@ namespace mongo {
         /* use this when a record is deleted. basically a union with next/prev fields */
         DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
 
-        Extent* myExtent(const DiskLoc& myLoc) { return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs() ) ); }
+        Extent* myExtent(const DiskLoc& myLoc) { return DiskLoc(myLoc.a(), extentOfs() ).ext(); }
 
         /* get the next record in the namespace, traversing extents as necessary */
         DiskLoc getNext(const DiskLoc& myLoc);
@@ -270,10 +264,6 @@ namespace mongo {
         return BSONObj::make(rec()->accessed());
     }
 
-    inline Extent* DiskLoc::ext() const {
-        return DataFileMgr::getExtent(*this);
-    }
-
     template< class V >
     inline 
     const BtreeBucket<V> * DiskLoc::btree() const {
@@ -308,11 +298,6 @@ namespace mongo {
             memconcept::is(d, memconcept::concept::nsdetails, ns, sizeof(NamespaceDetails));
         }
         return d;
-    }
-
-    inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
-        verify( dl.a() != -1 );
-        return cc().database()->getExtentManager().getExtent(dl);
     }
 
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );

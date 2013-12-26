@@ -83,7 +83,6 @@ namespace mongo {
 
 
     class DataFile {
-        friend class DataFileMgr;
         friend class BasicCursor;
         friend class ExtentManager;
     public:

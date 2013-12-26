@@ -164,17 +164,17 @@ namespace mongo {
            (think of this as an unchecked type cast)
            Note: set your Context first so that the database to which the diskloc applies is known.
         */
-        BSONObj obj() const;
-        Record* rec() const;
-        DeletedRecord* drec() const;
-        Extent* ext() const;
+        BSONObj obj() const; // TODO(ERH): remove
+        Record* rec() const; // TODO(ERH): remove
+        DeletedRecord* drec() const; // TODO(ERH): remove
+        Extent* ext() const; // TODO(ERH): remove
 
         template< class V >
-        const BtreeBucket<V> * btree() const;
+        const BtreeBucket<V> * btree() const; // TODO(ERH): remove
 
         // Explicitly signals we are writing and casts away const
         template< class V >
-        BtreeBucket<V> * btreemod() const;
+        BtreeBucket<V> * btreemod() const; // TODO(ERH): remove
 
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused
