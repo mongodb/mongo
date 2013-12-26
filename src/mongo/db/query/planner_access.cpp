@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/planner_access.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "mongo/db/matcher/expression_array.h"
@@ -39,6 +40,19 @@
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+
+namespace {
+
+    using namespace mongo;
+
+    /**
+     * Text node functors.
+     */
+    bool isTextNode(const QuerySolutionNode* node) {
+        return STAGE_TEXT == node->getType();
+    }
+
+} // namespace
 
 namespace mongo {
 
@@ -701,6 +715,10 @@ namespace mongo {
                 orResult = orn;
             }
         }
+
+        // Evaluate text nodes first to ensure that text scores are available.
+        // Move text nodes to front of vector.
+        std::stable_partition(orResult->children.begin(), orResult->children.end(), isTextNode);
 
         // OR must have an index for each child, so we should have detached all children from
         // 'root', and there's nothing useful to do with an empty or MatchExpression.  We let it die

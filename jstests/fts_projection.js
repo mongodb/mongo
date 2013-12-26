@@ -39,3 +39,16 @@ var results = t.find({a: /text/}, {score: {$meta: "textScore"}}).toArray();
 
 // No textScore proj. with nested fields
 assert.throws(function() { t.find({$text: {$search: "blah"}}, {'x.y':{$meta: "textScore"}}).toArray(); });
+
+// SERVER-12173
+// When $text operator is in $or, should evaluate first
+results = t.find({$or: [{$text: {$search: "textual content -irrelevant"}}, {_id: 1}]},
+                 {_idCopy:0, score:{$meta: "textScore"}}).toArray();
+printjson(results);
+// Scores should exist.
+assert.eq(results.length, 2);
+assert(results[0].score,
+       "invalid text score for " + tojson(results[0], '', true) + " when $text is in $or");
+assert(results[1].score,
+       "invalid text score for " + tojson(results[0], '', true) + " when $text is in $or");
+
