@@ -32,8 +32,146 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/db/storage/extent.h"
 
 namespace mongo {
+
+    /* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
+
+    *11:03:20 AM) dm10gen: regarding extentOfs...
+    (11:03:42 AM) dm10gen: an extent is a continugous disk area, which contains many Records and DeleteRecords
+    (11:03:56 AM) dm10gen: a DiskLoc has two pieces, the fileno and ofs.  (64 bit total)
+    (11:04:16 AM) dm10gen: to keep the headesr small, instead of storing a 64 bit ptr to the full extent address, we keep just the offset
+    (11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
+    (11:04:33 AM) dm10gen: see class DiskLoc for more info
+    (11:04:43 AM) dm10gen: so that is how Record::myExtent() works
+    (11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must populate its extentOfs then
+    */
+#pragma pack(1)
+    class Record {
+    public:
+        enum HeaderSizeValue { HeaderSize = 16 };
+
+        int lengthWithHeaders() const {  _accessing(); return _lengthWithHeaders; }
+        int& lengthWithHeaders() {  _accessing(); return _lengthWithHeaders; }
+
+        int extentOfs() const { _accessing(); return _extentOfs; }
+        int& extentOfs() { _accessing(); return _extentOfs; }
+
+        int nextOfs() const { _accessing(); return _nextOfs; }
+        int& nextOfs() { _accessing(); return _nextOfs; }
+
+        int prevOfs() const {  _accessing(); return _prevOfs; }
+        int& prevOfs() {  _accessing(); return _prevOfs; }
+
+        const char * data() const { _accessing(); return _data; }
+        char * data() { _accessing(); return _data; }
+
+        const char * dataNoThrowing() const { return _data; }
+        char * dataNoThrowing() { return _data; }
+
+        int netLength() const { _accessing(); return _netLength(); }
+
+        /* use this when a record is deleted. basically a union with next/prev fields */
+        DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
+
+        // TODO(ERH): remove
+        Extent* myExtent(const DiskLoc& myLoc) { return DiskLoc(myLoc.a(), extentOfs() ).ext(); }
+
+        /* get the next record in the namespace, traversing extents as necessary */
+        DiskLoc getNext(const DiskLoc& myLoc); // TODO(ERH): remove
+        DiskLoc getPrev(const DiskLoc& myLoc); // TODO(ERH): remove
+
+        struct NP {
+            int nextOfs;
+            int prevOfs;
+        };
+        NP* np() { return (NP*) &_nextOfs; }
+
+        // ---------------------
+        // memory cache
+        // ---------------------
+
+        /**
+         * touches the data so that is in physical memory
+         * @param entireRecrd if false, only the header and first byte is touched
+         *                    if true, the entire record is touched
+         * */
+        void touch( bool entireRecrd = false ) const;
+
+        /**
+         * @return if this record is likely in physical memory
+         *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
+         */
+        bool likelyInPhysicalMemory() const ;
+
+        /**
+         * tell the cache this Record was accessed
+         * @return this, for simple chaining
+         */
+        Record* accessed();
+
+        static bool likelyInPhysicalMemory( const char* data );
+
+        /**
+         * this adds stats about page fault exceptions currently
+         * specically how many times we call _accessing where the record is not in memory
+         * and how many times we throw a PageFaultException
+         */
+        static void appendStats( BSONObjBuilder& b );
+
+        static void appendWorkingSetInfo( BSONObjBuilder& b );
+    private:
+
+        int _netLength() const { return _lengthWithHeaders - HeaderSize; }
+
+        /**
+         * call this when accessing a field which could hit disk
+         */
+        void _accessing() const;
+
+        int _lengthWithHeaders;
+        int _extentOfs;
+        int _nextOfs;
+        int _prevOfs;
+
+        /** be careful when referencing this that your write intent was correct */
+        char _data[4];
+
+    public:
+        static bool MemoryTrackingEnabled;
+
+    };
+#pragma pack()
+
+    class DeletedRecord {
+    public:
+
+        int lengthWithHeaders() const { _accessing(); return _lengthWithHeaders; }
+        int& lengthWithHeaders() { _accessing(); return _lengthWithHeaders; }
+
+        int extentOfs() const { _accessing(); return _extentOfs; }
+        int& extentOfs() { _accessing(); return _extentOfs; }
+
+        // TODO: we need to not const_cast here but problem is DiskLoc::writing
+        DiskLoc& nextDeleted() const { _accessing(); return const_cast<DiskLoc&>(_nextDeleted); }
+
+        DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
+            _accessing();
+            return DiskLoc(myLoc.a(), _extentOfs);
+        }
+        Extent* myExtent(const DiskLoc& myLoc) {
+            _accessing();
+            return DiskLoc(myLoc.a(), _extentOfs).ext();
+        }
+    private:
+
+        void _accessing() const;
+
+        int _lengthWithHeaders;
+        int _extentOfs;
+        DiskLoc _nextDeleted;
+    };
 
     struct RecordStats {
         void record( BSONObjBuilder& b );
@@ -42,6 +180,58 @@ namespace mongo {
         AtomicInt64 pageFaultExceptionsThrown;
     };
 
+    // ------------------
 
+    inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
+        _accessing();
+        if ( _nextOfs != DiskLoc::NullOfs ) {
+            /* defensive */
+            if ( _nextOfs >= 0 && _nextOfs < 10 ) {
+                logContext("Assertion failure - Record::getNext() referencing a deleted record?");
+                return DiskLoc();
+            }
+
+            return DiskLoc(myLoc.a(), _nextOfs);
+        }
+        Extent *e = myExtent(myLoc);
+        while ( 1 ) {
+            if ( e->xnext.isNull() )
+                return DiskLoc(); // end of table.
+            e = e->xnext.ext();
+            if ( !e->firstRecord.isNull() )
+                break;
+            // entire extent could be empty, keep looking
+        }
+        return e->firstRecord;
+    }
+
+    inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
+        _accessing();
+
+        // Check if we still have records on our current extent
+        if ( _prevOfs != DiskLoc::NullOfs ) {
+            return DiskLoc(myLoc.a(), _prevOfs);
+        }
+
+        // Get the current extent
+        Extent *e = myExtent(myLoc);
+        while ( 1 ) {
+            if ( e->xprev.isNull() ) {
+                // There are no more extents before this one
+                return DiskLoc();
+            }
+
+            // Move to the extent before this one
+            e = e->xprev.ext();
+
+            if ( !e->lastRecord.isNull() ) {
+                // We have found a non empty extent
+                break;
+            }
+        }
+
+        // Return the last record in our new extent
+        return e->lastRecord;
+    }
 
 }

@@ -543,6 +543,10 @@ namespace mongo {
         return cc().database()->getExtentManager().getExtent(*this);
     }
 
+    BSONObj DiskLoc::obj() const {
+        return BSONObj::make(rec()->accessed());
+    }
+
     void Record::_accessing() const {
         if ( likelyInPhysicalMemory() )
             return;
