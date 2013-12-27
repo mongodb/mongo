@@ -105,7 +105,7 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	int ret;
 	void *p;
 
-	big[bytes] = '\0';
+	big[bytes - 1] = '\0';
 
 	printf("%zu" "%s%s: %s %s big %s\n",
 	    bytes < MEGABYTE ? bytes :
@@ -165,7 +165,7 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "WT_CONNECTION.close");
 
-	big[bytes] = 'a';
+	big[bytes - 1] = 'a';
 }
 
 int
@@ -206,6 +206,7 @@ main(int argc, char *argv[])
 			run(cp, 0, *lp);	/* Big value */
 		}
 	}
+	free(big);
 
 	(void)system("rm -rf WT_TEST");
 
