@@ -47,6 +47,7 @@ namespace mongo {
         bool snapShotQuery;
         unsigned int skip;
         unsigned int limit;
+        std::string sort;
     };
 
     extern MongoExportGlobalParams mongoExportGlobalParams;

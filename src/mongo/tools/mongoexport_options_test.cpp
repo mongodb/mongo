@@ -366,7 +366,7 @@ namespace {
             else if (iterator->_dottedName == "query") {
                 ASSERT_EQUALS(iterator->_singleName, "query,q");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "query filter, as a JSON string");
+                ASSERT_EQUALS(iterator->_description, "query filter, as a JSON string, e.g., '{x:{$gt:1}}'");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
@@ -456,6 +456,18 @@ namespace {
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 moe::Value defaultVal(0);
                 ASSERT_TRUE(iterator->_default.equal(defaultVal));
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "sort") {
+                ASSERT_EQUALS(iterator->_singleName, "sort");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "sort order, as a JSON string, e.g., '{x:1}'");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
                 ASSERT_EQUALS(iterator->_sources, moe::SourceAll);

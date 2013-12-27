@@ -174,6 +174,10 @@ public:
         }
 
         Query q(mongoExportGlobalParams.query);
+        if (mongoExportGlobalParams.sort != "") {
+            BSONObj sortSpec = mongo::fromjson(mongoExportGlobalParams.sort);
+            q.sort(sortSpec);
+        }
 
         if (mongoExportGlobalParams.snapShotQuery) {
             q.snapshot();

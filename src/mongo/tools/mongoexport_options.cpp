@@ -62,7 +62,7 @@ namespace mongo {
         }
 
         options->addOptionChaining("query", "query,q", moe::String,
-                "query filter, as a JSON string");
+                "query filter, as a JSON string, e.g., '{x:{$gt:1}}'");
 
         options->addOptionChaining("csv", "csv", moe::Switch, "export to csv instead of json");
 
@@ -85,6 +85,9 @@ namespace mongo {
         options->addOptionChaining("limit", "limit", moe::Int,
                 "limit the numbers of documents returned, default all")
                                   .setDefault(moe::Value(0));
+
+        options->addOptionChaining("sort", "sort", moe::String,
+                "sort order, as a JSON string, e.g., '{x:1}'");
 
 
         return Status::OK();
@@ -125,12 +128,19 @@ namespace mongo {
         mongoExportGlobalParams.jsonArray = hasParam("jsonArray");
         mongoExportGlobalParams.query = getParam("query", "");
         mongoExportGlobalParams.snapShotQuery = false;
-        if (!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) {
+
+        // Only allow snapshot query (requires _id idx scan) if following conditions are false
+        if (!hasParam("query") && 
+            !hasParam("sort") && 
+            !hasParam("dbpath") && 
+            !hasParam("forceTableScan")) {
             mongoExportGlobalParams.snapShotQuery = true;
         }
+
         mongoExportGlobalParams.slaveOk = params["slaveOk"].as<bool>();
         mongoExportGlobalParams.limit = getParam("limit", 0);
         mongoExportGlobalParams.skip = getParam("skip", 0);
+        mongoExportGlobalParams.sort = getParam("sort", "");
 
         // we write output to standard error by default to avoid mangling output, but we don't need
         // to do this if an output file was specified
