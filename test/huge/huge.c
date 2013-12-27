@@ -135,17 +135,14 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 		die(ret, "WT_SESSION.open_cursor: %s", cp->uri);
 
 	/* Set the key/value. */
-	if (bigkey) {
+	if (bigkey)
 		cursor->set_key(cursor, big);
-		cursor->set_value(cursor, big);
-	} else {
-		if (cp->recno) {
-			keyno = 1;
-			cursor->set_key(cursor, keyno);
-		} else
-			cursor->set_key(cursor, "key001");
-		cursor->set_value(cursor, big);
-	}
+	else if (cp->recno) {
+		keyno = 1;
+		cursor->set_key(cursor, keyno);
+	} else
+		cursor->set_key(cursor, "key001");
+	cursor->set_value(cursor, big);
 
 	/* Insert the record. */
 	if ((ret = cursor->insert(cursor)) != 0)
