@@ -35,6 +35,8 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/db/structure/btree/key.h"
 
 namespace mongo {
@@ -1059,6 +1061,15 @@ namespace mongo {
         static string dupKeyError( const IndexDescriptor* idx , const Key& key );
     };
 #pragma pack()
+
+    template< class V >
+    inline
+    const BtreeBucket<V> * DiskLoc::btree() const {
+        verify( _a != -1 );
+        Record *r = rec();
+        memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
+        return (const BtreeBucket<V> *) r->data();
+    }
 
     /**
      * give us a writable version of the btree bucket (declares write intent).

@@ -69,17 +69,6 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    template< class V >
-    inline
-    const BtreeBucket<V> * DiskLoc::btree() const {
-        verify( _a != -1 );
-        Record *r = rec();
-        memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
-        return (const BtreeBucket<V> *) r->data();
-    }
-
-
-
     boost::intmax_t dbSize( const char *database );
 
     inline NamespaceIndex* nsindex(const StringData& ns) {
