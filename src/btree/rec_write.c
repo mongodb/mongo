@@ -1633,7 +1633,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 * The destination buffer really only needs to be large enough for the
 	 * target block size, corrected for the requirements of the underlying
 	 * block manager.  If the target block size is 8KB, that's a multiple
-	 * of 512Band so the underlying block manager is fine with it.  But...
+	 * of 512B and so the underlying block manager is fine with it.  But...
 	 * we don't control what the pre_size method returns us as a required
 	 * size, and we don't want to document the compress_raw method has to
 	 * skip bytes in the buffer because that's confusing, so do something
