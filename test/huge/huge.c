@@ -194,7 +194,7 @@ main(int argc, char *argv[])
 		}
 
 	/* Allocate a buffer to use. */
-	len = (size_t)4 * GIGABYTE;
+	len = small ? ((size_t)250 * MEGABYTE) : ((size_t)4 * GIGABYTE);
 	if ((big = malloc(len)) == NULL)
 		die(errno, "");
 	memset(big, 'a', len);
