@@ -57,10 +57,11 @@ static CONFIG config[] = {
 	{ NULL, NULL, 0 }
 };
 
+#define	SMALL_MAX	MEGABYTE
 static size_t lengths[] = {
     20,					/* Check configuration */
-    (size_t)1 * MEGABYTE,		/* 1MB */
-    (size_t)250 * MEGABYTE,		/* 250MB (largest -s configuration) */
+    (size_t)1 * MEGABYTE,		/* 1MB (largest -s configuration) */
+    (size_t)250 * MEGABYTE,		/* 250MB */
     (size_t)1 * GIGABYTE,		/* 1GB */
     (size_t)2 * GIGABYTE,		/* 2GB */
     (size_t)3 * GIGABYTE,		/* 3GB */
@@ -191,14 +192,14 @@ main(int argc, char *argv[])
 		}
 
 	/* Allocate a buffer to use. */
-	len = small ? ((size_t)250 * MEGABYTE) : ((size_t)4 * GIGABYTE);
+	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
 	if ((big = malloc(len)) == NULL)
 		die(errno, "");
 	memset(big, 'a', len);
 
 	/* Make sure the configurations all work. */
 	for (lp = lengths; *lp != 0; ++lp) {
-		if (small && *lp >= GIGABYTE)
+		if (small && *lp > SMALL_MAX)
 			break;
 		for (cp = config; cp->uri != NULL; ++cp) {
 			if (!cp->recno)		/* Big key on row-store */
