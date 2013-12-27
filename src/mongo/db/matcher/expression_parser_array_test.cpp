@@ -104,6 +104,37 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 6 ) ) ) );
     }
 
+    TEST( MatchExpressionParserArrayTest, ElemMatchDBRef1 ) {
+        OID oid = OID::gen();
+        BSONObj match = BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" );
+        OID oidx = OID::gen();
+        BSONObj notMatch = BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" );
+
+        BSONObj query = BSON( "x" << BSON( "$elemMatch" << BSON( "$eq" << match ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+    }
+
+    // with explicit $eq
+    TEST( MatchExpressionParserArrayTest, ElemMatchDBRef2 ) {
+        OID oid = OID::gen();
+        BSONObj match = BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" );
+        OID oidx = OID::gen();
+        BSONObj notMatch = BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" );
+
+        BSONObj query = BSON( "x" << BSON( "$elemMatch" << match ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+    }
+
     TEST( MatchExpressionParserArrayTest, All1 ) {
         BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( 1 << 2 ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );

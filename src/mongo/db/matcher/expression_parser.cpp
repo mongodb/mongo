@@ -609,6 +609,28 @@ namespace mongo {
             return StatusWithMatchExpression( temp.release() );
         }
 
+        // DBRef value case
+        // A DBRef document under a $elemMatch should be treated as a value case
+        // with an implied $eq.
+
+        if ( _isDBRefDocument( obj ) ) {
+
+            std::auto_ptr<EqualityMatchExpression> eq( new EqualityMatchExpression() );
+            Status s = eq->init( "", e );
+            if ( !s.isOK() ) {
+                return StatusWithMatchExpression( s );
+            }
+
+            std::auto_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
+            s = temp->init( name );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+
+            temp->add( eq.release() );
+
+            return StatusWithMatchExpression( temp.release() );
+        }
+
         // object case
 
         StatusWithMatchExpression sub = _parse( obj, false );
