@@ -142,7 +142,7 @@ namespace mongo {
     }
 
     TEST( NamespaceStringTest, nsToDatabase2 ) {
-        char buf[128];
+        char buf[MaxDatabaseNameLen];
 
         nsToDatabase( "foo.bar", buf );
         ASSERT_EQUALS( 'f', buf[0] );

@@ -41,8 +41,9 @@ namespace mongo {
         // if profiling indicates this method is a significant bottleneck, we could have a version we
         // use for reads which does not fill with zeroes, and keep the zeroing behavior on writes.
         //
-        memset( buf, 0, MaxNsLen );
-        uassert( 10080 , "ns name too long, max size is 128", ns.size() < MaxNsLen - 1);
+        memset( buf, 0, sizeof(buf) );
+        uassert( 10080 , "ns name too long, max size is 127 bytes", ns.size() <= MaxNsLen);
+        uassert( 17380 , "ns name can't contain embedded '\0' byte", ns.find('\0') == string::npos);
         ns.copyTo( buf, true );
         return *this;
     }
@@ -51,7 +52,7 @@ namespace mongo {
         char ex[] = "$extra";
         ex[5] += i;
         string s = string(buf) + ex;
-        massert( 10348 , "$extra: ns name too long", s.size() < MaxNsLen);
+        massert( 10348 , "$extra: ns name too long", s.size() <= MaxNsLen);
         return s;
     }
 

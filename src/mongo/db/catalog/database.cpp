@@ -567,6 +567,13 @@ namespace mongo {
             uasserted(14037, "can't create user databases on a --configsvr instance");
         }
 
+        if (NamespaceString::normal(ns)) {
+            // This check only applies for actual collections, not indexes or other types of ns.
+            uassert(17381, str::stream() << "fully qualified namespace " << ns << " is too long "
+                                         << "(max is " << Namespace::MaxNsColletionLen << " bytes)",
+                    ns.size() <= Namespace::MaxNsColletionLen);
+        }
+
         audit::logCreateCollection( currentClient.get(), ns );
 
         // allocation strategy set explicitly in flags or by server-wide default

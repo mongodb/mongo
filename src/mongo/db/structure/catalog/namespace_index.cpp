@@ -76,13 +76,18 @@ namespace mongo {
         Namespace n(ns);
         _ht->kill(n);
 
-        for( int i = 0; i<=1; i++ ) {
-            try {
-                Namespace extra(n.extraName(i));
-                _ht->kill(extra);
-            }
-            catch(DBException&) {
-                MONGO_DLOG(3) << "caught exception in kill_ns" << endl;
+        if (ns.size() <= Namespace::MaxNsColletionLen) {
+            // Larger namespace names don't have room for $extras so they can't exist. The code
+            // below would cause an "$extra: ns too large" error and stacktrace to be printed to the
+            // log even though everything is fine.
+            for( int i = 0; i<=1; i++ ) {
+                try {
+                    Namespace extra(n.extraName(i));
+                    _ht->kill(extra);
+                }
+                catch(DBException&) {
+                    MONGO_DLOG(3) << "caught exception in kill_ns" << endl;
+                }
             }
         }
     }

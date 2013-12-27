@@ -39,7 +39,7 @@
 namespace mongo {
     namespace {
         BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
-        BOOST_STATIC_ASSERT( Namespace::MaxNsLen == MaxDatabaseNameLen );
+        BOOST_STATIC_ASSERT( Namespace::MaxNsLenWithNUL == MaxDatabaseNameLen );
     }
 }
 

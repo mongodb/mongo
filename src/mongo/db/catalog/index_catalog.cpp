@@ -534,10 +534,10 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex, "no index name specified" );
 
         string indexNamespace = IndexDetails::indexNamespaceFromObj(spec);
-        if ( indexNamespace.length() > 128 )
+        if ( indexNamespace.length() > Namespace::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "namespace name generated from index name \"" <<
-                           indexNamespace << "\" is too long (128 char max)" );
+                           indexNamespace << "\" is too long (127 byte max)" );
 
         BSONObj key = spec.getObjectField("key");
         if ( key.objsize() > 2048 )

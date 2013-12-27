@@ -44,9 +44,6 @@ namespace mongo {
 
     class CmdRenameCollection : public Command {
     public:
-        // Absolute maximum Namespace is 128 incl NUL
-        // Namespace is 128 minus .$ and $extra so 120 before additions
-        static const int maxNamespaceLen = 120;
         CmdRenameCollection() : Command( "renameCollection" ) {}
         virtual bool adminOnly() const {
             return true;
@@ -131,12 +128,14 @@ namespace mongo {
                     sourceColl->getIndexCatalog()->getIndexIterator( true );
                 int longestIndexNameLength = 0;
                 while ( sourceIndIt.more() ) {
-                    int thisLength = sourceIndIt.next()->getInfoElement("name").valuesize();
+                    int thisLength = sourceIndIt.next()->indexName().length();
                     if ( thisLength > longestIndexNameLength )
                         longestIndexNameLength = thisLength;
                 }
 
-                unsigned int longestAllowed = maxNamespaceLen - longestIndexNameLength - 1;
+                unsigned int longestAllowed =
+                    min(int(Namespace::MaxNsColletionLen),
+                        int(Namespace::MaxNsLen) - 2/*strlen(".$")*/ - longestIndexNameLength);
                 if (target.size() > longestAllowed) {
                     StringBuilder sb;
                     sb << "collection name length of " << target.size()
