@@ -246,11 +246,13 @@ javaClose(JAVA_CALLBACK *jcb, jfieldID *pfid)
 
 	if (pfid == NULL || *pfid == NULL) {
 		cls = (*env)->GetObjectClass(env, jcb->jobj);
-		*pfid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
+		fid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
 		if (pfid != NULL)
 			*pfid = fid;
+	} else {
+		fid = *pfid;
 	}
-	(*env)->SetLongField(env, jcb->jobj, *pfid, 0L);
+	(*env)->SetLongField(env, jcb->jobj, fid, 0L);
 	(*env)->DeleteGlobalRef(env, jcb->jobj);
 	return (0);
 }
@@ -297,13 +299,11 @@ cursorCloseHandler(WT_CURSOR *cursor)
 	JAVA_CALLBACK *jcb;
 	JAVA_CALLBACK *sess_jcb;
 
-	static jfieldID ccp_fid = NULL;     /* cursor cptr fid, computed once */
-
 	jcb = (JAVA_CALLBACK *)cursor->lang_private;
 	sess_jcb = (JAVA_CALLBACK *)
 	    ((WT_SESSION_IMPL *)cursor->session)->lang_private;
 	cursor->lang_private = NULL;
-	ret = javaClose(jcb, &sess_jcb->fid);
+	ret = javaClose(jcb, sess_jcb ? &sess_jcb->fid : NULL);
 	__wt_free((WT_SESSION_IMPL *)cursor->session, jcb);
 
 	return (ret);
