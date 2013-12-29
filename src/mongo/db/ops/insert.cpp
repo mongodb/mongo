@@ -156,6 +156,7 @@ namespace mongo {
         if ( coll.startsWith( "system." ) ) {
             if ( coll == "system.indexes" ) return Status::OK();
             if ( coll == "system.js" ) return Status::OK();
+            if ( coll == "system.profile" ) return Status::OK();
             if ( coll == "system.users" ) return Status::OK();
             if ( db == "admin" ) {
                 if ( coll == "system.version" ) return Status::OK();
