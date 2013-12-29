@@ -69,7 +69,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/memconcept.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
@@ -308,8 +307,6 @@ namespace mongo {
         massert(10356 ,
                 str::stream() << "invalid ns: " << ns,
                 NamespaceString::validCollectionComponent(ns));
-
-        uassertStatusOK( userAllowedWriteNS( ns ) );
 
         bool ok = _userCreateNS(ns, options, err, deferIdIndex);
         if ( logForReplication && ok ) {

@@ -60,6 +60,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
@@ -523,6 +524,12 @@ namespace mongo {
             uassert(15888,
                     "must pass name of collection to create",
                     firstElt.valuestrsafe()[0] != '\0');
+
+            Status status = userAllowedWriteNS( dbname, firstElt.valuestr() );
+            if ( !status.isOK() ) {
+                return appendCommandStatus( result, status );
+            }
+
             string ns = dbname + '.' + firstElt.valuestr();
 
             // Build options object from remaining cmdObj elements.
