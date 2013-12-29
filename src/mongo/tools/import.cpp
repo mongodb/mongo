@@ -362,9 +362,10 @@ public:
         try {
             ns = getNS();
         }
-        catch (int e) {
-            if (e == -1) {
-                // no collection specified - use name of collection that was dumped from
+        catch (...) {
+            // The only time getNS throws is when the collection was not specified.  In that case,
+            // check if the user specified a file name and use that as the collection name.
+            if (!mongoImportGlobalParams.filename.empty()) {
                 string oldCollName =
                     boost::filesystem::path(mongoImportGlobalParams.filename).leaf().string();
                 oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
@@ -375,10 +376,6 @@ public:
                 printHelp(cerr);
                 return -1;
             }
-        }
-        catch (...) {
-            printHelp(cerr);
-            return -1;
         }
 
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
