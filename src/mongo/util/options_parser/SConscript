@@ -16,6 +16,13 @@ env.Library('options_parser', ['environment.cpp',
                                        '$BUILD_DIR/third_party/shim_pcrecpp'
                               ])
 
+# This library contains the initializers to run option parsing.  This is separated into its own
+# library because some code that is shared between many different binaries needs to link against the
+# options_parser library, but not all these binaries need to actually run the option parsing.
+# Linking against this library will cause the option parsing initializer to actually be run.
+env.Library('options_parser_init', ['options_parser_init.cpp'],
+                                    LIBDEPS=['options_parser'])
+
 env.CppUnitTest('options_parser_test',
                 'options_parser_test.cpp',
                 LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])
