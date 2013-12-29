@@ -140,7 +140,7 @@ namespace mongo {
                 if ( isindex == false && collection == NULL ) {
                     collection = context.db()->getCollection( to_collection );
                     if ( !collection ) {
-                        massert( 17317,
+                        massert( 17321,
                                  str::stream()
                                  << "collection dropped during clone ["
                                  << to_collection << "]",

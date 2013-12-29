@@ -78,7 +78,7 @@ namespace mongo {
 
     // so we can fail the same way
     void checkOplogInsert( StatusWith<DiskLoc> result ) {
-        massert( 17318,
+        massert( 17322,
                  str::stream() << "write to oplog failed: " << result.getStatus().toString(),
                  result.isOK() );
     }
