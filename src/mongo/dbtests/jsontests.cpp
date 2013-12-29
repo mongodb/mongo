@@ -180,6 +180,33 @@ namespace JsonTests {
             }
         };
 
+        class NumberDoubleNaN {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", std::numeric_limits<double>::quiet_NaN());
+                ASSERT_EQUALS("{ \"a\" : NaN }", b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberDoubleInfinity {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", std::numeric_limits<double>::infinity());
+                ASSERT_EQUALS("{ \"a\" : Infinity }", b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberDoubleNegativeInfinity {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", -std::numeric_limits<double>::infinity());
+                ASSERT_EQUALS("{ \"a\" : -Infinity }", b.done().jsonString(Strict));
+            }
+        };
+
         class SingleBoolMember {
         public:
             void run() {
@@ -2592,6 +2619,9 @@ namespace JsonTests {
             add< JsonStringTests::NumberLongStrict >();
             add< JsonStringTests::NumberLongStrictLarge >();
             add< JsonStringTests::NumberLongStrictNegative >();
+            add< JsonStringTests::NumberDoubleNaN >();
+            add< JsonStringTests::NumberDoubleInfinity >();
+            add< JsonStringTests::NumberDoubleNegativeInfinity >();
             add< JsonStringTests::SingleBoolMember >();
             add< JsonStringTests::SingleNullMember >();
             add< JsonStringTests::SingleUndefinedMember >();

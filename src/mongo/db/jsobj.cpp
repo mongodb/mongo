@@ -97,6 +97,9 @@ namespace mongo {
                 s.precision( 16 );
                 s << number();
             }
+            // This is not valid JSON, but according to RFC-4627, "Numeric values that cannot be
+            // represented as sequences of digits (such as Infinity and NaN) are not permitted." so
+            // we are accepting the fact that if we have such values we cannot output valid JSON.
             else if ( mongo::isNaN(number()) ) {
                 s << "NaN";
             }
