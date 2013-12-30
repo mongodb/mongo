@@ -511,6 +511,13 @@ namespace {
         }
     }
 
+    OpTime ReplSetImpl::getEarliestOpTimeWritten() const {
+        Lock::DBRead lk(rsoplog);
+        BSONObj o;
+        uassert(17347, "Problem reading earliest entry from oplog", Helpers::getFirst(rsoplog, o));
+        return o["ts"]._opTime();
+    }
+
     /* call after constructing to start - returns fairly quickly after launching its threads */
     void ReplSetImpl::_go() {
         {

@@ -367,6 +367,8 @@ namespace mongo {
         SyncSourceFeedback syncSourceFeedback;
 
         OpTime lastOpTimeWritten;
+        OpTime getEarliestOpTimeWritten() const;
+
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex

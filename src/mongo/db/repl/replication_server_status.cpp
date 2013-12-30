@@ -153,6 +153,24 @@ namespace mongo {
         }
     } replicationInfoServerStatus;
 
+    class OplogInfoServerStatus : public ServerStatusSection {
+    public:
+        OplogInfoServerStatus() : ServerStatusSection( "oplog" ){}
+        bool includeByDefault() const { return false; }
+
+        BSONObj generateSection(const BSONElement& configElement) const {
+            if (!theReplSet)
+                return BSONObj();
+
+            BSONObjBuilder result;
+            result.appendTimestamp("latestOptime", theReplSet->lastOpTimeWritten.asDate());
+            result.appendTimestamp("earliestOptime",
+                                   theReplSet->getEarliestOpTimeWritten().asDate());
+
+            return result.obj();
+        }
+    } oplogInfoServerStatus;
+
     class CmdIsMaster : public Command {
     public:
         virtual bool requiresAuth() { return false; }
