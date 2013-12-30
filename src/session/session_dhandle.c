@@ -282,7 +282,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
-		if (dhandle != session->dhandle && 
+		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
 		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
