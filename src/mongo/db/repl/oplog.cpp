@@ -135,6 +135,12 @@ namespace mongo {
         OpTime::setLast( ts );
     }
 
+    /**
+     * This allows us to stream the oplog entry directly into data region
+     * main goal is to avoid copying the o portion
+     * which can be very large
+     * TODO: can have this build the entire doc
+     */
     class OplogDocWriter : public DocWriter {
     public:
         OplogDocWriter( const BSONObj& frame, const BSONObj& oField )
