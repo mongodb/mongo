@@ -56,7 +56,8 @@ namespace mongo {
          * assigned to it from 'modExpr'. It returns OK if successful or a status describing
          * the error.
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts);
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL);
 
         /** Evaluates the validity of applying $currentDate.
          */

@@ -55,7 +55,8 @@ namespace mongo {
          * Ex. {$pullAll : {<field> : [<values>]}}
          * {$pullAll :{ array : [1,2] } } will transform {array: [1,2,3]} -> {array: [3]}
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts);
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL);
 
         virtual Status prepare(mutablebson::Element root,
                                const StringData& matchedField,

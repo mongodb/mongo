@@ -58,7 +58,8 @@ namespace mongo {
          * unexpected format or if it can't be parsed for some reason, returns an error status
          * describing the error.
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts);
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL);
 
         /**
          * Registers the that 'root' is in the document that we want to fully replace.

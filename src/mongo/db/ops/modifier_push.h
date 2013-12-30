@@ -71,7 +71,8 @@ namespace mongo {
          *   + Because of the previous, $sort requires that the array being pushed to be made
          *     of objects
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts);
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL);
 
         /**
          * Locates the array to be pushed into in the 'root', if it exists, and fills in

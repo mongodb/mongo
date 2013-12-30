@@ -51,7 +51,8 @@ namespace mongo {
          *  internally to a mutable bson. Both single and $each forms are supported. Returns OK
          *  if the item(s) are valid otherwise returns a status describing the error.
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts);
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL);
 
         /** Decides which portion of the array items that are going to be set-unioned to root's
          *  document and fills in 'execInfo' accordingly. Returns OK if the document has a

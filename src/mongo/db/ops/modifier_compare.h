@@ -61,7 +61,8 @@ namespace mongo {
          * assigned to it from 'modExpr'. It returns OK if successful or a status describing
          * the error.
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts);
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL);
 
         /**
          * Looks up the field name in the sub-tree rooted at 'root', and binds, if necessary,

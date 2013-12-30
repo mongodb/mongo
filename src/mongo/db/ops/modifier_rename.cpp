@@ -75,7 +75,8 @@ namespace mongo {
     ModifierRename::~ModifierRename() {
     }
 
-    Status ModifierRename::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierRename::init(const BSONElement& modExpr, const Options& opts,
+                                bool* positional) {
 
         if (modExpr.type() != String) {
             return Status(ErrorCodes::BadValue,
@@ -123,6 +124,9 @@ namespace mongo {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The destination field for $rename may not be dynamic: "
                                         << _toFieldRef.dottedField());
+
+        if (positional)
+            *positional = false;
 
         return Status::OK();
     }

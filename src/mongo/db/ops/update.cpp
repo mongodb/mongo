@@ -584,20 +584,33 @@ namespace mongo {
             doc.reset(oldObj, mutablebson::Document::kInPlaceEnabled);
             BSONObj logObj;
 
-            // If there was a matched field, obtain it.
-            // TODO: Only do this when needed (need requirements from update_driver/mods)
-            MatchDetails matchDetails;
-            matchDetails.requestElemMatchKey();
-
-            // TODO: Find out if can move this to the query side so we don't need to double match
-            verify(cq->root()->matchesBSON(oldObj, &matchDetails));
-
-            string matchedField;
-            if (matchDetails.hasElemMatchKey())
-                matchedField = matchDetails.elemMatchKey();
 
             FieldRefSet updatedFields;
-            Status status = driver->update(matchedField, &doc, &logObj, &updatedFields);
+
+            Status status = Status::OK();
+            if (!driver->needMatchDetails()) {
+                // If we don't need match details, avoid doing the rematch
+                status = driver->update(StringData(), &doc, &logObj, &updatedFields);
+            }
+            else {
+                // If there was a matched field, obtain it.
+                MatchDetails matchDetails;
+                matchDetails.requestElemMatchKey();
+
+                verify(cq->root()->matchesBSON(oldObj, &matchDetails));
+
+                string matchedField;
+                if (matchDetails.hasElemMatchKey())
+                    matchedField = matchDetails.elemMatchKey();
+
+                // TODO: Right now, each mod checks in 'prepare' that if it needs positional
+                // data, that a non-empty StringData() was provided. In principle, we could do
+                // that check here in an else clause to the above conditional and remove the
+                // checks from the mods.
+
+                status = driver->update(matchedField, &doc, &logObj, &updatedFields);
+            }
+
             if (!status.isOK()) {
                 uasserted(16837, status.reason());
             }

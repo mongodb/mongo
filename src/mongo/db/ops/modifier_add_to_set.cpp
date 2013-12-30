@@ -78,7 +78,6 @@ namespace mongo {
             : doc(doc)
             , idxFound(0)
             , elemFound(doc.end())
-            , boundDollar("")
             , addAll(false)
             , elementsToAdd()
             , noOp(false) {
@@ -92,9 +91,6 @@ namespace mongo {
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mb::Element elemFound;
-
-        // Value to bind to a $-positional field, if one is provided.
-        std::string boundDollar;
 
         // Are we adding all of the $each elements, or just a subset?
         bool addAll;
@@ -117,7 +113,8 @@ namespace mongo {
     ModifierAddToSet::~ModifierAddToSet() {
     }
 
-    Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts,
+                                  bool* positional) {
 
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
@@ -130,6 +127,10 @@ namespace mongo {
         // and ensure only one occurrence.
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+
+        if (positional)
+            *positional = foundDollar;
+
         if (foundDollar && foundCount > 1) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Too many positional (i.e. '$') elements found in path '"
@@ -223,8 +224,7 @@ namespace mongo {
                                                "needed from the query. Unexpanded update: "
                                             << _fieldRef.dottedField());
             }
-            _preparedState->boundDollar = matchedField.toString();
-            _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
+            _fieldRef.setPart(_posDollar, matchedField);
         }
 
         // Locate the field name in 'root'.

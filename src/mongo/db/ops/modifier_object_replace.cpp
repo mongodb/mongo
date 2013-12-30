@@ -82,7 +82,8 @@ namespace mongo {
     ModifierObjectReplace::~ModifierObjectReplace() {
     }
 
-    Status ModifierObjectReplace::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierObjectReplace::init(const BSONElement& modExpr, const Options& opts,
+                                       bool* positional) {
 
         if (modExpr.type() != Object) {
             // Impossible, really since the caller check this already...
@@ -91,6 +92,10 @@ namespace mongo {
                                            " but the type supplied was "
                                         << modExpr.type());
         }
+
+        // Object replacements never have positional operator.
+        if (positional)
+            *positional = false;
 
         // We make a copy of the object here because the update driver does not guarantees, in
         // the case of object replacement, that the modExpr is going to outlive this mod.
