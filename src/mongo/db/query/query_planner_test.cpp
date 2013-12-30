@@ -1240,6 +1240,20 @@ namespace {
                                             "node: {ixscan: {pattern: {'arr.x': 1, a: 1}}}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, CompoundAndNonCompoundIndices) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("a" << 1 << "b" << 1), true);
+        runQuery(fromjson("{a: 1, b: {$gt: 2, $lt: 2}}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 3U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and:[{b:{$lt:2}},{b:{$gt:2}}]}, node: "
+                                "{ixscan: {pattern: {a:1}, bounds: {a: [[1,1,true,true]]}}}}}");
+        assertSolutionExists("{fetch: {filter: {$and:[{b:{$lt:2}},{b:{$gt:2}}]}, node: "
+                                "{ixscan: {pattern: {a:1,b:1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
     //
     // Sort orders
     //
@@ -1745,6 +1759,20 @@ namespace {
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: {filter: null, pattern: "
                                 "{a: 1, b: 1}, bounds: {a: [['foo',{},false,false]], "
                                  "b:[['bar',{},true,false]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, IndexBoundsAndWithNestedOr) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$and: [{a: 1, $or: [{a: 2}, {a: 3}]}]}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{cscan: {dir: 1, filter: "
+                                "{$and: [{a: 1}, {$or: [{a: 2}, {a: 3}]}]}}}");
+        assertSolutionExists("{fetch: {filter: {a: 1}, node: {ixscan: "
+                                "{pattern: {a: 1}, filter: null,"
+                                " bounds: {a: [[2,2,true,true], [3,3,true,true]]}}}}}");
+        assertSolutionExists("{fetch: {filter: {$or: [{a: 2}, {a: 3}]}, node: {ixscan: "
+                                "{pattern: {a: 1}, filter: null, bounds: {a: [[1,1,true,true]]}}}}}");
     }
 
     //

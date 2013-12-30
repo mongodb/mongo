@@ -54,8 +54,6 @@ for( i = 0; i < 10; ++i ) {
 
 checkCursorCovered( 'BtreeCursor a_1_b_1', true, 10, { a:0 }, { _id:0, a:1 } );
 
-// QUERY_MIGRATION: we have an expression on 'd'...not sure why these would be covered.
-// Changing 'true' to 'false' below.
 checkCursorCovered( 'BtreeCursor a_1_b_1', false, 10, { a:0, d:null }, { _id:0, a:1 } );
 checkCursorCovered( 'BtreeCursor a_1_b_1', false, 10, { a:0, d:null }, { _id:0, a:1, b:1 } );
 
