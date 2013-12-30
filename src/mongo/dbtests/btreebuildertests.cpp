@@ -86,6 +86,8 @@ namespace BtreeBuilderTests {
         Client::WriteContext _ctx;
     };
 
+    // QUERY_MIGRATION
+#if 0
     /**
      * BtreeBuilder::commit() is interrupted if there is a request to kill the current operation.
      */
@@ -126,6 +128,7 @@ namespace BtreeBuilderTests {
     private:
         bool _mayInterrupt;
     };
+#endif
 
     class BtreeBuilderTests : public Suite {
     public:
@@ -134,8 +137,9 @@ namespace BtreeBuilderTests {
         }
 
         void setupTests() {
-            add<InterruptCommit>( false );
-            add<InterruptCommit>( true );
+            // QUERY_MIGRATION
+            //add<InterruptCommit>( false );
+            //add<InterruptCommit>( true );
         }
     } btreeBuilderTests;
 

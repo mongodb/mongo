@@ -56,7 +56,7 @@ namespace mongo {
         massert( 17320,
                  str::stream() << "cannot do " << caller
                  << " on namespace with a $ in it: " << ns,
-                 ns.find( '$' ) == string::npos );
+                 NamespaceString::normal( ns ) );
     }
 
     Database::~Database() {

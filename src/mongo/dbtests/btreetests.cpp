@@ -29,6 +29,9 @@
  *    then also delete it in the license file.
  */
 
+    // QUERY_MIGRATION
+#if 0
+
 #include "mongo/pch.h"
 
 #include "mongo/db/structure/btree/btree.h"
@@ -58,3 +61,5 @@ namespace BtreeTests0 {
 namespace BtreeTests1 {
 #include "mongo/dbtests/btreetests.inl"
 }
+
+#endif

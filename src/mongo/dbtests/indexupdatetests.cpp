@@ -231,6 +231,8 @@ namespace IndexUpdateTests {
     };
 #endif
 
+    // QUERY_MIGRATION
+#if 0
     /** buildBottomUpPhases2And3() aborts if the current operation is interrupted. */
     class InterruptBuildBottomUp : public IndexBuildBase {
     public:
@@ -301,6 +303,7 @@ namespace IndexUpdateTests {
     private:
         bool _mayInterrupt;
     };
+#endif
 
     /** doDropDups() deletes the duplicate documents in the provided set. */
     class DoDropDups : public IndexBuildBase {
@@ -775,9 +778,9 @@ namespace IndexUpdateTests {
             add<InterruptAddKeysToPhaseOne>( false );
             add<InterruptAddKeysToPhaseOne>( true );
             // QUERY_MIGRATION
-           //  add<BuildBottomUp>();
-            add<InterruptBuildBottomUp>( false );
-            add<InterruptBuildBottomUp>( true );
+            //add<BuildBottomUp>();
+            //add<InterruptBuildBottomUp>( false );
+            //add<InterruptBuildBottomUp>( true );
             add<DoDropDups>();
             add<InterruptDoDropDups>( false );
             add<InterruptDoDropDups>( true );
