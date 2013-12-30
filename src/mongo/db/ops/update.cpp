@@ -498,8 +498,10 @@ namespace mongo {
 
         int numMatched = 0;
 
-        // NOTE: We only store the locs of moved docs, since the runner will keep track of the rest
-        unordered_set<DiskLoc, DiskLoc::Hasher> updatedLocs;
+        // NOTE: When doing a multi-update, we only store the locs of moved docs, since the
+        // runner will keep track of the rest.
+        typedef unordered_set<DiskLoc, DiskLoc::Hasher> DiskLocSet;
+        const scoped_ptr<DiskLocSet> updatedLocs(request.isMulti() ? new DiskLocSet : NULL);
 
         // Reset these counters on each call. We might re-enter this function to retry this
         // update if we throw a page fault exception below, and we rely on these counters
@@ -562,7 +564,7 @@ namespace mongo {
 
             // We fill this with the new locs of moved doc so we don't double-update.
             // NOTE: The runner will de-dup non-moved things.
-            if (updatedLocs.count(loc) > 0) {
+            if (updatedLocs && updatedLocs->count(loc) > 0) {
                 continue;
             }
 
@@ -681,11 +683,12 @@ namespace mongo {
                 uassertStatusOK(res.getStatus());
                 DiskLoc newLoc = res.getValue();
 
-                // If we've moved this object to a new location, make sure we don't apply
-                // that update again if our traversal picks the object again.
-                // NOTE: The runner takes care of deduping non-moved docs.
-                if (newLoc != loc) {
-                    updatedLocs.insert(newLoc);
+                // If we are tracking updated DiskLocs because we are doing a multi-update, and
+                // if we've moved this object to a new location, make sure we don't apply that
+                // update again if our traversal picks the object again. NOTE: The runner takes
+                // care of deduping non-moved docs.
+                if (updatedLocs && (newLoc != loc)) {
+                    updatedLocs->insert(newLoc);
                 }
 
                 docWasModified = true;
