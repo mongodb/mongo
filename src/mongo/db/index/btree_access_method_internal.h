@@ -80,6 +80,7 @@ namespace mongo {
 
         virtual Status validate(int64_t* numKeys);
 
+        // XXX: consider migrating callers to use IndexCursor instead
         virtual DiskLoc findSingle( const BSONObj& key );
 
     protected:

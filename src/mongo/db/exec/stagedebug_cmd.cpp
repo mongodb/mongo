@@ -360,7 +360,7 @@ namespace mongo {
 
                 IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
                 FTSAccessMethod* fam =
-                    reinterpret_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
+                    dynamic_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
                 TextStageParams params(fam->getSpec());
                 params.ns = ns;
                 params.index = index;

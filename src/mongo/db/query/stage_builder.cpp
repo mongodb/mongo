@@ -219,7 +219,7 @@ namespace mongo {
             }
             IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
             const FTSAccessMethod* fam =
-                reinterpret_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
+                static_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
             TextStageParams params(fam->getSpec());
 
             params.ns = qsol.ns;

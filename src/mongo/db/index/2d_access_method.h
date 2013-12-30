@@ -32,10 +32,10 @@
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/btree_access_method_internal.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
+    class BtreeInMemoryState;
     class IndexCursor;
     class IndexDescriptor;
     struct TwoDIndexingParams;

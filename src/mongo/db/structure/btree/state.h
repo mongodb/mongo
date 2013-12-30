@@ -40,7 +40,6 @@ namespace mongo {
     class Collection;
     class IndexDetails;
     class IndexDescriptor;
-    class NamesapceDetails;
     class RecordStore;
 
     /**
