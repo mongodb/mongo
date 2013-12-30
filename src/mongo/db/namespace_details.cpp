@@ -730,6 +730,44 @@ namespace mongo {
         }
     }
 
+    int NamespaceDetails::findIndexByKeyPattern(const BSONObj& keyPattern,
+                                                bool includeBackgroundInProgress) {
+        IndexIterator i = ii(includeBackgroundInProgress);
+        while( i.more() ) {
+            if( i.next().keyPattern() == keyPattern )
+                return i.pos()-1;
+        }
+        return -1;
+    }
+
+    const IndexDetails* NamespaceDetails::findIndexByPrefix( const BSONObj &keyPattern ,
+                                                             bool requireSingleKey ) {
+        const IndexDetails* bestMultiKeyIndex = NULL;
+        IndexIterator i = ii();
+        while( i.more() ) {
+            const IndexDetails& currentIndex = i.next();
+            if( keyPattern.isPrefixOf( currentIndex.keyPattern() ) ){
+                if( ! isMultikey( i.pos()-1 ) ){
+                    return &currentIndex;
+                } else {
+                    bestMultiKeyIndex = &currentIndex;
+                }
+            }
+        }
+        return requireSingleKey ? NULL : bestMultiKeyIndex;
+    }
+
+    // @return offset in indexes[]
+    int NamespaceDetails::findIndexByName(const StringData& name,
+                                          bool includeBackgroundInProgress) {
+        IndexIterator i = ii(includeBackgroundInProgress);
+        while( i.more() ) {
+            if ( name == i.next().info.obj().getStringField("name") )
+                return i.pos()-1;
+        }
+        return -1;
+    }
+
     /* ------------------------------------------------------------------------- */
 
     bool legalClientSystemNS( const StringData& ns , bool write ) {
