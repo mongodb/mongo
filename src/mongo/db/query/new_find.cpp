@@ -141,6 +141,9 @@ namespace mongo {
         ClientCursorPin ccPin(cursorid);
         ClientCursor* cc = ccPin.c();
 
+        // reset timeout timer on the cursor since the cursor is still in use
+        cc->setIdleTime(0);
+
         // These are set in the QueryResult msg we return.
         int resultFlags = ResultFlag_AwaitCapable;
 

@@ -165,6 +165,7 @@ namespace mongo {
          * note called outside of locks (other than ccmutex) so care must be exercised
          */
         bool shouldTimeout( unsigned millis );
+        void setIdleTime( unsigned millis );
         unsigned idleTime() const { return _idleAgeMillis; }
 
         uint64_t getLeftoverMaxTimeMicros() const { return _leftoverMaxTimeMicros; }

@@ -358,6 +358,10 @@ namespace mongo {
         return _idleAgeMillis > 600000 && _pinValue == 0;
     }
 
+    void ClientCursor::setIdleTime( unsigned millis ) {
+        _idleAgeMillis = millis;
+    }
+
     void ClientCursor::idleTimeReport(unsigned millis) {
         bool foundSomeToTimeout = false;
 
