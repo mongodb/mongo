@@ -1046,14 +1046,15 @@ namespace mongo {
 
     Status IndexCatalog::checkNoIndexConflicts( const BSONObj &obj ) {
         for ( int idxNo = 0; idxNo < numIndexesTotal(); idxNo++ ) {
-            if( !_details->idx(idxNo).unique() )
-                continue;
-
-            IndexDetails& idx = _details->idx(idxNo);
-            if (ignoreUniqueIndex(idx)) // XXX(ERH)
-                continue;
 
             IndexDescriptor* descriptor = getDescriptor( idxNo );
+
+            if ( !descriptor->unique() )
+                continue;
+
+            if ( ignoreUniqueIndex(descriptor) )
+                continue;
+
             IndexAccessMethod* iam = getIndex( descriptor );
 
             InsertDeleteOptions options;
