@@ -23,11 +23,8 @@ checkScanMatch( {$and:[{a:/o/}]}, 1, 1 );
 checkScanMatch( {$and:[{a:/a/}]}, 0, 0 );
 checkScanMatch( {$and:[{a:{$not:/o/}}]}, 2, 1 );
 checkScanMatch( {$and:[{a:{$not:/a/}}]}, 2, 2 );
-// QUERY_MIGRATION: currently, any query with NOT or
-// NOR will just perform a collection scan; consequently,
-// our nscannedObjects is 2 for both the following tests
-//checkScanMatch( {$and:[{a:/o/},{a:{$not:/o/}}]}, 1, 0 );
-//checkScanMatch( {$and:[{a:/o/},{a:{$not:/a/}}]}, 1, 1 );
+checkScanMatch( {$and:[{a:/o/},{a:{$not:/o/}}]}, 1, 0 );
+checkScanMatch( {$and:[{a:/o/},{a:{$not:/a/}}]}, 1, 1 );
 checkScanMatch( {$or:[{a:/o/}]}, 1, 1 );
 checkScanMatch( {$or:[{a:/a/}]}, 0, 0 );
 checkScanMatch( {$nor:[{a:/o/}]}, 2, 1 );
@@ -57,8 +54,10 @@ checkScanMatch( {a:1,$and:[{a:1},{a:1,$where:'this.a==1'}]}, 1, 1 );
 function checkImpossibleMatch( query ) {
     var e = t.find( query ).explain();
     assert.eq( 0, e.n );
-    // QUERY_MIGRATION: If new bounds are empty we don't output BasicCursor.
-    // assert.eq( 'BasicCursor', e.cursor );
+    // The explain output should include the indexBounds field.
+    // The presence of the indexBounds field indicates that the
+    // query can make use of an index.
+    assert('indexBounds' in e, 'index bounds are missing');
 }
 
 // With a single key index, all bounds are utilized.
