@@ -28,7 +28,7 @@
 
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "third_party/s2/s2.h"
+#include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2regioncoverer.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2polyline.h"

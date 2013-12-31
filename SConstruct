@@ -80,6 +80,7 @@ else:
 nix = not windows
 
 # --- options ----
+use_clang = False
 
 options = {}
 
@@ -1049,6 +1050,9 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    global use_clang
+    use_clang = using_clang()
+
     # Figure out what our minimum windows version is. If the user has specified, then use
     # that. Otherwise, if they have explicitly selected between 32 bit or 64 bit, choose XP or
     # Vista respectively. Finally, if they haven't done either of these, try invoking the
@@ -1125,7 +1129,7 @@ def doConfigure(myenv):
         test_mutation = mutation
         if using_gcc():
             test_mutation = copy.deepcopy(mutation)
-            # GCC helpfully doesn't issue a diagnostic on unkown flags of the form -Wno-xxx
+            # GCC helpfully doesn't issue a diagnostic on unknown flags of the form -Wno-xxx
             # unless other diagnostics are triggered. That makes it tough to check for support
             # for -Wno-xxx. To work around, if we see that we are testing for a flag of the
             # form -Wno-xxx (but not -Wno-error=xxx), we also add -Wxxx to the flags. GCC does
@@ -1179,12 +1183,6 @@ def doConfigure(myenv):
         # Clang likes to warn about unused private fields, but some of our third_party
         # libraries have such things.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
-
-        # Clang warns about struct/class tag mismatch, but most people think that that is not
-        # really an issue, see
-        # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
-        # warning so it doesn't become an error.
-        AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
 
         # Prevents warning about using deprecated features (such as auto_ptr in c++11)
         # Using -Wno-error=deprecated-declarations does not seem to work on some compilers,
@@ -1691,6 +1689,7 @@ Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("enforce_glibc")
 Export("s3push")
+Export("use_clang")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False)

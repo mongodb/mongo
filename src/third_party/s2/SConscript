@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env windows linux darwin solaris")
+Import("env windows linux darwin solaris use_clang")
 
 env = env.Clone()
 
@@ -13,6 +13,13 @@ env.SConscript( [
 
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 env.Append(CCFLAGS=['-DDEBUG_MODE=false'])
+
+# Clang warns about struct/class tag mismatch, but as long as this is
+# not a problem on Windows, these mismatches can be ignored
+# http://stackoverflow.com/questions/4866425/mixing-class-and-struct. W
+# warning so it doesn't become an error.
+if use_clang:
+    env.Append(CCFLAGS=['-Wno-mismatched-tags'])
 
 env.StaticLibrary( "s2",
     [ 

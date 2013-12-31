@@ -33,7 +33,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
-#include "third_party/s2/s2.h"
+#include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cap.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2latlng.h"
