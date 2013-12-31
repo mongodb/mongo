@@ -267,6 +267,7 @@ namespace mongo {
 
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
+        signal(SIGXCPU, sighandler);
 
 #if defined(SIGQUIT)
         signal( SIGQUIT , printStackAndExit );
