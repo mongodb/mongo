@@ -1093,6 +1093,7 @@ namespace mongo {
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
         sigaddset( &asyncSignals, SIGUSR1 );
+        sigaddset( &asyncSignals, SIGXCPU );
 
         set_terminate( myterminate );
         set_new_handler( my_new_handler );
