@@ -84,6 +84,8 @@
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/ramlog.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/signal_win32.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
@@ -1168,7 +1170,42 @@ namespace mongo {
         _set_purecall_handler( myPurecallHandler );
     }
 
-    void startSignalProcessingThread() {}
+    void eventProcessingThread() {
+        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
+
+        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
+        if (event == NULL) {
+            warning() << "eventProcessingThread CreateEvent failed: "
+                << errnoWithDescription();
+            return;
+        }
+
+        ON_BLOCK_EXIT(CloseHandle, event);
+
+        int returnCode = WaitForSingleObject(event, INFINITE);
+        if (returnCode != WAIT_OBJECT_0) {
+            if (returnCode == WAIT_FAILED) {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription();
+                return;
+            }
+            else {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription(returnCode);
+                return;
+            }
+        }
+
+        Client::initThread("eventTerminate");
+        log() << "shutdown event signaled, will terminate after current cmd ends";
+        exitCleanly(EXIT_KILL);
+    }
+
+    void startSignalProcessingThread() {
+        if (Command::testCommandsEnabled) {
+            boost::thread it(eventProcessingThread);
+        }
+    }
 
 #endif  // if !defined(_WIN32)
 

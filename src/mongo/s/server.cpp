@@ -76,7 +76,9 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
+#include "mongo/util/signal_win32.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
@@ -221,6 +223,42 @@ namespace mongo {
         verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( signalProcessingThread );
     }
+#else
+
+    void eventProcessingThread() {
+        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
+
+        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
+        if (event == NULL) {
+            warning() << "eventProcessingThread CreateEvent failed: "
+                << errnoWithDescription();
+            return;
+        }
+
+        ON_BLOCK_EXIT(CloseHandle, event);
+
+        int returnCode = WaitForSingleObject(event, INFINITE);
+        if (returnCode != WAIT_OBJECT_0) {
+            if (returnCode == WAIT_FAILED) {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription();
+                return;
+            }
+            else {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription(returnCode);
+                return;
+            }
+        }
+
+        Client::initThread("eventTerminate");
+        log() << "shutdown event signaled, will terminate after current cmd ends";
+        exitCleanly(EXIT_KILL);
+    }
+
+    void startSignalProcessingThread() {
+        boost::thread it(eventProcessingThread);
+    }
 #endif  // not _WIN32
 
     void setupSignalHandlers() {
@@ -246,8 +284,9 @@ namespace mongo {
 #ifndef _WIN32
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGUSR1 );
-        startSignalProcessingThread();
 #endif
+
+        startSignalProcessingThread();
 
         setWindowsUnhandledExceptionFilter();
         set_new_handler( my_new_handler );
