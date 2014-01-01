@@ -58,12 +58,9 @@ namespace {
     }
 
     /**
-     * Retrieves a collection's plan cache from the client context.
+     * Retrieves a collection's plan cache from the database.
      */
-    Status getPlanCache(const Client::Context& ctx, PlanCache** planCacheOut) {
-        const char* ns = ctx.ns();
-
-        Database* db = ctx.db();
+    Status getPlanCache(Database* db, const string& ns, PlanCache** planCacheOut) {
         verify(db);
 
         Collection* collection = db->getCollection(ns);
@@ -79,11 +76,6 @@ namespace {
 
         *planCacheOut = planCache;
         return Status::OK();
-    }
-
-    Status getPlanCache(Client::ReadContext& readCtx, PlanCache** planCacheOut) {
-        Client::Context& ctx = readCtx.ctx();
-        return getPlanCache(ctx, planCacheOut);
     }
 
     //
@@ -173,8 +165,9 @@ namespace mongo {
                                                   BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -206,8 +199,9 @@ namespace mongo {
                                                BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -287,8 +281,9 @@ namespace mongo {
     Status PlanCacheGet::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                              BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -331,8 +326,9 @@ namespace mongo {
     Status PlanCacheDrop::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                               BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -365,8 +361,9 @@ namespace mongo {
     Status PlanCacheListPlans::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                                    BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -416,8 +413,9 @@ namespace mongo {
     Status PlanCachePinPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                                  BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -462,8 +460,9 @@ namespace mongo {
     Status PlanCacheUnpinPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                                    BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -498,8 +497,9 @@ namespace mongo {
     Status PlanCacheAddPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                                  BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
@@ -548,8 +548,9 @@ namespace mongo {
     Status PlanCacheShunPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
                                                   BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(readCtx, &planCache);
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             return status;
         }
