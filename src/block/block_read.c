@@ -182,7 +182,12 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 			    PRIu32 "B @ %" PRIuMAX ", %"
 			    PRIu32 " != %" PRIu32 "]",
 			    size, (uintmax_t)offset, cksum, page_cksum);
-			WT_ASSERT(session, cksum == page_cksum);
+
+			/*
+			 * Abort if there is a checksum failure during an
+			 * ordinary read.
+			 */
+			WT_ASSERT(session, block->verify);
 		}
 		return (WT_ERROR);
 	}
