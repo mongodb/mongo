@@ -339,7 +339,16 @@ __conn_btree_open(
 
 	if (0) {
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
-		WT_TRET(__wt_conn_btree_close(session, 1));
+		/*
+		 * If the open failed, close the handle.  If there was no
+		 * reference to the handle in this session, we incremented the
+		 * session reference count, so decrement it here.  Otherwise,
+		 * just close the handle without decrementing.
+		 */
+		if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
+			WT_TRET(__wt_conn_btree_close(session, 1));
+		else if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			WT_TRET(__wt_conn_btree_sync_and_close(session));
 	}
 
 	return (ret);
