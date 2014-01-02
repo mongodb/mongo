@@ -253,7 +253,7 @@ namespace mongo {
 
         Client::initThread("eventTerminate");
         log() << "shutdown event signaled, will terminate after current cmd ends";
-        exitCleanly(EXIT_KILL);
+        exitCleanly(EXIT_CLEAN);
     }
 
     void startSignalProcessingThread() {
