@@ -733,7 +733,6 @@ namespace {
         BSONObj sort = BSON("c" << 1);
         runQuerySortProj(query, sort, BSONObj());
 
-        assertNotCached("{sort: {pattern: {c: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
         assertPlanCacheRecoversSolution(query, sort, BSONObj(),
             "{fetch: {node: {mergeSort: {nodes: "
                 "[{ixscan: {pattern: {a: 1, c: 1}}}, {ixscan: {pattern: {b: 1, c: 1}}}]}}}}");
@@ -783,21 +782,40 @@ namespace {
     }
 
     //
-    // Check queries that, at least for now, are not cached.
+    // Caching collection scans.
     //
 
-    TEST_F(CachePlanSelectionTest, NoUsefulIndicesNotCached) {
+    TEST_F(CachePlanSelectionTest, CollscanNoUsefulIndices) {
         addIndex(BSON("a" << 1 << "b" << 1));
         addIndex(BSON("c" << 1));
         runQuery(BSON("b" << 4));
-        assertNotCached("{cscan: {dir: 1}}");
+        assertPlanCacheRecoversSolution(BSON("b" << 4),
+            "{cscan: {filter: {b: 4}, dir: 1}}");
     }
 
-    TEST_F(CachePlanSelectionTest, OrWithoutEnoughIndicesNotCached) {
+    TEST_F(CachePlanSelectionTest, CollscanOrWithoutEnoughIndices) {
         addIndex(BSON("a" << 1));
-        runQuery(fromjson("{$or: [{a: 20}, {b: 21}]}"));
-        assertNotCached("{cscan: {dir: 1, filter: {$or: [{a: 20}, {b: 21}]}}}");
+        BSONObj query =fromjson("{$or: [{a: 20}, {b: 21}]}");
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query,
+            "{cscan: {filter: {$or:[{a:20},{b:21}]}, dir: 1}}");
     }
+
+    TEST_F(CachePlanSelectionTest, CollscanMergeSort) {
+        addIndex(BSON("a" << 1 << "c" << 1));
+        addIndex(BSON("b" << 1 << "c" << 1));
+
+        BSONObj query = fromjson("{$or: [{a:1}, {b:1}]}");
+        BSONObj sort = BSON("c" << 1);
+        runQuerySortProj(query, sort, BSONObj());
+
+        assertPlanCacheRecoversSolution(query, sort, BSONObj(),
+            "{sort: {pattern: {c: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
+    }
+
+    //
+    // Check queries that, at least for now, are not cached.
+    //
 
     TEST_F(CachePlanSelectionTest, GeoNear2DNotCached) {
         addIndex(BSON("a" << "2d"));

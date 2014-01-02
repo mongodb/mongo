@@ -250,15 +250,14 @@ namespace mongo {
                                        const QueryPlannerParams& params,
                                        CachedSolution* cachedSoln,
                                        QuerySolution** out) {
-        // TODO: Right now the plan cache does not cache a collscan. We
-        // should make it possible to cache a collscan as the best solution.
         if (NULL == cachedSoln->plannerData.get()) {
             return Status(ErrorCodes::BadValue,
                           "planner data does not exist in the cached solution");
         }
 
         SolutionCacheData* cacheData = cachedSoln->plannerData.get();
-        if (cacheData->wholeIXSoln) {
+        if (SolutionCacheData::WHOLE_IXSCAN_SOLN == cacheData->solnType) {
+            // The solution can be constructed by a scan over the entire index.
             QuerySolution* soln = buildWholeIXSoln(*cacheData->tree->entry,
                 query, params, cacheData->wholeIXSolnDir);
             if (soln == NULL) {
@@ -270,9 +269,22 @@ namespace mongo {
                 return Status::OK();
             }
         }
+        else if (SolutionCacheData::COLLSCAN_SOLN == cacheData->solnType) {
+            // The cached solution is a collection scan. We don't cache collscans
+            // with tailable==true, hence the false below.
+            QuerySolution* soln = buildCollscanSoln(query, false, params);
+            if (soln == NULL) {
+                return Status(ErrorCodes::BadValue, "plan cache error: collection scan soln");
+            }
+            else {
+                *out = soln;
+                return Status::OK();
+            }
+        }
 
-        // If we're here then this is not the 'wholeIXSoln' case, and we proceed
-        // by using the PlanCacheIndexTree to tag the query tree.
+        // SolutionCacheData::USE_TAGS_SOLN == cacheData->solnType
+        // If we're here then this is neither the whole index scan or collection scan
+        // cases, and we proceed by using the PlanCacheIndexTree to tag the query tree.
 
         // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
         MatchExpression* clone = query.root()->shallowClone();
@@ -711,7 +723,7 @@ namespace mongo {
                             indexTree->setIndexEntry(params.indices[i]);
                             SolutionCacheData* scd = new SolutionCacheData();
                             scd->tree.reset(indexTree);
-                            scd->wholeIXSoln = true;
+                            scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
                             scd->wholeIXSolnDir = 1;
 
                             soln->cacheData.reset(scd);
@@ -728,7 +740,7 @@ namespace mongo {
                             indexTree->setIndexEntry(params.indices[i]);
                             SolutionCacheData* scd = new SolutionCacheData();
                             scd->tree.reset(indexTree);
-                            scd->wholeIXSoln = true;
+                            scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
                             scd->wholeIXSolnDir = -1;
 
                             soln->cacheData.reset(scd);
@@ -749,6 +761,9 @@ namespace mongo {
         {
             QuerySolution* collscan = buildCollscanSoln(query, false, params);
             if (NULL != collscan) {
+                SolutionCacheData* scd = new SolutionCacheData();
+                scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
+                collscan->cacheData.reset(scd);
                 out->push_back(collscan);
                 QLOG() << "Planner: outputting a collscan:\n";
                 QLOG() << collscan->toString() << endl;
