@@ -29,6 +29,7 @@
 #include <string>
 #include <sstream>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database.h"
@@ -91,16 +92,25 @@ namespace {
     // available to the client.
     //
 
-    PlanCacheListKeys cmdPlanCacheListKeys;
-    PlanCacheClear cmdPlanCacheClear;
-    PlanCacheGenerateKey cmdPlanCacheGenerateKey;
-    PlanCacheGet cmdPlanCacheGet;
-    PlanCacheDrop cmdPlanCacheDrop;
-    PlanCacheListPlans cmdPlanCacheListPlans;
-    PlanCachePinPlan cmdPlanCachePinPlan;
-    PlanCacheUnpinPlan cmdPlanCacheUnpinPlan;
-    PlanCacheAddPlan cmdPlanCacheAddPlan;
-    PlanCacheShunPlan cmdPlanCacheShunPlan;
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands, MONGO_NO_PREREQUISITES)(
+            InitializerContext* context) {
+
+        // PlanCacheCommand constructors refer to static ActionType instances.
+        // Registering commands in a mongo static initializer ensures that
+        // the ActionType construction will be completed first.
+        new PlanCacheListKeys();
+        new PlanCacheClear();
+        new PlanCacheGenerateKey();
+        new PlanCacheGet();
+        new PlanCacheDrop();
+        new PlanCacheListPlans();
+        new PlanCachePinPlan();
+        new PlanCacheUnpinPlan();
+        new PlanCacheAddPlan();
+        new PlanCacheShunPlan();
+
+        return Status::OK();
+    }
 
 } // namespace
 
