@@ -280,13 +280,14 @@ namespace mongo {
                                           const BSONObj& shardKeyPattern,
                                           BSONObj* indexPattern ) {
         verify( Lock::isLocked() );
-        NamespaceDetails* nsd = nsdetails( ns );
-        if ( !nsd )
+        Collection* collection = cc().database()->getCollection( ns );
+        if ( !collection )
             return false;
-        const IndexDetails* idx =
-                nsd->findIndexByPrefix(shardKeyPattern, true /* require single key */);
+        const IndexDescriptor* idx =
+            collection->getIndexCatalog()->findIndexByPrefix(shardKeyPattern,
+                                                             true /* require single key */);
 
-        if ( !idx )
+        if ( idx == NULL )
             return false;
         *indexPattern = idx->keyPattern().getOwned();
         return true;

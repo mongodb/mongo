@@ -371,21 +371,19 @@ namespace mongo {
                 try  {
                     IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-                    result.append("nIndexes", nsd->getCompletedIndexCount());
+                    result.append("nIndexes", indexCatalog->numIndexesReady() );
                     BSONObjBuilder indexes; // not using subObjStart to be exception safe
-                    NamespaceDetails::IndexIterator i = nsd->ii();
+                    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(false);
                     while( i.more() ) {
-                        IndexDetails& id = i.next();
-                        log() << "validating index " << idxn << ": " << id.indexNamespace() << endl;
-
-                        IndexDescriptor* descriptor = indexCatalog->getDescriptor( idxn );
-                        verify( descriptor );
+                        IndexDescriptor* descriptor = i.next();
+                        log() << "validating index " << descriptor->indexNamespace() << endl;
                         IndexAccessMethod* iam = indexCatalog->getIndex( descriptor );
                         verify( iam );
 
                         int64_t keys;
                         iam->validate(&keys);
-                        indexes.appendNumber(id.indexNamespace(), static_cast<long long>(keys));
+                        indexes.appendNumber(descriptor->indexNamespace(),
+                                             static_cast<long long>(keys));
                         idxn++;
                     }
                     result.append("keysPerIndex", indexes.done());

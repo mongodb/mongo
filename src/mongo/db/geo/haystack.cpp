@@ -85,8 +85,8 @@ namespace mongo {
                 return false;
             }
 
-            vector<int> idxs;
-            collection->details()->findIndexByType(IndexNames::GEO_HAYSTACK, idxs);
+            vector<IndexDescriptor*> idxs;
+            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_HAYSTACK, idxs);
             if (idxs.size() == 0) {
                 errmsg = "no geoSearch index";
                 return false;
@@ -108,8 +108,7 @@ namespace mongo {
             if (cmdObj["limit"].isNumber())
                 limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
 
-            int idxNum = idxs[0];
-            IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(idxNum);
+            IndexDescriptor* desc = idxs[0];
             HaystackAccessMethod* ham =
                 static_cast<HaystackAccessMethod*>( collection->getIndexCatalog()->getIndex(desc) );
             ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),

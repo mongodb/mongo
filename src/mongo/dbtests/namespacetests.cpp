@@ -1084,10 +1084,6 @@ namespace NamespaceTests {
             IndexCatalog* indexCatalog() const { 
                 return collection()->getIndexCatalog();
             }
-            void setIndexIsMultikey( int idxNo, bool isMultikey ) {
-                indexCatalog()->markMultikey( indexCatalog()->getDescriptor( idxNo ),
-                                              isMultikey );
-            }
             CollectionInfoCache* infoCache() const {
                 return collection()->infoCache();
             }

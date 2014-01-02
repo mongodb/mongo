@@ -62,9 +62,7 @@ namespace QueryStageAnd {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-            NamespaceDetails* nsd = coll->details();
-            int idxNo = nsd->findIndexByKeyPattern(obj);
-            return coll->getIndexCatalog()->getDescriptor( idxNo );
+            return coll->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {

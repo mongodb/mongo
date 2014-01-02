@@ -338,33 +338,6 @@ namespace mongo {
         // @return offset in indexes[]
         int findIndexByName(const StringData& name, bool includeBackgroundInProgress = false);
 
-        // @return offset in indexes[]
-        int findIndexByKeyPattern(const BSONObj& keyPattern, 
-                                  bool includeBackgroundInProgress = false);
-
-        void findIndexByType( const string& name , vector<int>& matches ) {
-            IndexIterator i = ii();
-            while ( i.more() ) {
-                if ( IndexNames::findPluginName(i.next().keyPattern()) == name )
-                    matches.push_back( i.pos() - 1 );
-            }
-        }
-
-        /* Returns the index entry for the first index whose prefix contains
-         * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
-         * array attributes. Otherwise, returns NULL.
-         */
-        const IndexDetails* findIndexByPrefix( const BSONObj &keyPattern ,
-                                               bool requireSingleKey );
-
-
-        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
-         * The specified index must already contain an expireAfterSeconds field, and the value in
-         * that field and newExpireSecs must both be numeric.
-         */
-        void updateTTLIndex( int idxNo , const BSONElement& newExpireSecs );
-
-
         const int systemFlags() const { return _systemFlags; }
         bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
         void setSystemFlag( int flag );

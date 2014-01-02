@@ -76,15 +76,16 @@ namespace mongo {
                 warning() << "Can't ixscan null ns " << qsol.ns << endl;
                 return NULL;
             }
-            NamespaceDetails* nsd = collection->details();
-            int idxNo = nsd->findIndexByKeyPattern(ixn->indexKeyPattern);
-            if (-1 == idxNo) {
+
+            IndexScanParams params;
+
+            params.descriptor = collection->getIndexCatalog()->findIndexByKeyPattern( ixn->indexKeyPattern );
+            if ( params.descriptor == NULL ) {
                 warning() << "Can't find idx " << ixn->indexKeyPattern.toString()
                           << "in ns " << qsol.ns << endl;
                 return NULL;
             }
-            IndexScanParams params;
-            params.descriptor = collection->getIndexCatalog()->getDescriptor( idxNo );
+
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.limit = ixn->limit;
@@ -211,13 +212,13 @@ namespace mongo {
                 warning() << "null collection for text?";
                 return NULL;
             }
-            vector<int> idxMatches;
-            collection->details()->findIndexByType("text", idxMatches);
+            vector<IndexDescriptor*> idxMatches;
+            collection->getIndexCatalog()->findIndexByType("text", idxMatches);
             if (1 != idxMatches.size()) {
                 warning() << "more than one text idx?";
                 return NULL;
             }
-            IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
+            IndexDescriptor* index = idxMatches[0];
             const FTSAccessMethod* fam =
                 static_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
             TextStageParams params(fam->getSpec());

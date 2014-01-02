@@ -121,13 +121,17 @@ namespace mongo {
 
         // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
         QueryPlannerParams plannerParams;
-        for (int i = 0; i < collection->getIndexCatalog()->numIndexesReady(); ++i) {
-            IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor( i );
-            plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
-                                                       desc->isMultikey(),
-                                                       desc->isSparse(),
-                                                       desc->indexName(),
-                                                       desc->infoObj()));
+
+        {
+            IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator( false );
+            while ( ii.more() ) {
+                const IndexDescriptor* desc = ii.next();
+                plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
+                                                           desc->isMultikey(),
+                                                           desc->isSparse(),
+                                                           desc->indexName(),
+                                                           desc->infoObj()));
+            }
         }
 
         // Tailable: If the query requests tailable the collection must be capped.

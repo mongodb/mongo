@@ -59,12 +59,10 @@ namespace mongo {
             if ( !collection )
                 return PlanStage::IS_EOF;
 
-            int idxNo = collection->details()->findIndexByKeyPattern(_params.indexKeyPattern);
-            if (-1 == idxNo)
+            _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+            if ( _descriptor == NULL )
                 return PlanStage::IS_EOF;
 
-            _descriptor = collection->getIndexCatalog()->getDescriptor( idxNo );
-            verify( _descriptor );
             _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
             verify( _am );
             // I hate this.

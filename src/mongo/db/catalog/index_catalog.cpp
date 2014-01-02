@@ -523,13 +523,12 @@ namespace mongo {
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
-            const int idx = _details->findIndexByKeyPattern(key, true);
-            if (idx >= 0) {
+            const IndexDescriptor* desc = findIndexByKeyPattern(key, true);
+            if (desc) {
                 LOG(2) << "index already exists with diff name " << name
                         << ' ' << key << endl;
 
-                const IndexDetails& indexSpec(_details->idx(idx));
-                if ( !indexSpec.areIndexOptionsEquivalent( spec ) )
+                if ( !_getIndexDetails(desc)->areIndexOptionsEquivalent( spec ) )
                     return Status( ErrorCodes::CannotCreateIndex,
                                    str::stream() << "Index with pattern: " << key
                                    << " already exists with different options" );
@@ -796,6 +795,33 @@ namespace mongo {
             _collection->infoCache()->clearQueryCache();
     }
 
+    void IndexCatalog::updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds ) {
+        IndexDetails* indexDetails = _getIndexDetails( idx );
+
+        BSONElement oldExpireSecs = indexDetails->info.obj().getField("expireAfterSeconds");
+
+        // Important that we set the new value in-place.  We are writing directly to the
+        // object here so must be careful not to overwrite with a longer numeric type.
+
+        BSONElementManipulator manip( oldExpireSecs );
+        switch( oldExpireSecs.type() ) {
+        case EOO:
+            massert( 16631, "index does not have an 'expireAfterSeconds' field", false );
+            break;
+        case NumberInt:
+            manip.SetInt( static_cast<int>( newExpireSeconds ) );
+            break;
+        case NumberDouble:
+            manip.SetNumber( static_cast<double>( newExpireSeconds ) );
+            break;
+        case NumberLong:
+            manip.SetLong( newExpireSeconds );
+            break;
+        default:
+            massert( 16632, "current 'expireAfterSeconds' is not a number", false );
+        }
+    }
+
     // ---------------------------
 
     int IndexCatalog::numIndexesTotal() const {
@@ -806,9 +832,10 @@ namespace mongo {
         return _details->getCompletedIndexCount();
     }
 
-    IndexDescriptor* IndexCatalog::findIdIndex() {
-        for ( int i = 0; i < numIndexesReady(); i++ ) {
-            IndexDescriptor* desc = getDescriptor( i );
+    IndexDescriptor* IndexCatalog::findIdIndex() const {
+        IndexIterator ii = getIndexIterator( false );
+        while ( ii.more() ) {
+            IndexDescriptor* desc = ii.next();
             if ( desc->isIdIndex() )
                 return desc;
         }
@@ -816,32 +843,39 @@ namespace mongo {
     }
 
     IndexDescriptor* IndexCatalog::findIndexByName( const StringData& name,
-                                                    bool includeUnfinishedIndexes ) {
-        int idxNo = _details->findIndexByName( name, includeUnfinishedIndexes );
-        if ( idxNo < 0 )
-            return NULL;
-        return getDescriptor( idxNo );
+                                                    bool includeUnfinishedIndexes ) const {
+        IndexIterator ii = getIndexIterator( includeUnfinishedIndexes );
+        while ( ii.more() ) {
+            IndexDescriptor* desc = ii.next();
+            if ( desc->indexName() == name )
+                return desc;
+        }
+        return NULL;
     }
 
     IndexDescriptor* IndexCatalog::findIndexByKeyPattern( const BSONObj& key,
-                                                          bool includeUnfinishedIndexes ) {
-        int idxNo = _details->findIndexByKeyPattern( key, includeUnfinishedIndexes );
-        if ( idxNo < 0 )
-            return NULL;
-        return getDescriptor( idxNo );
+                                                          bool includeUnfinishedIndexes ) const {
+        IndexIterator ii = getIndexIterator( includeUnfinishedIndexes );
+        while ( ii.more() ) {
+            IndexDescriptor* desc = ii.next();
+            if ( desc->keyPattern() == key )
+                return desc;
+        }
+        return NULL;
     }
 
     IndexDescriptor* IndexCatalog::findIndexByPrefix( const BSONObj &keyPattern,
-                                                      bool requireSingleKey ) {
+                                                      bool requireSingleKey ) const {
         IndexDescriptor* best = NULL;
 
-        for ( int i = 0; i < numIndexesReady(); i++ ) {
-            IndexDescriptor* desc = getDescriptor( i );
+        IndexIterator ii = getIndexIterator( false );
+        while ( ii.more() ) {
+            IndexDescriptor* desc = ii.next();
 
             if ( !keyPattern.isPrefixOf( desc->keyPattern() ) )
                 continue;
 
-            if( !_details->isMultikey( i ) )
+            if( !desc->isMultikey() )
                 return desc;
 
             if ( !requireSingleKey )
@@ -851,7 +885,18 @@ namespace mongo {
         return best;
     }
 
-    IndexDescriptor* IndexCatalog::getDescriptor( int idxNo ) {
+    void IndexCatalog::findIndexByType( const string& type , vector<IndexDescriptor*>& matches ) const {
+        IndexIterator ii = getIndexIterator( false );
+        while ( ii.more() ) {
+            IndexDescriptor* desc = ii.next();
+            if ( IndexNames::findPluginName( desc->keyPattern() ) == type ) {
+                matches.push_back( desc );
+            }
+        }
+    }
+
+
+    IndexDescriptor* IndexCatalog::_getDescriptor( int idxNo ) const {
         _checkMagic();
         verify( idxNo < numIndexesTotal() );
 
@@ -967,10 +1012,17 @@ namespace mongo {
                                        &_details->idx( idxNo ) );
     }
 
+    IndexDetails* IndexCatalog::_getIndexDetails( const IndexDescriptor* descriptor ) const {
+        verify( descriptor->getIndexNumber() >= 0 );
+        IndexDetails* id = &_details->idx( descriptor->getIndexNumber() );
+        DEV verify( id->indexName() == descriptor->indexName() );
+        return id;
+    }
+
     // ---------------------------
 
     Status IndexCatalog::_indexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc ) {
-        IndexDescriptor* desc = getDescriptor( idxNo );
+        IndexDescriptor* desc = _getDescriptor( idxNo );
         verify(desc);
         IndexAccessMethod* iam = getIndex( desc );
         verify(iam);
@@ -986,7 +1038,7 @@ namespace mongo {
     }
 
     Status IndexCatalog::_unindexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc, bool logIfError ) {
-        IndexDescriptor* desc = getDescriptor( idxNo );
+        IndexDescriptor* desc = _getDescriptor( idxNo );
         verify( desc );
         IndexAccessMethod* iam = getIndex( desc );
         verify( iam );
@@ -1044,9 +1096,9 @@ namespace mongo {
     }
 
     Status IndexCatalog::checkNoIndexConflicts( const BSONObj &obj ) {
-        for ( int idxNo = 0; idxNo < numIndexesTotal(); idxNo++ ) {
-
-            IndexDescriptor* descriptor = getDescriptor( idxNo );
+        IndexIterator ii = getIndexIterator( true );
+        while ( ii.more() ) {
+            IndexDescriptor* descriptor = ii.next();
 
             if ( !descriptor->unique() )
                 continue;

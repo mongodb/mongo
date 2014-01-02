@@ -354,11 +354,11 @@ namespace mongo {
                 Database* db = cc().database();
                 Collection* collection = db->getCollection( ns );
                 uassert(17193, "Can't find namespace " + ns, collection);
-                vector<int> idxMatches;
-                collection->details()->findIndexByType("text", idxMatches);
+                vector<IndexDescriptor*> idxMatches;
+                collection->getIndexCatalog()->findIndexByType("text", idxMatches);
                 uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
 
-                IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
+                IndexDescriptor* index = idxMatches[0];
                 FTSAccessMethod* fam =
                     dynamic_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
                 TextStageParams params(fam->getSpec());

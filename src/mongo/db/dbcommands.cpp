@@ -1144,15 +1144,13 @@ namespace mongo {
                         continue;
                     }
 
-                    int idxNo = nsd->findIndexByKeyPattern( keyPattern );
-                    if( idxNo < 0 ){
+                    IndexDescriptor* idx = coll->getIndexCatalog()->findIndexByKeyPattern( keyPattern );
+                    if ( idx == NULL ) {
                         errmsg = str::stream() << "cannot find index " << keyPattern
                                                << " for ns " << ns;
                         ok = false;
                         continue;
                     }
-
-                    IndexDescriptor* idx = coll->getIndexCatalog()->getDescriptor( idxNo );
                     BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
                     if( oldExpireSecs.eoo() ){
                         errmsg = "no expireAfterSeconds field to update";
@@ -1168,7 +1166,7 @@ namespace mongo {
                     if ( oldExpireSecs != newExpireSecs ) {
                         // change expireAfterSeconds
                         result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
-                        nsd->updateTTLIndex( idxNo , newExpireSecs );
+                        coll->getIndexCatalog()->updateTTLSetting( idx, newExpireSecs.numberLong() );
                         result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
                     }
                 }

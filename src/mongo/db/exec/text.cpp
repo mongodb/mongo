@@ -119,8 +119,8 @@ namespace mongo {
             warning() << "TextStage params namespace error";
             return PlanStage::FAILURE;
         }
-        vector<int> idxMatches;
-        collection->details()->findIndexByType("text", idxMatches);
+        vector<IndexDescriptor*> idxMatches;
+        collection->getIndexCatalog()->findIndexByType("text", idxMatches);
         if (1 != idxMatches.size()) {
             warning() << "Expected exactly one text index";
             return PlanStage::FAILURE;
@@ -136,7 +136,7 @@ namespace mongo {
             params.bounds.endKey = FTSIndexFormat::getIndexKey(0, term, _params.indexPrefix);
             params.bounds.endKeyInclusive = true;
             params.bounds.isSimpleRange = true;
-            params.descriptor = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
+            params.descriptor = idxMatches[0];
             params.forceBtreeAccessMethod = true;
             params.direction = -1;
             IndexScan* ixscan = new IndexScan(params, _ws, NULL);

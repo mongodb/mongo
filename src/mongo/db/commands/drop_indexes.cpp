@@ -31,6 +31,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/db/pdfile.h"
@@ -128,18 +129,18 @@ namespace mongo {
                     return true;
                 }
 
-                int idxNo = collection->details()->findIndexByName( indexToDelete );
-                if ( idxNo < 0 ) {
+                IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName( indexToDelete );
+                if ( desc == NULL ) {
                     errmsg = str::stream() << "index not found with name [" << indexToDelete << "]";
                     return false;
                 }
 
-                if ( idxNo == collection->details()->findIdIndex() ) {
+                if ( desc->isIdIndex() ) {
                     errmsg = "cannot drop _id index";
                     return false;
                 }
 
-                Status s = indexCatalog->dropIndex( idxNo );
+                Status s = indexCatalog->dropIndex( desc );
                 if ( !s.isOK() ) {
                     appendCommandStatus( anObjBuilder, s );
                     return false;
@@ -149,19 +150,19 @@ namespace mongo {
             }
 
             if ( f.type() == Object ) {
-                int idxNo = collection->details()->findIndexByKeyPattern( f.embeddedObject() );
-                if ( idxNo < 0 ) {
+                IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByKeyPattern( f.embeddedObject() );
+                if ( desc == NULL ) {
                     errmsg = "can't find index with key:";
                     errmsg += f.embeddedObject().toString();
                     return false;
                 }
 
-                if ( idxNo == collection->details()->findIdIndex() ) {
+                if ( desc->isIdIndex() ) {
                     errmsg = "cannot drop _id index";
                     return false;
                 }
 
-                Status s = indexCatalog->dropIndex( idxNo );
+                Status s = indexCatalog->dropIndex( desc );
                 if ( !s.isOK() ) {
                     appendCommandStatus( anObjBuilder, s );
                     return false;

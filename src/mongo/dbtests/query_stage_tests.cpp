@@ -101,9 +101,7 @@ namespace QueryStageTests {
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Client::ReadContext ctx(ns());
             Collection* collection = ctx.ctx().db()->getCollection( ns() );
-            NamespaceDetails* nsd = collection->details();
-            int idxNo = nsd->findIndexByKeyPattern(obj);
-            return collection->getIndexCatalog()->getDescriptor( idxNo );
+            return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
 
         static int numObj() { return 50; }

@@ -242,17 +242,17 @@ namespace mongo {
     private:
         bool getFieldName(Collection* collection, IndexCatalog* indexCatalog, string* fieldOut,
                           string* errOut, bool *isFrom2D) {
-            vector<int> idxs;
+            vector<IndexDescriptor*> idxs;
 
             // First, try 2d.
-            collection->details()->findIndexByType(IndexNames::GEO_2D, idxs);
+            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_2D, idxs);
             if (idxs.size() > 1) {
                 *errOut = "more than one 2d index, not sure which to run geoNear on";
                 return false;
             }
 
             if (1 == idxs.size()) {
-                BSONObj indexKp = indexCatalog->getDescriptor(idxs[0])->keyPattern();
+                BSONObj indexKp = idxs[0]->keyPattern();
                 BSONObjIterator kpIt(indexKp);
                 while (kpIt.more()) {
                     BSONElement elt = kpIt.next();
@@ -266,7 +266,7 @@ namespace mongo {
 
             // Next, 2dsphere.
             idxs.clear();
-            collection->details()->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
+            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
             if (0 == idxs.size()) {
                 *errOut = "no geo indices for geoNear";
                 return false;
@@ -278,7 +278,7 @@ namespace mongo {
             }
 
             // 1 == idx.size()
-            BSONObj indexKp = indexCatalog->getDescriptor(idxs[0])->keyPattern();
+            BSONObj indexKp = idxs[0]->keyPattern();
             BSONObjIterator kpIt(indexKp);
             while (kpIt.more()) {
                 BSONElement elt = kpIt.next();

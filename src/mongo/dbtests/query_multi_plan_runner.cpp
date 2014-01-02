@@ -65,9 +65,7 @@ namespace QueryMultiPlanRunner {
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Collection* collection = cc().database()->getCollection( ns() );
-            NamespaceDetails* nsd = collection->details();
-            int idxNo = nsd->findIndexByKeyPattern(obj);
-            return collection->getIndexCatalog()->getDescriptor( idxNo );
+            return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
         void insert(const BSONObj& obj) {

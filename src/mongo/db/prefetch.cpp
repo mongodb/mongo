@@ -136,11 +136,10 @@ namespace mongo {
             TimerHolder timer( &prefetchIndexStats);
             // on the update op case, the call to prefetchRecordPages will touch the _id index.
             // thus perhaps this option isn't very useful?
-            int indexNo = collection->details()->findIdIndex();
-            if (indexNo == -1) return;
             try {
-                IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(indexNo);
-                verify( desc );
+                IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex();
+                if ( !desc )
+                    return;
                 IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
                 verify( iam );
                 iam->touch(obj);
@@ -154,13 +153,12 @@ namespace mongo {
         {
             // indexCount includes all indexes, including ones
             // in the process of being built
-            int indexCount = collection->getIndexCatalog()->numIndexesTotal();
-            for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
+            IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator( true );
+            while ( ii.more() ) {
                 TimerHolder timer( &prefetchIndexStats);
                 // This will page in all index pages for the given object.
                 try {
-                    IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(indexNo);
-                    verify( desc );
+                    IndexDescriptor* desc = ii.next();
                     IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
                     verify( iam );
                     iam->touch(obj);

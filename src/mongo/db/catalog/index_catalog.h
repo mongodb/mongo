@@ -69,31 +69,28 @@ namespace mongo {
          * in which case everything from this tree has to go away
          */
 
-        IndexDescriptor* findIdIndex();
+        IndexDescriptor* findIdIndex() const;
 
         /**
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByName( const StringData& name,
-                                          bool includeUnfinishedIndexes = false );
+                                          bool includeUnfinishedIndexes = false ) const;
 
         /**
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByKeyPattern( const BSONObj& key,
-                                                bool includeUnfinishedIndexes = false );
+                                                bool includeUnfinishedIndexes = false ) const;
 
         /* Returns the index entry for the first index whose prefix contains
          * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
          * array attributes. Otherwise, returns NULL.
          */
         IndexDescriptor* findIndexByPrefix( const BSONObj &keyPattern,
-                                            bool requireSingleKey );
+                                            bool requireSingleKey ) const;
 
-
-        // throws
-        // never returns NULL
-        IndexDescriptor* getDescriptor( int idxNo );
+        void findIndexByType( const string& type , vector<IndexDescriptor*>& matches ) const;
 
         // never returns NULL
         IndexAccessMethod* getIndex( const IndexDescriptor* desc );
@@ -104,10 +101,10 @@ namespace mongo {
 
         class IndexIterator {
         public:
-            bool more() { return _i < _n; }
-            IndexDescriptor* next() { return _catalog->getDescriptor( _i++ ); }
+            bool more() const { return _i < _n; }
+            IndexDescriptor* next() { return _catalog->_getDescriptor( _i++ ); }
         private:
-            IndexIterator( IndexCatalog* cat, bool includeUnfinishedIndexes ) {
+            IndexIterator( const IndexCatalog* cat, bool includeUnfinishedIndexes ) {
                 _catalog = cat;
                 if ( includeUnfinishedIndexes )
                     _n = _catalog->numIndexesTotal();
@@ -117,15 +114,15 @@ namespace mongo {
             }
             int _i;
             int _n;
-            IndexCatalog* _catalog;
+            const IndexCatalog* _catalog;
             friend class IndexCatalog;
         };
 
-        IndexIterator getIndexIterator( bool includeUnfinishedIndexes ) {
+        IndexIterator getIndexIterator( bool includeUnfinishedIndexes ) const {
             return IndexIterator( this, includeUnfinishedIndexes );
         };
 
-        // ---- index modifiers ------
+        // ---- index set modifiers ------
 
         Status ensureHaveIdIndex();
 
@@ -150,6 +147,14 @@ namespace mongo {
          */
         BSONObj prepOneUnfinishedIndex();
 
+        // ---- modify single index
+
+        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
+         * The specified index must already contain an expireAfterSeconds field, and the value in
+         * that field and newExpireSecs must both be numeric.
+         */
+        void updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds );
+
         void markMultikey( const IndexDescriptor* idx, bool isMultikey = true );
 
         // --- these probably become private?
@@ -168,7 +173,7 @@ namespace mongo {
             string _ns;
             string _indexName;
 
-            NamespaceDetails* _nsd;
+            NamespaceDetails* _nsd; // for the collection, not index
             IndexDetails* _indexDetails;
         };
 
@@ -229,6 +234,12 @@ namespace mongo {
          */
         string _getAccessMethodName(const BSONObj& keyPattern);
 
+        // throws
+        // never returns NULL
+        IndexDescriptor* _getDescriptor( int idxNo ) const;
+
+        IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
+
         void _checkMagic() const;
 
         Status _indexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc );
@@ -245,8 +256,7 @@ namespace mongo {
 
         // these are caches, not source of truth
         // they should be treated as such
-
-        std::vector<IndexDescriptor*> _descriptorCache;
+        mutable std::vector<IndexDescriptor*> _descriptorCache; // XXX-ERH mutable here is temp
         std::vector<IndexAccessMethod*> _accessMethodCache;
         std::vector<BtreeAccessMethod*> _forcedBtreeAccessMethodCache;
 
