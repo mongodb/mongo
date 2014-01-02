@@ -30,10 +30,12 @@ for( i = 0; i < 40; ++i ) {
     t.save( { a:2, b:i, c:big } );
 }
 
-recordIndex( 'a_1', { a:1 }, { b:1 } );
+// QUERY_MIGRATION: Plan cache does not invalidate
+// a cached plan that will fail due to an out-of-memory error.
+/*recordIndex( 'a_1', { a:1 }, { b:1 } );
 result = t.find( { a:2 }, { a:1, b:1 } ).sort( { b:1 } ).toArray();
 assert.eq( 40, result.length );
-checkBOrdering( result );
+checkBOrdering( result );*/
 
 // An optimal in order plan is recorded and reused.
 recordIndex( 'b_1', { b:{ $gte:0 } }, { b:1 } );

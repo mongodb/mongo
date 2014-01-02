@@ -164,8 +164,10 @@ namespace mongo {
     Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
                                                  const vector<IndexEntry>& relevantIndices,
                                                  PlanCacheIndexTree** out) {
+        // On any early return, the out-parameter must contain NULL.
+        *out = NULL;
+
         if (NULL == taggedTree) {
-            *out = NULL;
             return Status(ErrorCodes::BadValue, "Cannot produce cache data: tree is NULL.");
         }
 
@@ -174,13 +176,23 @@ namespace mongo {
         if (NULL != taggedTree->getTag()) {
             IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
             if (itag->index >= relevantIndices.size()) {
-                *out = NULL;
                 std::stringstream ss;
                 ss << "Index number is " << itag->index
                    << " but there are only " << relevantIndices.size()
                    << " relevant indices.";
                 return Status(ErrorCodes::BadValue, ss.str());
             }
+
+            // Make sure not to cache solutions which use '2d' indices.
+            // A 2d index that doesn't wrap on one query may wrap on another, so we have to
+            // check that the index is OK with the predicate. The only thing we have to do
+            // this for is 2d.  For now it's easier to move ahead if we don't cache 2d.
+            //
+            // XXX: revisit with a post-cached-index-assignment compatibility check
+            if (is2DIndex(relevantIndices[itag->index].keyPattern)) {
+                return Status(ErrorCodes::BadValue, "can't cache '2d' index");
+            }
+
             IndexEntry* ientry = new IndexEntry(relevantIndices[itag->index]);
             indexTree->entry.reset(ientry);
             indexTree->index_pos = itag->pos;
@@ -191,7 +203,6 @@ namespace mongo {
             PlanCacheIndexTree* indexTreeChild;
             Status s = cacheDataFromTaggedTree(taggedChild, relevantIndices, &indexTreeChild);
             if (!s.isOK()) {
-                *out = NULL;
                 return s;
             }
             indexTree->children.push_back(indexTreeChild);
@@ -253,6 +264,14 @@ namespace mongo {
         if (NULL == cachedSoln->plannerData.get()) {
             return Status(ErrorCodes::BadValue,
                           "planner data does not exist in the cached solution");
+        }
+
+        // Queries with hint/min/max are not cached.
+        if (!query.getParsed().getHint().isEmpty()) {
+            return Status(ErrorCodes::BadValue, "cannot plan from cache if a hint is present");
+        }
+        if (!query.getParsed().getMin().isEmpty() || !query.getParsed().getMax().isEmpty()) {
+            return Status(ErrorCodes::BadValue, "cannot plan from cache with min/max");
         }
 
         SolutionCacheData* cacheData = cachedSoln->plannerData.get();
@@ -652,7 +671,7 @@ namespace mongo {
                 PlanCacheIndexTree* cacheData;
                 Status indexTreeStatus = cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
                 if (!indexTreeStatus.isOK()) {
-                    warning() << "building the plan cache index tree failed" << endl;
+                    QLOG() << "Query is not cachable: " << indexTreeStatus.reason() << endl;
                 }
                 auto_ptr<PlanCacheIndexTree> autoData(cacheData);
 
