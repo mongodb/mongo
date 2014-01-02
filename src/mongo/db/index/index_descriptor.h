@@ -146,11 +146,6 @@ namespace mongo {
         // Return the info object.
         const BSONObj& infoObj() const { _checkOk(); return _infoObj; }
 
-        // Set multikey attribute.  We never unset it.
-        void setMultikey() {
-            _collection->getIndexCatalog()->markMultikey( this );
-        }
-
         // Is this index being created in the background?
         bool isBackgroundIndex() const {
             return _indexNumber >= _collection->details()->getCompletedIndexCount();
