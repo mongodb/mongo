@@ -391,14 +391,33 @@ namespace mongo {
         }
         scoped_ptr<CachedSolution> cr(crRaw);
 
-        // XXX: Fix these field values once we have fleshed out cache entries.
         BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
-        size_t numPlans = cr->numPlans;
+        size_t numPlans = cr->plannerData.size();
         for (size_t i = 0; i < numPlans; ++i) {
             BSONObjBuilder planBob(plansBuilder.subobjStart());
             stringstream ss;
             ss << "plan" << i;
             planBob.append("plan", ss.str());
+
+            // Create plan details field.
+            // Currently, simple string representationg of
+            // SolutionCacheData. Need to revisit format when we
+            // need to parse user-provided plan details for planCacheAddPlan.
+            SolutionCacheData* scd = cr->plannerData[i];
+            BSONObjBuilder detailsBob(planBob.subobjStart("details"));
+            detailsBob.append("solution", scd->toString());
+            detailsBob.doneFast();
+
+            bool pinned = (cr->pinned && i == cr->pinnedIndex);
+            bool shunned = (cr->shunnedIndexes.find(i) != cr->shunnedIndexes.end());
+
+            // XXX: Fill in rest of fields with bogus data.
+            // XXX: Fix these field values once we have fleshed out cache entries.
+            planBob.append("reason", BSONObj());
+            planBob.append("feedback", BSONObj());
+            planBob.append("pinned", pinned);
+            planBob.append("shunned", shunned);
+            planBob.append("source", "planner");
         }
         plansBuilder.doneFast();
 

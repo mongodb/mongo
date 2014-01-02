@@ -13,7 +13,15 @@
  * - planCachePinPlan
  * - planCacheUnpinPlan
  * - planCacheAddPlan
+ * 
  * - planCacheShunPlan
+ *       Prevents a plan from being used to execute the query.
+ *       This plan will show up in planCacheListPlans results
+ *       with shunned set to true. If a plan has been shunned,
+ *       the only way to restore the plan is to drop the query
+ *       from the cache using planCacheDrop and allow the query
+ *       optimizer to re-populate the cache with plans for the
+ *       query.
  */ 
 
 var t = db.jstests_query_cache;
@@ -75,7 +83,7 @@ missingCollection.drop();
 assert.commandFailed(missingCollection.runCommand('planCacheListKeys'));
 
 // Retrieve cache keys from the test collection
-// Number of keys should match number of indexed queries executed so far
+// Number of keys should match queries executed by multi-plan runner.
 var keys = getKeys();
 assert.eq(1, keys.length, 'unexpected number of keys in planCacheListKeys result');
 assert.eq(keyA1, keys[0], 'unexpected cache key returned from planCacheListKeys');
@@ -136,6 +144,11 @@ assert.commandFailed(t.runCommand('planCacheListPlans', {key: 'unknownquery'}));
 var plans = getPlans(keyA1);
 assert.eq(2, plans.length, 'unexpected number of plans cached for query');
 
+// Print every plan
+print('planCacheListPlans result:');
+for (var i = 0; i < plans.length; i++) {
+    print('plan ' + i + ': ' + tojson(plans[i]));
+}
 
 
 //
@@ -148,9 +161,20 @@ assert.commandFailed(t.runCommand('planCachePinPlan', {key: 'unknownquery', plan
 // Plan ID has to be provided.
 assert.commandFailed(t.runCommand('planCachePinPlan', {key: keyA1}));
 
-// XXX: Pinning plan is no-op for now.
-res = t.runCommand('planCachePinPlan', {key: keyA1, plan: 'plan0'});
+var plan1 = getPlans(keyA1)[1].plan;
+res = t.runCommand('planCachePinPlan', {key: keyA1, plan: plan1});
 assert.commandWorked(res, 'planCachePinPlan failed');
+
+// Retrieve plans for valid cache entry after pinning
+plans = getPlans(keyA1);
+assert.eq(2, plans.length, 'unexpected number of plans cached for query after pinning');
+
+// Print every plan
+print('planCacheListPlans (after pinning) result:');
+for (var i = 0; i < plans.length; i++) {
+    print('plan ' + i + ': ' + tojson(plans[i]));
+}
+assert(plans[1].pinned, 'plan1 should be listed as pinned');
 
 
 
@@ -161,9 +185,19 @@ assert.commandWorked(res, 'planCachePinPlan failed');
 // Invalid key should be an error.
 assert.commandFailed(t.runCommand('planCacheUnpinPlan', {key: 'unknownquery'}));
 
-// XXX: Unpinning plan is no-op for now.
 res = t.runCommand('planCacheUnpinPlan', {key: keyA1});
 assert.commandWorked(res, 'planCacheUnpinPlan failed');
+
+// Retrieve plans for valid cache entry after unpinning
+plans = getPlans(keyA1);
+assert.eq(2, plans.length, 'unexpected number of plans cached for query after unpinning');
+
+// Print every plan
+print('planCacheListPlans (after unpinning) result:');
+for (var i = 0; i < plans.length; i++) {
+    print('plan ' + i + ': ' + tojson(plans[i]));
+}
+assert(!plans[1].pinned, 'plan1 should not be listed as pinned');
 
 
 
@@ -177,17 +211,27 @@ assert.commandFailed(t.runCommand('planCacheAddPlan', {key: 'unknownquery', deta
 // Plan details must to be provided.
 assert.commandFailed(t.runCommand('planCacheAddPlan', {key: keyA1}));
 
-// XXX: Adding a plan is not very meaningful at the moment. Merely increments
-// numPlans inside cache entry.
+// XXX: Adding a plan is not very meaningful at the moment. Adds non-executable plan
+// to plan cache.
 // Returns ID of added plan.
 var numPlansBeforeAdd = getPlans(keyA1).length;
 res = t.runCommand('planCacheAddPlan', {key: keyA1, details: {}});
 assert.commandWorked(res, 'planCacheAddPlan failed');
 print('planCacheAddPlan results = ' + tojson(res));
 assert(res.hasOwnProperty('plan'), 'plan missing from planCacheAddPlan result');
-var numPlansAfterAdd = getPlans(keyA1).length;
+plans = getPlans(keyA1);
+var numPlansAfterAdd = plans.length;
 assert.eq(numPlansBeforeAdd + 1, numPlansAfterAdd, 'number of plans cached unchanged');
 var planAdded = res.plan;
+
+// Print every plan
+print('planCacheListPlans (after adding) result:');
+for (var i = 0; i < plans.length; i++) {
+    print('plan ' + i + ': ' + tojson(plans[i]));
+}
+var planAddedIndex = numPlansAfterAdd - 1;
+assert.eq(planAdded, plans[planAddedIndex].plan,
+          'added plan not found at end of planCacheListPlans result');
 
 
 
@@ -204,13 +248,21 @@ assert.commandFailed(t.runCommand('planCacheShunPlan', {key: keyA1}));
 // Invalid plan is not acceptable.
 assert.commandFailed(t.runCommand('planCacheShunPlan', {key: keyA1, plan: 'bogusplan'}));
 
-// XXX: Shunning plan is not very meaningful at the moment. Merely decrements
-// numPlans inside cache entry.
+// Shunning plan should update shunned field in planCacheListPlans result.
 var numPlansBeforeShun = getPlans(keyA1).length;
-res = t.runCommand('planCacheShunPlan', {key: keyA1, plan: planAdded});
+var plan0 = getPlans(keyA1)[0].plan;
+res = t.runCommand('planCacheShunPlan', {key: keyA1, plan: plan0});
 assert.commandWorked(res, 'planCacheShunPlan failed');
-var numPlansAfterShun = getPlans(keyA1).length;
-assert.eq(numPlansBeforeShun - 1, numPlansAfterShun, 'number of plans cached unchanged');
+plans = getPlans(keyA1);
+var numPlansAfterShun = plans.length;
+assert.eq(numPlansBeforeShun, numPlansAfterShun, 'number of plans cached unchanged');
+
+// Print every plan
+print('planCacheListPlans (after shunning) result:');
+for (var i = 0; i < plans.length; i++) {
+    print('plan ' + i + ': ' + tojson(plans[i]));
+}
+assert(plans[0].shunned, 'first plan is not shown as shunned in planCacheListPlans result');
 
 
 
@@ -219,8 +271,6 @@ assert.eq(numPlansBeforeShun - 1, numPlansAfterShun, 'number of plans cached unc
 //
 
 // Drop query cache. This clears all cached queries in the collection.
-// XXX: Shunning a query should mark it as sunned in planCacheListPlans, not
-// remove it. Revisit when we have real cached solutions.
 res = t.runCommand('planCacheClear');
 print('planCacheClear() = ' + tojson(res));
 assert.commandWorked(res, 'planCacheClear failed');

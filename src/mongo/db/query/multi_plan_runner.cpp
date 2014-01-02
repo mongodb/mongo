@@ -339,12 +339,38 @@ namespace mongo {
         }
 
         // Store the choice we just made in the cache.
-        Database* db = cc().database();
-        verify(NULL != db);
-        Collection* collection = db->getCollection(_query->ns());
-        verify(NULL != collection);
-        PlanCache* cache = collection->infoCache()->getPlanCache();
-        cache->add(*_query, *_bestSolution, ranking.release());
+        if (PlanCache::shouldCacheQuery(*_query)) {
+            Database* db = cc().database();
+            verify(NULL != db);
+            Collection* collection = db->getCollection(_query->ns());
+            verify(NULL != collection);
+            PlanCache* cache = collection->infoCache()->getPlanCache();
+            // Create list of candidate solutions for the cache with
+            // the best solution at the front.
+            std::vector<QuerySolution*> solutions;
+            solutions.push_back(_bestSolution.get());
+            for (size_t i = 0; i < _candidates.size(); ++i) {
+                if (i == bestChild) { continue; }
+                solutions.push_back(_candidates[i].solution);
+            }
+
+            // Check solution cache data. Do not add to cache if
+            // we have any invalid SolutionCacheData data.
+            // XXX: One known example is 2D queries
+            bool validSolutions = true;
+            for (size_t i = 0; i < solutions.size(); ++i) {
+                if (NULL == solutions[i]->cacheData.get()) {
+                    QLOG() << "Not caching query because this solution has no cache data: "
+                           << solutions[i]->toString();
+                    validSolutions = false;
+                    break;
+                }
+            }
+
+            if (validSolutions) {
+                cache->add(*_query, solutions, ranking.release());
+            }
+        }
 
         // Clear out the candidate plans, leaving only stats as we're all done w/them.
         for (size_t i = 0; i < _candidates.size(); ++i) {
