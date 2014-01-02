@@ -141,9 +141,6 @@ namespace mongo {
         ClientCursorPin ccPin(cursorid);
         ClientCursor* cc = ccPin.c();
 
-        // reset timeout timer on the cursor since the cursor is still in use
-        cc->setIdleTime(0);
-
         // These are set in the QueryResult msg we return.
         int resultFlags = ResultFlag_AwaitCapable;
 
@@ -159,6 +156,9 @@ namespace mongo {
             // there for the cursor
             uassert(17011, "auth error", str::equals(ns, cc->ns().c_str()));
             *isCursorAuthorized = true;
+
+            // Reset timeout timer on the cursor since the cursor is still in use.
+            cc->setIdleTime(0);
 
             // TODO: fail point?
 
