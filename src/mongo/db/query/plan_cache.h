@@ -128,9 +128,7 @@ namespace mongo {
          */
         std::string toString(int indents = 0) const;
 
-        // Children owned here. If 'wholeIXSoln' is false, then 'tree'
-        // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
-        // is true, then 'tree' is used to store the relevant IndexEntry.
+        // Children owned here.
         std::vector<PlanCacheIndexTree*> children;
 
         // Owned here.
@@ -146,7 +144,11 @@ namespace mongo {
      * QuerySolution.
      */
     struct SolutionCacheData {
-        SolutionCacheData() : tree(NULL), wholeIXSoln(false), wholeIXSolnDir(1) { }
+        SolutionCacheData() :
+            tree(NULL),
+            solnType(USE_INDEX_TAGS_SOLN),
+            wholeIXSolnDir(1) {
+        }
 
         // Make a deep copy.
         SolutionCacheData* clone() const;
@@ -154,16 +156,29 @@ namespace mongo {
         // For debugging.
         std::string toString() const;
 
-        // Owned here
+        // Owned here. If 'wholeIXSoln' is false, then 'tree'
+        // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
+        // is true, then 'tree' is used to store the relevant IndexEntry.
+        // If 'collscanSoln' is true, then 'tree' should be NULL.
         scoped_ptr<PlanCacheIndexTree> tree;
 
-        // If true, indicates that the plan should
-        // use the index as a proxy for a collection
-        // scan (e.g. using index to provide sort).
-        bool wholeIXSoln;
+        enum SolutionType {
+            // Indicates that the plan should use
+            // the index as a proxy for a collection
+            // scan (e.g. using index to provide sort).
+            WHOLE_IXSCAN_SOLN,
+
+            // The cached plan is a collection scan.
+            COLLSCAN_SOLN,
+
+            // Build the solution by using 'tree'
+            // to tag the match expression.
+            USE_INDEX_TAGS_SOLN
+        } solnType;
 
         // The direction of the index scan used as
-        // a proxy for a collection scan.
+        // a proxy for a collection scan. Used only
+        // for WHOLE_IXSCAN_SOLN.
         int wholeIXSolnDir;
     };
 

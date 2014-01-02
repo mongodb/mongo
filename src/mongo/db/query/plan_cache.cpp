@@ -283,8 +283,12 @@ namespace mongo {
 
     SolutionCacheData* SolutionCacheData::clone() const {
         SolutionCacheData* other = new SolutionCacheData();
-        other->tree.reset(this->tree->clone());
-        other->wholeIXSoln = this->wholeIXSoln;
+        if (NULL != this->tree.get()) {
+            // 'tree' could be NULL if the cached solution
+            // is a collection scan.
+            other->tree.reset(this->tree->clone());
+        }
+        other->solnType = this->solnType;
         other->wholeIXSolnDir = this->wholeIXSolnDir;
         return other;
     }
