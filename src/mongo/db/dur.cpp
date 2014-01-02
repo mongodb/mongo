@@ -40,7 +40,9 @@
          have to handle falling behind which would use too much ram (going back into a read lock would suffice to stop that).
          for now (1.7.5/1.8.0) we are in read lock which is not ideal.
      WRITETODATAFILES
-       apply the writes back to the non-private MMF after they are for certain in redo log
+       actually write to the database data files in this phase.  currently done by memcpy'ing the writes back to 
+       the non-private MMF.  alternatively one could write to the files the traditional way; however the way our 
+       storage engine works that isn't any faster (actually measured a tiny bit slower).
      REMAPPRIVATEVIEW
        we could in a write lock quickly flip readers back to the main view, then stay in read lock and do our real
          remapping. with many files (e.g., 1000), remapping could be time consuming (several ms), so we don't want
@@ -50,21 +52,21 @@
 
    mutexes:
 
-     READLOCK dbMutex
+     READLOCK dbMutex (big 'R')
      LOCK groupCommitMutex
        PREPLOGBUFFER()
      READLOCK mmmutex
        commitJob.reset()
-     UNLOCK dbMutex                                     // now other threads can write
+     UNLOCK dbMutex                      // now other threads can write
        WRITETOJOURNAL()
        WRITETODATAFILES()
      UNLOCK mmmutex
      UNLOCK groupCommitMutex
 
-     on the next write lock acquisition for dbMutex:    // see MongoMutex::_acquiredWriteLock()
-       REMAPPRIVATEVIEW()
+   every Nth groupCommit, at the end, we REMAPPRIVATEVIEW() at the end of the work. because of
+   that we are in W lock for that groupCommit, which is nonideal of course.
 
-     @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
+   @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
 #include "mongo/pch.h"
