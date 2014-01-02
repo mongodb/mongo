@@ -100,7 +100,7 @@ namespace mongo {
 
             BSONObj toDelete;
 
-            // XXX: do we want to buffer docs and delete them in a group rather than
+            // TODO: do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
             runner->saveState();
             collection->deleteDocument(rloc, false, false, logop ? &toDelete : NULL );
@@ -134,4 +134,5 @@ namespace mongo {
 
         return nDeleted;
     }
-}
+
+}  // namespace mongo

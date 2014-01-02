@@ -96,6 +96,11 @@ namespace mongo {
         virtual PlanStageStats* getStats();
 
     private:
+        /**
+         * Initialize the underlying IndexCursor
+         */
+        void initIndexCursor();
+
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
 

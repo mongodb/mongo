@@ -84,86 +84,82 @@ namespace mongo {
         _specificStats.keyPattern = _descriptor->keyPattern();
     }
 
+    void IndexScan::initIndexCursor() {
+        CursorOptions cursorOptions;
+
+        if (1 == _params.direction) {
+            cursorOptions.direction = CursorOptions::INCREASING;
+        }
+        else {
+            cursorOptions.direction = CursorOptions::DECREASING;
+        }
+
+        IndexCursor *cursor;
+        Status s = _iam->newCursor(&cursor);
+        verify(s.isOK());
+        _indexCursor.reset(cursor);
+        _indexCursor->setOptions(cursorOptions);
+
+        if (_params.bounds.isSimpleRange) {
+            // Start at one key, end at another.
+            Status status = _indexCursor->seek(_params.bounds.startKey);
+            if (!status.isOK()) {
+                warning() << "Seek failed: " << status.toString();
+                _hitEnd = true;
+            }
+            if (!isEOF()) {
+                _specificStats.keysExamined = 1;
+            }
+        }
+        else {
+            // "Fast" Btree-specific navigation.
+            _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
+            _checker.reset(new IndexBoundsChecker(&_params.bounds,
+                                                  _descriptor->keyPattern(),
+                                                  _params.direction));
+
+            int nFields = _descriptor->keyPattern().nFields();
+            vector<const BSONElement*> key;
+            vector<bool> inc;
+            key.resize(nFields);
+            inc.resize(nFields);
+            if (_checker->getStartKey(&key, &inc)) {
+                _btreeCursor->seek(key, inc);
+                _keyElts.resize(nFields);
+                _keyEltsInc.resize(nFields);
+            }
+            else {
+                _hitEnd = true;
+            }
+        }
+    }
+
     PlanStage::StageState IndexScan::work(WorkingSetID* out) {
         ++_commonStats.works;
 
         if (NULL == _indexCursor.get()) {
             // First call to work().  Perform cursor init.
-            CursorOptions cursorOptions;
-
-            // The limit is *required* for 2d $near, which is the only index that pays attention to
-            // it anyway.
-            cursorOptions.numWanted = _params.limit;
-
-            if (1 == _params.direction) {
-                cursorOptions.direction = CursorOptions::INCREASING;
-            }
-            else {
-                cursorOptions.direction = CursorOptions::DECREASING;
-            }
-
-            IndexCursor *cursor;
-            Status s = _iam->newCursor(&cursor);
-            verify(s.isOK());
-            _indexCursor.reset(cursor);
-            _indexCursor->setOptions(cursorOptions);
-
-            if (_params.bounds.isSimpleRange) {
-                // Start at one key, end at another.
-                Status status = _indexCursor->seek(_params.bounds.startKey);
-                if (!status.isOK()) {
-
-
-
-
-                    warning() << "Seek failed: " << status.toString();
-                    _hitEnd = true;
-                    return PlanStage::FAILURE;
-                }
-                if (!isEOF()) {
-                    _specificStats.keysExamined = 1;
-                }
-            }
-            else {
-                // "Fast" Btree-specific navigation.
-                _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
-                _checker.reset(new IndexBoundsChecker(&_params.bounds,
-                                                      _descriptor->keyPattern(),
-                                                      _params.direction));
-
-                int nFields = _descriptor->keyPattern().nFields();
-                vector<const BSONElement*> key;
-                vector<bool> inc;
-                key.resize(nFields);
-                inc.resize(nFields);
-                if (_checker->getStartKey(&key, &inc)) {
-                    _btreeCursor->seek(key, inc);
-                    _keyElts.resize(nFields);
-                    _keyEltsInc.resize(nFields);
-                }
-                else {
-                    _hitEnd = true;
-                }
-            }
-
+            initIndexCursor();
             checkEnd();
         }
         else if (_yieldMovedCursor) {
             _yieldMovedCursor = false;
-            // Note that we're not calling next() here.
-        }
-        else {
-            // You're allowed to call work() even if the stage is EOF, but we can't call
-            // _indexCursor->next() if we're EOF.
-            if (!isEOF()) {
-                _indexCursor->next();
-                checkEnd();
-            }
+            // Note that we're not calling next() here.  We got the next thing when we recovered
+            // from yielding.
         }
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
+        // Grab the next (key, value) from the index.
+        BSONObj ownedKeyObj = _indexCursor->getKey().getOwned();
         DiskLoc loc = _indexCursor->getValue();
+
+        // Move to the next result.
+        // The underlying IndexCursor points at the *next* thing we want to return.  We do this so
+        // that if we're scanning an index looking for docs to delete we don't continually clobber
+        // the thing we're pointing at.
+        _indexCursor->next();
+        checkEnd();
 
         if (_shouldDedup) {
             ++_specificStats.dupsTested;
@@ -176,8 +172,6 @@ namespace mongo {
                 _returned.insert(loc);
             }
         }
-
-        BSONObj ownedKeyObj = _indexCursor->getKey().getOwned();
 
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
