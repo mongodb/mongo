@@ -44,12 +44,24 @@ namespace {
     using std::stringstream;
     using namespace mongo;
 
+    void encodePlanCacheKeyTree(const MatchExpression* tree, ostream* os);
+
     /**
      * Comparator for MatchExpression nodes. nodes by:
      * 1) operator type (MatchExpression::MatchType)
      * 2) path name (MatchExpression::path())
+     * 3) cache key of the subtree
      *
-     * XXX: Do we need to a third item in the tuple to break ties?
+     * The third item is needed to break ties, thus ensuring that
+     * match expression trees which should have the same cache key
+     * always sort the same way. If you're wondering when the tuple
+     * (operator type, path name) could ever be equal, consider this
+     * query:
+     *
+     * {$and:[{$or:[{a:1},{a:2}]},{$or:[{b:1},{b:2}]}]}
+     *
+     * The two OR nodes would compare as equal in this case were it
+     * not for tuple item #3 (cache key of the subtree).
      */
     bool OperatorAndFieldNameComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
         // First compare by MatchType
@@ -61,7 +73,14 @@ namespace {
         // Second, path.
         StringData lhsPath = lhs->path();
         StringData rhsPath = rhs->path();
-        return lhsPath < rhsPath;
+        if (lhsPath != rhsPath) {
+            return lhsPath < rhsPath;
+        }
+        // Third, cache key.
+        stringstream ssLeft, ssRight;
+        encodePlanCacheKeyTree(lhs, &ssLeft);
+        encodePlanCacheKeyTree(rhs, &ssRight);
+        return ssLeft.str() < ssRight.str();
     }
 
     /**
@@ -359,6 +378,7 @@ namespace mongo {
         cr->query = entry->query;
         cr->sort = entry->sort;
         cr->projection = entry->projection;
+        cr->plannerData.reset(entry->plannerData->clone());
 
         *crOut = cr.release();
         return Status::OK();

@@ -264,6 +264,20 @@ namespace mongo {
 
         if (Runner::RUNNER_ERROR == state && (NULL != _backupSolution)) {
             QLOG() << "Best plan errored out switching to backup\n";
+            // Uncache the bad solution if we fall back
+            // on the backup solution.
+            //
+            // XXX: Instead of uncaching we should find a way for the
+            // cached plan runner to fall back on a different solution
+            // if the best solution fails. Alternatively we could try to
+            // defer cache insertion to be after the first produced result.
+            Database* db = cc().database();
+            verify(NULL != db);
+            Collection* collection = db->getCollection(_query->ns());
+            verify(NULL != collection);
+            PlanCache* cache = collection->infoCache()->getPlanCache();
+            cache->remove(getPlanCacheKey(*_query));
+
             _bestPlan.reset(_backupPlan);
             _backupPlan = NULL;
             _bestSolution.reset(_backupSolution);

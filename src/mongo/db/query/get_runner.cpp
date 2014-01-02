@@ -194,7 +194,11 @@ namespace mongo {
             QuerySolution *qs;
             Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, rawCS, &qs);
             if (status.isOK()) {
-                // XXX: create new CachedSolutionRunner here.
+                WorkingSet* ws;
+                PlanStage* root;
+                verify(StageBuilder::build(*qs, &root, &ws));
+                *out = new CachedPlanRunner(canonicalQuery.release(), qs, root, ws);
+                return Status::OK();
             }
         }
 

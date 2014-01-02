@@ -572,35 +572,6 @@ namespace {
     // Geo
     //
 
-    TEST_F(CachePlanSelectionTest, Basic2DNonNear) {
-        addIndex(BSON("a" << "2d"));
-        BSONObj query;
-
-        // Polygon
-        query = fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}");
-        runQuery(query);
-        assertPlanCacheRecoversSolution(query,
-            "{fetch: {node: {geo2d: {a: '2d'}}}}");
-
-        // Center
-        query = fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}");
-        runQuery(query);
-        assertPlanCacheRecoversSolution(query,
-            "{fetch: {node: {geo2d: {a: '2d'}}}}");
-
-        // Centersphere
-        query = fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}");
-        runQuery(query);
-        assertPlanCacheRecoversSolution(query,
-            "{fetch: {node: {geo2d: {a: '2d'}}}}");
-
-        // Within box.
-        query = fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}");
-        runQuery(query);
-        assertPlanCacheRecoversSolution(query,
-            "{fetch: {node: {geo2d: {a: '2d'}}}}");
-    }
-
     TEST_F(CachePlanSelectionTest, Basic2DSphereNonNear) {
         addIndex(BSON("a" << "2dsphere"));
         BSONObj query;
@@ -644,17 +615,6 @@ namespace {
         runQuery(BSON("x" << 1));
         assertPlanCacheRecoversSolution(BSON("x" << 1),
             "{fetch: {node: {ixscan: {pattern: {x: 1, a: '2dsphere'}}}}}");
-    }
-
-    TEST_F(CachePlanSelectionTest, Or2DNonNear) {
-        addIndex(BSON("a" << "2d"));
-        addIndex(BSON("b" << "2d"));
-        BSONObj query = fromjson("{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
-                                        " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}");
-
-        runQuery(query);
-        assertPlanCacheRecoversSolution(query,
-            "{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}}");
     }
 
     TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
@@ -850,6 +810,45 @@ namespace {
         runQueryHint(BSONObj(), fromjson("{a: 1}"));
         assertNotCached("{fetch: {filter: null, "
                             "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
+    }
+
+    //
+    // Queries using '2d' indices are not cached.
+    //
+
+    TEST_F(CachePlanSelectionTest, Basic2DNonNearNotCached) {
+        addIndex(BSON("a" << "2d"));
+        BSONObj query;
+
+        // Polygon
+        query = fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}");
+        runQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+
+        // Center
+        query = fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}");
+        runQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+
+        // Centersphere
+        query = fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}");
+        runQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+
+        // Within box.
+        query = fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}");
+        runQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+    }
+
+    TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
+        addIndex(BSON("a" << "2d"));
+        addIndex(BSON("b" << "2d"));
+        BSONObj query = fromjson("{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
+                                        " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}");
+
+        runQuery(query);
+        assertNotCached("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}}");
     }
 
 }  // namespace

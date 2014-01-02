@@ -508,11 +508,19 @@ namespace mongo {
                     delete child;
                     // Don't increment curChild.
                 }
-                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
+                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED
+                         && !indices[currentIndexNumber].multikey) {
                     // The bounds are not exact, but the information needed to
                     // evaluate the predicate is in the index key. Remove the
                     // MatchExpression from its parent and attach it to the filter
                     // of the index scan we're building.
+                    //
+                    // We can only use this optimization if the index is NOT multikey.
+                    // Suppose that we had the multikey index {x: 1} and a document
+                    // {x: ["a", "b"]}. Now if we query for {x: /b/} the filter might
+                    // ever only be applied to the index key "a". We'd incorrectly
+                    // conclude that the document does not match the query :( so we
+                    // gotta stick to non-multikey indices.
                     root->getChildVector()->erase(root->getChildVector()->begin()
                                                   + curChild);
 
@@ -796,12 +804,13 @@ namespace mongo {
                 if (tightness == IndexBoundsBuilder::EXACT) {
                     return soln;
                 }
-                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
+                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED
+                         && !indices[tag->index].multikey) {
                     verify(NULL == soln->filter.get());
                     soln->filter.reset(autoRoot.release());
                     return soln;
                 }
-                else { // tightness == IndexBoundsBuilder::INEXACT_FETCH
+                else {
                     FetchNode* fetch = new FetchNode();
                     verify(NULL != autoRoot.get());
                     fetch->filter.reset(autoRoot.release());

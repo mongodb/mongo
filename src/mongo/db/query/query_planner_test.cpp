@@ -1559,6 +1559,28 @@ namespace {
                                 "{ixscan: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, pattern: {a: 1}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, NonPrefixRegexMultikey) {
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        runQuery(fromjson("{a: /foo/}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: {filter: {a: /foo/}, dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a: /foo/}, node: {ixscan: "
+                                "{pattern: {a: 1}, filter: null}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ThreeRegexSameFieldMultikey) {
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        runQuery(fromjson("{$and: [{a: /0/}, {a: /1/}, {a: /2/}]}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, node: {ixscan: "
+                                "{pattern: {a: 1}, filter: null}}}}");
+    }
+
     //
     // Negation
     //
