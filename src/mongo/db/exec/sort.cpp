@@ -217,7 +217,7 @@ namespace mongo {
         params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
         // We're creating a "virtual index" with key pattern equal to the sort order.
-        IndexEntry sortOrder(sortObj, true, false, "doesnt_matter");
+        IndexEntry sortOrder(sortObj, true, false, "doesnt_matter", BSONObj());
         params.indices.push_back(sortOrder);
 
         CanonicalQuery* rawQueryForSort;

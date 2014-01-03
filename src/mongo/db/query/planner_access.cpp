@@ -156,7 +156,7 @@ namespace mongo {
             isn->maxScan = query.getParsed().getMaxScan();
             isn->addKeyMetadata = query.getParsed().returnKey();
 
-            IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(),
+            IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(), index,
                                           &isn->bounds.fields[0], tightnessOut);
 
             // QLOG() << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
@@ -212,15 +212,15 @@ namespace mongo {
         OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
         if (boundsToFillOut->fields[pos].name.empty()) {
-            IndexBoundsBuilder::translate(expr, keyElt, oil, tightnessOut);
+            IndexBoundsBuilder::translate(expr, keyElt, index, oil, tightnessOut);
         }
         else {
             if (MatchExpression::AND == mergeType) {
-                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, oil, tightnessOut);
+                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, index, oil, tightnessOut);
             }
             else {
                 verify(MatchExpression::OR == mergeType);
-                IndexBoundsBuilder::translateAndUnion(expr, keyElt, oil, tightnessOut);
+                IndexBoundsBuilder::translateAndUnion(expr, keyElt, index, oil, tightnessOut);
             }
         }
     }

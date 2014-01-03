@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
@@ -75,6 +76,7 @@ namespace mongo {
         PlanStageStats* getStats();
 
     private:
+        void init();
         StageState addResultToQueue(WorkingSetID* out);
         void nextAnnulus();
 
@@ -136,6 +138,12 @@ namespace mongo {
 
         // Did we encounter an unrecoverable error?
         bool _failed;
+
+        // Have we init()'d yet?
+        bool _initted;
+
+        // What index are we searching over?
+        IndexDescriptor* _descriptor;
 
         CommonStats _commonStats;
     };

@@ -49,6 +49,8 @@ namespace {
     double negativeInfinity = -numeric_limits<double>::infinity();
     double positiveInfinity = numeric_limits<double>::infinity();
 
+    IndexEntry testIndex = IndexEntry(BSONObj());
+
     /**
      * Utility function to create MatchExpression
      */
@@ -71,10 +73,10 @@ namespace {
             auto_ptr<MatchExpression> expr(parseMatchExpression(*it));
             BSONElement elt = it->firstElement();
             if (toUnion.begin() == it) {
-                IndexBoundsBuilder::translate(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translate(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
             else {
-                IndexBoundsBuilder::translateAndUnion(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translateAndUnion(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
         }
     }
@@ -91,10 +93,10 @@ namespace {
             auto_ptr<MatchExpression> expr(parseMatchExpression(*it));
             BSONElement elt = it->firstElement();
             if (toIntersect.begin() == it) {
-                IndexBoundsBuilder::translate(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translate(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
             else {
-                IndexBoundsBuilder::translateAndIntersect(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translateAndIntersect(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
         }
     }
@@ -117,13 +119,13 @@ namespace {
             auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
             BSONElement elt = obj.firstElement();
             if (constraints.begin() == it) {
-                IndexBoundsBuilder::translate(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translate(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
             else if (isIntersect) {
-                IndexBoundsBuilder::translateAndIntersect(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translateAndIntersect(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
             else {
-                IndexBoundsBuilder::translateAndUnion(expr.get(), elt, oilOut, tightnessOut);
+                IndexBoundsBuilder::translateAndUnion(expr.get(), elt, testIndex, oilOut, tightnessOut);
             }
         }
     }
@@ -141,7 +143,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -159,7 +161,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -173,7 +175,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -187,7 +189,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -201,7 +203,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -215,7 +217,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -229,7 +231,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -241,7 +243,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -255,7 +257,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -269,7 +271,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -283,7 +285,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 0U);
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -295,7 +297,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -309,7 +311,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -323,7 +325,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -337,7 +339,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -351,7 +353,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -365,7 +367,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 2U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -381,7 +383,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 4U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -401,7 +403,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 3U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -587,7 +589,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(oil.intervals.size(), 1U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
@@ -722,7 +724,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.intervals.size(), 2U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': '', '': {}}"), true, false)));
@@ -737,7 +739,7 @@ namespace {
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
-        IndexBoundsBuilder::translate(expr.get(), elt, &oil, &tightness);
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
         ASSERT_EQUALS(oil.intervals.size(), 2U);
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
             Interval(fromjson("{'': 'foo', '': 'fop'}"), true, false)));

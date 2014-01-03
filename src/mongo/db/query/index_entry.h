@@ -39,15 +39,16 @@ namespace mongo {
      * This name sucks, but every name involving 'index' is used somewhere.
      */
     struct IndexEntry {
-        IndexEntry(const BSONObj& kp, bool mk, bool sp, const string& n)
-            : keyPattern(kp), multikey(mk), sparse(sp), name(n) { }
-
-        IndexEntry(const IndexEntry& other) {
-            keyPattern = other.keyPattern;
-            multikey = other.multikey;
-            sparse = other.sparse;
-            name = other.name;
-        }
+        IndexEntry(const BSONObj& kp,
+                   bool mk = false,
+                   bool sp = false,
+                   const string& n = "default_name",
+                   const BSONObj& io = BSONObj())
+            : keyPattern(kp),
+              multikey(mk),
+              sparse(sp),
+              name(n),
+              infoObj(io) { }
 
         BSONObj keyPattern;
 
@@ -57,15 +58,25 @@ namespace mongo {
 
         string name;
 
+        // Geo indices have extra parameters.  We need those available to plan correctly.
+        BSONObj infoObj;
+
         std::string toString() const {
             stringstream ss;
-            ss << keyPattern.toString();
+            ss << "kp: "  << keyPattern.toString();
+
             if (multikey) {
                 ss << " multikey";
             }
+
             if (sparse) {
                 ss << " sparse";
             }
+
+            if (!infoObj.isEmpty()) {
+                ss << " io: " << infoObj.toString();
+            }
+
             return ss.str();
         }
     };

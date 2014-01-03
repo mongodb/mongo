@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/db/geo/core.h"
+#include "mongo/db/geo/hash.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -40,6 +41,36 @@
 #include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
+
+    static double fieldWithDefault(const BSONObj& infoObj, const string& name, double def) {
+        BSONElement e = infoObj[name];
+        if (e.isNumber()) { return e.numberDouble(); }
+        return def;
+    }
+
+    /**
+     * 2d indices don't handle wrapping so we can't use them for queries that wrap.
+     */
+    static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
+        // XXX: where does this really belong
+        GeoHashConverter::Parameters params;
+        params.bits = static_cast<unsigned>(fieldWithDefault(index.infoObj, "bits", 26));
+        params.max = fieldWithDefault(index.infoObj, "max", 180.0);
+        params.min = fieldWithDefault(index.infoObj, "min", -180.0);
+        double numBuckets = (1024 * 1024 * 1024 * 4.0);
+        params.scaling = numBuckets / (params.max - params.min);
+
+        GeoHashConverter conv(params);
+
+        // FYI: old code used flat not spherical error.
+        double yscandist = rad2deg(circle.radius) + conv.getErrorSphere();
+        double xscandist = computeXScanDistance(circle.center.y, yscandist);
+        bool ret = circle.center.x + xscandist < 180
+                && circle.center.x - xscandist > -180
+                && circle.center.y + yscandist < 90
+                && circle.center.y - yscandist > -90;
+        return ret;
+    }
 
     // static
     void QueryPlannerIXSelect::getFields(MatchExpression* node,
@@ -163,10 +194,10 @@ namespace mongo {
                 }
 
                 verify(SPHERE == gc._cap->crs);
-                // No wrapping in 2d centerSphere, don't use 2d index for that.
                 const Circle& circle = gc._cap->circle;
-                // An overestimate.
-                return twoDWontWrap(circle.center.x, circle.center.y, circle.radius);
+
+                // No wrapping around the edge of the world is allowed in 2d centerSphere.
+                return twoDWontWrap(circle, index);
             }
             return false;
         }

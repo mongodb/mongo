@@ -41,10 +41,15 @@
 namespace mongo {
 
     S2NearStage::S2NearStage(const S2NearParams& params, WorkingSet* ws) {
+        _initted = false;
         _params = params;
         _ws = ws;
         _worked = false;
         _failed = false;
+    }
+
+    void S2NearStage::init() {
+        _initted = true;
 
         // The field we're near-ing from is the n-th field.  Figure out what that 'n' is.  We
         // put the cover for the search annulus in this spot in the bounds.
@@ -74,8 +79,36 @@ namespace mongo {
         _innerRadius = _outerRadius = _minDistance;
         _outerRadiusInclusive = false;
 
-        // XXX: where do we grab finestIndexedLevel from really?  idx descriptor?
-        int finestIndexedLevel = S2::kAvgEdge.GetClosestLevel(500.0 / kRadiusOfEarthInMeters);
+        // Grab the IndexDescriptor.
+        Database* db = cc().database();
+        if (!db) {
+            _failed = true;
+            return;
+        }
+
+        Collection* collection = db->getCollection(_params.ns);
+        if (!collection) {
+            _failed = true;
+            return;
+        }
+
+        _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+        if (NULL == _descriptor) {
+            _failed = true;
+            return;
+        }
+
+        // The user can override this so we honor it.  We could ignore it though -- it's just used
+        // to set _radiusIncrement, not to do any covering.
+        int finestIndexedLevel;
+        BSONElement fl = _descriptor->infoObj()["finestIndexedLevel"];
+        if (fl.isNumber()) {
+            finestIndexedLevel = fl.numberInt();
+        }
+        else {
+            finestIndexedLevel = S2::kAvgEdge.GetClosestLevel(500.0 / kRadiusOfEarthInMeters);
+        }
+
         // Start with a conservative _radiusIncrement.  When we're done searching a shell we
         // increment the two radii by this.
         _radiusIncrement = 5 * S2::kAvgEdge.GetValue(finestIndexedLevel) * kRadiusOfEarthInMeters;
@@ -88,6 +121,8 @@ namespace mongo {
     }
 
     PlanStage::StageState S2NearStage::work(WorkingSetID* out) {
+        if (!_initted) { init(); }
+
         if (_failed) { return PlanStage::FAILURE; }
         if (isEOF()) { return PlanStage::IS_EOF; }
         ++_commonStats.works;
@@ -113,7 +148,8 @@ namespace mongo {
             // Remove from invalidation map.
             WorkingSetMember* member = _ws->get(*out);
             if (member->hasLoc()) {
-                unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher>::iterator it = _invalidationMap.find(member->loc);
+                unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher>::iterator it
+                    = _invalidationMap.find(member->loc);
                 verify(_invalidationMap.end() != it);
                 _invalidationMap.erase(it);
             }
@@ -161,32 +197,15 @@ namespace mongo {
         _annulus.Release(NULL);
         _annulus.Init(&regions);
 
-        _params.baseBounds.fields[_nearFieldIndex].intervals.clear();
-        ExpressionMapping::cover2dsphere(_annulus, &_params.baseBounds.fields[_nearFieldIndex]);
-
         // Step 3: Actually create the ixscan.
-        // TODO: Cache params.
-
-        Database* db = cc().database();
-        if ( !db ) {
-            _failed = true;
-            return;
-        }
-
-        Collection* collection = db->getCollection( _params.ns );
-        if ( !collection ) {
-            _failed = true;
-            return;
-        }
 
         IndexScanParams params;
-        params.descriptor =
-            collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern );
+        params.descriptor = _descriptor;
+        _params.baseBounds.fields[_nearFieldIndex].intervals.clear();
+        ExpressionMapping::cover2dsphere(_annulus,
+                                         params.descriptor->infoObj(),
+                                         &_params.baseBounds.fields[_nearFieldIndex]);
 
-        if ( !params.descriptor ) {
-            _failed = true;
-            return;
-        }
         params.bounds = _params.baseBounds;
         params.direction = 1;
         IndexScan* scan = new IndexScan(params, _ws, NULL);

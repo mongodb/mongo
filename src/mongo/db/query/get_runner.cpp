@@ -130,7 +130,8 @@ namespace mongo {
             plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
                                                        desc->isMultikey(),
                                                        desc->isSparse(),
-                                                       desc->indexName()));
+                                                       desc->indexName(),
+                                                       desc->infoObj()));
         }
 
         // Tailable: If the query requests tailable the collection must be capped.

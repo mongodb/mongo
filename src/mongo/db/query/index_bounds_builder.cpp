@@ -178,18 +178,26 @@ namespace mongo {
     }
 
     // static
-    void IndexBoundsBuilder::translateAndIntersect(const MatchExpression* expr, const BSONElement& elt,
-                                                   OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
+    void IndexBoundsBuilder::translateAndIntersect(const MatchExpression* expr,
+                                                   const BSONElement& elt,
+                                                   const IndexEntry& index,
+                                                   OrderedIntervalList* oilOut,
+                                                   BoundsTightness* tightnessOut) {
         OrderedIntervalList arg;
-        translate(expr, elt, &arg, tightnessOut);
-        // translate outputs arg in sorted order.  intersectize assumes that its arguments are sorted.
+        translate(expr, elt, index, &arg, tightnessOut);
+
+        // translate outputs arg in sorted order.  intersectize assumes that its arguments are
+        // sorted.
         intersectize(arg, oilOut);
     }
 
     // static
-    void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
-                                               OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
-        translate(expr, elt, oilOut, tightnessOut);
+    void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr,
+                                               const BSONElement& elt,
+                                               const IndexEntry& index,
+                                               OrderedIntervalList* oilOut,
+                                               BoundsTightness* tightnessOut) {
+        translate(expr, elt, index, oilOut, tightnessOut);
         unionize(oilOut);
     }
 
@@ -203,8 +211,11 @@ namespace mongo {
     }
 
     // static
-    void IndexBoundsBuilder::translate(const MatchExpression* expr, const BSONElement& elt,
-                                       OrderedIntervalList* oilOut, BoundsTightness* tightnessOut) {
+    void IndexBoundsBuilder::translate(const MatchExpression* expr,
+                                       const BSONElement& elt,
+                                       const IndexEntry& index,
+                                       OrderedIntervalList* oilOut,
+                                       BoundsTightness* tightnessOut) {
         oilOut->name = elt.fieldName();
 
         bool isHashed = false;
@@ -219,12 +230,12 @@ namespace mongo {
 
         if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
             OrderedIntervalList acc;
-            translate(expr->getChild(0), elt, &acc, tightnessOut);
+            translate(expr->getChild(0), elt, index, &acc, tightnessOut);
 
             for (size_t i = 1; i < expr->numChildren(); ++i) {
                 OrderedIntervalList next;
                 BoundsTightness tightness;
-                translate(expr->getChild(i), elt, &next, &tightness);
+                translate(expr->getChild(i), elt, index, &next, &tightness);
                 intersectize(next, &acc);
             }
 
@@ -235,6 +246,7 @@ namespace mongo {
             if (!oilOut->intervals.empty()) {
                 std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
             }
+
             // $elemMatch value requires an array.
             // Scalars and directly nested objects are not matched with $elemMatch.
             // We can't tell if a multi-key index key is derived from an array field.
@@ -293,7 +305,6 @@ namespace mongo {
             bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            QLOG() << "data obj is " << dataObj.toString() << endl;
             Interval interval = makeRangeInterval(dataObj, typeMatch(dataObj), false);
 
             // If the operand to LT is equal to the lower bound X, the interval [X, X) is invalid
@@ -427,7 +438,7 @@ namespace mongo {
             }
 
             const S2Region& region = gme->getGeoQuery().getRegion();
-            ExpressionMapping::cover2dsphere(region, oilOut);
+            ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else {
