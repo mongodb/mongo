@@ -781,15 +781,6 @@ namespace mongo {
         return info;
     }
 
-    Status IndexCatalog::blowAwayInProgressIndexEntries() {
-        while ( numIndexesInProgress() > 0 ) {
-            Status s = dropIndex( numIndexesTotal() - 1 );
-            if ( !s.isOK() )
-                return s;
-        }
-        return Status::OK();
-    }
-
     void IndexCatalog::markMultikey( const IndexDescriptor* idx, bool isMultikey ) {
         if ( _details->setIndexIsMultikey( idx->_indexNumber, isMultikey ) )
             _collection->infoCache()->clearQueryCache();

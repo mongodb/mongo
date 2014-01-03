@@ -105,10 +105,9 @@ namespace mongo {
             if (!serverGlobalParams.indexBuildRetry) {
                 // If we crash between unsetting the inProg flag and cleaning up the index, the
                 // index space will be lost.
-                Status s = indexCatalog->blowAwayInProgressIndexEntries();
-                if ( !s.isOK() ) {
-                    log() << "failed to blowAwayInProgressIndexEntries: " << s;
-                    fassertFailed( 17201 );
+                while ( indexCatalog->numIndexesInProgress() > 0 ) {
+                    // ignoring return as we're just destroying these
+                    indexCatalog->prepOneUnfinishedIndex();
                 }
                 continue;
             }

@@ -138,13 +138,8 @@ namespace mongo {
         Status dropIndex( int idxNo );
 
         /**
-         * drops ALL uncompleted indexes
-         * this is meant to only run at startup after a crash
-         */
-        Status blowAwayInProgressIndexEntries();
-
-        /**
          * will drop an uncompleted index and return spec
+         * after this, the index can be rebuilt
          * @return the info for a single index to retry
          */
         BSONObj prepOneUnfinishedIndex();
