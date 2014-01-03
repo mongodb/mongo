@@ -1143,7 +1143,6 @@ namespace mongo {
             // special case if most-significant field isn't in query
             FieldRange range = frsp->shardKeyRange(_key.key().firstElementFieldName());
             if ( range.universal() ) {
-                DEV PRINT(range.universal());
                 getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
                 return;
             }
