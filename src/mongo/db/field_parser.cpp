@@ -33,12 +33,18 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<bool>& field,
-                              bool* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<bool>& field,
+                                                  bool* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<bool>& field,
+                                                  bool* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -54,16 +60,23 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "boolean", errMsg);
+        _genFieldErrMsg(elem, field, "boolean", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<BSONArray>& field,
-                              BSONArray* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<BSONArray>& field,
+                                                  BSONArray* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<BSONArray>& field,
+                                                  BSONArray* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -79,16 +92,23 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "array", errMsg);
+        _genFieldErrMsg(elem, field, "array", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<BSONObj>& field,
-                              BSONObj* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<BSONObj>& field,
+                                                  BSONObj* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<BSONObj>& field,
+                                                  BSONObj* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -104,16 +124,23 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "object", errMsg);
+        _genFieldErrMsg(elem, field, "object", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<Date_t>& field,
-                              Date_t* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<Date_t>& field,
+                                                  Date_t* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<Date_t>& field,
+                                                  Date_t* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -129,16 +156,23 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "date", errMsg);
+        _genFieldErrMsg(elem, field, "date", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<OpTime>& field,
-                              OpTime* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<OpTime>& field,
+                                                  OpTime* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<OpTime>& field,
+                                                  OpTime* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -154,16 +188,22 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "timestamp", errMsg);
+        _genFieldErrMsg(elem, field, "timestamp", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<string>& field,
-                              string* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<string>& field,
+                                                  string* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<string>& field,
+                                                  string* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -180,16 +220,23 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "string", errMsg);
+        _genFieldErrMsg(elem, field, "string", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<OID>& field,
-                              OID* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<OID>& field,
+                                                  OID* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<OID>& field,
+                                                  OID* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -205,16 +252,22 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "OID", errMsg);
+        _genFieldErrMsg(elem, field, "OID", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<int>& field,
-                              int* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<int>& field,
+                                                  int* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<int>& field,
+                                                  int* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -230,16 +283,21 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "integer", errMsg);
+        _genFieldErrMsg(elem, field, "integer", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extractNumber(BSONObj doc,
-                              const BSONField<int>& field,
-                              int* out,
-                              string* errMsg)
-    {
-        BSONElement elem = doc[field.name()];
+    FieldParser::FieldState FieldParser::extractNumber( BSONObj doc,
+                                                        const BSONField<int>& field,
+                                                        int* out,
+                                                        string* errMsg ) {
+        return extractNumber( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extractNumber( BSONElement elem,
+                                                        const BSONField<int>& field,
+                                                        int* out,
+                                                        string* errMsg ) {
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -255,16 +313,22 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "number", errMsg);
+        _genFieldErrMsg(elem, field, "number", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<long long>& field,
-                              long long* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<long long>& field,
+                                                  long long* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<long long>& field,
+                                                  long long* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -280,16 +344,21 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "long", errMsg);
+        _genFieldErrMsg(elem, field, "long", errMsg);
         return FIELD_INVALID;
     }
 
-    FieldParser::FieldState FieldParser::extractNumber(BSONObj doc,
-                                    const BSONField<long long>& field,
-                                    long long* out,
-                                    string* errMsg)
-    {
-        BSONElement elem = doc[field.name()];
+    FieldParser::FieldState FieldParser::extractNumber( BSONObj doc,
+                                                        const BSONField<long long>& field,
+                                                        long long* out,
+                                                        string* errMsg ) {
+        return extractNumber( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extractNumber( BSONElement elem,
+                                                        const BSONField<long long>& field,
+                                                        long long* out,
+                                                        string* errMsg ) {
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -305,7 +374,7 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "number", errMsg);
+        _genFieldErrMsg(elem, field, "number", errMsg);
         return FIELD_INVALID;
     }
 
@@ -313,7 +382,13 @@ namespace mongo {
                                                     const BSONField<BSONObj>& field,
                                                     BSONObj* out,
                                                     string* errMsg ) {
-        BSONElement elem = doc[field.name()];
+        return extractID( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extractID( BSONElement elem,
+                                                    const BSONField<BSONObj>& field,
+                                                    BSONObj* out,
+                                                    string* errMsg ) {
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault().firstElement().wrap( "" );
@@ -329,7 +404,7 @@ namespace mongo {
             return FIELD_SET;
         }
 
-        _genFieldErrMsg(doc, field, "id", errMsg);
+        _genFieldErrMsg(elem, field, "id", errMsg);
         return FIELD_INVALID;
     }
 

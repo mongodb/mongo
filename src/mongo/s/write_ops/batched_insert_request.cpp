@@ -99,31 +99,48 @@ namespace mongo {
         std::string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, collName, &_collName, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isCollNameSet = fieldState == FieldParser::FIELD_SET;
+        BSONObjIterator sourceIt(source);
 
-        fieldState = FieldParser::extract(source, documents, &_documents, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDocumentsSet = fieldState == FieldParser::FIELD_SET;
+        while ( sourceIt.more() ) {
 
-        fieldState = FieldParser::extract(source, writeConcern, &_writeConcern, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            BSONElement sourceEl = sourceIt.next();
 
-        fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            if ( collName() == sourceEl.fieldName() ) {
+                FieldParser::FieldState fieldState =
+                    FieldParser::extract( sourceEl, collName, &_collName, errMsg );
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isCollNameSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( documents() == sourceEl.fieldName() ) {
+                FieldParser::FieldState fieldState =
+                    FieldParser::extract( sourceEl, documents, &_documents, errMsg );
+                if ( fieldState == FieldParser::FIELD_INVALID ) return false;
+                _isDocumentsSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( writeConcern() == sourceEl.fieldName() ) {
+                FieldParser::FieldState fieldState =
+                    FieldParser::extract(sourceEl, writeConcern, &_writeConcern, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( ordered() == sourceEl.fieldName() ) {
+                FieldParser::FieldState fieldState =
+                    FieldParser::extract(sourceEl, ordered, &_ordered, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( metadata() == sourceEl.fieldName() ) {
+                BSONObj metadataObj;
+                FieldParser::FieldState fieldState =
+                    FieldParser::extract(sourceEl, metadata, &metadataObj, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        BSONObj metadataObj;
-        fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-
-        if (!metadataObj.isEmpty()) {
-            _metadata.reset(new BatchedRequestMetadata());
-            if (!_metadata->parseBSON(metadataObj, errMsg)) {
-                return false;
+                if (!metadataObj.isEmpty()) {
+                    _metadata.reset(new BatchedRequestMetadata());
+                    if (!_metadata->parseBSON(metadataObj, errMsg)) {
+                        return false;
+                    }
+                }
             }
         }
 

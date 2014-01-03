@@ -66,65 +66,120 @@ namespace mongo {
             FIELD_NONE
         };
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<bool>& field,
-                            bool* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<bool>& field,
+                                   bool* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<BSONArray>& field,
-                            BSONArray* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<bool>& field,
+                                   bool* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<BSONObj>& field,
-                            BSONObj* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<BSONArray>& field,
+                                   BSONArray* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<Date_t>& field,
-                            Date_t* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<BSONArray>& field,
+                                   BSONArray* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<OpTime>& field,
-                            OpTime* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<BSONObj>& field,
+                                   BSONObj* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<string>& field,
-                            string* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<BSONObj>& field,
+                                   BSONObj* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<OID>& field,
-                            OID* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<Date_t>& field,
+                                   Date_t* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<int>& field,
-                            int* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<Date_t>& field,
+                                   Date_t* out,
+                                   string* errMsg = NULL );
 
-        static FieldState extract(BSONObj doc,
-                            const BSONField<long long>& field,
-                            long long* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<OpTime>& field,
+                                   OpTime* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<OpTime>& field,
+                                   OpTime* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<string>& field,
+                                   string* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<string>& field,
+                                   string* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<OID>& field,
+                                   OID* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<OID>& field,
+                                   OID* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<int>& field,
+                                   int* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<int>& field,
+                                   int* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<long long>& field,
+                                   long long* out,
+                                   string* errMsg = NULL );
+
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<long long>& field,
+                                   long long* out,
+                                   string* errMsg = NULL );
 
         /**
          * The following extractNumber methods do implicit conversion between any numeric type and
          * the BSONField type.  This can be useful when an exact numeric type is not needed, for
          * example if the field is sometimes modified from the shell which can change the type.
          */
-        static FieldState extractNumber(BSONObj doc,
-                                  const BSONField<int>& field,
-                                  int* out,
-                                  string* errMsg = NULL);
+        static FieldState extractNumber( BSONObj doc,
+                                         const BSONField<int>& field,
+                                         int* out,
+                                         string* errMsg = NULL );
 
-        static FieldState extractNumber(BSONObj doc,
-                                  const BSONField<long long>& field,
-                                  long long* out,
-                                  string* errMsg = NULL);
+        static FieldState extractNumber( BSONElement elem,
+                                         const BSONField<int>& field,
+                                         int* out,
+                                         string* errMsg = NULL );
+
+        static FieldState extractNumber( BSONObj doc,
+                                         const BSONField<long long>& field,
+                                         long long* out,
+                                         string* errMsg = NULL );
+
+        static FieldState extractNumber( BSONElement elem,
+                                         const BSONField<long long>& field,
+                                         long long* out,
+                                         string* errMsg = NULL );
 
         /**
          * Extracts a document id from a particular field name, which may be of any type but Array.
@@ -134,6 +189,13 @@ namespace mongo {
                                      const BSONField<BSONObj>& field,
                                      BSONObj* out,
                                      string* errMsg = NULL );
+
+        static FieldState extractID( BSONElement elem,
+                                     const BSONField<BSONObj>& field,
+                                     BSONObj* out,
+                                     string* errMsg = NULL );
+
+        // TODO: BSONElement extraction of types below
 
         /**
          * Extracts a mandatory BSONSerializable structure 'field' from the object 'doc'. Write
@@ -213,16 +275,28 @@ namespace mongo {
          * FieldParser::extract(doc, field, val, &val);
          */
         template<typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<vector<T> >& field,
-                            vector<T>* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<vector<T> >& field,
+                                   vector<T>* out,
+                                   string* errMsg = NULL );
+
+        template<typename T>
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<vector<T> >& field,
+                                   vector<T>* out,
+                                   string* errMsg = NULL );
 
         template<typename K, typename T>
-        static FieldState extract(BSONObj doc,
-                            const BSONField<map<K, T> >& field,
-                            map<K, T>* out,
-                            string* errMsg = NULL);
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<map<K, T> >& field,
+                                   map<K, T>* out,
+                                   string* errMsg = NULL );
+
+        template<typename K, typename T>
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<map<K, T> >& field,
+                                   map<K, T>* out,
+                                   string* errMsg = NULL );
 
     private:
         template<typename T>

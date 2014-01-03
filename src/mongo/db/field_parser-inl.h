@@ -34,14 +34,14 @@ namespace mongo {
     using mongoutils::str::stream;
 
     template<class T>
-    void _genFieldErrMsg(const BSONObj& doc,
+    void _genFieldErrMsg(const BSONElement& elem,
                          const BSONField<T>& field,
                          const string expected,
                          string* errMsg)
     {
         if (!errMsg) return;
         *errMsg = stream() << "wrong type for '" << field() << "' field, expected " << expected
-                           << ", found " << doc[field.name()].toString();
+                           << ", found " << elem.toString();
     }
 
     template<typename T>
@@ -62,7 +62,7 @@ namespace mongo {
         }
 
         if (elem.type() != Object && elem.type() != Array) {
-            _genFieldErrMsg(doc, field, "Object/Array", errMsg);
+            _genFieldErrMsg(elem, field, "Object/Array", errMsg);
             return FIELD_INVALID;
         }
 
@@ -94,7 +94,7 @@ namespace mongo {
         }
 
         if (elem.type() != Object && elem.type() != Array) {
-            _genFieldErrMsg(doc, field, "Object/Array", errMsg);
+            _genFieldErrMsg(elem, field, "Object/Array", errMsg);
             return FIELD_INVALID;
         }
 
@@ -145,12 +145,19 @@ namespace mongo {
 
     // Extracts an array into a vector
     template<typename T>
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<vector<T> >& field,
-                              vector<T>* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<vector<T> >& field,
+                                                  vector<T>* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<vector<T> >& field,
+                                                  vector<T>* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -175,7 +182,7 @@ namespace mongo {
                 BSONElement next = objIt.next();
                 BSONField<T> fieldFor(next.fieldName(), out->at(initialSize + i));
 
-                if (!FieldParser::extract(arr,
+                if (!FieldParser::extract(next,
                                           fieldFor,
                                           &out->at(initialSize + i),
                                           &elErrMsg))
@@ -194,7 +201,7 @@ namespace mongo {
 
         if (errMsg) {
             *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                               << "vector array" << ", found " << doc[field.name()].toString();
+                               << "vector array" << ", found " << elem.toString();
         }
         return FIELD_INVALID;
     }
@@ -305,12 +312,19 @@ namespace mongo {
 
     // Extracts an object into a map
     template<typename K, typename T>
-    FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                              const BSONField<map<K, T> >& field,
-                              map<K, T>* out,
-                              string* errMsg)
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<map<K, T> >& field,
+                                                  map<K, T>* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    template<typename K, typename T>
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<map<K, T> >& field,
+                                                  map<K, T>* out,
+                                                  string* errMsg )
     {
-        BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
                 *out = field.getDefault();
@@ -331,7 +345,7 @@ namespace mongo {
                 T& value = (*out)[next.fieldName()];
 
                 BSONField<T> fieldFor(next.fieldName(), value);
-                if (!FieldParser::extract(obj, fieldFor, &value, &elErrMsg)) {
+                if (!FieldParser::extract(next, fieldFor, &value, &elErrMsg)) {
                     if (errMsg) {
                         *errMsg = stream() << "error parsing map element " << next.fieldName()
                                            << " of field " << field() << causedBy(elErrMsg);
@@ -345,7 +359,7 @@ namespace mongo {
 
         if (errMsg) {
             *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                               << "vector array" << ", found " << doc[field.name()].toString();
+                               << "vector array" << ", found " << elem.toString();
         }
         return FIELD_INVALID;
     }
