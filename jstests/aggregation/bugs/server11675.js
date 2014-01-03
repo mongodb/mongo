@@ -1,4 +1,5 @@
 // SERVER-11675 Text search integration with aggregation
+load('jstests/aggregation/extras/utils.js');
 
 var server11675 = function() {
     var t = db.server11675;
@@ -129,5 +130,35 @@ var server11675 = function() {
                                       ,score: {$meta: 'textScore'} }}
                           ]).toArray();
     assert.eq(res[0].score, score);
+
+    // Make sure the metadata is 'missing()' when it doesn't exist because it was never created
+    /* broken, will be fixed by SERVER-12488 
+    var res = t.aggregate([{$project: {_id: 1, score: {$meta: 'textScore'}}}]).toArray();
+    assert(!("score" in res[0]));
+    */
+
+    // Make sure the metadata is 'missing()' when it doesn't exist because the document changed
+    var res = t.aggregate([{$match: {_id: 1, $text: {$search: 'apple banana'}}},
+                           {$group: {_id: 1, score: {$first: {$meta: 'textScore'}}}},
+                           {$project: {_id: 1, scoreAgain: {$meta: 'textScore'}}},
+                          ]).toArray();
+    assert(!("scoreAgain" in res[0]));
+
+    // Make sure metadata works after a $unwind
+    t.insert({_id: 5, text: 'mango', words: [1, 2, 3]});
+    var res = t.aggregate([{$match: {$text: {$search: 'mango'}}},
+                           {$project: {score: {$meta: "textScore"}, _id:1, words: 1}},
+                           {$unwind: '$words'},
+                           {$project: {scoreAgain: {$meta: "textScore"}, score: 1}}
+                       ]).toArray();
+    assert.eq(res[0].scoreAgain, res[0].score);
+
+    // Error checking
+    // $match, but wrong position
+    assertErrorCode(t, [{$sort: {text: 1}} ,{$match: {$text: {$search: 'apple banana'}}}], 17313);
+
+    // wrong $stage, but correct position
+    assertErrorCode(t, [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}], 15999);
+    assertErrorCode(t, [{$sort: {$text: {$search: 'apple banana'}}}], 17312);
 }
 server11675();
