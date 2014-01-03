@@ -32,7 +32,8 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/database.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/db/query/get_runner.h"
 
 namespace mongo {
@@ -63,12 +64,11 @@ namespace mongo {
         return num;
     }
 
-    long long runCount( const char *ns, const BSONObj &cmd, string &err, int &errCode ) {
+    long long runCount( const string& ns, const BSONObj &cmd, string &err, int &errCode ) {
         // Lock 'ns'.
         Client::Context cx(ns);
-
-        NamespaceDetails *d = nsdetails(ns);
-        if (NULL == d) {
+        Collection* collection = cx.db()->getCollection(ns);
+        if (NULL == collection) {
             err = "ns missing";
             return -1;
         }
@@ -84,7 +84,7 @@ namespace mongo {
         
         // count of all objects
         if (query.isEmpty()) {
-            return applySkipLimit(d->numRecords(), cmd);
+            return applySkipLimit(collection->numRecords(), cmd);
         }
 
         CanonicalQuery* cq;

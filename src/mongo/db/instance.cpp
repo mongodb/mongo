@@ -1067,7 +1067,7 @@ namespace {
         Lock::DBRead lk( ns );
         string errmsg;
         int errCode;
-        long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
+        long long res = runCount( ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
         if ( res == -1 ) {
             // namespace doesn't exist
             return 0;

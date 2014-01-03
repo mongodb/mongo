@@ -472,7 +472,7 @@ namespace mongo {
             string ns = parseNs(dbname, cmdObj);
             string err;
             int errCode;
-            long long n = runCount(ns.c_str(), cmdObj, err, errCode);
+            long long n = runCount(ns, cmdObj, err, errCode);
             long long nn = n;
             bool ok = true;
             if ( n == -1 ) {

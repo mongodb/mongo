@@ -31,7 +31,7 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    
+
     /**
      * 'ns' is the namespace we're counting on.
      *
@@ -40,6 +40,6 @@ namespace mongo {
      * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
      * match count.
      */
-    long long runCount(const char *ns, const BSONObj& cmd, string& err, int& errCode );
-    
+    long long runCount(const std::string& ns, const BSONObj& cmd, string& err, int& errCode );
+
 } // namespace mongo
