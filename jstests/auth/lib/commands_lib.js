@@ -93,7 +93,7 @@ var roles_write = {
     root: 1,
     __system: 1
 };
-var roles_readWrite = {
+var roles_read = {
     read: 1,
     readAnyDatabase: 1,
     readWrite: 1,
@@ -103,7 +103,7 @@ var roles_readWrite = {
     root: 1,
     __system: 1
 };
-var roles_readWriteAny = {
+var roles_readAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
     backup: 1,
@@ -129,7 +129,7 @@ var roles_writeDbAdmin = {
     dbAdminAnyDatabase: 1,
     dbOwner: 1,
     root: 1,
-    __system: 1 
+    __system: 1
 };
 var roles_writeDbAdminAny = {
     readWriteAnyDatabase: 1,
@@ -137,7 +137,7 @@ var roles_writeDbAdminAny = {
     root: 1,
     __system: 1
 };
-var roles_readWriteDbAdmin = {
+var roles_readDbAdmin = {
     read: 1,
     readAnyDatabase: 1,
     readWrite: 1,
@@ -148,7 +148,7 @@ var roles_readWriteDbAdmin = {
     root: 1,
     __system: 1
 };
-var roles_readWriteDbAdminAny = {
+var roles_readDbAdminAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
     dbAdminAnyDatabase: 1,
@@ -245,14 +245,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "foo"}, actions: ["find"] }
                     ]
@@ -265,14 +265,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "foo"}, actions: ["find"] }
                     ]
@@ -330,7 +330,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -344,7 +344,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -601,14 +601,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -711,7 +711,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -724,7 +724,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -825,14 +825,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "coll"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "coll"}, actions: ["find"] }
                     ]
@@ -981,14 +981,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: ""}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: ""}, actions: ["find"] }
                     ]
@@ -1068,14 +1068,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -1095,14 +1095,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -1239,14 +1239,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -1396,14 +1396,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ]
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ]
@@ -1523,14 +1523,14 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWriteDbAdmin,
+                    roles: roles_readDbAdmin,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["planCacheRead"] }
                     ],
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteDbAdminAny,
+                    roles: roles_readDbAdminAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["planCacheRead"] }
                     ],
@@ -2167,7 +2167,7 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_readWrite,
+                    roles: roles_read,
                     privileges: [
                         { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
                     ],
@@ -2175,7 +2175,7 @@ var authCommandsLib = {
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_readWriteAny,
+                    roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
                     ],
