@@ -69,6 +69,8 @@ namespace mongo {
          * in which case everything from this tree has to go away
          */
 
+        bool haveIdIndex() const;
+
         IndexDescriptor* findIdIndex() const;
 
         /**

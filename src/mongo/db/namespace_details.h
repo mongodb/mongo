@@ -362,22 +362,6 @@ namespace mongo {
 
         void syncUserFlags( const string& ns );
 
-        /* @return -1 = not found
-           generally id is first index, so not that expensive an operation (assuming present).
-        */
-        int findIdIndex() {
-            IndexIterator i = ii();
-            while( i.more() ) {
-                if( i.next().isIdIndex() )
-                    return i.pos()-1;
-            }
-            return -1;
-        }
-
-        bool haveIdIndex() {
-            return isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex ) || findIdIndex() >= 0;
-        }
-
         /* return which "deleted bucket" for this size object */
         static int bucket(int size) {
             for ( int i = 0; i < Buckets; i++ ) {

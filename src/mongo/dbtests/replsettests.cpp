@@ -1008,8 +1008,8 @@ namespace ReplSetTests {
 
             // check _id index created
             Client::Context ctx(cappedNs());
-            NamespaceDetails *nsd = nsdetails(cappedNs());
-            verify(nsd->findIdIndex() > -1);
+            Collection* collection = ctx.db()->getCollection( cappedNs() );
+            verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
 
@@ -1036,8 +1036,8 @@ namespace ReplSetTests {
             // this changed in 2.1.2
             // we now have indexes on capped collections
             Client::Context ctx(cappedNs());
-            NamespaceDetails *nsd = nsdetails(cappedNs());
-            verify(nsd->findIdIndex() >= 0);
+            Collection* collection = ctx.db()->getCollection( cappedNs() );
+            verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
 

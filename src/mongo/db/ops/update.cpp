@@ -615,7 +615,7 @@ namespace mongo {
                 uasserted(16837, status.reason());
             }
 
-            const bool idRequired = collection->details()->haveIdIndex();
+            const bool idRequired = collection->getIndexCatalog()->haveIdIndex();
 
             // Move _id as first element
             mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
@@ -784,7 +784,7 @@ namespace mongo {
         }
 
         // If the collection doesn't exist or has an _id index, then an _id is required
-        const bool idRequired = collection ? collection->details()->haveIdIndex() : true;
+        const bool idRequired = collection ? collection->getIndexCatalog()->haveIdIndex() : true;
 
         mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
 

@@ -494,7 +494,7 @@ namespace mongo {
         Lock::assertWriteLocked(ns);
 
         Collection* collection = cc().database()->getCollection( ns );
-        NamespaceDetails *nsd = collection == NULL ? NULL : collection->details();
+        IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types
         const char *opType = fieldOp.valuestrsafe();
@@ -543,8 +543,8 @@ namespace mongo {
                 else {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
-                    RARELY if ( nsd && !nsd->isCapped() ) {
-                        collection->getIndexCatalog()->ensureHaveIdIndex();
+                    RARELY if ( indexCatalog && !collection->isCapped() ) {
+                        indexCatalog->ensureHaveIdIndex();
                     }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
@@ -572,8 +572,8 @@ namespace mongo {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( nsd && !nsd->isCapped() ) {
-                collection->getIndexCatalog()->ensureHaveIdIndex();
+            RARELY if ( indexCatalog && !collection->isCapped() ) {
+                indexCatalog->ensureHaveIdIndex();
             }
 
             OpDebug debug;
@@ -605,10 +605,10 @@ namespace mongo {
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
                     else {
-                        if (nsd == NULL ||
-                            (nsd->findIdIndex() >= 0 && Helpers::findById(collection, updateCriteria).isNull()) ||
+                        if (collection == NULL ||
+                            (indexCatalog->haveIdIndex() && Helpers::findById(collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (nsd->findIdIndex() < 0 && Helpers::findOne(ns, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex() && Helpers::findOne(ns, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }

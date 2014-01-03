@@ -832,6 +832,11 @@ namespace mongo {
         return _details->getCompletedIndexCount();
     }
 
+    bool IndexCatalog::haveIdIndex() const {
+        return _details->isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex )
+            || findIdIndex() != NULL;
+    }
+
     IndexDescriptor* IndexCatalog::findIdIndex() const {
         IndexIterator ii = getIndexIterator( false );
         while ( ii.more() ) {

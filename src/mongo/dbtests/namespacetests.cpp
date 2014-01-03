@@ -1445,11 +1445,10 @@ namespace NamespaceTests {
                 create();
 
                 // Find the indexNamespace name and indexNsd metadata pointer.
-                int idIndexNo = nsd()->findIdIndex();
-                IndexDetails& idx = nsd()->idx( idIndexNo );
-                string indexNamespace = idx.indexNamespace();
-                ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
-                NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
+                IndexDescriptor* desc = indexCatalog()->findIdIndex();
+                string indexNamespace = desc->indexNamespace();
+                ASSERT( !NamespaceString::normal( indexNamespace ) );
+                NamespaceDetails* indexNsd = nsdetails( indexNamespace );
 
                 // Check that no quantization is performed.
                 DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 300 );
@@ -1464,9 +1463,8 @@ namespace NamespaceTests {
                 create();
 
                 // Find the indexNamespace name and indexNsd metadata pointer.
-                int idIndexNo = nsd()->findIdIndex();
-                IndexDetails& idx = nsd()->idx( idIndexNo );
-                string indexNamespace = idx.indexNamespace();
+                IndexDescriptor* desc = indexCatalog()->findIdIndex();
+                string indexNamespace = desc->indexNamespace();
                 ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
                 NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
 
