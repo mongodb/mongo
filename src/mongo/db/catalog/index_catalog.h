@@ -189,8 +189,6 @@ namespace mongo {
 
         // ------- temp internal -------
 
-        int _removeFromSystemIndexes( const StringData& indexName );
-
         string getAccessMethodName(const BSONObj& keyPattern) {
             return _getAccessMethodName( keyPattern );
         }
@@ -212,15 +210,7 @@ namespace mongo {
 
         Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 
-        /**
-         * this is just an attempt to clean up old orphaned stuff on a delete all indexes
-         * call. repair database is the clean solution, but this gives one a lighter weight
-         * partial option.  see dropIndexes()
-         * @param idIndex - can be NULL
-         * @return how many things were deleted, should be 0
-         */
-        int _assureSysIndexesEmptied( IndexDetails* idIndex );
-
+        int _removeFromSystemIndexes( const StringData& indexName );
 
         bool _shouldOverridePlugin( const BSONObj& keyPattern );
 

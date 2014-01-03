@@ -49,7 +49,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
@@ -604,14 +606,34 @@ namespace mongo {
             i--;
         }
 
-        if ( idIndex ) {
-            verify( numIndexesTotal() == 1 );
-        }
-        else {
-            verify( numIndexesTotal() == 0 );
+        // verify state is sane post cleaning
+
+        long long numSystemIndexesEntries = 0;
+        {
+            BSONObj nsQuery = BSON( "query" << BSON( "ns" << _collection->ns() ) );
+            string errmsg;
+            int errCode;
+            numSystemIndexesEntries = runCount( _collection->_database->_indexesName,
+                                                nsQuery,
+                                                errmsg,
+                                                errCode );
+            verify( numSystemIndexesEntries >= 0 );
+            if ( errmsg.size() ) {
+                error() << "counting system.indexes failed: " << errmsg;
+                fassertFailed( 17323 );
+            }
         }
 
-        _assureSysIndexesEmptied( idIndex );
+
+        if ( idIndex ) {
+            fassert( 17324, numIndexesTotal() == 1 );
+            fassert( 17325, numIndexesReady() == 1 );
+            fassert( 17326, numSystemIndexesEntries == 1 );
+        }
+        else {
+            fassert( 17327, numIndexesTotal() == 0 );
+            fassert( 17328, numSystemIndexesEntries == 0 );
+        }
 
         return Status::OK();
     }
@@ -742,24 +764,10 @@ namespace mongo {
         BSONObjBuilder b;
         b.append( "ns", _collection->ns() );
         b.append( "name", indexName );
-        BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
+        BSONObj cond = b.obj(); // e.g.: { name: "ts_1", ns: "foo.coll" }
+
         return static_cast<int>( deleteObjects( _collection->_database->_indexesName,
                                                 cond, false, false, true ) );
-    }
-
-    int IndexCatalog::_assureSysIndexesEmptied( IndexDetails* idIndex ) {
-        BSONObjBuilder b;
-        b.append("ns", _collection->ns() );
-        if ( idIndex ) {
-            b.append("name", BSON( "$ne" << idIndex->indexName().c_str() ));
-        }
-        BSONObj cond = b.done();
-        int n = static_cast<int>( deleteObjects( _collection->_database->_indexesName,
-                                                 cond, false, false, true) );
-        if( n ) {
-            warning() << "assureSysIndexesEmptied cleaned up " << n << " entries";
-        }
-        return n;
     }
 
     BSONObj IndexCatalog::prepOneUnfinishedIndex() {
