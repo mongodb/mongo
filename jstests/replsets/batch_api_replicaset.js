@@ -109,7 +109,7 @@ var executeUnorderedTests = function() {
     coll.ensureIndex({a : 1}, {unique : true});
 }
 
-var buildVersion = parseInt(db.runCommand({buildInfo:1}).versionArray.slice(0, 3).join(""), 10);
+var buildVersion = parseInt(rstConn.getDB( "test" ).runCommand({buildInfo:1}).versionArray.slice(0, 3).join(""), 10);
 // Save the existing useWriteCommands function
 var _useWriteCommands = coll.getMongo().useWriteCommands;
 
