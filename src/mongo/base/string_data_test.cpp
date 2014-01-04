@@ -137,6 +137,42 @@ namespace {
         ASSERT_EQUALS( string("foo").find( "" ), StringData("foo").find( "" ) );
     }
 
+    // Helper function for Test(Hasher, Str1)
+    template <int SizeofSizeT>
+    void SDHasher_check(void);
+
+    template <>
+    void SDHasher_check<4>(void) {
+        ASSERT_EQUALS(StringData::Hasher()(""),
+            static_cast<size_t>(0));
+        ASSERT_EQUALS(StringData::Hasher()("foo"),
+            static_cast<size_t>(4138058784));
+        ASSERT_EQUALS(StringData::Hasher()("pizza"),
+            static_cast<size_t>(3587803311));
+        ASSERT_EQUALS(StringData::Hasher()("mongo"),
+            static_cast<size_t>(3724335885));
+        ASSERT_EQUALS(StringData::Hasher()("murmur"),
+            static_cast<size_t>(1945310157));
+    }
+
+    template <>
+    void SDHasher_check<8>(void) {
+        ASSERT_EQUALS(StringData::Hasher()(""),
+            static_cast<size_t>(0));
+        ASSERT_EQUALS(StringData::Hasher()("foo"),
+            static_cast<size_t>(16316970633193145697UL));
+        ASSERT_EQUALS(StringData::Hasher()("pizza"),
+            static_cast<size_t>(12165495155477134356UL));
+        ASSERT_EQUALS(StringData::Hasher()("mongo"),
+            static_cast<size_t>(2861051452199491487UL));
+        ASSERT_EQUALS(StringData::Hasher()("murmur"),
+            static_cast<size_t>(18237957392784716687UL));
+    }
+
+    TEST(Hasher, Str1) {
+        SDHasher_check<sizeof(size_t)>();
+    }
+
     TEST(Rfind, Char1) {
         ASSERT_EQUALS( string::npos, StringData( "foo" ).rfind( 'a' ) );
 
