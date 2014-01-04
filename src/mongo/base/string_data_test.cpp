@@ -146,13 +146,13 @@ namespace {
         ASSERT_EQUALS(StringData::Hasher()(""),
             static_cast<size_t>(0));
         ASSERT_EQUALS(StringData::Hasher()("foo"),
-            static_cast<size_t>(4138058784));
+            static_cast<size_t>(4138058784U));
         ASSERT_EQUALS(StringData::Hasher()("pizza"),
-            static_cast<size_t>(3587803311));
+            static_cast<size_t>(3587803311U));
         ASSERT_EQUALS(StringData::Hasher()("mongo"),
-            static_cast<size_t>(3724335885));
+            static_cast<size_t>(3724335885U));
         ASSERT_EQUALS(StringData::Hasher()("murmur"),
-            static_cast<size_t>(1945310157));
+            static_cast<size_t>(1945310157U));
     }
 
     template <>
