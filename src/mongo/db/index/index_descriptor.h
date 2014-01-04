@@ -54,9 +54,9 @@ namespace mongo {
          * OnDiskIndexData is a pointer to the memory mapped per-index data.
          * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
          */
-        IndexDescriptor(Collection* collection, int indexNumber,BSONObj infoObj)
+        IndexDescriptor(Collection* collection, BSONObj infoObj)
             : _magic(123987),
-              _collection(collection), _indexNumber(indexNumber),
+              _collection(collection),
               _infoObj(infoObj.getOwned()),
               _numFields(infoObj.getObjectField("key").nFields()),
               _keyPattern(infoObj.getObjectField("key").getOwned()),
@@ -124,7 +124,7 @@ namespace mongo {
         bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
-        bool isMultikey() const { _checkOk(); return _collection->details()->isMultikey(_indexNumber); }
+        bool isMultikey() const { _checkOk(); return _collection->getIndexCatalog()->isMultikey( this ); }
 
         bool isIdIndex() const { _checkOk(); return _isIdIndex; }
 
@@ -146,14 +146,6 @@ namespace mongo {
         // Return the info object.
         const BSONObj& infoObj() const { _checkOk(); return _infoObj; }
 
-        // Is this index being created in the background?
-        bool isBackgroundIndex() const {
-            return _indexNumber >= _collection->details()->getCompletedIndexCount();
-        }
-
-        // this is the collection over which the index is over
-        Collection* getIndexedCollection() const { return _collection; }
-
         // this is the owner of this IndexDescriptor
         IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
 
@@ -166,16 +158,10 @@ namespace mongo {
             verify(0);
         }
 
-        int getIndexNumber() const { return _indexNumber; }
-
         int _magic;
 
         // Related catalog information of the parent collection
         Collection* _collection;
-
-        // What # index are we in the catalog represented by _namespaceDetails?  Needed for setting
-        // and getting multikey.
-        int _indexNumber;
 
         // The BSONObj describing the index.  Accessed through the various members above.
         const BSONObj _infoObj;

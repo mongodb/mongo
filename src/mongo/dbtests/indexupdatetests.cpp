@@ -66,6 +66,8 @@ namespace IndexUpdateTests {
             return _ctx.ctx().db()->getCollection( _ns );
         }
     protected:
+    // QUERY_MIGRATION
+#if 0
         /** @return IndexDetails for a new index on a:1, with the info field populated. */
         IndexDescriptor* addIndexWithInfo() {
             BSONObj indexInfo = BSON( "v" << 1 <<
@@ -88,11 +90,13 @@ namespace IndexUpdateTests {
 
             return collection()->getIndexCatalog()->findIndexByName( "a_1" );
         }
-
+#endif
         Client::WriteContext _ctx;
     };
 
     /** addKeysToPhaseOne() adds keys from a collection's documents to an external sorter. */
+    // QUERY_MIGRATION
+#if 0
     class AddKeysToPhaseOne : public IndexBuildBase {
     public:
         void run() {
@@ -170,6 +174,7 @@ namespace IndexUpdateTests {
     private:
         bool _mayInterrupt;
     };
+#endif
 
     // QUERY_MIGRATION
 #if 0
@@ -549,7 +554,8 @@ namespace IndexUpdateTests {
                                           BSON( "ns" << _ns << "name" << "a_1" ) ) );
         }
     };
-
+    // QUERY_MIGRATION
+#if 0
     class IndexBuildInProgressTest : public IndexBuildBase {
     public:
         void run() {
@@ -603,6 +609,7 @@ namespace IndexUpdateTests {
             return new IndexCatalog::IndexBuildBlock( _ctx.ctx().db()->getCollection( _ns )->getIndexCatalog(), name, infoLoc );
         }
     };
+#endif
 
     /**
      * Fixture class that has a basic compound index.
@@ -774,9 +781,9 @@ namespace IndexUpdateTests {
         }
 
         void setupTests() {
-            add<AddKeysToPhaseOne>();
-            add<InterruptAddKeysToPhaseOne>( false );
-            add<InterruptAddKeysToPhaseOne>( true );
+            //add<AddKeysToPhaseOne>();
+            //add<InterruptAddKeysToPhaseOne>( false );
+            //add<InterruptAddKeysToPhaseOne>( true );
             // QUERY_MIGRATION
             //add<BuildBottomUp>();
             //add<InterruptBuildBottomUp>( false );
@@ -790,7 +797,7 @@ namespace IndexUpdateTests {
             add<InsertBuildIdIndexInterruptDisallowed>();
             add<DirectClientEnsureIndexInterruptDisallowed>();
             add<HelpersEnsureIndexInterruptDisallowed>();
-            add<IndexBuildInProgressTest>();
+            //add<IndexBuildInProgressTest>();
             add<SameSpecDifferentOption>();
             add<SameSpecSameOptions>();
             add<DifferentSpecSameName>();

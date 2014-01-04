@@ -432,7 +432,7 @@ namespace mongo {
             if ( !newIndexSpecLoc.isOK() )
                 return newIndexSpecLoc.getStatus();
 
-            int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
+            int indexI = details->_catalogFindIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();
             indexDetails.info = newIndexSpecLoc.getValue();

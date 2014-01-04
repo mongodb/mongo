@@ -1240,7 +1240,7 @@ namespace {
             return;
         }
 #endif
-        tryToOutputFatal( "dbexit: really exiting now" );
+        tryToOutputFatal( "dbexit: really exiting now\n" );
         if ( c ) c->shutdown();
         ::_exit(rc);
     }

@@ -66,7 +66,7 @@ namespace NamespaceTests {
 
                 BSONObj bobj = builder.done();
 
-                _index.reset( new IndexDescriptor( NULL, -1, bobj ) );
+                _index.reset( new IndexDescriptor( NULL, bobj ) );
 
                 _keyPattern = key().getOwned();
 

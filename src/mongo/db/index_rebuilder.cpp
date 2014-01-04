@@ -90,46 +90,39 @@ namespace mongo {
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-            if ( indexCatalog->numIndexesInProgress() == 0 ) {
+            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes();
+
+            // The indexes have now been removed from system.indexes, so the only record is
+            // in-memory. If there is a journal commit between now and when insert() rewrites
+            // the entry and the db crashes before the new system.indexes entry is journalled,
+            // the index will be lost forever.  Thus, we're assuming no journaling will happen
+            // between now and the entry being re-written.
+
+            if ( indexesToBuild.size() == 0 ) {
                 continue;
             }
 
-            log() << "found interrupted index build(s) on " << *it << endl;
+            log() << "found " << indexesToBuild.size()
+                  << " interrupted index build(s) on " << *it;
 
             if (firstTime) {
                 log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
                 firstTime = false;
             }
 
-            // If the indexBuildRetry flag isn't set, just clear the inProg flag
             if (!serverGlobalParams.indexBuildRetry) {
-                // If we crash between unsetting the inProg flag and cleaning up the index, the
-                // index space will be lost.
-                while ( indexCatalog->numIndexesInProgress() > 0 ) {
-                    // ignoring return as we're just destroying these
-                    indexCatalog->prepOneUnfinishedIndex();
-                }
+                log() << "  not rebuilding interrupted indexes";
                 continue;
             }
 
-            // We go from right to left building these indexes, so that indexBuildInProgress-- has
-            // the correct effect of "popping" an index off the list.
-            while ( indexCatalog->numIndexesInProgress() > 0 ) {
-                // First, clean up the in progress index build.  Save the system.indexes entry so that we
-                // can add it again afterwards.
-                BSONObj indexObj = indexCatalog->prepOneUnfinishedIndex();
+            // TODO: these can/should/must be done in parallel
+            for ( size_t i = 0; i < indexesToBuild.size(); i++ ) {
+                BSONObj indexObj = indexesToBuild[i];
 
-                // The index has now been removed from system.indexes, so the only record of it is
-                // in-memory. If there is a journal commit between now and when insert() rewrites
-                // the entry and the db crashes before the new system.indexes entry is journalled,
-                // the index will be lost forever.  Thus, we're assuming no journaling will happen
-                // between now and the entry being re-written.
+                log() << "going to rebuild: " << indexObj;
 
                 Status status = indexCatalog->createIndex( indexObj, false );
-                if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
-                    // no-op
-                }
-                else if ( !status.isOK() ) {
+                if ( !status.isOK() ) {
                     log() << "building index failed: " << status.toString() << " index: " << indexObj;
                 }
 

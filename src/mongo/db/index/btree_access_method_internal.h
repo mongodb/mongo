@@ -92,7 +92,7 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
-        scoped_ptr<BtreeInMemoryState> _btreeState; // OWNED HERE
+        BtreeInMemoryState* _btreeState; // owned by IndexCatalogEntry
         const IndexDescriptor* _descriptor;
 
         // There are 2 types of Btree disk formats.  We put them both behind one interface.

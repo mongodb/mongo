@@ -409,7 +409,7 @@ namespace mongo {
             BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
             BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
 
-            auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max, false));
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx, min, max, false));
             // we can afford to yield here because any change to the base data that we might miss is
             // already being  queued and will be migrated in the 'transferMods' stage
             runner->setYieldPolicy(Runner::YIELD_AUTO);

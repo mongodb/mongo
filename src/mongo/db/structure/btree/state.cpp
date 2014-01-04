@@ -39,23 +39,102 @@ namespace mongo {
 
     BtreeInMemoryState::BtreeInMemoryState( Collection* collection,
                                             const IndexDescriptor* descriptor,
-                                            RecordStore* recordStore,
-                                            IndexDetails* details )
+                                            RecordStore* recordStore )
         : _collection( collection ),
           _descriptor( descriptor ),
           _recordStore( recordStore ),
-          _indexDetails( details ),
           _ordering( Ordering::make( descriptor->keyPattern() ) ) {
+        _isReady = false;
+        _isMultikeySet = false;
+        _head.Null();
     }
 
-    const DiskLoc& BtreeInMemoryState::head() const { return _indexDetails->head; }
+    int BtreeInMemoryState::_indexNo() const {
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = nsd->_catalogFindIndexByName( _descriptor->indexName(), true );
+        fassert( 17333, idxNo >= 0 );
+        return idxNo;
+    }
+
+    const DiskLoc& BtreeInMemoryState::head() const {
+        if ( _head.isNull() ) {
+            _head = _catalogFindHeadFromDisk();
+            return _head;
+        }
+
+        DEV {
+            if ( _head != _catalogFindHeadFromDisk() ) {
+                log() << "_head: " << _head
+                      << " _catalogFindHeadFromDisk(): " << _catalogFindHeadFromDisk();
+            }
+            verify( _head == _catalogFindHeadFromDisk() );
+        }
+
+        return _head;
+    }
+
+    DiskLoc BtreeInMemoryState::_catalogFindHeadFromDisk() const {
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        return nsd->idx( idxNo ).head;
+    }
 
     void BtreeInMemoryState::setHead( DiskLoc newHead ) {
-        _indexDetails->head.writing() = newHead;
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        IndexDetails& id = nsd->idx( idxNo );
+        id.head.writing() = newHead;
+        _head = newHead;
     }
 
     void BtreeInMemoryState::setMultikey() {
-        _collection->getIndexCatalog()->markMultikey( _descriptor, true );
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        if ( nsd->setIndexIsMultikey( idxNo, true ) )
+            _collection->infoCache()->clearQueryCache();
+
+        _isMultikeySet = true;
+        _isMultikey = true;
     }
 
+    bool BtreeInMemoryState::isMultikey() const {
+        if ( _isMultikeySet ) {
+            DEV {
+                NamespaceDetails* nsd = _collection->details();
+                int idxNo = _indexNo();
+                verify( _isMultikey == nsd->isMultikey( idxNo ) );
+            }
+            return _isMultikey;
+        }
+
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        _isMultikey = nsd->isMultikey( idxNo );
+        _isMultikeySet = true;
+        return _isMultikey;
+    }
+
+
+    bool BtreeInMemoryState::isReady() const {
+        DEV _debugCheckVerifyReady();
+        return _isReady;
+    }
+
+    void BtreeInMemoryState::setIsReady( bool isReady ) {
+        _isReady = isReady;
+        DEV _debugCheckVerifyReady();
+        if ( isReady ) {
+            // get caches ready
+            head();
+            isMultikey();
+
+            fassert( 17339, _head == _catalogFindHeadFromDisk() );
+            fassert( 17340, _isMultikey == _collection->details()->isMultikey( _indexNo() ) );
+        }
+    }
+
+    void BtreeInMemoryState::_debugCheckVerifyReady() const {
+        bool real = _indexNo() < _collection->getIndexCatalog()->numIndexesReady();
+        verify( real == _isReady );
+    }
 }

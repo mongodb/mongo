@@ -704,9 +704,8 @@ namespace mongo {
         }
     }
 
-    // @return offset in indexes[]
-    int NamespaceDetails::findIndexByName(const StringData& name,
-                                          bool includeBackgroundInProgress) {
+    int NamespaceDetails::_catalogFindIndexByName(const StringData& name,
+                                                  bool includeBackgroundInProgress) {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
             if ( name == i.next().info.obj().getStringField("name") )

@@ -68,6 +68,11 @@ assert.soon( function() {
     return 2 == secondDB.system.indexes.count( {ns:"bgIndexNoRetrySec.jstests_bgsec"} ); }, 
              "index not created on secondary (prior to restart)", 30000, 50 );
 
+// wait till minvalid
+assert.soon( function() {
+    return secondDB.jstests_bgsec.findOne( { i : -1 } ) != null; },
+             "doc after index not on secondary (prior to restart)", 30000, 50 );
+
 // restart secondary and reconnect
 jsTest.log("Restarting secondary");
 replTest.restart(secondId, {}, /*signal=*/ 9,  /*wait=*/true);

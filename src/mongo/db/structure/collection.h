@@ -91,9 +91,20 @@ namespace mongo {
         BSONObj docFor( const DiskLoc& loc );
 
         // ---- things that should move to a CollectionAccessMethod like thing
-
+        /**
+         * canonical to get all would be
+         * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
+         */
         CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
                                          const CollectionScanParams::Direction& dir) const;
+
+
+        /**
+         * does a table scan to do a count
+         * this should only be used at a very low level
+         * does no yielding, indexes, etc...
+         */
+        int64_t countTableScan( const MatchExpression* expression );
 
         void deleteDocument( const DiskLoc& loc,
                              bool cappedOK = false,

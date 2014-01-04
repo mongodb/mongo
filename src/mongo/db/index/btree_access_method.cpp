@@ -62,7 +62,7 @@ namespace mongo {
 
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
             try {
-                _interface->bt_insert(_btreeState.get(),
+                _interface->bt_insert(_btreeState,
                                       _btreeState->head(),
                                       loc,
                                       *i,
@@ -70,7 +70,7 @@ namespace mongo {
                                       true);
                 ++*numInserted;
             } catch (AssertionException& e) {
-                if (10287 == e.getCode() && _descriptor->isBackgroundIndex()) {
+                if (10287 == e.getCode() && !_btreeState->isReady()) {
                     // This is the duplicate key exception.  We ignore it for some reason in BG
                     // indexing.
                     DEV log() << "info: key already in index during bg indexing (ok)\n";
@@ -101,7 +101,7 @@ namespace mongo {
         bool ret = false;
 
         try {
-            ret = _interface->unindex(_btreeState.get(),
+            ret = _interface->unindex(_btreeState,
                                       _btreeState->head(),
                                       key,
                                       loc);
@@ -168,7 +168,7 @@ namespace mongo {
             int unusedPos;
             bool unusedFound;
             DiskLoc unusedDiskLoc;
-            _interface->locate(_btreeState.get(),
+            _interface->locate(_btreeState,
                                _btreeState->head(),
                                *i,
                                unusedPos,
@@ -182,12 +182,12 @@ namespace mongo {
 
     DiskLoc BtreeBasedAccessMethod::findSingle( const BSONObj& key ) {
         if ( 0 == _descriptor->version() ) {
-            return _btreeState->getHeadBucket<V0>()->findSingle( _btreeState.get(),
+            return _btreeState->getHeadBucket<V0>()->findSingle( _btreeState,
                                                                  _btreeState->head(),
                                                                  key );
         }
         if ( 1 == _descriptor->version() ) {
-            return _btreeState->getHeadBucket<V1>()->findSingle( _btreeState.get(),
+            return _btreeState->getHeadBucket<V1>()->findSingle( _btreeState,
                                                                  _btreeState->head(),
                                                                  key );
         }
@@ -196,7 +196,7 @@ namespace mongo {
 
 
     Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
-        *numKeys = _interface->fullValidate(_btreeState.get(),
+        *numKeys = _interface->fullValidate(_btreeState,
                                             _btreeState->head(),
                                             _descriptor->keyPattern());
         return Status::OK();
@@ -223,12 +223,12 @@ namespace mongo {
 
         if (checkForDups) {
             for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                if (_interface->wouldCreateDup(_btreeState.get(),
+                if (_interface->wouldCreateDup(_btreeState,
                                                _btreeState->head(),
                                                **i, record)) {
                     status->_isValid = false;
                     return Status(ErrorCodes::DuplicateKey,
-                                  _interface->dupKeyError(_btreeState.get(),
+                                  _interface->dupKeyError(_btreeState,
                                                           _btreeState->head(),
                                                           **i));
                 }
@@ -253,7 +253,7 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < data->added.size(); ++i) {
-            _interface->bt_insert(_btreeState.get(),
+            _interface->bt_insert(_btreeState,
                                   _btreeState->head(),
                                   data->loc,
                                   *data->added[i],
@@ -262,7 +262,7 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < data->removed.size(); ++i) {
-            _interface->unindex(_btreeState.get(),
+            _interface->unindex(_btreeState,
                                 _btreeState->head(),
                                 *data->removed[i],
                                 data->loc);
@@ -304,7 +304,7 @@ namespace mongo {
     }
 
     Status BtreeAccessMethod::newCursor(IndexCursor** out) const {
-        *out = new BtreeIndexCursor(_btreeState.get(), _interface);
+        *out = new BtreeIndexCursor(_btreeState, _interface);
         return Status::OK();
     }
 

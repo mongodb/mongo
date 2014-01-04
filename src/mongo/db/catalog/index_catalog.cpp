@@ -51,7 +51,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
@@ -71,20 +70,65 @@ namespace mongo {
     // -------------
 
     IndexCatalog::IndexCatalog( Collection* collection, NamespaceDetails* details )
-        : _magic(INDEX_CATALOG_MAGIC), _collection( collection ), _details( details ),
-          _descriptorCache( NamespaceDetails::NIndexesMax ),
-          _accessMethodCache( NamespaceDetails::NIndexesMax ),
-          _forcedBtreeAccessMethodCache( NamespaceDetails::NIndexesMax ) {
+        : _magic(654321), _collection( collection ), _details( details ) {
     }
 
     IndexCatalog::~IndexCatalog() {
-        _checkMagic();
+        if ( _magic != 654321 ) {
+            // only do this check if we haven't been initialized
+            _checkMagic();
+        }
         _magic = 123456;
+    }
 
-        for ( unsigned i = 0; i < _descriptorCache.capacity(); i++ ) {
-            _deleteCacheEntry(i);
+    Status IndexCatalog::init() {
+
+        NamespaceDetails::IndexIterator ii = _details->ii(true);
+        while ( ii.more() ) {
+            IndexDetails& id = ii.next();
+            int idxNo = ii.pos() - 1;
+
+            if ( idxNo >= _details->getCompletedIndexCount() ) {
+                _leftOverIndexes.push_back( id.info.obj().getOwned() );
+                continue;
+            }
+
+            auto_ptr<IndexDescriptor> descriptor( new IndexDescriptor( _collection,
+                                                                       id.info.obj().getOwned() ) );
+
+            NamespaceDetails* indexMetadata =
+                _collection->_database->namespaceIndex().details( descriptor->indexNamespace() );
+            massert( 17329,
+                     str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
+                     indexMetadata );
+
+            auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
+            recordStore->init( indexMetadata, _collection->getExtentManager(), false );
+
+            auto_ptr<BtreeInMemoryState> state( new BtreeInMemoryState( _collection,
+                                                                        descriptor.get(),
+                                                                        recordStore.release() ) );
+            state->setIsReady( true );
+
+            auto_ptr<IndexAccessMethod> accessMethod( _createAccessMethod( descriptor.get(),
+                                                                           state.get() ) );
+
+            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( descriptor.release(),
+                                                                      state.release(),
+                                                                      accessMethod.release() ) );
+            _entries.add( entry.release() );
         }
 
+        // we clean up any unfinished indexes right here
+        // its too weird to leave in any state
+        // if someone wants to clean them, they can call prepOneUnfinishedIndex
+
+        if ( _leftOverIndexes.size() ) {
+            log() << "found " << _leftOverIndexes.size() << " index(es) that wasn't finished before shutdown";
+        }
+
+        _magic = INDEX_CATALOG_MAGIC;
+        return Status::OK();
     }
 
     bool IndexCatalog::ok() const {
@@ -92,14 +136,20 @@ namespace mongo {
     }
 
     void IndexCatalog::_checkMagic() const {
-        dassert( _descriptorCache.capacity() == NamespaceDetails::NIndexesMax );
-        dassert( _accessMethodCache.capacity() == NamespaceDetails::NIndexesMax );
-        dassert( _forcedBtreeAccessMethodCache.capacity() == NamespaceDetails::NIndexesMax );
-
-        if ( ok() )
+        if ( ok() ) {
             return;
+        }
         log() << "IndexCatalog::_magic wrong, is : " << _magic;
         fassertFailed(17198);
+    }
+
+    void IndexCatalog::_checkUnifished() const {
+
+        massert( 17338,
+                 str::stream()
+                 << "IndexCatalog has left over indexes that must be cleared"
+                 << " ns: " << _collection->ns().ns(),
+                 _leftOverIndexes.size() == 0 );
     }
 
     bool IndexCatalog::_shouldOverridePlugin(const BSONObj& keyPattern) {
@@ -185,6 +235,9 @@ namespace mongo {
     }
 
     Status IndexCatalog::createIndex( BSONObj spec, bool mayInterrupt ) {
+        Lock::assertWriteLocked( _collection->_database->name() );
+        _checkMagic();
+        _checkUnifished();
         /**
          * There are 2 main variables so(4 possibilies) for how we build indexes
          * variable 1 - size of collection
@@ -227,6 +280,22 @@ namespace mongo {
                 return s;
         }
 
+        // -------------
+        // no disk modifications yet
+        // going to prep some stuff, without any mods
+        // -------------
+
+        IndexDescriptor* descriptor = new IndexDescriptor( _collection, spec.getOwned() );
+        auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
+
+        auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
+
+
+        // -------------
+        // now going to touch disk
+        // -------------
+
+        // -------- system.indexes
 
         Collection* systemIndexes = db->getCollection( db->_indexesName );
         if ( !systemIndexes ) {
@@ -241,33 +310,62 @@ namespace mongo {
 
         string idxName = spec["name"].valuestr();
 
-        // Set curop description before setting indexBuildInProg, so that there's something
-        // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
-        // killable index, so we don't overwrite commands in currentOp.
-        if ( mayInterrupt ) {
-            cc().curop()->setQuery( spec );
+        // ------- allocates IndexDetails
+        IndexBuildBlock indexBuildBlock( this,
+                                         idxName,
+                                         descriptor->indexNamespace(),
+                                         loc.getValue() );
+
+        // ------- allocate RecordsStore
+        {
+            Database* db = _collection->_database;
+            NamespaceIndex& nsi = db->namespaceIndex();
+            verify( nsi.details( descriptor->indexNamespace() ) == NULL );
+            nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
+            NamespaceDetails* nsd = nsi.details( descriptor->indexNamespace() );
+            verify(nsd);
+            recordStore->init( nsd, _collection->getExtentManager(), false );
+            db->_addNamespaceToCatalog( descriptor->indexNamespace(), NULL );
         }
 
-        IndexBuildBlock indexBuildBlock( this, idxName, loc.getValue() );
-        verify( indexBuildBlock.indexDetails() );
+        // ---------
+        // finish creating in memory state
+        // ---------
+        {
+            auto_ptr<BtreeInMemoryState> state( new BtreeInMemoryState( _collection,
+                                                                        descriptor,
+                                                                        recordStore.release() ) );
+
+            auto_ptr<IndexAccessMethod> accessMethod( _createAccessMethod( descriptor,
+                                                                           state.get() ) );
+
+            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( descriptorCleaner.release(),
+                                                                      state.release(),
+                                                                      accessMethod.release() ) );
+
+            _entries.add( entry.release() );
+        }
+
+        // sanity check
+        verify( _details->_catalogFindIndexByName( idxName, true ) >= 0 );
+
+        IndexCatalogEntry* entry = _entries.find( descriptor );
+        verify( entry );
 
         try {
-            int idxNo = _details->findIndexByName( idxName, true );
-            verify( idxNo >= 0 );
 
-            IndexDetails* id = &_details->idx(idxNo);
+            // Set curop description before setting indexBuildInProg, so that there's something
+            // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
+            // killable index, so we don't overwrite commands in currentOp.
+            if ( mayInterrupt ) {
+                cc().curop()->setQuery( spec );
+            }
 
-            scoped_ptr<IndexDescriptor> desc( new IndexDescriptor( _collection, idxNo,
-                                                                   id->info.obj().getOwned() ) );
-            auto_ptr<BtreeInMemoryState> btreeState( createInMemory( desc.get() ) );
-            buildAnIndex( _collection, btreeState.get(), mayInterrupt );
+            buildAnIndex( _collection, entry->state(), mayInterrupt );
             indexBuildBlock.success();
 
-            // in case we got any access methods or something like that
-            // TEMP until IndexDescriptor has to direct refs
-            idxNo = _details->findIndexByName( idxName, true );
-            verify( idxNo >= 0 );
-            _deleteCacheEntry( idxNo );
+            int idxNo = _details->_catalogFindIndexByName( idxName, true );
+            verify( idxNo < numIndexesReady() );
 
             return Status::OK();
         }
@@ -276,28 +374,22 @@ namespace mongo {
                   << " spec: " << spec
                   << " error: " << e;
 
-            // in case we got any access methods or something like that
-            // TEMP until IndexDescriptor has to direct refs
-            int idxNo = _details->findIndexByName( idxName, true );
-            verify( idxNo >= 0 );
-            _deleteCacheEntry( idxNo );
-
             ErrorCodes::Error codeToUse = ErrorCodes::fromInt( e.getCode() );
             if ( codeToUse == ErrorCodes::UnknownError )
                 return Status( ErrorCodes::InternalError, e.what(), e.getCode() );
             return Status( codeToUse, e.what() );
         }
-
-
     }
 
     IndexCatalog::IndexBuildBlock::IndexBuildBlock( IndexCatalog* catalog,
                                                     const StringData& indexName,
+                                                    const StringData& indexNamespace,
                                                     const DiskLoc& loc )
         : _catalog( catalog ),
           _ns( _catalog->_collection->ns().ns() ),
           _indexName( indexName.toString() ),
-          _indexDetails( NULL ) {
+          _indexNamespace( indexNamespace.toString() ),
+          _inProgress( false ) {
 
         _nsd = _catalog->_collection->details();
 
@@ -306,16 +398,16 @@ namespace mongo {
         verify( _catalog->_collection->ok() );
         verify( !loc.isNull() );
 
-        _indexDetails = &_nsd->getNextIndexDetails( _ns.c_str() );
+        IndexDetails* indexDetails = &_nsd->getNextIndexDetails( _ns.c_str() );
+        _inProgress = true;
 
         try {
             // we don't want to kill a half formed IndexDetails, so be carefule
             LOG(1) << "creating index with info @ " << loc;
-            getDur().writingDiskLoc( _indexDetails->info ) = loc;
+            getDur().writingDiskLoc( indexDetails->info ) = loc;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;
-            _indexDetails = NULL;
             return;
         }
 
@@ -324,38 +416,44 @@ namespace mongo {
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
-            _indexDetails = NULL;
+            _inProgress = false;
             return;
         }
 
     }
 
     IndexCatalog::IndexBuildBlock::~IndexBuildBlock() {
-        if ( !_indexDetails ) {
+        if ( !_inProgress ) {
             // taken care of already
             return;
         }
+        _inProgress = false; // defensive
 
         fassert( 17204, _catalog->_collection->ok() );
 
-        int idxNo = _nsd->findIndexByName( _indexName, true );
+        int idxNo = _nsd->_catalogFindIndexByName( _indexName, true );
         fassert( 17205, idxNo >= 0 );
 
-        _catalog->_dropIndex( idxNo );
+        IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
+        if ( entry ) {
+            _catalog->_dropIndex( entry );
+        }
+        else {
+            _catalog->_deleteIndexFromDisk( _indexName,
+                                            _indexNamespace,
+                                            idxNo );
+        }
 
-        _indexDetails = NULL;
     }
 
     void IndexCatalog::IndexBuildBlock::success() {
 
-        fassert( 17206, _indexDetails );
-        BSONObj keyPattern = _indexDetails->keyPattern().getOwned();
-
-        _indexDetails = NULL;
+        fassert( 17206, _inProgress );
+        _inProgress = false;
 
         fassert( 17207, _catalog->_collection->ok() );
 
-        int idxNo = _nsd->findIndexByName( _indexName, true );
+        int idxNo = _nsd->_catalogFindIndexByName( _indexName, true );
         fassert( 17202, idxNo >= 0 );
 
         // Make sure the newly created index is relocated to nIndexes, if it isn't already there
@@ -367,10 +465,6 @@ namespace mongo {
 
             _nsd->swapIndex( idxNo, toIdxNo );
 
-            // neither of these should be used in queries yet, so nothing should be caching these
-            _catalog->_deleteCacheEntry( idxNo );
-            _catalog->_deleteCacheEntry( toIdxNo );
-
             idxNo = _nsd->getCompletedIndexCount();
         }
 
@@ -379,9 +473,15 @@ namespace mongo {
 
         _catalog->_collection->infoCache()->addedIndex();
 
-        _catalog->_fixDescriptorCacheNumbers();
+        IndexDescriptor* desc = _catalog->findIndexByName( _indexName, true );
+        fassert( 17330, desc );
+        IndexCatalogEntry* entry = _catalog->_entries.find( desc );
+        fassert( 17331, entry );
 
-        IndexLegacy::postBuildHook( _catalog->_collection, keyPattern );
+        entry->state()->setIsReady( true );
+
+        IndexLegacy::postBuildHook( _catalog->_collection,
+                                    _catalog->findIndexByName( _indexName )->keyPattern() );
     }
 
 
@@ -499,7 +599,7 @@ namespace mongo {
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
-            const int idx = _details->findIndexByName(name, true);
+            const int idx = _details->_catalogFindIndexByName(name, true);
             if (idx >= 0) {
                 // index already exists.
                 const IndexDetails& indexSpec( _details->idx(idx) );
@@ -580,6 +680,8 @@ namespace mongo {
     }
 
     Status IndexCatalog::dropAllIndexes( bool includingIdIndex ) {
+        Lock::assertWriteLocked( _collection->_database->name() );
+
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
@@ -589,61 +691,85 @@ namespace mongo {
         // make sure nothing in progress
         verify( numIndexesTotal() == numIndexesReady() );
 
-        LOG(4) << "  d->nIndexes was " << numIndexesTotal() << std::endl;
+        bool haveIdIndex = false;
 
-        IndexDetails *idIndex = 0;
-
-        for ( int i = 0; i < numIndexesTotal(); i++ ) {
-
-            if ( !includingIdIndex && _details->idx(i).isIdIndex() ) {
-                idIndex = &_details->idx(i);
-                continue;
+        vector<string> indexNamesToDrop;
+        {
+            int seen = 0;
+            IndexIterator ii = getIndexIterator( true );
+            while ( ii.more() ) {
+                seen++;
+                IndexDescriptor* desc = ii.next();
+                if ( desc->isIdIndex() && includingIdIndex == false ) {
+                    haveIdIndex = true;
+                    continue;
+                }
+                indexNamesToDrop.push_back( desc->indexName() );
             }
+            verify( seen == numIndexesTotal() );
+        }
 
-            Status s = dropIndex( i );
-            if ( !s.isOK() )
-                return s;
-            i--;
+        for ( size_t i = 0; i < indexNamesToDrop.size(); i++ ) {
+            string indexName = indexNamesToDrop[i];
+            IndexDescriptor* desc = findIndexByName( indexName, true );
+            verify( desc );
+            LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
+            IndexCatalogEntry* entry = _entries.find( desc );
+            verify( entry );
+            _dropIndex( entry );
         }
 
         // verify state is sane post cleaning
 
         long long numSystemIndexesEntries = 0;
         {
-            BSONObj nsQuery = BSON( "query" << BSON( "ns" << _collection->ns() ) );
-            string errmsg;
-            int errCode;
-            numSystemIndexesEntries = runCount( _collection->_database->_indexesName,
-                                                nsQuery,
-                                                errmsg,
-                                                errCode );
-            verify( numSystemIndexesEntries >= 0 );
-            if ( errmsg.size() ) {
-                error() << "counting system.indexes failed: " << errmsg;
-                fassertFailed( 17323 );
+            Collection* systemIndexes =
+                _collection->_database->getCollection( _collection->_database->_indexesName );
+            if ( systemIndexes ) {
+                EqualityMatchExpression expr;
+                BSONObj nsBSON = BSON( "ns" << _collection->ns() );
+                verify( expr.init( "ns", nsBSON.firstElement() ).isOK() );
+                numSystemIndexesEntries = systemIndexes->countTableScan( &expr );
+            }
+            else {
+                // this is ok, 0 is the right number
             }
         }
 
-
-        if ( idIndex ) {
+        if ( haveIdIndex ) {
             fassert( 17324, numIndexesTotal() == 1 );
             fassert( 17325, numIndexesReady() == 1 );
             fassert( 17326, numSystemIndexesEntries == 1 );
+            fassert( 17336, _entries.size() == 1 );
         }
         else {
+            if ( numIndexesTotal() || numSystemIndexesEntries || _entries.size() ) {
+                error() << "about to fassert - "
+                        << " numIndexesTotal(): " << numIndexesTotal()
+                        << " numSystemIndexesEntries: " << numSystemIndexesEntries
+                        << " _entries.size(): " << _entries.size()
+                        << " indexNamesToDrop: " << indexNamesToDrop.size()
+                        << " haveIdIndex: " << haveIdIndex;
+            }
             fassert( 17327, numIndexesTotal() == 0 );
             fassert( 17328, numSystemIndexesEntries == 0 );
+            fassert( 17337, _entries.size() == 0 );
         }
 
         return Status::OK();
     }
 
     Status IndexCatalog::dropIndex( IndexDescriptor* desc ) {
-        return dropIndex( desc->getIndexNumber() );
+        Lock::assertWriteLocked( _collection->_database->name() );
+        IndexCatalogEntry* entry = _entries.find( desc );
+        if ( !entry )
+            return Status( ErrorCodes::InternalError, "cannot find index to delete" );
+        if ( !entry->state()->isReady() )
+            return Status( ErrorCodes::InternalError, "cannot delete not ready index" );
+        return _dropIndex( entry );
     }
 
-    Status IndexCatalog::dropIndex( int idxNo ) {
-
+    Status IndexCatalog::_dropIndex( IndexCatalogEntry* entry ) {
         /**
          * IndexState in order
          *  <db>.system.indexes
@@ -652,23 +778,12 @@ namespace mongo {
          */
 
         // ----- SANITY CHECKS -------------
-
-        verify( idxNo >= 0 );
-        verify( idxNo < numIndexesReady() );
-        verify( numIndexesReady() == numIndexesTotal() );
-
-        // ------ CLEAR CACHES, ETC -----------
+        verify( entry );
 
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
-
-        return _dropIndex( idxNo );
-    }
-
-    Status IndexCatalog::_dropIndex( int idxNo ) {
-        verify( idxNo < numIndexesTotal() );
-        verify( idxNo >= 0 );
-
         _checkMagic();
+        _checkUnifished();
+
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
         ClientCursor::invalidate( _collection->ns().ns() );
@@ -676,34 +791,26 @@ namespace mongo {
         // wipe out stats
         _collection->infoCache()->reset();
 
-        string indexNamespace = _details->idx( idxNo ).indexNamespace();
-        string indexName = _details->idx( idxNo ).indexName();
+        string indexNamespace = entry->descriptor()->indexNamespace();
+        string indexName = entry->descriptor()->indexName();
 
-        // delete my entries first so we don't have invalid pointers lying around
-        _deleteCacheEntry(idxNo);
+        int idxNo = _details->_catalogFindIndexByName( indexName, true );
+        verify( idxNo >= 0 );
 
         // --------- START REAL WORK ----------
 
         audit::logDropIndex( currentClient.get(), indexName, _collection->ns().ns() );
 
+        _entries.remove( entry->descriptor() );
+        entry = NULL;
+
         try {
             _details->clearSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
 
             // ****   this is the first disk change ****
-
-            // data + system.namespaces
-            Status status = _collection->_database->_dropNS( indexNamespace );
-            if ( !status.isOK() ) {
-                LOG(2) << "IndexDetails::kill(): couldn't drop index " << indexNamespace;
-            }
-
-            // all info in the .ns file
-            _details->_removeIndexFromMe( idxNo );
-
-            // remove from system.indexes
-            int n = _removeFromSystemIndexes( indexName );
-            wassert( n == 1 );
-
+            _deleteIndexFromDisk( indexName,
+                                  indexNamespace,
+                                  idxNo );
         }
         catch ( std::exception& ) {
             // this is bad, and we don't really know state
@@ -712,9 +819,6 @@ namespace mongo {
             log() << "error dropping index: " << indexNamespace
                   << " going to leak some memory to be safe";
 
-            _descriptorCache.clear();
-            _accessMethodCache.clear();
-            _forcedBtreeAccessMethodCache.clear();
 
             _collection->_database->_clearCollectionCache( indexNamespace );
 
@@ -723,41 +827,30 @@ namespace mongo {
 
         _collection->_database->_clearCollectionCache( indexNamespace );
 
-        // now that is really gone can fix arrays
-
         _checkMagic();
-
-        for ( unsigned i = static_cast<unsigned>(idxNo); i < _descriptorCache.capacity(); i++ ) {
-            _deleteCacheEntry(i);
-        }
-
-        _fixDescriptorCacheNumbers();
 
         return Status::OK();
     }
 
-    void IndexCatalog::_deleteCacheEntry( unsigned i ) {
-        delete _descriptorCache[i];
-        _descriptorCache[i] = NULL;
+    void IndexCatalog::_deleteIndexFromDisk( const string& indexName,
+                                             const string& indexNamespace,
+                                             int idxNo ) {
+        verify( idxNo >= 0 );
+        verify( _details->_catalogFindIndexByName( indexName, true ) == idxNo );
 
-        delete _accessMethodCache[i];
-        _accessMethodCache[i] = NULL;
-
-        delete _forcedBtreeAccessMethodCache[i];
-        _forcedBtreeAccessMethodCache[i] = NULL;
-    }
-
-    void IndexCatalog::_fixDescriptorCacheNumbers() {
-
-        for ( unsigned i=0; i < _descriptorCache.capacity(); i++ ) {
-            if ( !_descriptorCache[i] )
-                continue;
-            fassert( 17230, static_cast<int>( i ) < numIndexesTotal() );
-            IndexDetails& id = _details->idx( i );
-            fassert( 17227, _descriptorCache[i]->_indexNumber == static_cast<int>( i ) );
-            fassert( 17228, id.info.obj() == _descriptorCache[i]->_infoObj );
+        // data + system.namespacesa
+        Status status = _collection->_database->_dropNS( indexNamespace );
+        if ( !status.isOK() ) {
+            LOG(2) << "IndexDetails::kill(): couldn't drop extents for "
+                   << indexNamespace;
         }
 
+        // all info in the .ns file
+        _details->_removeIndexFromMe( idxNo );
+
+        // remove from system.indexes
+        int n = _removeFromSystemIndexes( indexName );
+        wassert( n == 1 );
     }
 
     int IndexCatalog::_removeFromSystemIndexes( const StringData& indexName ) {
@@ -765,33 +858,30 @@ namespace mongo {
         b.append( "ns", _collection->ns() );
         b.append( "name", indexName );
         BSONObj cond = b.obj(); // e.g.: { name: "ts_1", ns: "foo.coll" }
-
         return static_cast<int>( deleteObjects( _collection->_database->_indexesName,
-                                                cond, false, false, true ) );
+                                                cond,
+                                                false,
+                                                false,
+                                                true ) );
     }
 
-    BSONObj IndexCatalog::prepOneUnfinishedIndex() {
-        verify( _details->_indexBuildsInProgress > 0 );
+    vector<BSONObj> IndexCatalog::getAndClearUnfinishedIndexes() {
+        vector<BSONObj> toReturn = _leftOverIndexes;
+        _leftOverIndexes.clear();
+        for ( size_t i = 0; i < toReturn.size(); i++ ) {
+            BSONObj spec = toReturn[i];
 
-        // details.info is always a valid system.indexes entry because DataFileMgr::insert journals
-        // creating the index doc and then insert_makeIndex durably assigns its DiskLoc to info.
-        // indexBuildsInProgress is set after that, so if it is set, info must be set.
-        int offset = numIndexesTotal() - 1;
+            IndexDescriptor desc( _collection, spec );
 
-        BSONObj info = _details->idx(offset).info.obj().getOwned();
+            int idxNo = _details->_catalogFindIndexByName( desc.indexName(), true );
+            verify( idxNo >= 0 );
+            verify( idxNo >= numIndexesReady() );
 
-        Status s = _dropIndex( offset );
-
-        massert( 17200,
-                 str::stream() << "failed to to dropIndex in prepOneUnfinishedIndex: " << s.toString(),
-                 s.isOK() );
-
-        return info;
-    }
-
-    void IndexCatalog::markMultikey( const IndexDescriptor* idx, bool isMultikey ) {
-        if ( _details->setIndexIsMultikey( idx->_indexNumber, isMultikey ) )
-            _collection->infoCache()->clearQueryCache();
+            _deleteIndexFromDisk( desc.indexName(),
+                                  desc.indexNamespace(),
+                                  idxNo );
+        }
+        return toReturn;
     }
 
     void IndexCatalog::updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds ) {
@@ -821,6 +911,13 @@ namespace mongo {
         }
     }
 
+    bool IndexCatalog::isMultikey( const IndexDescriptor* idx ) {
+        IndexCatalogEntry* entry = _entries.find( idx );
+        verify( entry );
+        return entry->state()->isMultikey();
+    }
+
+
     // ---------------------------
 
     int IndexCatalog::numIndexesTotal() const {
@@ -835,6 +932,54 @@ namespace mongo {
         return _details->isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex )
             || findIdIndex() != NULL;
     }
+
+    IndexCatalog::IndexIterator::IndexIterator( const IndexCatalog* cat,
+                                                bool includeUnfinishedIndexes )
+        : _includeUnfinishedIndexes( includeUnfinishedIndexes ),
+          _catalog( cat ),
+          _iterator( cat->_entries.begin() ),
+          _start( true ),
+          _prev( NULL ),
+          _next( NULL ) {
+    }
+
+    bool IndexCatalog::IndexIterator::more() {
+        if ( _start ) {
+            _advance();
+            _start = false;
+        }
+        return _next != NULL;
+    }
+
+    IndexDescriptor* IndexCatalog::IndexIterator::next() {
+        if ( !more() )
+            return NULL;
+        _prev = _next;
+        _advance();
+        return _prev->descriptor();
+    }
+
+    IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod( IndexDescriptor* desc ) {
+        verify( desc == _prev->descriptor() );
+        return _prev->accessMethod();
+    }
+
+    void IndexCatalog::IndexIterator::_advance() {
+        _next = NULL;
+
+        while ( _iterator != _catalog->_entries.end() ) {
+            IndexCatalogEntry* entry = *_iterator;
+            ++_iterator;
+
+            if ( _includeUnfinishedIndexes ||
+                 entry->state()->isReady() ) {
+                _next = entry;
+                return;
+            }
+        }
+
+    }
+
 
     IndexDescriptor* IndexCatalog::findIdIndex() const {
         IndexIterator ii = getIndexIterator( false );
@@ -899,35 +1044,19 @@ namespace mongo {
         }
     }
 
-
-    IndexDescriptor* IndexCatalog::_getDescriptor( int idxNo ) const {
-        _checkMagic();
-        verify( idxNo < numIndexesTotal() );
-
-        if ( _descriptorCache[idxNo] )
-            return _descriptorCache[idxNo];
-
-        IndexDetails* id = &_details->idx(idxNo);
-
-        if ( static_cast<unsigned>( idxNo ) >= _descriptorCache.size() )
-            _descriptorCache.resize( idxNo + 1 );
-
-        _descriptorCache[idxNo] = new IndexDescriptor( _collection, idxNo,
-                                                       id->info.obj().getOwned());
-        return _descriptorCache[idxNo];
+    IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) {
+        IndexCatalogEntry* entry = _entries.find( desc );
+        massert( 17334, "cannot find index entry", entry );
+        return entry->accessMethod();
     }
 
     IndexAccessMethod* IndexCatalog::getBtreeIndex( const IndexDescriptor* desc ) {
-        _checkMagic();
-        int idxNo = desc->getIndexNumber();
-
-        if ( _forcedBtreeAccessMethodCache[idxNo] ) {
-            return _forcedBtreeAccessMethodCache[idxNo];
+        IndexCatalogEntry* entry = _entries.find( desc );
+        massert( 17335, "cannot find index entry", entry );
+        if ( !entry->forcedBtreeIndex() ) {
+            entry->setForcedBtreeIndex( new BtreeAccessMethod( entry->state() ) );
         }
-
-        BtreeAccessMethod* newlyCreated = new BtreeAccessMethod( createInMemory( desc ) );
-        _forcedBtreeAccessMethodCache[idxNo] = newlyCreated;
-        return newlyCreated;
+        return entry->forcedBtreeIndex();
     }
 
     BtreeBasedAccessMethod* IndexCatalog::getBtreeBasedIndex( const IndexDescriptor* desc ) {
@@ -950,108 +1079,66 @@ namespace mongo {
     }
 
 
-    IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) {
-        _checkMagic();
-        int idxNo = desc->getIndexNumber();
-
-        if ( _accessMethodCache[idxNo] ) {
-            return _accessMethodCache[idxNo];
-        }
-
-        auto_ptr<BtreeInMemoryState> state( createInMemory( desc ) );
-
-        IndexAccessMethod* newlyCreated = 0;
-
+    IndexAccessMethod* IndexCatalog::_createAccessMethod( const IndexDescriptor* desc,
+                                                          BtreeInMemoryState* state ) {
         string type = _getAccessMethodName(desc->keyPattern());
 
-        if (IndexNames::HASHED == type) {
-            newlyCreated = new HashAccessMethod( state.release() );
-        }
-        else if (IndexNames::GEO_2DSPHERE == type) {
-            newlyCreated = new S2AccessMethod( state.release() );
-        }
-        else if (IndexNames::TEXT == type) {
-            newlyCreated = new FTSAccessMethod( state.release() );
-        }
-        else if (IndexNames::GEO_HAYSTACK == type) {
-            newlyCreated =  new HaystackAccessMethod( state.release() );
-        }
-        else if ("" == type) {
-            newlyCreated =  new BtreeAccessMethod( state.release() );
-        }
-        else if (IndexNames::GEO_2D == type) {
-            newlyCreated = new TwoDAccessMethod( state.release() );
-        }
-        else {
-            log() << "Can't find index for keypattern " << desc->keyPattern();
-            verify(0);
-            return NULL;
-        }
+        if (IndexNames::HASHED == type)
+            return new HashAccessMethod( state );
 
-        _accessMethodCache[idxNo] = newlyCreated;
+        if (IndexNames::GEO_2DSPHERE == type)
+            return new S2AccessMethod( state );
 
-        return newlyCreated;
-    }
+        if (IndexNames::TEXT == type)
+            return new FTSAccessMethod( state );
 
-    BtreeInMemoryState* IndexCatalog::createInMemory( const IndexDescriptor* descriptor ) {
-        int idxNo = _details->findIndexByName( descriptor->indexName(), true );
-        verify( idxNo >= 0 );
+        if (IndexNames::GEO_HAYSTACK == type)
+            return new HaystackAccessMethod( state );
 
-        Database* db =  _collection->_database;
-        NamespaceDetails* nsd = db->namespaceIndex().details( descriptor->indexNamespace() );
-        if ( !nsd ) {
-            // have to create!
-            db->namespaceIndex().add_ns( descriptor->indexNamespace(), DiskLoc(), false );
-            nsd = db->namespaceIndex().details( descriptor->indexNamespace() );
-            db->_addNamespaceToCatalog( descriptor->indexNamespace(), NULL );
-            verify(nsd);
-        }
+        if ("" == type)
+            return new BtreeAccessMethod( state );
 
-        RecordStore* rs = new RecordStore( descriptor->indexNamespace() );
-        rs->init( nsd, _collection->getExtentManager(), false );
+        if (IndexNames::GEO_2D == type)
+            return new TwoDAccessMethod( state );
 
-        return new BtreeInMemoryState( _collection,
-                                       descriptor,
-                                       rs,
-                                       &_details->idx( idxNo ) );
+        log() << "Can't find index for keypattern " << desc->keyPattern();
+        verify(0);
+        return NULL;
     }
 
     IndexDetails* IndexCatalog::_getIndexDetails( const IndexDescriptor* descriptor ) const {
-        verify( descriptor->getIndexNumber() >= 0 );
-        IndexDetails* id = &_details->idx( descriptor->getIndexNumber() );
-        DEV verify( id->indexName() == descriptor->indexName() );
-        return id;
+        int idxNo = _details->_catalogFindIndexByName( descriptor->indexName(), true );
+        verify( idxNo >= 0 );
+        return &_details->idx( idxNo );
     }
 
     // ---------------------------
 
-    Status IndexCatalog::_indexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc ) {
-        IndexDescriptor* desc = _getDescriptor( idxNo );
-        verify(desc);
-        IndexAccessMethod* iam = getIndex( desc );
-        verify(iam);
-
+    Status IndexCatalog::_indexRecord( IndexCatalogEntry* index,
+                                       const BSONObj& obj,
+                                       const DiskLoc &loc ) {
         InsertDeleteOptions options;
         options.logIfError = false;
-        options.dupsAllowed =
-            ignoreUniqueIndex( desc ) ||
-            ( !KeyPattern::isIdKeyPattern(desc->keyPattern()) && !desc->unique() );
+
+        bool isUnique =
+            KeyPattern::isIdKeyPattern(index->descriptor()->keyPattern()) ||
+            index->descriptor()->unique();
+
+        options.dupsAllowed = ignoreUniqueIndex( index->descriptor() ) || !isUnique;
 
         int64_t inserted;
-        return iam->insert(obj, loc, options, &inserted);
+        return index->accessMethod()->insert(obj, loc, options, &inserted);
     }
 
-    Status IndexCatalog::_unindexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc, bool logIfError ) {
-        IndexDescriptor* desc = _getDescriptor( idxNo );
-        verify( desc );
-        IndexAccessMethod* iam = getIndex( desc );
-        verify( iam );
-
+    Status IndexCatalog::_unindexRecord( IndexCatalogEntry* index,
+                                         const BSONObj& obj,
+                                         const DiskLoc &loc,
+                                         bool logIfError ) {
         InsertDeleteOptions options;
         options.logIfError = logIfError;
 
         int64_t removed;
-        Status status = iam->remove(obj, loc, options, &removed);
+        Status status = index->accessMethod()->remove(obj, loc, options, &removed);
 
         if ( !status.isOK() ) {
             problem() << "Couldn't unindex record " << obj.toString()
@@ -1064,22 +1151,35 @@ namespace mongo {
 
     void IndexCatalog::indexRecord( const BSONObj& obj, const DiskLoc &loc ) {
 
-        for ( int i = 0; i < numIndexesTotal(); i++ ) {
+        for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
+              i != _entries.end();
+              ++i ) {
+
+            IndexCatalogEntry* entry = *i;
+
             try {
-                Status s = _indexRecord( i, obj, loc );
+                Status s = _indexRecord( entry, obj, loc );
                 uassert(s.location(), s.reason(), s.isOK() );
             }
             catch ( AssertionException& ae ) {
 
                 LOG(2) << "IndexCatalog::indexRecord failed: " << ae;
 
-                for ( int j = 0; j <= i; j++ ) {
+                for ( IndexCatalogEntryContainer::const_iterator j = _entries.begin();
+                      j != _entries.end();
+                      ++j ) {
+
+                    IndexCatalogEntry* toDelete = *j;
+
                     try {
-                        _unindexRecord( j, obj, loc, false );
+                        _unindexRecord( toDelete, obj, loc, false );
                     }
                     catch ( DBException& e ) {
                         LOG(1) << "IndexCatalog::indexRecord rollback failed: " << e;
                     }
+
+                    if ( toDelete == entry )
+                        break;
                 }
 
                 throw;
@@ -1089,12 +1189,15 @@ namespace mongo {
     }
 
     void IndexCatalog::unindexRecord( const BSONObj& obj, const DiskLoc& loc, bool noWarn ) {
-        int numIndices = numIndexesTotal();
+        for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
+              i != _entries.end();
+              ++i ) {
 
-        for (int i = 0; i < numIndices; i++) {
-            // If i >= d->nIndexes, it's a background index, and we DO NOT want to log anything.
-            bool logIfError = ( i < numIndexesTotal() ) ? !noWarn : false;
-            _unindexRecord( i, obj, loc, logIfError );
+            IndexCatalogEntry* entry = *i;
+
+            // If it's a background index, we DO NOT want to log anything.
+            bool logIfError = entry->state()->isReady() ? !noWarn : false;
+            _unindexRecord( entry, obj, loc, logIfError );
         }
 
     }

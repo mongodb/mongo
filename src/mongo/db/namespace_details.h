@@ -42,6 +42,7 @@
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
+    class BtreeInMemoryState;
     class Database;
     class IndexCatalog;
 
@@ -335,9 +336,6 @@ namespace mongo {
             }
         }
 
-        // @return offset in indexes[]
-        int findIndexByName(const StringData& name, bool includeBackgroundInProgress = false);
-
         const int systemFlags() const { return _systemFlags; }
         bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
         void setSystemFlag( int flag );
@@ -405,6 +403,10 @@ namespace mongo {
         NamespaceDetails *writingWithExtra();
 
     private:
+        // @return offset in indexes[]
+        int _catalogFindIndexByName( const StringData& name,
+                                     bool includeBackgroundInProgress = false);
+
         void _removeIndexFromMe( int idx );
 
         /**
@@ -419,8 +421,10 @@ namespace mongo {
         DiskLoc __stdAlloc(int len, bool willBeAt);
         void compact(); // combine adjacent deleted records
 
+        friend class Database;
         friend class NamespaceIndex;
         friend class IndexCatalog;
+        friend class BtreeInMemoryState;
 
         struct ExtraOld {
             // note we could use this field for more chaining later, so don't waste it:

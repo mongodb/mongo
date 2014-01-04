@@ -912,7 +912,7 @@ namespace mongo {
                 min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
 
-                runner.reset(InternalPlanner::indexScan(idx, min, max, false));
+                runner.reset(InternalPlanner::indexScan(collection, idx, min, max, false));
             }
 
             long long avgObjSize = collection->details()->dataSize() / collection->numRecords();

@@ -38,6 +38,7 @@
 namespace mongo {
 
     class Collection;
+    class IndexCatalog;
     class IndexDetails;
     class IndexDescriptor;
     class RecordStore;
@@ -55,8 +56,7 @@ namespace mongo {
     public:
         BtreeInMemoryState( Collection* collection,
                             const IndexDescriptor* descriptor,
-                            RecordStore* recordStore,
-                            IndexDetails* details );
+                            RecordStore* recordStore );
 
         const Collection* collection() const { return _collection; }
 
@@ -72,8 +72,12 @@ namespace mongo {
 
         void setHead( DiskLoc newHead );
 
+        bool isMultikey() const;
+
         void setMultikey();
 
+        // if this ready is ready for queries
+        bool isReady() const;
         // ------------
 
 
@@ -84,6 +88,17 @@ namespace mongo {
         const BtreeBucket<V>* getBucket( const DiskLoc& loc ) const;
 
     private:
+
+        int _indexNo() const;
+
+        void setIsReady( bool isReady );
+
+        void _debugCheckVerifyReady() const;
+
+        DiskLoc _catalogFindHeadFromDisk() const;
+
+        // ---------
+
         // the collection this index is over, not storage for the index
         Collection* _collection; // not-owned here
 
@@ -92,10 +107,16 @@ namespace mongo {
         // the record store for this index (where its buckets go)
         scoped_ptr<RecordStore> _recordStore; // OWNED HERE
 
-        IndexDetails* _indexDetails; // TODO: remove
-
         Ordering _ordering;
 
+        bool _isReady; // cache of NamespaceDetails
+
+        mutable DiskLoc _head; // cache of IndexDetails or Null
+
+        mutable bool _isMultikeySet;
+        mutable bool _isMultikey;  // cache of NamespaceDetails
+
+        friend class IndexCatalog;
     };
 
 }

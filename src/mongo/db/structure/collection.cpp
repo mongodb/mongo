@@ -61,6 +61,7 @@ namespace mongo {
                            &database->getExtentManager(),
                            _ns.coll() == "system.indexes" );
         _magic = 1357924;
+        _indexCatalog.init();
     }
 
     Collection::~Collection() {
@@ -102,6 +103,21 @@ namespace mongo {
         if ( _details->isCapped() )
             return new CappedIterator( this, start, tailable, dir );
         return new FlatIterator( this, start, dir );
+    }
+
+    int64_t Collection::countTableScan( const MatchExpression* expression ) {
+        scoped_ptr<CollectionIterator> iterator( getIterator( DiskLoc(),
+                                                              false,
+                                                              CollectionScanParams::FORWARD ) );
+        int64_t count = 0;
+        while ( !iterator->isEOF() ) {
+            DiskLoc loc = iterator->getNext();
+            BSONObj obj = docFor( loc );
+            if ( expression->matchesBSON( obj ) )
+                count++;
+        }
+
+        return count;
     }
 
     BSONObj Collection::docFor( const DiskLoc& loc ) {

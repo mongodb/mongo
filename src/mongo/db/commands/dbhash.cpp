@@ -88,7 +88,8 @@ namespace mongo {
 
         auto_ptr<Runner> runner;
         if ( desc ) {
-            runner.reset(InternalPlanner::indexScan(desc,
+            runner.reset(InternalPlanner::indexScan(collection,
+                                                    desc,
                                                     BSONObj(),
                                                     BSONObj(),
                                                     false,

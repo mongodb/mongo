@@ -34,6 +34,7 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/catalog/index_catalog_internal.h"
 
 namespace mongo {
 
@@ -55,6 +56,9 @@ namespace mongo {
     public:
         IndexCatalog( Collection* collection, NamespaceDetails* details );
         ~IndexCatalog();
+
+        // must be called before used
+        Status init();
 
         bool ok() const;
 
@@ -103,20 +107,25 @@ namespace mongo {
 
         class IndexIterator {
         public:
-            bool more() const { return _i < _n; }
-            IndexDescriptor* next() { return _catalog->_getDescriptor( _i++ ); }
+            bool more();
+            IndexDescriptor* next();
+
+            // returns the access method for the last return IndexDescriptor
+            IndexAccessMethod* accessMethod( IndexDescriptor* desc );
         private:
-            IndexIterator( const IndexCatalog* cat, bool includeUnfinishedIndexes ) {
-                _catalog = cat;
-                if ( includeUnfinishedIndexes )
-                    _n = _catalog->numIndexesTotal();
-                else
-                    _n = _catalog->numIndexesReady();
-                _i = 0;
-            }
-            int _i;
-            int _n;
+            IndexIterator( const IndexCatalog* cat, bool includeUnfinishedIndexes );
+
+            void _advance();
+
+            bool _includeUnfinishedIndexes;
             const IndexCatalog* _catalog;
+            IndexCatalogEntryContainer::const_iterator _iterator;
+
+            bool _start;
+
+            IndexCatalogEntry* _prev;
+            IndexCatalogEntry* _next;
+
             friend class IndexCatalog;
         };
 
@@ -135,14 +144,12 @@ namespace mongo {
         Status dropAllIndexes( bool includingIdIndex );
 
         Status dropIndex( IndexDescriptor* desc );
-        Status dropIndex( int idxNo );
 
         /**
-         * will drop an uncompleted index and return spec
-         * after this, the index can be rebuilt
-         * @return the info for a single index to retry
+         * will drop all uncompleted indexes and return specs
+         * after this, the indexes can be rebuilt
          */
-        BSONObj prepOneUnfinishedIndex();
+        vector<BSONObj> getAndClearUnfinishedIndexes();
 
         // ---- modify single index
 
@@ -152,16 +159,17 @@ namespace mongo {
          */
         void updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds );
 
-        void markMultikey( const IndexDescriptor* idx, bool isMultikey = true );
+        bool isMultikey( const IndexDescriptor* idex );
 
         // --- these probably become private?
 
         class IndexBuildBlock {
         public:
-            IndexBuildBlock( IndexCatalog* catalog, const StringData& indexName, const DiskLoc& loc );
+            IndexBuildBlock( IndexCatalog* catalog,
+                             const StringData& indexName,
+                             const StringData& indexNamespace,
+                             const DiskLoc& locInSystemIndexes );
             ~IndexBuildBlock();
-
-            IndexDetails* indexDetails() { return _indexDetails; }
 
             void success();
 
@@ -169,9 +177,11 @@ namespace mongo {
             IndexCatalog* _catalog;
             string _ns;
             string _indexName;
+            string _indexNamespace;
 
             NamespaceDetails* _nsd; // for the collection, not index
-            IndexDetails* _indexDetails;
+
+            bool _inProgress;
         };
 
         // ----- data modifiers ------
@@ -203,10 +213,9 @@ namespace mongo {
 
     private:
 
-        BtreeInMemoryState* createInMemory( const IndexDescriptor* descriptor );
-
-        void _deleteCacheEntry( unsigned i );
-        void _fixDescriptorCacheNumbers();
+        // creates a new thing, no caching
+        IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
+                                                BtreeInMemoryState* state );
 
         Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 
@@ -221,33 +230,36 @@ namespace mongo {
          */
         string _getAccessMethodName(const BSONObj& keyPattern);
 
-        // throws
-        // never returns NULL
-        IndexDescriptor* _getDescriptor( int idxNo ) const;
-
         IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 
         void _checkMagic() const;
+        void _checkUnifished() const;
 
-        Status _indexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc );
-        Status _unindexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc, bool logIfError );
+        Status _indexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc );
+        Status _unindexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc,
+                               bool logIfError );
 
         /**
          * this does no sanity checks
          */
-        Status _dropIndex( int idxNo );
+        Status _dropIndex( IndexCatalogEntry* entry );
+
+        // just does diskc hanges
+        // doesn't change memory state, etc...
+        void _deleteIndexFromDisk( const string& indexName,
+                                   const string& indexNamespace,
+                                   int idxNo );
 
         int _magic;
         Collection* _collection;
         NamespaceDetails* _details;
 
-        // these are caches, not source of truth
-        // they should be treated as such
-        mutable std::vector<IndexDescriptor*> _descriptorCache; // XXX-ERH mutable here is temp
-        std::vector<IndexAccessMethod*> _accessMethodCache;
-        std::vector<BtreeAccessMethod*> _forcedBtreeAccessMethodCache;
+        IndexCatalogEntryContainer _entries;
+
+        std::vector<BSONObj> _leftOverIndexes;
 
         static const BSONObj _idObj; // { _id : 1 }
+
     };
 
 }

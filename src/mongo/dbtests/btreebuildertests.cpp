@@ -42,6 +42,8 @@ namespace BtreeBuilderTests {
     static const char* const _ns = "unittests.btreebuilder";
     DBDirectClient _client;
 
+    // QUERY_MIGRATION
+#if 0
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to
      * partially construct a new IndexDetails in a manner that supports proper cleanup in
@@ -85,6 +87,7 @@ namespace BtreeBuilderTests {
     private:
         Client::WriteContext _ctx;
     };
+#endif
 
     // QUERY_MIGRATION
 #if 0

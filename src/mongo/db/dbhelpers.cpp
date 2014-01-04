@@ -354,7 +354,7 @@ namespace mongo {
                 IndexDescriptor* desc =
                     collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
 
-                auto_ptr<Runner> runner(InternalPlanner::indexScan(desc, min, max,
+                auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, desc, min, max,
                                                                    maxInclusive,
                                                                    InternalPlanner::FORWARD,
                                                                    InternalPlanner::IXSCAN_FETCH));
@@ -492,7 +492,7 @@ namespace mongo {
         bool isLargeChunk = false;
         long long docCount = 0;
 
-        auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max, false));
+        auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
         runner->setYieldPolicy(Runner::YIELD_AUTO);

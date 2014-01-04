@@ -86,13 +86,14 @@ namespace mongo {
         /**
          * Return an index scan.  Caller owns returned pointer.
          */
-        static Runner* indexScan(const IndexDescriptor* descriptor,
+        static Runner* indexScan(const Collection* collection,
+                                 const IndexDescriptor* descriptor,
                                  const BSONObj& startKey, const BSONObj& endKey,
                                  bool endKeyInclusive, Direction direction = FORWARD,
                                  int options = 0) {
             verify(descriptor);
 
-            const NamespaceString& ns = descriptor->getIndexedCollection()->ns();
+            const NamespaceString& ns = collection->ns();
 
             IndexScanParams params;
             params.descriptor = descriptor;
