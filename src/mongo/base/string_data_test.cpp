@@ -146,13 +146,13 @@ namespace {
         ASSERT_EQUALS(StringData::Hasher()(""),
             static_cast<size_t>(0));
         ASSERT_EQUALS(StringData::Hasher()("foo"),
-            static_cast<size_t>(4138058784U));
+            static_cast<size_t>(4138058784ULL));
         ASSERT_EQUALS(StringData::Hasher()("pizza"),
-            static_cast<size_t>(3587803311U));
+            static_cast<size_t>(3587803311ULL));
         ASSERT_EQUALS(StringData::Hasher()("mongo"),
-            static_cast<size_t>(3724335885U));
+            static_cast<size_t>(3724335885ULL));
         ASSERT_EQUALS(StringData::Hasher()("murmur"),
-            static_cast<size_t>(1945310157U));
+            static_cast<size_t>(1945310157ULL));
     }
 
     template <>
@@ -160,13 +160,13 @@ namespace {
         ASSERT_EQUALS(StringData::Hasher()(""),
             static_cast<size_t>(0));
         ASSERT_EQUALS(StringData::Hasher()("foo"),
-            static_cast<size_t>(16316970633193145697UL));
+            static_cast<size_t>(16316970633193145697ULL));
         ASSERT_EQUALS(StringData::Hasher()("pizza"),
-            static_cast<size_t>(12165495155477134356UL));
+            static_cast<size_t>(12165495155477134356ULL));
         ASSERT_EQUALS(StringData::Hasher()("mongo"),
-            static_cast<size_t>(2861051452199491487UL));
+            static_cast<size_t>(2861051452199491487ULL));
         ASSERT_EQUALS(StringData::Hasher()("murmur"),
-            static_cast<size_t>(18237957392784716687UL));
+            static_cast<size_t>(18237957392784716687ULL));
     }
 
     TEST(Hasher, Str1) {
