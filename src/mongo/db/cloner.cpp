@@ -775,7 +775,9 @@ namespace mongo {
                 }
                 cloner.setConnection( authConn_.release() );
             }
-            else {
+            else if (!fromSelf) {
+                // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
+
                 DBClientConnection* conn = new DBClientConnection();
                 cloner.setConnection(conn);
                 if (!conn->connect(fromhost, errmsg)) {

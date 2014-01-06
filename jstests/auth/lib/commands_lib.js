@@ -619,6 +619,23 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "copydb",
+            command: {copydb: 1, fromdb: firstDbName, todb: secondDbName},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                    privileges: [
+                        { resource: {db: firstDbName, collection: ""}, actions:["find"] },
+                        { resource: {db: firstDbName, collection: "system.js"}, actions:["find"] },
+                        { resource: {db: secondDbName, collection: ""},
+                          actions:["insert", "createIndex"] },
+                        { resource: {db: secondDbName, collection: "system.js"}, actions:["insert"] },
+                    ]
+                },
+            ]
+        },
+        {
             testname: "count",
             command: {count: "x"},
             testcases: [

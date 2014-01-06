@@ -125,7 +125,7 @@ function runOneTest(conn, t) {
 
         // test resource pattern where collection is ""
         testcase.privileges.forEach(function(j) {
-            if (j.resource.collection) {
+            if (j.resource.collection && !j.resource.collection.startsWith('system.')) {
                 j.resource.collection = "";
             }
         });
