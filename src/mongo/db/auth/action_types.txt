@@ -16,7 +16,6 @@
 "changePassword",
 "changeOwnPassword",
 "changeOwnCustomData",
-"clean",
 "cleanupOrphaned",
 "closeAllDatabases",
 "collMod",

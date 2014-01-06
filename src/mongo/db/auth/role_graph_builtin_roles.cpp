@@ -78,9 +78,6 @@ namespace {
     // and that the "dbAdminAnyDatabase" role may perform on normal resources of any database.
     ActionSet dbAdminRoleActions;
 
-    /// Actions that the "dbOwner" role may perform on normal resources of a specific database.
-    ActionSet dbOwnerRoleActions;
-
     /// Actions that the "clusterMonitor" role may perform on the cluster resource.
     ActionSet clusterMonitorRoleClusterActions;
 
@@ -150,7 +147,6 @@ namespace {
 
         // DB admin role
         dbAdminRoleActions
-            << ActionType::clean
             << ActionType::collMod
             << ActionType::collStats // clusterMonitor gets this also
             << ActionType::compact
@@ -239,11 +235,6 @@ namespace {
             << ActionType::enableSharding
             << ActionType::splitVector;
 
-        // Database-owner role database actions.
-        dbOwnerRoleActions += readWriteRoleActions;
-        dbOwnerRoleActions += dbAdminRoleActions;
-        dbOwnerRoleActions += userAdminRoleActions;
-
         return Status::OK();
     }
 
@@ -306,13 +297,9 @@ namespace {
     }
 
     void addDbOwnerPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
-
         addReadWriteDbPrivileges(privileges, dbName);
         addDbAdminDbPrivileges(privileges, dbName);
         addUserAdminDbPrivileges(privileges, dbName);
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forDatabaseName(dbName), dbOwnerRoleActions));
     }
 
 
@@ -589,9 +576,6 @@ namespace {
         addUserAdminAnyDbPrivileges(privileges);
         addDbAdminAnyDbPrivileges(privileges);
         addReadWriteAnyDbPrivileges(privileges);
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forAnyNormalResource(), dbOwnerRoleActions));
     }
 
     void addInternalRolePrivileges(PrivilegeVector* privileges) {
