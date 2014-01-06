@@ -37,8 +37,7 @@ doTest = function( index ) {
     checkArrs( [ { _id:6, x:1, a:2, b:1 } ], an1bn2 );
     checkArrs( t.find( { x:1, a:{$ne:1}, b:{$ne:2} } ).toArray(), an1bn2 );
     if ( index ) {
-        // QUERY_MIGRATION
-        //assert( t.find( { x:1, $nor: [ { a : 1 }, { b : 2 } ] } ).explain().cursor.match( /Btree/ ) );
+        assert( t.find( { x:1, $nor: [ { a : 1 }, { b : 2 } ] } ).explain().cursor.match( /Btree/ ) );
     }
     
     an1b2 = t.find( { $nor: [ { a : 1 } ], $or: [ { b : 2 } ] } ).toArray();
