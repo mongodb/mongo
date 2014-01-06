@@ -284,16 +284,20 @@ namespace mongo {
                     }
 
                     const uint64_t elemStartPos = buffer->position();
-                    Status status = validateElementInfo(buffer, &state, idElem);
+                    ValidationState::State nextState = state;
+                    Status status = validateElementInfo(buffer, &nextState, idElem);
                     if (!status.isOK())
                         return status;
 
-                    if (idElem.eoo() && atTopLevel) {
-                        // we've already validated that fieldname is safe to access.
+                    // we've already validated that fieldname is safe to access as long as we aren't
+                    // at the end of the object, since EOO doesn't have a fieldname.
+                    if (nextState != ValidationState::EndObj && idElem.eoo() && atTopLevel) {
                         if (strcmp(buffer->getBasePtr() + elemStartPos + 1/*type*/, "_id") == 0) {
                             idElemStartPos = elemStartPos;
                         }
                     }
+
+                    state = nextState;
                     break;
                 }
                 case ValidationState::EndObj: {
