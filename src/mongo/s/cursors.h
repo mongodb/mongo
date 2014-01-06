@@ -44,7 +44,7 @@ namespace mongo {
 
     class ShardedClientCursor : boost::noncopyable {
     public:
-        ShardedClientCursor( QueryMessage& q , ClusteredCursor * cursor );
+        ShardedClientCursor( QueryMessage& q , ParallelSortClusteredCursor * cursor );
         virtual ~ShardedClientCursor();
 
         long long getId();
@@ -86,7 +86,7 @@ namespace mongo {
 
     protected:
 
-        ClusteredCursor * _cursor;
+        ParallelSortClusteredCursor * _cursor;
 
         int _skip;
         int _ntoreturn;

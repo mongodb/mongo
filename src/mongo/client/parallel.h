@@ -66,180 +66,8 @@ namespace mongo {
         BSONObj _orderObject;
     };
 
-    /**
-     * this is a cursor that works over a set of servers
-     * can be used in serial/parallel as controlled by sub classes
-     */
-    class MONGO_CLIENT_API ClusteredCursor {
-    public:
-        ClusteredCursor( const QuerySpec& q );
-        ClusteredCursor( QueryMessage& q );
-        ClusteredCursor( const string& ns , const BSONObj& q , int options=0 , const BSONObj& fields=BSONObj() );
-        virtual ~ClusteredCursor();
-
-        /** call before using */
-        void init();
-
-        virtual std::string getNS() { return _ns; }
-
-        virtual bool more() = 0;
-        virtual BSONObj next() = 0;
-
-        static BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
-
-        virtual string type() const = 0;
-
-        virtual void explain(BSONObjBuilder& b) = 0;
-
-    protected:
-
-        virtual void _init() = 0;
-
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() , int skipLeft = 0 , bool lazy=false );
-        BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
-
-        /**
-         * checks the cursor for any errors
-         * will throw an exceptionif an error is encountered
-         */
-        void _checkCursor( DBClientCursor * cursor );
-
-        static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
-
-        virtual void _explain( map< string,list<BSONObj> >& out ) = 0;
-
-        string _ns;
-        BSONObj _query;
-        BSONObj _hint;
-        BSONObj _sort;
-
-        int _options;
-        BSONObj _fields;
-        int _batchSize;
-
-        bool _didInit;
-
-        bool _done;
-    };
-
     class ParallelConnectionMetadata;
-
-    // TODO:  We probably don't really need this as a separate class.
-    class MONGO_CLIENT_API FilteringClientCursor {
-    public:
-        FilteringClientCursor( const BSONObj filter = BSONObj() );
-        FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter = BSONObj() );
-        FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter = BSONObj() );
-        ~FilteringClientCursor();
-
-        void reset( auto_ptr<DBClientCursor> cursor );
-        void reset( DBClientCursor* cursor, ParallelConnectionMetadata* _pcmData = NULL );
-
-        bool more();
-        BSONObj next();
-
-        BSONObj peek();
-
-        DBClientCursor* raw() { return _cursor.get(); }
-        ParallelConnectionMetadata* rawMData(){ return _pcmData; }
-
-        // Required for new PCursor
-        void release(){
-            _cursor.release();
-            _pcmData = NULL;
-        }
-
-    private:
-        void _advance();
-
-        Matcher _matcher;
-        auto_ptr<DBClientCursor> _cursor;
-        ParallelConnectionMetadata* _pcmData;
-
-        BSONObj _next;
-        bool _done;
-    };
-
-
-    class MONGO_CLIENT_API Servers {
-    public:
-        Servers() {
-        }
-
-        void add( const ServerAndQuery& s ) {
-            add( s._server , s._extra );
-        }
-
-        void add( const string& server , const BSONObj& filter ) {
-            vector<BSONObj>& mine = _filters[server];
-            mine.push_back( filter.getOwned() );
-        }
-
-        // TOOO: pick a less horrible name
-        class View {
-            View( const Servers* s ) {
-                for ( map<string, vector<BSONObj> >::const_iterator i=s->_filters.begin(); i!=s->_filters.end(); ++i ) {
-                    _servers.push_back( i->first );
-                    _filters.push_back( i->second );
-                }
-            }
-        public:
-            int size() const {
-                return _servers.size();
-            }
-
-            string getServer( int n ) const {
-                return _servers[n];
-            }
-
-            vector<BSONObj> getFilter( int n ) const {
-                return _filters[ n ];
-            }
-
-        private:
-            vector<string> _servers;
-            vector< vector<BSONObj> > _filters;
-
-            friend class Servers;
-        };
-
-        View view() const {
-            return View( this );
-        }
-
-
-    private:
-        map<string, vector<BSONObj> > _filters;
-
-        friend class View;
-    };
-
-
-    /**
-     * runs a query in serial across any number of servers
-     * returns all results from 1 server, then the next, etc...
-     */
-    class MONGO_CLIENT_API SerialServerClusteredCursor : public ClusteredCursor {
-    public:
-        SerialServerClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , int sortOrder=0);
-        virtual bool more();
-        virtual BSONObj next();
-        virtual string type() const { return "SerialServer"; }
-
-    protected:
-        virtual void _explain( map< string,list<BSONObj> >& out );
-
-        void _init() {}
-
-        vector<ServerAndQuery> _servers;
-        unsigned _serverIndex;
-
-        FilteringClientCursor _current;
-
-        int _needToSkip;
-    };
-
-
+    class FilteringClientCursor;
 
     class MONGO_CLIENT_API CommandInfo {
     public:
@@ -323,27 +151,36 @@ namespace mongo {
     typedef shared_ptr<PCMData> PCMDataPtr;
 
     /**
-     * Runs a query in parallel across N servers.  New logic has several modes -
-     * 1) Standard query, enforces compatible chunk versions for queries across all results
-     * 2) Standard query, sent to particular servers with no compatible chunk version enforced, but handling
-     *    stale configuration exceptions
-     * 3) Command query, either enforcing compatible chunk versions or sent to particular shards.
+     * Runs a query in parallel across N servers, enforcing compatible chunk versions for queries
+     * across all shards.
+     *
+     * If CommandInfo is provided, the ParallelCursor does not use the direct .$cmd namespace in the
+     * query spec, but instead enforces versions across another namespace specified by CommandInfo.
+     * This is to support commands like:
+     * db.runCommand({ fileMD5 : "<coll name>" })
+     *
+     * There is a deprecated legacy mode as well which effectively does a merge-sort across a number
+     * of servers, but does not correctly enforce versioning (used only in mapreduce).
      */
-    class MONGO_CLIENT_API ParallelSortClusteredCursor : public ClusteredCursor {
+    class MONGO_CLIENT_API ParallelSortClusteredCursor {
     public:
 
         ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );
-        ParallelSortClusteredCursor( const set<Shard>& servers, const QuerySpec& qSpec );
 
-        // LEGACY Constructors
-        ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , const BSONObj& sortKey );
+        // DEPRECATED legacy constructor for pure mergesort functionality - do not use
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns ,
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
 
-        virtual ~ParallelSortClusteredCursor();
-        virtual bool more();
-        virtual BSONObj next();
-        virtual string type() const { return "ParallelSort"; }
+        ~ParallelSortClusteredCursor();
+
+        std::string getNS();
+
+        /** call before using */
+        void init();
+
+        bool more();
+        BSONObj next();
+        string type() const { return "ParallelSort"; }
 
         void fullInit();
         void startInit();
@@ -362,17 +199,18 @@ namespace mongo {
         BSONObj toBSON() const;
         string toString() const;
 
-        virtual void explain(BSONObjBuilder& b);
+        void explain(BSONObjBuilder& b);
 
-    protected:
+    private:
         void _finishCons();
-        void _init();
-        void _oldInit();
 
-        virtual void _explain( map< string,list<BSONObj> >& out );
+        void _explain( map< string,list<BSONObj> >& out );
 
         void _markStaleNS( const NamespaceString& staleNS, const StaleConfigException& e, bool& forceReload, bool& fullReload );
         void _handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload );
+
+        bool _didInit;
+        bool _done;
 
         set<Shard> _qShards;
         QuerySpec _qSpec;
@@ -393,7 +231,6 @@ namespace mongo {
         FilteringClientCursor * _cursors;
         int _needToSkip;
 
-    private:
         /**
          * Setups the shard version of the connection. When using a replica
          * set connection and the primary cannot be reached, the version
@@ -405,9 +242,59 @@ namespace mongo {
                            const NamespaceString& ns,
                            const std::string& vinfo,
                            ChunkManagerPtr manager /* in */ );
+
+        // LEGACY init - Needed for map reduce
+        void _oldInit();
+
+        // LEGACY - Needed ONLY for _oldInit
+        string _ns;
+        BSONObj _query;
+        int _options;
+        BSONObj _fields;
+        int _batchSize;
+    };
+
+
+    // TODO:  We probably don't really need this as a separate class.
+    class MONGO_CLIENT_API FilteringClientCursor {
+    public:
+        FilteringClientCursor( const BSONObj filter = BSONObj() );
+        FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter = BSONObj() );
+        FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter = BSONObj() );
+        ~FilteringClientCursor();
+
+        void reset( auto_ptr<DBClientCursor> cursor );
+        void reset( DBClientCursor* cursor, ParallelConnectionMetadata* _pcmData = NULL );
+
+        bool more();
+        BSONObj next();
+
+        BSONObj peek();
+
+        DBClientCursor* raw() { return _cursor.get(); }
+        ParallelConnectionMetadata* rawMData(){ return _pcmData; }
+
+        // Required for new PCursor
+        void release(){
+            _cursor.release();
+            _pcmData = NULL;
+        }
+
+    private:
+        void _advance();
+
+        Matcher _matcher;
+        auto_ptr<DBClientCursor> _cursor;
+        ParallelConnectionMetadata* _pcmData;
+
+        BSONObj _next;
+        bool _done;
     };
 
     /**
+     * Generally clients should be using Strategy::commandOp() wherever possible - the Future API
+     * does not handle versioning.
+     *
      * tools for doing asynchronous operations
      * right now uses underlying sync network ops and uses another thread
      * should be changed to use non-blocking io

@@ -53,7 +53,8 @@ namespace mongo {
 
     // --------  ShardedCursor -----------
 
-    ShardedClientCursor::ShardedClientCursor( QueryMessage& q , ClusteredCursor * cursor ) {
+    ShardedClientCursor::ShardedClientCursor( QueryMessage& q,
+                                              ParallelSortClusteredCursor * cursor ) {
         verify( cursor );
         _cursor = cursor;
 
