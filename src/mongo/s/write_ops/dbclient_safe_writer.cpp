@@ -75,13 +75,14 @@ namespace mongo {
             }
 
             // Default GLE Options
+            const string dbName( NamespaceString( request->getNS() ).db().toString() );
             const bool fsync = false;
             const bool j = false;
-            const int w = 1;
+            // Config servers < v2.4.2 will complain if gle has a w parameter present.
+            const int w = ( dbName == "config" )? 0: 1;
             const int wtimeout = 0;
 
-            BSONObj result = conn->getLastErrorDetailed( NamespaceString( request->getNS() ).db()
-                                                             .toString(),
+            BSONObj result = conn->getLastErrorDetailed( dbName,
                                                          fsync,
                                                          j,
                                                          w,
