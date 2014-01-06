@@ -35,9 +35,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/s/distlock.h"
 
 namespace mongo {
 

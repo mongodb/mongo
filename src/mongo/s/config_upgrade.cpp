@@ -32,8 +32,8 @@
 
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/distlock.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/mongo_version_range.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/s/type_database.h"

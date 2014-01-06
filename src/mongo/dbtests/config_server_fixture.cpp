@@ -30,8 +30,8 @@
 
 #include <list>
 
-#include "mongo/client/distlock.h"
 #include "mongo/s/config.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/type_changelog.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"

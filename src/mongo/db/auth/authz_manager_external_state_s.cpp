@@ -33,11 +33,11 @@
 #include <string>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/config.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"

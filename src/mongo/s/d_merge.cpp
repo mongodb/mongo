@@ -27,11 +27,11 @@
  */
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/instance.h" // needed for DBDirectClient
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/chunk.h"  // needed for genID
 #include "mongo/s/config.h" // needed for changelog write
 #include "mongo/util/mongoutils/str.h"

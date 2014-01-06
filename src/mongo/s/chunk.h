@@ -32,8 +32,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
-#include "mongo/client/distlock.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/shardkey.h"
 #include "mongo/util/concurrency/ticketholder.h"

@@ -17,7 +17,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/client/distlock.h"
+#include "mongo/s/distlock.h"
 
 #include <boost/thread/thread.hpp>
 #include <iostream>

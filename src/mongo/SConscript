@@ -676,7 +676,7 @@ serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 
-env.Library('coreshard', ['client/distlock.cpp',
+env.Library('coreshard', ['s/distlock.cpp',
                           's/config.cpp',
                           's/grid.cpp',
                           's/chunk.cpp',
@@ -775,7 +775,7 @@ serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_state.cpp",
                      "s/d_split.cpp",
                      "s/d_merge.cpp",
-                     "client/distlock_test.cpp" ]
+                     "s/distlock_test.cpp" ]
 
 env.Library("defaultversion", "s/default_version.cpp")
 
