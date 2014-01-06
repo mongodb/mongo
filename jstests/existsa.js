@@ -24,7 +24,7 @@ function assertPrefix( prefix, str ) {
 
 /** @return count when hinting the index to use. */
 function hintedCount( query ) {
-    // QUERY_MIGRATION
+    // SERVER-12262: $exists currently will never use an index.
     //assertPrefix( indexCursorName, t.find( query ).hint( indexKeySpec ).explain().cursor );
     return t.find( query ).hint( indexKeySpec ).itcount();
 }
@@ -35,7 +35,9 @@ function assertMissing( query, expectedMissing, expectedIndexedMissing ) {
     expectedIndexedMissing = expectedIndexedMissing || 0;
     assert.eq( expectedMissing, t.count( query ) );
     assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
-    // QUERY_MIGRATION: old system gave diff # of results for index vs not-index...
+    // SERVER-12262: $exists currently will never use an index.
+    // We also shouldn't get a different count depending on whether
+    // an index is used or not.
     // assert.eq( expectedIndexedMissing, hintedCount( query ) );
 }
 
@@ -50,7 +52,7 @@ function assertExists( query, expectedExists ) {
     andClause[ indexKeyField ] = { $ne:null };
     Object.extend( query, { $and:[ andClause ] } );
     assert.eq( expectedExists, t.count( query ) );
-    // QUERY_MIGRATION
+    // SERVER-12262: $exists currently will never use an index.
     // assertPrefix( indexCursorName, t.find( query ).explain().cursor );
     assert.eq( expectedExists, hintedCount( query ) );
 }
@@ -112,5 +114,5 @@ t.drop();
 t.save( {} );
 t.ensureIndex( { a:1 } );
 assert.eq( 1, t.find( { a:{ $exists:false } } ).itcount() );
-// QUERY_MIGRATION
+// SERVER-12262: $exists currently will never use an index.
 //assert.eq( 'BtreeCursor a_1', t.find( { a:{ $exists:false } } ).explain().cursor );

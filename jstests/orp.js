@@ -1,51 +1,43 @@
-// QUERY MIGRATION
-// This is highly specific implementaion behavior of the old system
+// $or clause deduping with result set sizes > 101 (smaller result sets are now also deduped by the
+// query optimizer cursor).
 
-// // Delete and update work properly when the document to be modified is the first of a new unindexed
-// // $or clause.  SERVER-5198
+t = db.jstests_orp;
+t.drop();
 
-// t = db.jstests_orp;
-// t.drop();
+t.ensureIndex( { a:1 } );
+t.ensureIndex( { b:1 } );
+t.ensureIndex( { c:1 } );
 
-// function verifyExpectedQueryPlan( query ) {
-//     explain = t.find( query ).explain();
-//     assert.eq( 'BtreeCursor a_1', explain.clauses[ 0 ].cursor );
-//     assert.eq( 'BasicCursor', explain.clauses[ 1 ].cursor );
-// }
+for( i = 0; i < 200; ++i ) {
+    t.save( { a:1, b:1 } );
+}
 
-// function checkAdvanceWithWriteOp( writeOp ) {
-//     t.drop();
-   
-//     for( i = 0; i < 120; ++i ) {
-//         t.insert( { a:119-i, b:2 } );
-//     }
+// Deduping results from the previous clause.
+assert.eq( 200, t.count( { $or:[ { a:1 }, { b:1 } ] } ) );
 
-//     t.ensureIndex( { a:1 } );
+// Deduping results from a prior clause.
+assert.eq( 200, t.count( { $or:[ { a:1 }, { c:1 }, { b:1 } ] } ) );
+t.save( { c:1 } );
+assert.eq( 201, t.count( { $or:[ { a:1 }, { c:1 }, { b:1 } ] } ) );
 
-//     // The presence of an index on the b field causes the query below to generate query plans for
-//     // each $or clause iteratively rather than run a simple unindexed query plan.
-//     t.ensureIndex( { c:1, b:1 } );
+// Deduping results that would normally be index only matches on overlapping and double scanned $or
+// field regions.
+t.drop();
+t.ensureIndex( { a:1, b:1 } );
+for( i = 0; i < 16; ++i ) {
+    for( j = 0; j < 16; ++j ) {
+        t.save( { a:i, b:j } );
+    }
+}
+assert.eq( 16 * 16,
+          t.count( { $or:[ { a:{ $gte:0 }, b:{ $gte:0 } }, { a:{ $lte:16 }, b:{ $lte:16 } } ] } ) );
 
-//     // The cursors traversed for this $or query will be a:1, $natural:1.  The second clause will run
-//     // as an unindexed scan because no index has b as its first field.  The a:119 document will
-//     // be the last document of the first clause and the first document of the (unindexed) second
-//     // clause.
-//     query = { $or:[ { a:{ $gte:0 } }, { b:2 } ] };
-//     verifyExpectedQueryPlan( query );
-//     writeOp( query );
-//     assert( !db.getLastError() );
-//     assert.eq( 120, db.getLastErrorObj().n );
-// }
-
-// // Remove.
-// checkAdvanceWithWriteOp( function( query ) { t.remove( query ); } );
-// // The documents were removed.
-// assert.eq( 0, t.count() );
-// assert.eq( 0, t.find().itcount() );
-
-// // Update - add a large field so the document will move.
-// big = new Array( 10000 ).toString();
-// checkAdvanceWithWriteOp( function( query ) { t.update( query, { $push:{ z:big } }, false,
-//                                                       true ); } );
-// // The documents were updated.
-// assert.eq( 120, t.count( { z:{ $size:1 } } ) );
+// Deduping results from a clause that completed before the multi cursor takeover.
+t.drop();
+t.ensureIndex( { a:1 } );
+t.ensureIndex( { b:1 } );
+t.save( { a:1,b:200 } );
+for( i = 0; i < 200; ++i ) {
+    t.save( { b:i } );
+}
+assert.eq( 201, t.count( { $or:[ { a:1 }, { b:{ $gte:0 } } ] } ) );
