@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-    class BtreeInMemoryState;
+    class IndexCatalogEntry;
     class IndexCursor;
     class IndexDescriptor;
     struct TwoDIndexingParams;
@@ -69,7 +69,7 @@ namespace mongo {
         using BtreeBasedAccessMethod::_descriptor;
         using BtreeBasedAccessMethod::_interface;
 
-        TwoDAccessMethod(BtreeInMemoryState* btreeState);
+        TwoDAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~TwoDAccessMethod() { }
 
         virtual Status newCursor(IndexCursor** out) const;

@@ -54,7 +54,7 @@ namespace mongo {
         using BtreeBasedAccessMethod::_descriptor;
         using BtreeBasedAccessMethod::_interface;
 
-        BtreeAccessMethod(BtreeInMemoryState* btreeState );
+        BtreeAccessMethod(IndexCatalogEntry* btreeState );
         virtual ~BtreeAccessMethod() { }
 
         virtual Status newCursor(IndexCursor** out) const;

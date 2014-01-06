@@ -1,4 +1,4 @@
-// index_catalog_internal.h
+// index_catalog_entry.h
 
 /**
 *    Copyright (C) 2013 10gen Inc.
@@ -33,37 +33,86 @@
 #include <string>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/diskloc.h"
 
 namespace mongo {
 
+    class Collection;
     class IndexDescriptor;
-    class BtreeInMemoryState;
+    class RecordStore;
     class IndexAccessMethod;
 
     class IndexCatalogEntry {
+        MONGO_DISALLOW_COPYING( IndexCatalogEntry );
     public:
-        IndexCatalogEntry( IndexDescriptor* descriptor,
-                           BtreeInMemoryState* state,
-                           IndexAccessMethod* accessMethod );
+        IndexCatalogEntry( Collection* collection,
+                           IndexDescriptor* descriptor, // ownership passes to me
+                           RecordStore* recordStore ); // ownership passes to me
 
         ~IndexCatalogEntry();
 
-        IndexDescriptor* descriptor() { return _descriptor; }
-        BtreeInMemoryState* state() { return _state; }
-        IndexAccessMethod* accessMethod() { return _accessMethod; }
+        void init( IndexAccessMethod* accessMethod );
 
+        const Collection* collection() const { return _collection; }
+
+        IndexDescriptor* descriptor() { return _descriptor; }
         const IndexDescriptor* descriptor() const { return _descriptor; }
-        const BtreeInMemoryState* state() const { return _state; }
+
+        IndexAccessMethod* accessMethod() { return _accessMethod; }
         const IndexAccessMethod* accessMethod() const { return _accessMethod; }
 
         IndexAccessMethod* forcedBtreeIndex() { return _forcedBtreeIndex; }
+        // ownership passes
         void setForcedBtreeIndex( IndexAccessMethod* iam ) { _forcedBtreeIndex = iam; }
 
+        RecordStore* recordStore() { return _recordStore; }
+        const RecordStore* recordStore() const { return _recordStore; }
+
+        const Ordering& ordering() const { return _ordering; }
+
+        /// ---------------------
+
+        const DiskLoc& head() const;
+
+        void setHead( DiskLoc newHead );
+
+        void setIsReady( bool newIsReady );
+
+        // --
+
+        bool isMultikey() const;
+
+        void setMultikey();
+
+        // if this ready is ready for queries
+        bool isReady() const;
+
     private:
+
+        int _indexNo() const;
+
+        bool _catalogIsReady() const;
+        DiskLoc _catalogHead() const;
+        bool _catalogIsMultikey() const;
+
+        // -----
+
+        Collection* _collection; // not owned here
+
         IndexDescriptor* _descriptor; // owned here
-        BtreeInMemoryState* _state; // owned here
+
+        RecordStore* _recordStore; // owned here
+
         IndexAccessMethod* _accessMethod; // owned here
         IndexAccessMethod* _forcedBtreeIndex; // owned here
+
+        // cached stuff
+
+        Ordering _ordering; // TODO: this might be b-tree specific
+        bool _isReady; // cache of NamespaceDetails info
+        DiskLoc _head; // cache of IndexDetails
+        bool _isMultikey; // cache of NamespaceDetails info
     };
 
     class IndexCatalogEntryContainer {

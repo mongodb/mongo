@@ -42,7 +42,7 @@
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
-    class BtreeInMemoryState;
+    class IndexCatalogEntry;
     class Database;
     class IndexCatalog;
 
@@ -424,7 +424,7 @@ namespace mongo {
         friend class Database;
         friend class NamespaceIndex;
         friend class IndexCatalog;
-        friend class BtreeInMemoryState;
+        friend class IndexCatalogEntry;
 
         struct ExtraOld {
             // note we could use this field for more chaining later, so don't waste it:

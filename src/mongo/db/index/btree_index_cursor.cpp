@@ -43,7 +43,7 @@ namespace mongo {
     SimpleMutex BtreeIndexCursor::_activeCursorsMutex("active_btree_index_cursors");
 
     // Go forward by default.
-    BtreeIndexCursor::BtreeIndexCursor(const BtreeInMemoryState* btreeState,
+    BtreeIndexCursor::BtreeIndexCursor(const IndexCatalogEntry* btreeState,
                                        BtreeInterface *interface)
         : _direction(1), _btreeState(btreeState), _interface(interface),
           _bucket(btreeState->head()), _keyOffset(0) {

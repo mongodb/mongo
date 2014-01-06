@@ -43,7 +43,7 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        S2AccessMethod(BtreeInMemoryState* btreeState);
+        S2AccessMethod(IndexCatalogEntry* btreeState);
         virtual ~S2AccessMethod() { }
 
         virtual Status newCursor(IndexCursor** out) const;

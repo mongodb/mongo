@@ -26,11 +26,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/structure/btree/btree.h"
-#include "mongo/db/structure/btree/state.h"
-#include "mongo/db/structure/btree/state-inl.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/btree_interface.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/btree/btree.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 
@@ -41,14 +41,24 @@ namespace mongo {
 
         virtual ~BtreeInterfaceImpl() { }
 
-        virtual int bt_insert(BtreeInMemoryState* btreeState,
+        const BtreeBucket<Version>* getHeadBucket( const IndexCatalogEntry* entry ) const {
+            return getBucket( entry->head() );
+        }
+
+        const BtreeBucket<Version>* getBucket( const IndexCatalogEntry* entry,
+                                               const DiskLoc& loc ) const {
+            Record* record = entry->recordStore()->recordFor( loc );
+            return BtreeBucket<Version>::asVersion( record );
+        }
+
+        virtual int bt_insert(IndexCatalogEntry* btreeState,
                               const DiskLoc thisLoc,
                               const DiskLoc recordLoc,
                               const BSONObj& key,
                               bool dupsallowed,
                               bool toplevel) {
             // FYI: toplevel has a default value of true in btree.h
-            return btreeState->getBucket<Version>(thisLoc)->bt_insert(btreeState,
+            return getBucket( btreeState, thisLoc )->bt_insert(btreeState,
                                                                       thisLoc,
                                                                       recordLoc,
                                                                       key,
@@ -56,17 +66,17 @@ namespace mongo {
                                                                       toplevel);
         }
 
-        virtual bool unindex(BtreeInMemoryState* btreeState,
+        virtual bool unindex(IndexCatalogEntry* btreeState,
                              const DiskLoc thisLoc,
                              const BSONObj& key,
                              const DiskLoc recordLoc) {
-            return btreeState->getBucket<Version>(thisLoc)->unindex(btreeState,
+            return getBucket( btreeState, thisLoc )->unindex(btreeState,
                                                                     thisLoc,
                                                                     key,
                                                                     recordLoc);
         }
 
-        virtual DiskLoc locate(const BtreeInMemoryState* btreeState,
+        virtual DiskLoc locate(const IndexCatalogEntry* btreeState,
                                const DiskLoc& thisLoc,
                                const BSONObj& key,
                                int& pos,
@@ -74,7 +84,7 @@ namespace mongo {
                                const DiskLoc& recordLoc,
                                int direction) const {
             // FYI: direction has a default of 1
-            return btreeState->getBucket<Version>(thisLoc)->locate(btreeState,
+            return getBucket( btreeState, thisLoc )->locate(btreeState,
                                                                    thisLoc,
                                                                    key,
                                                                    pos,
@@ -83,18 +93,18 @@ namespace mongo {
                                                                    direction);
         }
 
-        virtual bool wouldCreateDup(const BtreeInMemoryState* btreeState,
+        virtual bool wouldCreateDup(const IndexCatalogEntry* btreeState,
                                     const DiskLoc& thisLoc,
                                     const BSONObj& key,
                                     const DiskLoc& self) const {
             typename Version::KeyOwned ownedVersion(key);
-            return btreeState->getBucket<Version>(thisLoc)->wouldCreateDup(btreeState,
+            return getBucket( btreeState, thisLoc )->wouldCreateDup(btreeState,
                                                                            thisLoc,
                                                                            ownedVersion,
                                                                            self);
         }
 
-        virtual void customLocate(const BtreeInMemoryState* btreeState,
+        virtual void customLocate(const IndexCatalogEntry* btreeState,
                                   DiskLoc& locInOut,
                                   int& keyOfs,
                                   const BSONObj& keyBegin,
@@ -114,7 +124,7 @@ namespace mongo {
                                                       bestParent);
         }
 
-        virtual void advanceTo(const BtreeInMemoryState* btreeState,
+        virtual void advanceTo(const IndexCatalogEntry* btreeState,
                                DiskLoc &thisLoc,
                                int &keyOfs,
                                const BSONObj &keyBegin,
@@ -123,7 +133,7 @@ namespace mongo {
                                const vector<const BSONElement*>& keyEnd,
                                const vector<bool>& keyEndInclusive,
                                int direction) const {
-            return btreeState->getBucket<Version>(thisLoc)->advanceTo(btreeState,
+            return getBucket( btreeState, thisLoc )->advanceTo(btreeState,
                                                                       thisLoc,
                                                                       keyOfs,
                                                                       keyBegin,
@@ -176,26 +186,26 @@ namespace mongo {
             }
         }
 
-        virtual string dupKeyError(const BtreeInMemoryState* btreeState,
+        virtual string dupKeyError(const IndexCatalogEntry* btreeState,
                                    DiskLoc bucket,
                                    const BSONObj& keyObj) const {
             typename Version::KeyOwned key(keyObj);
-            return btreeState->getBucket<Version>( bucket )->dupKeyError(btreeState->descriptor(),
-                                                                         key);
+            return getBucket( btreeState, bucket )->dupKeyError(btreeState->descriptor(),
+                                                                key);
         }
 
-        virtual DiskLoc advance(const BtreeInMemoryState* btreeState,
+        virtual DiskLoc advance(const IndexCatalogEntry* btreeState,
                                 const DiskLoc& thisLoc,
                                 int& keyOfs,
                                 int direction,
                                 const char* caller) const {
-            return btreeState->getBucket<Version>(thisLoc)->advance(thisLoc, keyOfs, direction, caller);
+            return getBucket( btreeState, thisLoc )->advance(thisLoc, keyOfs, direction, caller);
         }
 
-        virtual long long fullValidate(const BtreeInMemoryState* btreeState,
+        virtual long long fullValidate(const IndexCatalogEntry* btreeState,
                                        const DiskLoc& thisLoc,
                                        const BSONObj& keyPattern) {
-            return btreeState->getBucket<Version>(thisLoc)->fullValidate(thisLoc, keyPattern);
+            return getBucket( btreeState, thisLoc )->fullValidate(thisLoc, keyPattern);
         }
     };
 

@@ -38,7 +38,7 @@ namespace mongo {
 
     class FTSAccessMethod : public BtreeBasedAccessMethod {
     public:
-        FTSAccessMethod(BtreeInMemoryState* btreeState );
+        FTSAccessMethod(IndexCatalogEntry* btreeState );
         virtual ~FTSAccessMethod() { }
 
         // Not implemented:

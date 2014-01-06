@@ -37,7 +37,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
@@ -52,7 +51,7 @@ namespace mongo {
     class BtreeBasedAccessMethod : public IndexAccessMethod {
         MONGO_DISALLOW_COPYING( BtreeBasedAccessMethod );
     public:
-        BtreeBasedAccessMethod( BtreeInMemoryState* btreeState );
+        BtreeBasedAccessMethod( IndexCatalogEntry* btreeState );
 
         virtual ~BtreeBasedAccessMethod() { }
 
@@ -92,7 +91,7 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
-        BtreeInMemoryState* _btreeState; // owned by IndexCatalogEntry
+        IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
         const IndexDescriptor* _descriptor;
 
         // There are 2 types of Btree disk formats.  We put them both behind one interface.

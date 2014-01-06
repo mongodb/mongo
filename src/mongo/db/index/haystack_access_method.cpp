@@ -39,7 +39,7 @@ namespace mongo {
 
     static const string GEOSEARCHNAME = "geoHaystack";
 
-    HaystackAccessMethod::HaystackAccessMethod(BtreeInMemoryState* btreeState)
+    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState)
         : BtreeBasedAccessMethod(btreeState) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();

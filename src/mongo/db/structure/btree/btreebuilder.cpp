@@ -44,14 +44,13 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/structure/btree/btree.h"
-#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
     /* --- BtreeBuilder --- */
 
     template<class V>
-    BtreeBuilder<V>::BtreeBuilder(bool dupsAllowed, BtreeInMemoryState* btreeState ):
+    BtreeBuilder<V>::BtreeBuilder(bool dupsAllowed, IndexCatalogEntry* btreeState ):
         _dupsAllowed(dupsAllowed),
         _btreeState(btreeState),
         _numAdded(0) {

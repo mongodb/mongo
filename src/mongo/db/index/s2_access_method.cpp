@@ -44,7 +44,7 @@ namespace mongo {
         return def;
     }
 
-    S2AccessMethod::S2AccessMethod(BtreeInMemoryState* btreeState)
+    S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState)
         : BtreeBasedAccessMethod(btreeState) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();

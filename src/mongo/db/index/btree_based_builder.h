@@ -44,7 +44,7 @@ namespace mongo {
 
     class Collection;
     class BSONObjExternalSorter;
-    class BtreeInMemoryState;
+    class IndexCatalogEntry;
     class ExternalSortComparison;
     class IndexDescriptor;
     class IndexDetails;
@@ -59,10 +59,10 @@ namespace mongo {
          * Want to build an index?  Call this.  Throws DBException.
          */
         static uint64_t fastBuildIndex(Collection* collection,
-                                       BtreeInMemoryState* descriptor,
+                                       IndexCatalogEntry* descriptor,
                                        bool mayInterrupt);
 
-        static DiskLoc makeEmptyIndex(BtreeInMemoryState* idx);
+        static DiskLoc makeEmptyIndex(IndexCatalogEntry* idx);
 
         static ExternalSortComparison* getComparison(int version,
                                                      const BSONObj& keyPattern);
@@ -89,7 +89,7 @@ namespace mongo {
     // Exposed for testing purposes.
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   BtreeInMemoryState* btreeState,
+                                   IndexCatalogEntry* btreeState,
                                    BSONObjExternalSorter& sorter,
                                    bool dropDups,
                                    set<DiskLoc>& dupsToDrop,

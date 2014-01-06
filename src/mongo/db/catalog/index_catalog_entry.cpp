@@ -1,4 +1,4 @@
-// index_catalog_internal.h
+// index_catalog_entry.h
 
 /**
 *    Copyright (C) 2013 10gen Inc.
@@ -28,28 +28,108 @@
 *    it in the license file.
 */
 
-#include "mongo/db/catalog/index_catalog_internal.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/structure/btree/state.h"
 
 namespace mongo {
 
-    IndexCatalogEntry::IndexCatalogEntry( IndexDescriptor* descriptor,
-                                          BtreeInMemoryState* state,
-                                          IndexAccessMethod* accessMethod )
-        : _descriptor( descriptor ),
-          _state( state ),
-          _accessMethod( accessMethod ),
-          _forcedBtreeIndex( 0 ) {
-        }
+    IndexCatalogEntry::IndexCatalogEntry( Collection* collection,
+                                          IndexDescriptor* descriptor,
+                                          RecordStore* recordstore )
+        : _collection( collection ),
+          _descriptor( descriptor ),
+          _recordStore( recordstore ),
+          _accessMethod( NULL ),
+          _forcedBtreeIndex( NULL ),
+          _ordering( Ordering::make( descriptor->keyPattern() ) ),
+          _isReady( false ) {
+    }
 
     IndexCatalogEntry::~IndexCatalogEntry() {
+        delete _forcedBtreeIndex;
         delete _accessMethod;
-        delete _state;
+
+        delete _recordStore;
+
         delete _descriptor;
     }
+
+    void IndexCatalogEntry::init( IndexAccessMethod* accessMethod ) {
+        verify( _accessMethod == NULL );
+        _accessMethod = accessMethod;
+
+        _isReady = _catalogIsReady();
+        _head = _catalogHead();
+        _isMultikey = _catalogIsMultikey();
+    }
+
+    const DiskLoc& IndexCatalogEntry::head() const {
+        DEV verify( _head == _catalogHead() );
+        return _head;
+    }
+
+    bool IndexCatalogEntry::isReady() const {
+        DEV verify( _isReady == _catalogIsReady() );
+        return _isReady;
+    }
+
+    bool IndexCatalogEntry::isMultikey() const {
+        DEV verify( _isMultikey == _catalogIsMultikey() );
+        return _isMultikey;
+    }
+
+    // ---
+
+    void IndexCatalogEntry::setIsReady( bool newIsReady ) {
+        _isReady = newIsReady;
+        verify( isReady() == newIsReady );
+    }
+
+    void IndexCatalogEntry::setHead( DiskLoc newHead ) {
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        IndexDetails& id = nsd->idx( idxNo );
+        id.head.writing() = newHead;
+        _head = newHead;
+    }
+
+    void IndexCatalogEntry::setMultikey() {
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        if ( nsd->setIndexIsMultikey( idxNo, true ) )
+            _collection->infoCache()->clearQueryCache();
+        _isMultikey = true;
+    }
+
+    // ----
+
+    bool IndexCatalogEntry::_catalogIsReady() const {
+        return _indexNo() < _collection->getIndexCatalog()->numIndexesReady();
+    }
+
+    DiskLoc IndexCatalogEntry::_catalogHead() const {
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        return nsd->idx( idxNo ).head;
+    }
+
+    bool IndexCatalogEntry::_catalogIsMultikey() const {
+        NamespaceDetails* nsd = _collection->details();
+        int idxNo = _indexNo();
+        return nsd->isMultikey( idxNo );
+    }
+
+    int IndexCatalogEntry::_indexNo() const {
+        int idxNo = _collection->details()->_catalogFindIndexByName( _descriptor->indexName(),
+                                                                     true );
+        fassert( 17341, idxNo >= 0 );
+        return idxNo;
+    }
+
+
+    // ------------------
 
     const IndexCatalogEntry* IndexCatalogEntryContainer::find( const IndexDescriptor* desc ) const {
         for ( const_iterator i = begin(); i != end(); ++i ) {

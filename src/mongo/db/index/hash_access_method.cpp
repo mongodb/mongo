@@ -37,7 +37,7 @@ namespace mongo {
         return BSONElementHasher::hash64(e, seed);
     }
 
-    HashAccessMethod::HashAccessMethod(BtreeInMemoryState* btreeState)
+    HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState)
         : BtreeBasedAccessMethod(btreeState) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();

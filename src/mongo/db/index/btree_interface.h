@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    class BtreeInMemoryState;
+    class IndexCatalogEntry;
 
     /**
      * We have two Btree on-disk formats which support identical operations.  We hide this as much
@@ -51,19 +51,19 @@ namespace mongo {
         // was deleted.  Calling code needs to be able to recognize this and possibly ignore it.
         static const int deletedBucketCode = 16738;
 
-        virtual int bt_insert(BtreeInMemoryState* btreeState,
+        virtual int bt_insert(IndexCatalogEntry* btreeState,
                               const DiskLoc thisLoc,
                               const DiskLoc recordLoc,
                               const BSONObj& key,
                               bool dupsallowed,
                               bool toplevel = true) = 0;
 
-        virtual bool unindex(BtreeInMemoryState* btreeState,
+        virtual bool unindex(IndexCatalogEntry* btreeState,
                              const DiskLoc thisLoc,
                              const BSONObj& key,
                              const DiskLoc recordLoc) = 0;
 
-        virtual DiskLoc locate(const BtreeInMemoryState* btreeState,
+        virtual DiskLoc locate(const IndexCatalogEntry* btreeState,
                                const DiskLoc& thisLoc,
                                const BSONObj& key,
                                int& pos, // out
@@ -71,12 +71,12 @@ namespace mongo {
                                const DiskLoc& recordLoc, // out
                                int direction = 1) const = 0;
 
-        virtual bool wouldCreateDup(const BtreeInMemoryState* btreeState,
+        virtual bool wouldCreateDup(const IndexCatalogEntry* btreeState,
                                     const DiskLoc& thisLoc,
                                     const BSONObj& key,
                                     const DiskLoc& self) const = 0;
 
-        virtual void customLocate(const BtreeInMemoryState* btreeState,
+        virtual void customLocate(const IndexCatalogEntry* btreeState,
                                   DiskLoc& locInOut,
                                   int& keyOfs,
                                   const BSONObj& keyBegin,
@@ -86,7 +86,7 @@ namespace mongo {
                                   int direction,
                                   pair<DiskLoc, int>& bestParent) const = 0 ;
 
-        virtual void advanceTo(const BtreeInMemoryState* btreeState,
+        virtual void advanceTo(const IndexCatalogEntry* btreeState,
                                DiskLoc &thisLoc,
                                int &keyOfs,
                                const BSONObj &keyBegin,
@@ -96,17 +96,17 @@ namespace mongo {
                                const vector<bool>& keyEndInclusive,
                                int direction) const = 0;
 
-        virtual string dupKeyError(const BtreeInMemoryState* btreeState,
+        virtual string dupKeyError(const IndexCatalogEntry* btreeState,
                                    DiskLoc bucket,
                                    const BSONObj& keyObj) const =0;
 
-        virtual DiskLoc advance(const BtreeInMemoryState* btreeState,
+        virtual DiskLoc advance(const IndexCatalogEntry* btreeState,
                                 const DiskLoc& thisLoc,
                                 int& keyOfs,
                                 int direction,
                                 const char* caller) const = 0;
 
-        virtual long long fullValidate(const BtreeInMemoryState* btreeState,
+        virtual long long fullValidate(const IndexCatalogEntry* btreeState,
                                        const DiskLoc& thisLoc,
                                        const BSONObj& keyPattern) = 0;
 

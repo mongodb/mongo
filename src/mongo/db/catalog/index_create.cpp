@@ -81,7 +81,7 @@ namespace mongo {
             : BackgroundOperation(ns) {
         }
 
-        unsigned long long go( Collection* collection, BtreeInMemoryState* idx );
+        unsigned long long go( Collection* collection, IndexCatalogEntry* idx );
 
     private:
         unsigned long long addExistingToIndex( Collection* collection,
@@ -103,7 +103,7 @@ namespace mongo {
     };
 
     unsigned long long BackgroundIndexBuildJob::go( Collection* collection,
-                                                    BtreeInMemoryState* btreeState) {
+                                                    IndexCatalogEntry* btreeState) {
 
         string ns = collection->ns().ns();
 
@@ -226,7 +226,7 @@ namespace mongo {
 
     // throws DBException
     void buildAnIndex( Collection* collection,
-                       BtreeInMemoryState* btreeState,
+                       IndexCatalogEntry* btreeState,
                        bool mayInterrupt ) {
 
         string ns = collection->ns().ns(); // our copy

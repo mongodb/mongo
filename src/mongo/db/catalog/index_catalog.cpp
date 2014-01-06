@@ -105,17 +105,15 @@ namespace mongo {
             auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
             recordStore->init( indexMetadata, _collection->getExtentManager(), false );
 
-            auto_ptr<BtreeInMemoryState> state( new BtreeInMemoryState( _collection,
-                                                                        descriptor.get(),
-                                                                        recordStore.release() ) );
-            state->setIsReady( true );
+            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection,
+                                                                      descriptor.release(),
+                                                                      recordStore.release() ) );
 
-            auto_ptr<IndexAccessMethod> accessMethod( _createAccessMethod( descriptor.get(),
-                                                                           state.get() ) );
+            entry->init( _createAccessMethod( entry->descriptor(),
+                                              entry.get() ) );
 
-            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( descriptor.release(),
-                                                                      state.release(),
-                                                                      accessMethod.release() ) );
+            fassert( 17340, entry->isReady()  );
+
             _entries.add( entry.release() );
         }
 
@@ -332,16 +330,12 @@ namespace mongo {
         // finish creating in memory state
         // ---------
         {
-            auto_ptr<BtreeInMemoryState> state( new BtreeInMemoryState( _collection,
-                                                                        descriptor,
-                                                                        recordStore.release() ) );
+            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection,
+                                                                      descriptorCleaner.release(),
+                                                                      recordStore.release() ) );
 
-            auto_ptr<IndexAccessMethod> accessMethod( _createAccessMethod( descriptor,
-                                                                           state.get() ) );
-
-            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( descriptorCleaner.release(),
-                                                                      state.release(),
-                                                                      accessMethod.release() ) );
+            entry->init( _createAccessMethod( entry->descriptor(),
+                                              entry.get() ) );
 
             _entries.add( entry.release() );
         }
@@ -361,7 +355,7 @@ namespace mongo {
                 cc().curop()->setQuery( spec );
             }
 
-            buildAnIndex( _collection, entry->state(), mayInterrupt );
+            buildAnIndex( _collection, entry, mayInterrupt );
             indexBuildBlock.success();
 
             int idxNo = _details->_catalogFindIndexByName( idxName, true );
@@ -478,7 +472,7 @@ namespace mongo {
         IndexCatalogEntry* entry = _catalog->_entries.find( desc );
         fassert( 17331, entry );
 
-        entry->state()->setIsReady( true );
+        entry->setIsReady( true );
 
         IndexLegacy::postBuildHook( _catalog->_collection,
                                     _catalog->findIndexByName( _indexName )->keyPattern() );
@@ -764,7 +758,7 @@ namespace mongo {
         IndexCatalogEntry* entry = _entries.find( desc );
         if ( !entry )
             return Status( ErrorCodes::InternalError, "cannot find index to delete" );
-        if ( !entry->state()->isReady() )
+        if ( !entry->isReady() )
             return Status( ErrorCodes::InternalError, "cannot delete not ready index" );
         return _dropIndex( entry );
     }
@@ -914,7 +908,7 @@ namespace mongo {
     bool IndexCatalog::isMultikey( const IndexDescriptor* idx ) {
         IndexCatalogEntry* entry = _entries.find( idx );
         verify( entry );
-        return entry->state()->isMultikey();
+        return entry->isMultikey();
     }
 
 
@@ -972,7 +966,7 @@ namespace mongo {
             ++_iterator;
 
             if ( _includeUnfinishedIndexes ||
-                 entry->state()->isReady() ) {
+                 entry->isReady() ) {
                 _next = entry;
                 return;
             }
@@ -1054,7 +1048,7 @@ namespace mongo {
         IndexCatalogEntry* entry = _entries.find( desc );
         massert( 17335, "cannot find index entry", entry );
         if ( !entry->forcedBtreeIndex() ) {
-            entry->setForcedBtreeIndex( new BtreeAccessMethod( entry->state() ) );
+            entry->setForcedBtreeIndex( new BtreeAccessMethod( entry ) );
         }
         return entry->forcedBtreeIndex();
     }
@@ -1080,26 +1074,26 @@ namespace mongo {
 
 
     IndexAccessMethod* IndexCatalog::_createAccessMethod( const IndexDescriptor* desc,
-                                                          BtreeInMemoryState* state ) {
+                                                          IndexCatalogEntry* entry ) {
         string type = _getAccessMethodName(desc->keyPattern());
 
         if (IndexNames::HASHED == type)
-            return new HashAccessMethod( state );
+            return new HashAccessMethod( entry );
 
         if (IndexNames::GEO_2DSPHERE == type)
-            return new S2AccessMethod( state );
+            return new S2AccessMethod( entry );
 
         if (IndexNames::TEXT == type)
-            return new FTSAccessMethod( state );
+            return new FTSAccessMethod( entry );
 
         if (IndexNames::GEO_HAYSTACK == type)
-            return new HaystackAccessMethod( state );
+            return new HaystackAccessMethod( entry );
 
         if ("" == type)
-            return new BtreeAccessMethod( state );
+            return new BtreeAccessMethod( entry );
 
         if (IndexNames::GEO_2D == type)
-            return new TwoDAccessMethod( state );
+            return new TwoDAccessMethod( entry );
 
         log() << "Can't find index for keypattern " << desc->keyPattern();
         verify(0);
@@ -1196,7 +1190,7 @@ namespace mongo {
             IndexCatalogEntry* entry = *i;
 
             // If it's a background index, we DO NOT want to log anything.
-            bool logIfError = entry->state()->isReady() ? !noWarn : false;
+            bool logIfError = entry->isReady() ? !noWarn : false;
             _unindexRecord( entry, obj, loc, logIfError );
         }
 

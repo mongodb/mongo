@@ -75,7 +75,7 @@ namespace mongo {
 
     template< class V >
     void buildBottomUpPhases2And3( bool dupsAllowed,
-                                   BtreeInMemoryState* btreeState,
+                                   IndexCatalogEntry* btreeState,
                                    BSONObjExternalSorter& sorter,
                                    bool dropDups,
                                    set<DiskLoc>& dupsToDrop,
@@ -136,7 +136,7 @@ namespace mongo {
         }
     }
 
-    DiskLoc BtreeBasedBuilder::makeEmptyIndex(BtreeInMemoryState* idx) {
+    DiskLoc BtreeBasedBuilder::makeEmptyIndex(IndexCatalogEntry* idx) {
         if (0 == idx->descriptor()->version()) {
             return BtreeBucket<V0>::addBucket(idx);
         } else {
@@ -189,7 +189,7 @@ namespace mongo {
     }
 
     uint64_t BtreeBasedBuilder::fastBuildIndex( Collection* collection,
-                                                BtreeInMemoryState* btreeState,
+                                                IndexCatalogEntry* btreeState,
                                                 bool mayInterrupt ) {
         CurOp * op = cc().curop();
         Timer t;

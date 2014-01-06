@@ -55,7 +55,7 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HaystackAccessMethod(BtreeInMemoryState* btreeState);
+        HaystackAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~HaystackAccessMethod() { }
 
         // Not implemented.

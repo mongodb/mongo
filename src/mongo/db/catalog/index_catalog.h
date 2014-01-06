@@ -34,7 +34,7 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/catalog/index_catalog_internal.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 
 namespace mongo {
 
@@ -215,7 +215,7 @@ namespace mongo {
 
         // creates a new thing, no caching
         IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
-                                                BtreeInMemoryState* state );
+                                                IndexCatalogEntry* entry );
 
         Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 

@@ -37,11 +37,10 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pdfile_private.h"
-#include "mongo/db/structure/btree/state-inl.h"
 
 namespace mongo {
 
-    BtreeBasedAccessMethod::BtreeBasedAccessMethod(BtreeInMemoryState* btreeState)
+    BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState)
         : _btreeState(btreeState), _descriptor(btreeState->descriptor()) {
 
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
@@ -181,15 +180,18 @@ namespace mongo {
     }
 
     DiskLoc BtreeBasedAccessMethod::findSingle( const BSONObj& key ) {
+        DiskLoc head = _btreeState->head();
+        Record* record = _btreeState->recordStore()->recordFor( head );
+
         if ( 0 == _descriptor->version() ) {
-            return _btreeState->getHeadBucket<V0>()->findSingle( _btreeState,
-                                                                 _btreeState->head(),
-                                                                 key );
+            return BtreeBucket<V0>::asVersion( record )->findSingle( _btreeState,
+                                                                     _btreeState->head(),
+                                                                     key );
         }
         if ( 1 == _descriptor->version() ) {
-            return _btreeState->getHeadBucket<V1>()->findSingle( _btreeState,
-                                                                 _btreeState->head(),
-                                                                 key );
+            return BtreeBucket<V1>::asVersion( record )->findSingle( _btreeState,
+                                                                     _btreeState->head(),
+                                                                     key );
         }
         verify( 0 );
     }
@@ -274,7 +276,7 @@ namespace mongo {
     }
 
     // Standard Btree implementation below.
-    BtreeAccessMethod::BtreeAccessMethod(BtreeInMemoryState* btreeState)
+    BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState)
         : BtreeBasedAccessMethod(btreeState) {
 
         // The key generation wants these values.
