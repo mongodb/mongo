@@ -75,6 +75,10 @@ namespace mongo {
                 res->setCursor("Complex Plan");
                 res->setNScanned(0);
                 res->setNScannedObjects(0);
+                // Don't know this, really...
+                res->setIsMultiKey(false);
+                // Or this...
+                res->setIndexOnly(false);
                 *explain = res.release();
                 return Status::OK();
             }
@@ -176,7 +180,7 @@ namespace mongo {
         }
         else if (leaf->stageType == STAGE_IXSCAN) {
             IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
-            dassert(indexStats);
+            verify(indexStats);
             string direction = indexStats->direction > 0 ? "" : " reverse";
             res->setCursor(indexStats->indexType + " " + indexStats->indexName + direction);
             res->setNScanned(indexStats->keysExamined);

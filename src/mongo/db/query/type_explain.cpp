@@ -410,18 +410,18 @@ namespace mongo {
     }
 
     size_t TypeExplain::sizeClauses() const {
-        dassert(_clauses.get());
+        verify(_clauses.get());
         return _clauses->size();
     }
 
     const std::vector<TypeExplain*>& TypeExplain::getClauses() const {
-        dassert(_clauses.get());
+        verify(_clauses.get());
         return *_clauses;
     }
 
     const TypeExplain* TypeExplain::getClausesAt(size_t pos) const {
-        dassert(_clauses.get());
-        dassert(_clauses->size() > pos);
+        verify(_clauses.get());
+        verify(_clauses->size() > pos);
         return _clauses->at(pos);
     }
 
@@ -439,7 +439,7 @@ namespace mongo {
     }
 
     const std::string& TypeExplain::getCursor() const {
-        dassert(_isCursorSet);
+        verify(_isCursorSet);
         return _cursor;
     }
 
@@ -457,7 +457,7 @@ namespace mongo {
     }
 
     bool TypeExplain::getIsMultiKey() const {
-        dassert(_isIsMultiKeySet);
+        verify(_isIsMultiKeySet);
         return _isMultiKey;
     }
 
@@ -475,7 +475,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getN() const {
-        dassert(_isNSet);
+        verify(_isNSet);
         return _n;
     }
 
@@ -493,7 +493,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getNScannedObjects() const {
-        dassert(_isNScannedObjectsSet);
+        verify(_isNScannedObjectsSet);
         return _nScannedObjects;
     }
 
@@ -511,7 +511,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getNScanned() const {
-        dassert(_isNScannedSet);
+        verify(_isNScannedSet);
         return _nScanned;
     }
 
@@ -529,7 +529,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getNScannedObjectsAllPlans() const {
-        dassert(_isNScannedObjectsAllPlansSet);
+        verify(_isNScannedObjectsAllPlansSet);
         return _nScannedObjectsAllPlans;
     }
 
@@ -547,7 +547,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getNScannedAllPlans() const {
-        dassert(_isNScannedAllPlansSet);
+        verify(_isNScannedAllPlansSet);
         return _nScannedAllPlans;
     }
 
@@ -565,7 +565,7 @@ namespace mongo {
     }
 
     bool TypeExplain::getScanAndOrder() const {
-        dassert(_isScanAndOrderSet);
+        verify(_isScanAndOrderSet);
         return _scanAndOrder;
     }
 
@@ -583,7 +583,7 @@ namespace mongo {
     }
 
     bool TypeExplain::getIndexOnly() const {
-        dassert(_isIndexOnlySet);
+        verify(_isIndexOnlySet);
         return _indexOnly;
     }
 
@@ -601,7 +601,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getNYields() const {
-        dassert(_isNYieldsSet);
+        verify(_isNYieldsSet);
         return _nYields;
     }
 
@@ -619,7 +619,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getNChunkSkips() const {
-        dassert(_isNChunkSkipsSet);
+        verify(_isNChunkSkipsSet);
         return _nChunkSkips;
     }
 
@@ -637,7 +637,7 @@ namespace mongo {
     }
 
     long long TypeExplain::getMillis() const {
-        dassert(_isMillisSet);
+        verify(_isMillisSet);
         return _millis;
     }
 
@@ -655,7 +655,7 @@ namespace mongo {
     }
 
     const BSONObj& TypeExplain::getIndexBounds() const {
-        dassert(_isIndexBoundsSet);
+        verify(_isIndexBoundsSet);
         return _indexBounds;
     }
 
@@ -693,18 +693,18 @@ namespace mongo {
     }
 
     size_t TypeExplain::sizeAllPlans() const {
-        dassert(_allPlans.get());
+        verify(_allPlans.get());
         return _allPlans->size();
     }
 
     const std::vector<TypeExplain*>& TypeExplain::getAllPlans() const {
-        dassert(_allPlans.get());
+        verify(_allPlans.get());
         return *_allPlans;
     }
 
     const TypeExplain* TypeExplain::getAllPlansAt(size_t pos) const {
-        dassert(_allPlans.get());
-        dassert(_allPlans->size() > pos);
+        verify(_allPlans.get());
+        verify(_allPlans->size() > pos);
         return _allPlans->at(pos);
     }
 
@@ -721,7 +721,7 @@ namespace mongo {
     }
 
     const TypeExplain* TypeExplain::getOldPlan() const {
-        dassert(_oldPlan.get());
+        verify(_oldPlan.get());
         return _oldPlan.get();
     }
 
@@ -739,7 +739,7 @@ namespace mongo {
     }
 
     const std::string& TypeExplain::getServer() const {
-        dassert(_isServerSet);
+        verify(_isServerSet);
         return _server;
     }
 

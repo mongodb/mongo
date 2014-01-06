@@ -120,7 +120,7 @@ namespace mongo {
     }
 
     void Interval::init(BSONObj base, bool si, bool ei) {
-        dassert(base.nFields() >= 2);
+        verify(base.nFields() >= 2);
 
         _intervalData = base.getOwned();
         BSONObjIterator it(_intervalData);
@@ -209,7 +209,7 @@ namespace mongo {
             break;
 
         default:
-            dassert(false);
+            verify(false);
         }
     }
 
@@ -246,7 +246,7 @@ namespace mongo {
             break;
 
         default:
-            dassert(false);
+            verify(false);
         }
     }
 

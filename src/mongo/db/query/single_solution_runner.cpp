@@ -87,7 +87,7 @@ namespace mongo {
     }
 
     Status SingleSolutionRunner::getExplainPlan(TypeExplain** explain) const {
-        dassert(_exec.get());
+        verify(_exec.get());
 
         scoped_ptr<PlanStageStats> stats(_exec->getStats());
         if (NULL == stats.get()) {
