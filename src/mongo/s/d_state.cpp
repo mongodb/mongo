@@ -788,7 +788,7 @@ namespace mongo {
         UnsetShardingCommand() : MongodShardCommand("unsetSharding") {}
 
         virtual void help( stringstream& help ) const {
-            help << " example: { unsetSharding : 1 } ";
+            help << "internal";
         }
 
         virtual LockType locktype() const { return NONE; }
@@ -799,7 +799,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::unsetSharding);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
@@ -815,7 +815,7 @@ namespace mongo {
         SetShardVersion() : MongodShardCommand("setShardVersion") {}
 
         virtual void help( stringstream& help ) const {
-            help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
+            help << "internal";
         }
 
         virtual bool slaveOk() const { return true; }
@@ -825,7 +825,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::setShardVersion);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 

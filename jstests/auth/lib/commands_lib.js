@@ -1758,7 +1758,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [
-                        { resource: {cluster: true}, actions: ["replSetElect"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -1792,7 +1792,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [
-                        { resource: {cluster: true}, actions: ["replSetFresh"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -1809,7 +1809,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [
-                        { resource: {cluster: true}, actions: ["replSetGetRBID"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -1849,7 +1849,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [
-                        { resource: {cluster: true}, actions: ["replSetHeartbeat"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -2025,7 +2025,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [
-                        { resource: {cluster: true}, actions: ["setShardVersion"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -2238,7 +2238,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     roles: {__system: 1},
                     privileges: [
-                        { resource: {cluster: true}, actions: ["unsetSharding"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },

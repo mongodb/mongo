@@ -57,19 +57,18 @@
 "grantPrivilegesToRole",
 "grantRolesToRole",  # Not used for permissions checks, but to id the event in logs.
 "grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
-"handshake",
 "hostInfo",
 "impersonate",
 "indexStats",
 "inprog",
 "insert",
+"internal", # Special action type that represents internal actions
 "invalidateUserCache",
 "killCursors",
 "killop",
 "listDatabases",
 "listShards",
 "logRotate",
-"mapReduceShardedFinish",
 "moveChunk",
 "netstat",
 "planCacheRead", # view contents of plan cache
@@ -81,14 +80,10 @@
 "renameCollectionSameDB",
 "repairDatabase",
 "replSetConfigure",
-"replSetElect",
-"replSetFresh",
-"replSetGetRBID",
 "replSetGetStatus",
 "replSetHeartbeat",
 "replSetReconfig",  # Not used for permissions checks, but to id the event in logs.
 "replSetStateChange",
-"replSetUpdatePosition",
 "resync",
 "revokeRole",
 "revokePrivilegesFromRole",
@@ -96,7 +91,6 @@
 "revokeRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
 "serverStatus",
 "setParameter",
-"setShardVersion",
 "shardCollection",  # Not used for permissions checks, but to id the event in logs.
 "shardingState",
 "shutdown",
@@ -106,7 +100,6 @@
 "top",
 "touch",
 "unlock",
-"unsetSharding",
 "update",
 "updateRole",  # Not used for permissions checks, but to id the event in logs.
 "updateUser",  # Not used for permissions checks, but to id the event in logs.
@@ -114,11 +107,5 @@
 "viewRole",
 "viewUser",
 "writebacklisten",
-"writeBacksQueued",
-"_migrateClone",
-"_recvChunkAbort",
-"_recvChunkCommit",
-"_recvChunkStart",
-"_recvChunkStatus",
-"_transferMods"]
+"writeBacksQueued"]
 
