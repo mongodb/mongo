@@ -55,8 +55,18 @@ namespace mongo {
         _btreeState(btreeState),
         _numAdded(0) {
         first = cur = BtreeBucket<V>::addBucket(btreeState);
-        b = cur.btreemod<V>();
+        b = _getModifiableBucket( cur );
         committed = false;
+    }
+
+    template<class V>
+    BtreeBucket<V>* BtreeBuilder<V>::_getModifiableBucket( DiskLoc loc ) {
+        return BtreeBucket<V>::asVersionMod( _btreeState->recordStore()->recordFor( loc ) );
+    }
+
+    template<class V>
+    const BtreeBucket<V>* BtreeBuilder<V>::_getBucket( DiskLoc loc ) {
+        return BtreeBucket<V>::asVersion( _btreeState->recordStore()->recordFor( loc ) );
     }
 
     template<class V>
@@ -64,13 +74,13 @@ namespace mongo {
         DiskLoc L = BtreeBucket<V>::addBucket(_btreeState);
         b->setTempNext(L);
         cur = L;
-        b = cur.btreemod<V>();
+        b = _getModifiableBucket( cur );
     }
 
     template<class V>
     void BtreeBuilder<V>::mayCommitProgressDurably() {
         if ( getDur().commitIfNeeded() ) {
-            b = cur.btreemod<V>();
+            b = _getModifiableBucket( cur );
         }
     }
 
@@ -114,7 +124,7 @@ namespace mongo {
     void BtreeBuilder<V>::buildNextLevel(DiskLoc loc, bool mayInterrupt) {
         int levels = 1;
         while( 1 ) {
-            if( loc.btree<V>()->tempNext().isNull() ) {
+            if( _getBucket(loc)->tempNext().isNull() ) {
                 // only 1 bucket at this level. we are done.
                 _btreeState->setHead( loc );
                 break;
@@ -123,18 +133,18 @@ namespace mongo {
 
             DiskLoc upLoc = BtreeBucket<V>::addBucket(_btreeState);
             DiskLoc upStart = upLoc;
-            BtreeBucket<V> *up = upLoc.btreemod<V>();
+            BtreeBucket<V> *up = _getModifiableBucket( upLoc );
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
                 killCurrentOp.checkForInterrupt( !mayInterrupt );
 
                 if ( getDur().commitIfNeeded() ) {
-                    b = cur.btreemod<V>();
-                    up = upLoc.btreemod<V>();
+                    b = _getModifiableBucket( cur );
+                    up = _getModifiableBucket( upLoc );
                 }
 
-                BtreeBucket<V> *x = xloc.btreemod<V>();
+                BtreeBucket<V> *x = _getModifiableBucket( xloc );
                 Key k;
                 DiskLoc r;
                 x->popBack(r,k);
@@ -146,7 +156,7 @@ namespace mongo {
                     DiskLoc n = BtreeBucket<V>::addBucket(_btreeState);
                     up->setTempNext(n);
                     upLoc = n;
-                    up = upLoc.btreemod<V>();
+                    up = _getModifiableBucket( upLoc );
                     up->pushBack(r, k, _btreeState->ordering(), keepLoc);
                 }
 
@@ -157,7 +167,7 @@ namespace mongo {
                 else {
                     if ( !x->nextChild.isNull() ) {
                         DiskLoc ll = x->nextChild;
-                        ll.btreemod<V>()->parent = upLoc;
+                        _getModifiableBucket(ll)->parent = upLoc;
                         //(x->nextChild.btreemod<V>())->parent = upLoc;
                     }
                     x->deallocBucket( _btreeState, xloc );

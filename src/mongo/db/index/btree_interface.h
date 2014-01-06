@@ -119,22 +119,26 @@ namespace mongo {
          * Is the key at (bucket, keyOffset) being used or not?
          * Some keys are marked as not used and skipped.
          */
-        virtual bool keyIsUsed(DiskLoc bucket, int keyOffset) const = 0;
+        virtual bool keyIsUsed(const IndexCatalogEntry* btreeState,
+                               DiskLoc bucket, int keyOffset) const = 0;
 
         /**
          * Get the BSON representation of the key at (bucket, keyOffset).
          */
-        virtual BSONObj keyAt(DiskLoc bucket, int keyOffset) const = 0;
+        virtual BSONObj keyAt(const IndexCatalogEntry* btreeState,
+                              DiskLoc bucket, int keyOffset) const = 0;
 
         /**
          * Get the DiskLoc that the key at (bucket, keyOffset) points at.
          */
-        virtual DiskLoc recordAt(DiskLoc bucket, int keyOffset) const = 0;
+        virtual DiskLoc recordAt(const IndexCatalogEntry* btreeState,
+                                 DiskLoc bucket, int keyOffset) const = 0;
 
         /**
          * keyAt and recordAt at the same time.
          */
-        virtual void keyAndRecordAt(DiskLoc bucket, int keyOffset, BSONObj* keyOut,
+        virtual void keyAndRecordAt(const IndexCatalogEntry* btreeState,
+                                    DiskLoc bucket, int keyOffset, BSONObj* keyOut,
                                     DiskLoc* recordOut) const = 0;
     };
 

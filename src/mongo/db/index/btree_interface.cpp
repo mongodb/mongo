@@ -145,13 +145,15 @@ namespace mongo {
         }
 
 
-        virtual bool keyIsUsed(DiskLoc bucket, int keyOffset) const {
-            return bucket.btree<Version>()->k(keyOffset).isUsed();
+        virtual bool keyIsUsed(const IndexCatalogEntry* btreeState,
+                               DiskLoc bucket, int keyOffset) const {
+            return getBucket(btreeState,bucket)->k(keyOffset).isUsed();
         }
 
-        virtual BSONObj keyAt(DiskLoc bucket, int keyOffset) const {
+        virtual BSONObj keyAt(const IndexCatalogEntry* btreeState,
+                              DiskLoc bucket, int keyOffset) const {
             verify(!bucket.isNull());
-            const BtreeBucket<Version> *b = bucket.btree<Version>();
+            const BtreeBucket<Version> *b = getBucket(btreeState,bucket);
             int n = b->getN();
             if (n == b->INVALID_N_SENTINEL) {
                 throw UserException(deletedBucketCode, "keyAt bucket deleted");
@@ -160,15 +162,17 @@ namespace mongo {
             return keyOffset >= n ? BSONObj() : b->keyNode(keyOffset).key.toBson();
         }
 
-        virtual DiskLoc recordAt(DiskLoc bucket, int keyOffset) const {
-            const BtreeBucket<Version> *b = bucket.btree<Version>();
+        virtual DiskLoc recordAt(const IndexCatalogEntry* btreeState,
+                                 DiskLoc bucket, int keyOffset) const {
+            const BtreeBucket<Version> *b = getBucket(btreeState,bucket);
             return b->keyNode(keyOffset).recordLoc;
         }
 
-        virtual void keyAndRecordAt(DiskLoc bucket, int keyOffset, BSONObj* keyOut,
+        virtual void keyAndRecordAt(const IndexCatalogEntry* btreeState,
+                                    DiskLoc bucket, int keyOffset, BSONObj* keyOut,
                                     DiskLoc* recordOut) const {
             verify(!bucket.isNull());
-            const BtreeBucket<Version> *b = bucket.btree<Version>();
+            const BtreeBucket<Version> *b = getBucket(btreeState,bucket);
 
             int n = b->getN();
 

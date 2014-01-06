@@ -60,6 +60,10 @@ namespace mongo {
         void buildNextLevel(DiskLoc loc, bool mayInterrupt);
         void mayCommitProgressDurably();
 
+        BtreeBucket<V>* _getModifiableBucket( DiskLoc loc );
+        const BtreeBucket<V>* _getBucket( DiskLoc loc );
+
+
     public:
         BtreeBuilder(bool dupsAllowed, IndexCatalogEntry* idx);
 

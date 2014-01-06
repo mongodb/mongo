@@ -146,12 +146,12 @@ namespace mongo {
 
     BSONObj BtreeIndexCursor::getKey() const {
         verify(!_bucket.isNull());
-        return _interface->keyAt(_bucket, _keyOffset);
+        return _interface->keyAt(_btreeState, _bucket, _keyOffset);
     }
 
     DiskLoc BtreeIndexCursor::getValue() const {
         verify(!_bucket.isNull());
-        return _interface->recordAt(_bucket, _keyOffset);
+        return _interface->recordAt(_btreeState, _bucket, _keyOffset);
     }
 
     void BtreeIndexCursor::next() { advance("BtreeIndexCursor::next"); skipUnusedKeys(); }
@@ -219,7 +219,7 @@ namespace mongo {
     void BtreeIndexCursor::skipUnusedKeys() {
         int skipped = 0;
 
-        while (!isEOF() && !_interface->keyIsUsed(_bucket, _keyOffset)) {
+        while (!isEOF() && !_interface->keyIsUsed(_btreeState, _bucket, _keyOffset)) {
             advance("BtreeIndexCursor::skipUnusedKeys");
             ++skipped;
         }
@@ -231,11 +231,11 @@ namespace mongo {
 
     bool BtreeIndexCursor::isSavedPositionValid() {
         // We saved the key.  If it's in the same position we saved it from...
-        if (_interface->keyAt(_bucket, _keyOffset).binaryEqual(_savedKey)) {
+        if (_interface->keyAt(_btreeState, _bucket, _keyOffset).binaryEqual(_savedKey)) {
             // And the record it points to is the same record...
-            if (_interface->recordAt(_bucket, _keyOffset) == _savedLoc) {
+            if (_interface->recordAt(_btreeState, _bucket, _keyOffset) == _savedLoc) {
                 // Success!  We found it.  However!
-                if (!_interface->keyIsUsed(_bucket, _keyOffset)) {
+                if (!_interface->keyIsUsed(_btreeState, _bucket, _keyOffset)) {
                     // We could have been deleted but still exist as a "vacant" key, so skip
                     // over any unused keys.
                     skipUnusedKeys();
