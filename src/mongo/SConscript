@@ -690,8 +690,6 @@ env.Library('coreshard', ['client/distlock.cpp',
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",
     "s/strategy.cpp",
-    "s/strategy_shard.cpp",
-    "s/strategy_single.cpp",
     "s/commands_admin.cpp",
     "s/commands_public.cpp",
     "s/commands/cluster_merge_chunks_cmd.cpp",

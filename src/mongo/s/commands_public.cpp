@@ -734,7 +734,7 @@ namespace mongo {
 
                 vector<Strategy::CommandResult> countResult;
 
-                SHARDED->commandOp( dbName, countCmdBuilder.done(),
+                STRATEGY->commandOp( dbName, countCmdBuilder.done(),
                             options, fullns, filter, &countResult );
 
                 long long total = 0;
@@ -1192,7 +1192,7 @@ namespace mongo {
                     BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
                     vector<Strategy::CommandResult> results;
-                    SHARDED->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
+                    STRATEGY->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
                     verify(results.size() == 1); // querying on shard key so should only talk to one shard
                     BSONObj res = results.begin()->result;
 
@@ -1225,7 +1225,7 @@ namespace mongo {
 
                         vector<Strategy::CommandResult> results;
                         try {
-                            SHARDED->commandOp(dbName, shardCmd, 0, fullns, finder, &results);
+                            STRATEGY->commandOp(dbName, shardCmd, 0, fullns, finder, &results);
                         }
                         catch( DBException& e ){
                             //This is handled below and logged
@@ -1583,7 +1583,7 @@ namespace mongo {
                     */
 
                     try {
-                        SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
+                        STRATEGY->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
                     }
                     catch( DBException& e ){
                         e.addContext( str::stream() << "could not run map command on all shards for ns " << fullns << " and query " << q );
@@ -1734,7 +1734,7 @@ namespace mongo {
                         results.clear();
 
                         try {
-                            SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), &results );
+                            STRATEGY->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), &results );
                             ok = true;
                         }
                         catch( DBException& e ){
@@ -1993,7 +1993,7 @@ namespace mongo {
             // Run the command on the shards
             // TODO need to make sure cursors are killed if a retry is needed
             vector<Strategy::CommandResult> shardResults;
-            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
+            STRATEGY->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
             if (pPipeline->isExplain()) {
                 result << "splitPipeline" << DOC("shardsPart" << pShardPipeline->writeExplainOps()
@@ -2092,7 +2092,7 @@ namespace mongo {
 
             // Run the command on the shards
             vector<Strategy::CommandResult> shardResults;
-            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
+            STRATEGY->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
             mergePipeline->addInitialSource(
                     DocumentSourceCommandShards::create(shardResults, mergePipeline->getContext()));

@@ -122,8 +122,6 @@ namespace mongo {
                << " attempt: " << attempt
                << endl;
 
-        Strategy * s = SHARDED;
-
         _d.markSet();
 
         bool iscmd = false;
@@ -140,17 +138,17 @@ namespace mongo {
                                               << ") for $cmd type ns - can only be 1 or -1",
                          n == 1 || n == -1 );
 
-                SINGLE->queryOp(*this);
+                STRATEGY->clientCommandOp(*this);
             }
             else {
-                s->queryOp( *this );
+                STRATEGY->queryOp( *this );
             }
         }
         else if ( op == dbGetMore ) {
-            s->getMore( *this );
+            STRATEGY->getMore( *this );
         }
         else {
-            s->writeOp( op, *this );
+            STRATEGY->writeOp( op, *this );
         }
 
         LOG(3) << "Request::process end ns: " << getns()

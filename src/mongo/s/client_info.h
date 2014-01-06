@@ -143,18 +143,6 @@ namespace mongo {
         static ClientInfo* create(AbstractMessagingPort* messagingPort);
 
     private:
-        struct WBInfo {
-            WBInfo( const WriteBackListener::ConnectionIdent& c, OID o, bool fromLastOperation )
-                : ident( c ), id( o ), fromLastOperation( fromLastOperation ) {}
-            WriteBackListener::ConnectionIdent ident;
-            OID id;
-            bool fromLastOperation;
-        };
-
-        // for getLastError
-        void _addWriteBack( vector<WBInfo>& all , const BSONObj& o, bool fromLastOperation );
-        vector<BSONObj> _handleWriteBacks( const vector<WBInfo>& all , bool fromWriteBackListener );
-
 
         int _id; // unique client id
         HostAndPort _remote; // server:port of remote socket end

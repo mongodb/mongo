@@ -142,7 +142,7 @@ namespace mongo {
                 r.process();
 
                 // Release connections after non-write op 
-                if ( ShardConnection::releaseConnectionsAfterResponse && r.expectResponse() ) {
+                if ( r.expectResponse() ) {
                     LOG(2) << "release thread local connections back to pool" << endl;
                     ShardConnection::releaseMyConnections();
                 }

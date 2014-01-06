@@ -1525,36 +1525,22 @@ namespace mongo {
                 LastError *le = lastError.disableForCommand();
                 verify( le );
 
-                if ( Strategy::useClusterWriteCommands ) {
 
-                    // Write commands always have the error stored in the mongos last error
-                    if ( le->nPrev == 1 ) {
-                        le->appendSelf( result );
-                    }
-                    else {
-                        result.appendNull( "err" );
-                    }
-
-                    bool wcResult = ClientInfo::get()->enforceWriteConcern( dbName,
-                                                                            cmdObj,
-                                                                            &errmsg );
-
-                    // Don't forget about our last hosts, reset the client info
-                    ClientInfo::get()->disableForCommand();
-                    return wcResult;
+                // Write commands always have the error stored in the mongos last error
+                if ( le->nPrev == 1 ) {
+                    le->appendSelf( result );
+                }
+                else {
+                    result.appendNull( "err" );
                 }
 
-                {
-                    if ( le->msg.size() && le->nPrev == 1 ) {
-                        le->appendSelf( result );
-                        return true;
-                    }
-                }
+                bool wcResult = ClientInfo::get()->enforceWriteConcern( dbName,
+                                                                        cmdObj,
+                                                                        &errmsg );
 
-                ClientInfo * client = ClientInfo::get();
-                bool res = client->getLastError( dbName, cmdObj , result, errmsg );
-                client->disableForCommand();
-                return res;
+                // Don't forget about our last hosts, reset the client info
+                ClientInfo::get()->disableForCommand();
+                return wcResult;
             }
         } cmdGetLastError;
 

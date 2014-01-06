@@ -51,29 +51,8 @@ namespace mongo {
     class WriteBackListener : public BackgroundJob {
     public:
 
-        class ConnectionIdent {
-        public:
-            ConnectionIdent( const string& ii , ConnectionId id )
-                : instanceIdent( ii ) , connectionId( id ) {
-            }
-
-            bool operator<(const ConnectionIdent& other) const {
-                if ( instanceIdent == other.instanceIdent )
-                    return connectionId < other.connectionId;
-
-                return instanceIdent < other.instanceIdent;
-            }
-
-            string toString() const { return str::stream() << instanceIdent << ":" << connectionId; }
-
-            string instanceIdent;
-            ConnectionId connectionId;
-        };
-
         static void init( DBClientBase& conn );
         static void init( const string& host );
-
-        static BSONObj waitFor( const ConnectionIdent& ident, const OID& oid );
 
     protected:
         WriteBackListener( const string& addr );
@@ -89,15 +68,6 @@ namespace mongo {
         static unordered_map<string,WriteBackListener*> _cache; // server to listener
         static unordered_set<string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes
 
-        struct WBStatus {
-            OID id;
-            BSONObj gle;
-        };
-
-        static mongo::mutex _seenWritebacksLock;  // protects _seenWritbacks
-        static map<ConnectionIdent,WBStatus> _seenWritebacks; // connectionId -> last write back GLE
     };
-
-    void waitForWriteback( const OID& oid );
 
 }  // namespace mongo
