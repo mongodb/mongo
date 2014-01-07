@@ -1201,7 +1201,7 @@ DB.prototype._authOrThrow = function () {
     else if (arguments.length == 1) {
         if (typeof(arguments[0]) != "object")
             throw Error("Single-argument form of auth expects a parameter object");
-        params = arguments[0];
+        params = Object.extend({}, arguments[0]);
     }
     else {
         throw Error(
