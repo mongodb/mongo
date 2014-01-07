@@ -30,7 +30,7 @@ namespace mongo {
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
 
     void DBClientCursor::_finishConsInit() {
-        _originalHost = _client->toString();
+        _originalHost = _client->getServerAddress();
     }
 
     int DBClientCursor::nextBatchSize() {

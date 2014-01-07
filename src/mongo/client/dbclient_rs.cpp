@@ -808,7 +808,7 @@ namespace mongo {
             }
 
             if (errmsg.empty()) {
-                log() << "successfully connected to new host " << *i
+                log() << "successfully connected to new host " << newConn->toString()
                         << " in replica set " << this->_name << endl;
             }
             else {
@@ -1237,7 +1237,7 @@ namespace mongo {
             }
 
             if (conn.get() != NULL && errmsg.empty()) {
-                log() << "successfully connected to seed " << *iter
+                log() << "successfully connected to seed " << conn->toString()
                         << " for replica set " << _name << endl;
 
                 string maybePrimary;

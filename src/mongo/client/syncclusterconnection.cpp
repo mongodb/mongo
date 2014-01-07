@@ -426,7 +426,18 @@ namespace mongo {
 
     string SyncClusterConnection::_toString() const {
         stringstream ss;
-        ss << "SyncClusterConnection [" << _address << "]";
+        ss << "SyncClusterConnection ";
+        ss << " [";
+        for ( size_t i = 0; i < _conns.size(); i++ ) {
+            if ( i != 0 ) ss << ",";
+            if ( _conns[i] ) {
+                ss << _conns[i]->toString();
+            }
+            else {
+                ss << "(no conn)";
+            }
+        }
+        ss << "]";
         return ss.str();
     }
 

@@ -170,20 +170,16 @@ namespace mongo {
             dassert( requestMetadata );
 
             // Make sure our shard name is set or is the same as what was set previously
-            if ( !shardingState.setShardName( requestMetadata->getShardName() ) ) {
-
-                // If our shard name is stale, our version must have been stale as well
-                dassert( writeErrors.size() == request.sizeWriteOps() );
-                warning() << "shard name " << requestMetadata->getShardName()
-                          << " in batch does not match previously-set shard name "
-                          << shardingState.getShardName() << ", not reloading metadata" << endl;
-            }
-            else {
+            if ( shardingState.setShardName( requestMetadata->getShardName() ) ) {
                 // Refresh our shard version
                 ChunkVersion latestShardVersion;
                 shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
                                                        requestMetadata->getShardVersion(),
                                                        &latestShardVersion );
+            }
+            else {
+                // If our shard name is stale, our version must have been stale as well
+                dassert( writeErrors.size() == request.sizeWriteOps() );
             }
         }
 

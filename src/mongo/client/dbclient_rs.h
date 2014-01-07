@@ -506,7 +506,7 @@ namespace mongo {
 
         double getSoTimeout() const { return _so_timeout; }
 
-        string toString() { return getServerAddress(); }
+        string toString() const { return getServerAddress(); }
 
         string getServerAddress() const;
 

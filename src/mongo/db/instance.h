@@ -95,7 +95,7 @@ namespace mongo {
             return true;
         }
 
-        virtual string toString() {
+        virtual string toString() const {
             return "DBDirectClient";
         }
         virtual string getServerAddress() const {

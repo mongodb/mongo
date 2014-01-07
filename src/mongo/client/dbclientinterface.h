@@ -968,7 +968,7 @@ namespace mongo {
             return ret;
         }
 
-        virtual string toString() = 0;
+        virtual string toString() const = 0;
 
         /**
          * A function type for runCommand hooking; the function takes a pointer
@@ -1268,15 +1268,13 @@ namespace mongo {
 
         MessagingPort& port() { verify(p); return *p; }
 
-        string toStringLong() const {
+        string toString() const {
             stringstream ss;
             ss << _serverString;
+            if ( !_serverAddrString.empty() ) ss << " (" << _serverAddrString << ")";
             if ( _failed ) ss << " failed";
             return ss.str();
         }
-
-        /** Returns the address of the server */
-        string toString() { return _serverString; }
 
         string getServerAddress() const { return _serverString; }
 
@@ -1325,7 +1323,8 @@ namespace mongo {
         const bool autoReconnect;
         Backoff autoReconnectBackoff;
         HostAndPort _server; // remember for reconnects
-        string _serverString;
+        string _serverString;     // server host and port
+        string _serverAddrString; // resolved ip of server
         void _checkConnection();
 
         // throws SocketException if in failed state and not reconnecting or if waiting to reconnect

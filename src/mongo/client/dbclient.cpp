@@ -897,27 +897,35 @@ namespace mongo {
 
     bool DBClientConnection::_connect( string& errmsg ) {
         _serverString = _server.toString();
+        _serverAddrString.clear();
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
         server.reset(new SockAddr(_server.host().c_str(), _server.port()));
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
-        if (_server.host().empty() || server->getAddr() == "0.0.0.0") {
-            stringstream s;
-            errmsg = 
-                str::stream() << "couldn't connect to server " << _server.toString();
+        if (_server.host().empty() ) {
+            errmsg = str::stream() << "couldn't connect to server " << toString()
+                                   << ", host is empty";
             return false;
         }
 
-        // if( _so_timeout == 0 ){
-        //    printStackTrace();
-        //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
-        // }
+        _serverAddrString = server->getAddr();
+
+        if ( _serverAddrString == "0.0.0.0" ) {
+            errmsg = str::stream() << "couldn't connect to server " << toString()
+                                   << ", address resolved to 0.0.0.0";
+            return false;
+        }
+
         if ( !p->connect(*server) ) {
-            errmsg = str::stream() << "couldn't connect to server " << _server.toString();
+            errmsg = str::stream() << "couldn't connect to server " << toString()
+                                   << ", connection attempt failed";
             _failed = true;
             return false;
+        }
+        else {
+            LOG( 1 ) << "connected to server " << toString() << endl;
         }
 
 #ifdef MONGO_SSL
@@ -961,16 +969,16 @@ namespace mongo {
         // Don't hammer reconnects, backoff if needed
         autoReconnectBackoff.nextSleepMillis();
 
-        LOG(_logLevel) << "trying reconnect to " << _serverString << endl;
+        LOG(_logLevel) << "trying reconnect to " << toString() << endl;
         string errmsg;
         _failed = false;
         if ( ! _connect(errmsg) ) {
             _failed = true;
-            LOG(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
+            LOG(_logLevel) << "reconnect " << toString() << " failed " << errmsg << endl;
             throw SocketException( SocketException::CONNECT_ERROR , toString() );
         }
 
-        LOG(_logLevel) << "reconnect " << _serverString << " ok" << endl;
+        LOG(_logLevel) << "reconnect " << toString() << " ok" << endl;
         for( map<string, BSONObj>::const_iterator i = authCache.begin(); i != authCache.end(); i++ ) {
             try {
                 DBClientConnection::_auth(i->second);

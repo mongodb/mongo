@@ -101,7 +101,7 @@ namespace mongo {
         return _remoteServer->getServerAddress();
     }
 
-    string MockDBClientConnection::toString() {
+    string MockDBClientConnection::toString() const {
         return _remoteServer->toString();
     }
 

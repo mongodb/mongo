@@ -64,9 +64,16 @@ namespace mongo {
                 ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
                 auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS , Query());
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
+
+                int numShards = 0;
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
+                    ++numShards;
                 }
+
+                LOG( 1 ) << "found " << numShards << " shards listed on config server(s): "
+                         << conn.get()->toString() << endl;
+
                 conn.done();
             }
 
