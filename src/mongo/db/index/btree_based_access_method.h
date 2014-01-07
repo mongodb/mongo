@@ -75,6 +75,8 @@ namespace mongo {
 
         virtual Status newCursor(IndexCursor **out) const = 0;
 
+        virtual Status initializeAsEmpty();
+
         virtual Status touch(const BSONObj& obj);
 
         virtual Status validate(int64_t* numKeys);

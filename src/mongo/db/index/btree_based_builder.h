@@ -62,8 +62,6 @@ namespace mongo {
                                        IndexCatalogEntry* descriptor,
                                        bool mayInterrupt);
 
-        static DiskLoc makeEmptyIndex(IndexCatalogEntry* idx);
-
         static ExternalSortComparison* getComparison(int version,
                                                      const BSONObj& keyPattern);
 

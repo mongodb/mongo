@@ -136,14 +136,6 @@ namespace mongo {
         }
     }
 
-    DiskLoc BtreeBasedBuilder::makeEmptyIndex(IndexCatalogEntry* idx) {
-        if (0 == idx->descriptor()->version()) {
-            return BtreeBucket<V0>::addBucket(idx);
-        } else {
-            return BtreeBucket<V1>::addBucket(idx);
-        }
-    }
-
     ExternalSortComparison* BtreeBasedBuilder::getComparison(int version,
                                                              const BSONObj& keyPattern) {
         if (0 == version) {

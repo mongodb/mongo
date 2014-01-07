@@ -114,7 +114,11 @@ namespace mongo {
         prep( ns );
 
         try {
-            btreeState->setHead( BtreeBasedBuilder::makeEmptyIndex( btreeState ) );
+            Status status = btreeState->accessMethod()->initializeAsEmpty();
+            massert( 17342,
+                     str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
+                     status.isOK() );
+
             unsigned long long n = addExistingToIndex( collection, btreeState->descriptor() );
             // idx may point at an invalid index entry at this point
             done( ns );
@@ -245,7 +249,13 @@ namespace mongo {
 
         verify( Lock::isWriteLocked( ns ) );
 
-        if( inDBRepair || !idxInfo["background"].trueValue() ) {
+        if ( collection->numRecords() == 0 ) {
+            Status status = btreeState->accessMethod()->initializeAsEmpty();
+            massert( 17343,
+                     str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
+                     status.isOK() );
+        }
+        else if ( inDBRepair || !idxInfo["background"].trueValue() ) {
             n = BtreeBasedBuilder::fastBuildIndex( collection, btreeState, mayInterrupt );
             verify( !btreeState->head().isNull() );
         }

@@ -159,6 +159,26 @@ namespace mongo {
         }
     }
 
+    Status BtreeBasedAccessMethod::initializeAsEmpty() {
+        if ( !_btreeState->head().isNull() )
+            return Status( ErrorCodes::InternalError, "index already initialized" );
+
+        DiskLoc newHead;
+        if ( 0 == _descriptor->version() ) {
+            newHead = BtreeBucket<V0>::addBucket( _btreeState );
+        }
+        else if ( 1 == _descriptor->version() ) {
+            newHead = BtreeBucket<V1>::addBucket( _btreeState );
+        }
+        else {
+            return Status( ErrorCodes::InternalError, "invalid index number" );
+        }
+        _btreeState->setHead( newHead );
+
+        return Status::OK();
+    }
+
+
     Status BtreeBasedAccessMethod::touch(const BSONObj& obj) {
         BSONObjSet keys;
         getKeys(obj, &keys);

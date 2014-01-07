@@ -110,6 +110,16 @@ namespace mongo {
          */
         virtual Status newCursor(IndexCursor **out) const = 0;
 
+        // ------ index level operations ------
+
+
+        /**
+         * initializes this index
+         * only called once for the lifetime of the index
+         * if called multiple times, is an error
+         */
+        virtual Status initializeAsEmpty() = 0;
+
         /**
          * Try to page-in the pages that contain the keys generated from 'obj'.
          * This can be used to speed up future accesses to an index by trying to ensure the
