@@ -57,6 +57,7 @@
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/writeback_listener.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
@@ -1451,6 +1452,8 @@ namespace mongo {
                 result.append("msg", "isdbgrid");
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
                 result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
+                result.appendNumber("maxWriteBatchSize",
+                                    BatchedCommandRequest::kMaxWriteBatchSize);
                 result.appendDate("localTime", jsTime());
 
                 // Mongos tries to keep exactly the same version range of the server it is

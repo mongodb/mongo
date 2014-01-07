@@ -47,6 +47,9 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(BatchedCommandRequest);
     public:
 
+        // Maximum number of write ops supported per batch
+        static const int kMaxWriteBatchSize = 1000;
+
         enum BatchType {
             BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown
         };

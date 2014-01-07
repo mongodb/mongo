@@ -42,6 +42,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
@@ -178,6 +179,7 @@ namespace mongo {
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
+            result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
             result.appendDate("localTime", jsTime());
             result.append("maxWireVersion", maxWireVersion);
             result.append("minWireVersion", minWireVersion);
