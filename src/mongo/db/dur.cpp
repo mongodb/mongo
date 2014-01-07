@@ -698,6 +698,8 @@ namespace mongo {
             //
             DEV verify( !commitJob.hasWritten() );
             if( !Lock::isW() ) {
+                // todo: note we end up here i believe if our lock state is X -- and that might not be what we want.
+
                 // REMAPPRIVATEVIEW needs done in a write lock (as there is a short window during remapping when each view 
                 // might not exist) thus we do it later.
                 // 
@@ -724,11 +726,11 @@ namespace mongo {
             }
         }
 
-        /** locking: in read lock when called
-                     or, for early commits (commitIfNeeded), in write lock
+        /** locking: in at least 'R' when called
+                     or, for early commits (commitIfNeeded), in W or X
             @param lwg set if the durcommitthread *only* -- then we will upgrade the lock 
-                   to W so we can remapprivateview. only durcommitthread as more than one 
-                   thread upgrading would potentially deadlock
+                   to W so we can remapprivateview. only durcommitthread calls with 
+                   lgw != 0 as more than one thread upgrading would deadlock
             @see DurableMappedFile::close()
         */
         static void groupCommit(Lock::GlobalWrite *lgw) {
