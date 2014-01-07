@@ -176,7 +176,7 @@ namespace {
             out[TypeExplain::cursor()] = Value(info->getCursor());
 
         if (info->isIsMultiKeySet())
-            out[TypeExplain::isMultiKey()] = Value(info->isMultiKey());
+            out[TypeExplain::isMultiKey()] = Value(info->getIsMultiKey());
 
         if (info->isScanAndOrderSet())
             out[TypeExplain::scanAndOrder()] = Value(info->getScanAndOrder());
