@@ -41,7 +41,7 @@
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/index/btree_access_method_internal.h"
+#include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/haystack_access_method.h"
