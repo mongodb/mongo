@@ -27,10 +27,7 @@ var randEnvironment = function(){
 	if( Random.rand() < 0.5 ){
 		return { max : 180, 
 				 min : -180, 
-                 // QUERY_MIGRATION: if it's spherical we don't change the # of bits.
-                 // The "will this wrap" function for query planning currently ignores the error
-                 // from low #s of bits.  See SERVER-11387.
-				 // bits : Math.floor( Random.rand() * 32 ) + 1, 
+				 bits : Math.floor( Random.rand() * 32 ) + 1, 
 				 earth : true,
 				 bucketSize : 360 / ( 4 * 1024 * 1024 * 1024 ) }
 	}
@@ -48,9 +45,7 @@ var randEnvironment = function(){
     	
 	return { max : max,
 		     min : min,
-             // QUERY_MIGRATION: We don't use the # of bits (yet) in creating geohashers
-             // so we get this wrong for flat as well.
-		     // bits : bits,
+		     bits : bits,
 		     earth : false,
 		     bucketSize : bucketSize }
 	
@@ -126,9 +121,17 @@ function computexscandist(y, maxDistDegrees) {
                                      Math.cos(deg2rad(Math.max(-89.0, y - maxDistDegrees))));
 }
 
-function pointIsOK(startPoint, radius) {
-    // QUERY_MIGRATION: figure out a better error
-    yscandist = rad2deg(radius) + 0.01;
+function errorMarginForPoint(env) {
+    if (!env.bits) {
+        return 0.01;
+    }
+    var scalingFactor = Math.pow(2, env.bits);
+    return ((env.max - env.min) / scalingFactor) * Math.sqrt(2);
+}
+
+function pointIsOK(startPoint, radius, env) {
+    var error = errorMarginForPoint(env);
+    yscandist = rad2deg(radius) + error;
     xscandist = computexscandist(startPoint[1], yscandist);
     return (startPoint[0] + xscandist < 180)
            && (startPoint[0] - xscandist > -180)
@@ -149,7 +152,7 @@ var randQuery = function( env ) {
 		for( i = 0; i < 5; i++ ){
             sphereRadius = Random.rand() * 45 * Math.PI / 180
             sphereCenter = randPoint( env )
-            if (pointIsOK(sphereCenter, sphereRadius)) { break; }
+            if (pointIsOK(sphereCenter, sphereRadius, env)) { break; }
             /*
 			var t = db.testSphere; t.drop(); t.ensureIndex({ loc : "2d" }, env )
 			try{ t.find({ loc : { $within : { $centerSphere : [ sphereCenter, sphereRadius ] } } } ).count(); var err; if( err = db.getLastError() ) throw err;  }
