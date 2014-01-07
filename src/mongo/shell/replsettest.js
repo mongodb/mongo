@@ -117,7 +117,7 @@ ReplSetTest.prototype.getNodeId = function(node) {
         }
     }
     
-    if( node.nodeId ) return parseInt( node.nodeId )
+    if( node.nodeId != null ) return parseInt( node.nodeId )
     
     return undefined
     
