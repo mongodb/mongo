@@ -21,7 +21,7 @@ env.Append(CCFLAGS=['-DDEBUG_MODE=false'])
 if use_clang:
     env.Append(CCFLAGS=['-Wno-mismatched-tags'])
 
-env.StaticLibrary( "s2",
+env.Library( "s2",
     [ 
 	"s1angle.cc",
 	"s2.cc",

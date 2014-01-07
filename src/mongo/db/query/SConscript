@@ -82,7 +82,7 @@ env.Library(
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target="query_logger",
     source=[
         "qlog.cpp"
