@@ -96,6 +96,8 @@ namespace mongo {
     }
 
     void IndexCatalogEntry::setMultikey() {
+        if ( isMultikey() )
+            return;
         NamespaceDetails* nsd = _collection->details();
         int idxNo = _indexNo();
         if ( nsd->setIndexIsMultikey( idxNo, true ) )

@@ -30,8 +30,9 @@
 
 #include <boost/thread.hpp>
 
+#include "mongo/db/database.h"
 #include "mongo/db/extsort.h"
-#include "mongo/db/index/btree_based_builder.h"
+#include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/cstdint.h"
@@ -51,8 +52,8 @@ namespace ExtSortTests {
 
     static const char* const _ns = "unittests.extsort";
     DBDirectClient _client;
-    ExternalSortComparison* _arbitrarySort = BtreeBasedBuilder::getComparison(time(0)%2, BSONObj());
-    ExternalSortComparison* _aFirstSort = BtreeBasedBuilder::getComparison(0, BSON("a" << 1));
+    ExternalSortComparison* _arbitrarySort = BtreeBasedAccessMethod::getComparison(time(0)%2, BSONObj());
+    ExternalSortComparison* _aFirstSort = BtreeBasedAccessMethod::getComparison(0, BSON("a" << 1));
 
     /** Sort four values. */
     class SortFour {
@@ -319,7 +320,7 @@ namespace ExtSortTests {
             coll->insertDocument( b.obj(), true );
             // Create a sorter with a max file size of only 10k, to trigger a file flush after a
             // relatively small number of inserts.
-            auto_ptr<ExternalSortComparison> cmp(BtreeBasedBuilder::getComparison(0,
+            auto_ptr<ExternalSortComparison> cmp(BtreeBasedAccessMethod::getComparison(0,
                 BSON("a" << 1)));
             BSONObjExternalSorter sorter(cmp.get(), 10 * 1024 );
             // Register a request to kill the current operation.

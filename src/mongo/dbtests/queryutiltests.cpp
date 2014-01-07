@@ -1596,7 +1596,7 @@ namespace QueryUtilTests {
             static const char *ns() { return "unittests.FieldRangeSetPairTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             Client::Context* ctx() { return &_ctx; }
-            IndexDetails *index( const BSONObj &key ) {
+            IndexDetails *index( const BSONObj &key, int* indexNoOut = NULL ) {
                 stringstream ss;
                 ss << indexNum_++;
                 string name = ss.str();
@@ -1604,14 +1604,20 @@ namespace QueryUtilTests {
                 client_.ensureIndex( ns(), key, false, name.c_str() );
                 NamespaceDetails *d = nsd();
                 for( int i = 0; i < d->getCompletedIndexCount(); ++i ) {
-                    if ( d->idx(i).keyPattern() == key /*indexName() == name*/ || ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) )
+                    if ( d->idx(i).keyPattern() == key /*indexName() == name*/ ||
+                         ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) ) {
+                        if ( indexNoOut )
+                            *indexNoOut = i;
                         return &d->idx(i);
+                    }
                 }
                 verify( false );
                 return 0;
             }
             int indexno( const BSONObj &key ) {
-                return nsd()->idxNo( *index(key) );
+                int idxNo;
+                ASSERT( index(key, &idxNo) );
+                return idxNo;
             }
             static DBDirectClient client_;
         private:

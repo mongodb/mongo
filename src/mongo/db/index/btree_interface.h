@@ -115,6 +115,9 @@ namespace mongo {
          * two on-disk formats.
          */
 
+        virtual int nKeys(const IndexCatalogEntry* btreeState,
+                          DiskLoc bucket ) = 0;
+
         /**
          * Is the key at (bucket, keyOffset) being used or not?
          * Some keys are marked as not used and skipped.

@@ -58,7 +58,6 @@ namespace mongo {
     class Extent;
     class OpDebug;
     class Record;
-    struct SortPhaseOne;
 
     void dropDatabase(const std::string& db);
     bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);

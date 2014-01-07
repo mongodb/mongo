@@ -145,6 +145,12 @@ namespace mongo {
         }
 
 
+        virtual int nKeys(const IndexCatalogEntry* btreeState,
+                          DiskLoc bucket ) {
+            return getBucket(btreeState,bucket)->nKeys();
+        }
+
+
         virtual bool keyIsUsed(const IndexCatalogEntry* btreeState,
                                DiskLoc bucket, int keyOffset) const {
             return getBucket(btreeState,bucket)->k(keyOffset).isUsed();

@@ -31,12 +31,17 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/btree_interface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pdfile_private.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/sort_phase_one.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 
 namespace mongo {
 
@@ -178,7 +183,6 @@ namespace mongo {
         return Status::OK();
     }
 
-
     Status BtreeBasedAccessMethod::touch(const BSONObj& obj) {
         BSONObjSet keys;
         getKeys(obj, &keys);
@@ -294,5 +298,256 @@ namespace mongo {
 
         return Status::OK();
     }
+
+    // -------
+
+    class BtreeBulk : public IndexAccessMethod {
+    public:
+        BtreeBulk( BtreeBasedAccessMethod* real ) {
+            _real = real;
+        }
+
+        ~BtreeBulk() {}
+
+        virtual Status insert(const BSONObj& obj,
+                              const DiskLoc& loc,
+                              const InsertDeleteOptions& options,
+                              int64_t* numInserted) {
+            BSONObjSet keys;
+            _real->getKeys(obj, &keys);
+            _phase1.addKeys(keys, loc, false);
+            if ( numInserted )
+                *numInserted += keys.size();
+            return Status::OK();
+        }
+
+        virtual Status remove(const BSONObj& obj,
+                              const DiskLoc& loc,
+                              const InsertDeleteOptions& options,
+                              int64_t* numDeleted) {
+            return _notAllowed();
+        }
+
+        virtual Status validateUpdate(const BSONObj& from,
+                                      const BSONObj& to,
+                                      const DiskLoc& loc,
+                                      const InsertDeleteOptions& options,
+                                      UpdateTicket* ticket) {
+            return _notAllowed();
+        }
+
+        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated) {
+            return _notAllowed();
+        }
+
+        virtual Status newCursor(IndexCursor **out) const {
+            return _notAllowed();
+        }
+        virtual Status initializeAsEmpty() {
+            return _notAllowed();
+        }
+
+        virtual IndexAccessMethod* initiateBulk() {
+            return this;
+        }
+
+        virtual Status commitBulk( IndexAccessMethod* bulk,
+                                   bool mayInterrupt,
+                                   std::set<DiskLoc>* dups ) {
+            verify( this == bulk );
+            return Status::OK();
+        }
+
+        virtual Status touch(const BSONObj& obj) {
+            return _notAllowed();
+        }
+
+        virtual Status validate(int64_t* numKeys) {
+            return _notAllowed();
+        }
+
+        // -------
+
+        template< class V >
+        void commit( set<DiskLoc>* dupsToDrop,
+                     CurOp* op,
+                     bool mayInterrupt ) {
+
+            Timer timer;
+
+            IndexCatalogEntry* entry = _real->_btreeState;
+
+            bool dupsAllowed = !entry->descriptor()->unique() ||
+                ignoreUniqueIndex(entry->descriptor());
+            bool dropDups = entry->descriptor()->dropDups() || inDBRepair;
+
+            BtreeBuilder<V> btBuilder(dupsAllowed, entry);
+
+            BSONObj keyLast;
+            scoped_ptr<BSONObjExternalSorter::Iterator> i( _phase1.sorter->iterator() );
+
+            // verifies that pm and op refer to the same ProgressMeter
+            ProgressMeter& pm = op->setMessage("Index Bulk Build: (2/3) btree bottom up",
+                                               "Index: (2/3) BTree Bottom Up Progress",
+                                               _phase1.nkeys,
+                                               10);
+
+            while( i->more() ) {
+                RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
+                ExternalSortDatum d = i->next();
+
+                try {
+                    if ( !dupsAllowed && dropDups ) {
+                        LastError::Disabled led( lastError.get() );
+                        btBuilder.addKey(d.first, d.second);
+                    }
+                    else {
+                        btBuilder.addKey(d.first, d.second);
+                    }
+                }
+                catch( AssertionException& e ) {
+                    if ( dupsAllowed ) {
+                        // unknown exception??
+                        throw;
+                    }
+
+                    if( e.interrupted() ) {
+                        killCurrentOp.checkForInterrupt();
+                    }
+
+                    if ( ! dropDups )
+                        throw;
+
+                    /* we could queue these on disk, but normally there are very few dups,
+                     * so instead we keep in ram and have a limit.
+                    */
+                    if ( dupsToDrop ) {
+                        dupsToDrop->insert(d.second);
+                        uassert( 10092,
+                                 "too may dups on index build with dropDups=true",
+                                 dupsToDrop->size() < 1000000 );
+                    }
+                }
+                pm.hit();
+            }
+            pm.finished();
+            op->setMessage("Index Bulk Build: (3/3) btree-middle",
+                           "Index: (3/3) BTree Middle Progress");
+            LOG(timer.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit";
+            btBuilder.commit( mayInterrupt );
+            if ( btBuilder.getn() != _phase1.nkeys && ! dropDups ) {
+                warning() << "not all entries were added to the index, probably some "
+                          << "keys were too large" << endl;
+            }
+        }
+
+        // -------
+
+        Status _notAllowed() const {
+            return Status( ErrorCodes::InternalError, "cannot use bulk for this yet" );
+        }
+
+        BtreeBasedAccessMethod* _real; // now owned here
+        SortPhaseOne _phase1;
+    };
+
+    int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o); // key.cpp
+
+    class BtreeExternalSortComparisonV0 : public ExternalSortComparison {
+    public:
+        BtreeExternalSortComparisonV0(const BSONObj& ordering)
+            : _ordering(Ordering::make(ordering)){
+        }
+
+        virtual ~BtreeExternalSortComparisonV0() { }
+
+        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const {
+            int x = oldCompare(l.first, r.first, _ordering);
+            if (x) { return x; }
+            return l.second.compare(r.second);
+        }
+    private:
+        const Ordering _ordering;
+    };
+
+    class BtreeExternalSortComparisonV1 : public ExternalSortComparison {
+    public:
+        BtreeExternalSortComparisonV1(const BSONObj& ordering)
+            : _ordering(Ordering::make(ordering)) {
+        }
+
+        virtual ~BtreeExternalSortComparisonV1() { }
+
+        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const {
+            int x = l.first.woCompare(r.first, _ordering, /*considerfieldname*/false);
+            if (x) { return x; }
+            return l.second.compare(r.second);
+        }
+    private:
+        const Ordering _ordering;
+    };
+
+    ExternalSortComparison* BtreeBasedAccessMethod::getComparison(int version,
+                                                                  const BSONObj& keyPattern) {
+
+        if ( 0 == version ) {
+            return new BtreeExternalSortComparisonV0( keyPattern );
+        }
+        else if ( 1 == version ) {
+            return new BtreeExternalSortComparisonV1( keyPattern );
+        }
+        verify( 0 );
+        return NULL;
+    }
+
+    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk() {
+
+        if ( _interface->nKeys( _btreeState,
+                                _btreeState->head() ) > 0 )
+            return NULL;
+
+        auto_ptr<BtreeBulk> bulk( new BtreeBulk( this ) );
+        bulk->_phase1.sortCmp.reset( getComparison( _descriptor->version(),
+                                                    _descriptor->keyPattern() ) );
+
+        bulk->_phase1.sorter.reset( new BSONObjExternalSorter(bulk->_phase1.sortCmp.get()) );
+        bulk->_phase1.sorter->hintNumObjects( _btreeState->collection()->numRecords() );
+
+        return bulk.release();
+    }
+
+    Status BtreeBasedAccessMethod::commitBulk( IndexAccessMethod* bulkRaw,
+                                               bool mayInterrupt,
+                                               set<DiskLoc>* dupsToDrop ) {
+
+        if ( _interface->nKeys( _btreeState,
+                                _btreeState->head() ) > 0 ) {
+            return Status( ErrorCodes::InternalError, "trying to commit, but has data already" );
+        }
+
+        {
+            DiskLoc oldHead = _btreeState->head();
+            _btreeState->setHead( DiskLoc() );
+            _btreeState->recordStore()->deleteRecord( oldHead );
+        }
+
+        string ns = _btreeState->collection()->ns().ns();
+
+        BtreeBulk* bulk = static_cast<BtreeBulk*>( bulkRaw );
+        if ( bulk->_phase1.multi )
+            _btreeState->setMultikey();
+
+        bulk->_phase1.sorter->sort( false );
+
+        if ( _descriptor->version() == 0 )
+            bulk->commit<V0>( dupsToDrop, cc().curop(), mayInterrupt );
+        else if ( _descriptor->version() == 1 )
+            bulk->commit<V1>( dupsToDrop, cc().curop(), mayInterrupt );
+        else
+            return Status( ErrorCodes::InternalError, "bad btree version" );
+
+        return Status::OK();
+    }
+
 
 }  // namespace mongo

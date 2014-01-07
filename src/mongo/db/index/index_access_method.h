@@ -140,12 +140,29 @@ namespace mongo {
         virtual Status validate(int64_t* numKeys) = 0;
 
         //
-        // Bulk operations support (TODO)
+        // Bulk operations support
         //
 
-        // virtual Status insertBulk(BulkDocs arg) = 0;
+        /**
+         * Starts a bulk operation.
+         * You work on the returned IndexAccessMethod and then call commitBulk.
+         * This can return NULL, meaning bulk mode is not available.
+         */
+        virtual IndexAccessMethod* initiateBulk() = 0;
 
-        // virtual Status removeBulk(BulkDocs arg) = 0;
+        /**
+         * Call this when you are ready to finish your bulk work.
+         * Pass in the IndexAccessMethod gotten from initiateBulk.
+         * After this method is called, the bulk index access method is invalid
+         * and should not be used.
+         * @param bulk - something created from initiateBulk
+         * @param mayInterrupt - is this commit interruptable (will cancel)
+         * @param dups - if NULL, error out on dups if not allowed
+         *               if not NULL, put the bad DiskLocs there
+         */
+        virtual Status commitBulk( IndexAccessMethod* bulk,
+                                   bool mayInterrupt,
+                                   std::set<DiskLoc>* dups ) = 0;
     };
 
     /**

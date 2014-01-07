@@ -31,7 +31,7 @@
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/btree_based_builder.h"
+#include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/sort_phase_one.h"
@@ -45,7 +45,7 @@ namespace IndexUpdateTests {
 
     static const char* const _ns = "unittests.indexupdate";
     DBDirectClient _client;
-    ExternalSortComparison* _aFirstSort = BtreeBasedBuilder::getComparison(0, BSON("a" << 1));
+    ExternalSortComparison* _aFirstSort = BtreeBasedAccessMethod::getComparison(0, BSON("a" << 1));
 
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -309,91 +309,6 @@ namespace IndexUpdateTests {
         bool _mayInterrupt;
     };
 #endif
-
-    /** doDropDups() deletes the duplicate documents in the provided set. */
-    class DoDropDups : public IndexBuildBase {
-    public:
-        void run() {
-            // Insert some documents.
-            int32_t nDocs = 1000;
-            for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "a" << ( i / 4 ) ) );
-            }
-
-            // Find the documents that are dups.
-            set<DiskLoc> dups;
-            int32_t last = -1;
-            CollectionIterator* it = collection()->getIterator( DiskLoc(), false,
-                                                                CollectionScanParams::FORWARD );
-            while ( !it->isEOF() ) {
-                DiskLoc currLoc = it->getNext();
-                int32_t currA = currLoc.obj()[ "a" ].Int();
-                if ( currA == last ) {
-                    dups.insert( currLoc );
-                }
-                last = currA;
-            }
-            delete it;
-
-            // Check the expected number of dups.
-            ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
-            // Drop the dups.
-            BtreeBasedBuilder::doDropDups( collection(), dups, true );
-            // Check that the expected number of documents remain.
-            ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
-        }
-    };
-
-    /** doDropDups() aborts if the current operation is interrupted. */
-    class InterruptDoDropDups : public IndexBuildBase {
-    public:
-        InterruptDoDropDups( bool mayInterrupt ) :
-            _mayInterrupt( mayInterrupt ) {
-        }
-        void run() {
-            // Insert some documents.
-            int32_t nDocs = 1000;
-            for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "a" << ( i / 4 ) ) );
-            }
-
-            // Find the documents that are dups.
-            set<DiskLoc> dups;
-            int32_t last = -1;
-            CollectionIterator* it = collection()->getIterator( DiskLoc(), false,
-                                                                CollectionScanParams::FORWARD );
-            while ( !it->isEOF() ) {
-                DiskLoc currLoc = it->getNext();
-                int32_t currA = currLoc.obj()[ "a" ].Int();
-                if ( currA == last ) {
-                    dups.insert( currLoc );
-                }
-                last = currA;
-            }
-            delete it;
-
-            // Check the expected number of dups.  There must be enough to trigger a RARELY
-            // condition when deleting them.
-            ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 * 3 ), dups.size() );
-            // Kill the current operation.
-            cc().curop()->kill();
-            if ( _mayInterrupt ) {
-                // doDropDups() aborts.
-                ASSERT_THROWS( BtreeBasedBuilder::doDropDups( collection(), dups, _mayInterrupt ),
-                               UserException );
-                // Not all dups are dropped.
-                ASSERT( static_cast<uint32_t>( nDocs / 4 ) < _client.count( _ns ) );
-            }
-            else {
-                // doDropDups() succeeds.
-                BtreeBasedBuilder::doDropDups( collection(), dups, _mayInterrupt );
-                // The expected number of documents were dropped.
-                ASSERT_EQUALS( static_cast<uint32_t>( nDocs / 4 ), _client.count( _ns ) );
-            }
-        }
-    private:
-        bool _mayInterrupt;
-    };
 
     /** Index creation is killed if mayInterrupt is true. */
     class InsertBuildIndexInterrupt : public IndexBuildBase {
@@ -788,9 +703,6 @@ namespace IndexUpdateTests {
             //add<BuildBottomUp>();
             //add<InterruptBuildBottomUp>( false );
             //add<InterruptBuildBottomUp>( true );
-            add<DoDropDups>();
-            add<InterruptDoDropDups>( false );
-            add<InterruptDoDropDups>( true );
             add<InsertBuildIndexInterrupt>();
             add<InsertBuildIndexInterruptDisallowed>();
             add<InsertBuildIdIndexInterrupt>();

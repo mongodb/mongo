@@ -399,6 +399,7 @@ namespace mongo {
             // we don't want to kill a half formed IndexDetails, so be carefule
             LOG(1) << "creating index with info @ " << loc;
             getDur().writingDiskLoc( indexDetails->info ) = loc;
+            getDur().writingDiskLoc( indexDetails->head ).Null();
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;

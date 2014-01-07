@@ -37,7 +37,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/storage/index_details.h"
-#include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
@@ -54,93 +53,50 @@ namespace mongo {
     /**
      * Add the provided (obj, dl) pair to the provided index.
      */
-    static void addKeysToIndex( Collection* collection, const IndexDescriptor* desc,
+    static void addKeysToIndex( Collection* collection,
+                                const IndexDescriptor* descriptor,
+                                IndexAccessMethod* accessMethod,
                                 const BSONObj& obj, const DiskLoc &recordLoc ) {
-
-        verify( desc );
-        IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
 
         InsertDeleteOptions options;
         options.logIfError = false;
-        options.dupsAllowed = (!KeyPattern::isIdKeyPattern(desc->keyPattern()) && !desc->unique())
-            || ignoreUniqueIndex(desc);
+        options.dupsAllowed = true;
+
+        if ( descriptor->isIdIndex() || descriptor->unique() ) {
+            if ( !ignoreUniqueIndex( descriptor ) ) {
+                options.dupsAllowed = false;
+            }
+        }
 
         int64_t inserted;
-        Status ret = iam->insert(obj, recordLoc, options, &inserted);
+        Status ret = accessMethod->insert(obj, recordLoc, options, &inserted);
         uassertStatusOK( ret );
     }
 
-    //
-    // Bulk index building
-    //
-
-    class BackgroundIndexBuildJob : public BackgroundOperation {
-
-    public:
-        BackgroundIndexBuildJob(const StringData& ns)
-            : BackgroundOperation(ns) {
-        }
-
-        unsigned long long go( Collection* collection, IndexCatalogEntry* idx );
-
-    private:
-        unsigned long long addExistingToIndex( Collection* collection,
-                                               const IndexDescriptor* idx );
-
-        void prep(const StringData& ns ) {
-            Lock::assertWriteLocked(ns);
-            uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , !Lock::nested() );
-        }
-        void done(const StringData& ns) {
-            Lock::assertWriteLocked(ns);
-
-            // clear query optimizer cache
-            Collection* collection = cc().database()->getCollection( ns );
-            if ( collection )
-                collection->infoCache()->addedIndex();
-        }
-
-    };
-
-    unsigned long long BackgroundIndexBuildJob::go( Collection* collection,
-                                                    IndexCatalogEntry* btreeState) {
-
-        string ns = collection->ns().ns();
-
-        // clear cached things since we are changing state
-        // namely what fields are indexed
-        collection->infoCache()->addedIndex();
-
-        prep( ns );
-
-        try {
-            Status status = btreeState->accessMethod()->initializeAsEmpty();
-            massert( 17342,
-                     str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
-                     status.isOK() );
-
-            unsigned long long n = addExistingToIndex( collection, btreeState->descriptor() );
-            // idx may point at an invalid index entry at this point
-            done( ns );
-            return n;
-        }
-        catch (...) {
-            done( ns );
-            throw;
-        }
-    }
-
-    unsigned long long BackgroundIndexBuildJob::addExistingToIndex( Collection* collection,
-                                                                    const IndexDescriptor* idx ) {
+    unsigned long long addExistingToIndex( Collection* collection,
+                                           const IndexDescriptor* descriptor,
+                                           IndexAccessMethod* accessMethod,
+                                           bool shouldYield ) {
 
         string ns = collection->ns().ns(); // our copy for sanity
 
-        bool dupsAllowed = !idx->unique();
-        bool dropDups = idx->dropDups();
+        bool dupsAllowed = !descriptor->unique();
+        bool dropDups = descriptor->dropDups();
 
-        ProgressMeter& progress = cc().curop()->setMessage("bg index build",
-                                                           "Background Index Build Progress",
-                                                           collection->numRecords());
+
+        string curopMessage;
+        {
+            stringstream ss;
+            ss << "Index Build";
+            if ( shouldYield )
+                ss << "(background)";
+            curopMessage = ss.str();
+        }
+
+        ProgressMeter& progress =
+            cc().curop()->setMessage( curopMessage.c_str(),
+                                      curopMessage,
+                                      collection->numRecords() );
 
         unsigned long long n = 0;
         unsigned long long numDropped = 0;
@@ -151,7 +107,7 @@ namespace mongo {
         // happens.
         RunnerYieldPolicy yieldPolicy;
 
-        std::string idxName = idx->indexName();
+        std::string idxName = descriptor->indexName();
 
         // After this yields in the loop, idx may point at a different index (if indexes get
         // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
@@ -163,10 +119,10 @@ namespace mongo {
             try {
                 if ( !dupsAllowed && dropDups ) {
                     LastError::Disabled led( lastError.get() );
-                    addKeysToIndex(collection, idx, js, loc);
+                    addKeysToIndex(collection, descriptor, accessMethod, js, loc);
                 }
                 else {
-                    addKeysToIndex(collection, idx, js, loc);
+                    addKeysToIndex(collection, descriptor, accessMethod, js, loc);
                 }
             }
             catch( AssertionException& e ) {
@@ -207,7 +163,7 @@ namespace mongo {
             progress.hit();
 
             getDur().commitIfNeeded();
-            if (yieldPolicy.shouldYield()) {
+            if (shouldYield && yieldPolicy.shouldYield()) {
                 if (!yieldPolicy.yieldAndCheckIfOK(runner.get())) {
                     uasserted(12584, "cursor gone during bg index");
                     break;
@@ -215,14 +171,15 @@ namespace mongo {
 
                 progress.setTotalWhileRunning( collection->numRecords() );
                 // Recalculate idxNo if we yielded
-                idx = collection->getIndexCatalog()->findIndexByName( idxName, true );
-                verify( idx );
+                IndexDescriptor* idx = collection->getIndexCatalog()->findIndexByName( idxName,
+                                                                                       true );
+                verify( idx && idx == descriptor );
             }
         }
 
         progress.finished();
-        if ( dropDups )
-            log() << "\t backgroundIndexBuild dupsToDrop: " << numDropped << endl;
+        if ( dropDups && numDropped )
+            log() << "\t index build dropped: " << numDropped << " dups";
         return n;
     }
 
@@ -234,37 +191,83 @@ namespace mongo {
                        bool mayInterrupt ) {
 
         string ns = collection->ns().ns(); // our copy
-
         const IndexDescriptor* idx = btreeState->descriptor();
-
         const BSONObj& idxInfo = idx->infoObj();
 
         MONGO_TLOG(0) << "build index on: " << ns
                       << " properties: " << idx->toString() << endl;
-
         audit::logCreateIndex( currentClient.get(), &idxInfo, idx->indexName(), ns );
 
         Timer t;
-        unsigned long long n;
 
         verify( Lock::isWriteLocked( ns ) );
+        collection->infoCache()->addedIndex();
 
         if ( collection->numRecords() == 0 ) {
             Status status = btreeState->accessMethod()->initializeAsEmpty();
             massert( 17343,
                      str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
                      status.isOK() );
+            MONGO_TLOG(0) << "\t added index to empty collection";
+            return;
         }
-        else if ( inDBRepair || !idxInfo["background"].trueValue() ) {
-            n = BtreeBasedBuilder::fastBuildIndex( collection, btreeState, mayInterrupt );
-            verify( !btreeState->head().isNull() );
+
+        scoped_ptr<BackgroundOperation> backgroundOperation;
+        bool doInBackground = false;
+
+        if ( idxInfo["background"].trueValue() && !inDBRepair ) {
+            doInBackground = true;
+            backgroundOperation.reset( new BackgroundOperation( ns) );
+            uassert( 13130,
+                     "can't start bg index b/c in recursive lock (db.eval?)",
+                     !Lock::nested() );
+            log() << "\t building index in background";
         }
-        else {
-            BackgroundIndexBuildJob j( ns );
-            n = j.go( collection, btreeState );
+
+        Status status = btreeState->accessMethod()->initializeAsEmpty();
+        massert( 17342,
+                 str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
+                 status.isOK() );
+
+        IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk();
+        IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
+
+        if ( bulk )
+            log() << "\t building index using bulk method";
+
+        unsigned long long n = addExistingToIndex( collection,
+                                                   btreeState->descriptor(),
+                                                   iam,
+                                                   doInBackground );
+
+        if ( bulk ) {
+            log() << "\t bulk commit starting";
+            std::set<DiskLoc> dupsToDrop;
+
+            btreeState->accessMethod()->commitBulk( bulk, mayInterrupt, &dupsToDrop );
+
+            if ( dupsToDrop.size() )
+                log() << "\t bulk dropping " << dupsToDrop.size() << " dups";
+
+            for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
+                RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
+                BSONObj toDelete;
+                collection->deleteDocument( *i,
+                                            false /* cappedOk */,
+                                            true /* noWarn */,
+                                            &toDelete );
+                if ( isMaster( ns.c_str() ) ) {
+                    logOp( "d", ns.c_str(), toDelete );
+                }
+                getDur().commitIfNeeded();
+            }
         }
+
+        verify( !btreeState->head().isNull() );
         MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. "
                       << t.millis() / 1000.0 << " secs" << endl;
+
+        collection->infoCache()->addedIndex();
     }
 
 }  // namespace mongo

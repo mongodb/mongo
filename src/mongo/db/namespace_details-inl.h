@@ -34,41 +34,6 @@
 
 namespace mongo {
 
-    inline IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected ) {
-        if( idxNo < NIndexesBase ) {
-            IndexDetails& id = _indexes[idxNo];
-            return id;
-        }
-        Extra *e = extra();
-        if ( ! e ) {
-            if ( missingExpected )
-                throw MsgAssertionException( 13283 , "Missing Extra" );
-            massert(14045, "missing Extra", e);
-        }
-        int i = idxNo - NIndexesBase;
-        if( i >= NIndexesExtra ) {
-            e = e->next(this);
-            if ( ! e ) {
-                if ( missingExpected )
-                    throw MsgAssertionException( 14823 , "missing extra" );
-                massert(14824, "missing Extra", e);
-            }
-            i -= NIndexesExtra;
-        }
-        return e->details[i];
-    }
-
-    inline int NamespaceDetails::idxNo(const IndexDetails& idx) {
-        IndexIterator i = ii();
-        while( i.more() ) {
-            if( &i.next() == &idx )
-                return i.pos()-1;
-        }
-        massert( 10349 , "E12000 idxNo fails", false);
-        return -1;
-    }
-
-
     inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d,
                                                           bool includeBackgroundInProgress) {
         d = _d;

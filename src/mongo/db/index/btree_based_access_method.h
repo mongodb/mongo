@@ -40,6 +40,9 @@
 
 namespace mongo {
 
+    class BtreeBulk;
+    class ExternalSortComparison;
+
     /**
      * Any access method that is Btree based subclasses from this.
      *
@@ -77,6 +80,12 @@ namespace mongo {
 
         virtual Status initializeAsEmpty();
 
+        virtual IndexAccessMethod* initiateBulk() ;
+
+        virtual Status commitBulk( IndexAccessMethod* bulk,
+                                   bool mayInterrupt,
+                                   std::set<DiskLoc>* dups );
+
         virtual Status touch(const BSONObj& obj);
 
         virtual Status validate(int64_t* numKeys);
@@ -84,9 +93,13 @@ namespace mongo {
         // XXX: consider migrating callers to use IndexCursor instead
         virtual DiskLoc findSingle( const BSONObj& key );
 
+        // exposed for testing, used for bulk commit
+        static ExternalSortComparison* getComparison(int version,
+                                                     const BSONObj& keyPattern);
+
     protected:
         // Friends who need getKeys.
-        friend class BtreeBasedBuilder;
+        friend class BtreeBulk;
 
         // See below for body.
         class BtreeBasedPrivateUpdateData;
