@@ -1074,4 +1074,25 @@ namespace mongo {
         recordLoc(k.recordLoc), key(bb.data+k.keyDataOfs())
     { }
 
+    template< class V >
+    const BtreeBucket<V> * DiskLoc::btree() const {
+        verify( _a != -1 );
+        Record *r = rec();
+        memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
+        return (const BtreeBucket<V> *) r->data();
+    }
+
+    /**
+     * give us a writable version of the btree bucket (declares write intent).
+     * note it is likely more efficient to declare write intent on something smaller when you can.
+     */
+    template< class V >
+    BtreeBucket<V> * DiskLoc::btreemod() const {
+        verify( _a != -1 );
+        BtreeBucket<V> *b = const_cast< BtreeBucket<V> * >( btree<V>() );
+        return static_cast< BtreeBucket<V>* >( getDur().writingPtr( b, V::BucketSize ) );
+    }
+
+
+
 } // namespace mongo;
