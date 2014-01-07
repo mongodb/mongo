@@ -1,5 +1,10 @@
+// test end-to-end data allocation without powerOf2Sizes enabled
 f = db.jstests_datasize;
 f.drop();
+
+// this test requires usePowerOf2Sizes to be off
+db.createCollection( f.getName(), { usePowerOf2Sizes: false } );
+assert.eq(0, f.stats().userFlags);
 
 assert.eq( 0, db.runCommand( {datasize:"test.jstests_datasize"} ).size );
 f.save( {qq:'c'} );
@@ -8,6 +13,8 @@ f.save( {qq:'fg'} );
 assert.eq( 68, db.runCommand( {datasize:"test.jstests_datasize"} ).size );
 
 f.drop();
+db.createCollection( f.getName(), { usePowerOf2Sizes: false} );
+
 f.ensureIndex( {qq:1} );
 assert.eq( 0, db.runCommand( {datasize:"test.jstests_datasize"} ).size );
 f.save( {qq:'c'} );

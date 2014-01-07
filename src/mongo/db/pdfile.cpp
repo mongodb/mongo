@@ -277,10 +277,6 @@ namespace mongo {
         if ( mx > 0 )
             d->setMaxCappedDocs( mx );
 
-        if ( options["flags"].numberInt() ) {
-            d->replaceUserFlags( options["flags"].numberInt() );
-        }
-
         return true;
     }
 

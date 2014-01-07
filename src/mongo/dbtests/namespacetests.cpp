@@ -1358,6 +1358,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
+                ASSERT( nsd()->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT_EQUALS( 1.0, nsd()->paddingFactor() );
                 ASSERT_EQUALS( 300, nsd()->getRecordAllocationSize( 300 ) );
             }
@@ -1371,6 +1372,7 @@ namespace NamespaceTests {
                 create();
                 double paddingFactor = 1.2;
                 nsd()->setPaddingFactor( paddingFactor );
+                ASSERT( nsd()->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT_EQUALS( paddingFactor, nsd()->paddingFactor() );
                 ASSERT_EQUALS( static_cast<int>( 300 * paddingFactor ),
                                nsd()->getRecordAllocationSize( 300 ) );
@@ -1386,7 +1388,6 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                ASSERT( nsd()->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
             }
@@ -1402,7 +1403,6 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                ASSERT( nsd()->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 nsd()->setPaddingFactor( 2.0 );
                 ASSERT_EQUALS( 2.0, nsd()->paddingFactor() );
@@ -1429,6 +1429,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
+                ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 DiskLoc loc = nsd()->alloc( ns(), 300 );
                 ASSERT_EQUALS( 300, loc.rec()->lengthWithHeaders() );
             }

@@ -1,8 +1,11 @@
-
 load( "jstests/libs/fts.js" );
 
 t = db.text1;
 t.drop();
+
+// this test requires usePowerOf2Sizes to be off
+db.createCollection( t.getName(), {"usePowerOf2Sizes" : false } );
+assert.eq(0, t.stats().userFlags);
 
 assert.eq( [] , queryIDS( t , "az" ) , "A0" );
 
@@ -24,4 +27,3 @@ assert.eq( [4] , queryIDS( t , "d" ) , "A2" );
 idx = db.system.indexes.findOne( { ns: t.getFullName(), "weights.x" : 1 } )
 assert( idx.v >= 1, tojson( idx ) )
 assert( idx.textIndexVersion >= 1, tojson( idx ) )
-

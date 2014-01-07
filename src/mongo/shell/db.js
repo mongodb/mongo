@@ -80,6 +80,7 @@ DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
         capped: if true, this is a capped collection (where old data rolls out).
     </li>
     <li> max: maximum number of objects if capped (optional).</li>
+    <li> usePowerOf2Sizes: if true, set usePowerOf2Sizes allocation for the collection.</li>
     </ul>
 
     <p>Example:</p>
@@ -100,6 +101,8 @@ DB.prototype.createCollection = function(name, opt) {
         cmd.capped = options.capped;
     if (options.size != undefined)
         cmd.size = options.size;
+    if (options.usePowerOf2Sizes != undefined) 
+        cmd.flags = options.usePowerOf2Sizes ? 1 : 0;
     var res = this._dbCommand(cmd);
     return res;
 }

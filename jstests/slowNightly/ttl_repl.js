@@ -23,8 +23,11 @@ var slave1db = slave1.getDB( 'd' );
 var mastercol = masterdb[ 'c' ];
 var slave1col = slave1db[ 'c' ];
 
-// create new collection. insert 24 docs, aged at one-hour intervalss
+// turn off usePowerOf2Sizes as this tests the flag is set automatically
 mastercol.drop();
+masterdb.createCollection(mastercol.getName(), {usePowerOf2Sizes: false});
+
+// create new collection. insert 24 docs, aged at one-hour intervalss
 now = (new Date()).getTime();
 for ( i=0; i<24; i++ )
     mastercol.insert( { x : new Date( now - ( 3600 * 1000 * i ) ) } );

@@ -45,12 +45,17 @@ var assertFieldNamesMatch = function( splitPoint , keyPattern ){
     }
 }
 
+// turn off powerOf2, this test checks regular allocation 
+var resetCollection = function() {
+    f.drop();
+    db.createCollection(f.getName(), {usePowerOf2Sizes: false});
+}
+
 // -------------------------
 //  TESTS START HERE
 // -------------------------
-
 f = db.jstests_splitvector;
-f.drop();
+resetCollection();
 
 // -------------------------
 // Case 1: missing parameters 
@@ -75,7 +80,7 @@ assert.eq( [], db.runCommand( { splitVector: "test.jstests_splitvector" , keyPat
 // -------------------------
 // Case 4: uniform collection
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1 } );
 
 var case4 = function() {
@@ -109,7 +114,7 @@ case4();
 // -------------------------
 // Case 5: limit number of split points
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1 } );
 
 var case5 = function() {
@@ -132,7 +137,7 @@ case5();
 // -------------------------
 // Case 6: limit number of objects in a chunk
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1 } );
 
 var case6 = function() {
@@ -156,7 +161,7 @@ case6();
 // Case 7: enough occurances of min key documents to pass the chunk limit
 // [1111111111111111,2,3)
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1 } );
 
 var case7 = function() {
@@ -184,7 +189,7 @@ case7();
 // Case 8: few occurrances of min key, and enough of some other that we cannot split it
 // [1, 22222222222222, 3)
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1 } );
 
 var case8 = function() {
@@ -218,7 +223,7 @@ case8();
 // Case 9: splitVector "force" mode, where we split (possible small) chunks in the middle
 //
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1 } );
 
 var case9 = function() {
@@ -253,51 +258,51 @@ case9();
 // Repeat all cases using prefix shard key.
 //
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: 1 } );
 case4();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case4();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: 1 } );
 case5();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case5();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: 1 } );
 case6();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case6();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: 1 } );
 case7();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case7();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: 1 } );
 case8();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case8();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: 1 } );
 case9();
 
-f.drop();
+resetCollection();
 f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case9();
 

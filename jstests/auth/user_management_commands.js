@@ -145,6 +145,7 @@ function runTest(conn) {
          jsTestLog("Testing usersInfo");
 
          var res = testUserAdmin.runCommand({usersInfo: 'spencer'});
+         printjson(res);
          assert.eq(1, res.users.length);
          assert.eq(10036, res.users[0].customData.zipCode);
 
@@ -153,9 +154,19 @@ function runTest(conn) {
          assert.eq(10036, res.users[0].customData.zipCode);
 
          res = testUserAdmin.runCommand({usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}]});
+         printjson(res);
          assert.eq(2, res.users.length);
-         assert.eq(10036, res.users[0].customData.zipCode);
-         assert(res.users[1].customData.userAdmin);
+         if (res.users[0].user == "spencer") {
+             assert.eq(10036, res.users[0].customData.zipCode);
+             assert(res.users[1].customData.userAdmin);
+         } else if (res.users[0].user == "userAdmin") {
+             assert.eq(10036, res.users[1].customData.zipCode);
+             assert(res.users[0].customData.userAdmin);
+         } else {
+             doassert("Expected user names returned by usersInfo to be either 'userAdmin' or 'spencer', "
+                      + "but got: " + res.users[0].user);
+         }
+
 
          res = testUserAdmin.runCommand({usersInfo: 1});
          assert.eq(2, res.users.length);
@@ -177,6 +188,7 @@ function runTest(conn) {
 
 jsTest.log('Test standalone');
 var conn = MongoRunner.runMongod({ auth: '' });
+conn.getDB('admin').runCommand({setParameter:1, newCollectionsUsePowerOf2Sizes: false});
 runTest(conn);
 MongoRunner.stopMongod(conn.port);
 

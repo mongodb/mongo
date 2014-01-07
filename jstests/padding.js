@@ -1,6 +1,10 @@
 p = db.getCollection("padding");
 p.drop();
 
+// this test requires usePowerOf2Sizes to be off 
+db.createCollection( p.getName(), { "usePowerOf2Sizes" : false } );
+assert.eq(0, p.stats().userFlags);
+
 for (var i = 0; i < 1000; i++) {
     p.insert({ x: 1, y: "aaaaaaaaaaaaaaa" });
 }

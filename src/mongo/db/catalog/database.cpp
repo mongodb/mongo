@@ -47,10 +47,13 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(newCollectionsUsePowerOf2Sizes, bool, true);
 
     void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
         massert( 17320,
@@ -555,6 +558,7 @@ namespace mongo {
         return c;
     }
 
+
     Collection* Database::createCollection( const StringData& ns, bool capped,
                                             const BSONObj* options, bool allocateDefaultSpace ) {
         verify( _namespaceIndex.details( ns ) == NULL );
@@ -568,6 +572,20 @@ namespace mongo {
         }
 
         audit::logCreateCollection( currentClient.get(), ns );
+
+        // allocation strategy set explicitly in flags or by server-wide default
+        // need to check validity before creating the collection
+        int userFlags = 0;
+        bool flagSet = false;
+
+        if ( options && options->getField("flags").type() ) {
+            uassert( 17351, "flags must be a number", options->getField("flags").isNumber() );
+            userFlags = options->getField("flags").numberInt();
+            flagSet = true;
+        }
+        if ( newCollectionsUsePowerOf2Sizes && !flagSet && !capped ) {
+            userFlags = NamespaceDetails::Flag_UsePowerOf2Sizes;
+        }
 
         _namespaceIndex.add_ns( ns, DiskLoc(), capped );
         _addNamespaceToCatalog( ns, options );
@@ -584,6 +602,9 @@ namespace mongo {
         Collection* collection = getCollection( ns );
         verify( collection );
 
+        NamespaceDetails* nsd = collection->details();
+        nsd->setUserFlag( userFlags );
+
         if ( allocateDefaultSpace ) {
             collection->increaseStorageSize( Extent::initialSize( 128 ), false );
         }
@@ -598,6 +619,7 @@ namespace mongo {
                 uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
             }
         }
+
 
         return collection;
     }

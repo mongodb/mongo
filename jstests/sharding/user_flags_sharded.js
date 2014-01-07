@@ -18,10 +18,10 @@ db1.createCollection( coll );
 var collstats = db1.getCollection( coll ).stats()
 print( "*************** Fresh Collection Stats ************" );
 printjson( collstats );
-assert.eq( collstats.userFlags , 0 , "fresh collection doesn't have userFlags = 0 ");
+assert.eq( collstats.userFlags , 1 , "fresh collection doesn't have userFlags = 1 ");
 
 // Now we modify the collection with the usePowerOf2Sizes flag
-var res = db1.runCommand( { "collMod" : coll ,  "usePowerOf2Sizes" : true } );
+var res = db1.runCommand( { "collMod" : coll ,  "usePowerOf2Sizes" : false } );
 assert.eq( res.ok , 1 , "collMod failed" );
 
 // and insert some stuff, for the hell of it
@@ -29,11 +29,11 @@ var numdocs = 20;
 for( i=0; i < numdocs; i++){ db1.getCollection( coll ).insert( {_id : i} ); }
 db1.getLastError()
 
-// Next verify that userFlags has changed to 1
+// Next verify that userFlags has changed to 0
 collstats = db1.getCollection( coll ).stats()
 print( "*************** Collection Stats After CollMod ************" );
 printjson( collstats );
-assert.eq( collstats.userFlags , 1 , "modified collection should have userFlags = 1 ");
+assert.eq( collstats.userFlags , 0 , "modified collection should have userFlags = 0 ");
 
 // start up a new sharded cluster, and add previous mongod
 var s = new ShardingTest( "user_flags", 1 );
@@ -53,7 +53,7 @@ shard2stats = shard2.getCollection( coll ).stats()
 printjson( shard2stats );
 
 assert.eq( shard2stats.count , numdocs , "moveChunk didn't succeed" );
-assert.eq( shard2stats.userFlags , 1 , "new shard should also have userFlags = 1 ");
+assert.eq( shard2stats.userFlags , 0 , "new shard should also have userFlags = 0 ");
 
 stopMongod( 29000 );
 s.stop();

@@ -126,7 +126,7 @@ var setupSharding = function(mongo) {
     mongo.getDB("admin").runCommand({shardCollection : "test.foo", key : {_id : 1}});
 
     var test = mongo.getDB("test");
-    for(i = 1; i < 40; i++) {
+    for(i = 1; i < 20; i++) {
         test.foo.insert({_id: i});
     }
 };
