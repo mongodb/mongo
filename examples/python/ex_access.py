@@ -1,4 +1,4 @@
-# Public Domain 2008-2013 WiredTiger, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #

@@ -71,30 +71,27 @@ check()
 # Search for files, ignoring test/3rdparty.
 for i in `cd .. &&
     find [a-z]* -name '*.[chi]' \
-        -o -name '*.cxx' -o -name '*.java' -o -name '*.py' |
+        -o -name '*.cxx' -o -name '*.in' -o -name '*.java' -o -name '*.py' |
     sed -e '/test\/3rdparty\//d' \
 	-e '/^build/d' \
+	-e '/Makefile.in/d' \
 	-e 's/^\.\///'`
 do
 	check $i
 done
 
-# The documentation copyright appears in two files.
+# A few special cases: LICENSE, documentation, wt utility, some of which
+# have more than one copyright notice in the file.
 s="Copyright (c) 2008-$year WiredTiger, Inc."
-f="src/docs/build-javadoc.sh src/docs/style/footer.html"
-for i in $f; do
-	if `grep "$s" ../$i > /dev/null`; then
-		continue;
+special_copyright()
+{
+	cnt=`grep "$s" ../$1 | wc -l`
+	if test $cnt -ne $2; then
+		echo "$1: copyright information is incorrect"
 	fi
-	echo "$i: copyright information is incorrect"
-done
+}
 
-# The wt utility and LICENSE files have a copyright.
-s="Copyright (c) 2008-$year WiredTiger, Inc."
-f="LICENSE src/utilities/util_cpyright.c"
-for i in $f; do
-	if `grep "$s" ../$i > /dev/null`; then
-		continue;
-	fi
-	echo "$i: copyright information is incorrect"
-done
+special_copyright LICENSE 1
+special_copyright src/docs/build-javadoc.sh 1
+special_copyright src/docs/style/footer.html 2
+special_copyright src/utilities/util_cpyright.c 2
