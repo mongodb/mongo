@@ -49,6 +49,14 @@ namespace mongo {
 
         /**
          * @return a rough estimate of elapsed time since the server started
+           todo: 
+           1) consider adding some sort of relaxedLoad semantic to the reading here of 
+              _elapsedTime
+           2) curTimeMillis() implementations have gotten faster. consider eliminating
+              this code?  would have to measure it first.  if eliminated be careful if 
+              syscall used isn't skewable.  Note also if #2 is done, listen() doesn't 
+              then have to keep waking up and maybe that helps on a developer's laptop 
+              battery usage...
          */
         long long getMyElapsedTimeMillis() const { return _elapsedTime; }
 
