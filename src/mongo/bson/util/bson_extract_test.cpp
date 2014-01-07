@@ -13,6 +13,7 @@
  *    limitations under the License.
  */
 
+#include <limits>
 #include <string>
 
 #include "mongo/bson/util/bson_extract.h"
@@ -114,7 +115,7 @@ TEST(ExtractBSON, ExtractIntegerField) {
                           "a",
                           &v));
     ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
-                          BSON("a" << nan("")),
+                          BSON("a" << std::numeric_limits<float>::quiet_NaN()),
                           "a",
                           &v));
     ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
