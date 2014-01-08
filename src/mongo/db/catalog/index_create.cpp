@@ -201,6 +201,8 @@ namespace mongo {
         Timer t;
 
         verify( Lock::isWriteLocked( ns ) );
+        // this is so that people know there are more keys to look at when doing
+        // things like in place updates, etc...
         collection->infoCache()->addedIndex();
 
         if ( collection->numRecords() == 0 ) {
@@ -267,6 +269,7 @@ namespace mongo {
         MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. "
                       << t.millis() / 1000.0 << " secs" << endl;
 
+        // this one is so people know that the index is finished
         collection->infoCache()->addedIndex();
     }
 

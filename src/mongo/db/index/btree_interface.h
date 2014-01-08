@@ -115,6 +115,10 @@ namespace mongo {
          * two on-disk formats.
          */
 
+        /**
+         * Returns number of total keys just in provided bucket
+         * (not recursive)
+         */
         virtual int nKeys(const IndexCatalogEntry* btreeState,
                           DiskLoc bucket ) = 0;
 

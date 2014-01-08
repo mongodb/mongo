@@ -147,6 +147,12 @@ namespace mongo {
          * Starts a bulk operation.
          * You work on the returned IndexAccessMethod and then call commitBulk.
          * This can return NULL, meaning bulk mode is not available.
+         *
+         * Long term, you'll eventually be able to mix/match bulk, not bulk,
+         * have as many as you want, etc..
+         *
+         * For now (1/8/14) you can only do bulk when the index is empty
+         * it will fail if you try other times.
          */
         virtual IndexAccessMethod* initiateBulk() = 0;
 
