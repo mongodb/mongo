@@ -272,12 +272,28 @@ namespace mongo {
             help << "http://dochub.mongodb.org/core/databaseprofiler";
         }
         virtual LockType locktype() const { return WRITE; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::enableProfiler);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+
+            if (cmdObj.firstElement().numberInt() == -1 && !cmdObj.hasField("slowms")) {
+                // If you just want to get the current profiling level you can do so with just
+                // read access to system.profile, even if you can't change the profiling level.
+                if (authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(NamespaceString(dbname,
+                                                                           "system.profile")),
+                        ActionType::find)) {
+                    return Status::OK();
+                }
+            }
+
+            if (authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(dbname), ActionType::enableProfiler)) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
         CmdProfile() : Command("profile") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

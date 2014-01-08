@@ -1610,7 +1610,7 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "profile",  
+            testname: "profile",
             command: {profile: 0},
             skipSharded: true,
             testcases: [
@@ -1626,6 +1626,43 @@ var authCommandsLib = {
                     roles: roles_dbAdminAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: ""}, actions: ["enableProfiler"] }
+                    ]
+                }
+            ]
+        },
+        {
+            testname: "profileGetLevel",
+            command: {profile: -1},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        dbAdmin: 1,
+                        dbAdminAnyDatabase: 1,
+                        dbOwner: 1,
+                        clusterMonitor: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "system.profile"},
+                          actions: ["find"] }
+                    ]
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: {
+                        dbAdminAnyDatabase: 1,
+                        clusterMonitor: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "system.profile"},
+                          actions: ["find"] }
                     ]
                 }
             ]
