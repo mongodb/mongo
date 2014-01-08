@@ -696,6 +696,7 @@ mongosLibraryFiles = [
     "s/commands_public.cpp",
     "s/commands/auth_schema_upgrade_s.cpp",
     "s/commands/cluster_merge_chunks_cmd.cpp",
+    "s/commands/cluster_plan_cache_cmd.cpp",
     "s/commands/cluster_write_cmd.cpp",
     "s/request.cpp",
     "s/client_info.cpp",

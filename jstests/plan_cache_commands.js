@@ -24,7 +24,7 @@
  *       query.
  */ 
 
-var t = db.jstests_query_cache;
+var t = db.jstests_plan_cache_commands;
 
 t.drop();
 

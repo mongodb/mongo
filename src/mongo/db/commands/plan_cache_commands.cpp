@@ -218,7 +218,8 @@ namespace mongo {
     }
 
     PlanCacheGenerateKey::PlanCacheGenerateKey() : PlanCacheCommand("planCacheGenerateKey",
-        "Returns a key into the cache for a query. Similar queries with the same query shape "
+        "Returns a key into the cache for a query. "
+        "Similar queries with the same query shape "
         "will resolve to the same key.",
         ActionType::planCacheRead) { }
 
