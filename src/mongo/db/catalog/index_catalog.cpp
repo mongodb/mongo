@@ -117,11 +117,9 @@ namespace mongo {
             _entries.add( entry.release() );
         }
 
-        // we clean up any unfinished indexes right here
-        // its too weird to leave in any state
-        // if someone wants to clean them, they can call prepOneUnfinishedIndex
-
         if ( _leftOverIndexes.size() ) {
+            // if there are left over indexes, we don't let anyone add/drop indexes
+            // until someone goes and fixes them
             log() << "found " << _leftOverIndexes.size() << " index(es) that wasn't finished before shutdown";
         }
 
@@ -141,13 +139,14 @@ namespace mongo {
         fassertFailed(17198);
     }
 
-    void IndexCatalog::_checkUnifished() const {
+    Status IndexCatalog::_checkUnfinished() const {
+        if ( _leftOverIndexes.size() == 0 )
+            return Status::OK();
 
-        massert( 17338,
-                 str::stream()
-                 << "IndexCatalog has left over indexes that must be cleared"
-                 << " ns: " << _collection->ns().ns(),
-                 _leftOverIndexes.size() == 0 );
+        return Status( ErrorCodes::InternalError,
+                       str::stream()
+                       << "IndexCatalog has left over indexes that must be cleared"
+                       << " ns: " << _collection->ns().ns() );
     }
 
     bool IndexCatalog::_shouldOverridePlugin(const BSONObj& keyPattern) {
@@ -235,7 +234,9 @@ namespace mongo {
     Status IndexCatalog::createIndex( BSONObj spec, bool mayInterrupt ) {
         Lock::assertWriteLocked( _collection->_database->name() );
         _checkMagic();
-        _checkUnifished();
+        Status status = _checkUnfinished();
+        if ( !status.isOK() )
+            return status;
         /**
          * There are 2 main variables so(4 possibilies) for how we build indexes
          * variable 1 - size of collection
@@ -257,7 +258,7 @@ namespace mongo {
         // 1) add entry in system.indexes
         // 2) call into buildAnIndex?
 
-        Status status = okToAddIndex( spec );
+        status = okToAddIndex( spec );
         if ( !status.isOK() )
             return status;
 
@@ -316,7 +317,6 @@ namespace mongo {
 
         // ------- allocate RecordsStore
         {
-            Database* db = _collection->_database;
             NamespaceIndex& nsi = db->namespaceIndex();
             verify( nsi.details( descriptor->indexNamespace() ) == NULL );
             nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
@@ -419,9 +419,12 @@ namespace mongo {
 
     IndexCatalog::IndexBuildBlock::~IndexBuildBlock() {
         if ( !_inProgress ) {
-            // taken care of already
+            // taken care of already when success() is called
             return;
         }
+
+        // if we're here, the index build failed
+
         _inProgress = false; // defensive
 
         fassert( 17204, _catalog->_collection->ok() );
@@ -777,7 +780,9 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
         _checkMagic();
-        _checkUnifished();
+        Status status = _checkUnfinished();
+        if ( !status.isOK() )
+            return status;
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
@@ -844,6 +849,8 @@ namespace mongo {
         _details->_removeIndexFromMe( idxNo );
 
         // remove from system.indexes
+        // n is how many things were removed from this
+        // probably should clean this up
         int n = _removeFromSystemIndexes( indexName );
         wassert( n == 1 );
     }

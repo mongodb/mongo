@@ -233,7 +233,7 @@ namespace mongo {
         IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 
         void _checkMagic() const;
-        void _checkUnifished() const;
+        Status _checkUnfinished() const;
 
         Status _indexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc );
         Status _unindexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc,
@@ -256,6 +256,10 @@ namespace mongo {
 
         IndexCatalogEntryContainer _entries;
 
+        // These are the index specs of indexes that were "leftover"
+        // "Leftover" means they were unfinished when a mongod shut down
+        // Certain operations are prohibted until someone fixes
+        // get by calling getAndClearUnfinishedIndexes
         std::vector<BSONObj> _leftOverIndexes;
 
         static const BSONObj _idObj; // { _id : 1 }
