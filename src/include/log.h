@@ -68,7 +68,6 @@ typedef struct {
 	WT_LSN	slot_end_lsn;	/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
-	WT_CONDVAR *slot_done_cond;	/* Signalled when write done */
 	int32_t	slot_churn;		/* Active slots are scarce. */
 #define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
 #define	SLOT_BUFFERED	0x02			/* Buffer writes */
@@ -108,9 +107,10 @@ typedef struct {
 	 */
 	WT_SPINLOCK      log_lock;      /* Locked: Logging fields */
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
+	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
 
-	/* Notify any waiting slots when write_lsn is updated. */
-	WT_CONDVAR	*log_release_cond;
+	/* Notify any waiting threads when sync_lsn is updated. */
+	WT_CONDVAR	*log_sync_cond;
 
 	/*
 	 * Consolidation array information

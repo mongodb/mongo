@@ -175,6 +175,7 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	log = conn->log;
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
+	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
 		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
@@ -188,7 +189,7 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session,
-	    "log release", 0, &log->log_release_cond));
+	    "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
@@ -258,9 +259,9 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 	}
 
 	WT_TRET(__wt_log_slot_destroy(session));
-	WT_TRET(__wt_cond_destroy(session, &conn->log->log_release_cond));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
+	__wt_spin_destroy(session, &conn->log->log_sync_lock);
 	__wt_free(session, conn->log);
 
 	return (ret);
