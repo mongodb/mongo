@@ -163,31 +163,6 @@ namespace mongo {
         return root;
     }
 
-    // TODO: Should this really live in the parsing?  Or elsewhere?
-    Status argsValid(MatchExpression* root) {
-        MatchExpression::MatchType type = root->matchType();
-
-        if (MatchExpression::GT == type || MatchExpression::GTE == type
-            || MatchExpression::LT == type || MatchExpression::LTE == type) {
-
-            ComparisonMatchExpression* cme = static_cast<ComparisonMatchExpression*>(root);
-            BSONElement data = cme->getData();
-            if (RegEx == data.type()) {
-                return Status(ErrorCodes::BadValue,
-                              "Can't have RegEx as arg to pred " + cme->toString());
-            }
-        }
-
-        for (size_t i = 0; i < root->numChildren(); ++i) {
-            Status s = argsValid(root->getChild(i));
-            if (!s.isOK()) {
-                return s;
-            }
-        }
-
-        return Status::OK();
-    }
-
     size_t countNodes(MatchExpression* root, MatchExpression::MatchType type) {
         size_t sum = 0;
         if (type == root->matchType()) {
@@ -201,12 +176,6 @@ namespace mongo {
 
     // TODO: Move this to query_validator.cpp
     Status isValid(MatchExpression* root) {
-        // TODO: This should really be done as part of type checking in the parser.
-        Status argStatus = argsValid(root);
-        if (!argStatus.isOK()) {
-            return argStatus;
-        }
-
         // Analysis below should be done after squashing the tree to make it clearer.
 
         // TODO: We want $text in root level or within rooted AND for consistent text score
