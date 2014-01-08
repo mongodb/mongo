@@ -32,9 +32,9 @@
 
 #include <vector>
 
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
 
 namespace mongo {
 
@@ -121,7 +121,7 @@ namespace mongo {
             const IndexCatalog* _catalog;
             IndexCatalogEntryContainer::const_iterator _iterator;
 
-            bool _start;
+            bool _start; // only true before we've called next() or more()
 
             IndexCatalogEntry* _prev;
             IndexCatalogEntry* _next;
@@ -146,7 +146,7 @@ namespace mongo {
         Status dropIndex( IndexDescriptor* desc );
 
         /**
-         * will drop all uncompleted indexes and return specs
+         * will drop all incompleted indexes and return specs
          * after this, the indexes can be rebuilt
          */
         vector<BSONObj> getAndClearUnfinishedIndexes();
@@ -233,6 +233,10 @@ namespace mongo {
         IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 
         void _checkMagic() const;
+
+
+        // checks if there is anything in _leftOverIndexes
+        // meaning we shouldn't modify catalog
         Status _checkUnfinished() const;
 
         Status _indexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc );
@@ -244,7 +248,7 @@ namespace mongo {
          */
         Status _dropIndex( IndexCatalogEntry* entry );
 
-        // just does diskc hanges
+        // just does disk hanges
         // doesn't change memory state, etc...
         void _deleteIndexFromDisk( const string& indexName,
                                    const string& indexNamespace,
@@ -260,7 +264,7 @@ namespace mongo {
         // "Leftover" means they were unfinished when a mongod shut down
         // Certain operations are prohibted until someone fixes
         // get by calling getAndClearUnfinishedIndexes
-        std::vector<BSONObj> _leftOverIndexes;
+        std::vector<BSONObj> _unfinishedIndexes;
 
         static const BSONObj _idObj; // { _id : 1 }
 

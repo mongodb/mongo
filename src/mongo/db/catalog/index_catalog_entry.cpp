@@ -1,4 +1,4 @@
-// index_catalog_entry.h
+// index_catalog_entry.cpp
 
 /**
 *    Copyright (C) 2013 10gen Inc.

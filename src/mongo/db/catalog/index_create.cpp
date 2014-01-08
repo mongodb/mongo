@@ -219,7 +219,7 @@ namespace mongo {
 
         if ( idxInfo["background"].trueValue() && !inDBRepair ) {
             doInBackground = true;
-            backgroundOperation.reset( new BackgroundOperation( ns) );
+            backgroundOperation.reset( new BackgroundOperation(ns) );
             uassert( 13130,
                      "can't start bg index b/c in recursive lock (db.eval?)",
                      !Lock::nested() );
@@ -228,7 +228,9 @@ namespace mongo {
 
         Status status = btreeState->accessMethod()->initializeAsEmpty();
         massert( 17342,
-                 str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
+                 str::stream()
+                 << "IndexAccessMethod::initializeAsEmpty failed"
+                 << status.toString(),
                  status.isOK() );
 
         IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk();
@@ -243,7 +245,7 @@ namespace mongo {
                                                    doInBackground );
 
         if ( bulk ) {
-            log() << "\t bulk commit starting";
+            LOG(1) << "\t bulk commit starting";
             std::set<DiskLoc> dupsToDrop;
 
             btreeState->accessMethod()->commitBulk( bulk, mayInterrupt, &dupsToDrop );

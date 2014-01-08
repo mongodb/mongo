@@ -464,7 +464,7 @@ namespace mongo {
         return *id;
     }
 
-    IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected ) {
+    IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) {
         if( idxNo < NIndexesBase ) {
             IndexDetails& id = _indexes[idxNo];
             return id;

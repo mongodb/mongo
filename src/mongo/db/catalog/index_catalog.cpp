@@ -60,7 +60,8 @@
 
 namespace mongo {
 
-#define INDEX_CATALOG_MAGIC 283711
+    static const int INDEX_CATALOG_INIT = 283711;
+    static const int INDEX_CATALOG_UNINIT = 654321;
 
     // What's the default version of our indices?
     const int DefaultIndexVersionNumber = 1;
@@ -70,11 +71,11 @@ namespace mongo {
     // -------------
 
     IndexCatalog::IndexCatalog( Collection* collection, NamespaceDetails* details )
-        : _magic(654321), _collection( collection ), _details( details ) {
+        : _magic(INDEX_CATALOG_UNINIT), _collection( collection ), _details( details ) {
     }
 
     IndexCatalog::~IndexCatalog() {
-        if ( _magic != 654321 ) {
+        if ( _magic != INDEX_CATALOG_UNINIT ) {
             // only do this check if we haven't been initialized
             _checkMagic();
         }
@@ -89,7 +90,7 @@ namespace mongo {
             int idxNo = ii.pos() - 1;
 
             if ( idxNo >= _details->getCompletedIndexCount() ) {
-                _leftOverIndexes.push_back( id.info.obj().getOwned() );
+                _unfinishedIndexes.push_back( id.info.obj().getOwned() );
                 continue;
             }
 
@@ -117,18 +118,19 @@ namespace mongo {
             _entries.add( entry.release() );
         }
 
-        if ( _leftOverIndexes.size() ) {
+        if ( _unfinishedIndexes.size() ) {
             // if there are left over indexes, we don't let anyone add/drop indexes
             // until someone goes and fixes them
-            log() << "found " << _leftOverIndexes.size() << " index(es) that wasn't finished before shutdown";
+            log() << "found " << _unfinishedIndexes.size()
+                  << " index(es) that wasn't finished before shutdown";
         }
 
-        _magic = INDEX_CATALOG_MAGIC;
+        _magic = INDEX_CATALOG_INIT;
         return Status::OK();
     }
 
     bool IndexCatalog::ok() const {
-        return ( _magic == INDEX_CATALOG_MAGIC );
+        return ( _magic == INDEX_CATALOG_INIT );
     }
 
     void IndexCatalog::_checkMagic() const {
@@ -140,7 +142,7 @@ namespace mongo {
     }
 
     Status IndexCatalog::_checkUnfinished() const {
-        if ( _leftOverIndexes.size() == 0 )
+        if ( _unfinishedIndexes.size() == 0 )
             return Status::OK();
 
         return Status( ErrorCodes::InternalError,
@@ -392,6 +394,8 @@ namespace mongo {
         verify( _catalog->_collection->ok() );
         verify( !loc.isNull() );
 
+        // this doesn't actually change any counters or anything
+        // so we're basically changing nothing
         IndexDetails* indexDetails = &_nsd->getNextIndexDetails( _ns.c_str() );
         _inProgress = true;
 
@@ -403,6 +407,7 @@ namespace mongo {
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;
+            _inProgress = false; // this will cause an fassert in destructor
             return;
         }
 
@@ -411,7 +416,7 @@ namespace mongo {
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
-            _inProgress = false;
+            _inProgress = false; // this will cause an fassert in destructor
             return;
         }
 
@@ -868,8 +873,8 @@ namespace mongo {
     }
 
     vector<BSONObj> IndexCatalog::getAndClearUnfinishedIndexes() {
-        vector<BSONObj> toReturn = _leftOverIndexes;
-        _leftOverIndexes.clear();
+        vector<BSONObj> toReturn = _unfinishedIndexes;
+        _unfinishedIndexes.clear();
         for ( size_t i = 0; i < toReturn.size(); i++ ) {
             BSONObj spec = toReturn[i];
 
