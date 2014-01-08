@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <set>
 #include <boost/thread/mutex.hpp>
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
@@ -41,29 +42,14 @@ namespace mongo {
     struct QuerySolutionNode;
 
     /**
-     * TODO: Debug commands:
-     * 1. show canonical form of query
-     * 2. show plans generated for query without (and with) cache
-     * 3. print out cache.
-     * 4. clear all elements from cache
-     * 5. pin and unpin cached solutions
-     */
-
-    /**
      * TODO HK notes
 
-     * must cache query w/shape, not exact data.
-
      * cache should be LRU with some cap on size
-
-     * order doesn't matter: ensure that cache entry for query={a:1, b:1} same for query={b:1, a:1}
-
-     * cache whenever possible
 
      * write ops should invalidate but tell plan_cache there was a write op, don't enforce policy elsewhere,
        enforce here.
 
-     * cache key is sort + query shape
+     * cache key is sort + query shape + projection
 
      * {x:1} and {x:{$gt:7}} not same shape for now -- operator matters
      */
@@ -182,12 +168,41 @@ namespace mongo {
         int wholeIXSolnDir;
     };
 
+    class PlanCacheEntry;
+
     /**
      * Information returned from a get(...) query.
      */
-    struct CachedSolution {
+    class CachedSolution {
+    private:
+        MONGO_DISALLOW_COPYING(CachedSolution);
+    public:
+        CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry);
+        ~CachedSolution();
+
+        /**
+         * Resolves index of winning solution.
+         * Takes into account pinned and shunned plans.
+         * Pinned plans take precendence over shunned plans.
+         * If a plan is both pinned and shunned, it will be the winning plan.
+         * The reason we provide the index into plannerData is to support the
+         * notion of a backup plan in the multi plan runner. The cache solution
+         * runner could go to the next solution after the winner index.
+         */
+        size_t getWinnerIndex() const;
+
         // Owned here.
-        boost::scoped_ptr<SolutionCacheData> plannerData;
+        std::vector<SolutionCacheData*> plannerData;
+
+        // Pin information
+        bool pinned;
+
+        // Index of pinned plan in plannerData.
+        // Valid if pinned is true.
+        size_t pinnedIndex;
+
+        // Indexes of shunned plans.
+        std::set<size_t> shunnedIndexes;
 
         // Key used to provide feedback on the entry.
         PlanCacheKey key;
@@ -195,13 +210,12 @@ namespace mongo {
         // For debugging.
         std::string toString() const;
 
-        // XXX: remove when we have a real CachedSolution
-        size_t numPlans;
+        // We are extracting just enough information from the canonical
+        // query. We could clone the canonical query but the following
+        // items are all that is displayed to the user.
         BSONObj query;
         BSONObj sort;
         BSONObj projection;
-
-        // XXX: no copying
     };
 
     /**
@@ -215,11 +229,11 @@ namespace mongo {
 
         /**
          * Create a new PlanCacheEntry.
-         * Grabs any planner-specific data required from the solution.
+         * Grabs any planner-specific data required from the solutions.
          * Takes ownership of the PlanRankingDecision that placed the plan in the cache.
          * XXX: what else should this take?
          */
-        PlanCacheEntry(const QuerySolution& s,
+        PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
                    PlanRankingDecision* d);
 
         ~PlanCacheEntry();
@@ -227,10 +241,10 @@ namespace mongo {
         // For debugging.
         std::string toString() const;
 
-        // Data provided to the planner to allow it to recreate the solution this entry
-        // represents. The SolutionCacheData is fully owned here, so in order to return
+        // Data provided to the planner to allow it to recreate the solutions this entry
+        // represents. Each SolutionCacheData is fully owned here, so in order to return
         // it from the cache a deep copy is made and returned inside CachedSolution.
-        boost::scoped_ptr<SolutionCacheData> plannerData;
+        std::vector<SolutionCacheData*> plannerData;
 
         // Why the best solution was picked.
         // TODO: Do we want to store other information like the other plans considered?
@@ -243,8 +257,12 @@ namespace mongo {
         // Is this pinned in the cache?  If so, we will never remove it as a result of feedback.
         bool pinned;
 
-        // XXX: for test only. Remove when plan cache entries are implemented.
-        size_t numPlans;
+        // Index of pinned plan in plannerData.
+        // Valid if pinned is true.
+        size_t pinnedIndex;
+
+        // Indexes of shunned plans.
+        std::set<size_t> shunnedIndexes;
 
         // XXX: Replace with copy of canonical query?
         BSONObj query;
@@ -257,8 +275,6 @@ namespace mongo {
      * mapping, the cache contains information on why that mapping was made and statistics on the
      * cache entry's actual performance on subsequent runs.
      *
-     * XXX: lock in here!  this can be called by many threads at the same time since the only above-this
-     * locking required is a read lock on the ns.
      */
     class PlanCache {
     private:
@@ -289,8 +305,10 @@ namespace mongo {
         ~PlanCache();
 
         /**
-         * Record 'solution' as the best plan for 'query' which was picked for reasons detailed in
-         * 'why'.
+         * Record solutions for query. Best plan is first element in list.
+         * Each query in the cache will have more than 1 plan because we only
+         * add queries which are considered by the multi plan runner (which happens
+         * only when the query planner generates multiple candidate plans).
          *
          * Takes ownership of 'why'.
          *
@@ -298,7 +316,7 @@ namespace mongo {
          * If the mapping already existed or some other error occurred, returns another Status.
          */
         Status add(const CanonicalQuery& query,
-                   const QuerySolution& soln,
+                   const std::vector<QuerySolution*>& solns,
                    PlanRankingDecision* why);
 
         /**

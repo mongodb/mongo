@@ -196,7 +196,9 @@ namespace mongo {
         const MatchExpression* expr = query.root();
 
         // Collection scan
-        if (expr->matchType() == MatchExpression::AND && expr->numChildren() == 0) {
+        // No sort order requested
+        if (lpq.getSort().isEmpty() &&
+            expr->matchType() == MatchExpression::AND && expr->numChildren() == 0) {
             return false;
         }
 
@@ -242,26 +244,82 @@ namespace mongo {
     }
 
     //
+    // CachedSolution
+    //
+
+    CachedSolution::CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry)
+        : plannerData(entry.plannerData.size()),
+          pinned(entry.pinned),
+          pinnedIndex(entry.pinnedIndex),
+          shunnedIndexes(entry.shunnedIndexes),
+          key(key),
+          query(entry.query.copy()),
+          sort(entry.sort.copy()),
+          projection(entry.projection.copy()) {
+        // CachedSolution should not having any references into
+        // cache entry. All relevant data should be cloned/copied.
+        for (size_t i = 0; i < entry.plannerData.size(); ++i) {
+            verify(entry.plannerData[i]);
+            plannerData[i] = entry.plannerData[i]->clone();
+        }
+    }
+
+    CachedSolution::~CachedSolution() {
+        for (std::vector<SolutionCacheData*>::const_iterator i = plannerData.begin();
+             i != plannerData.end(); ++i) {
+            SolutionCacheData* scd = *i;
+            delete scd;
+        }
+    }
+
+    size_t CachedSolution::getWinnerIndex() const {
+        // Choose pinned plan always (even if shunned).
+        if (pinned) {
+            verify(pinnedIndex < plannerData.size());
+            return pinnedIndex;
+        }
+
+        // Cached solution should contain at least one unshunned plan.
+        verify(shunnedIndexes.size() < plannerData.size());
+        for (size_t i = 0; i < plannerData.size(); ++i) {
+            if (shunnedIndexes.find(i) == shunnedIndexes.end()) {
+                return i;
+            }
+        }
+
+        // Unreachable code.
+        verify(0);
+        return 0;
+    }
+
+    //
     // PlanCacheEntry
     //
 
-    PlanCacheEntry::PlanCacheEntry(const QuerySolution& s, PlanRankingDecision* d) {
+    PlanCacheEntry::PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
+                                   PlanRankingDecision* d)
+        : plannerData(solutions.size()) {
         // The caller of this constructor is responsible for ensuring
         // that the QuerySolution 's' has valid cacheData. If there's no
         // data to cache you shouldn't be trying to construct a PlanCacheEntry.
-        verify(NULL != s.cacheData.get());
+
+        // Copy the solution's cache data into the plan cache entry.
+        for (size_t i = 0; i < solutions.size(); ++i) {
+            verify(solutions[i]->cacheData.get());
+            plannerData[i] = solutions[i]->cacheData->clone();
+        }
 
         decision.reset(d);
         pinned = false;
-        numPlans = 0;
-
-        // Copy the solution's cache data into the plan cache entry.
-        plannerData.reset(s.cacheData->clone());
+        pinnedIndex = 0;
     }
 
     PlanCacheEntry::~PlanCacheEntry() {
         for (size_t i = 0; i < feedback.size(); ++i) {
             delete feedback[i];
+        }
+        for (size_t i = 0; i < plannerData.size(); ++i) {
+            delete plannerData[i];
         }
     }
 
@@ -338,7 +396,25 @@ namespace mongo {
     }
 
     std::string SolutionCacheData::toString() const {
-        return this->tree->toString();
+        stringstream ss;
+        switch (this->solnType) {
+        case WHOLE_IXSCAN_SOLN:
+            verify(this->tree.get());
+            ss << "(whole index scan solution: "
+               << "dir=" << this->wholeIXSolnDir << "; "
+               << "tree=" << this->tree->toString()
+               << ")";
+            break;
+        case COLLSCAN_SOLN:
+            ss << "(collection scan)";
+            break;
+        case USE_INDEX_TAGS_SOLN:
+            verify(this->tree.get());
+            ss << "(index-tagged expression tree: "
+               << "tree=" << this->tree->toString()
+               << ")";
+        }
+        return ss.str();
     }
 
     //
@@ -349,18 +425,16 @@ namespace mongo {
         _clear();
     }
 
-    Status PlanCache::add(const CanonicalQuery& query, const QuerySolution& soln,
+    Status PlanCache::add(const CanonicalQuery& query, const std::vector<QuerySolution*>& solns,
                           PlanRankingDecision* why) {
         verify(why);
 
-        if (NULL == soln.cacheData.get()) {
-            return Status(ErrorCodes::BadValue, "invalid solution - no cache data");
+        if (solns.empty()) {
+            return Status(ErrorCodes::BadValue, "no solutions provided");
         }
 
         PlanCacheKey key = getPlanCacheKey(query);
-        PlanCacheEntry* entry = new PlanCacheEntry(soln, why);
-        // XXX: fix later
-        entry->numPlans = why->onlyOneSolution ? 1 : 2;
+        PlanCacheEntry* entry = new PlanCacheEntry(solns, why);
         const LiteParsedQuery& pq = query.getParsed();
         entry->query = pq.getFilter().copy();
         entry->sort = pq.getSort().copy();
@@ -397,15 +471,8 @@ namespace mongo {
         PlanCacheEntry* entry = i->second;
         verify(entry);
 
-        auto_ptr<CachedSolution> cr(new CachedSolution());
-        cr->key = key;
-        cr->numPlans = entry->numPlans;
-        cr->query = entry->query;
-        cr->sort = entry->sort;
-        cr->projection = entry->projection;
-        cr->plannerData.reset(entry->plannerData->clone());
+        *crOut = new CachedSolution(key, *entry);
 
-        *crOut = cr.release();
         return Status::OK();
     }
 
@@ -456,12 +523,13 @@ namespace mongo {
 
         // search for plan
         // XXX: remove when we have real cached plans
-        for (size_t i = 0; i < entry->numPlans; i++) {
+        for (size_t i = 0; i < entry->plannerData.size(); i++) {
             stringstream ss;
             ss << "plan" << i;
             PlanID currentPlan(ss.str());
             if (currentPlan == plan) {
                 entry->pinned = true;
+                entry->pinnedIndex = i;
                 return Status::OK();
             }
         }
@@ -496,10 +564,12 @@ namespace mongo {
 
         // XXX: Generate fake plan ID
         stringstream ss;
-        ss << "plan" << entry->numPlans;
+        ss << "plan" << entry->plannerData.size();
         PlanID plan(ss.str());
 
-        entry->numPlans++;
+        SolutionCacheData* scd = new SolutionCacheData();
+        scd->tree.reset(new PlanCacheIndexTree());
+        entry->plannerData.push_back(scd);
 
         *planOut = plan;
         return Status::OK();
@@ -526,22 +596,27 @@ namespace mongo {
         PlanCacheEntry* entry = i->second;
         verify(entry);
 
-        // Do not proceed if there's only one plan for this query.
-        if (1 == entry->numPlans) {
-            return Status(ErrorCodes::BadValue, "cannot shun only plan for query");
-        }
-       
         if (i == _cache.end()) {
             return Status(ErrorCodes::BadValue, "no such key in cache");
         }
+
         // search for plan
-        // XXX: remove when we have real cached plans
-        for (size_t i = 0; i < entry->numPlans; i++) {
+        for (size_t i = 0; i < entry->plannerData.size(); i++) {
             stringstream ss;
             ss << "plan" << i;
             PlanID currentPlan(ss.str());
             if (currentPlan == plan) {
-                entry->numPlans--;
+                // Do nothing if plan is already shunned.
+                if (entry->shunnedIndexes.find(i) != entry->shunnedIndexes.end()) {
+                    return Status::OK();
+                }
+
+                // Do not proceed if this is the last unshunned plan.
+                if ((entry->shunnedIndexes.size() + 1U) == entry->plannerData.size()) {
+                    return Status(ErrorCodes::BadValue, "query must have at least one unshunned plan");
+                }
+
+                entry->shunnedIndexes.insert(i);
                 return Status::OK();
             }
         }

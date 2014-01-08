@@ -181,11 +181,13 @@ namespace mongo {
 
         // Try to look up a cached solution for the query.
         //
-        // XXX: we don't want to do this if there is a hint or if max/min is set.
+        // Skip cache look up for non-cacheable queries.
+        // See PlanCache::shouldCacheQuery()
         //
         // TODO: Can the cache have negative data about a solution?
         CachedSolution* rawCS;
-        if (collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
+        if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
+            collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
             // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
             QuerySolution *qs;
             Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, rawCS, &qs);
