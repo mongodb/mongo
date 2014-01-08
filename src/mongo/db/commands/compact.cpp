@@ -46,10 +46,8 @@
 
 namespace mongo {
 
-    bool compactCollection(Collection* collection, string& errmsg, bool validate,
-                           BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding,
-                           bool preservePadding);
-
+    bool compactCollection(Collection* collection, const CompactOptions* compactOptions,
+                           string& errmsg, BSONObjBuilder& result );
 
     // from repl/rs.cpp
     bool isCurrentlyAReplSetPrimary();
@@ -113,40 +111,38 @@ namespace mongo {
                 return false;
             }
 
-            double pf = 1.0;
-            int pb = 0;
-            // preservePadding trumps all other compact methods
-            bool preservePadding = false;
-            // useDefaultPadding is used to track whether or not a padding requirement was passed in
-            // if it wasn't than UsePowerOf2Sizes will be maintained when compacting
-            bool useDefaultPadding = true;
-            if (cmdObj.hasElement("preservePadding")) {
-                preservePadding = cmdObj["preservePadding"].trueValue();
-                useDefaultPadding = false;
-            }
+            CompactOptions compactOptions;
 
-            if( cmdObj.hasElement("paddingFactor") ) {
-                if (preservePadding == true) {
-                    errmsg = "preservePadding is incompatible with paddingFactor";
+            if ( cmdObj["preservePadding"].trueValue() ) {
+                compactOptions.paddingMode = CompactOptions::PRESERVE;
+                if ( cmdObj.hasElement( "paddingFactor" ) ||
+                     cmdObj.hasElement( "paddingBytes" ) ) {
+                    errmsg = "cannot mix preservePadding and paddingFactor|paddingBytes";
                     return false;
                 }
-                useDefaultPadding = false;
-                pf = cmdObj["paddingFactor"].Number();
-                verify( pf >= 1.0 && pf <= 4.0 );
             }
-            if( cmdObj.hasElement("paddingBytes") ) {
-                if (preservePadding == true) {
-                    errmsg = "preservePadding is incompatible with paddingBytes";
-                    return false;
+            else if ( cmdObj.hasElement( "paddingFactor" ) || cmdObj.hasElement( "paddingBytes" ) ) {
+                compactOptions.paddingMode = CompactOptions::MANUAL;
+                if ( cmdObj.hasElement("paddingFactor") ) {
+                    compactOptions.paddingFactor = cmdObj["paddingFactor"].Number();
+                    if ( compactOptions.paddingFactor < 1 ||
+                         compactOptions.paddingFactor > 4 ){
+                        errmsg = "invalid padding factor";
+                        return false;
+                    }
                 }
-                useDefaultPadding = false;
-                pb = (int) cmdObj["paddingBytes"].Number();
-                verify( pb >= 0 && pb <= 1024 * 1024 );
+                if ( cmdObj.hasElement("paddingBytes") ) {
+                    compactOptions.paddingBytes = cmdObj["paddingBytes"].numberInt();
+                    if ( compactOptions.paddingBytes < 0 ||
+                         compactOptions.paddingBytes > ( 1024 * 1024 ) ) {
+                        errmsg = "invalid padding bytes";
+                        return false;
+                    }
+                }
             }
 
-            bool validate = true; // default is true at the moment
             if ( cmdObj.hasElement("validate") )
-                validate = cmdObj["validate"].trueValue();
+                compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
             bool ok = false;
             {
@@ -165,16 +161,12 @@ namespace mongo {
                     return false;
                 }
 
-                log() << "compact " << ns << " begin" << endl;
+                log() << "compact " << ns << " begin, options: " << compactOptions.toString();
 
                 std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
 
-                if( pf != 0 || pb != 0 ) {
-                    log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
-                }
                 try {
-                    ok = compactCollection(collection, errmsg, validate,
-                                           result, pf, pb, useDefaultPadding, preservePadding);
+                    ok = compactCollection(collection, &compactOptions, errmsg, result );
                 }
                 catch(...) {
                     log() << "compact " << ns << " end (with error)" << endl;

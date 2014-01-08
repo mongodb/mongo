@@ -60,11 +60,10 @@ namespace mongo {
     }
 
     /** @return number of skipped (invalid) documents */
-    unsigned compactExtent(Collection* collection, const DiskLoc diskloc, int n,
-                           int nidx, bool validate, double pf, int pb, bool useDefaultPadding,
-                           bool preservePadding) {
+    unsigned compactExtent(Collection* collection, const DiskLoc diskloc, int extentNumber,
+                           const CompactOptions* compactOptions ) {
 
-        log() << "compact begin extent #" << n << " for namespace " << collection->ns();
+        log() << "compact begin extent #" << extentNumber << " for namespace " << collection->ns();
         unsigned oldObjSize = 0; // we'll report what the old padding was
         unsigned oldObjSizeWithPadding = 0;
 
@@ -101,7 +100,11 @@ namespace mongo {
                     L = db->getExtentManager().getNextRecordInExtent(L);
                     BSONObj objOld = BSONObj::make(recOld);
 
-                    if( !validate || objOld.valid() ) {
+                    if ( compactOptions->validateDocuments && !objOld.valid() ) {
+                        // object is corrupt!
+                        log() << "compact skipping corrupt document!";
+                    }
+                    else {
                         nrecords++;
                         unsigned sz = objOld.objsize();
 
@@ -110,24 +113,25 @@ namespace mongo {
 
                         unsigned lenWHdr = sz + Record::HeaderSize;
                         unsigned lenWPadding = lenWHdr;
-                        // if we are preserving the padding, the record should not change size
-                        if (preservePadding) {
+
+                        switch( compactOptions->paddingMode ) {
+                        case CompactOptions::NONE:
+                            if ( collection->details()->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes) )
+                                lenWPadding = collection->details()->quantizePowerOf2AllocationSpace(lenWPadding);
+                            break;
+                        case CompactOptions::PRESERVE:
+                            // if we are preserving the padding, the record should not change size
                             lenWPadding = recOld->lengthWithHeaders();
-                        }
-                        // maintain UsePowerOf2Sizes if no padding values were passed in
-                        else if (collection->details()->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes)
-                                && useDefaultPadding) {
-                            lenWPadding = collection->details()->quantizePowerOf2AllocationSpace(lenWPadding);
-                        }
-                        // otherwise use the padding values (pf and pb) that were passed in
-                        else {
-                            lenWPadding = static_cast<unsigned>(pf*lenWPadding);
-                            lenWPadding += pb;
+                            break;
+                        case CompactOptions::MANUAL:
+                            lenWPadding = compactOptions->computeRecordSize(lenWPadding);
                             lenWPadding = lenWPadding & quantizeMask(lenWPadding);
+                            if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) {
+                                lenWPadding = lenWHdr;
+                            }
+                            break;
                         }
-                        if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
-                            lenWPadding = lenWHdr;
-                        }
+
                         DiskLoc loc = allocateSpaceForANewRecord(collection->ns().ns().c_str(),
                                                                  collection->details(), lenWPadding, false);
                         uassert(14024, "compact error out of space during compaction", !loc.isNull());
@@ -136,10 +140,6 @@ namespace mongo {
                         recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
                         addRecordToRecListInExtent(recNew, loc);
                         memcpy(recNew->data(), objOld.objdata(), sz);
-                    }
-                    else { 
-                        if( ++skipped <= 10 )
-                            log() << "compact skipping invalid object" << endl;
                     }
 
                     if( L.isNull() ) { 
@@ -178,7 +178,8 @@ namespace mongo {
                 double op = 1.0;
                 if( oldObjSize )
                     op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
-                log() << "compact finished extent #" << n << " containing " << nrecords << " documents (" << datasize/1000000.0 << "MB)"
+                log() << "compact finished extent #" << extentNumber << " containing " << nrecords
+                      << " documents (" << datasize/1000000.0 << "MB)"
                       << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100;
             }
         }
@@ -186,9 +187,8 @@ namespace mongo {
         return skipped;
     }
 
-    bool compactCollection(Collection* collection, string& errmsg, bool validate,
-                           BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding,
-                           bool preservePadding) {
+    bool compactCollection(Collection* collection, const CompactOptions* compactOptions,
+                           string& errmsg, BSONObjBuilder& result ) {
 
         verify( collection );
         NamespaceDetails* d = collection->details();
@@ -265,9 +265,8 @@ namespace mongo {
         // as we're about to tally them up again for each new extent
         d->setStats( 0, 0 );
 
-        for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            skipped += compactExtent(collection, *i, n++, nidx, validate, pf, pb,
-                                     useDefaultPadding, preservePadding);
+        for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) {
+            skipped += compactExtent(collection, *i, n++, compactOptions );
             pm.hit();
         }
 
