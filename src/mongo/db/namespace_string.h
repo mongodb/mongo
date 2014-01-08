@@ -80,6 +80,8 @@ namespace mongo {
         bool isCommand() const { return coll() == "$cmd"; }
         bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
         bool isSpecial() const { return special( _ns ); }
+        bool isNormal() const { return normal( _ns ); }
+
         /**
          * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
          */

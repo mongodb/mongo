@@ -619,6 +619,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     # most commands are only for mongod
                     "db/stats/top.cpp",
                     "db/commands/apply_ops.cpp",
+                    "db/commands/compact.cpp",
                     "db/commands/dbhash.cpp",
                     "db/commands/merge_chunks_cmd.cpp",
                     "db/commands/cleanup_orphaned_cmd.cpp",

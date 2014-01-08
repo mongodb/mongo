@@ -35,15 +35,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/background.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/curop-inl.h"
-#include "mongo/db/extsort.h"
-#include "mongo/db/storage/index_details.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
@@ -67,11 +60,11 @@ namespace mongo {
     }
 
     /** @return number of skipped (invalid) documents */
-    unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc diskloc, int n,
+    unsigned compactExtent(Collection* collection, const DiskLoc diskloc, int n,
                            int nidx, bool validate, double pf, int pb, bool useDefaultPadding,
                            bool preservePadding) {
 
-        log() << "compact begin extent #" << n << " for namespace " << ns << endl;
+        log() << "compact begin extent #" << n << " for namespace " << collection->ns();
         unsigned oldObjSize = 0; // we'll report what the old padding was
         unsigned oldObjSizeWithPadding = 0;
 
@@ -122,9 +115,9 @@ namespace mongo {
                             lenWPadding = recOld->lengthWithHeaders();
                         }
                         // maintain UsePowerOf2Sizes if no padding values were passed in
-                        else if (d->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes)
+                        else if (collection->details()->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes)
                                 && useDefaultPadding) {
-                            lenWPadding = d->quantizePowerOf2AllocationSpace(lenWPadding);
+                            lenWPadding = collection->details()->quantizePowerOf2AllocationSpace(lenWPadding);
                         }
                         // otherwise use the padding values (pf and pb) that were passed in
                         else {
@@ -135,7 +128,8 @@ namespace mongo {
                         if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
                             lenWPadding = lenWHdr;
                         }
-                        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
+                        DiskLoc loc = allocateSpaceForANewRecord(collection->ns().ns().c_str(),
+                                                                 collection->details(), lenWPadding, false);
                         uassert(14024, "compact error out of space during compaction", !loc.isNull());
                         Record *recNew = loc.rec();
                         datasize += recNew->netLength();
@@ -167,35 +161,38 @@ namespace mongo {
                 }
             } // if !L.isNull()
 
-            verify( d->firstExtent() == diskloc );
-            verify( d->lastExtent() != diskloc );
+            verify( collection->details()->firstExtent() == diskloc );
+            verify( collection->details()->lastExtent() != diskloc );
             DiskLoc newFirst = e->xnext;
-            d->firstExtent().writing() = newFirst;
+            collection->details()->firstExtent().writing() = newFirst;
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             cc().database()->getExtentManager().freeExtents( diskloc, diskloc );
 
             // update datasize/record count for this namespace's extent
-            d->incrementStats( datasize, nrecords );
+            collection->details()->incrementStats( datasize, nrecords );
 
             getDur().commitIfNeeded();
 
-            { 
+            {
                 double op = 1.0;
-                if( oldObjSize ) 
+                if( oldObjSize )
                     op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
                 log() << "compact finished extent #" << n << " containing " << nrecords << " documents (" << datasize/1000000.0 << "MB)"
-                    << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100
-                    << endl;                    
+                      << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100;
             }
         }
 
         return skipped;
     }
 
-    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate,
-                  BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding,
-                  bool preservePadding) {
+    bool compactCollection(Collection* collection, string& errmsg, bool validate,
+                           BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding,
+                           bool preservePadding) {
+
+        verify( collection );
+        NamespaceDetails* d = collection->details();
+
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitIfNeeded();
 
@@ -209,21 +206,19 @@ namespace mongo {
                                                         extents.size()));
 
         // same data, but might perform a little different after compact?
-        Collection* collection = cc().database()->getCollection( ns );
-        verify( collection );
-        collection->infoCache()->addedIndex();
+        collection->infoCache()->reset();
 
         verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
         int nidx = d->getCompletedIndexCount();
         scoped_array<BSONObj> indexSpecs( new BSONObj[nidx] );
         {
-            NamespaceDetails::IndexIterator ii = d->ii(); 
+            NamespaceDetails::IndexIterator ii = d->ii();
             // For each existing index...
             for( int idxNo = 0; ii.more(); ++idxNo ) {
                 // Build a new index spec based on the old index spec.
                 BSONObjBuilder b;
                 BSONObj::iterator i(ii.next().info.obj());
-                while( i.more() ) { 
+                while( i.more() ) {
                     BSONElement e = i.next();
                     if ( str::equals( e.fieldName(), "v" ) ) {
                         // Drop any preexisting index version spec.  The default index version will
@@ -248,7 +243,9 @@ namespace mongo {
         d->setLastExtentSize( 0 );
 
         // before dropping indexes, at least make sure we can allocate one extent!
-        uassert(14025, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1, false).isNull());
+        uassert(14025,
+                "compact error no space available to allocate",
+                !allocateSpaceForANewRecord(collection->ns().ns().c_str(), d, Record::HeaderSize+1, false).isNull());
 
         // note that the drop indexes call also invalidates all clientcursors for the namespace, which is important and wanted here
         log() << "compact dropping indexes" << endl;
@@ -269,7 +266,7 @@ namespace mongo {
         d->setStats( 0, 0 );
 
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            skipped += compactExtent(ns, d, *i, n++, nidx, validate, pf, pb,
+            skipped += compactExtent(collection, *i, n++, nidx, validate, pf, pb,
                                      useDefaultPadding, preservePadding);
             pm.hit();
         }
@@ -297,150 +294,5 @@ namespace mongo {
 
         return true;
     }
-
-    bool isCurrentlyAReplSetPrimary();
-
-    class CompactCmd : public Command {
-    public:
-        virtual LockType locktype() const { return NONE; }
-        virtual bool adminOnly() const { return false; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool maintenanceMode() const { return true; }
-        virtual bool logTheOp() { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::compact);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-        }
-        virtual void help( stringstream& help ) const {
-            help << "compact collection\n"
-                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
-                "{ compact : <collection_name>, [force:<bool>], [validate:<bool>],\n"
-                "  [paddingFactor:<num>], [paddingBytes:<num>] }\n"
-                "  force - allows to run on a replica set primary\n"
-                "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer (defaults to true in this version)\n";
-        }
-        CompactCmd() : Command("compact") { }
-
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
-                                                     const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
-            std::string coll = cmdObj.firstElement().valuestr();
-            std::string ns = dbname + "." + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
-
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
-        }
-
-        virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || db.empty() ) {
-                errmsg = "no collection name specified";
-                return false;
-            }
-
-            if( isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue() ) { 
-                errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
-                return false;
-            }
-            
-            string ns = db + '.' + coll;
-            if ( ! NamespaceString::normal(ns.c_str()) ) {
-                errmsg = "bad namespace name";
-                return false;
-            }
-            
-            // parameter validation to avoid triggering assertions in compact()
-            if ( str::contains(ns, ".system.") ) {
-                errmsg = "can't compact a system namespace";
-                return false;
-            }
-            
-            {
-                Lock::DBWrite lk(ns);
-                Client::Context ctx(ns);
-                NamespaceDetails *d = nsdetails(ns);
-                if( ! d ) {
-                    errmsg = "namespace does not exist";
-                    return false;
-                }
-
-                if ( d->isCapped() ) {
-                    errmsg = "cannot compact a capped collection";
-                    return false;
-                }
-            }
-
-
-            double pf = 1.0;
-            int pb = 0;
-            // preservePadding trumps all other compact methods
-            bool preservePadding = false;
-            // useDefaultPadding is used to track whether or not a padding requirement was passed in
-            // if it wasn't than UsePowerOf2Sizes will be maintained when compacting
-            bool useDefaultPadding = true;
-            if (cmdObj.hasElement("preservePadding")) {
-                preservePadding = cmdObj["preservePadding"].trueValue();
-                useDefaultPadding = false;
-            }
-
-            if( cmdObj.hasElement("paddingFactor") ) {
-                if (preservePadding == true) {
-                    errmsg = "preservePadding is incompatible with paddingFactor";
-                    return false;
-                }
-                useDefaultPadding = false;
-                pf = cmdObj["paddingFactor"].Number();
-                verify( pf >= 1.0 && pf <= 4.0 );
-            }
-            if( cmdObj.hasElement("paddingBytes") ) {
-                if (preservePadding == true) {
-                    errmsg = "preservePadding is incompatible with paddingBytes";
-                    return false;
-                }
-                useDefaultPadding = false;
-                pb = (int) cmdObj["paddingBytes"].Number();
-                verify( pb >= 0 && pb <= 1024 * 1024 );
-            }
-
-            bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
-
-            massert( 14028, "bad ns", NamespaceString::normal(ns.c_str()) );
-            massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
-
-            bool ok;
-            {
-                Lock::DBWrite lk(ns);
-                BackgroundOperation::assertNoBgOpInProgForNs(ns.c_str());
-                Client::Context ctx(ns);
-                NamespaceDetails *d = nsdetails(ns);
-                massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
-                massert( 13661, "cannot compact capped collection", !d->isCapped() );
-                log() << "compact " << ns << " begin" << endl;
-
-                std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
-
-                if( pf != 0 || pb != 0 ) { 
-                    log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
-                } 
-                try { 
-                    ok = _compact(ns.c_str(), d, errmsg, validate,
-                                  result, pf, pb, useDefaultPadding, preservePadding);
-                }
-                catch(...) { 
-                    log() << "compact " << ns << " end (with error)" << endl;
-                    throw;
-                }
-                log() << "compact " << ns << " end" << endl;
-
-                IndexBuilder::restoreIndexes(indexesInProg);
-            }
-
-            return ok;
-        }
-    };
-    static CompactCmd compactCmd;
 
 }
