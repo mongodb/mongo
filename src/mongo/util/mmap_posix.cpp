@@ -198,8 +198,11 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         if ( views.empty() || fd == 0 )
             return;
-        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) )
-            problem() << "msync " << errnoWithDescription() << endl;
+        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) ) {
+            // msync failed, this is very bad
+            problem() << "msync failed: " << errnoWithDescription();
+            dataSyncFailedHandler();
+        }
     }
 
     class PosixFlushable : public MemoryMappedFile::Flushable {
@@ -209,10 +212,17 @@ namespace mongo {
         }
 
         void flush() {
-            if ( _view && _fd )
-                if ( msync(_view, _len, MS_SYNC ) )
-                    problem() << "msync " << errnoWithDescription() << endl;
-
+            if ( _view && _fd ) {
+                if ( msync(_view, _len, MS_SYNC ) ) {
+                    if ( errno == EBADF ) {
+                        // ok, we were unlocked, so this file was closed
+                    }
+                    else {
+                        problem() << "msync " << errnoWithDescription() << endl;
+                        dataSyncFailedHandler();
+                    }
+                }
+            }
         }
 
         void * _view;

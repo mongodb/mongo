@@ -145,9 +145,9 @@ namespace {
     void (*MongoFile::notifyPostFlush)() = nullFunc;
 
     /*static*/ int MongoFile::flushAll( bool sync ) {
-        notifyPreFlush();
+        if ( sync ) notifyPreFlush();
         int x = _flushAll(sync);
-        notifyPostFlush();
+        if ( sync ) notifyPostFlush();
         return x;
     }
 
@@ -225,6 +225,12 @@ namespace {
         out << "vsize: " << pi.getVirtualMemorySize()
             << " resident: " << pi.getResidentSize()
             << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+    }
+
+    void dataSyncFailedHandler() {
+        problem() << "error syncing data to disk, probably a disk error";
+        problem() << " shutting down immediately to avoid corruption";
+        fassertFailed( 17346 );
     }
 
 } // namespace mongo

@@ -32,6 +32,9 @@ namespace mongo {
     extern const size_t g_minOSPageSizeBytes;
     void minOSPageSizeBytesTest(size_t minOSPageSizeBytes);  // lame-o
 
+    // call this if syncing data fails
+    void dataSyncFailedHandler();
+
     class MAdvise {
         void *_p;
         unsigned _len;
