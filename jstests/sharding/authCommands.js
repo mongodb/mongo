@@ -24,14 +24,11 @@ var rwUser = 'rwUser';
 var roUser = 'roUser';
 var password = 'password';
 
-adminDB.createUser({user: rwUser, pwd: password, roles: jsTest.adminUserRoles},
-                   {w: st.rs0.numNodes, wtimeout: 30000} );
+adminDB.createUser({user: rwUser, pwd: password, roles: jsTest.adminUserRoles});
 
 assert( adminDB.auth( rwUser, password ) );
-testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles},
-                  {w: st.rs0.numNodes, wtimeout: 30000} );
-testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles},
-                  {w: st.rs0.numNodes, wtimeout: 30000} );
+testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles});
+testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles});
 
 authenticatedConn = new Mongo( mongos.host );
 authenticatedConn.getDB( 'admin' ).auth( rwUser, password );
