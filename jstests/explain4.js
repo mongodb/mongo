@@ -20,9 +20,8 @@ function checkNonCursorPlanFields( explain, matches, n ) {
 
 function checkPlanFields( explain, matches, n ) {
     checkField( explain, "cursor", "BasicCursor" );
-    // QUERY MIGRATION
     // index related fields do not appear in non-indexed plan
-    //checkField( explain, "indexBounds", {} );
+    assert(!("indexBounds" in explain));
     checkNonCursorPlanFields( explain, matches, n );
 }
 
