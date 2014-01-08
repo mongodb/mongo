@@ -108,10 +108,10 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	 * In diagnostic mode, verify the block we're about to read isn't on
 	 * the available list, or for live systems, the discard list.
 	 *
-	 * Don't check during salvage, it's possible we're reading an already
-	 * freed overflow page.
+	 * Don't check during the salvage read phase, we might be reading an
+	 * already freed overflow page.
 	 */
-	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
+	if (!F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
 		WT_RET(__wt_block_misplaced(
 		    session, block, "read", offset, size, bm->is_live));
 #endif
@@ -176,20 +176,18 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	page_cksum = __wt_cksum(buf->mem,
 	    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP);
 	if (cksum != page_cksum) {
-		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)) {
+		if (!F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
 			__wt_errx(session,
 			    "read checksum error [%"
 			    PRIu32 "B @ %" PRIuMAX ", %"
 			    PRIu32 " != %" PRIu32 "]",
 			    size, (uintmax_t)offset, cksum, page_cksum);
 
-			/*
-			 * Abort if there is a checksum failure during an
-			 * ordinary read.
-			 */
-			WT_ASSERT(session, block->verify);
-		}
-		return (WT_ERROR);
+		/* Panic if a checksum fails during an ordinary read. */
+		return (block->verify ||
+		    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
+		    WT_ERROR :
+		    __wt_illegal_value(session, block->name));
 	}
 
 	WT_STAT_FAST_CONN_INCR(session, block_read);

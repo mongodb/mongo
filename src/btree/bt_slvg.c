@@ -174,9 +174,9 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * Turn off read checksum and verification error messages while we're
 	 * reading the file, we expect to see corrupted blocks.
 	 */
-	F_SET(session, WT_SESSION_SALVAGE_QUIET_ERR);
+	F_SET(session, WT_SESSION_SALVAGE_CORRUPT_OK);
 	ret = __slvg_read(session, ss);
-	F_CLR(session, WT_SESSION_SALVAGE_QUIET_ERR);
+	F_CLR(session, WT_SESSION_SALVAGE_CORRUPT_OK);
 	WT_ERR(ret);
 
 	/*
@@ -526,8 +526,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		/*
 		 * Row-store format: copy the first and last keys on the page.
 		 * Keys are prefix-compressed, the simplest and slowest thing
-		 * to do is instantiate the in-memory page (which instantiates
-		 * the prefix keys at specific split points), then instantiate
+		 * to do is instantiate the in-memory page, then instantiate
 		 * and copy the full keys, then free the page.   We do this
 		 * on every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
