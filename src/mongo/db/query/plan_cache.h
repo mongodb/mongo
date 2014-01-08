@@ -34,6 +34,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -281,6 +282,12 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(PlanCache);
     public:
         /**
+         * Flush cache when the number of write operations since last
+         * clear() reaches this limit.
+         */
+        static const int kPlanCacheMaxWriteOperations;
+
+        /**
          * We don't want to cache every possible query. This function
          * encapsulates the criteria for what makes a canonical query
          * suitable for lookup/inclusion in the cache.
@@ -398,6 +405,12 @@ namespace mongo {
          */
         Status shunPlan(const PlanCacheKey& key, const PlanID& plan);
 
+        /**
+         *  You must notify the cache if you are doing writes, as query plan utility will change.
+         *  Cache is flushed after every 1000 notifications.
+         */
+        void notifyOfWriteOp();
+
     private:
 
         /**
@@ -413,6 +426,12 @@ namespace mongo {
          * Protects _cache.
          */
         mutable boost::mutex _cacheMutex;
+
+        /**
+         * Counter for write notifications since initialization or last clear() invocation.
+         * Starts at 0.
+         */
+        AtomicInt32 _writeOperations;
     };
 
 }  // namespace mongo

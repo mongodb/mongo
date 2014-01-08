@@ -348,8 +348,59 @@ namespace {
         std::vector<PlanCacheKey> keys;
         planCache.getKeys(&keys);
         ASSERT_EQUALS(keys.size(), 1U);
+
+        // Calling getKeys() with a non-empty vector
+        // should result in the vector contents being replaced.
+        planCache.getKeys(&keys);
+        ASSERT_EQUALS(keys.size(), 1U);
     }
 
+    TEST(PlanCacheTest, NotifyOfWriteOp) {
+        PlanCache planCache;
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
+        QuerySolution qs;
+        qs.cacheData.reset(new SolutionCacheData());
+        qs.cacheData->tree.reset(new PlanCacheIndexTree());
+        std::vector<QuerySolution*> solns;
+        solns.push_back(&qs);
+        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        std::vector<PlanCacheKey> keys;
+        planCache.getKeys(&keys);
+        ASSERT_EQUALS(keys.size(), 1U);
+
+        // First (PlanCache::kPlanCacheMaxWriteOperations - 1) notifications should have
+        // no effect on cache contents.
+        for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
+            planCache.notifyOfWriteOp();
+        }
+        planCache.getKeys(&keys);
+        ASSERT_EQUALS(keys.size(), 1U);
+
+        // 1000th notification will cause cache to be cleared.
+        planCache.notifyOfWriteOp();
+        planCache.getKeys(&keys);
+        ASSERT_TRUE(keys.empty());
+
+        // Clearing the cache should reset the internal write
+        // operation counter.
+        // Repopulate cache. Write (PlanCache::kPlanCacheMaxWriteOperations - 1) times.
+        // Clear cache.
+        // Add cache entry again.
+        // After clearing and adding a new entry, the next write operation should not
+        // clear the cache.
+        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
+            planCache.notifyOfWriteOp();
+        }
+        planCache.getKeys(&keys);
+        ASSERT_EQUALS(keys.size(), 1U);
+        planCache.clear();
+        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        // Notification after clearing will not flush cache.
+        planCache.notifyOfWriteOp();
+        planCache.getKeys(&keys);
+        ASSERT_EQUALS(keys.size(), 1U);
+    }
     /**
      * Test functions for getPlanCacheKey.
      * Cache keys are intentionally obfuscated and are meaningful only

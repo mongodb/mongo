@@ -193,6 +193,11 @@ namespace {
         // Sort query should generate different key from unsorted query.
         PlanCacheKey sortQueryKey = generateKey("{query: {a: 1, b: 1}, sort: {a: 1}}");
         ASSERT_NOT_EQUALS(queryKey, sortQueryKey);
+
+        // Projected query should generate different key from unprojected query.
+        PlanCacheKey projectionQueryKey =
+            generateKey("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}");
+        ASSERT_NOT_EQUALS(queryKey, projectionQueryKey);
     }
 
     /**

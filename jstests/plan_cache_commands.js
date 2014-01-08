@@ -33,8 +33,9 @@ t.save({a: 1});
 t.ensureIndex({a: 1});
 
 var queryA1 = {a: 1};
+var projectionA1 = {_id: 0, a: 1};
 var sortA1 = {a: -1};
-assert.eq(1, t.find(queryA1).sort(sortA1).itcount(), 'unexpected document count');
+assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
 
 
 
@@ -54,11 +55,11 @@ function generateKey(cmdObj) {
     return res.key;
 }
 
-//Invalid sort
+// Invalid sort
 assert.commandFailed(t.runCommand('planCacheGenerateKey', {query: {}, sort: {a: 'foo'}}));
 
 // Valid query {a: 1} should return a non-empty cache key.
-var keyA1 = generateKey({query: queryA1, sort: sortA1, projection: {}});
+var keyA1 = generateKey({query: queryA1, sort: sortA1, projection: projectionA1});
 
 
 
@@ -98,13 +99,12 @@ assert.eq(keyA1, keys[0], 'unexpected cache key returned from planCacheListKeys'
 assert.commandFailed(t.runCommand('planCacheGet', {key: 'unknownquery'}));
 
 // Get details on a query. This does not include plans.
-// XXX: Add checks on query, sort and projection fields in result.
 var res = t.runCommand('planCacheGet', {key: keyA1});
 print('planCacheGet({key: ' + tojson(keyA1) + ') = ' + tojson(res));
 assert.commandWorked(res, 'planCacheGet failed');
 assert.eq(queryA1, res.query, 'query in planCacheGetResult does not match initial query filter');
 assert.eq(sortA1, res.sort, 'sort in planCacheGetResult does not match initial sort order');
-assert(res.hasOwnProperty('projection'), 'projection missing from planCacheGet result');
+assert.eq(projectionA1, res.projection, 'projection missing from planCacheGet result');
 
 
 
@@ -274,7 +274,53 @@ assert(plans[0].shunned, 'first plan is not shown as shunned in planCacheListPla
 res = t.runCommand('planCacheClear');
 print('planCacheClear() = ' + tojson(res));
 assert.commandWorked(res, 'planCacheClear failed');
-res = t.runCommand('planCacheListKeys');
-assert.commandWorked(res, 'planCacheListKeys failed');
-assert.eq(0, res.queries.length, 'plan cache should be empty after successful planCacheClear()');
+assert.eq(0, getKeys().length, 'plan cache should be empty after successful planCacheClear()');
 
+
+
+//
+// Query Plan Revision
+// http://docs.mongodb.org/manual/core/query-plans/#query-plan-revision
+// As collections change over time, the query optimizer deletes the query plan and re-evaluates
+// after any of the following events:
+// - The collection receives 1,000 write operations.
+// - The reIndex rebuilds the index.
+// - You add or drop an index.
+// - The mongod process restarts.
+//
+
+// Case 1: The collection receives 1,000 write operations.
+// Steps:
+//     Populate cache. Cache should contain 1 key after running query.
+//     Insert 1000 documents.
+//     Cache should be cleared.
+assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
+assert.eq(1, getKeys().length, 'plan cache should not be empty after query');
+for (var i = 0; i < 1000; i++) {
+    t.save({b: i});
+}
+assert.eq(0, getKeys().length, 'plan cache should be empty after adding 1000 documents.');
+
+// Case 2: The reIndex rebuilds the index.
+// Steps:
+//     Populate the cache with 1 entry.
+//     Run reIndex on the collection.
+//     Confirm that cache is empty.
+assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
+assert.eq(1, getKeys().length, 'plan cache should not be empty after query');
+res = t.reIndex();
+print('reIndex result = ' + tojson(res));
+assert.eq(0, getKeys().length, 'plan cache should be empty after reIndex operation');
+
+// Case 3: You add or drop an index.
+// Steps:
+//     Populate the cache with 1 entry.
+//     Add an index.
+//     Confirm that cache is empty.
+assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
+assert.eq(1, getKeys().length, 'plan cache should not be empty after query');
+t.ensureIndex({b: 1});
+assert.eq(0, getKeys().length, 'plan cache should be empty after adding index');
+
+// Case 4: The mongod process restarts
+// Not applicable.

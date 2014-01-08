@@ -187,6 +187,8 @@ namespace {
 
 namespace mongo {
 
+    const int PlanCache::kPlanCacheMaxWriteOperations = 1000;
+
     //
     // Cache-related functions for CanonicalQuery
     //
@@ -498,17 +500,22 @@ namespace mongo {
     void PlanCache::clear() {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         _clear();
+        _writeOperations.store(0);
     }
 
     void PlanCache::getKeys(std::vector<PlanCacheKey>* keysOut) const {
         verify(keysOut);
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        std::vector<PlanCacheKey> keys;
         typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
         for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
             const PlanCacheKey& key = i->first;
-            keysOut->push_back(key);
+            keys.push_back(key);
         }
+
+        // Replace contents of output vector provided in keysOut.
+        keys.swap(*keysOut);
     }
 
     Status PlanCache::pin(const PlanCacheKey& key, const PlanID& plan) {
@@ -622,6 +629,15 @@ namespace mongo {
         }
 
         return Status(ErrorCodes::BadValue, "no such plan in cache");
+    }
+
+    void PlanCache::notifyOfWriteOp() {
+        // It's fine to clear the cache multiple times if multiple threads
+        // increment the counter to kPlanCacheMaxWriteOperations or greater.
+        if (_writeOperations.addAndFetch(1) < kPlanCacheMaxWriteOperations) {
+            return;
+        }
+        clear();
     }
 
     void PlanCache::_clear() {

@@ -255,8 +255,17 @@ namespace mongo {
             sortObj = sortElt.Obj();
         }
 
-        // Create canonical query
+        // projection - optional
+        BSONElement projElt = cmdObj.getField("projection");
         BSONObj projObj;
+        if (!projElt.eoo()) {
+            if (!projElt.isABSONObj()) {
+                return Status(ErrorCodes::BadValue, "optional field projection must be an object");
+            }
+            projObj = projElt.Obj();
+        }
+
+        // Create canonical query
         CanonicalQuery* cqRaw;
         Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cqRaw);
         if (!result.isOK()) {
