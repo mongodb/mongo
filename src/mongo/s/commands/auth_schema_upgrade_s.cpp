@@ -150,6 +150,10 @@ namespace {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            status = checkClusterMongoVersions(configServer.getConnectionString(), "2.5.4");
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
             status = authzManager->upgradeSchema(maxSteps, writeConcern);
             if (!status.isOK())
                 return appendCommandStatus(result, status);

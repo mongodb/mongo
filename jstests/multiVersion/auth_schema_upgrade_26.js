@@ -2,7 +2,9 @@
  * Tests a clean upgrade of user auth data from 2.4 to 2.6.
  *
  * Creates a 2.4 sharded cluster with auth enabled, and replicasets for the shards.
- * Upgrades the processes to 2.6, then upgrades the auth schema on all the components.
+ * Upgrades the processes to 2.6.
+ * Starts a 2.4 mongos, and confirms that upgrade cannot proceed; then stops that mongos.
+ * Upgrades the auth schema on all the components.
  * Finally, verifies that all users are available where expected.
  */
 
@@ -249,6 +251,24 @@ load('jstests/multiVersion/libs/multi_rs.js');
 
     var s0AdminConn = new Mongo(shardingTest.s0.host);
     assertAuthenticate(s0AdminConn, 'admin', { user: 'admin-cluster', pwd: 'a' });
+
+    print('\n--------------------\n' +
+          'Attempting upgrade with old mongos still running; should fail.' +
+          '\n--------------------\n');
+    var oldMongoS = MongoRunner.runMongos({
+        binVersion : oldVersion,
+        configdb : shardingTest._configDB,
+        keyFile: keyfile
+    });
+    assert.neq(null, oldMongoS);
+    assert.commandFailedWithCode(
+        s0AdminConn.getDB('admin').runCommand({authSchemaUpgrade: 1}),
+        25,
+        "Expected RemoteValidationFailed error code");
+    MongoRunner.stopMongos(oldMongoS);
+
+    s0AdminConn.getDB("config").mongos.remove();
+    assert.gleSuccess(s0AdminConn.getDB("config"), "Flushing ping time data failed.");
 
     print('\n--------------------\n' +
           'Upgrading auth schema.' +

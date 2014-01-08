@@ -99,10 +99,11 @@ namespace mongo {
                 else {
                     if (versionCmp(mongoVersion, minMongoVersion) < 0) {
                         return Status(ErrorCodes::RemoteValidationError,
-                                      stream() << "version " << mongoVersion << " of mongos at "
+                                      stream() << "version " << mongoVersion
+                                               << " detected on mongos at "
                                                << ping.getName()
-                                               << " is not compatible with the config update, "
-                                               << "you must wait 5 minutes "
+                                               << ", but version >= " << minMongoVersion
+                                               << " required; you must wait 5 minutes "
                                                << "after shutting down a pre-" << minMongoVersion
                                                << " mongos");
                     }
@@ -190,7 +191,8 @@ namespace mongo {
                 catch (const DBException& e) {
                     warning() << "could not run buildInfo command on " << serverLoc.toString()
                               << causedBy(e) << ", you must manually verify this mongo server is "
-                              << "offline (for at least 5 minutes) or of a version >= 2.2" << endl;
+                              << "offline (for at least 5 minutes) or of a version >= "
+                              << minMongoVersion;
                     continue;
                 }
 
@@ -208,9 +210,9 @@ namespace mongo {
 
                 if (versionCmp(mongoVersion, minMongoVersion) < 0) {
                     return Status(ErrorCodes::RemoteValidationError,
-                                  stream() << "version " << mongoVersion << " of mongo server at "
-                                           << serverLoc.toString()
-                                           << " is not compatible with the config update");
+                                  stream() << "version " << mongoVersion << " detected on mongo "
+                                  "server at " << serverLoc.toString() <<
+                                  ", but version >= " << minMongoVersion << " required");
                 }
             }
         }

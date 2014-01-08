@@ -716,6 +716,7 @@ env.Library( "mongoscore",
                       'db/query/lite_parsed_query',
                       's/cluster_write_ops',
                       's/cluster_write_op_conversion',
+                      's/upgrade',
                      ] )
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
