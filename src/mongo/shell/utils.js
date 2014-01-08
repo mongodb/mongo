@@ -246,7 +246,6 @@ if ( typeof _threadInject != "undefined" ){
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js",
                                "jstests/auth1.js",
-                               "jstests/auth_copydb2.js",
                                "jstests/connection_status.js",
                                "jstests/validate_user_documents.js"
 //                              ,"jstests/fsync2.js" // SERVER-4243
