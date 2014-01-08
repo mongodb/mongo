@@ -631,7 +631,8 @@ namespace mongo {
     Status Database::_dropNS( const StringData& ns ) {
         NamespaceDetails* d = _namespaceIndex.details( ns );
         if ( !d )
-            return Status( ErrorCodes::InternalError, str::stream() << "ns not found: " << ns );
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "ns not found: " << ns );
 
         BackgroundOperation::assertNoBgOpInProgForNs( ns );
 

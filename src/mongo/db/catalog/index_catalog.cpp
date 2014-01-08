@@ -94,28 +94,11 @@ namespace mongo {
                 continue;
             }
 
-            auto_ptr<IndexDescriptor> descriptor( new IndexDescriptor( _collection,
-                                                                       id.info.obj().getOwned() ) );
-
-            NamespaceDetails* indexMetadata =
-                _collection->_database->namespaceIndex().details( descriptor->indexNamespace() );
-            massert( 17329,
-                     str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
-                     indexMetadata );
-
-            auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
-            recordStore->init( indexMetadata, _collection->getExtentManager(), false );
-
-            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection,
-                                                                      descriptor.release(),
-                                                                      recordStore.release() ) );
-
-            entry->init( _createAccessMethod( entry->descriptor(),
-                                              entry.get() ) );
+            IndexDescriptor* descriptor = new IndexDescriptor( _collection,
+                                                               id.info.obj().getOwned() );
+            IndexCatalogEntry* entry = _setupInMemoryStructures( descriptor );
 
             fassert( 17340, entry->isReady()  );
-
-            _entries.add( entry.release() );
         }
 
         if ( _unfinishedIndexes.size() ) {
@@ -127,6 +110,35 @@ namespace mongo {
 
         _magic = INDEX_CATALOG_INIT;
         return Status::OK();
+    }
+
+    IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures( IndexDescriptor* descriptor ) {
+        auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
+
+        NamespaceDetails* indexMetadata =
+            _collection->_database->namespaceIndex().details( descriptor->indexNamespace() );
+
+        massert( 17329,
+                 str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
+                 indexMetadata );
+
+        auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
+        recordStore->init( indexMetadata, _collection->getExtentManager(), false );
+
+        auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection,
+                                                                  descriptorCleanup.release(),
+                                                                  recordStore.release() ) );
+
+        entry->init( _createAccessMethod( entry->descriptor(),
+                                          entry.get() ) );
+
+        IndexCatalogEntry* save = entry.get();
+        _entries.add( entry.release() );
+
+        verify( save == _entries.find( descriptor ) );
+        verify( save == _entries.find( descriptor->indexName() ) );
+
+        return save;
     }
 
     bool IndexCatalog::ok() const {
@@ -271,9 +283,6 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-
-        Database* db = _collection->_database;
-
         string pluginName = IndexNames::findPluginName( spec["key"].Obj() );
         if ( pluginName.size() ) {
             Status s = _upgradeDatabaseMinorVersionIfNeeded( pluginName );
@@ -281,75 +290,24 @@ namespace mongo {
                 return s;
         }
 
-        // -------------
-        // no disk modifications yet
-        // going to prep some stuff, without any mods
-        // -------------
-
-        IndexDescriptor* descriptor = new IndexDescriptor( _collection, spec.getOwned() );
-        auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
-
-        auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
-
-
-        // -------------
         // now going to touch disk
-        // -------------
+        IndexBuildBlock indexBuildBlock( _collection, spec );
+        status = indexBuildBlock.init();
+        if ( !status.isOK() )
+            return status;
 
-        // -------- system.indexes
+        // sanity checks, etc...
+        IndexCatalogEntry* entry = indexBuildBlock.entry();
+        verify( entry );
+        IndexDescriptor* descriptor = entry->descriptor();
+        verify( descriptor );
 
-        Collection* systemIndexes = db->getCollection( db->_indexesName );
-        if ( !systemIndexes ) {
-            systemIndexes = db->createCollection( db->_indexesName, false, NULL, false );
-            verify( systemIndexes );
-        }
+        string idxName = descriptor->indexName(); // out copy for yields, etc...
 
-        StatusWith<DiskLoc> loc = systemIndexes->insertDocument( spec, false );
-        if ( !loc.isOK() )
-            return loc.getStatus();
-        verify( !loc.getValue().isNull() );
-
-        string idxName = spec["name"].valuestr();
-
-        // ------- allocates IndexDetails
-        IndexBuildBlock indexBuildBlock( this,
-                                         idxName,
-                                         descriptor->indexNamespace(),
-                                         loc.getValue() );
-
-        // ------- allocate RecordsStore
-        {
-            NamespaceIndex& nsi = db->namespaceIndex();
-            verify( nsi.details( descriptor->indexNamespace() ) == NULL );
-            nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
-            NamespaceDetails* nsd = nsi.details( descriptor->indexNamespace() );
-            verify(nsd);
-            recordStore->init( nsd, _collection->getExtentManager(), false );
-            db->_addNamespaceToCatalog( descriptor->indexNamespace(), NULL );
-        }
-
-        // ---------
-        // finish creating in memory state
-        // ---------
-        {
-            auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection,
-                                                                      descriptorCleaner.release(),
-                                                                      recordStore.release() ) );
-
-            entry->init( _createAccessMethod( entry->descriptor(),
-                                              entry.get() ) );
-
-            _entries.add( entry.release() );
-        }
-
-        // sanity check
+        verify( entry == _entries.find( descriptor ) );
         verify( _details->_catalogFindIndexByName( idxName, true ) >= 0 );
 
-        IndexCatalogEntry* entry = _entries.find( descriptor );
-        verify( entry );
-
         try {
-
             // Set curop description before setting indexBuildInProg, so that there's something
             // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
             // killable index, so we don't overwrite commands in currentOp.
@@ -360,6 +318,7 @@ namespace mongo {
             buildAnIndex( _collection, entry, mayInterrupt );
             indexBuildBlock.success();
 
+            // sanity check
             int idxNo = _details->_catalogFindIndexByName( idxName, true );
             verify( idxNo < numIndexesReady() );
 
@@ -377,49 +336,84 @@ namespace mongo {
         }
     }
 
-    IndexCatalog::IndexBuildBlock::IndexBuildBlock( IndexCatalog* catalog,
-                                                    const StringData& indexName,
-                                                    const StringData& indexNamespace,
-                                                    const DiskLoc& loc )
-        : _catalog( catalog ),
+    IndexCatalog::IndexBuildBlock::IndexBuildBlock( Collection* collection,
+                                                    const BSONObj& spec )
+        : _collection( collection ),
+          _catalog( collection->getIndexCatalog() ),
           _ns( _catalog->_collection->ns().ns() ),
-          _indexName( indexName.toString() ),
-          _indexNamespace( indexNamespace.toString() ),
+          _spec( spec.getOwned() ),
+          _entry( NULL ),
           _inProgress( false ) {
 
-        _nsd = _catalog->_collection->details();
+        verify( collection );
+    }
 
-        verify( catalog );
-        verify( _nsd );
-        verify( _catalog->_collection->ok() );
-        verify( !loc.isNull() );
+    Status IndexCatalog::IndexBuildBlock::init() {
+        // we do special cleanup until we're far enough in
+        verify( _inProgress == false );
 
-        // this doesn't actually change any counters or anything
-        // so we're basically changing nothing
-        IndexDetails* indexDetails = &_nsd->getNextIndexDetails( _ns.c_str() );
-        _inProgress = true;
+        // need this first for names, etc...
+        IndexDescriptor* descriptor = new IndexDescriptor( _collection, _spec );
+        auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
+
+        _indexName = descriptor->indexName();
+        _indexNamespace = descriptor->indexNamespace();
+
+        /// ----------   setup on disk structures ----------------
+
+        Database* db = _collection->_database;
+
+        // 1) insert into system.indexes
+
+        Collection* systemIndexes = db->getOrCreateCollection( db->_indexesName );
+        verify( systemIndexes );
+
+        StatusWith<DiskLoc> systemIndexesEntry = systemIndexes->insertDocument( _spec, false );
+        if ( !systemIndexesEntry.isOK() )
+            return systemIndexesEntry.getStatus();
+
+
+        // 2) collection's NamespaceDetails
+        IndexDetails& indexDetails = _collection->details()->getNextIndexDetails( _ns.c_str() );
 
         try {
-            // we don't want to kill a half formed IndexDetails, so be carefule
-            LOG(1) << "creating index with info @ " << loc;
-            getDur().writingDiskLoc( indexDetails->info ) = loc;
-            getDur().writingDiskLoc( indexDetails->head ).Null();
+            getDur().writingDiskLoc( indexDetails.info ) = systemIndexesEntry.getValue();
+            getDur().writingDiskLoc( indexDetails.head ).Null();
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;
-            _inProgress = false; // this will cause an fassert in destructor
-            return;
+            _catalog->_removeFromSystemIndexes( descriptor->indexName() );
+            return Status( ErrorCodes::InternalError, e.toString() );
         }
 
+        int before = _collection->details()->_indexBuildsInProgress;
         try {
-            getDur().writingInt( _nsd->_indexBuildsInProgress ) += 1;
+            getDur().writingInt( _collection->details()->_indexBuildsInProgress ) += 1;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
-            _inProgress = false; // this will cause an fassert in destructor
-            return;
+            fassert( 17344, before == _collection->details()->_indexBuildsInProgress );
+            _catalog->_removeFromSystemIndexes( descriptor->indexName() );
+            return Status( ErrorCodes::InternalError, e.toString() );
         }
 
+        // as this point we can do normal clean up procedure, so we mark ourselves
+        // as in progress.
+        _inProgress = true;
+
+        // 3) indexes entry in .ns file
+        NamespaceIndex& nsi = db->namespaceIndex();
+        verify( nsi.details( descriptor->indexNamespace() ) == NULL );
+        nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
+
+        // 4) system.namespaces entry index ns
+        db->_addNamespaceToCatalog( descriptor->indexNamespace(), NULL );
+
+        /// ----------   setup in memory structures  ----------------
+
+        _entry = _catalog->_setupInMemoryStructures( descriptorCleaner.release() );
+
+        return Status::OK();
     }
 
     IndexCatalog::IndexBuildBlock::~IndexBuildBlock() {
@@ -428,16 +422,21 @@ namespace mongo {
             return;
         }
 
-        // if we're here, the index build failed
+        // if we're here, the index build failed or was interrupted
 
         _inProgress = false; // defensive
+        fassert( 17204, _catalog->_collection->ok() ); // defensive
 
-        fassert( 17204, _catalog->_collection->ok() );
+        // TODO: if we are doing a background build on a secondary
+        // and are in shutdown, we should NOT cleanup, as we want to
+        // re-start index build when server re-starts
 
-        int idxNo = _nsd->_catalogFindIndexByName( _indexName, true );
+        int idxNo = _collection->details()->_catalogFindIndexByName( _indexName, true );
         fassert( 17205, idxNo >= 0 );
 
         IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
+        verify( entry == _entry );
+
         if ( entry ) {
             _catalog->_dropIndex( entry );
         }
@@ -456,30 +455,30 @@ namespace mongo {
 
         fassert( 17207, _catalog->_collection->ok() );
 
-        int idxNo = _nsd->_catalogFindIndexByName( _indexName, true );
+        int idxNo = _collection->details()->_catalogFindIndexByName( _indexName, true );
         fassert( 17202, idxNo >= 0 );
 
         // Make sure the newly created index is relocated to nIndexes, if it isn't already there
-        if ( idxNo != _nsd->getCompletedIndexCount() ) {
+        if ( idxNo != _collection->details()->getCompletedIndexCount() ) {
             log() << "switching indexes at position " << idxNo << " and "
-                  << _nsd->getCompletedIndexCount() << endl;
+                  << _collection->details()->getCompletedIndexCount() << endl;
 
-            int toIdxNo = _nsd->getCompletedIndexCount();
+            int toIdxNo = _collection->details()->getCompletedIndexCount();
 
-            _nsd->swapIndex( idxNo, toIdxNo );
+            _collection->details()->swapIndex( idxNo, toIdxNo );
 
-            idxNo = _nsd->getCompletedIndexCount();
+            idxNo = _collection->details()->getCompletedIndexCount();
         }
 
-        getDur().writingInt( _nsd->_indexBuildsInProgress ) -= 1;
-        getDur().writingInt( _nsd->_nIndexes ) += 1;
+        getDur().writingInt( _collection->details()->_indexBuildsInProgress ) -= 1;
+        getDur().writingInt( _collection->details()->_nIndexes ) += 1;
 
         _catalog->_collection->infoCache()->addedIndex();
 
         IndexDescriptor* desc = _catalog->findIndexByName( _indexName, true );
         fassert( 17330, desc );
         IndexCatalogEntry* entry = _catalog->_entries.find( desc );
-        fassert( 17331, entry );
+        fassert( 17331, entry && entry == _entry );
 
         entry->setIsReady( true );
 
@@ -845,9 +844,11 @@ namespace mongo {
 
         // data + system.namespacesa
         Status status = _collection->_database->_dropNS( indexNamespace );
-        if ( !status.isOK() ) {
-            LOG(2) << "IndexDetails::kill(): couldn't drop extents for "
-                   << indexNamespace;
+        if ( status.code() == ErrorCodes::NamespaceNotFound ) {
+            // this is ok, as we may be partially through index creation
+        }
+        else if ( !status.isOK() ) {
+            warning() << "couldn't drop extents for " << indexNamespace << " " << status.toString();
         }
 
         // all info in the .ns file

@@ -163,24 +163,40 @@ namespace mongo {
 
         // --- these probably become private?
 
+
+        /**
+         * disk creation order
+         * 1) system.indexes entry
+         * 2) collection's NamespaceDetails
+         *    a) info + head
+         *    b) _indexBuildsInProgress++
+         * 3) indexes entry in .ns file
+         * 4) system.namespaces entry for index ns
+         */
         class IndexBuildBlock {
         public:
-            IndexBuildBlock( IndexCatalog* catalog,
-                             const StringData& indexName,
-                             const StringData& indexNamespace,
-                             const DiskLoc& locInSystemIndexes );
+            IndexBuildBlock( Collection* collection,
+                             const BSONObj& spec );
             ~IndexBuildBlock();
+
+            Status init();
 
             void success();
 
+            IndexCatalogEntry* entry() { return _entry; }
+
         private:
+
+            Collection* _collection;
             IndexCatalog* _catalog;
             string _ns;
+
+            BSONObj _spec;
+
             string _indexName;
             string _indexNamespace;
 
-            NamespaceDetails* _nsd; // for the collection, not index
-
+            IndexCatalogEntry* _entry;
             bool _inProgress;
         };
 
@@ -253,6 +269,9 @@ namespace mongo {
         void _deleteIndexFromDisk( const string& indexName,
                                    const string& indexNamespace,
                                    int idxNo );
+
+        // descriptor ownership passes to _setupInMemoryStructures
+        IndexCatalogEntry* _setupInMemoryStructures( IndexDescriptor* descriptor );
 
         int _magic;
         Collection* _collection;
