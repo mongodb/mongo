@@ -39,6 +39,7 @@ struct __wt_page_header {
 	uint8_t type;			/* 24: page type */
 
 #define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
+#define	WT_PAGE_NO_EMPTY_VALUES	0x02	/* Page has no zero-length values */
 	uint8_t flags;			/* 25: flags */
 
 	/*
