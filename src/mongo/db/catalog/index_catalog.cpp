@@ -504,6 +504,10 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex,
                            "cannot create indexes on the system.indexes collection" );
 
+        if ( nss.isOplog() )
+            return Status( ErrorCodes::CannotCreateIndex,
+                           "cannot create indexes on the oplog" );
+
         if ( nss == _collection->_database->_extentFreelistName ) {
             // this isn't really proper, but we never want it and its not an error per se
             return Status( ErrorCodes::IndexAlreadyExists, "cannot index freelist" );

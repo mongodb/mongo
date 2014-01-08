@@ -78,6 +78,7 @@ namespace mongo {
         bool isSystemDotIndexes() const { return coll() == "system.indexes"; }
         bool isConfigDB() const { return db() == "config"; }
         bool isCommand() const { return coll() == "$cmd"; }
+        bool isOplog() const { return oplog( _ns ); }
         bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
         bool isSpecial() const { return special( _ns ); }
         bool isNormal() const { return normal( _ns ); }

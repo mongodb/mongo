@@ -101,8 +101,11 @@ namespace mongo {
 
     static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
         list<string> * l = (list<string>*)extra;
-        if ( ! k.hasDollarSign() )
+        if ( ! k.hasDollarSign() || k == "local.oplog.$main" ) {
+            // we call out local.oplog.$main specifically as its the only "normal"
+            // collection that has a $, so we make sure it gets added
             l->push_back( (string)k );
+        }
     }
 
     void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {

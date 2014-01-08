@@ -81,14 +81,24 @@ namespace mongo {
                 it != nsToCheck.end();
                 ++it) {
 
+            string ns = *it;
+
+            LOG(3) << "IndexRebuilder::checkNS: " << ns;
+
             // This write lock is held throughout the index building process
             // for this namespace.
-            Client::WriteContext ctx(*it);
-            Collection* collection = ctx.ctx().db()->getCollection( *it );
+            Client::WriteContext ctx(ns);
+            Collection* collection = ctx.ctx().db()->getCollection( ns );
             if ( collection == NULL )
                 continue;
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
+
+            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
+                warning() << ns << " had ilegal indexes, removing";
+                indexCatalog->dropAllIndexes( true );
+                continue;
+            }
 
             vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes();
 
@@ -103,7 +113,7 @@ namespace mongo {
             }
 
             log() << "found " << indexesToBuild.size()
-                  << " interrupted index build(s) on " << *it;
+                  << " interrupted index build(s) on " << ns;
 
             if (firstTime) {
                 log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
