@@ -84,7 +84,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 */
 		if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 			WT_ERR(
-			    F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR) ?
+			    F_ISSET(btree, WT_BTREE_VERIFY) ||
+			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
 	} else
