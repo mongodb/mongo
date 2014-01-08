@@ -75,7 +75,6 @@ int
 __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_LOG *log;
 	int i;
 
@@ -244,6 +243,8 @@ retry:
 int
 __wt_log_slot_notify(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	WT_UNUSED(session);
+
 	slot->slot_state =
 	    (int64_t)WT_LOG_SLOT_DONE - (int64_t)slot->slot_group_size;
 	return (0);
@@ -256,6 +257,8 @@ __wt_log_slot_notify(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 int
 __wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	WT_UNUSED(session);
+
 	while (slot->slot_state > WT_LOG_SLOT_DONE)
 		__wt_yield();
 	return (0);
