@@ -32,7 +32,6 @@
 
 #include "mongo/db/query/plan_cache.h"
 
-#include <algorithm>
 #include <ostream>
 #include <sstream>
 #include <memory>
@@ -128,91 +127,6 @@ namespace {
         FAIL(ss.str());
     }
 
-    //
-    // Tests for CachedSolution
-    //
-
-    /**
-     * Generator for vector of QuerySolution shared pointers.
-     */
-    struct GenerateQuerySolution {
-        QuerySolution* operator()() const {
-            auto_ptr<QuerySolution> qs(new QuerySolution());
-            qs->cacheData.reset(new SolutionCacheData());
-            qs->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-            qs->cacheData->tree.reset(new PlanCacheIndexTree());
-            return qs.release();
-        }
-    };
-
-    /**
-     * Clean up query solutions vector.
-     */
-    void deleteQuerySolutions(std::vector<QuerySolution*>* solns) {
-        for (std::vector<QuerySolution*>::const_iterator i = solns->begin();
-             i != solns->end(); ++i) {
-            QuerySolution* qs = *i;
-            delete qs;
-        }
-        solns->clear();
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexNoPinnedOrShunnedPlans) {
-        std::vector<QuerySolution*> solns(5U);
-        for (size_t i = 0; i<solns.size(); ++i) {
-            auto_ptr<QuerySolution> qs(new QuerySolution());
-            qs->cacheData.reset(new SolutionCacheData());
-            qs->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-            qs->cacheData->tree.reset(new PlanCacheIndexTree());
-            solns[i] = qs.release();
-        }
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(0U, cs.getWinnerIndex());
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexWithPinnedPlan) {
-        std::vector<QuerySolution*> solns(5U);
-        std::generate(solns.begin(), solns.end(), GenerateQuerySolution());
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        // Pin 3rd plan.
-        entry.pinned = true;
-        entry.pinnedIndex = 2U;
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(entry.pinnedIndex, cs.getWinnerIndex());
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexWithShunnedPlans) {
-        std::vector<QuerySolution*> solns(5U);
-        std::generate(solns.begin(), solns.end(), GenerateQuerySolution());
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        // Shun first 2 plans.
-        entry.shunnedIndexes.insert(0U);
-        entry.shunnedIndexes.insert(1U);
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(2U, cs.getWinnerIndex());
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexWithPinnedAndShunnedPlan) {
-        std::vector<QuerySolution*> solns(5U);
-        std::generate(solns.begin(), solns.end(), GenerateQuerySolution());
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        // Pin and shun 2nd plan.
-        entry.pinned = true;
-        entry.pinnedIndex = 1U;
-        entry.shunnedIndexes.insert(1U);
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(1U, cs.getWinnerIndex());
-    }
-
     /**
      * Test functions for shouldCacheQuery
      * Use these functions to assert which categories
@@ -250,11 +164,6 @@ namespace {
 
     TEST(PlanCacheTest, ShouldCacheQueryBasic) {
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
-        assertShouldCacheQuery(*cq);
-    }
-
-    TEST(PlanCacheTest, ShouldCacheQuerySort) {
-        auto_ptr<CanonicalQuery> cq(canonicalize("{}", "{a: -1}", "{_id: 0, a: 1}"));
         assertShouldCacheQuery(*cq);
     }
 
@@ -328,26 +237,24 @@ namespace {
                                    "{a: {$elemMatch: {b: 1, c:1}}}");
     }
 
-    // Adding an empty vector of query solutions should fail.
-    TEST(PlanCacheTest, AddEmptySolutions) {
-        PlanCache planCache;
-        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
-        std::vector<QuerySolution*> solns;
-        ASSERT_NOT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
-    }
-
     TEST(PlanCacheTest, AddValidSolution) {
         PlanCache planCache;
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
         QuerySolution qs;
         qs.cacheData.reset(new SolutionCacheData());
         qs.cacheData->tree.reset(new PlanCacheIndexTree());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_OK(planCache.add(*cq, qs, new PlanRankingDecision()));
         std::vector<PlanCacheKey> keys;
         planCache.getKeys(&keys);
         ASSERT_EQUALS(keys.size(), 1U);
+    }
+
+    // Adding a query solution without valid cache data should fail.
+    TEST(PlanCacheTest, AddInvalidSolution) {
+        PlanCache planCache;
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
+        QuerySolution qs;
+        ASSERT_NOT_OK(planCache.add(*cq, qs, new PlanRankingDecision()));
     }
 
     /**
@@ -547,14 +454,9 @@ namespace {
             scoped_ptr<CanonicalQuery> scopedCq(cq);
             cq = NULL;
 
-            // Create a CachedSolution the long way..
-            // QuerySolution -> PlanCacheEntry -> CachedSolution
-            QuerySolution qs;
-            qs.cacheData.reset(soln.cacheData->clone());
-            std::vector<QuerySolution*> solutions;
-            solutions.push_back(&qs);
-            PlanCacheEntry entry(solutions, new PlanRankingDecision());
-            CachedSolution cachedSoln(ck, entry);
+            CachedSolution cachedSoln;
+            cachedSoln.key = ck;
+            cachedSoln.plannerData.reset(soln.cacheData->clone());
 
             QuerySolution* out;
             s = QueryPlanner::planFromCache(*scopedCq.get(), params, &cachedSoln, &out);

@@ -106,9 +106,7 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, qs, new PlanRankingDecision());
 
         vector<PlanCacheKey> keys = getKeys(planCache);
         ASSERT_EQUALS(keys.size(), 1U);
@@ -132,9 +130,7 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, qs, new PlanRankingDecision());
         ASSERT_EQUALS(getKeys(planCache).size(), 1U);
 
         // Clear cache and confirm number of keys afterwards.
@@ -235,9 +231,7 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, qs, new PlanRankingDecision());
 
         BSONObjBuilder bob;
         ASSERT_OK(PlanCacheGet::get(planCache, BSON("key" << queryKey), &bob));
@@ -298,10 +292,8 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cqA, solns, new PlanRankingDecision());
-        planCache.add(*cqB, solns, new PlanRankingDecision());
+        planCache.add(*cqA, qs, new PlanRankingDecision());
+        planCache.add(*cqB, qs, new PlanRankingDecision());
 
         // Check keys in cache before dropping {b: 1}
         vector<PlanCacheKey> keysBefore = getKeys(planCache);
@@ -331,65 +323,32 @@ namespace {
      *     reason: <ranking_stats>,
      *     feedback: <execution_stats>,
      *     pinned: <pinned>,
-     *     shunned: <shunned>,
      *     source: <source>
      * }
      */
     struct GetPlan {
-        BSONObj operator()(const BSONElement& elt) {
+        PlanID operator()(const BSONElement& elt) {
             ASSERT_TRUE(elt.isABSONObj());
             BSONObj obj = elt.Obj();
-
-            // Check required fields.
-            // plan ID
             BSONElement planElt = obj.getField("plan");
             ASSERT_EQUALS(planElt.type(), mongo::String);
             string planStr = planElt.String();
             ASSERT_FALSE(planStr.empty());
-
-            // details
-            BSONElement detailsElt = obj.getField("details");
-            ASSERT_TRUE(detailsElt.isABSONObj());
-
-            // reason
-            BSONElement reasonElt = obj.getField("reason");
-            ASSERT_TRUE(reasonElt.isABSONObj());
-
-            // feedback
-            BSONElement feedbackElt = obj.getField("feedback");
-            ASSERT_TRUE(feedbackElt.isABSONObj());
-
-            // pinned
-            BSONElement pinnedElt = obj.getField("pinned");
-            ASSERT_TRUE(pinnedElt.isBoolean());
-
-            // shunned
-            BSONElement shunnedElt = obj.getField("shunned");
-            ASSERT_TRUE(shunnedElt.isBoolean());
-
-            // source
-            BSONElement sourceElt = obj.getField("source");
-            ASSERT_EQUALS(sourceElt.type(), mongo::String);
-            string sourceStr = sourceElt.String();
-            ASSERT_TRUE(sourceStr == "planner" || sourceStr == "client");
-
-            return obj.copy();
+            return PlanID(planStr);
         }
     };
 
     /**
      * Utility function to get list of plan IDs for a query in the cache.
      */
-    vector<BSONObj> getPlans(const PlanCache& planCache, const PlanCacheKey& key) {
+    vector<PlanID> getPlans(const PlanCache& planCache, const PlanCacheKey& key) {
         BSONObjBuilder bob;
-        BSONObj cmdObj = BSON("key" << key);
-        ASSERT_OK(PlanCacheListPlans::list(planCache, cmdObj, &bob));
+        ASSERT_OK(PlanCacheListPlans::list(planCache, BSON("key" << key), &bob));
         BSONObj resultObj = bob.obj();
         BSONElement plansElt = resultObj.getField("plans");
         ASSERT_EQUALS(plansElt.type(), mongo::Array);
         vector<BSONElement> planEltArray = plansElt.Array();
-        ASSERT_FALSE(planEltArray.empty());
-        vector<BSONObj> plans(planEltArray.size());
+        vector<PlanID> plans(planEltArray.size());
         std::transform(planEltArray.begin(), planEltArray.end(), plans.begin(), GetPlan());
         return plans;
     }
@@ -429,11 +388,12 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        PlanRankingDecision* why = new PlanRankingDecision();
+        // PlanCacheEntry::numPlans is derived from value of onlyOneSolution.
+        why->onlyOneSolution = true;
+        planCache.add(*cq, qs, why);
 
-        vector<BSONObj> plans = getPlans(planCache, queryKey);
+        vector<PlanID> plans = getPlans(planCache, queryKey);
         ASSERT_EQUALS(plans.size(), 1U);
     }
 
@@ -450,13 +410,12 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        // Add cache entry with 2 solutions.
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        PlanRankingDecision* why = new PlanRankingDecision();
+        // PlanCacheEntry::numPlans is derived from value of onlyOneSolution.
+        why->onlyOneSolution = false;
+        planCache.add(*cq, qs, why);
 
-        vector<BSONObj> plans = getPlans(planCache, queryKey);
+        vector<PlanID> plans = getPlans(planCache, queryKey);
         ASSERT_EQUALS(plans.size(), 2U);
     }
 
@@ -500,44 +459,20 @@ namespace {
         // Generate a cache key
         PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
 
-        // Plan cache with 2 entries
+        // Plan cache with one entry
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, qs, new PlanRankingDecision());
 
         // Get first plan ID
-        PlanID plan = getPlans(planCache, key).front().getStringField("plan");
+        PlanID plan = getPlans(planCache, key).front();
 
         // Command with invalid plan ID should raise an error.
         PlanID badPlan = "BADPLAN_" + plan;
         ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, BSON("key" << key << "plan" << badPlan)));
 
-        // Check pin status before pinning.
-        vector<BSONObj> plansBefore = getPlans(planCache, key);
-        ASSERT_FALSE(plansBefore[0].getBoolField("pinned"));
-        ASSERT_FALSE(plansBefore[1].getBoolField("pinned"));
-
         ASSERT_OK(PlanCachePinPlan::pin(&planCache, BSON("key" << key << "plan" << plan)));
-
-        // Check pin status after pinning.
-        vector<BSONObj> plansAfter = getPlans(planCache, key);
-        ASSERT_TRUE(plansAfter[0].getBoolField("pinned"));
-        ASSERT_FALSE(plansAfter[1].getBoolField("pinned"));
-
-        // Pin second plan
-        PlanID plan2 = getPlans(planCache, key).back().getStringField("plan");
-
-        ASSERT_OK(PlanCachePinPlan::pin(&planCache, BSON("key" << key << "plan" << plan2)));
-
-        // Check pin status after pinning.
-        vector<BSONObj> plansAfter2 = getPlans(planCache, key);
-        ASSERT_FALSE(plansAfter2[0].getBoolField("pinned"));
-        ASSERT_TRUE(plansAfter2[1].getBoolField("pinned"));
-
     }
 
     /**
@@ -576,9 +511,7 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, qs, new PlanRankingDecision());
 
         ASSERT_OK(PlanCacheUnpinPlan::unpin(&planCache, BSON("key" << key)));
     }
@@ -631,9 +564,7 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, qs, new PlanRankingDecision());
 
         BSONObjBuilder bob;
         ASSERT_OK(PlanCacheAddPlan::add(&planCache, BSON("key" << key << "details" << BSONObj()),
@@ -690,12 +621,12 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        PlanRankingDecision* why = new PlanRankingDecision();
+        why->onlyOneSolution = true;
+        planCache.add(*cq, qs, why);
 
         // Get first plan ID
-        PlanID plan = getPlans(planCache, key).front().getStringField("plan");
+        PlanID plan = getPlans(planCache, key).front();
 
         ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, BSON("key" << key << "plan" << plan)));
     }
@@ -713,14 +644,13 @@ namespace {
         PlanCache planCache;
         QuerySolution qs;
         qs.cacheData.reset(createSolutionCacheData());
-        // Add cache entry with 2 solutions.
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        PlanRankingDecision* why = new PlanRankingDecision();
+        // XXX: When onlyOneSolution is false, PlanCacheEntry::numPlans will be set to 2.
+        why->onlyOneSolution = false;
+        planCache.add(*cq, qs, why);
 
         // Get first plan ID
-        PlanID plan = getPlans(planCache, key).front().getStringField("plan");
+        PlanID plan = getPlans(planCache, key).front();
 
         // Command with invalid plan ID should raise an error.
         PlanID badPlan = "BADPLAN_" + plan;
@@ -729,20 +659,9 @@ namespace {
 
         ASSERT_OK(PlanCacheShunPlan::shun(&planCache, BSON("key" << key << "plan" << plan)));
 
-        // Check plan count after shunning. Should be unchanged.
-        // shunned field should be set to false.
-        vector<BSONObj> plans = getPlans(planCache, key);
-        ASSERT_EQUALS(plans.size(), 2U);
-        ASSERT_TRUE(plans.front().getBoolField("shunned"));
-
-        // Shunning the same plan more than once has no effect.
-        ASSERT_OK(PlanCacheShunPlan::shun(&planCache, BSON("key" << key << "plan" << plan)));
-
-        // Plan entry must have at least one unshunned plan.
-        // Shunning remaining plan should fail.
-        PlanID plan1 = plans[1].getStringField("plan");
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache,
-                                              BSON("key" << key << "plan" << plan1)));
+        // Check plan count after shunning.
+        vector<PlanID> plans = getPlans(planCache, key);
+        ASSERT_EQUALS(plans.size(), 1U);
     }
 
 }  // namespace

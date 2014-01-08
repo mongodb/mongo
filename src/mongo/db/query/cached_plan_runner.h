@@ -38,7 +38,7 @@
 namespace mongo {
 
     class BSONObj;
-    class CachedSolution;
+    struct CachedSolution;
     class CanonicalQuery;
     class DiskLoc;
     class PlanExecutor;

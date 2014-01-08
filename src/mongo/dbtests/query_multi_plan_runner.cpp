@@ -40,17 +40,6 @@
 
 namespace QueryMultiPlanRunner {
 
-    /**
-     * Create query solution.
-     */
-    QuerySolution* createQuerySolution() {
-        std::auto_ptr<QuerySolution> soln(new QuerySolution());
-        soln->cacheData.reset(new SolutionCacheData());
-        soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-        soln->cacheData->tree.reset(new PlanCacheIndexTree());
-        return soln.release();
-    }
-
     class MultiPlanRunnerBase {
     public:
         MultiPlanRunnerBase() { }
@@ -133,8 +122,8 @@ namespace QueryMultiPlanRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
             MultiPlanRunner mpr(cq);
-            mpr.addPlan(createQuerySolution(), firstRoot.release(), firstWs.release());
-            mpr.addPlan(createQuerySolution(), secondRoot.release(), secondWs.release());
+            mpr.addPlan(new QuerySolution(), firstRoot.release(), firstWs.release());
+            mpr.addPlan(new QuerySolution(), secondRoot.release(), secondWs.release());
 
             // Plan 0 aka the first plan aka the index scan should be the best.
             size_t best;

@@ -261,23 +261,20 @@ namespace mongo {
                                        const QueryPlannerParams& params,
                                        CachedSolution* cachedSoln,
                                        QuerySolution** out) {
-        verify(cachedSoln);
-        verify(out);
-        verify(PlanCache::shouldCacheQuery(query));
-
-        // Queries not suitable for caching are filtered
-        // in multi plan runner using PlanCache::shouldCacheQuery().
-
-        // Look up winning solution in cached solution's array.
-        size_t solutionIndex = cachedSoln->getWinnerIndex();
-
-        SolutionCacheData* cacheData = cachedSoln->plannerData[solutionIndex];
-
-        if (NULL == cacheData) {
+        if (NULL == cachedSoln->plannerData.get()) {
             return Status(ErrorCodes::BadValue,
                           "planner data does not exist in the cached solution");
         }
 
+        // Queries with hint/min/max are not cached.
+        if (!query.getParsed().getHint().isEmpty()) {
+            return Status(ErrorCodes::BadValue, "cannot plan from cache if a hint is present");
+        }
+        if (!query.getParsed().getMin().isEmpty() || !query.getParsed().getMax().isEmpty()) {
+            return Status(ErrorCodes::BadValue, "cannot plan from cache with min/max");
+        }
+
+        SolutionCacheData* cacheData = cachedSoln->plannerData.get();
         if (SolutionCacheData::WHOLE_IXSCAN_SOLN == cacheData->solnType) {
             // The solution can be constructed by a scan over the entire index.
             QuerySolution* soln = buildWholeIXSoln(*cacheData->tree->entry,
