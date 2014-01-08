@@ -413,6 +413,11 @@ namespace {
         addReadOnlyDbPrivileges(privileges, "config");
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  NamespaceString("local.system.replset")),
+                          ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
                 Privilege(ResourcePattern::forCollectionName("system.profile"), ActionType::find));
     }
 
