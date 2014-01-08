@@ -60,8 +60,6 @@ namespace mongo {
             Client::initThread("RangeDeleter");
         }
 
-        cc().getAuthorizationSession()->grantInternalAuthorization();
-
         ShardForceVersionOkModeBlock forceVersion;
         {
             Helpers::RemoveSaver removeSaver("moveChunk", ns.toString(), "post-cleanup");
