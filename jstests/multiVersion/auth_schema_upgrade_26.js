@@ -8,6 +8,7 @@
  * Finally, verifies that all users are available where expected.
  */
 
+load('jstests/multiVersion/libs/auth_support.js');
 load('jstests/multiVersion/libs/multi_cluster.js');
 load('jstests/multiVersion/libs/multi_rs.js');
 
@@ -17,87 +18,12 @@ load('jstests/multiVersion/libs/multi_rs.js');
     var newVersion = '2.6';
     var keyfile = 'jstests/libs/key1';
 
-    /**
-     * Logs out all connections "conn" from database "dbname".
-     */
-    function logout(conn, dbname) {
-        var i;
-        if (null == conn.length) {
-            conn = [ conn ];
-        }
-        for (i = 0; i < conn.length; ++i) {
-            conn[i].getDB(dbname).logout();
-        }
-    }
+    var logout = AuthSupport.logout;
+    var assertAuthenticate = AuthSupport.assertAuthenticate;
+    var assertAuthenticateFails = AuthSupport.assertAuthenticateFails;
 
-    /**
-     * Authenticates all connections in "conns" using "authParams" on database "dbName".
-     *
-     * Raises an exception if any authentication fails, and tries to leave all connnections
-     * in "conns" in the logged-out-of-dbName state.
-     */
-    function assertAuthenticate(conns, dbName, authParams) {
-        var conn, i, ex, ex2;
-        if (conns.length == null)
-            conns = [ conns ];
-
-        try {
-            for (i = 0; i < conns.length; ++i) {
-                conn = conns[i];
-                assert(conn.getDB(dbName).auth(authParams),
-                       "Failed to authenticate " + conn + " to " + dbName + " using parameters " +
-                       tojson(authParams));
-            }
-        }
-        catch (ex) {
-            try {
-                logout(conns, dbName);
-            }
-            catch (ex2) {
-            }
-            throw ex;
-        }
-    }
-
-    /**
-     * Authenticates all connections in "conns" using "authParams" on database "dbName".
-     * Raises in exception if any of the authentications succeed.
-     */
-    function assertAuthenticateFails(conns, dbName, authParams) {
-        var conn, i;
-        if (conns.length == null)
-            conns = [ conns ];
-
-        for (i = 0; i < conns.length; ++i) {
-            conn = conns[i];
-            assert(!conn.getDB(dbName).auth(authParams),
-                   "Unexpectedly authenticated " + conn + " to " + dbName + " using parameters " +
-                   tojson(authParams));
-        }
-    }
-
-    /**
-     * Executes action() after authenticating the keyfile user on "conn", then logs out the keyfile
-     * user.
-     */
     function asCluster(conn, action) {
-        var ex;
-        assertAuthenticate(conn, 'local', {
-            user: '__system',
-            mechanism: 'MONGODB-CR',
-            pwd: cat(keyfile).replace(/[ \n]/g, '')
-        });
-
-        try {
-            action();
-        }
-        finally {
-            try {
-                logout(conn, 'local');
-            }
-            catch (ex) {
-            }
-        }
+        return AuthSupport.asCluster(conn, keyfile, action);
     }
 
     /**
@@ -118,22 +44,6 @@ load('jstests/multiVersion/libs/multi_rs.js');
             }
         }
     }
-
-    // Update ReplSetTest.prototype.waitForIndicator to authenticate connections to the
-    // replica set members using the keyfile, before attempting to perform operations.
-    (function updateReplsetTestPrototypes() {
-        var originalWaitForIndicator = ReplSetTest.prototype.waitForIndicator;
-        ReplSetTest.prototype.waitForIndicator = function newRSTestWaitForIndicator(
-            node, states, ind, timeout) {
-
-            var self = this;
-            if (node.length)
-                return originalWaitForIndicator.apply(self, [node, states, ind, timeout]);
-            asCluster(self.getMaster(), function () {
-                originalWaitForIndicator.apply(self, [node, states, ind, timeout]);
-            });
-        };
-    }());
 
     /**
      * Asserts that the correct administrative users appear in the correct nodes, as
