@@ -171,7 +171,7 @@ namespace {
         }
 
         if (_globalKill) {
-            uasserted(11600, "interrupted at shutdown");
+            uasserted(InterruptedAtShutdown, "interrupted at shutdown");
         }
         if (c.curop()->maxTimeHasExpired()) {
             c.curop()->kill();

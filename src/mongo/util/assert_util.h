@@ -31,6 +31,7 @@ namespace mongo {
     enum CommonErrorCodes {
         OkCode = 0,
         DatabaseDifferCaseCode = 13297 ,  // uassert( 13297 )
+        InterruptedAtShutdown = 11600 ,   // uassert( 11600 )
         SendStaleConfigCode = 13388 ,     // uassert( 13388 )
         RecvStaleConfigCode = 9996,       // uassert( 9996 )
         PrepareConfigsFailedCode = 13104, // uassert( 13104 )
@@ -146,7 +147,7 @@ namespace mongo {
 
         /* true if an interrupted exception - see KillCurrentOp */
         bool interrupted() {
-            return _ei.code == 11600 || _ei.code == 11601 ||
+            return _ei.code == InterruptedAtShutdown || _ei.code == 11601 ||
                    _ei.code == ErrorCodes::ExceededTimeLimit;
         }
     };

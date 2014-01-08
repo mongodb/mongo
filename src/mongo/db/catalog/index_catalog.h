@@ -137,7 +137,14 @@ namespace mongo {
 
         Status ensureHaveIdIndex();
 
-        Status createIndex( BSONObj spec, bool mayInterrupt );
+        enum ShutdownBehavior {
+            SHUTDOWN_CLEANUP, // fully clean up this build
+            SHUTDOWN_LEAVE_DIRTY // leave as if kill -9 happened, so have to deal with on restart
+        };
+
+        Status createIndex( BSONObj spec,
+                            bool mayInterrupt,
+                            ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
 
         Status okToAddIndex( const BSONObj& spec ) const;
 
@@ -183,7 +190,18 @@ namespace mongo {
 
             void success();
 
-            IndexCatalogEntry* entry() { return _entry; }
+            /**
+             * index build failed, clean up meta data
+             */
+            void fail();
+
+            /**
+             * we're stopping the build
+             * do NOT cleanup, leave meta data as is
+             */
+            void abort();
+
+            IndexCatalogEntry* getEntry() { return _entry; }
 
         private:
 

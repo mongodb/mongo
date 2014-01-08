@@ -245,32 +245,14 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::createIndex( BSONObj spec, bool mayInterrupt ) {
+    Status IndexCatalog::createIndex( BSONObj spec,
+                                      bool mayInterrupt,
+                                      ShutdownBehavior shutdownBehavior ) {
         Lock::assertWriteLocked( _collection->_database->name() );
         _checkMagic();
         Status status = _checkUnfinished();
         if ( !status.isOK() )
             return status;
-        /**
-         * There are 2 main variables so(4 possibilies) for how we build indexes
-         * variable 1 - size of collection
-         * variable 2 - foreground or background
-         *
-         * size: 0 - we build index in foreground
-         * size > 0 - do either fore or back based on ask
-         *
-         *
-         * what it means to create an index
-         *  not in an order
-         * * system.indexes
-         * * entry in collection's NamespaceDetails (IndexDetails)
-         * * entry for NamespaceDetails in .ns file for record store
-         * * entry in system.namespaces for record store
-         * * head entry in IndexDetails populated (?is this required)
-         */
-
-        // 1) add entry in system.indexes
-        // 2) call into buildAnIndex?
 
         status = okToAddIndex( spec );
         if ( !status.isOK() )
@@ -297,7 +279,7 @@ namespace mongo {
             return status;
 
         // sanity checks, etc...
-        IndexCatalogEntry* entry = indexBuildBlock.entry();
+        IndexCatalogEntry* entry = indexBuildBlock.getEntry();
         verify( entry );
         IndexDescriptor* descriptor = entry->descriptor();
         verify( descriptor );
@@ -324,15 +306,23 @@ namespace mongo {
 
             return Status::OK();
         }
-        catch (DBException& e) {
+        catch ( const AssertionException& exc ) {
             log() << "index build failed."
                   << " spec: " << spec
-                  << " error: " << e;
+                  << " error: " << exc;
 
-            ErrorCodes::Error codeToUse = ErrorCodes::fromInt( e.getCode() );
+            if ( shutdownBehavior == SHUTDOWN_LEAVE_DIRTY &&
+                 exc.getCode() == InterruptedAtShutdown ) {
+                indexBuildBlock.abort();
+            }
+            else {
+                indexBuildBlock.fail();
+            }
+
+            ErrorCodes::Error codeToUse = ErrorCodes::fromInt( exc.getCode() );
             if ( codeToUse == ErrorCodes::UnknownError )
-                return Status( ErrorCodes::InternalError, e.what(), e.getCode() );
-            return Status( codeToUse, e.what() );
+                return Status( ErrorCodes::InternalError, exc.what(), exc.getCode() );
+            return Status( codeToUse, exc.what() );
         }
     }
 
@@ -372,7 +362,6 @@ namespace mongo {
         if ( !systemIndexesEntry.isOK() )
             return systemIndexesEntry.getStatus();
 
-
         // 2) collection's NamespaceDetails
         IndexDetails& indexDetails = _collection->details()->getNextIndexDetails( _ns.c_str() );
 
@@ -397,7 +386,7 @@ namespace mongo {
             return Status( ErrorCodes::InternalError, e.toString() );
         }
 
-        // as this point we can do normal clean up procedure, so we mark ourselves
+        // at this point we can do normal clean up procedure, so we mark ourselves
         // as in progress.
         _inProgress = true;
 
@@ -422,14 +411,26 @@ namespace mongo {
             return;
         }
 
+        try {
+            fail();
+        }
+        catch ( const AssertionException& exc ) {
+            log() << "exception in ~IndexBuildBlock trying to cleanup: " << exc;
+            log() << " going to fassert to preserve state";
+            fassertFailed( 17345 );
+        }
+    }
+
+    void IndexCatalog::IndexBuildBlock::fail() {
+        if ( !_inProgress ) {
+            // taken care of already when success() is called
+            return;
+        }
+
         // if we're here, the index build failed or was interrupted
 
         _inProgress = false; // defensive
         fassert( 17204, _catalog->_collection->ok() ); // defensive
-
-        // TODO: if we are doing a background build on a secondary
-        // and are in shutdown, we should NOT cleanup, as we want to
-        // re-start index build when server re-starts
 
         int idxNo = _collection->details()->_catalogFindIndexByName( _indexName, true );
         fassert( 17205, idxNo >= 0 );
@@ -448,6 +449,10 @@ namespace mongo {
 
     }
 
+    void IndexCatalog::IndexBuildBlock::abort() {
+        _inProgress = false;
+    }
+
     void IndexCatalog::IndexBuildBlock::success() {
 
         fassert( 17206, _inProgress );
@@ -455,23 +460,25 @@ namespace mongo {
 
         fassert( 17207, _catalog->_collection->ok() );
 
-        int idxNo = _collection->details()->_catalogFindIndexByName( _indexName, true );
+        NamespaceDetails* nsd = _collection->details();
+
+        int idxNo = nsd->_catalogFindIndexByName( _indexName, true );
         fassert( 17202, idxNo >= 0 );
 
         // Make sure the newly created index is relocated to nIndexes, if it isn't already there
-        if ( idxNo != _collection->details()->getCompletedIndexCount() ) {
+        if ( idxNo != nsd->getCompletedIndexCount() ) {
             log() << "switching indexes at position " << idxNo << " and "
-                  << _collection->details()->getCompletedIndexCount() << endl;
+                  << nsd->getCompletedIndexCount() << endl;
 
-            int toIdxNo = _collection->details()->getCompletedIndexCount();
+            int toIdxNo = nsd->getCompletedIndexCount();
 
-            _collection->details()->swapIndex( idxNo, toIdxNo );
+            nsd->swapIndex( idxNo, toIdxNo );
 
-            idxNo = _collection->details()->getCompletedIndexCount();
+            idxNo = nsd->getCompletedIndexCount();
         }
 
-        getDur().writingInt( _collection->details()->_indexBuildsInProgress ) -= 1;
-        getDur().writingInt( _collection->details()->_nIndexes ) += 1;
+        getDur().writingInt( nsd->_indexBuildsInProgress ) -= 1;
+        getDur().writingInt( nsd->_nIndexes ) += 1;
 
         _catalog->_collection->infoCache()->addedIndex();
 
