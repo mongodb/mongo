@@ -159,6 +159,7 @@ namespace {
             << ActionType::createIndex
             << ActionType::indexStats
             << ActionType::enableProfiler
+            << ActionType::planCacheHint
             << ActionType::planCacheRead
             << ActionType::planCacheWrite
             << ActionType::reIndex

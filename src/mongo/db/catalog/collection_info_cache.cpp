@@ -45,13 +45,16 @@ namespace mongo {
     CollectionInfoCache::CollectionInfoCache( Collection* collection )
         : _collection( collection ),
           _keysComputed( false ),
-          _planCache(new PlanCache()) { }
+          _planCache(new PlanCache()),
+          _querySettings(new QuerySettings()) { }
 
     void CollectionInfoCache::reset() {
         Lock::assertWriteLocked( _collection->ns().ns() );
         clearQueryCache();
         _keysComputed = false;
         _planCache->clear();
+        // query settings is not affected by info cache reset.
+        // admin hints should persist throughout life of collection
     }
 
     void CollectionInfoCache::computeIndexKeys() {
@@ -87,6 +90,10 @@ namespace mongo {
 
     PlanCache* CollectionInfoCache::getPlanCache() const {
         return _planCache.get();
+    }
+
+    QuerySettings* CollectionInfoCache::getQuerySettings() const {
+        return _querySettings.get();
     }
 
 }

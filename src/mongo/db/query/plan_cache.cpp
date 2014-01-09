@@ -34,6 +34,7 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -203,6 +204,7 @@ namespace mongo {
         }
         other->solnType = this->solnType;
         other->wholeIXSolnDir = this->wholeIXSolnDir;
+        other->adminHintApplied = this->adminHintApplied;
         return other;
     }
 
@@ -244,7 +246,6 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "no solutions provided");
         }
 
-        PlanCacheKey key = query.getPlanCacheKey();
         PlanCacheEntry* entry = new PlanCacheEntry(solns, why);
         const LiteParsedQuery& pq = query.getParsed();
         entry->query = pq.getFilter().copy();
@@ -265,6 +266,7 @@ namespace mongo {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         // Replace existing entry.
         typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        const PlanCacheKey& key = query.getPlanCacheKey();
         ConstIterator i = _cache.find(key);
         if (i != _cache.end()) {
             PlanCacheEntry* previousEntry = i->second;
@@ -276,11 +278,7 @@ namespace mongo {
     }
 
     Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) const{
-        PlanCacheKey key = query.getPlanCacheKey();
-        return get(key, crOut);
-    }
-
-    Status PlanCache::get(const PlanCacheKey& key, CachedSolution** crOut) const {
+        const PlanCacheKey& key = query.getPlanCacheKey();
         verify(crOut);
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
@@ -297,14 +295,15 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status PlanCache::feedback(const PlanCacheKey& ck, PlanCacheEntryFeedback* feedback) {
+    Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback) {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         return Status(ErrorCodes::BadValue, "not implemented yet");
     }
 
-    Status PlanCache::remove(const PlanCacheKey& ck) {
+    Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        const PlanCacheKey& ck = canonicalQuery.getPlanCacheKey();
         ConstIterator i = _cache.find(ck);
         if (i == _cache.end()) {
             return Status(ErrorCodes::BadValue, "no such key in cache");

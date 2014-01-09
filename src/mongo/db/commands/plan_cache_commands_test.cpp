@@ -135,9 +135,6 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Retrieve the cache key
-        PlanCacheKey queryKey = cq->getPlanCacheKey();
-
         // Plan cache with one entry
         PlanCache planCache;
         QuerySolution qs;
@@ -157,55 +154,41 @@ namespace {
      * Mostly validation on the input parameters
      */
 
-    /**
-     * Utility function to generate a cache key from command object string.
-     */
-    PlanCacheKey generateKey(const char* cmdStr) {
-        BSONObj cmdObj = fromjson(cmdStr);
-        PlanCacheKey key;
-        Status status = PlanCacheCommand::makeCacheKey(ns, cmdObj, &key);
-        if (!status.isOK()) {
-            mongoutils::str::stream ss;
-            ss << "failed to generate cache key. cmdObj: " << cmdStr;
-            FAIL(ss);
-        }
-        if (key.empty()) {
-            mongoutils::str::stream ss;
-            ss << "zero-length cache key generated. cmdObj: " << cmdStr;
-            FAIL(ss);
-        }
-        return key;
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheGenerateKey) {
+    TEST(PlanCacheCommandsTest, Canonicalize) {
         // Invalid parameters
-        PlanCacheKey ignored;
+        CanonicalQuery* cqRaw;
         // Missing query field
-        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{}"), &ignored));
+        ASSERT_NOT_OK(PlanCacheCommand::canonicalize(ns, fromjson("{}"), &cqRaw));
         // Query needs to be an object
-        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{query: 1}"), &ignored));
+        ASSERT_NOT_OK(PlanCacheCommand::canonicalize(ns, fromjson("{query: 1}"), &cqRaw));
         // Sort needs to be an object
-        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{query: {}, sort: 1}"),
-                                                     &ignored));
+        ASSERT_NOT_OK(PlanCacheCommand::canonicalize(ns, fromjson("{query: {}, sort: 1}"),
+                                                     &cqRaw));
         // Bad query (invalid sort order)
-        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{query: {}, sort: {a: 0}}"),
-                                                     &ignored));
+        ASSERT_NOT_OK(PlanCacheCommand::canonicalize(ns, fromjson("{query: {}, sort: {a: 0}}"),
+                                                     &cqRaw));
 
         // Valid parameters
-        PlanCacheKey queryKey = generateKey("{query: {a: 1, b: 1}}");
+        ASSERT_OK(PlanCacheCommand::canonicalize(ns, fromjson("{query: {a: 1, b: 1}}"), &cqRaw));
+        scoped_ptr<CanonicalQuery> query(cqRaw);
+
 
         // Equivalent query should generate same key.
-        PlanCacheKey equivQueryKey = generateKey("{query: {b: 1, a: 1}}");
-        ASSERT_EQUALS(queryKey, equivQueryKey);
+        ASSERT_OK(PlanCacheCommand::canonicalize(ns, fromjson("{query: {b: 1, a: 1}}"), &cqRaw));
+        scoped_ptr<CanonicalQuery> equivQuery(cqRaw);
+        ASSERT_EQUALS(query->getPlanCacheKey(), equivQuery->getPlanCacheKey());
 
         // Sort query should generate different key from unsorted query.
-        PlanCacheKey sortQueryKey = generateKey("{query: {a: 1, b: 1}, sort: {a: 1}}");
-        ASSERT_NOT_EQUALS(queryKey, sortQueryKey);
+        ASSERT_OK(PlanCacheCommand::canonicalize(ns,
+            fromjson("{query: {a: 1, b: 1}, sort: {a: 1}}"), &cqRaw));
+        scoped_ptr<CanonicalQuery> sortQuery(cqRaw);
+        ASSERT_NOT_EQUALS(query->getPlanCacheKey(), sortQuery->getPlanCacheKey());
 
         // Projected query should generate different key from unprojected query.
-        PlanCacheKey projectionQueryKey =
-            generateKey("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}");
-        ASSERT_NOT_EQUALS(queryKey, projectionQueryKey);
+        ASSERT_OK(PlanCacheCommand::canonicalize(ns,
+            fromjson("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}"), &cqRaw));
+        scoped_ptr<CanonicalQuery> projectionQuery(cqRaw);
+        ASSERT_NOT_EQUALS(query->getPlanCacheKey(), projectionQuery->getPlanCacheKey());
     }
 
     /**
@@ -233,10 +216,6 @@ namespace {
         auto_ptr<CanonicalQuery> cqA(cqRaw);
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{b: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cqB(cqRaw);
-
-        // Generate 2 cache keys.
-        PlanCacheKey keyA = cqA->getPlanCacheKey();
-        PlanCacheKey keyB = cqB->getPlanCacheKey();
 
         // Create plan cache with 2 entries.
         PlanCache planCache;
@@ -347,9 +326,6 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Retrieve the cache key
-        PlanCacheKey queryKey = cq->getPlanCacheKey();
-
         // Plan cache with one entry
         PlanCache planCache;
         QuerySolution qs;
@@ -368,9 +344,6 @@ namespace {
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;

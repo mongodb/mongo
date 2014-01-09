@@ -337,7 +337,7 @@ namespace {
                              const char* projStr,
                              const char *expectedStr) {
         auto_ptr<CanonicalQuery> cq(canonicalize(queryStr, sortStr, projStr));
-        PlanCacheKey key = cq->getPlanCacheKey();
+        const PlanCacheKey& key = cq->getPlanCacheKey();
         PlanCacheKey expectedKey(expectedStr);
         if (key == expectedKey) {
             return;

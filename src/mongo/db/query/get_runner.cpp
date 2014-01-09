@@ -32,6 +32,7 @@
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
+#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/idhack_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/multi_plan_runner.h"
@@ -91,6 +92,33 @@ namespace mongo {
             && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }
 
+    // static
+    void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
+                                   std::vector<IndexEntry>* indexEntries) {
+        invariant(indexEntries);
+
+        // Filter index entries
+        // Check BSON objects in AllowedIndices::_indexKeyPatterns against IndexEntry::keyPattern.
+        // Removes IndexEntrys that do not match _indexKeyPatterns.
+        std::vector<IndexEntry> temp;
+        for (std::vector<IndexEntry>::const_iterator i = indexEntries->begin();
+             i != indexEntries->end(); ++i) {
+            const IndexEntry& indexEntry = *i;
+            for (std::vector<BSONObj>::const_iterator j = allowedIndices.indexKeyPatterns.begin();
+                 j != allowedIndices.indexKeyPatterns.end(); ++j) {
+                const BSONObj& index = *j;
+                // Copy index entry to temp vector if found in query settings.
+                if (0 == indexEntry.keyPattern.woCompare(index)) {
+                    temp.push_back(indexEntry);
+                    break;
+                }
+            }
+        }
+
+        // Update results.
+        temp.swap(*indexEntries);
+    }
+
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
@@ -142,6 +170,18 @@ namespace mongo {
                                                            desc->indexName(),
                                                            desc->infoObj()));
             }
+        }
+
+        // If query supports admin hint, filter params.indices by indexes in query settings.
+        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+        AllowedIndices* allowedIndicesRaw;
+
+        // Filter index catalog if admin hint is specified for query.
+        // Also, signal to planner that application hint should be ignored.
+        if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
+            boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+            filterAllowedIndexEntries(*allowedIndices, &plannerParams.indices);
+            plannerParams.adminHintApplied = true;
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -210,7 +250,8 @@ namespace mongo {
                 WorkingSet* ws;
                 PlanStage* root;
                 verify(StageBuilder::build(*qs, &root, &ws));
-                CachedPlanRunner* cpr = new CachedPlanRunner(canonicalQuery.release(), qs, root, ws);
+                CachedPlanRunner* cpr = new CachedPlanRunner(canonicalQuery.release(), qs,
+                                                             root, ws);
 
                 if (NULL != backupQs) {
                     WorkingSet* backupWs;
@@ -263,6 +304,9 @@ namespace mongo {
             for (size_t i = 0; i < solutions.size(); ++i) {
                 WorkingSet* ws;
                 PlanStage* root;
+                if (solutions[i]->cacheData.get()) {
+                    solutions[i]->cacheData->adminHintApplied = plannerParams.adminHintApplied;
+                }
                 verify(StageBuilder::build(*solutions[i], &root, &ws));
                 // Takes ownership of all arguments.
                 mpr->addPlan(solutions[i], root, ws);

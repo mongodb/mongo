@@ -261,7 +261,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    PlanCacheKey CanonicalQuery::getPlanCacheKey() const {
+    const PlanCacheKey& CanonicalQuery::getPlanCacheKey() const {
         return _cacheKey;
     }
 

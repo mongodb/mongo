@@ -439,7 +439,13 @@ namespace mongo {
         vector<IndexEntry> relevantIndices;
 
         // Hints require us to only consider the hinted index.
-        BSONObj hintIndex = query.getParsed().getHint();
+        // If admin hints in the query settings were used to override
+        // the allowed indices for planning, we should not use the hinted index
+        // requested in the query.
+        BSONObj hintIndex;
+        if (!params.adminHintApplied) {
+            hintIndex = query.getParsed().getHint();
+        }
 
         // Snapshot is a form of a hint.  If snapshot is set, try to use _id index to make a real
         // plan.  If that fails, just scan the _id index.

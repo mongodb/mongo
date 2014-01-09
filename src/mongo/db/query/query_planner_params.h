@@ -36,7 +36,7 @@
 namespace mongo {
 
     struct QueryPlannerParams {
-        QueryPlannerParams() : options(DEFAULT) { }
+        QueryPlannerParams() : options(DEFAULT), adminHintApplied(false) { }
 
         enum Options {
             // You probably want to set this.
@@ -76,6 +76,9 @@ namespace mongo {
         // stage.  If we know the shard key, we can perform covering analysis instead of always
         // forcing a fetch.
         BSONObj shardKey;
+
+        // Were admin hints applied to indices?
+        bool adminHintApplied;
     };
 
 }  // namespace mongo

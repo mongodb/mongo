@@ -1555,6 +1555,29 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "planCacheHint",
+            command: {planCacheClearHints: "x"},
+            skipSharded: true,
+            setup: function (db) { db.x.save( {} ); },
+            teardown: function (db) { db.x.drop(); },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_dbAdmin,
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "x"}, actions: ["planCacheHint"] }
+                    ],
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: roles_dbAdminAny,
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "x"}, actions: ["planCacheHint"] }
+                    ],
+                },
+            ]
+        },
+        {
             testname: "planCacheRead",
             command: {planCacheListQueryShapes: "x"},
             skipSharded: true,

@@ -27,11 +27,22 @@
  */
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/runner.h"
 
 namespace mongo {
 
     class Collection;
+
+    /**
+     * Filter indexes retrieved from index catalog by
+     * allowed indices in query settings.
+     * Used by getRunner().
+     * This function is public to facilitate testing.
+     */
+    void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
+                                   std::vector<IndexEntry>* indexEntries);
+
 
     /**
      * Get a runner for a query.  Takes ownership of rawCanonicalQuery.

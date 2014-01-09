@@ -128,7 +128,8 @@ namespace mongo {
         SolutionCacheData() :
             tree(NULL),
             solnType(USE_INDEX_TAGS_SOLN),
-            wholeIXSolnDir(1) {
+            wholeIXSolnDir(1),
+            adminHintApplied(false) {
         }
 
         // Make a deep copy.
@@ -161,6 +162,9 @@ namespace mongo {
         // a proxy for a collection scan. Used only
         // for WHOLE_IXSCAN_SOLN.
         int wholeIXSolnDir;
+
+        // True if admin hints were applied.
+        bool adminHintApplied;
     };
 
     class PlanCacheEntry;
@@ -268,6 +272,10 @@ namespace mongo {
         /**
          * Generates a key for a normalized (for caching) canonical query
          * from the match expression and sort order.
+         * This is an expensive operation because it clones and sorts
+         * the expression tree in order to generate a string from
+         * the normalized expression tree. The string generation is also
+         * potentially expensive.
          */
         static PlanCacheKey getPlanCacheKey(const CanonicalQuery& query);
 
@@ -302,35 +310,25 @@ namespace mongo {
         Status get(const CanonicalQuery& query, CachedSolution** crOut) const;
 
         /**
-         * Look up the cached data access for the provided key.
-         *
-         * If there is no entry in the cache for the 'query', returns an error Status.
-         *
-         * If there is an entry in the cache, populates 'crOut' and returns Status::OK().  Caller
-         * owns '*crOut'.
-         */
-        Status get(const PlanCacheKey& key, CachedSolution** crOut) const;
-
-        /**
          * When the CachedPlanRunner runs a plan out of the cache, we want to record data about the
          * plan's performance.  The CachedPlanRunner calls feedback(...) at the end of query
          * execution in order to do this.
          *
          * Cache takes ownership of 'feedback'.
          *
-         * If the entry corresponding to 'ck' isn't in the cache anymore, the feedback is ignored
+         * If the entry corresponding to 'cq' isn't in the cache anymore, the feedback is ignored
          * and an error Status is returned.
          *
-         * If the entry corresponding to 'ck' still exists, 'feedback' is added to the run
+         * If the entry corresponding to 'cq' still exists, 'feedback' is added to the run
          * statistics about the plan.  Status::OK() is returned.
          */
-        Status feedback(const PlanCacheKey& ck, PlanCacheEntryFeedback* feedback);
+        Status feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback);
 
         /**
          * Remove the entry corresponding to 'ck' from the cache.  Returns Status::OK() if the plan
          * was present and removed and an error status otherwise.
          */
-        Status remove(const PlanCacheKey& ck);
+        Status remove(const CanonicalQuery& canonicalQuery);
 
         /**
          * Remove *all* entries.

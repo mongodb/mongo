@@ -87,7 +87,7 @@ namespace mongo {
         /**
          * Get the cache key for this canonical query.
          */
-        PlanCacheKey getPlanCacheKey() const;
+        const PlanCacheKey& getPlanCacheKey() const;
 
         // Debugging
         string toString() const;

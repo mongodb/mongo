@@ -632,6 +632,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/distinct.cpp",
                     "db/commands/find_and_modify.cpp",
                     "db/commands/group.cpp",
+                    "db/commands/hint_commands.cpp",
                     "db/commands/index_stats.cpp",
                     "db/commands/mr.cpp",
                     "db/commands/oplog_note.cpp",
@@ -694,6 +695,7 @@ mongosLibraryFiles = [
     "s/commands_admin.cpp",
     "s/commands_public.cpp",
     "s/commands/auth_schema_upgrade_s.cpp",
+    "s/commands/cluster_hint_cmd.cpp",
     "s/commands/cluster_merge_chunks_cmd.cpp",
     "s/commands/cluster_plan_cache_cmd.cpp",
     "s/commands/cluster_write_cmd.cpp",
@@ -796,6 +798,20 @@ env.Library("geoquery", [ "db/geo/geoquery.cpp", ],
 
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
 env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["geoparser"])
+
+
+env.CppUnitTest(
+    target="hint_commands_test",
+    source=[
+        "db/commands/hint_commands_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+    ],
+    NO_CRUTCH = True,
+)
 
 env.CppUnitTest(
     target="plan_cache_commands_test",

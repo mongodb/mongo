@@ -43,15 +43,15 @@ namespace mongo {
     using std::vector;
 
     /**
-     * Base class for mongos plan cache commands.
-     * Cluster plan cache commands don't do much more than
+     * Base class for mongos hint commands.
+     * Cluster hint commands don't do much more than
      * forwarding the commands to all shards and combining the results.
      */
-    class ClusterPlanCacheCmd : public Command {
-    MONGO_DISALLOW_COPYING(ClusterPlanCacheCmd);
+    class ClusterHintCmd : public Command {
+    MONGO_DISALLOW_COPYING(ClusterHintCmd);
     public:
 
-        virtual ~ClusterPlanCacheCmd() {
+        virtual ~ClusterHintCmd() {
         }
 
         bool logTheOp() {
@@ -76,7 +76,7 @@ namespace mongo {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
     
-            if (authzSession->isAuthorizedForActionsOnResource(pattern, _actionType)) {
+            if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheHint)) {
                 return Status::OK();
             }
     
@@ -97,22 +97,20 @@ namespace mongo {
          * Instantiates a command that can be invoked by "name", which will be described by
          * "helpText", and will require privilege "actionType" to run.
          */
-        ClusterPlanCacheCmd( const std::string& name, const std::string& helpText,
-                             ActionType actionType ) :
-            Command( name ), _helpText( helpText ), _actionType( actionType ) {
+        ClusterHintCmd( const std::string& name, const std::string& helpText) :
+            Command( name ), _helpText( helpText ) {
         }
 
     private:
 
         std::string _helpText;
-        ActionType _actionType;
     };
 
     //
-    // Cluster plan cache command implementation(s) below
+    // Cluster hint command implementation(s) below
     //
 
-    bool ClusterPlanCacheCmd::run( const std::string& dbName,
+    bool ClusterHintCmd::run( const std::string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                std::string& errMsg,
@@ -122,7 +120,7 @@ namespace mongo {
         NamespaceString nss(fullns);
 
         // Dispatch command to all the shards.
-        // Targeted shard commands are generally data-dependent but plan cache
+        // Targeted shard commands are generally data-dependent but hint
         // commands are tied to query shape (data has no effect on query shape).
         vector<Strategy::CommandResult> results;
         STRATEGY->commandOp(dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
@@ -151,33 +149,26 @@ namespace mongo {
     }
 
     //
-    // Register plan cache commands at startup
+    // Register hint commands at startup
     //
 
     namespace {
 
-        MONGO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
+        MONGO_INITIALIZER(RegisterHintCommands)(InitializerContext* context) {
             // Leaked intentionally: a Command registers itself when constructed.
 
-            new ClusterPlanCacheCmd(
-                "planCacheListQueryShapes",
-                "Displays all query shapes in a collection.",
-                ActionType::planCacheRead );
+            new ClusterHintCmd(
+                "planCacheListHints",
+                "Displays admin hints for all query shapes in a collection." );
 
-            new ClusterPlanCacheCmd(
-                "planCacheClear",
-                "Drops all cached queries in a collection.",
-                ActionType::planCacheWrite );
+            new ClusterHintCmd(
+                "planCacheClearHints",
+                "Clears all admin hints for a single query shape or, "
+                "if the query shape is omitted, for the entire collection." );
 
-            new ClusterPlanCacheCmd(
-                "planCacheDrop",
-                "Drops query shape from plan cache.",
-                ActionType::planCacheWrite );
-
-            new ClusterPlanCacheCmd(
-                "planCacheListPlans",
-                "Displays the cached plans for a query shape.",
-                ActionType::planCacheRead );
+            new ClusterHintCmd(
+                "planCacheSetHint",
+                "Sets admin hints for a query shape. Overrides existing hints." );
 
             return Status::OK();
         }

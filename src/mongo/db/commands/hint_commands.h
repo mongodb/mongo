@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,24 +29,29 @@
 #pragma once
 
 #include "mongo/db/commands.h"
+#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/plan_cache.h"
 
 namespace mongo {
 
     /**
-     * DB commands for plan cache.
-     * These are in a header to facilitate unit testing. See plan_cache_commands_test.cpp.
+     * DB commands for admin hints.
+     * Admin hint commands work on a different data structure in the collection
+     * info cache from the plan cache.
+     * The user still thinks of admin hint commands as part of the plan cache functionality
+     * so the command name prefix is still "planCache".
+     *
+     * These are in a header to facilitate unit testing. See hint_commands_test.cpp.
      */
 
     /**
-     * PlanCacheCommand
-     * Defines common attributes for all plan cache related commands
+     * HintCommand
+     * Defines common attributes for all admin hint related commands
      * such as slaveOk and locktype.
      */
-    class PlanCacheCommand : public Command {
+    class HintCommand : public Command {
     public:
-        PlanCacheCommand(const std::string& name, const std::string& helpText,
-                         ActionType actionType);
+        HintCommand(const std::string& name, const std::string& helpText);
 
         /**
          * Entry point from command subsystem.
@@ -73,102 +78,90 @@ namespace mongo {
         virtual void help(std::stringstream& ss) const;
 
         /**
-         * Two action types defined for plan cache commands:
-         * - planCacheRead
-         * - planCacheWrite
+         * One action type defined for hint commands:
+         * - adminHintReadWrite
          */
         virtual Status checkAuthForCommand(ClientBasic* client, const std::string& dbname,
                                            const BSONObj& cmdObj);
-        /**
-         * Subset of command arguments used by plan cache commands
-         * Override to provide command functionality.
-         * Should contain just enough logic to invoke run*Command() function
-         * in plan_cache.h
-         */
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
-                                           BSONObjBuilder* bob) = 0;
 
         /**
-         * Validatess query shape from command object and returns canonical query.
+         * Subset of command arguments used by hint commands
+         * Override to provide command functionality.
+         * Should contain just enough logic to invoke run*Command() function
+         * in admin_hint.h
          */
-        static Status canonicalize(const std::string& ns, const BSONObj& cmdObj,
-                                   CanonicalQuery** canonicalQueryOut);
+        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj,
+                                      BSONObjBuilder* bob) = 0;
 
     private:
         std::string helpText;
-        ActionType actionType;
     };
 
     /**
-     * planCacheListQueryShapes
+     * ListHints
      *
-     * { planCacheListQueryShapes: <collection> }
+     * { planCacheListHints: <collection> }
      *
      */
-    class PlanCacheListQueryShapes : public PlanCacheCommand {
+    class ListHints : public HintCommand {
     public:
-        PlanCacheListQueryShapes();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
+        ListHints();
+
+        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
-         * Looks up cache keys for collection's plan cache.
-         * Inserts keys for query into BSON builder.
+         * Looks up admin hints from collection's query settings.
+         * Inserts hints into BSON builder.
          */
-        static Status list(const PlanCache& planCache, BSONObjBuilder* bob);
+        static Status list(const QuerySettings& querySettings, BSONObjBuilder* bob);
     };
 
     /**
-     * planCacheClear
+     * ClearHints
      *
-     * { planCacheClear: <collection> }
+     * { planCacheClearHints: <collection>, query: <query>, sort: <sort>, projection: <projection> }
      *
      */
-    class PlanCacheClear : public PlanCacheCommand {
+    class ClearHints : public HintCommand {
     public:
-        PlanCacheClear();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
+        ClearHints();
+
+        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
-         * Clears collection's plan cache.
+         * If query shape is provided, clears hints for a query.
+         * Otherwise, clears collection's query settings.
+         * Namespace argument ns is ignored if we are clearing the entire cache.
+         * Removes corresponding entries from plan cache.
          */
-        static Status clear(PlanCache* planCache);
+        static Status clear(QuerySettings* querySettings, PlanCache* planCache, const std::string& ns,
+                            const BSONObj& cmdObj);
     };
 
     /**
-     * planCacheDrop
+     * SetHint
      *
-     * { planCacheDrop: <collection>, key: <key> } }
-     *
-     */
-    class PlanCacheDrop : public PlanCacheCommand {
-    public:
-        PlanCacheDrop();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
-                                           BSONObjBuilder* bob);
-
-        /**
-         * Drops using a cache key.
-         */
-        static Status drop(PlanCache* planCache,const std::string& ns,  const BSONObj& cmdObj);
-    };
-
-    /**
-     * planCacheListPlans
-     *
-     * { planCacheListPlans: <collection>, key: <key> } }
+     * {
+     *     planCacheSetHint: <collection>,
+     *     query: <query>,
+     *     sort: <sort>,
+     *     projection: <projection>,
+     *     indexes: [ <index1>, <index2>, <index3>, ... ]
+     * }
      *
      */
-    class PlanCacheListPlans : public PlanCacheCommand {
+    class SetHint : public HintCommand {
     public:
-        PlanCacheListPlans();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
-                                           BSONObjBuilder* bob);
+        SetHint();
+
+        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
-         * Displays the cached plans for a query shape.
+         * Sets admin hints for a query shape.
+         * Removes entry for query shape from plan cache.
          */
-        static Status list(const PlanCache& planCache, const std::string& ns,
-                           const BSONObj& cmdObj, BSONObjBuilder* bob);
+        static Status set(QuerySettings* querySettings, PlanCache* planCache, const std::string& ns,
+                          const BSONObj& cmdObj);
     };
 
 }  // namespace mongo

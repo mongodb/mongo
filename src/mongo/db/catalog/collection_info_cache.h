@@ -33,6 +33,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/index_set.h"
+#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/plan_cache.h"
 
 namespace mongo {
@@ -61,6 +62,11 @@ namespace mongo {
          * Get the PlanCache for this collection.
          */
         PlanCache* getPlanCache() const;
+
+        /**
+         * Get the QuerySettings for this collection.
+         */
+        QuerySettings* getQuerySettings() const;
 
         // -------------------
 
@@ -95,6 +101,10 @@ namespace mongo {
 
         // A cache for query plans.
         boost::scoped_ptr<PlanCache> _planCache;
+
+        // Query settings.
+        // Includes admin hints.
+        boost::scoped_ptr<QuerySettings> _querySettings;
 
         void computeIndexKeys();
     };

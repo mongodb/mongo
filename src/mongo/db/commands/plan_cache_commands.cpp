@@ -136,7 +136,7 @@ namespace mongo {
     }
 
     void PlanCacheCommand::help(stringstream& ss) const {
-        ss << helpText << endl;
+        ss << helpText;
     }
 
     Status PlanCacheCommand::checkAuthForCommand(ClientBasic* client, const std::string& dbname,
@@ -152,7 +152,8 @@ namespace mongo {
     }
 
     // static
-    Status PlanCacheCommand::makeCacheKey(const string& ns, const BSONObj& cmdObj, PlanCacheKey* keyOut) {
+    Status PlanCacheCommand::canonicalize(const string& ns, const BSONObj& cmdObj,
+                                          CanonicalQuery** canonicalQueryOut) {
         // query - required
         BSONElement queryElt = cmdObj.getField("query");
         if (queryElt.eoo()) {
@@ -192,12 +193,8 @@ namespace mongo {
         if (!result.isOK()) {
             return result;
         }
-        scoped_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate key
-        PlanCacheKey key = cq->getPlanCacheKey();
-        *keyOut = key;
-
+        *canonicalQueryOut = cqRaw;
         return Status::OK();
     }
 
@@ -288,13 +285,14 @@ namespace mongo {
 
     // static
     Status PlanCacheDrop::drop(PlanCache* planCache, const string& ns, const BSONObj& cmdObj) {
-        PlanCacheKey key;
-        Status status = makeCacheKey(ns, cmdObj, &key);
+        CanonicalQuery* cqRaw;
+        Status status = canonicalize(ns, cmdObj, &cqRaw);
         if (!status.isOK()) {
             return status;
         }
 
-        Status result = planCache->remove(key);
+        scoped_ptr<CanonicalQuery> cq(cqRaw);
+        Status result = planCache->remove(*cq);
         if (!result.isOK()) {
             return result;
         }
@@ -320,14 +318,15 @@ namespace mongo {
     // static
     Status PlanCacheListPlans::list(const PlanCache& planCache, const std::string& ns,
                                     const BSONObj& cmdObj, BSONObjBuilder* bob) {
-        PlanCacheKey key;
-        Status status = makeCacheKey(ns, cmdObj, &key);
+        CanonicalQuery* cqRaw;
+        Status status = canonicalize(ns, cmdObj, &cqRaw);
         if (!status.isOK()) {
             return status;
         }
 
+        scoped_ptr<CanonicalQuery> cq(cqRaw);
         CachedSolution* crRaw;
-        Status result = planCache.get(key, &crRaw);
+        Status result = planCache.get(*cq, &crRaw);
         if (!result.isOK()) {
             return result;
         }
@@ -347,10 +346,12 @@ namespace mongo {
             detailsBob.append("solution", scd->toString());
             detailsBob.doneFast();
 
-            // XXX: Fill in rest of fields with bogus data.
             // XXX: Fix these field values once we have fleshed out cache entries.
+            //      reason should contain initial plan stats and score from ranking process.
+            //      feedback should contain execution stats from running the query to completion.
             planBob.append("reason", BSONObj());
             planBob.append("feedback", BSONObj());
+            planBob.append("hint", scd->adminHintApplied);
         }
         plansBuilder.doneFast();
 
