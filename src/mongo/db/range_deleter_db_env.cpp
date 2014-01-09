@@ -122,8 +122,9 @@ namespace mongo {
             while (!opReplicatedEnough(lastOpApplied,
                                        BSON("w" << "majority").firstElement())) {
                 if (elapsedTime.seconds() >= 3600) {
-                    *errMsg = str::stream() << "moveChunk repl sync timed out after "
-                                            << elapsedTime.seconds() << " seconds";
+                    *errMsg = str::stream() << "rangeDeleter timed out after "
+                                            << elapsedTime.seconds() << " seconds while waiting"
+                                            << " for deletions to be replicated to majority nodes";
 
                     if (!initiallyHaveClient) {
                         cc().shutdown();
@@ -136,8 +137,8 @@ namespace mongo {
             }
 
             LOG(elapsedTime.seconds() < 30 ? 1 : 0)
-                << "moveChunk repl sync took "
-                << elapsedTime.seconds() << " seconds" << endl;
+                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
+                << " waiting for deletes to be replicated to majority nodes" << endl;
         }
 
         if (!initiallyHaveClient) {
