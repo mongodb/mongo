@@ -87,7 +87,7 @@ AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([\
-	clock_gettime fcntl ftruncate gettimeofday posix_fadvise\
+	clock_gettime fcntl fdatasync ftruncate gettimeofday posix_fadvise\
 	posix_fallocate posix_madvise posix_memalign strtouq sync_file_range])
 AC_SYS_LARGEFILE
 
