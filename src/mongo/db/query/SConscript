@@ -93,6 +93,16 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target="canonical_query_test",
+    source=[
+        "canonical_query_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
     target="index_bounds_test",
     source=[
         "index_bounds_test.cpp"

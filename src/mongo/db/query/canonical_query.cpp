@@ -111,10 +111,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    /**
-     * Returns the normalized version of the subtree rooted at 'root'.
-     */
-    MatchExpression* normalizeTree(MatchExpression* root) {
+    // static
+    MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
         // root->isLogical() is true now.  We care about AND and OR.  Negations currently scare us.
         if (MatchExpression::AND == root->matchType() || MatchExpression::OR == root->matchType()) {
             // We could have AND of AND of AND.  Make sure we clean up our children before merging
@@ -174,8 +172,8 @@ namespace mongo {
         return sum;
     }
 
-    // TODO: Move this to query_validator.cpp
-    Status isValid(MatchExpression* root) {
+    // static
+    Status CanonicalQuery::isValid(MatchExpression* root) {
         // Analysis below should be done after squashing the tree to make it clearer.
 
         // TODO: We want $text in root level or within rooted AND for consistent text score
@@ -184,27 +182,28 @@ namespace mongo {
         // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root
         // must be an AND and its child must be a NEAR.
         size_t numGeoNear = countNodes(root, MatchExpression::GEO_NEAR);
-
-        if (0 == numGeoNear) {
-            return Status::OK();
-        }
-
         if (numGeoNear > 1) {
             return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
         }
-
-        if (MatchExpression::GEO_NEAR == root->matchType()) {
-            return Status::OK();
-        }
-        else if (MatchExpression::AND == root->matchType()) {
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
-                    return Status::OK();
+        else if (1 == numGeoNear) {
+            bool topLevel = false;
+            if (MatchExpression::GEO_NEAR == root->matchType()) {
+                topLevel = true;
+            }
+            else if (MatchExpression::AND == root->matchType()) {
+                for (size_t i = 0; i < root->numChildren(); ++i) {
+                    if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
+                        topLevel = true;
+                        break;
+                    }
                 }
+            }
+            if (!topLevel) {
+                return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
             }
         }
 
-        return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
+        return Status::OK();
     }
 
     Status CanonicalQuery::init(LiteParsedQuery* lpq) {

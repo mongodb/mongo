@@ -81,10 +81,16 @@ namespace mongo {
         const LiteParsedQuery& getParsed() const { return *_pq; }
         const ParsedProjection* getProj() const { return _proj.get(); }
 
-        //
         // Debugging
-        //
         string toString() const;
+
+        // TODO: Move this to query_validator.cpp
+        static Status isValid(MatchExpression* root);
+
+        /**
+         * Returns the normalized version of the subtree rooted at 'root'.
+         */
+        static MatchExpression* normalizeTree(MatchExpression* root);
 
     private:
         // You must go through canonicalize to create a CanonicalQuery.
