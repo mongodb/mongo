@@ -508,6 +508,11 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
 	log->write_lsn = slot->slot_end_lsn;
+	/*
+	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
+	 * so that threads finishing writing to the log will wait while the
+	 * current fsync completes and advance log->write_lsn.
+	 */
 	while (F_ISSET(slot, SLOT_SYNC) &&
 	    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 		if (__wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
@@ -515,6 +520,10 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 			    session, log->log_sync_cond, 10000);
 			continue;
 		}
+		/*
+		 * Record the current end of log after we grabbed the lock.
+		 * That is how far our fsync call with guarantee.
+		 */
 		sync_lsn = log->write_lsn;
 		if (LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
