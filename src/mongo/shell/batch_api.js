@@ -12,6 +12,9 @@ var _batch_api_module = (function() {
   var UNKNOWN_ERROR = 8;
   var WRITE_CONCERN_ERROR = 64;
 
+  // Constants
+  var IndexCollPattern = new RegExp('system\.indexes$');
+
   /**
    * Helper function to define properties
    */
@@ -44,6 +47,62 @@ var _batch_api_module = (function() {
         throw "getlasterror failed: " + tojson( res );
     return res;
   }
+
+  /**
+   * Wraps the result for write commands and presents a convenient api for accessing
+   * single results & errors (returns the last one if there are multiple).
+   */
+  var SingleWriteResult = function(bulkResult) {
+    // Define properties
+    defineReadOnlyProperty(this, "ok", bulkResult.ok);
+    defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
+    defineReadOnlyProperty(this, "nUpserted", bulkResult.nUpserted);
+    defineReadOnlyProperty(this, "nUpdated", bulkResult.nUpdated);
+    defineReadOnlyProperty(this, "nModified", bulkResult.nUpserted);
+    defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
+
+    //
+    // Define access methods
+    this.getUpsertedId = function() {
+      return bulkResult.upserted[bulkResult.upserted.length - 1];
+    };
+
+    this.getRawResponse = function() {
+      return bulkResult;
+    };
+
+    this.hasWriteErrors = function() {
+      return bulkResult.writeErrors.length > 0;
+    };
+
+    this.getWriteError = function() {
+      return bulkResult.writeErrors[bulkResult.writeErrors.length - 1];
+    };
+
+    this.getWriteConcernError = function() {
+      if (bulkResult.writeConcernErrors.length == 0) {
+        return null;
+      } else {
+        return bulkResult.writeConcernErrors[bulkResult.writeConcernErrors - 1];
+      }
+    };
+
+    this.tojson = function() {
+      return bulkResult;
+    };
+
+    this.toString = function() {
+      return "SingleWriteResult(" + tojson(bulkResult) + ")";
+    };
+
+    this.shellPrint = function() {
+      return this.toString();
+    };
+
+    this.isOK = function() {
+      return bulkResult.ok == 1;
+    };
+  };
 
   /**
    * Wraps the result for the commands
@@ -97,7 +156,7 @@ var _batch_api_module = (function() {
         return null;
       } else if(bulkResult.writeConcernErrors.length == 1) {
         // Return the error
-        bulkResult.writeConcernErrors[0];
+        return bulkResult.writeConcernErrors[0];
       } else {
 
         // Combine the errors
@@ -127,8 +186,15 @@ var _batch_api_module = (function() {
 
     this.isOK = function() {
       return bulkResult.ok == 1;
+    };
+
+    /**
+     * @return {SingleWriteResult} the simplified results condensed into one.
+     */
+    this.toSingleResult = function() {
+      return new SingleWriteResult(bulkResult);
     }
-  }
+  };
 
   /**
    * Wraps the error
@@ -284,17 +350,47 @@ var _batch_api_module = (function() {
         currentBatch.operations.push(document)
         currentIndex = currentIndex + 1;
       }
-    }
+    };
 
-    // Add the insert document
+    /**
+     * @return {Object} a new document with an _id: ObjectId if _id is not present.
+     *     Otherwise, returns the same object passed.
+     */
+    var addIdIfNeeded = function(obj) {
+      if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
+        var tmp = obj; // don't want to modify input
+        obj = {_id: new ObjectId()};
+        for (var key in tmp){
+          obj[key] = tmp[key];
+        }
+      }
+
+      return obj;
+    };
+
+    /**
+     * Add the insert document.
+     *
+     * @param document {Object} the document to insert.
+     */
     this.insert = function(document) {
+      if (!collection.getMongo().useWriteCommands() && !IndexCollPattern.test(namespace)) {
+        // Validation is done on server for write commands.
+        DBCollection._validateForStorage(document);
+      }
+
       return addToOperationsList(INSERT, document);
-    }
+    };
 
     //
     // Find based operations
     var findOperations = {
       update: function(updateDocument) {
+        if (!collection.getMongo().useWriteCommands()) {
+          // Validation is done on server for write commands.
+          DBCollection._validateUpdateDoc(updateDocument);
+        }
+
         // Set the top value for the update 0 = multi true, 1 = multi false
         var upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
         // Establish the update command
@@ -312,6 +408,11 @@ var _batch_api_module = (function() {
       },
 
       updateOne: function(updateDocument) {
+        if (!collection.getMongo().useWriteCommands()) {
+          // Validation is done on server for write commands.
+          DBCollection._validateUpdateDoc(updateDocument);
+        }
+
         // Set the top value for the update 0 = multi true, 1 = multi false
         var upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
         // Establish the update command
@@ -339,6 +440,11 @@ var _batch_api_module = (function() {
       },
 
       removeOne: function() {
+        if (!collection.getMongo().useWriteCommands()) {
+          // Validation is done on server for write commands.
+          DBCollection._validateRemoveDoc(currentOp.selector);
+        }
+
         // Establish the update command
         var document = {
             q: currentOp.selector
@@ -352,6 +458,11 @@ var _batch_api_module = (function() {
       },
 
       remove: function() {
+        if (!collection.getMongo().useWriteCommands()) {
+          // Validation is done on server for write commands.
+          DBCollection._validateRemoveDoc(currentOp.selector);
+        }
+
         // Establish the update command
         var document = {
             q: currentOp.selector
@@ -460,6 +571,12 @@ var _batch_api_module = (function() {
       if(batch.batchType == UPDATE) {
         cmd = { update: namespace, updates: batch.operations, ordered: ordered }
       } else if(batch.batchType == INSERT) {
+        var transformedInserts = [];
+        batch.operations.forEach(function(insertDoc) {
+          transformedInserts.push(addIdIfNeeded(insertDoc));
+        });
+        batch.operations = transformedInserts;
+
         cmd = { insert: namespace, documents: batch.operations, ordered: ordered }
       } else if(batch.batchType == REMOVE) {
         cmd = { delete: namespace, deletes: batch.operations, ordered: ordered }
@@ -492,17 +609,35 @@ var _batch_api_module = (function() {
     var executeLegacyOp = function(_legacyOp) {
       // Handle the different types of operation types
       if(_legacyOp.batchType == INSERT) {
-        collection.insert(_legacyOp.operation);
+        if (Array.isArray(_legacyOp.operation)) {
+          var transformedInserts = [];
+          _legacyOp.operation.forEach(function(insertDoc) {
+            transformedInserts.push(addIdIfNeeded(insertDoc));
+          });
+          _legacyOp.operation = transformedInserts;
+        }
+        else {
+          _legacyOp.operation = addIdIfNeeded(_legacyOp.operation);
+        }
+
+        collection.getMongo().insert(collection.getFullName(),
+                                     _legacyOp.operation,
+                                     ordered);
       } else if(_legacyOp.batchType == UPDATE) {
         if(_legacyOp.operation.multi) options.multi = _legacyOp.operation.multi;
         if(_legacyOp.operation.upsert) options.upsert = _legacyOp.operation.upsert;
 
-        collection.update(_legacyOp.operation.q
-          , _legacyOp.operation.u, options.upsert, options.update);
+        collection.getMongo().update(collection.getFullName(),
+                                     _legacyOp.operation.q,
+                                     _legacyOp.operation.u,
+                                     options.upsert,
+                                     options.multi);
       } else if(_legacyOp.batchType == REMOVE) {
         if(_legacyOp.operation.limit) options.single = true;
 
-        collection.remove(_legacyOp.operation.q, options.single);
+        collection.getMongo().remove(collection.getFullName(),
+                                     _legacyOp.operation.q,
+                                     options.single);
       }
 
       // Retrieve the lastError object
@@ -633,4 +768,45 @@ var _batch_api_module = (function() {
       return new BulkWriteResult(bulkResult);
     }
   }
-})()
+})();
+
+if ( ( typeof WriteConcern ) == 'undefined' ){
+
+    /**
+     * Shell representation of WriteConcern, includes:
+     *  j: write durably written to journal
+     *  w: write replicated to number of servers
+     *  wtimeout: how long to wait for replication
+     * 
+     * Accepts { w : x, j : x, wtimeout : x } or w, j, wtimeout
+     */
+    WriteConcern = function( wValue, jValue, wTimeout ){
+
+        if ( typeof wValue == 'object' && !jValue ) {
+            var opts = wValue;
+            wValue = opts.w;
+            jValue = opts.j;
+            wTimeout = opts.wtimeout;
+        }
+
+        this._w = wValue;
+        if ( this._w === undefined ) this._w = 1;
+        assert( typeof this._w == 'number' || typeof this._w == 'string' );
+
+        this._j = jValue ? true : false;
+        this._wTimeout = NumberInt( wTimeout ).toNumber();
+    };
+
+    WriteConcern.prototype.tojson = function() {
+        return { w : this._w, j : this._j, wtimeout : this._wTimeout };
+    };
+
+    WriteConcern.prototype.toString = function() {
+        return "WriteConcern(" + tojson( this.tojson() ) + ")";
+    };
+
+    WriteConcern.prototype.shellPrint = function() {
+        return this.toString();
+    };
+}
+

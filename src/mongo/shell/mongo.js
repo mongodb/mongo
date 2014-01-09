@@ -186,8 +186,12 @@ Mongo.prototype.useWriteCommands = function() {
 //
 
 Mongo.prototype.setWriteConcern = function( wc ) {
-    if ( typeof wc != 'WriteConcern' ) wc = new WriteConcern( wc );
-    this._writeConcern = wc;
+    if ( wc instanceof WriteConcern ) {
+        this._writeConcern = wc;
+    }
+    else {
+        this._writeConcern = new WriteConcern( wc );
+    }
 };
 
 Mongo.prototype.getWriteConcern = function() {
