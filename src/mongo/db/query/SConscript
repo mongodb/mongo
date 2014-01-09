@@ -99,6 +99,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner",
+        "$BUILD_DIR/mongo/expressions_text",
     ],
 )
 

@@ -47,6 +47,82 @@ namespace {
         return StatusWithMatchExpression(CanonicalQuery::normalizeTree(swme.getValue()));
     }
 
+    TEST(CanonicalQueryTest, IsValidText) {
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Valid: regular TEXT.
+        swme = parseNormalize("{$text: {$search: 's'}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Valid: TEXT inside OR.
+        swme = parseNormalize(
+            "{$or: ["
+            "    {$text: {$search: 's'}},"
+            "    {a: 1}"
+            "]}"
+        );
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Valid: TEXT outside NOR.
+        swme = parseNormalize("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Invalid: TEXT inside NOR.
+        swme = parseNormalize("{$nor: [{$text: {$search: 's'}}, {a: 1}]}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Invalid: TEXT inside NOR.
+        swme = parseNormalize(
+            "{$nor: ["
+            "    {$or: ["
+            "        {$text: {$search: 's'}},"
+            "        {a: 1}"
+            "    ]},"
+            "    {a: 2}"
+            "]}"
+        );
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Invalid: >1 TEXT.
+        swme = parseNormalize(
+            "{$and: ["
+            "    {$text: {$search: 's'}},"
+            "    {$text: {$search: 't'}}"
+            "]}"
+        );
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Invalid: >1 TEXT.
+        swme = parseNormalize(
+            "{$and: ["
+            "    {$or: ["
+            "        {$text: {$search: 's'}},"
+            "        {a: 1}"
+            "    ]},"
+            "    {$or: ["
+            "        {$text: {$search: 't'}},"
+            "        {b: 1}"
+            "    ]}"
+            "]}"
+        );
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+    }
+
     TEST(CanonicalQueryTest, IsValidGeo) {
         auto_ptr<MatchExpression> me;
         StatusWithMatchExpression swme(Status::OK());

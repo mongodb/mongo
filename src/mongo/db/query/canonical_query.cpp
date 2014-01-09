@@ -30,6 +30,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
 
@@ -172,12 +173,39 @@ namespace mongo {
         return sum;
     }
 
+    /**
+     * Does 'root' have a subtree of type 'subtreeType' with a node of type 'childType' inside?
+     */
+    bool hasNodeInSubtree(MatchExpression* root, MatchExpression::MatchType childType,
+                          MatchExpression::MatchType subtreeType) {
+        if (subtreeType == root->matchType()) {
+            return QueryPlannerCommon::hasNode(root, childType);
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            if (hasNodeInSubtree(root->getChild(i), childType, subtreeType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // static
     Status CanonicalQuery::isValid(MatchExpression* root) {
         // Analysis below should be done after squashing the tree to make it clearer.
 
-        // TODO: We want $text in root level or within rooted AND for consistent text score
-        // availability.
+        // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
+        //
+        // Note that the query grammar (as enforced by the MatchExpression parser) forbids TEXT
+        // inside of value-expression clauses like NOT, so we don't check those here.
+        size_t numText = countNodes(root, MatchExpression::TEXT);
+        if (numText > 1) {
+            return Status(ErrorCodes::BadValue, "Too many text expressions");
+        }
+        else if (1 == numText) {
+            if (hasNodeInSubtree(root, MatchExpression::TEXT, MatchExpression::NOR)) {
+                return Status(ErrorCodes::BadValue, "text expression not allowed in nor");
+            }
+        }
 
         // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root
         // must be an AND and its child must be a NEAR.
