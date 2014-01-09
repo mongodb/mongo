@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
+#include <gcc.h>				/* WiredTiger internal */
 
 const char *progname;				/* Program name */
 uint8_t *big;					/* Big key/value buffer */
@@ -118,7 +119,7 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	    bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"),
 	    cp->uri, cp->config, bigkey ? "key" : "value");
 
-	(void)system("rm -rf WT_TEST && mkdir WT_TEST");
+	WT_UNUSED_RET(system("rm -rf WT_TEST && mkdir WT_TEST"));
 
 	/*
 	 * Open/create the database, connection, session and cursor; set the
@@ -209,7 +210,7 @@ main(int argc, char *argv[])
 	}
 	free(big);
 
-	(void)system("rm -rf WT_TEST");
+	WT_UNUSED_RET(system("rm -rf WT_TEST"));
 
 	return (EXIT_SUCCESS);
 }
