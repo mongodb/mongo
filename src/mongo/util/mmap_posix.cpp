@@ -207,31 +207,44 @@ namespace mongo {
 
     class PosixFlushable : public MemoryMappedFile::Flushable {
     public:
-        PosixFlushable( void * view , HANDLE fd , long len )
-            : _view( view ) , _fd( fd ) , _len(len) {
+        PosixFlushable( MemoryMappedFile* theFile, void* view , HANDLE fd , long len )
+            : _theFile( theFile ), _view( view ) , _fd( fd ) , _len(len) {
         }
 
         void flush() {
-            if ( _view && _fd ) {
-                if ( msync(_view, _len, MS_SYNC ) ) {
-                    if ( errno == EBADF ) {
-                        // ok, we were unlocked, so this file was closed
-                    }
-                    else {
-                        problem() << "msync " << errnoWithDescription() << endl;
-                        dataSyncFailedHandler();
-                    }
-                }
+            if ( _view == NULL || _fd == 0 )
+                return;
+
+            if ( msync(_view, _len, MS_SYNC ) == 0 )
+                return;
+
+            if ( errno == EBADF ) {
+                // ok, we were unlocked, so this file was closed
+                return;
             }
+
+            // some error, lets see if we're supposed to exist
+            LockMongoFilesShared mmfilesLock;
+            if ( MongoFile::getAllFiles().count( _theFile ) == 0 ) {
+                log() << "msync failed with: " << errnoWithDescription()
+                      << " but file doesn't exist anymore, so ignoring";
+                // this was deleted while we were unlocked
+                return;
+            }
+
+            // we got an error, and we still exist, so this is bad, we fail
+            problem() << "msync " << errnoWithDescription() << endl;
+            dataSyncFailedHandler();
         }
 
+        MemoryMappedFile* _theFile;
         void * _view;
         HANDLE _fd;
         long _len;
     };
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new PosixFlushable( viewForFlushing() , fd , len );
+        return new PosixFlushable( this, viewForFlushing() , fd , len );
     }
 
 
