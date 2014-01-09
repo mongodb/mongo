@@ -231,6 +231,11 @@ namespace mongo {
             }
         }
 
+        // TEXT and NEAR cannot both be in the query.
+        if (numText > 0 && numGeoNear > 0) {
+            return Status(ErrorCodes::BadValue, "text and geoNear not allowed in same query");
+        }
+
         return Status::OK();
     }
 

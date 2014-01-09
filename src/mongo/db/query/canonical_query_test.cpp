@@ -209,4 +209,33 @@ namespace {
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
     }
 
+    TEST(CanonicalQueryTest, IsValidTextAndGeo) {
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: TEXT and GEO_NEAR.
+        swme = parseNormalize("{$text: {$search: 's'}, a: {$near: [0, 0]}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Invalid: TEXT and GEO_NEAR.
+        swme = parseNormalize("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+
+        // Invalid: TEXT and GEO_NEAR.
+        swme = parseNormalize(
+            "{$or: ["
+            "    {$text: {$search: 's'}},"
+            "    {a: 1}"
+            " ],"
+            " b: {$near: [0, 0]}}"
+        );
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+    }
+
 }
