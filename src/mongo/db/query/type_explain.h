@@ -142,6 +142,11 @@ namespace mongo {
         bool isIndexOnlySet() const;
         bool getIndexOnly() const;
 
+        void setIDHack(bool idhack);
+        void unsetIDHack();
+        bool isIDHackSet() const;
+        bool getIDHack() const;
+
         void setNYields(long long nYields);
         void unsetNYields();
         bool isNYieldsSet() const;
@@ -221,6 +226,10 @@ namespace mongo {
         // (O)  number of entries retrieved either from an index or collection across all plans
         bool _indexOnly;
         bool _isIndexOnlySet;
+
+        // (O)  whether the idhack was used to answer this query
+        bool _idHack;
+        bool _isIDHackSet;
 
         // (O)  number times this plan released and reacquired its lock
         long long _nYields;
