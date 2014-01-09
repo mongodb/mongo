@@ -45,33 +45,43 @@
 
 namespace mongo {
 
-    // Copied verbatim from queryutil.cpp.
     static bool isSimpleIdQuery(const BSONObj& query) {
-        // Just one field name.
-        BSONObjIterator it(query);
-        if (!it.more()) { return false; }
+        bool hasID = false;
 
-        BSONElement elt = it.next();
-        if (it.more()) { return false; }
-
-        // Which is _id...
-        if (strcmp("_id", elt.fieldName()) != 0) {
+        // Must have _id field, and optionally can have either
+        // $isolated or $atomic.
+        if (query.nFields() > 2) {
             return false;
         }
 
-        // And not something like { _id : { $gt : ...
-        if (elt.isSimpleType()) { return true; }
+        BSONObjIterator it(query);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            if (mongoutils::str::equals("_id", elt.fieldName())) {
+                // Verify that the query on _id is a simple equality.
+                hasID = true;
 
-        // BinData is OK too.
-        if (BinData == elt.type()) { return true; }
-
-        // And if the value is an object...
-        if (elt.type() == Object) {
-            // Can't do this.
-            return elt.Obj().firstElementFieldName()[0] != '$';
+                if (elt.type() == Object) {
+                    // If the value is an object, it can't have a query operator
+                    // (must be a literal object match).
+                    if (elt.Obj().firstElementFieldName()[0] == '$') {
+                        return false;
+                    }
+                }
+                else if (!elt.isSimpleType() && BinData != elt.type()) {
+                    // The _id fild cannot be something like { _id : { $gt : ...
+                    // But it can be BinData.
+                    return false;
+                }
+            }
+            else if (!(mongoutils::str::equals("$isolated", elt.fieldName()) ||
+                       mongoutils::str::equals("$atomic", elt.fieldName()))) {
+                // If the field is not _id, it must be $isolated/$atomic.
+                return false;
+            }
         }
 
-        return false;
+        return hasID;
     }
 
     static bool canUseIDHack(const CanonicalQuery& query) {
