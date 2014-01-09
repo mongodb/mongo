@@ -164,8 +164,10 @@ namespace mongo {
     }
 
     Status IDHackRunner::getExplainPlan(TypeExplain** explain) const {
-        // This shouldn't be called anyway as idhack is only used when there is no explain.
-        return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+        // The explain plan simply indicates that the plan is idhack.
+        *explain = new TypeExplain();
+        (*explain)->setIDHack(true);
+        return Status::OK();
     }
 
 } // namespace mongo

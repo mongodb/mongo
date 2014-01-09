@@ -276,6 +276,9 @@ namespace mongo {
         _indexOnly = false;
         _isIndexOnlySet = false;
 
+        _idHack = false;
+        _isIDHackSet = false;
+
         _nYields = 0;
         _isNYieldsSet = false;
 
@@ -337,6 +340,9 @@ namespace mongo {
 
         other->_indexOnly = _indexOnly;
         other->_isIndexOnlySet = _isIndexOnlySet;
+
+        other->_idHack = _idHack;
+        other->_isIDHackSet = _isIDHackSet;
 
         other->_nYields = _nYields;
         other->_isNYieldsSet = _isNYieldsSet;
@@ -585,6 +591,24 @@ namespace mongo {
     bool TypeExplain::getIndexOnly() const {
         verify(_isIndexOnlySet);
         return _indexOnly;
+    }
+
+    void TypeExplain::setIDHack(bool idhack) {
+        _idHack = idhack;
+        _isIDHackSet = true;
+    }
+
+    void TypeExplain::unsetIDHack() {
+        _isIDHackSet = false;
+    }
+
+    bool TypeExplain::isIDHackSet() const {
+        return _isIDHackSet;
+    }
+
+    bool TypeExplain::getIDHack() const {
+        verify(_isIDHackSet);
+        return _idHack;
     }
 
     void TypeExplain::setNYields(long long nYields) {

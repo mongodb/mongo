@@ -566,12 +566,17 @@ namespace mongo {
                                            shardingState.getVersion(pq.ns()));
         }
 
-        // Append explain information to query results by asking the runner to produce them.
-        if (isExplain) {
+        // Get explain information if it is needed by either the profiler
+        // or by an explain() query.
+        boost::scoped_ptr<TypeExplain> explain(NULL);
+        if (isExplain || ctx.ctx().db()->getProfilingLevel() > 0) {
+            // Ask the runner to produce explain information.
             TypeExplain* bareExplain;
             Status res = runner->getExplainPlan(&bareExplain);
-
-            if (!res.isOK()) {
+            if (res.isOK()) {
+                explain.reset(bareExplain);
+            }
+            else {
                 error() << "could not produce explain of query '" << pq.getFilter()
                         << "', error: " << res.reason();
                 // If numResults and the data in bb don't correspond, we'll crash later when rooting
@@ -582,28 +587,27 @@ namespace mongo {
                 numResults = 1;
                 // TODO: we can fill out millis etc. here just fine even if the plan screwed up.
             }
-            else {
-                boost::scoped_ptr<TypeExplain> explain(bareExplain);
+        }
 
-                // Fill in the missing run-time fields in explain, starting with propeties of
-                // the process running the query.
-                std::string server = mongoutils::str::stream()
-                    << getHostNameCached() << ":" << serverGlobalParams.port;
-                explain->setServer(server);
+        // Fill in the missing run-time fields in explain, starting with propeties of
+        // the process running the query.
+        if (isExplain && NULL != explain.get()) {
+            std::string server = mongoutils::str::stream()
+                << getHostNameCached() << ":" << serverGlobalParams.port;
+            explain->setServer(server);
 
-                // We might have skipped some results due to chunk migration etc. so our count is
-                // correct.
-                explain->setN(numResults);
+            // We might have skipped some results due to chunk migration etc. so our count is
+            // correct.
+            explain->setN(numResults);
 
-                // Clock the whole operation.
-                explain->setMillis(curop.elapsedMillis());
+            // Clock the whole operation.
+            explain->setMillis(curop.elapsedMillis());
 
-                BSONObj explainObj = explain->toBSON();
-                bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
+            BSONObj explainObj = explain->toBSON();
+            bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
 
-                // The explain output is actually a result.
-                numResults = 1;
-            }
+            // The explain output is actually a result.
+            numResults = 1;
         }
 
         long long ccId = 0;
@@ -658,8 +662,25 @@ namespace mongo {
         qr->startingFrom = 0;
         qr->nReturned = numResults;
 
+        // Set debug information for consumption by the profiler.
         curop.debug().ntoskip = pq.getSkip();
         curop.debug().nreturned = numResults;
+        if (NULL != explain.get()) {
+            if (explain->isScanAndOrderSet()) {
+                curop.debug().scanAndOrder = explain->getScanAndOrder();
+            }
+            else {
+                curop.debug().scanAndOrder = false;
+            }
+
+            if (explain->isNScannedSet()) {
+                curop.debug().nscanned = explain->getNScanned();
+            }
+
+            if (explain->isIDHackSet()) {
+                curop.debug().idhack = explain->getIDHack();
+            }
+        }
 
         // curop.debug().exhaust is set above.
         return curop.debug().exhaust ? pq.ns() : "";
