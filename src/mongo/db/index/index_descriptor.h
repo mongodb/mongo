@@ -40,6 +40,8 @@
 namespace mongo {
 
     class IndexCatalog;
+    class IndexCatalogEntry;
+    class IndexCatalogEntryContainer;
 
     /**
      * A cache of information computed from the memory-mapped per-index data (OnDiskIndexData).
@@ -65,7 +67,8 @@ namespace mongo {
               _isIdIndex(IndexDetails::isIdIndexPattern( _keyPattern )),
               _sparse(infoObj["sparse"].trueValue()),
               _dropDups(infoObj["dropDups"].trueValue()),
-              _unique( _isIdIndex || infoObj["unique"].trueValue() )
+              _unique( _isIdIndex || infoObj["unique"].trueValue() ),
+              _cachedEntry( NULL )
         {
             _indexNamespace = _parentNS + ".$" + _indexName;
 
@@ -179,7 +182,13 @@ namespace mongo {
         bool _unique;
         int _version;
 
+        // only used by IndexCatalogEntryContainer to do caching for perf
+        // users not allowed to touch, and not part of API
+        IndexCatalogEntry* _cachedEntry;
+
         friend class IndexCatalog;
+        friend class IndexCatalogEntry;
+        friend class IndexCatalogEntryContainer;
     };
 
 }  // namespace mongo

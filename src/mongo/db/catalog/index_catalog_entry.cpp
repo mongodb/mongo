@@ -45,9 +45,12 @@ namespace mongo {
           _forcedBtreeIndex( NULL ),
           _ordering( Ordering::make( descriptor->keyPattern() ) ),
           _isReady( false ) {
+        _descriptor->_cachedEntry = this;
     }
 
     IndexCatalogEntry::~IndexCatalogEntry() {
+        _descriptor->_cachedEntry = NULL; // defensive
+
         delete _forcedBtreeIndex;
         delete _accessMethod;
 
@@ -134,6 +137,9 @@ namespace mongo {
     // ------------------
 
     const IndexCatalogEntry* IndexCatalogEntryContainer::find( const IndexDescriptor* desc ) const {
+        if ( desc->_cachedEntry )
+            return desc->_cachedEntry;
+
         for ( const_iterator i = begin(); i != end(); ++i ) {
             const IndexCatalogEntry* e = *i;
             if ( e->descriptor() == desc )
@@ -143,6 +149,9 @@ namespace mongo {
     }
 
     IndexCatalogEntry* IndexCatalogEntryContainer::find( const IndexDescriptor* desc ) {
+        if ( desc->_cachedEntry )
+            return desc->_cachedEntry;
+
         for ( iterator i = begin(); i != end(); ++i ) {
             IndexCatalogEntry* e = *i;
             if ( e->descriptor() == desc )
