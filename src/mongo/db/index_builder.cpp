@@ -56,9 +56,9 @@ namespace mongo {
         Client::initThread(name().c_str());
         replLocalAuth();
 
-        string ns = _index["ns"].String();
-
-        Client::WriteContext ctx(ns);
+        cc().curop()->reset(HostAndPort(), dbInsert);
+        NamespaceString ns(_index["ns"].String());
+        Client::WriteContext ctx(ns.getSystemIndexesCollection());
 
         Status status = build( ctx.ctx() );
         if ( !status.isOK() ) {
@@ -76,7 +76,9 @@ namespace mongo {
             c = db->getOrCreateCollection( ns );
             verify(c);
         }
-        Status status = c->getIndexCatalog()->createIndex( _index, true );
+        Status status = c->getIndexCatalog()->createIndex( _index, 
+                                                           true, 
+                                                           IndexCatalog::SHUTDOWN_LEAVE_DIRTY );
         if ( status.code() == ErrorCodes::IndexAlreadyExists )
             return Status::OK();
         return status;
@@ -90,6 +92,7 @@ namespace mongo {
             BSONObj index = op->query();
             killCurrentOp.kill(op->opNum());
             indexes.push_back(index);
+            log() << "halting index build: " << index;
         }
         if (indexes.size() > 0) {
             log() << "halted " << indexes.size() << " index build(s)" << endl;
