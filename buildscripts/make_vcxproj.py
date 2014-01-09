@@ -1,15 +1,35 @@
 # generate vcxproj file(s)
 #
-# howto:
+#   HOW TO USE
+#
 #   scons --clean
-#   scons <a_target> > out
+#   # verify build/* is empty...
+#   scons TARGET.exe > out
 #   python buildscripts/make_vcxproj.py TARGET < out > my.vcxproj
 #
 #   where TARGET is your target e.g., "mongod"
 #
-#   note:
+#   NOTES
+#
+#   (1)
 #       directory paths are such that it is assumed the vcxproj is in the top level project directory.
 #       this is easy and likely to change...
+#
+#   (2)
+#       machine generated files (error_codes, action_types, ...) are, for now, copied by this script 
+#       into the source tree -- see note below in function pyth() as to why.
+#       if those files need refreshing, run scons to generate them, and then run make_vcxproj.py again
+#       to copy them over.  the rebuilding of the vcxproj file in that case should be moot, it is just 
+#       the copying over of the updated files we really want to happen.
+# 
+#   (3) 
+#       todo: i don't think the generated vcxproj perfectly handles switching from debug to release and 
+#       such yet.  so for example:
+#
+#         scons --clean all && scons --dd --win2008plus --64 mongod.exe && python ...
+#
+#       should generate a file that will work for building mongod.exe, *if* you pick win2008plus and 
+#       Debug and 64 bit from the drop downs.  The other variations so far, ymmv.
 #
 
 import sys
