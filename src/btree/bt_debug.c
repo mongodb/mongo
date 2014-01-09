@@ -712,7 +712,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			    ds, page, WT_PAGE_ROW_LEAF, "K", unpack));
 		}
 
-		if ((cell = __wt_row_value(page, rip)) == NULL)
+		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, unpack);

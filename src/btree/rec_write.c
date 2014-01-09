@@ -3425,7 +3425,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 		/* Build value cell. */
 		dictionary = 0;
-		if ((val_cell = __wt_row_value(page, rip)) != NULL)
+		if ((val_cell = __wt_row_leaf_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
 		WT_ERR(
 		    __rec_txn_read(session, r, WT_ROW_UPDATE(page, rip), &upd));
