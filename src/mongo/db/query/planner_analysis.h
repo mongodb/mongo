@@ -36,6 +36,13 @@ namespace mongo {
 
     class QueryPlannerAnalysis {
     public:
+
+        /**
+         * See explodeForSort.  Max number of index scans we're willing to create to pull
+         * a sort order out of an index scan with point intervals.
+         */
+        static const size_t kMaxScansToExplode;
+
         /**
          * In brief: performs sort and covering analysis.
          *
@@ -55,6 +62,41 @@ namespace mongo {
         static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
                                                 const QueryPlannerParams& params,
                                                 QuerySolutionNode* solnRoot);
+
+        /**
+         * Sort the results, if there is a sort required.
+         */
+        static QuerySolutionNode* analyzeSort(const CanonicalQuery& query,
+                                              const QueryPlannerParams& params,
+                                              QuerySolutionNode* solnRoot,
+                                              bool* blockingSortOut);
+
+        /**
+         * Internal helper function used by analyzeSort.
+         *
+         * Rewrites an index scan over many point intervals as an OR of many index scans in order to
+         * obtain an indexed sort.  For full details, see SERVER-1205.
+         *
+         * Here is an example:
+         *
+         * Consider the query find({a: {$in: [1,2]}}).sort({b: 1}) with using the index {a:1, b:1}.
+         *
+         * Our default solution will be to construct one index scan with the bounds a:[[1,1],[2,2]]
+         * and b: [MinKey, MaxKey].
+         *
+         * However, this is logically equivalent to the union of the following scans:
+         * a:[1,1], b:[MinKey, MaxKey]
+         * a:[2,2], b:[MinKey, MaxKey]
+         *
+         * Since the bounds on 'a' are a point, each scan provides the sort order {b:1} in addition
+         * to {a:1, b:1}.
+         *
+         * If we union these scans with a merge sort instead of a normal hashing OR, we can preserve
+         * the sort order that each scan provides.
+         */
+        static bool explodeForSort(const CanonicalQuery& query,
+                                   const QueryPlannerParams& params,
+                                   QuerySolutionNode** solnRoot);
     };
 
 }  // namespace mongo
