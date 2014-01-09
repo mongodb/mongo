@@ -127,7 +127,7 @@ DBCollection.prototype._massageObject = function( q ){
 }
 
 
-DBCollection._validateObject = function( o ){
+DBCollection.prototype._validateObject = function( o ){
     if (typeof(o) != "object")
         throw "attempted to save a " + typeof(o) + " value.  document expected.";
 
@@ -137,8 +137,8 @@ DBCollection._validateObject = function( o ){
 
 DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
-DBCollection._validateForStorage = function( o ){
-    DBCollection._validateObject( o );
+DBCollection.prototype._validateForStorage = function( o ){
+    this._validateObject( o );
     for ( var k in o ){
         if ( k.indexOf( "." ) >= 0 ) {
             throw "can't have . in field names [" + k + "]" ;
@@ -149,7 +149,7 @@ DBCollection._validateForStorage = function( o ){
         }
 
         if ( o[k] !== null && typeof( o[k] ) === "object" ) {
-            DBCollection._validateForStorage( o[k] );
+            this._validateForStorage( o[k] );
         }
     }
 };
@@ -184,47 +184,47 @@ DBCollection.prototype.findOne = function( query , fields, options ){
 DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     if ( ! obj )
         throw "no object passed to insert!";
-
+    if ( ! _allow_dot ) {
+        this._validateForStorage( obj );
+    }
+    
     if ( typeof( options ) == "undefined" ) options = 0;
+    
+    if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
+        var tmp = obj; // don't want to modify input
+        obj = {_id: new ObjectId()};
+        for (var key in tmp){
+            obj[key] = tmp[key];
+        }
+    }
 
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
 
     if ( this._mongo.useWriteCommands() ) {
-        // bit 0 of option flag is continueOnError.
-        var batch = ((options & 1) == 0) ? this.initializeUnorderedBulkOp() :
-                this.initializeOrderedBulkOp();
-
-        if (Array.isArray(obj)) {
-            obj.forEach(function(doc) {
-                batch.insert(doc, _allow_dot);
-            });
-        }
-        else {
-            batch.insert(obj, _allow_dot);
+        var documents = obj;
+        if (!Array.isArray(obj)) {
+            documents = [obj];
         }
 
-        var writeConcern = null;
-        if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().tojson();
+        var cmdColl = this._db.getCollection('$cmd');
+        var cmdObj = { insert: this.getName(),
+                       documents: documents,
+                       // bit 0 flag is continueOnError
+                       ordered: ((options & 1) == 0)};
+
+        if ( this._mongo.getWriteConcern() ) {
+            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
         }
 
-        result = batch.execute(writeConcern).toSingleResult();
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        result = new WriteResult( 'insert',
+            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
+                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
+                        0 /* flags */).next() );
     }
     else {
-        if ( ! _allow_dot ) {
-            DBCollection._validateForStorage( obj );
-        }
-
-        if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
-            var tmp = obj; // don't want to modify input
-            obj = {_id: new ObjectId()};
-            for (var key in tmp){
-                obj[key] = tmp[key];
-            }
-        }
-
         this._mongo.insert( this._fullName , obj, options );
     }
 
@@ -233,63 +233,63 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     return result;
 };
 
-DBCollection._validateRemoveDoc = function(doc) {
-  for ( var k in doc ){
-    if ( k == "_id" && typeof( doc[k] ) == "undefined" ){
-      throw new Error("can't have _id set to undefined in a remove expression");
-    }
-  }
-};
-
 DBCollection.prototype.remove = function( t , justOne ){
+    for ( var k in t ){
+        if ( k == "_id" && typeof( t[k] ) == "undefined" ){
+            throw "can't have _id set to undefined in a remove expression"
+        }
+    }
+
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
-
+    
     if ( this._mongo.useWriteCommands() ) {
+        
         var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
-        var batch = this.initializeOrderedBulkOp();
-        var removeOp = batch.find(query);
-
-        if (justOne) {
-            removeOp.removeOne();
+        
+        var limit = 0;
+        if (typeof(justOne) != 'undefined' && justOne != null && justOne) {
+            limit = 1;
         }
-        else {
-            removeOp.remove();
+        
+        var cmdColl = this._db.getCollection('$cmd');
+        var cmdObj = { 'delete': this.getName(),
+                       deletes: [{ q: query,
+                                   limit: limit }]};
+        
+        if ( this._mongo.getWriteConcern() ) {
+            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
         }
 
-        var writeConcern = null;
-        if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().tojson();
-        }
-
-        result = batch.execute(writeConcern).toSingleResult();
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        result = new WriteResult( 'remove',
+            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
+                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
+                        0 /* flags */).next() );
     }
     else {
-        DBCollection._validateRemoveDoc(t);
         this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
     }
-
+    
     this._printExtraInfo("Removed", startTime);
     return result;
 }
 
-DBCollection._validateUpdateDoc = function(doc) {
-    var firstKey = null;
-    for (var key in doc) { firstKey = key; break; }
-
-    if (firstKey != null && firstKey[0] == '$') {
-        // for mods we only validate partially, for example keys may have dots
-        DBCollection._validateObject( doc );
-    } else {
-        // we're basically inserting a brand new object, do full validation
-        DBCollection._validateForStorage( doc );
-    }
-};
-
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
     assert( query , "need a query" );
     assert( obj , "need an object" );
+
+    var firstKey = null;
+    for (var k in obj) { firstKey = k; break; }
+
+    if (firstKey != null && firstKey[0] == '$') {
+        // for mods we only validate partially, for example keys may have dots
+        this._validateObject( obj );
+    } else {
+        // we're basically inserting a brand new object, do full validation
+        this._validateForStorage( obj );
+    }
 
     // can pass options via object for improved readability
     if ( typeof(upsert) === 'object' ) {
@@ -305,29 +305,25 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
                      !_verboseShell) ? 0 : new Date().getTime();
 
     if ( this._mongo.useWriteCommands() ) {
-        var batch = this.initializeOrderedBulkOp();
-        var updateOp = batch.find(query);
 
-        if (upsert) {
-            updateOp = updateOp.upsert();
+        var cmdColl = this._db.getCollection('$cmd');
+        var cmdObj = { update: this.getName(),
+                       updates: [{ q: query,
+                                   u: obj,
+                                   upsert: (upsert? true : false),
+                                   multi: (multi? true : false) }]};
+
+        if ( this._mongo.getWriteConcern() ) {
+            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
         }
 
-        if (multi) {
-            updateOp.update(obj);
-        }
-        else {
-            updateOp.updateOne(obj);
-        }
-
-        var writeConcern = null;
-        if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().tojson();
-        }
-
-        result = batch.execute(writeConcern).toSingleResult();
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        result = new WriteResult( 'update',
+            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
+                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
+                        0 /* flags */).next() );
     }
     else {
-        DBCollection._validateUpdateDoc(obj);
         this._mongo.update(this._fullName, query, obj,
                            upsert ? true : false, multi ? true : false );
     }
