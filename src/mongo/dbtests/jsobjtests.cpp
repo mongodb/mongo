@@ -342,50 +342,6 @@ namespace JsobjTests {
             }
         };
 
-        class TimestampTest : public Base {
-        public:
-            void run() {
-                Client *c = currentClient.get();
-                if( c == 0 ) {
-                    Client::initThread("pretouchN");
-                    c = &cc();
-                }
-                Lock::GlobalWrite lk; // for initTimestamp
-        
-                BSONObjBuilder b;
-                b.appendTimestamp( "a" );
-                BSONObj o = b.done();
-                o.toString();
-                ASSERT( o.valid() );
-                ASSERT_EQUALS( Timestamp, o.getField( "a" ).type() );
-                BSONObjIterator i( o );
-                ASSERT( i.moreWithEOO() );
-                ASSERT( i.more() );
-
-                BSONElement e = i.next();
-                ASSERT_EQUALS( Timestamp, e.type() );
-                ASSERT( i.moreWithEOO() );
-                ASSERT( ! i.more() );
-
-                e = i.next();
-                ASSERT( e.eoo() );
-
-                OpTime before = OpTime::_now();
-                BSONElementManipulator( o.firstElement() ).initTimestamp();
-                OpTime after = OpTime::_now();
-
-                OpTime test = OpTime( o.firstElement().date() );
-                ASSERT( before < test && test < after );
-
-                BSONElementManipulator( o.firstElement() ).initTimestamp();
-                test = OpTime( o.firstElement().date() );
-                ASSERT( before < test && test < after );
-
-                OpTime x(123,456);
-                ASSERT_EQUALS( 528280977864LL , x.asLL() );
-            }
-        };
-
         class Nan : public Base {
         public:
             void run() {
@@ -2186,7 +2142,6 @@ namespace JsobjTests {
             add< BSONObjTests::WoSortOrder >();
             add< BSONObjTests::IsPrefixOf >();
             add< BSONObjTests::MultiKeySortOrder > ();
-            add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();
             add< BSONObjTests::AsTempObj >();
             add< BSONObjTests::AppendIntOrLL >();

@@ -390,15 +390,6 @@ namespace BasicTests {
         }
     };
 
-    class NSValidNames {
-    public:
-        void run() {
-            ASSERT( isValidNS( "test.foo" ) );
-            ASSERT( ! isValidNS( "test." ) );
-            ASSERT( ! isValidNS( "test" ) );
-        }
-    };
-
     class PtrTests {
     public:
         void run() {
@@ -590,8 +581,6 @@ namespace BasicTests {
             add< ArrayTests::basic1 >();
 
             add< DatabaseOwnsNS >();
-
-            add< NSValidNames >();
 
             add< PtrTests >();
 

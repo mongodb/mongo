@@ -64,8 +64,6 @@ namespace mongo {
 
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
 
-    bool isValidNS( const StringData& ns );
-
     /*---------------------------------------------------------------------*/
 
     boost::intmax_t dbSize( const char *database );

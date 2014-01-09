@@ -85,19 +85,6 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
-    bool isValidNS( const StringData& ns ) {
-        // TODO: should check for invalid characters
-
-        size_t idx = ns.find( '.' );
-        if ( idx == string::npos )
-            return false;
-
-        if ( idx == ns.size() - 1 )
-            return false;
-
-        return true;
-    }
-
     // TODO SERVER-4328
     bool inDBRepair = false;
     struct doingRepair {

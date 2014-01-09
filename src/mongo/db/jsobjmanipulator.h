@@ -43,10 +43,6 @@ namespace mongo {
             _element( element ) {
             verify( !_element.eoo() );
         }
-        /** Replace a Timestamp type with a Date type initialized to
-            OpTime::now().asDate()
-        */
-        void initTimestamp();
 
         // Note the ones with a capital letter call getDur().writing and journal
 
@@ -75,26 +71,6 @@ namespace mongo {
             memcpy( value(), e.value(), e.valuesize() );
         }
 
-        /* dur:: version */
-        void ReplaceTypeAndValue( const BSONElement &e );
-
-        static void lookForTimestamps( const BSONObj& obj ) {
-            // If have a Timestamp field as the first or second element,
-            // update it to a Date field set to OpTime::now().asDate().  The
-            // replacement policy is a work in progress.
-
-            BSONObjIterator i( obj );
-            for( int j = 0; i.moreWithEOO() && j < 2; ++j ) {
-                BSONElement e = i.next();
-                if ( e.eoo() )
-                    break;
-                if ( e.type() == Timestamp ) {
-                    // performance note, this locks a mutex:
-                    BSONElementManipulator( e ).initTimestamp();
-                    break;
-                }
-            }
-        }
     private:
         char *data() { return nonConst( _element.rawdata() ); }
         char *value() { return nonConst( _element.value() ); }
