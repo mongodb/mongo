@@ -684,7 +684,7 @@ methods = {
 	        seconds to wait between each write of the log records''',
 	        min='1', max='100000'),
 	    ]),
-	Config('transaction_sync', 'dsync', r'''
+	Config('transaction_sync', 'fsync', r'''
 	    how to sync log records when the transaction commits''',
 	    choices=['dsync', 'fsync', 'none']),
 	Config('use_environment_priv', 'false', r'''

@@ -121,12 +121,8 @@ connection_stats = [
 
 	Stat('log_slot_consolidated', 'log: logging bytes consolidated'),
 	Stat('log_slot_closes', 'log: consolidated slot closures'),
-	Stat('log_slot_ready_wait_timeout',
-	    'log: log slot ready wait timeouts'),
 	Stat('log_slot_joins', 'log: consolidated slot joins'),
 	Stat('log_slot_races', 'log: consolidated slot join races'),
-	Stat('log_slot_release_wait_timeout',
-	    'log: log slot release wait timeouts'),
 	Stat('log_slot_switch_fails',
 	    'log: slots selected for switching that were unavailable'),
 	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
