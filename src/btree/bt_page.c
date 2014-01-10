@@ -242,7 +242,9 @@ __wt_page_inmem(
 		 * If that flag is not set, there are more keys than values,
 		 * we have to walk the page to figure it out.
 		 */
-		if (F_ISSET(dsk, WT_PAGE_NO_EMPTY_VALUES))
+		if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
+			alloc_entries = dsk->u.entries;
+		else if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
 			alloc_entries = dsk->u.entries / 2;
 		else
 			WT_RET(__inmem_row_leaf_entries(

@@ -94,9 +94,18 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 	flags = dsk->flags;
 	if (LF_ISSET(WT_PAGE_COMPRESSED))
 		LF_CLR(WT_PAGE_COMPRESSED);
-	if (LF_ISSET(WT_PAGE_NO_EMPTY_VALUES))
-		if (dsk->type == WT_PAGE_ROW_LEAF)
-			LF_CLR(WT_PAGE_NO_EMPTY_VALUES);
+	if (dsk->type == WT_PAGE_ROW_LEAF) {
+		if (LF_ISSET(WT_PAGE_EMPTY_V_ALL) &&
+		    LF_ISSET(WT_PAGE_EMPTY_V_NONE))
+			WT_RET_VRFY(session,
+			    "page at %s has invalid flags combination: 0x%"
+			    PRIx8,
+			    addr, dsk->flags);
+		if (LF_ISSET(WT_PAGE_EMPTY_V_ALL))
+			LF_CLR(WT_PAGE_EMPTY_V_ALL);
+		if (LF_ISSET(WT_PAGE_EMPTY_V_NONE))
+			LF_CLR(WT_PAGE_EMPTY_V_NONE);
+	}
 	if (flags != 0)
 		WT_RET_VRFY(session,
 		    "page at %s has invalid flags set: 0x%" PRIx8,
@@ -377,7 +386,9 @@ key_compare:	/*
 	/*
 	 * On row-store internal pages, and on row-store leaf pages, where the
 	 * "no empty values" flag is set, the key count should be equal to half
-	 * the number of physical entries.
+	 * the number of physical entries.  On row-store leaf pages where the
+	 * "all empty values" flag is set, the key count should be equal to the
+	 * number of physical entries.
 	 */
 	if (dsk->type == WT_PAGE_ROW_INT && key_cnt * 2 != dsk->u.entries)
 		WT_ERR_VRFY(session,
@@ -386,7 +397,16 @@ key_compare:	/*
 		    __wt_page_type_string(dsk->type),
 		    addr, key_cnt, dsk->u.entries);
 	if (dsk->type == WT_PAGE_ROW_LEAF &&
-	    F_ISSET(dsk, WT_PAGE_NO_EMPTY_VALUES) &&
+	    F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL) &&
+	    key_cnt != dsk->u.entries)
+		WT_ERR_VRFY(session,
+		    "%s page at %s with the 'all empty values' flag set has a "
+		    "key count of %" PRIu32 " and a physical entry count of %"
+		    PRIu32,
+		    __wt_page_type_string(dsk->type),
+		    addr, key_cnt, dsk->u.entries);
+	if (dsk->type == WT_PAGE_ROW_LEAF &&
+	    F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE) &&
 	    key_cnt * 2 != dsk->u.entries)
 		WT_ERR_VRFY(session,
 		    "%s page at %s with the 'no empty values' flag set has a "

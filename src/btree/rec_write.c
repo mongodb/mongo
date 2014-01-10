@@ -70,12 +70,14 @@ typedef struct {
 	 * length) values.  We don't write out anything for empty values, so if
 	 * there are empty values on a page, we have to make two passes over the
 	 * page when it's read to figure out how many keys it has, expensive in
-	 * the common case of no empty values and (entries / 2) keys.  If we see
-	 * no empty values, set a flag in the page's on-disk header.
-	 *	The test test is per-page reconciliation as described above for
-	 * the overflow-item test.
+	 * the common case of no empty values and (entries / 2) keys.  Likewise,
+	 * a page with only empty values is another common data set, and keys on
+	 * that page will be equal to the number of entries.  In both cases, set
+	 * a flag in the page's on-disk header.
+	 *	The test is per-page reconciliation as described above for the
+	 * overflow-item test.
 	 */
-	int	empty_value;
+	int	all_empty_value, any_empty_value;
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, which happens
@@ -570,7 +572,8 @@ __rec_write_init(
 	r->ovfl_items = 0;
 
 	/* Per-page reconciliation: track empty values. */
-	r->empty_value = 0;
+	r->all_empty_value = 1;
+	r->any_empty_value = 0;
 
 	/* Remember the flags. */
 	r->flags = flags;
@@ -1985,9 +1988,11 @@ __rec_split_write(
 
 	/* Set the zero-length value flag in the page header. */
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
-		F_CLR(dsk, WT_PAGE_NO_EMPTY_VALUES);
-		if (!r->empty_value)
-			F_SET(dsk, WT_PAGE_NO_EMPTY_VALUES);
+		F_CLR(dsk, WT_PAGE_EMPTY_V_ALL | WT_PAGE_EMPTY_V_NONE);
+		if (r->all_empty_value)
+			F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
+		if (!r->any_empty_value)
+			F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
 	}
 
 	/* Write the chunk and save the resulting address for the parent. */
@@ -2148,7 +2153,10 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
-	if (val->len != 0) {
+	if (val->len == 0)
+		r->any_empty_value = 1;
+	else {
+		r->all_empty_value = 0;
 		if (btree->dictionary)
 			WT_RET(__rec_dict_replace(session, r, 0, val));
 		__rec_copy_incr(session, r, val);
@@ -3679,8 +3687,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len == 0)
-			r->empty_value = 1;
+			r->any_empty_value = 1;
 		else {
+			r->all_empty_value = 0;
 			if (dictionary && btree->dictionary)
 				WT_ERR(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
@@ -3760,8 +3769,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len == 0)
-			r->empty_value = 1;
+			r->any_empty_value = 1;
 		else {
+			r->all_empty_value = 0;
 			if (btree->dictionary)
 				WT_RET(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
