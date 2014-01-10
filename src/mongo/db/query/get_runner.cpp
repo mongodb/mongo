@@ -203,13 +203,23 @@ namespace mongo {
         if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
             collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
             // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-            QuerySolution *qs;
-            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, rawCS, &qs);
+            QuerySolution *qs, *backupQs;
+            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, rawCS,
+                                                        &qs, &backupQs);
             if (status.isOK()) {
                 WorkingSet* ws;
                 PlanStage* root;
                 verify(StageBuilder::build(*qs, &root, &ws));
-                *out = new CachedPlanRunner(canonicalQuery.release(), qs, root, ws);
+                CachedPlanRunner* cpr = new CachedPlanRunner(canonicalQuery.release(), qs, root, ws);
+
+                if (NULL != backupQs) {
+                    WorkingSet* backupWs;
+                    PlanStage* backupRoot;
+                    verify(StageBuilder::build(*backupQs, &backupRoot, &backupWs));
+                    cpr->setBackupPlan(backupQs, backupRoot, backupWs);
+                }
+
+                *out = cpr;
                 return Status::OK();
             }
         }

@@ -251,6 +251,7 @@ namespace mongo {
 
     CachedSolution::CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry)
         : plannerData(entry.plannerData.size()),
+          backupSoln(entry.backupSoln),
           pinned(entry.pinned),
           pinnedIndex(entry.pinnedIndex),
           shunnedIndexes(entry.shunnedIndexes),
@@ -441,6 +442,17 @@ namespace mongo {
         entry->query = pq.getFilter().copy();
         entry->sort = pq.getSort().copy();
         entry->projection = pq.getProj().copy();
+
+        // If the winning solution uses a blocking sort, then try and
+        // find a fallback solution that has no blocking sort.
+        if (solns[0]->hasSortStage) {
+            for (size_t i = 1; i < solns.size(); ++i) {
+                if (!solns[i]->hasSortStage) {
+                    entry->backupSoln.reset(i);
+                    break;
+                }
+            }
+        }
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         // XXX: Replacing existing entry - revisit when we have real cached solutions.

@@ -607,8 +607,9 @@ namespace {
             PlanCacheEntry entry(solutions, new PlanRankingDecision());
             CachedSolution cachedSoln(ck, entry);
 
-            QuerySolution* out;
-            s = QueryPlanner::planFromCache(*scopedCq.get(), params, &cachedSoln, &out);
+            QuerySolution *out, *backupOut;
+            s = QueryPlanner::planFromCache(*scopedCq.get(), params, &cachedSoln,
+                                            &out, &backupOut);
             ASSERT_OK(s);
 
             return out;
