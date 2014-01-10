@@ -1,5 +1,6 @@
 // This test checks validation of the replaced doc (on the server) for dots, $prefix and _id
 
+var origValidateFunc = DBCollection._validateForStorage;
 DBCollection._validateForStorage = function() {};
 
 var t = db.jstests_update_replace;
@@ -42,3 +43,6 @@ assert.gleSuccess(db, "embedded _id array");
 // This is fine since _id isn't a top level field
 t.save({b:1, a :{ _id: [9]}})
 assert.gleSuccess(db, "b embedded _id array");
+
+DBCollection._validateForStorage = origValidateFunc;
+
