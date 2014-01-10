@@ -412,8 +412,10 @@ namespace mongo {
 
             Collection* coll = cc().database()->getCollection( nsToDrop );
             // If collection does not exist, short circuit and return.
-            if ( !coll )
-                return true;
+            if ( !coll ) {
+                errmsg = "ns not found";
+                return false;
+            }
 
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
 
