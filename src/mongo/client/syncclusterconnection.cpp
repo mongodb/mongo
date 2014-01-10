@@ -515,10 +515,12 @@ namespace mongo {
     }
 
     void SyncClusterConnection::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+        // Set the hooks in both our sub-connections and in ourselves.
         for (size_t i = 0; i < _conns.size(); ++i) {
             if (_conns[i]) { 
                 _conns[i]->setRunCommandHook(func);
             }
         }
+        _runCommandHook = func;
     }
 }

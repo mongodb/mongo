@@ -1394,12 +1394,14 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+        // Set the hooks in both our sub-connections and in ourselves.
         if (_master) {
             _master->setRunCommandHook(func);
         }
         if (_lastSlaveOkConn) {
            _lastSlaveOkConn->setRunCommandHook(func);
         }
+        _runCommandHook = func;
     }
 
     // A replica set connection is never disconnected, since it controls its own reconnection
