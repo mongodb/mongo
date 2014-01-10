@@ -132,7 +132,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	rip = NULL;
 
 	item = &_item;
-	WT_CLEAR(_item);
+	WT_CLEAR_INLINE(WT_ITEM, *item);
 
 	/*
 	 * The row-store search routine uses a different comparison API.

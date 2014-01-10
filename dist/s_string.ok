@@ -104,6 +104,7 @@ Freelist
 Fsync
 GCC
 GIDs
+Gcc
 Geoff
 Givargis
 Google
@@ -607,6 +608,7 @@ memcpy
 memfree
 memmove
 memrata
+memset
 memsize
 mergeable
 metaconf
