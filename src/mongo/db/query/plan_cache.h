@@ -195,6 +195,10 @@ namespace mongo {
         // Owned here.
         std::vector<SolutionCacheData*> plannerData;
 
+        // An index into plannerData indicating the SolutionCacheData which should be
+        // used to produce a backup solution in the case of a blocking sort.
+        boost::optional<size_t> backupSoln;
+
         // Pin information
         bool pinned;
 
@@ -246,6 +250,10 @@ namespace mongo {
         // represents. Each SolutionCacheData is fully owned here, so in order to return
         // it from the cache a deep copy is made and returned inside CachedSolution.
         std::vector<SolutionCacheData*> plannerData;
+
+        // An index into plannerData indicating the SolutionCacheData which should be
+        // used to produce a backup solution in the case of a blocking sort.
+        boost::optional<size_t> backupSoln;
 
         // Why the best solution was picked.
         // TODO: Do we want to store other information like the other plans considered?

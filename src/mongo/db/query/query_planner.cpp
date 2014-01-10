@@ -259,20 +259,8 @@ namespace mongo {
     // static
     Status QueryPlanner::planFromCache(const CanonicalQuery& query,
                                        const QueryPlannerParams& params,
-                                       CachedSolution* cachedSoln,
+                                       SolutionCacheData* cacheData,
                                        QuerySolution** out) {
-        verify(cachedSoln);
-        verify(out);
-        verify(PlanCache::shouldCacheQuery(query));
-
-        // Queries not suitable for caching are filtered
-        // in multi plan runner using PlanCache::shouldCacheQuery().
-
-        // Look up winning solution in cached solution's array.
-        size_t solutionIndex = cachedSoln->getWinnerIndex();
-
-        SolutionCacheData* cacheData = cachedSoln->plannerData[solutionIndex];
-
         if (NULL == cacheData) {
             return Status(ErrorCodes::BadValue,
                           "planner data does not exist in the cached solution");
@@ -354,6 +342,44 @@ namespace mongo {
         }
 
         return Status(ErrorCodes::BadValue, "couldn't plan from cache");
+    }
+
+    // static
+    Status QueryPlanner::planFromCache(const CanonicalQuery& query,
+                                       const QueryPlannerParams& params,
+                                       CachedSolution* cachedSoln,
+                                       QuerySolution** out,
+                                       QuerySolution** backupOut) {
+        verify(cachedSoln);
+        verify(out);
+        verify(backupOut);
+        verify(PlanCache::shouldCacheQuery(query));
+
+        // If there is no backup solution, then return NULL through
+        // the 'backupOut' out-parameter.
+        *backupOut = NULL;
+
+        // Queries not suitable for caching are filtered
+        // in multi plan runner using PlanCache::shouldCacheQuery().
+
+        // Look up winning solution in cached solution's array.
+        size_t solutionIndex = cachedSoln->getWinnerIndex();
+
+        SolutionCacheData* winnerCacheData = cachedSoln->plannerData[solutionIndex];
+        Status s = planFromCache(query, params, winnerCacheData, out);
+        if (!s.isOK()) {
+            return s;
+        }
+
+        if (cachedSoln->backupSoln) {
+            SolutionCacheData* backupCacheData = cachedSoln->plannerData[*cachedSoln->backupSoln];
+            Status backupStatus = planFromCache(query, params, backupCacheData, backupOut);
+            if (!backupStatus.isOK()) {
+                return backupStatus;
+            }
+        }
+
+        return Status::OK();
     }
 
     // static

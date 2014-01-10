@@ -49,12 +49,28 @@ namespace mongo {
         : _canonicalQuery(canonicalQuery),
           _solution(solution),
           _exec(new PlanExecutor(ws, root)),
+          _alreadyProduced(false),
           _updatedCache(false) { }
 
     CachedPlanRunner::~CachedPlanRunner() { }
 
     Runner::RunnerState CachedPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         Runner::RunnerState state = _exec->getNext(objOut, dlOut);
+
+        if (Runner::RUNNER_ADVANCED == state) {
+            // Indicate that the plan executor already produced results.
+            _alreadyProduced = true;
+        }
+
+        // If the plan executor errors before producing any results,
+        // and we have a backup plan available, then fall back on the
+        // backup plan. This can happen if '_exec' has a blocking sort.
+        if (Runner::RUNNER_ERROR == state
+            && !_alreadyProduced
+            && NULL != _backupPlan.get()) {
+            _exec.reset(_backupPlan.release());
+            state = _exec->getNext(objOut, dlOut);
+        }
 
         // This could be called several times and we don't want to update the cache every time.
         if (Runner::RUNNER_EOF == state && !_updatedCache) {
@@ -70,18 +86,30 @@ namespace mongo {
 
     void CachedPlanRunner::saveState() {
         _exec->saveState();
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->saveState();
+        }
     }
 
     bool CachedPlanRunner::restoreState() {
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->restoreState();
+        }
         return _exec->restoreState();
     }
 
     void CachedPlanRunner::invalidate(const DiskLoc& dl) {
         _exec->invalidate(dl);
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->invalidate(dl);
+        }
     }
 
     void CachedPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
         _exec->setYieldPolicy(policy);
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->setYieldPolicy(policy);
+        }
     }
 
     const std::string& CachedPlanRunner::ns() {
@@ -90,6 +118,9 @@ namespace mongo {
 
     void CachedPlanRunner::kill() {
         _exec->kill();
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->kill();
+        }
     }
 
     Status CachedPlanRunner::getExplainPlan(TypeExplain** explain) const {
@@ -136,6 +167,11 @@ namespace mongo {
             warning() << "Failed to update cache: " << fbs.toString() << endl;
         }
 #endif
+    }
+
+    void CachedPlanRunner::setBackupPlan(QuerySolution* qs, PlanStage* root, WorkingSet* ws) {
+        _backupSolution.reset(qs);
+        _backupPlan.reset(new PlanExecutor(ws, root));
     }
 
 } // namespace mongo
