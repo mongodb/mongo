@@ -86,9 +86,14 @@ AC_CHECK_HEADERS([pthread_np.h])
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
+
 AC_CHECK_FUNCS([\
-	clock_gettime fcntl fdatasync ftruncate gettimeofday posix_fadvise\
+	clock_gettime fcntl ftruncate gettimeofday posix_fadvise\
 	posix_fallocate posix_madvise posix_memalign strtouq sync_file_range])
+
+# OS X wrongly reports that it has fdatasync
+AS_CASE([$host_os], [darwin*], [], [AC_CHECK_FUNCS([fdatasync])])
+
 AC_SYS_LARGEFILE
 
 AC_MSG_CHECKING([if the adaptive mutex type is available])
@@ -107,8 +112,8 @@ AC_C_BIGENDIAN
 # boundaries for O_DIRECT to work.
 BUFFER_ALIGNMENT=0
 if test "$ac_cv_func_posix_memalign" = "yes" ; then
-	case "`uname -s`" in
-	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
+	case "$host_os" in
+	linux*)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
 		BUFFER_ALIGNMENT=4096
 		;;
 	esac
