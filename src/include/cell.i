@@ -541,8 +541,8 @@ __wt_cell_unpack_safe(
     WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
 	static const WT_CELL_UNPACK unpack_clear;
-	size_t saved_len;
 	uint64_t saved_v, v;
+	uint32_t saved_len;
 	int copied;
 	const uint8_t *p;
 
@@ -630,7 +630,7 @@ restart:
 		 */
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
-		saved_len = WT_PTRDIFF(p, cell);
+		saved_len = WT_PTRDIFF32(p, cell);
 		saved_v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
 		copied = 1;
@@ -665,12 +665,12 @@ restart:
 			v += WT_CELL_SIZE_ADJUST;
 
 		unpack->data = p;
-		unpack->size = (size_t)v;
-		unpack->__len = WT_PTRDIFF(p + unpack->size, cell);
+		unpack->size = (uint32_t)v;
+		unpack->__len = WT_PTRDIFF32(p + unpack->size, cell);
 		break;
 
 	case WT_CELL_DEL:
-		unpack->__len = WT_PTRDIFF(p, cell);
+		unpack->__len = WT_PTRDIFF32(p, cell);
 		break;
 	default:
 		return (WT_ERROR);			/* Unknown cell type. */
