@@ -576,7 +576,7 @@ namespace mongo {
             if (res.isOK()) {
                 explain.reset(bareExplain);
             }
-            else {
+            else if (isExplain) {
                 error() << "could not produce explain of query '" << pq.getFilter()
                         << "', error: " << res.reason();
                 // If numResults and the data in bb don't correspond, we'll crash later when rooting
