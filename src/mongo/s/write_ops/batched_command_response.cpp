@@ -39,7 +39,7 @@ namespace mongo {
     const BSONField<int> BatchedCommandResponse::errCode("code", ErrorCodes::UnknownError);
     const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
     const BSONField<long long> BatchedCommandResponse::n("n", 0);
-    const BSONField<long long> BatchedCommandResponse::nDocsModified("nDocsModified", 0);
+    const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
     const BSONField<OpTime> BatchedCommandResponse::lastOp("lastOp");
@@ -79,7 +79,7 @@ namespace mongo {
 
         if (_isErrMessageSet) builder.append(errMessage(), _errMessage);
 
-        if (_isNDocsModifiedSet) builder.appendNumber(nDocsModified(), _nDocsModified);
+        if (_isNModifiedSet) builder.appendNumber(nModified(), _nModified);
         if (_isNSet) builder.appendNumber(n(), _n);
 
         if (_upsertDetails.get()) {
@@ -150,18 +150,18 @@ namespace mongo {
 
         // We're using appendNumber on generation so we'll try a smaller type
         // (int) first and then fall back to the original type (long long).
-        BSONField<int> fieldNUpdated(nDocsModified());
+        BSONField<int> fieldNUpdated(nModified());
         int tempNUpdated;
         fieldState = FieldParser::extract(source, fieldNUpdated, &tempNUpdated, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) {
             // try falling back to a larger type
-            fieldState = FieldParser::extract(source, nDocsModified, &_nDocsModified, errMsg);
+            fieldState = FieldParser::extract(source, nModified, &_nModified, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID) return false;
-            _isNDocsModifiedSet = fieldState == FieldParser::FIELD_SET;
+            _isNModifiedSet = fieldState == FieldParser::FIELD_SET;
         }
         else if (fieldState == FieldParser::FIELD_SET) {
-            _isNDocsModifiedSet = true;
-            _nDocsModified = tempNUpdated;
+            _isNModifiedSet = true;
+            _nModified = tempNUpdated;
         }
 
         std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
@@ -205,8 +205,8 @@ namespace mongo {
         _errMessage.clear();
         _isErrMessageSet = false;
 
-        _nDocsModified = 0;
-        _isNDocsModifiedSet = false;
+        _nModified = 0;
+        _isNModifiedSet = false;
 
         _n = 0;
         _isNSet = false;
@@ -249,8 +249,8 @@ namespace mongo {
         other->_errMessage = _errMessage;
         other->_isErrMessageSet = _isErrMessageSet;
 
-        other->_nDocsModified = _nDocsModified;
-        other->_isNDocsModifiedSet = _isNDocsModifiedSet;
+        other->_nModified = _nModified;
+        other->_isNModifiedSet = _isNModifiedSet;
 
         other->_n = _n;
         other->_isNSet = _isNSet;
@@ -351,25 +351,25 @@ namespace mongo {
         return _errMessage;
     }
 
-    void BatchedCommandResponse::setNDocsModified(long long n) {
-        _nDocsModified = n;
-        _isNDocsModifiedSet = true;
+    void BatchedCommandResponse::setNModified(long long n) {
+        _nModified = n;
+        _isNModifiedSet = true;
     }
 
-    void BatchedCommandResponse::unsetNDocsModified() {
-         _isNDocsModifiedSet = false;
+    void BatchedCommandResponse::unsetNModified() {
+         _isNModifiedSet = false;
      }
 
-    bool BatchedCommandResponse::isNDocsModified() const {
-         return _isNDocsModifiedSet;
+    bool BatchedCommandResponse::isNModified() const {
+         return _isNModifiedSet;
     }
 
-    long long BatchedCommandResponse::getNDocsModified() const {
-        if ( _isNDocsModifiedSet ) {
-            return _nDocsModified;
+    long long BatchedCommandResponse::getNModified() const {
+        if ( _isNModifiedSet ) {
+            return _nModified;
         }
         else {
-            return nDocsModified.getDefault();
+            return nModified.getDefault();
         }
     }
 

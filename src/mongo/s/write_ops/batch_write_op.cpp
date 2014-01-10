@@ -369,7 +369,7 @@ namespace mongo {
                 numUpserted = response.sizeUpsertDetails();
             }
             stats->numUpdated += ( response.getN() - numUpserted );
-            stats->numModified += response.getNDocsModified();
+            stats->numModified += response.getNModified();
             stats->numUpserted += numUpserted;
         }
         else {
@@ -597,7 +597,7 @@ namespace mongo {
                      + _stats->numDeleted;
         batchResp->setN( nValue );
         if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update )
-            batchResp->setNDocsModified( _stats->numModified );
+            batchResp->setNModified( _stats->numModified );
 
         dassert( batchResp->isValid( NULL ) );
     }

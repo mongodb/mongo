@@ -58,12 +58,16 @@ var _batch_api_module = (function() {
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
     defineReadOnlyProperty(this, "nUpserted", bulkResult.nUpserted);
     defineReadOnlyProperty(this, "nUpdated", bulkResult.nUpdated);
-    defineReadOnlyProperty(this, "nModified", bulkResult.nUpserted);
+    defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
 
     //
     // Define access methods
     this.getUpsertedId = function() {
+      if (bulkResult.upserted.length == 0) {
+        return null;
+      }
+
       return bulkResult.upserted[bulkResult.upserted.length - 1];
     };
 
@@ -113,7 +117,7 @@ var _batch_api_module = (function() {
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
     defineReadOnlyProperty(this, "nUpserted", bulkResult.nUpserted);
     defineReadOnlyProperty(this, "nUpdated", bulkResult.nUpdated);
-    defineReadOnlyProperty(this, "nModified", bulkResult.nUpserted);
+    defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
 
     //
@@ -536,7 +540,7 @@ var _batch_api_module = (function() {
 
       // If we have an update Batch type
       if(batch.batchType == UPDATE) {
-        var nModified = result.nDocsModified ? result.nDocsModified : 0;
+        var nModified = ('nModified' in result)? result.nModified: 0;
         bulkResult.nUpserted = bulkResult.nUpserted + nUpserted;
         bulkResult.nUpdated = bulkResult.nUpdated + (result.n - nUpserted);
         bulkResult.nModified = bulkResult.nModified + nModified;
@@ -649,7 +653,7 @@ var _batch_api_module = (function() {
 
       var batchResult = {
           n: 0
-        , nDocsModified: 0
+        , nModified: 0
         , writeErrors: []
         , upserted: []
       };
@@ -715,7 +719,6 @@ var _batch_api_module = (function() {
             });
           } else if(result.n) {
             batchResult.n = batchResult.n + result.n;
-            batchResult.nDocsModified = batchResult.nDocsModified + result.n;
           }
         }
 

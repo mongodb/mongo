@@ -21,21 +21,44 @@ var executeTests = function() {
     var batch = coll.initializeOrderedBulkOp();
     batch.insert({a:1});
     batch.find({a:1}).updateOne({$set: {b:1}});
+    // no-op, should increment nUpdate, but not nModified
+    batch.find({a:1}).updateOne({$set: {b:1}});
     batch.find({a:2}).upsert().updateOne({$set: {b:2}});
     batch.insert({a:3});
     batch.find({a:3}).remove({a:3});
     var result = batch.execute();
     assert.eq(2, result.nInserted);
     assert.eq(1, result.nUpserted);
-    assert.eq(1, result.nUpdated);
+    assert.eq(2, result.nUpdated);
+    if (coll.getMongo().useWriteCommands()) {
+        assert.eq(1, result.nModified);
+    }
+    else {
+        // Legacy updates does not support nModified.
+        assert.eq(0, result.nModified);
+    }
     assert.eq(1, result.nRemoved);
     var upserts = result.getUpsertedIds();
     assert.eq(1, upserts.length);
-    assert.eq(2, upserts[0].index);
+    assert.eq(3, upserts[0].index);
     assert(upserts[0]._id != null);
     var upsert = result.getUpsertedIdAt(0);
-    assert.eq(2, upsert.index);
+    assert.eq(3, upsert.index);
     assert(upsert._id != null);
+
+    var singleResult = result.toSingleResult();
+    assert.eq(2, singleResult.nInserted);
+    assert.eq(1, singleResult.nUpserted);
+    assert.eq(2, singleResult.nUpdated);
+    if (coll.getMongo().useWriteCommands()) {
+        assert.eq(1, singleResult.nModified);
+    }
+    else {
+        // Legacy updates does not support nModified.
+        assert.eq(0, singleResult.nModified);
+    }
+    assert.eq(1, singleResult.nRemoved);
+    assert(singleResult.getUpsertedId() != null);
 
     // Create unique index
     coll.remove({});

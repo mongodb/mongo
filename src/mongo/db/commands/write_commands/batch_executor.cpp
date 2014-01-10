@@ -178,7 +178,7 @@ namespace mongo {
         response->setN( _stats->numInserted + _stats->numUpserted + _stats->numUpdated
                         + _stats->numDeleted );
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update )
-            response->setNDocsModified( _stats->numModified );
+            response->setNModified( _stats->numModified );
 
         // TODO: Audit where we want to queue here - the shardingState calls may block for remote
         // data

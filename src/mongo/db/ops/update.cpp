@@ -508,7 +508,7 @@ namespace mongo {
         // reflecting only the actions taken locally. In particlar, we must have the no-op
         // counter reset so that we can meaningfully comapre it with numMatched above.
         opDebug->nscanned = 0;
-        opDebug->nDocsModified = 0;
+        opDebug->nModified = 0;
 
         // Get the cached document from the update driver.
         mutablebson::Document& doc = driver->getDocument();
@@ -528,7 +528,7 @@ namespace mongo {
 
         while (true) {
             // See if we have a write in isolation mode
-            isolationModeWriteOccured = isolated && (opDebug->nDocsModified > 0);
+            isolationModeWriteOccured = isolated && (opDebug->nModified > 0);
 
             // Change to manual yielding (no yielding) if we have written in isolation mode
             if (isolationModeWriteOccured) {
@@ -723,7 +723,7 @@ namespace mongo {
 
             // Only record doc modifications if they wrote (exclude no-ops)
             if (docWasModified)
-                opDebug->nDocsModified++;
+                opDebug->nModified++;
 
             if (!request.isMulti()) {
                 break;
@@ -738,7 +738,7 @@ namespace mongo {
             opDebug->nupdated = numMatched;
             return UpdateResult(numMatched > 0 /* updated existing object(s) */,
                                 !driver->isDocReplacement() /* $mod or obj replacement */,
-                                opDebug->nDocsModified /* number of modified docs, no no-ops */,
+                                opDebug->nModified /* number of modified docs, no no-ops */,
                                 numMatched /* # of docs matched/updated, even no-ops */,
                                 BSONObj());
         }
