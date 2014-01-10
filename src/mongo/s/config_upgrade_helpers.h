@@ -62,17 +62,6 @@ namespace mongo {
                               const std::string& nsB);
 
     /**
-     * Copies a collection (which must not change during this call) to another namespace.  All
-     * indexes will also be copied and constructed prior to the data being loaded.
-     *
-     * @return OK if copy was successful, RemoteValidationError if documents changed during the
-     * copy and an error Status if anything else went wrong.
-     */
-    Status copyFrozenCollection(const ConnectionString& configLoc,
-                                const std::string& fromNS,
-                                const std::string& toNS);
-
-    /**
      * Atomically overwrites a collection with another collection (only atomic if configLoc is a
      * single server).
      *

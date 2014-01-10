@@ -22,6 +22,8 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -171,7 +173,17 @@ namespace mongo {
 
                     // create index so remove is fast even with a lot of servers
                     if ( loops++ == 0 ) {
-                        conn->ensureIndex( LockpingsType::ConfigNS, BSON( LockpingsType::ping() << 1 ) );
+                        Status result = clusterCreateIndex( LockpingsType::ConfigNS,
+                                BSON( LockpingsType::ping() << 1 ),
+                                false, // unique
+                                WriteConcernOptions::AllConfigs,
+                                NULL );
+
+                        if ( !result.isOK() ) {
+                            warning() << "Failed to create ping_1 index on "
+                                      << LockpingsType::ConfigNS << ": "
+                                      << result.reason() << endl;
+                        }
                     }
 
                     LOG( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime

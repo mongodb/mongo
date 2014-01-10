@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/type_database.h"
@@ -279,30 +280,7 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
-
-            conn->get()->insert(collectionName, document);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string errstr = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (errstr.empty()) {
-                return Status::OK();
-            }
-            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-                return Status(ErrorCodes::DuplicateKey, errstr);
-            }
-            return Status(ErrorCodes::UnknownError, errstr);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+        return clusterInsert(collectionName, document, writeConcern, NULL);
     }
 
     Status AuthzManagerExternalStateMongos::update(const NamespaceString& collectionName,
@@ -312,29 +290,20 @@ namespace mongo {
                                                    bool multi,
                                                    const BSONObj& writeConcern,
                                                    int* numUpdated) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+        BatchedCommandResponse response;
+        Status res = clusterUpdate(collectionName,
+                query,
+                updatePattern,
+                upsert,
+                multi,
+                writeConcern,
+                &response);
 
-            conn->get()->update(collectionName, query, updatePattern, upsert, multi);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string err = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (!err.empty()) {
-                return Status(ErrorCodes::UnknownError, err);
-            }
-
-            *numUpdated = res["n"].numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+        if (res.isOK()) {
+            *numUpdated = response.getN();
         }
+
+        return res;
     }
 
     Status AuthzManagerExternalStateMongos::remove(
@@ -342,29 +311,14 @@ namespace mongo {
             const BSONObj& query,
             const BSONObj& writeConcern,
             int* numRemoved) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+        BatchedCommandResponse response;
+        Status res = clusterDelete(collectionName, query, 0 /* limit */, writeConcern, &response);
 
-            conn->get()->remove(collectionName, query);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string err = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (!err.empty()) {
-                return Status(ErrorCodes::UnknownError, err);
-            }
-
-            *numRemoved = res["n"].numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+        if (res.isOK()) {
+            *numRemoved = response.getN();
         }
+
+        return res;
     }
 
     Status AuthzManagerExternalStateMongos::createIndex(
@@ -372,30 +326,7 @@ namespace mongo {
             const BSONObj& pattern,
             bool unique,
             const BSONObj& writeConcern) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
-
-            if (conn->get()->ensureIndex(collectionName.ns(), pattern, unique)) {
-
-                // Handle write concern
-                BSONObjBuilder gleBuilder;
-                gleBuilder.append("getLastError", 1);
-                gleBuilder.appendElements(writeConcern);
-                BSONObj res;
-                conn->get()->runCommand("admin", gleBuilder.done(), res);
-                string err = conn->get()->getLastErrorString(res);
-
-                if (!err.empty()) {
-                    conn->done();
-                    return Status(ErrorCodes::UnknownError, err);
-                }
-            }
-            conn->done();
-            return Status::OK();
-
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
+        return clusterCreateIndex(collectionName, pattern, unique, writeConcern, NULL);
     }
 
     Status AuthzManagerExternalStateMongos::dropIndexes(

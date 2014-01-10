@@ -288,6 +288,24 @@ namespace mongo {
         writer.write( request, response );
     }
 
+    bool validConfigWC( const BSONObj& writeConcern ) {
+        BSONElement elem(writeConcern["w"]);
+
+        if ( elem.eoo() ) {
+            return true;
+        }
+
+        if ( elem.isNumber() && elem.numberInt() <= 1 ) {
+            return true;
+        }
+
+        if ( elem.type() == String && elem.str() == "majority" ) {
+            return true;
+        }
+
+        return false;
+    }
+
     void ClusterWriter::write( const BatchedCommandRequest& request,
                                BatchedCommandResponse* response ) {
 
@@ -332,7 +350,7 @@ namespace mongo {
             bool verboseWC = request.isVerboseWC();
 
             // We only support batch sizes of one and {w:0} write concern for config writes
-            if ( request.sizeWriteOps() != 1 || ( verboseWC && request.isWriteConcernSet() ) ) {
+            if ( request.sizeWriteOps() != 1 || !validConfigWC( request.getWriteConcern() )) {
                 // Invalid config server write
                 response->setOk( false );
                 response->setErrCode( ErrorCodes::InvalidOptions );
