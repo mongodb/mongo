@@ -243,15 +243,12 @@ if buildShared:
     elif darwin:
         sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,-undefined,dynamic_lookup"])
 
-    if windows:
-        # Ignore warning LNK4102, which complains about exposing deleting destructors.
-        sharedLibEnv.AppendUnique(SHLINKFLAGS=["/IGNORE:4102"])
-        libEnv.Command(['mongoclient.def'],
-                       ['#buildscripts/generate_def.py', mongoClientStaticLib],
-                       '$PYTHON ${SOURCES[0]} $TARGETS ${SOURCES[1:]}')
-        # SCons automatically looks for this file in the source list and passes the proper
-        # parameter to MS-LINK automatically.
-        clientObjects.append('mongoclient.def')
+    # On non-windows systems, we want to match the behavior of DLLs
+    # and not export all symbols from the dynamic shared library unless 
+    # they have been explicitly been marked.
+    if not windows:
+        sharedLibEnv.AppendUnique(CCFLAGS="-fvisibility=hidden")
+        sharedLibEnv.AppendUnique(SHLINKFLAGS="-fvisibility=hidden")
 
     mongoClientSharedLib = sharedLibEnv.SharedLibrary('mongoclient', clientObjects)
 
