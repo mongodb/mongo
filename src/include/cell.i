@@ -540,6 +540,7 @@ static inline int
 __wt_cell_unpack_safe(
     WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
+	static const WT_CELL_UNPACK unpack_clear;
 	size_t saved_len;
 	uint64_t saved_v, v;
 	int copied;
@@ -562,10 +563,13 @@ __wt_cell_unpack_safe(
 } while (0)
 
 restart:
-	WT_CLEAR(*unpack);
-	unpack->cell = cell;
-
+	/*
+	 * This code is performance critical for scans through read-only trees.
+	 * Avoid WT_CLEAR here: it makes this code run significantly slower.
+	 */
+	*unpack = unpack_clear;
 	WT_CELL_LEN_CHK(cell, 0);
+	unpack->cell = cell;
 	unpack->type = __wt_cell_type(cell);
 	unpack->raw = __wt_cell_type_raw(cell);
 

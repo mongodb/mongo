@@ -228,6 +228,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
+	WT_CLEAR(*unpack);	/* -Wuninitialized */
 
 	WT_VERBOSE_RET(session, verify, "%s %s",
 	    __wt_page_addr_string(session, vs->tmp1, page),
@@ -323,11 +324,10 @@ recno_chk:	if (recno != vs->record_total + 1)
 	}
 
 	/* If it's not the root page, unpack the parent cell. */
-	if (!WT_PAGE_IS_ROOT(page))
+	if (!WT_PAGE_IS_ROOT(page)) {
 		__wt_cell_unpack(page->ref->addr, unpack);
 
-	/* Compare the parent cell against the page type. */
-	if (!WT_PAGE_IS_ROOT(page))
+		/* Compare the parent cell against the page type. */
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 			if (unpack->raw != WT_CELL_ADDR_LEAF_NO)
@@ -351,6 +351,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    __wt_cell_type_string(unpack->raw));
 			break;
 		}
+	}
 
 	/*
 	 * Check overflow pages.  We check overflow cells separately from other

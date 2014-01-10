@@ -3028,8 +3028,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	key = &r->k;
 	kpack = &_kpack;
+	WT_CLEAR(*kpack);	/* -Wuninitialized */
 	val = &r->v;
 	vpack = &_vpack;
+	WT_CLEAR(*vpack);	/* -Wuninitialized */
 
 	WT_RET(__rec_split_init(session, r, page, 0ULL, btree->maxintlpage));
 
