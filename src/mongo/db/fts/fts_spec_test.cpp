@@ -212,6 +212,20 @@ namespace mongo {
             ASSERT( m["book"] < m["sat"] );
         }
 
+        TEST( FTSSpec, ScoreMultipleField2 ) {
+            // Test where one indexed field is a parent component of another indexed field.
+            BSONObj user = BSON( "key" << BSON( "a" << "text" << "a.b" << "text" ) );
+
+            FTSSpec spec( FTSSpec::fixSpec( user ) );
+
+            TermFrequencyMap m;
+            spec.scoreDocument( BSON( "a" << BSON( "b" << "term" ) ),
+                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                "",
+                                false,
+                                &m );
+            ASSERT_EQUALS( 1U, m.size() );
+        }
 
         TEST( FTSSpec, ScoreRepeatWord ) {
             BSONObj user = BSON( "key" << BSON( "title" << "text" <<

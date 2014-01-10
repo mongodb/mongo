@@ -179,7 +179,9 @@ namespace mongo {
                 // weight that could possibly match or be a prefix of dottedName.  And if this
                 // element fails to match, then no subsequent weight can match, since the weights
                 // are lexicographically ordered.
-                Weights::const_iterator i = _weights.lower_bound( dottedName );
+                Weights::const_iterator i = _weights.lower_bound( elem.type() == Object
+                                                                  ? dottedName + '.'
+                                                                  : dottedName );
 
                 // possibleWeightMatch is set if the weight map contains either a match or some item
                 // lexicographically larger than fieldName.  This boolean acts as a guard on
