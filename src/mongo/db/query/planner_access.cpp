@@ -785,9 +785,6 @@ namespace mongo {
                 QuerySolutionNode* soln = makeLeafNode(query, indices[tag->index], root,
                                                        &tightness);
                 verify(NULL != soln);
-                stringstream ss;
-                soln->appendToString(&ss, 0);
-                // QLOG() << "about to finish leaf node, soln " << ss.str() << endl;
                 finishLeafNode(soln, indices[tag->index]);
 
                 if (inArrayOperator) {
