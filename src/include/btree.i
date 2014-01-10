@@ -446,6 +446,36 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
+ * __wt_row_leaf_value --
+ *	Return a pointer to the value cell for a row-store leaf page key, or
+ * NULL if there isn't one.
+ */
+static inline WT_CELL *
+__wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip)
+{
+	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
+
+	cell = WT_ROW_KEY_COPY(rip);
+
+	/*
+	 * Key copied.
+	 *
+	 * Cell now either references a WT_IKEY structure with a cell offset,
+	 * or references the on-page key WT_CELL.  Both can be processed
+	 * regardless of what other threads are doing.  If it's the former,
+	 * use it to get the latter.
+	 */
+	if (__wt_off_page(page, cell))
+		cell = WT_PAGE_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
+
+	/* Unpack the key cell, then return its associated value cell. */
+	__wt_cell_unpack(cell, &unpack);
+	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
+	return (__wt_cell_leaf_value_parse(page, cell));
+}
+
+/*
  * __wt_ref_info --
  *	Return the addr/size and type triplet for a reference.
  */

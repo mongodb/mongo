@@ -1923,7 +1923,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    bm, session, unpack->data, unpack->size));
 		}
 
-		if ((cell = __wt_row_value(page, rip)) == NULL)
+		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)
 			continue;
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_VALUE_OVFL) {

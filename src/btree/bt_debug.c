@@ -712,7 +712,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			    ds, page, WT_PAGE_ROW_LEAF, "K", unpack));
 		}
 
-		if ((cell = __wt_row_value(page, rip)) == NULL)
+		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, unpack);
@@ -839,7 +839,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 
 	session = ds->session;
 
-	__dmsg(ds, "\t%s: len %zu",
+	__dmsg(ds, "\t%s: len %" PRIu32,
 	    __wt_cell_type_string(unpack->raw), unpack->size);
 
 	/* Dump cell's per-disk page type information. */

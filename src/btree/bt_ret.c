@@ -130,7 +130,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		}
 
 		/* Take the original cell (which may be empty). */
-		if ((cell = __wt_row_value(page, rip)) == NULL) {
+		if ((cell = __wt_row_leaf_value(page, rip)) == NULL) {
 			cursor->value.size = 0;
 			return (0);
 		}

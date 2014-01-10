@@ -139,19 +139,33 @@ struct __wt_cell {
 struct __wt_cell_unpack {
 	WT_CELL *cell;			/* Cell's disk image address */
 
+	/*
+	 * Row-store leaf pages contain pairs of key/value cells, and it's a
+	 * common operation to return both.  When unpacking a key cell on a
+	 * row-store in-memory leaf page, set the value field to reference the
+	 * next cell if there's an associated value for this key, and NULL if
+	 * there is not.
+	 */
+	WT_CELL *value;
+
 	uint64_t v;			/* RLE count or recno */
 
+	/*
+	 * !!!
+	 * The size and __len fields are reasonably type size_t; don't change
+	 * the type, performance drops significantly if they're type size_t.
+	 */
 	const void *data;		/* Data */
-	size_t      size;		/* Data size */
+	uint32_t    size;		/* Data size */
 
-	size_t __len;			/* Cell + data length (usually) */
+	uint32_t __len;			/* Cell + data length (usually) */
 
 	uint8_t prefix;			/* Cell prefix length */
 
 	uint8_t raw;			/* Raw cell type (include "shorts") */
 	uint8_t type;			/* Cell type */
 
-	uint8_t ovfl;			/* 1/0: cell is an overflow */
+	uint8_t ovfl;			/* boolean: cell is an overflow */
 };
 
 /*
@@ -483,12 +497,50 @@ __wt_cell_type_raw(WT_CELL *cell)
 }
 
 /*
+ * __wt_cell_leaf_value_parse --
+ *	Return the cell if it's a row-store leaf page value, otherwise return
+ * NULL.
+ */
+static inline WT_CELL *
+__wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
+{
+	uint8_t type;
+
+	/*
+	 * This function exists so there's a place for this comment.
+	 *
+	 * Row-store leaf pages may have a single data cell between each key, or
+	 * keys may be adjacent (when the data cell is empty).
+	 *
+	 * One special case: if the last key on a page is a key without a value,
+	 * don't walk off the end of the page: the size of the underlying disk
+	 * image is exact, which means the end of the last cell on the page plus
+	 * the length of the cell should be the byte immediately after the page
+	 * disk image.
+	 *
+	 * !!!
+	 * This line of code is really a call to __wt_off_page, but we know the
+	 * cell we're given with either be on the page or past the end of page,
+	 * so it's a simpler check.  (I wouldn't bother, but the real problem is
+	 * we can't call __wt_off_page directly, it's in btree.i which requires
+	 * this file be included first.)
+	 */
+	if (cell >= (WT_CELL *)((uint8_t *)page->dsk + page->dsk->mem_size))
+		return (NULL);
+
+	type = __wt_cell_type(cell);
+	return (type == WT_CELL_KEY || type == WT_CELL_KEY_OVFL ? NULL : cell);
+}
+
+/*
  * __wt_cell_unpack_safe --
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(
+    WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
+	static const WT_CELL_UNPACK unpack_clear;
 	size_t saved_len;
 	uint64_t saved_v, v;
 	int copied;
@@ -511,10 +563,13 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 } while (0)
 
 restart:
-	WT_CLEAR(*unpack);
-	unpack->cell = cell;
-
+	/*
+	 * This code is performance critical for scans through read-only trees.
+	 * Avoid WT_CLEAR here: it makes this code run significantly slower.
+	 */
+	*unpack = unpack_clear;
 	WT_CELL_LEN_CHK(cell, 0);
+	unpack->cell = cell;
 	unpack->type = __wt_cell_type(cell);
 	unpack->raw = __wt_cell_type_raw(cell);
 
@@ -632,6 +687,21 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 		unpack->__len = saved_len;
 		unpack->v = saved_v;
 	}
+
+	/*
+	 * If we just unpacked a key cell for an in-memory page, set the value
+	 * field to the next cell, interpreting it as a value cell, so cursors
+	 * can return a key/value pair without unpacking the key cell multiple
+	 * times.
+	 *
+	 * !!!
+	 * This function is only called with a non-NULL page when unpacking a
+	 * row-store leaf page key, which is why we don't check further.
+	 */
+	if (page != NULL) {
+		cell = (WT_CELL *)((uint8_t *)cell + unpack->__len);
+		unpack->value = __wt_cell_leaf_value_parse(page, cell);
+	}
 	return (0);
 }
 
@@ -642,7 +712,23 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(NULL, cell, unpack, NULL);
+}
+
+/*
+ * __wt_cell_unpack_with_value --
+ *	Unpack a WT_CELL into a structure, and check for an associated value.
+ */
+static inline void
+__wt_cell_unpack_with_value(
+    WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack)
+{
+	/*
+	 * This routine exists so we don't have pass in a NULL page reference
+	 * whenever we're unpacking cells from disk images (rather than from
+	 * in-memory pages).
+	 */
+	(void)__wt_cell_unpack_safe(page, cell, unpack, NULL);
 }
 
 /*

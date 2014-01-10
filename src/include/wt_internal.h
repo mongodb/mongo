@@ -259,7 +259,7 @@ struct __wt_update;
 
 #include "intpack.i"			/* required by cell.i, packing.i */
 #include "packing.i"
-#include "cell.i"
+#include "cell.i"			/* required by btree.i */
 
 #include "mutex.i"			/* required by btree.i */
 #include "txn.i"			/* required by btree.i */
