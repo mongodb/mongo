@@ -267,8 +267,8 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 		WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
-	/* Optionally dump the page in debugging mode. */
-	if (vs->dump_blocks && page->dsk != NULL)
+	/* Optionally dump the blocks or page in debugging mode. */
+	if (vs->dump_blocks)
 		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
 	if (vs->dump_pages)
 		WT_RET(__wt_debug_page(session, page, NULL));
