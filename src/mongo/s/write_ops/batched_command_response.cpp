@@ -45,7 +45,7 @@ namespace mongo {
     const BSONField<OpTime> BatchedCommandResponse::lastOp("lastOp");
     const BSONField<std::vector<WriteErrorDetail*> >
         BatchedCommandResponse::writeErrors("writeErrors");
-    const BSONField<BSONObj> BatchedCommandResponse::writeConcernError("writeConcernError");
+    const BSONField<WCErrorDetail*> BatchedCommandResponse::writeConcernError("writeConcernError");
 
     BatchedCommandResponse::BatchedCommandResponse() {
         clear();
@@ -178,19 +178,10 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         if (fieldState == FieldParser::FIELD_SET) _writeErrorDetails.reset(tempErrDetails);
 
-        BSONObj wcErrorObj;
-        fieldState = FieldParser::extract(source, writeConcernError, &wcErrorObj, errMsg);
+        WCErrorDetail* wcError = NULL;
+        fieldState = FieldParser::extract(source, writeConcernError, &wcError, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-
-        if (!wcErrorObj.isEmpty()) {
-            auto_ptr<WCErrorDetail> tempWCerror;
-            tempWCerror.reset(new WCErrorDetail());
-            if (!tempWCerror->parseBSON(wcErrorObj, errMsg)) {
-                return false;
-            }
-
-            _wcErrDetails.reset(tempWCerror.release());
-        }
+        if (fieldState == FieldParser::FIELD_SET) _wcErrDetails.reset(wcError);
 
         return true;
     }
@@ -512,9 +503,8 @@ namespace mongo {
         return _writeErrorDetails->at(pos);
     }
 
-    void BatchedCommandResponse::setWriteConcernError(const WCErrorDetail& error) {
-        _wcErrDetails.reset(new WCErrorDetail());
-        error.cloneTo(_wcErrDetails.get());
+    void BatchedCommandResponse::setWriteConcernError(WCErrorDetail* error) {
+        _wcErrDetails.reset(error);
     }
 
     void BatchedCommandResponse::unsetWriteConcernError() {

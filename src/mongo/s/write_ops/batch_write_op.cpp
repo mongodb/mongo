@@ -518,7 +518,7 @@ namespace mongo {
         dassert( isFinished() );
 
         if ( _batchCommandError.get() ) {
-            batchResp->setOk( 0 );
+            batchResp->setOk( false );
 
             const WriteErrorDetail& error = _batchCommandError->error;
             batchResp->setErrCode( error.getErrCode() );
@@ -526,6 +526,16 @@ namespace mongo {
             string errMsg( str::stream() << error.getErrMessage() << " at "
                                          << _batchCommandError->endpoint.shardName );
             batchResp->setErrMessage( errMsg );
+            dassert( batchResp->isValid( NULL ) );
+            return;
+        }
+
+        // Result is OK
+        batchResp->setOk( true );
+
+        // For non-verbose, it's all we need.
+        if ( !_clientRequest->isVerboseWC() ) {
+            dassert( batchResp->isValid( NULL ) );
             return;
         }
 
@@ -545,32 +555,6 @@ namespace mongo {
             }
         }
 
-        batchResp->setOk( !batchResp->isErrCodeSet() );
-
-        if ( !_clientRequest->isVerboseWC() ) {
-            dassert( batchResp->isValid( NULL ) );
-            return;
-        }
-
-        if ( !_wcErrors.empty() ) {
-            WCErrorDetail error;
-            error.setErrCode( ErrorCodes::WriteConcernFailed );
-
-            // Generate the multi-error message below
-            stringstream msg;
-            msg << "multiple errors reported : ";
-
-            for ( vector<ShardWCError*>::const_iterator it = _wcErrors.begin();
-                    it != _wcErrors.end(); ++it ) {
-                const ShardWCError* wcError = *it;
-                if ( it != _wcErrors.begin() ) msg << " :: and :: ";
-                msg << wcError->error.getErrMessage() << " at " << wcError->endpoint.shardName;
-            }
-
-            error.setErrMessage( msg.str() );
-            batchResp->setWriteConcernError( error );
-        }
-
         //
         // Build the per-item errors.
         //
@@ -582,6 +566,37 @@ namespace mongo {
                 writeOp.getOpError().cloneTo( error );
                 batchResp->addToErrDetails( error );
             }
+        }
+
+        // Only return a write concern error if everything succeeded (unordered or ordered)
+        // OR if something succeeded and we're unordered
+        bool reportWCError = errOps.empty()
+                             || ( !_clientRequest->getOrdered()
+                                  && errOps.size() < _clientRequest->sizeWriteOps() );
+        if ( !_wcErrors.empty() && reportWCError ) {
+
+            WCErrorDetail* error = new WCErrorDetail;
+
+            // Generate the multi-error message below
+            stringstream msg;
+            if ( _wcErrors.size() > 1 ) {
+                msg << "multiple errors reported : ";
+                error->setErrCode( ErrorCodes::WriteConcernFailed );
+            }
+            else {
+                error->setErrCode( ( *_wcErrors.begin() )->error.getErrCode() );
+            }
+
+            for ( vector<ShardWCError*>::const_iterator it = _wcErrors.begin();
+                it != _wcErrors.end(); ++it ) {
+                const ShardWCError* wcError = *it;
+                if ( it != _wcErrors.begin() )
+                    msg << " :: and :: ";
+                msg << wcError->error.getErrMessage() << " at " << wcError->endpoint.shardName;
+            }
+
+            error->setErrMessage( msg.str() );
+            batchResp->setWriteConcernError( error );
         }
 
         //

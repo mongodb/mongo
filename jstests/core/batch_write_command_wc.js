@@ -73,7 +73,8 @@ assert.eq(0, coll.count());
 coll.remove({});
 printjson( request = {insert : coll.getName(),
                    documents: [{a:1}, {a:1, $invalid: true}],
-                   writeConcern: {w:1, j:true}});
+                   writeConcern: {w:1, j:true},
+                   ordered : false});
 printjson( result = coll.runCommand(request) );
 assert(result.ok);
 assert.eq(1, result.n);
@@ -83,8 +84,7 @@ assert.eq(1, result.writeErrors[0].index);
 assert.eq('number', typeof result.writeErrors[0].code);
 assert.eq('string', typeof result.writeErrors[0].errmsg);
 
-assert(result.writeConcernError != null);
-assert.eq(2, result.writeConcernError.code);
+assert('writeConcernError' in result);
 assert.eq('string', typeof(result.writeConcernError.errmsg));
 
 assert.eq(1, coll.count());

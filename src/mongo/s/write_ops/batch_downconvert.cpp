@@ -32,110 +32,255 @@
 
 namespace mongo {
 
-    void SafeWriter::fillLastError( const BSONObj& gleResult, LastError* error ) {
-        if ( gleResult["code"].isNumber() ) error->code = gleResult["code"].numberInt();
-        if ( !gleResult["err"].eoo() ) {
-            if ( gleResult["err"].type() == String ) {
-                error->msg = gleResult["err"].String();
+    Status BatchSafeWriter::extractGLEErrors( const BSONObj& gleResponse, GLEErrors* errors ) {
+
+        // DRAGONS
+        // Parsing GLE responses is incredibly finicky.
+        // The order of testing here is extremely important.
+
+        const bool isOK = gleResponse["ok"].trueValue();
+        const string err = gleResponse["err"].str();
+        const string errMsg = gleResponse["errmsg"].str();
+        const string wNote = gleResponse["wnote"].str();
+        const string jNote = gleResponse["jnote"].str();
+        const int code = gleResponse["code"].numberInt();
+        const bool timeout = gleResponse["wtimeout"].trueValue();
+
+        if ( err == "norepl" || err == "noreplset" ) {
+            // Know this is legacy gle and the repl not enforced - write concern error in 2.4
+            errors->wcError.reset( new WCErrorDetail );
+            errors->wcError->setErrCode( ErrorCodes::WriteConcernFailed );
+            if ( !errMsg.empty() ) {
+                errors->wcError->setErrMessage( errMsg );
+            }
+            else if ( !wNote.empty() ) {
+                errors->wcError->setErrMessage( wNote );
             }
             else {
-                dassert( gleResult["err"].type() == jstNULL );
+                errors->wcError->setErrMessage( err );
             }
         }
-        if ( gleResult["n"].isNumber() ) error->nObjects = gleResult["n"].numberInt();
-        if ( gleResult["updatedExisting"].eoo() ) {
-            error->updatedExisting = LastError::NotUpdate;
+        else if ( timeout ) {
+            // Know there was no write error
+            errors->wcError.reset( new WCErrorDetail );
+            errors->wcError->setErrCode( ErrorCodes::WriteConcernFailed );
+            if ( !errMsg.empty() ) {
+                errors->wcError->setErrMessage( errMsg );
+            }
+            else {
+                errors->wcError->setErrMessage( err );
+            }
+            errors->wcError->setErrInfo( BSON( "wtimeout" << true ) );
         }
-        else {
-            error->updatedExisting =
-                gleResult["updatedExisting"].trueValue() ? LastError::True : LastError::False;
+        else if ( code == 10990 /* no longer primary */
+                  || code == 16805 /* replicatedToNum no longer primary */
+                  || code == 14830 /* gle wmode changed / invalid */) {
+            // Write concern errors that get returned as regular errors (result may not be ok: 1.0)
+            errors->wcError.reset( new WCErrorDetail );
+            errors->wcError->setErrCode( code );
+            errors->wcError->setErrMessage( errMsg );
         }
-        if ( !gleResult["upserted"].eoo() ) {
-            dassert( gleResult["upserted"].isABSONObj() );
-            error->upsertedId = gleResult["upserted"].Obj();
+        else if ( !isOK ) {
+
+            //
+            // !!! SOME GLE ERROR OCCURRED, UNKNOWN WRITE RESULT !!!
+            //
+
+            return Status( DBException::convertExceptionCode(
+                               code ? code : ErrorCodes::UnknownError ),
+                           errMsg );
         }
-        // Needed b/c we detect stale config on legacy hosts via this field
-        if ( !gleResult["writeback"].eoo() ) {
-            dassert( gleResult["writeback"].type() == jstOID );
-            error->writebackId = gleResult["writeback"].OID();
+        else if ( !err.empty() ) {
+            // Write error
+            errors->writeError.reset( new WriteErrorDetail );
+            errors->writeError->setErrCode( code == 0 ? ErrorCodes::UnknownError : code );
+            errors->writeError->setErrMessage( err );
+        }
+        else if ( !jNote.empty() ) {
+            // Know this is legacy gle and the journaling not enforced - write concern error in 2.4
+            errors->wcError.reset( new WCErrorDetail );
+            errors->wcError->setErrCode( ErrorCodes::WriteConcernFailed );
+            errors->wcError->setErrMessage( jNote );
+        }
+
+        // See if we had a version error reported as a writeback id - this is the only kind of
+        // write error where the write concern may still be enforced.
+        // The actual version that was stale is lost in the writeback itself.
+        const int opsSinceWriteback = gleResponse["writebackSince"].numberInt();
+        const bool hadWriteback = !gleResponse["writeback"].eoo();
+
+        if ( hadWriteback && opsSinceWriteback == 0 ) {
+
+            // We shouldn't have a previous write error
+            dassert( !errors->writeError.get() );
+            if ( errors->writeError.get() ) {
+                // Somehow there was a write error *and* a writeback from the last write
+                warning() << "both a write error and a writeback were reported "
+                          << "when processing a legacy write: " << errors->writeError->toBSON()
+                          << endl;
+            }
+
+            errors->writeError.reset( new WriteErrorDetail );
+            errors->writeError->setErrCode( ErrorCodes::StaleShardVersion );
+            errors->writeError->setErrInfo( BSON( "downconvert" << true ) ); // For debugging
+            errors->writeError->setErrMessage( "shard version was stale" );
+        }
+
+        return Status::OK();
+    }
+
+    void BatchSafeWriter::extractGLEStats( const BSONObj& gleResponse, GLEStats* stats ) {
+        stats->n = gleResponse["n"].numberInt();
+        if ( !gleResponse["upserted"].eoo() ) {
+            stats->upsertedId = gleResponse["upserted"].wrap( "upserted" );
+        }
+        if ( gleResponse["lastOp"].type() == Timestamp ) {
+            stats->lastOp = gleResponse["lastOp"]._opTime();
         }
     }
 
-    bool BatchSafeWriter::isFailedOp( const LastError& error ) {
-        return error.msg != "";
-    }
-
-    WriteErrorDetail* BatchSafeWriter::lastErrorToBatchError( const LastError& lastError ) {
-
-        bool isFailedOp = lastError.msg != "";
-        bool isStaleOp = lastError.writebackId.isSet();
-        dassert( !( isFailedOp && isStaleOp ) );
-
-        if ( isFailedOp ) {
-            WriteErrorDetail* batchError = new WriteErrorDetail;
-            if ( lastError.code != 0 ) batchError->setErrCode( lastError.code );
-            else batchError->setErrCode( ErrorCodes::UnknownError );
-            batchError->setErrMessage( lastError.msg );
-            return batchError;
+    static BSONObj fixWCForConfig( const BSONObj& writeConcern ) {
+        BSONObjBuilder fixedB;
+        BSONObjIterator it( writeConcern );
+        while ( it.more() ) {
+            BSONElement el = it.next();
+            if ( StringData( el.fieldName() ).compare( "w" ) != 0 ) {
+                fixedB.append( el );
+            }
         }
-        else if ( isStaleOp ) {
-            WriteErrorDetail* batchError = new WriteErrorDetail;
-            batchError->setErrCode( ErrorCodes::StaleShardVersion );
-            batchError->setErrInfo( BSON( "downconvert" << true ) ); // For debugging
-            batchError->setErrMessage( "shard version was stale" );
-            return batchError;
-        }
-
-        return NULL;
+        return fixedB.obj();
     }
 
     void BatchSafeWriter::safeWriteBatch( DBClientBase* conn,
                                           const BatchedCommandRequest& request,
                                           BatchedCommandResponse* response ) {
 
+        const NamespaceString nss( request.getNS() );
+
         // N starts at zero, and we add to it for each item
         response->setN( 0 );
 
         for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
 
+            // Break on first error if we're ordered
+            if ( request.getOrdered() && response->isErrDetailsSet() )
+                break;
+
             BatchItemRef itemRef( &request, static_cast<int>( i ) );
-            LastError lastError;
+            bool isLastItem = ( i == request.sizeWriteOps() - 1 );
 
-            _safeWriter->safeWrite( conn, itemRef, &lastError );
-
-            // Register the error if we need to
-            WriteErrorDetail* batchError = lastErrorToBatchError( lastError );
-            if ( batchError ) {
-                batchError->setIndex( i );
-                response->addToErrDetails( batchError );
+            BSONObj writeConcern;
+            if ( isLastItem && request.isWriteConcernSet() ) {
+                writeConcern = request.getWriteConcern();
+                // Pre-2.4.2 mongods react badly to 'w' being set on config servers
+                if ( nss.db() == "config" )
+                    writeConcern = fixWCForConfig( writeConcern );
             }
+
+            BSONObj gleResult;
+            GLEErrors errors;
+            Status status = _safeWriter->safeWrite( conn, itemRef, writeConcern, &gleResult );
+            if ( status.isOK() ) {
+                status = extractGLEErrors( gleResult, &errors );
+            }
+
+            if ( !status.isOK() ) {
+                response->clear();
+                response->setErrCode( status.code() );
+                response->setErrMessage( status.reason() );
+                return;
+            }
+
+            //
+            // STATS HANDLING
+            //
+
+            GLEStats stats;
+            extractGLEStats( gleResult, &stats );
 
             // Special case for making legacy "n" field result for insert match the write
             // command result.
-            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert &&
-                    batchError == NULL &&
-                    StringData( request.getNS() ).startsWith( "config." )) {
-                dassert( request.getInsertRequest()->getDocuments().size() == 1 );
+            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert
+                 && !errors.writeError.get() ) {
                 // n is always 0 for legacy inserts.
-                dassert( lastError.nObjects == 0 );
-
-                lastError.nObjects = 1;
+                dassert( stats.n == 0 );
+                stats.n = 1;
             }
 
-            response->setN( response->getN() + lastError.nObjects );
+            response->setN( response->getN() + stats.n );
 
-            if ( !lastError.upsertedId.isEmpty() ) {
+            if ( !stats.upsertedId.isEmpty() ) {
                 BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
                 upsertedId->setIndex( i );
-                upsertedId->setUpsertedID( lastError.upsertedId );
+                upsertedId->setUpsertedID( stats.upsertedId );
                 response->addToUpsertDetails( upsertedId );
             }
 
-            // Break on first error if we're ordered
-            if ( request.getOrdered() && BatchSafeWriter::isFailedOp( lastError ) ) break;
+            response->setLastOp( stats.lastOp );
+
+            //
+            // WRITE ERROR HANDLING
+            //
+
+            // If any error occurs (except stale config) the previous GLE was not enforced
+            bool enforcedWC = !errors.writeError.get()
+                              || errors.writeError->getErrCode() == ErrorCodes::StaleShardVersion;
+
+            // Save write error
+            if ( errors.writeError.get() ) {
+                errors.writeError->setIndex( i );
+                response->addToErrDetails( errors.writeError.release() );
+            }
+
+            //
+            // WRITE CONCERN ERROR HANDLING
+            //
+
+            // The last write is weird, since we enforce write concern and check the error through
+            // the same GLE if possible.  If the last GLE was an error, the write concern may not
+            // have been enforced in that same GLE, so we need to send another after resetting the
+            // error.
+            if ( isLastItem ) {
+
+                // Try to enforce the write concern if everything succeeded (unordered or ordered)
+                // OR if something succeeded and we're unordered.
+                bool needToEnforceWC =
+                    !response->isErrDetailsSet()
+                    || ( !request.getOrdered()
+                         && response->sizeErrDetails() < request.sizeWriteOps() );
+
+                if ( !enforcedWC && needToEnforceWC ) {
+                    dassert( !errors.writeError.get() ); // emptied above
+
+                    // Might have gotten a write concern validity error earlier, these are
+                    // enforced even if the wc isn't applied, so we ignore.
+                    errors.wcError.reset();
+
+                    Status status = _safeWriter->enforceWriteConcern( conn,
+                                                                      nss.db().toString(),
+                                                                      writeConcern,
+                                                                      &gleResult );
+
+                    if ( status.isOK() ) {
+                        status = extractGLEErrors( gleResult, &errors );
+                    }
+
+                    if ( !status.isOK() ) {
+                        response->clear();
+                        response->setErrCode( status.code() );
+                        response->setErrMessage( status.reason() );
+                        return;
+                    }
+                }
+                // END Write concern retry
+
+                if ( errors.wcError.get() ) {
+                    response->setWriteConcernError( errors.wcError.release() );
+                }
+            }
         }
 
-        response->setOk( !response->isErrCodeSet() );
+        response->setOk( true );
         dassert( response->isValid( NULL ) );
     }
 }

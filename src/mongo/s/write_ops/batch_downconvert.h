@@ -28,12 +28,13 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/optime.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -44,7 +45,7 @@
 namespace mongo {
 
     /**
-     * Interface to execute a single safe write.
+     * Interface to execute a single safe write and enforce write concern on a connection.
      */
     class SafeWriter {
     public:
@@ -52,12 +53,23 @@ namespace mongo {
         virtual ~SafeWriter() {
         }
 
-        virtual void safeWrite( DBClientBase* conn,
-                                const BatchItemRef& batchItem,
-                                LastError* error ) = 0;
+        /**
+         * Sends a write to a remote host and returns a GLE response.
+         */
+        virtual Status safeWrite( DBClientBase* conn,
+                                  const BatchItemRef& batchItem,
+                                  const BSONObj& writeConcern,
+                                  BSONObj* gleResponse ) = 0;
 
-        // Helper exposed for testing
-        static void fillLastError( const BSONObj& gleResult, LastError* error );
+        /**
+         * Purely enforces a write concern on a remote host by clearing the previous error.
+         * This is more expensive than a normal safe write, but is sometimes needed to support
+         * write command emulation.
+         */
+        virtual Status enforceWriteConcern( DBClientBase* conn,
+                                            const std::string& dbName,
+                                            const BSONObj& writeConcern,
+                                            BSONObj* gleResponse ) = 0;
     };
 
     /**
@@ -79,11 +91,38 @@ namespace mongo {
                              const BatchedCommandRequest& request,
                              BatchedCommandResponse* response );
 
-        // Helper exposed for testing
-        static bool isFailedOp( const LastError& error );
+        //
+        // Exposed for testing
+        //
 
-        // Helper exposed for testing
-        static WriteErrorDetail* lastErrorToBatchError( const LastError& error );
+        // Helper that acts as an auto-ptr for write and wc errors
+        struct GLEErrors {
+            auto_ptr<WriteErrorDetail> writeError;
+            auto_ptr<WCErrorDetail> wcError;
+        };
+
+        /**
+         * Given a GLE response, extracts a write error and a write concern error for the previous
+         * operation.
+         *
+         * Returns !OK if the GLE itself failed in an unknown way.
+         */
+        static Status extractGLEErrors( const BSONObj& gleResponse, GLEErrors* errors );
+
+        struct GLEStats {
+            GLEStats() :
+                n( 0 ) {
+            }
+
+            int n;
+            BSONObj upsertedId;
+            OpTime lastOp;
+        };
+
+        /**
+         * Given a GLE response, pulls out stats for the previous write operation.
+         */
+        static void extractGLEStats( const BSONObj& gleResponse, GLEStats* stats );
 
     private:
 

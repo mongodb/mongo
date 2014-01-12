@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include <vector>
+#include <string>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
@@ -47,7 +47,15 @@ namespace mongo {
         virtual ~DBClientSafeWriter() {
         }
 
-        void safeWrite( DBClientBase* conn, const BatchItemRef& batchItem, LastError* error );
+        Status safeWrite( DBClientBase* conn,
+                          const BatchItemRef& batchItem,
+                          const BSONObj& writeConcern,
+                          BSONObj* gleResponse );
+
+        Status enforceWriteConcern( DBClientBase* conn,
+                                    const std::string& dbName,
+                                    const BSONObj& writeConcern,
+                                    BSONObj* gleResponse );
 
     };
 

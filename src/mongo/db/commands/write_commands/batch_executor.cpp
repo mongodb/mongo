@@ -66,9 +66,8 @@ namespace mongo {
         _stats( new WriteBatchStats ) {
     }
 
-    static bool buildWCError( const Status& wcStatus,
-                              const WriteConcernResult& wcResult,
-                              WCErrorDetail* wcError ) {
+    static WCErrorDetail* toWriteConcernError( const Status& wcStatus,
+                                               const WriteConcernResult& wcResult ) {
 
         // Error reported is either the errmsg or err from wc
         string errMsg;
@@ -78,7 +77,9 @@ namespace mongo {
             errMsg = wcResult.err;
 
         if ( errMsg.empty() )
-            return false;
+            return NULL;
+
+        WCErrorDetail* wcError = new WCErrorDetail;
 
         if ( wcStatus.isOK() )
             wcError->setErrCode( ErrorCodes::WriteConcernFailed );
@@ -90,7 +91,7 @@ namespace mongo {
 
         wcError->setErrMessage( errMsg );
 
-        return true;
+        return wcError;
     }
 
     static WriteErrorDetail* toWriteError( const Status& status ) {
@@ -128,9 +129,6 @@ namespace mongo {
         bool silentWC = writeConcern.wMode.empty() && writeConcern.wNumNodes == 0
                         && writeConcern.syncMode == WriteConcernOptions::NONE;
 
-        // Apply each batch item, possibly bulking some items together in the write lock.
-        // Stops on error if batch is ordered.
-
         Timer commandTimer;
 
         OwnedPointerVector<WriteErrorDetail> writeErrorsOwned;
@@ -139,46 +137,39 @@ namespace mongo {
         OwnedPointerVector<BatchedUpsertDetail> upsertedOwned;
         vector<BatchedUpsertDetail*>& upserted = upsertedOwned.mutableVector();
 
+        //
+        // Apply each batch item, possibly bulking some items together in the write lock.
+        // Stops on error if batch is ordered.
+        //
+
         bulkExecute( request, &upserted, &writeErrors );
-        bool staleBatch = !writeErrors.empty()
-                          && writeErrors.back()->getErrCode() == ErrorCodes::StaleShardVersion;
 
-        // Send upserted back in response
-        if ( upserted.size() ) {
-            response->setUpsertDetails( upserted );
-            upserted.clear();
-        }
+        //
+        // Try to enforce the write concern if everything succeeded (unordered or ordered)
+        // OR if something succeeded and we're unordered.
+        //
 
-        // Send errors back in response
-        if ( writeErrors.size() ) {
-            response->setErrDetails( writeErrors );
-            writeErrors.clear();
-        }
+        auto_ptr<WCErrorDetail> wcError;
+        bool needToEnforceWC = writeErrors.empty()
+                               || ( !request.getOrdered()
+                                    && writeErrors.size() < request.sizeWriteOps() );
 
-        // Send opTime in response
-        if ( anyReplEnabled() ) {
-            response->setLastOp( _client->getLastOp() );
-        }
-
-        // Apply write concern if we had any successful writes
-        if ( writeErrors.size() < request.sizeWriteOps() ) {
+        if ( needToEnforceWC ) {
 
             _client->curop()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
             status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
 
-            WCErrorDetail wcError;
-            if ( buildWCError( status, res, &wcError ) ) {
-                response->setWriteConcernError( wcError );
-            }
+            wcError.reset( toWriteConcernError( status, res ) );
         }
 
-        // Set the stats for the response
-        response->setN( _stats->numInserted + _stats->numUpserted + _stats->numUpdated
-                        + _stats->numDeleted );
-        if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update )
-            response->setNModified( _stats->numModified );
+        //
+        // Refresh metadata if needed
+        //
+
+        bool staleBatch = !writeErrors.empty()
+                          && writeErrors.back()->getErrCode() == ErrorCodes::StaleShardVersion;
 
         // TODO: Audit where we want to queue here - the shardingState calls may block for remote
         // data
@@ -205,10 +196,39 @@ namespace mongo {
             }
         }
 
-        if ( silentWC )
-            response->clear();
+        //
+        // Construct response
+        //
 
         response->setOk( true );
+
+        if ( !silentWC ) {
+
+            if ( upserted.size() ) {
+                response->setUpsertDetails( upserted );
+                upserted.clear();
+            }
+
+            if ( writeErrors.size() ) {
+                response->setErrDetails( writeErrors );
+                writeErrors.clear();
+            }
+
+            if ( wcError.get() ) {
+                response->setWriteConcernError( wcError.release() );
+            }
+
+            if ( anyReplEnabled() ) {
+                response->setLastOp( _client->getLastOp() );
+            }
+
+            // Set the stats for the response
+            response->setN( _stats->numInserted + _stats->numUpserted + _stats->numUpdated
+                            + _stats->numDeleted );
+            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update )
+                response->setNModified( _stats->numModified );
+        }
+
         dassert( response->isValid( NULL ) );
     }
 

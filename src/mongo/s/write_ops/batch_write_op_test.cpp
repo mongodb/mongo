@@ -571,10 +571,10 @@ namespace {
         response.setOk( true );
         response.setN( 0 );
 
-        WCErrorDetail firstShardWCError;
-        firstShardWCError.setErrCode( ErrorCodes::UnknownError );
+        WCErrorDetail* firstShardWCError = new WCErrorDetail;
+        firstShardWCError->setErrCode( ErrorCodes::UnknownError );
         string firstShardWCMsg( "s1 unknown" );
-        firstShardWCError.setErrMessage( firstShardWCMsg );
+        firstShardWCError->setErrMessage( firstShardWCMsg );
 
         response.setWriteConcernError( firstShardWCError );
 
@@ -588,10 +588,10 @@ namespace {
         response2.setOk( true );
         response2.setN( 0 );
 
-        WCErrorDetail secondShardWCError;
-        secondShardWCError.setErrCode( ErrorCodes::UnknownError );
+        WCErrorDetail* secondShardWCError = new WCErrorDetail;
+        secondShardWCError->setErrCode( ErrorCodes::UnknownError );
         string secondShardWCMsg( "s2 unknown" );
-        secondShardWCError.setErrMessage( secondShardWCMsg );
+        secondShardWCError->setErrMessage( secondShardWCMsg );
         response2.setWriteConcernError( secondShardWCError );
 
         ASSERT( response2.isValid( NULL ) );

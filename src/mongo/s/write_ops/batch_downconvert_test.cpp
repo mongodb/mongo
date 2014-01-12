@@ -28,15 +28,401 @@
 
 #include "mongo/s/write_ops/batch_downconvert.h"
 
+#include <deque>
+#include <vector>
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using namespace mongo;
+    using std::vector;
+    using std::deque;
+
+    //
+    // Tests for parsing GLE responses into write errors and write concern errors for write
+    // commands.  These tests essentially document our expected 2.4 GLE behaviors.
+    //
+
+    TEST(GLEParsing, Empty) {
+
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( !errors.wcError.get() );
+
+        BatchSafeWriter::GLEStats stats;
+        BatchSafeWriter::extractGLEStats( gleResponse, &stats );
+        ASSERT_EQUALS( stats.n, 0 );
+        ASSERT( stats.upsertedId.isEmpty() );
+    }
+
+    TEST(GLEParsing, WriteErr) {
+
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: 'message', code: 1000}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( errors.writeError.get() );
+        ASSERT_EQUALS( errors.writeError->getErrMessage(), "message" );
+        ASSERT_EQUALS( errors.writeError->getErrCode(), 1000 );
+        ASSERT( !errors.wcError.get() );
+    }
+
+    TEST(GLEParsing, JournalFail) {
+
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null, jnote: 'message'}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( errors.wcError.get() );
+        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
+        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
+    }
+
+    TEST(GLEParsing, ReplErr) {
+
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: 'norepl', wnote: 'message'}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( errors.wcError.get() );
+        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
+        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
+    }
+
+    TEST(GLEParsing, ReplTimeoutErr) {
+
+        const BSONObj gleResponse =
+            fromjson( "{ok: 1.0, err: 'timeout', errmsg: 'message', wtimeout: true}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( errors.wcError.get() );
+        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
+        ASSERT( errors.wcError->getErrInfo()["wtimeout"].trueValue() );
+        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
+    }
+
+    TEST(GLEParsing, GLEFail) {
+
+        const BSONObj gleResponse =
+            fromjson( "{ok: 0.0, err: null, errmsg: 'message', code: 1000}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        Status status = BatchSafeWriter::extractGLEErrors( gleResponse, &errors );
+        ASSERT_NOT_OK( status );
+        ASSERT_EQUALS( status.reason(), "message" );
+        ASSERT_EQUALS( status.code(), 1000 );
+    }
+
+    TEST(GLEParsing, GLEFailNoCode) {
+
+        const BSONObj gleResponse = fromjson( "{ok: 0.0, err: null, errmsg: 'message'}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        Status status = BatchSafeWriter::extractGLEErrors( gleResponse, &errors );
+        ASSERT_NOT_OK( status );
+        ASSERT_EQUALS( status.reason(), "message" );
+        ASSERT_EQUALS( status.code(), ErrorCodes::UnknownError );
+    }
+
+    TEST(GLEParsing, NotMasterGLEFail) {
+
+        // Not master code in response
+        const BSONObj gleResponse =
+            fromjson( "{ok: 0.0, err: null, errmsg: 'message', code: 10990}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( errors.wcError.get() );
+        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
+        ASSERT_EQUALS( errors.wcError->getErrCode(), 10990 );
+    }
+
+    TEST(GLEParsing, OldStaleWrite) {
+
+        const BSONObj gleResponse =
+            fromjson( "{ok: 1.0, err: null, writeback: 'abcde', writebackSince: 1}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( !errors.wcError.get() );
+    }
+
+    TEST(GLEParsing, StaleWriteErrAndNotMasterGLEFail) {
+
+        // Not master code in response
+        const BSONObj gleResponse = fromjson( "{ok: 0.0, err: null, errmsg: 'message', code: 10990,"
+                                              " writeback: 'abcde', writebackSince: 0}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( errors.writeError.get() );
+        ASSERT_EQUALS( errors.writeError->getErrCode(), ErrorCodes::StaleShardVersion );
+        ASSERT( errors.wcError.get() );
+        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
+        ASSERT_EQUALS( errors.wcError->getErrCode(), 10990 );
+    }
+
+    TEST(GLEParsing, WriteErrWithStats) {
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, n: 2, err: 'message', code: 1000}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( errors.writeError.get() );
+        ASSERT_EQUALS( errors.writeError->getErrMessage(), "message" );
+        ASSERT_EQUALS( errors.writeError->getErrCode(), 1000 );
+        ASSERT( !errors.wcError.get() );
+
+        BatchSafeWriter::GLEStats stats;
+        BatchSafeWriter::extractGLEStats( gleResponse, &stats );
+        ASSERT_EQUALS( stats.n, 2 );
+        ASSERT( stats.upsertedId.isEmpty() );
+    }
+
+    TEST(GLEParsing, ReplTimeoutErrWithStats) {
+        const BSONObj gleResponse =
+            fromjson( "{ok: 1.0, err: 'timeout', errmsg: 'message', wtimeout: true,"
+                      " n: 1, upserted: 'abcde'}" );
+
+        BatchSafeWriter::GLEErrors errors;
+        ASSERT_OK( BatchSafeWriter::extractGLEErrors( gleResponse, &errors ) );
+        ASSERT( !errors.writeError.get() );
+        ASSERT( errors.wcError.get() );
+        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
+        ASSERT( errors.wcError->getErrInfo()["wtimeout"].trueValue() );
+        ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
+
+        BatchSafeWriter::GLEStats stats;
+        BatchSafeWriter::extractGLEStats( gleResponse, &stats );
+        ASSERT_EQUALS( stats.n, 1 );
+        ASSERT_EQUALS( stats.upsertedId.firstElement().str(), "abcde" );
+    }
+
+    //
+    // Tests of the aggregation of 2.4 GLE responses into batch responses.
+    //
+
+    /**
+     * Mock Safe Writer for testing
+     */
+    class MockSafeWriter : public SafeWriter {
+    public:
+
+        MockSafeWriter( const vector<BSONObj>& gleResponses ) :
+            _gleResponses( gleResponses.begin(), gleResponses.end() ) {
+        }
+
+        virtual ~MockSafeWriter() {
+        }
+
+        Status safeWrite( DBClientBase* conn,
+                          const BatchItemRef& batchItem,
+                          const BSONObj& writeConcern,
+                          BSONObj* gleResponse ) {
+            BSONObj response = _gleResponses.front();
+            _gleResponses.pop_front();
+            *gleResponse = response;
+            return Status::OK();
+        }
+
+        Status enforceWriteConcern( DBClientBase* conn,
+                                    const std::string& dbName,
+                                    const BSONObj& writeConcern,
+                                    BSONObj* gleResponse ) {
+            BSONObj response = _gleResponses.front();
+            _gleResponses.pop_front();
+            *gleResponse = response;
+            return Status::OK();
+        }
+
+        deque<BSONObj> _gleResponses;
+    };
 
     TEST(WriteBatchDownconvert, Basic) {
-        BatchSafeWriter( NULL );
-        ASSERT( true );
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Insert );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
+        request.addToDocuments(BSONObj());
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 1 );
+        ASSERT( !response.isErrDetailsSet() );
+        ASSERT( !response.isWriteConcernErrorSet() );
     }
+
+    TEST(WriteBatchDownconvert, BasicUpsert) {
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null, n: 1, upserted : 'abcde'}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Update );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedUpdateRequest& request = *cmdRequest.getUpdateRequest();
+        request.addToUpdates(new BatchedUpdateDocument);
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 1 );
+        ASSERT( response.isUpsertDetailsSet() );
+        ASSERT_EQUALS( response.getUpsertDetailsAt(0)->getIndex(), 0 );
+        ASSERT_EQUALS( response.getUpsertDetailsAt(0)->getUpsertedID().firstElement().str(),
+                       "abcde" );
+        ASSERT( !response.isErrDetailsSet() );
+        ASSERT( !response.isWriteConcernErrorSet() );
+    }
+
+    TEST(WriteBatchDownconvert, WriteError) {
+
+        // Error on first document, unordered
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: 'message', code: 12345}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Insert );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
+        request.addToDocuments(BSONObj());
+        request.addToDocuments(BSONObj());
+        request.setOrdered(false);
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 1 );
+        ASSERT_EQUALS( response.sizeErrDetails(), 1u );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getIndex(), 0);
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrMessage(), "message" );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrCode(), 12345 );
+        ASSERT( !response.isWriteConcernErrorSet() );
+    }
+
+    TEST(WriteBatchDownconvert, WriteErrorAndReplError) {
+
+        // Error on first document, write concern error on second document, unordered
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: 'message', code: 12345}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: 'norepl', wnote: 'message'}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Insert );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
+        request.addToDocuments( BSONObj() );
+        request.addToDocuments( BSONObj() );
+        request.setOrdered(false);
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 1 );
+        ASSERT_EQUALS( response.sizeErrDetails(), 1u );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getIndex(), 0 );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrMessage(), "message" );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrCode(), 12345 );
+        ASSERT( response.isWriteConcernErrorSet() );
+        ASSERT_EQUALS( response.getWriteConcernError()->getErrMessage(), "message" );
+        ASSERT_EQUALS( response.getWriteConcernError()->getErrCode(),
+                       ErrorCodes::WriteConcernFailed );
+    }
+
+    TEST(WriteBatchDownconvert, FinalWriteErrorAndReplError) {
+
+        // Error and write concern error on last document, need another gle to check write
+        // concern if the last document had a write error in an unordered batch.
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: 'message', code: 12345}" ) );
+        // Response is used *after* the last write for write concern error
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: 'norepl', wnote: 'message'}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Insert );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
+        request.addToDocuments( BSONObj() );
+        request.addToDocuments( BSONObj() );
+        request.setOrdered(false);
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 1 );
+        ASSERT_EQUALS( response.sizeErrDetails(), 1u );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getIndex(), 1 );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrMessage(), "message" );
+        ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrCode(), 12345 );
+        ASSERT( response.isWriteConcernErrorSet() );
+        ASSERT_EQUALS( response.getWriteConcernError()->getErrMessage(), "message" );
+        ASSERT_EQUALS( response.getWriteConcernError()->getErrCode(),
+                       ErrorCodes::WriteConcernFailed );
+    }
+
+    TEST(WriteBatchDownconvert, ReportOpTime) {
+
+        // Checks that we correctly report the latest OpTime (needed to enforce backward-compatible
+        // GLE calls after this call.
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null, lastOp: Timestamp(10, 0)}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null, lastOp: Timestamp(20, 0)}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Insert );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
+        request.addToDocuments(BSONObj());
+        request.addToDocuments(BSONObj());
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 2 );
+        ASSERT( !response.isErrDetailsSet() );
+        ASSERT( !response.isWriteConcernErrorSet() );
+        ASSERT_EQUALS( response.getLastOp().toStringPretty(), OpTime(20, 0).toStringPretty() );
+    }
+
 
 }

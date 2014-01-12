@@ -60,6 +60,9 @@ var executeOrderedTests = function() {
     coll.remove({});
     coll.ensureIndex({a : 1}, {unique : true});
 
+    /**
+    // XXX TEST INVALID UNTIL SERVER-12274 is fixed for shell
+
     //
     // Fail with write concern error and duplicate key error
     var batch = coll.initializeOrderedBulkOp();
@@ -75,6 +78,7 @@ var executeOrderedTests = function() {
     }
 
     assert(error);
+    */
 
     // Remove collection
     coll.dropIndexes();

@@ -61,7 +61,7 @@ namespace mongo {
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<OpTime> lastOp;
         static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
-        static const BSONField<BSONObj> writeConcernError;
+        static const BSONField<WCErrorDetail*> writeConcernError;
 
         //
         // construction / destruction
@@ -134,7 +134,7 @@ namespace mongo {
         const std::vector<WriteErrorDetail*>& getErrDetails() const;
         const WriteErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
-        void setWriteConcernError(const WCErrorDetail& error);
+        void setWriteConcernError(WCErrorDetail* error);
         void unsetWriteConcernError();
         bool isWriteConcernErrorSet() const;
         const WCErrorDetail* getWriteConcernError() const;
