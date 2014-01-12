@@ -122,8 +122,6 @@ namespace mongo {
         if (logicalStage != NULL) {
             uint64_t nScanned = 0;
             uint64_t nScannedObjects = 0;
-            bool isMultiKey = false;
-            bool isIndexOnly = covered;
             const std::vector<PlanStageStats*>& children = logicalStage->children;
             for (std::vector<PlanStageStats*>::const_iterator it = children.begin();
                  it != children.end();
@@ -131,15 +129,13 @@ namespace mongo {
                 TypeExplain* childExplain = NULL;
                 explainPlan(**it, &childExplain, false /* no full details */);
                 if (childExplain) {
+                    // 'res' takes ownership of 'childExplain'.
                     res->addToClauses(childExplain);
                     nScanned += childExplain->getNScanned();
 
                     // We don't necessarilly fetch on a branch, but the old query framework
                     // did. We're still emulating the number it would have produced.
                     nScannedObjects += childExplain->getNScanned();
-
-                    isMultiKey |= childExplain->getIsMultiKey();
-                    isIndexOnly &= childExplain->getIndexOnly();
                 }
             }
             res->setNScanned(nScanned);
