@@ -209,8 +209,8 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * Skip if a thread is still active in the chunk or it
 		 * isn't suitable.
 		 */
-		if (!F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) ||
-		    F_ISSET_ATOMIC(chunk,
+		if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
+		    F_ISSET(chunk,
 			WT_LSM_CHUNK_BLOOM | WT_LSM_CHUNK_MERGING) ||
 		    chunk->generation > 0 ||
 		    chunk->count == 0)
@@ -282,21 +282,20 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * is also evicted.  Either way, there is no point
 			 * trying to checkpoint it again.
 			 */
-			if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK)) {
-				if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EVICTED))
-					continue;
-
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) &&
+			    !chunk->evicted) {
 				if ((ret = __lsm_discard_handle(
 				    session, chunk->uri, NULL)) == 0)
-					F_SET_ATOMIC(
-					    chunk, WT_LSM_CHUNK_EVICTED);
+					chunk->evicted = 1;
 				else if (ret == EBUSY)
 					ret = 0;
 				else
 					WT_ERR_MSG(session, ret,
 					    "discard handle");
-				continue;
 			}
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+				continue;
 
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker flushing %u", i);
@@ -375,7 +374,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			++j;
 			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
-			F_SET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK);
+			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			ret = __wt_lsm_meta_write(session, lsm_tree);
 			++lsm_tree->dsk_gen;
 
@@ -491,7 +490,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	/* Ensure the bloom filter is in the metadata. */
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
-	F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
+	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	++lsm_tree->dsk_gen;
 	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -615,7 +614,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			continue;
 		}
 
-		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM)) {
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			/*
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
@@ -630,7 +629,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			} else
 				WT_ERR(ret);
 
-			F_CLR_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
+			F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
 		}
 		if (chunk->uri != NULL) {
 			/*
