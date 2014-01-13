@@ -185,6 +185,8 @@ __wt_lsm_merge(
 		--start_chunk;
 
 		if (nchunks == lsm_tree->merge_max) {
+			WT_ASSERT(session,
+			    F_ISSET(youngest, WT_LSM_CHUNK_MERGING));
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
 			record_count -= youngest->count;
 			chunk_size -= youngest->size;
@@ -196,6 +198,13 @@ __wt_lsm_merge(
 	WT_ASSERT(session, nchunks <= lsm_tree->merge_max);
 
 	if (nchunks > 0) {
+		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
+		for (i = 0; i < nchunks; i++) {
+			chunk = lsm_tree->chunk[start_chunk + i];
+			WT_ASSERT(session,
+			    F_ISSET(chunk, WT_LSM_CHUNK_MERGING));
+		}
+
 		chunk = lsm_tree->chunk[start_chunk];
 		youngest = lsm_tree->chunk[end_chunk];
 		start_id = chunk->id;
@@ -206,9 +215,12 @@ __wt_lsm_merge(
 		 */
 		if (nchunks < merge_min ||
 		    chunk->generation > youngest->generation + max_gap) {
-			for (i = 0; i < nchunks; i++)
-				F_CLR(lsm_tree->chunk[start_chunk + i],
-				    WT_LSM_CHUNK_MERGING);
+			for (i = 0; i < nchunks; i++) {
+				chunk = lsm_tree->chunk[start_chunk + i];
+				WT_ASSERT(session,
+				    F_ISSET(chunk, WT_LSM_CHUNK_MERGING));
+				F_CLR(chunk, WT_LSM_CHUNK_MERGING);
+			}
 			nchunks = 0;
 		}
 	}

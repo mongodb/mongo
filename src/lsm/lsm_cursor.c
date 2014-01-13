@@ -279,7 +279,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * we're starting at the right offset in the chunk array.
 		 */
 		if (start_chunk >= lsm_tree->nchunks ||
-		    lsm_tree->chunk[start_chunk]->id != start_id)
+		    lsm_tree->chunk[start_chunk]->id != start_id) {
 			for (start_chunk = 0;
 			    start_chunk < lsm_tree->nchunks;
 			    start_chunk++) {
@@ -287,6 +287,9 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 				if (chunk->id == start_id)
 					break;
 			}
+			/* We have to find the start chunk: merge locked it. */
+			WT_ASSERT(session, start_chunk < lsm_tree->nchunks);
+		}
 
 		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 	} else {
