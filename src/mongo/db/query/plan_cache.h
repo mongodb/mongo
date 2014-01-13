@@ -29,7 +29,9 @@
 #pragma once
 
 #include <set>
+#include <boost/optional/optional.hpp>
 #include <boost/thread/mutex.hpp>
+
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_tag.h"
