@@ -102,6 +102,10 @@ namespace mongo {
         bool upsert;         // true if the update actually did an insert
         int keyUpdates;
 
+        // New Query Framework debugging/profiling info
+        // XXX: should this really be an opaque BSONObj?  Not sure.
+        BSONObj execStats;
+
         // error handling
         ExceptionInfo exceptionInfo;
         

@@ -167,9 +167,7 @@ namespace mongo {
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
             killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
-            // TODO:
-            // curop.debug().query = BSONForQuery
-            // curop.setQuery(curop.debug().query);
+            // XXX: what should we set for the curop.debug() etc. here?
 
             // TODO: What is pass?
             if (0 == pass) { cc->updateSlaveLocation(curop); }
@@ -216,6 +214,8 @@ namespace mongo {
                     break;
                 }
             }
+
+            // XXX: should we update the execution stats in curop.debug() here?
 
             if (Runner::RUNNER_EOF == state && 0 == numResults
                 && (queryOptions & QueryOption_CursorTailable)
@@ -679,6 +679,10 @@ namespace mongo {
 
             if (explain->isIDHackSet()) {
                 curop.debug().idhack = explain->getIDHack();
+            }
+
+            if (!explain->stats.isEmpty()) {
+                curop.debug().execStats = explain->stats;
             }
         }
 

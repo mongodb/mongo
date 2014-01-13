@@ -729,6 +729,10 @@ namespace mongo {
         OPDEBUG_APPEND_NUMBER( responseLength );
         b.append( "millis" , executionTime );
 
+        if (!execStats.isEmpty()) {
+            b.append("execStats", execStats);
+        }
+
         return true;
     }
 
