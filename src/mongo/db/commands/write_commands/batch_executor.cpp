@@ -69,27 +69,12 @@ namespace mongo {
     static WCErrorDetail* toWriteConcernError( const Status& wcStatus,
                                                const WriteConcernResult& wcResult ) {
 
-        // Error reported is either the errmsg or err from wc
-        string errMsg;
-        if ( !wcStatus.isOK() )
-            errMsg = wcStatus.toString();
-        else if ( wcResult.err.size() )
-            errMsg = wcResult.err;
-
-        if ( errMsg.empty() )
-            return NULL;
-
         WCErrorDetail* wcError = new WCErrorDetail;
 
-        if ( wcStatus.isOK() )
-            wcError->setErrCode( ErrorCodes::WriteConcernFailed );
-        else
-            wcError->setErrCode( wcStatus.code() );
-
+        wcError->setErrCode( wcStatus.code() );
+        wcError->setErrMessage( wcStatus.reason() );
         if ( wcResult.wTimedOut )
             wcError->setErrInfo( BSON( "wtimeout" << true ) );
-
-        wcError->setErrMessage( errMsg );
 
         return wcError;
     }
@@ -116,6 +101,10 @@ namespace mongo {
         }
         else {
             status = writeConcern.parse( _defaultWriteConcern );
+        }
+
+        if ( status.isOK() ) {
+            status = validateWriteConcern( writeConcern );
         }
 
         if ( !status.isOK() ) {
@@ -161,7 +150,9 @@ namespace mongo {
             WriteConcernResult res;
             status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
 
-            wcError.reset( toWriteConcernError( status, res ) );
+            if ( !status.isOK() ) {
+                wcError.reset( toWriteConcernError( status, res ) );
+            }
         }
 
         //

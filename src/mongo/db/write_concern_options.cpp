@@ -36,4 +36,38 @@ namespace mongo {
     const BSONObj WriteConcernOptions::AllConfigs = BSONObj();
     const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 
+    Status WriteConcernOptions::parse( const BSONObj& obj ) {
+
+        bool j = obj["j"].trueValue();
+        bool fsync = obj["fsync"].trueValue();
+
+        if ( j & fsync )
+            return Status( ErrorCodes::BadValue, "fsync and j options cannot be used together" );
+
+        if ( j ) {
+            syncMode = JOURNAL;
+        }
+        if ( fsync ) {
+            syncMode = FSYNC;
+        }
+
+        BSONElement e = obj["w"];
+        if ( e.isNumber() ) {
+            wNumNodes = e.numberInt();
+        }
+        else if ( e.type() == String ) {
+            wMode = e.valuestrsafe();
+        }
+        else if ( e.eoo() ||
+                  e.type() == jstNULL ||
+                  e.type() == Undefined ) {
+        }
+        else {
+            return Status( ErrorCodes::BadValue, "w has to be a number or a string" );
+        }
+
+        wTimeout = obj["wtimeout"].numberInt();
+
+        return Status::OK();
+    }
 }

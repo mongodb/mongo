@@ -55,36 +55,34 @@ var testWriteBatches = function (coll) {
     // Insert tests
 
     //
-    // Basic no journal insert, default WC
+    // Basic insert, default WC
     coll.remove({});
     printjson( request = {insert : coll.getName(),
                           documents: [{_id: 1, a:1}]});
     printjson( result = coll.runCommand(request) );
     assert(result.ok);
     assert.eq(1, result.n);
-
     assert.eq(1, coll.count());
 
     //
-    // Basic no journal insert, error on WC with j set
+    // Basic insert, error on WC application with invalid wmode
     coll.remove({});
     printjson( request = {insert : coll.getName(),
                           documents: [{_id: 1, a:1}],
-                          writeConcern: {w:1, j:true}});
+                          writeConcern: {w:'invalid'}});
     printjson( result = coll.runCommand(request) );
     assert(result.ok);
     assert.eq(1, result.n);
     assert(result.writeConcernError != null);
     assert.eq('string', typeof(result.writeConcernError.errmsg));
-
     assert.eq(1, coll.count());
 
     //
-    // Basic no journal insert, insert error and no write
+    // Basic ordered insert, insert error so no WC error despite invalid wmode
     coll.remove({});
     printjson( request = {insert : coll.getName(),
                           documents: [{_id: 1, a:1, $invalid: true}],
-                          writeConcern: {w:1, j:true}});
+                          writeConcern: {w:'invalid'}});
     printjson( result = coll.runCommand(request) );
     assert(result.ok);
     assert.eq(0, result.n);
@@ -97,11 +95,11 @@ var testWriteBatches = function (coll) {
     assert.eq(0, coll.count());
 
     //
-    // Basic no journal insert, error on WC with j set and insert error
+    // Basic unordered insert, insert error and WC invalid mode error
     coll.remove({});
     printjson( request = {insert : coll.getName(),
                        documents: [{_id: -1, a:1}, {_id: 1, a:1, $invalid: true}],
-                       writeConcern: {w:1, j:true},
+                       writeConcern: {w:'invalid'},
                        ordered: false});
     printjson( result = coll.runCommand(request) );
     assert(result.ok);
@@ -117,7 +115,35 @@ var testWriteBatches = function (coll) {
 
     assert.eq(1, coll.count());
 
-    // TODO: More tests here
+    // GLE behavior change in 2.6
+    if (coll === coll26 || coll === collMixed) {
+
+        //
+        // Basic no journal insert, command error with nojournal in 2.6 and mixed
+        coll.remove({});
+        printjson( request = {insert : coll.getName(),
+                              documents: [{_id: -1, a:1},{_id: 1, a:1}],
+                              writeConcern: {j:true}});
+        printjson( result = coll.runCommand(request) );
+        assert(!result.ok);
+        // Explicitly *not* true when command fails totally
+        // assert.eq(0, coll.count());
+    }
+    else {
+
+        //
+        // Basic no journal insert, WC error with nojournal in 2.4
+        coll.remove({});
+        printjson( request = {insert : coll.getName(),
+                              documents: [{_id: -1, a:1},{_id: 1, a:1}],
+                              writeConcern: {j:true}});
+        printjson( result = coll.runCommand(request) );
+        assert(result.ok);
+        assert.eq(2, result.n);
+        assert(result.writeConcernError != null);
+        assert.eq('string', typeof(result.writeConcernError.errmsg));
+        assert.eq(2, coll.count());
+    }
 
 };
 

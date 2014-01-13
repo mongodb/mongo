@@ -184,14 +184,16 @@ namespace mongo {
             }
 
             map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(wStr);
-            uassert(14830, str::stream() << "unrecognized getLastError mode: " << wStr,
+            uassert(ErrorCodes::UnknownReplWriteConcern,
+                    str::stream() << "unrecognized getLastError mode: " << wStr,
                     it != theReplSet->config().rules.end());
 
             return op <= (*it).second->last;
         }
 
         bool replicatedToNum(OpTime& op, int w) {
-            massert( 16805, "replicatedToNum called but not master anymore", _isMaster() );
+            massert( ErrorCodes::NotMaster,
+                     "replicatedToNum called but not master anymore", _isMaster() );
 
             if ( w <= 1 )
                 return true;
@@ -202,7 +204,7 @@ namespace mongo {
         }
 
         bool waitForReplication(OpTime& op, int w, int maxSecondsToWait) {
-            static const int noLongerMasterAssertCode = 16806;
+            static const int noLongerMasterAssertCode = ErrorCodes::NotMaster;
             massert(noLongerMasterAssertCode, 
                     "waitForReplication called but not master anymore", _isMaster() );
 

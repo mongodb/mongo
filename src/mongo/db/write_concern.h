@@ -32,6 +32,11 @@
 
 namespace mongo {
 
+    /**
+     * Verifies that a WriteConcern is valid for this particular host.
+     */
+    Status validateWriteConcern( const WriteConcernOptions& writeConcern );
+
     struct WriteConcernResult {
         WriteConcernResult() {
             reset();
@@ -59,15 +64,15 @@ namespace mongo {
 
     /**
      * Blocks until the database is sure the specified user write concern has been fulfilled, or
-     * returns an error status if the write concern fails.
+     * returns an error status if the write concern fails.  Does no validation of the input write
+     * concern, it is an error to pass this function an invalid write concern for the host.
      *
      * Takes a user write concern as well as the replication opTime the write concern applies to -
      * if this opTime.isNull() no replication-related write concern options will be enforced.
      *
      * Returns result of the write concern if successful.
-     * Returns !OK if anything goes wrong.
-     * Returns WriteConcernLegacyOK if the write concern could not be applied but legacy GLE should
-     * not report an error.
+     * Returns NotMaster if the host steps down while waiting for replication
+     * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
      */
     Status waitForWriteConcern( const WriteConcernOptions& writeConcern,
                                 const OpTime& replOpTime,

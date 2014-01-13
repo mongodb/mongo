@@ -238,6 +238,7 @@ var _batch_api_module = (function() {
 
     // Define properties
     defineReadOnlyProperty(this, "code", err.code);
+    defineReadOnlyProperty(this, "errInfo", err.errInfo);
     defineReadOnlyProperty(this, "errmsg", err.errmsg);
 
     this.tojson = function() {
@@ -245,7 +246,7 @@ var _batch_api_module = (function() {
     }
 
     this.toString = function() {
-      return "WriteConcernError(" + err.errmsg + ")";
+      return "WriteConcernError(" + tojson(err) + ")";
     }
 
     this.shellPrint = function() {
