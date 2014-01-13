@@ -430,7 +430,8 @@ namespace {
         // With sort
         testGetPlanCacheKey("{}", "{a: 1}", "{}", "anaa");
         testGetPlanCacheKey("{}", "{a: -1}", "{}", "anda");
-        testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "{}", "anta");
+        testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "{a: {$meta: 'textScore'}}",
+                            "antap{ $meta: \"textScore\" }a");
         // With projection
         testGetPlanCacheKey("{}", "{}", "{a: 1}", "anp1a");
         testGetPlanCacheKey("{}", "{}", "{a: 0}", "anp0a");
