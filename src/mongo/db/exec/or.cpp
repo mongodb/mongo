@@ -50,7 +50,7 @@ namespace mongo {
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (0 == _specificStats.matchTested.size()) {
-            _specificStats.matchTested = vector<uint64_t>(_children.size(), 0);
+            _specificStats.matchTested = vector<size_t>(_children.size(), 0);
         }
 
         WorkingSetID id;

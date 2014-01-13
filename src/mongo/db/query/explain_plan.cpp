@@ -142,13 +142,12 @@ namespace mongo {
 
         bool covered = true;
         bool sortPresent = false;
-        uint64_t chunkSkips = 0;
+        size_t chunkSkips = 0;
 
         const PlanStageStats* orStage = NULL;
         const PlanStageStats* root = &stats;
         const PlanStageStats* leaf = root;
 
-        // Look for our leaf node.
         while (leaf->children.size() > 0) {
             // We shouldn't be here if there are any ANDs
             if (leaf->children.size() > 1) {
@@ -191,8 +190,8 @@ namespace mongo {
         //   filter. Those keys would have been FETCH-ed, if a fetch is present.
 
         if (orStage != NULL) {
-            uint64_t nScanned = 0;
-            uint64_t nScannedObjects = 0;
+            size_t nScanned = 0;
+            size_t nScannedObjects = 0;
             const std::vector<PlanStageStats*>& children = orStage->children;
             for (std::vector<PlanStageStats*>::const_iterator it = children.begin();
                  it != children.end();

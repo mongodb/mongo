@@ -43,12 +43,12 @@ namespace {
      */
     TEST(CommonStatsTest, defaultValues) {
         CommonStats stats;
-        ASSERT_EQUALS(stats.works, static_cast<uint64_t>(0));
-        ASSERT_EQUALS(stats.yields, static_cast<uint64_t>(0));
-        ASSERT_EQUALS(stats.invalidates, static_cast<uint64_t>(0));
-        ASSERT_EQUALS(stats.advanced, static_cast<uint64_t>(0));
-        ASSERT_EQUALS(stats.needTime, static_cast<uint64_t>(0));
-        ASSERT_EQUALS(stats.needFetch, static_cast<uint64_t>(0));
+        ASSERT_EQUALS(stats.works, static_cast<size_t>(0));
+        ASSERT_EQUALS(stats.yields, static_cast<size_t>(0));
+        ASSERT_EQUALS(stats.invalidates, static_cast<size_t>(0));
+        ASSERT_EQUALS(stats.advanced, static_cast<size_t>(0));
+        ASSERT_EQUALS(stats.needTime, static_cast<size_t>(0));
+        ASSERT_EQUALS(stats.needFetch, static_cast<size_t>(0));
         ASSERT_FALSE(stats.isEOF);
     }
 
@@ -75,8 +75,8 @@ namespace {
      */
     TEST(CommonStatsTest, writeExplainTo) {
         CommonStats stats;
-        stats.works = static_cast<uint64_t>(2);
-        stats.advanced = static_cast<uint64_t>(3);
+        stats.works = static_cast<size_t>(2);
+        stats.advanced = static_cast<size_t>(3);
         BSONObjBuilder bob;
         stats.writeExplainTo(&bob);
         BSONObj obj = bob.done();
@@ -92,8 +92,8 @@ namespace {
      */
     TEST(PlanStageStatsTest, writeExplainTo) {
         CommonStats stats;
-        stats.works = static_cast<uint64_t>(2);
-        stats.advanced = static_cast<uint64_t>(3);
+        stats.works = static_cast<size_t>(2);
+        stats.advanced = static_cast<size_t>(3);
         BSONObjBuilder bob;
         PlanStageStats pss(stats);
         pss.writeExplainTo(&bob);

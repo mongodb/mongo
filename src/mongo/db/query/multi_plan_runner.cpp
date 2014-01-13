@@ -528,8 +528,8 @@ namespace mongo {
 
         (*explain)->addToAllPlans(chosenPlan); // ownership xfer
 
-        uint64_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
-        uint64_t nScannedAllPlans = chosenPlan->getNScanned();
+        size_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
+        size_t nScannedAllPlans = chosenPlan->getNScanned();
         for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
              it != _candidateStats.end();
              ++it) {

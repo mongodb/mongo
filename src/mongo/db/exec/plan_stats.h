@@ -54,15 +54,15 @@ namespace mongo {
                         isEOF(false) { }
 
         // Count calls into the stage.
-        uint64_t works;
-        uint64_t yields;
-        uint64_t unyields;
-        uint64_t invalidates;
+        size_t works;
+        size_t yields;
+        size_t unyields;
+        size_t invalidates;
 
         // How many times was this state the return value of work(...)?
-        uint64_t advanced;
-        uint64_t needTime;
-        uint64_t needFetch;
+        size_t advanced;
+        size_t needTime;
+        size_t needFetch;
 
         // TODO: have some way of tracking WSM sizes (or really any series of #s).  We can measure
         // the size of our inputs and the size of our outputs.  We can do a lot with the WS here.
@@ -116,15 +116,15 @@ namespace mongo {
 
         // Invalidation counters.
         // How many results had the AND fully evaluated but were invalidated?
-        uint64_t flaggedButPassed;
+        size_t flaggedButPassed;
 
         // How many results were mid-AND but got flagged?
-        uint64_t flaggedInProgress;
+        size_t flaggedInProgress;
 
         // How many entries are in the map after each child?
         // child 'i' produced children[i].common.advanced DiskLocs, of which mapAfterChild[i] were
         // intersections.
-        std::vector<uint64_t> mapAfterChild;
+        std::vector<size_t> mapAfterChild;
 
         // mapAfterChild[mapAfterChild.size() - 1] WSMswere match tested.
         // commonstats.advanced is how many passed.
@@ -137,20 +137,20 @@ namespace mongo {
         virtual ~AndSortedStats() { }
 
         // How many results from each child did not pass the AND?
-        std::vector<uint64_t> failedAnd;
+        std::vector<size_t> failedAnd;
 
         // How many results were flagged via invalidation?
-        uint64_t flagged;
+        size_t flagged;
 
         // Fails == common.advanced - matchTested
-        uint64_t matchTested;
+        size_t matchTested;
     };
 
     struct CollectionScanStats : public SpecificStats {
         CollectionScanStats() : docsTested(0) { }
 
         // How many documents did we check against our filter?
-        uint64_t docsTested;
+        size_t docsTested;
     };
 
     struct FetchStats : public SpecificStats {
@@ -161,17 +161,17 @@ namespace mongo {
         virtual ~FetchStats() { }
 
         // Have we seen anything that already had an object?
-        uint64_t alreadyHasObj;
+        size_t alreadyHasObj;
 
         // How many fetches weren't in memory?  it's common.needFetch.
         // How many total fetches did we do?  it's common.advanced.
         // So the number of fetches that were in memory are common.advanced - common.needFetch.
 
         // How many records were we forced to fetch as the result of an invalidation?
-        uint64_t forcedFetches;
+        size_t forcedFetches;
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
-        uint64_t matchTested;
+        size_t matchTested;
     };
 
     struct IndexScanStats : public SpecificStats {
@@ -204,18 +204,18 @@ namespace mongo {
         // Whether this index is over a field that contain array values.
         bool isMultiKey;
 
-        uint64_t yieldMovedCursor;
-        uint64_t dupsTested;
-        uint64_t dupsDropped;
+        size_t yieldMovedCursor;
+        size_t dupsTested;
+        size_t dupsDropped;
 
-        uint64_t seenInvalidated;
+        size_t seenInvalidated;
         // TODO: we could track key sizes here.
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
-        uint64_t matchTested;
+        size_t matchTested;
 
         // Number of entries retrieved from the index during the scan.
-        uint64_t keysExamined;
+        size_t keysExamined;
 
     };
 
@@ -226,14 +226,14 @@ namespace mongo {
 
         virtual ~OrStats() { }
 
-        uint64_t dupsTested;
-        uint64_t dupsDropped;
+        size_t dupsTested;
+        size_t dupsDropped;
 
         // How many calls to invalidate(...) actually removed a DiskLoc from our deduping map?
-        uint64_t locsForgotten;
+        size_t locsForgotten;
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
-        std::vector<uint64_t> matchTested;
+        std::vector<size_t> matchTested;
     };
 
     struct SortStats : public SpecificStats {
@@ -242,7 +242,7 @@ namespace mongo {
         virtual ~SortStats() { }
 
         // How many records were we forced to fetch as the result of an invalidation?
-        uint64_t forcedFetches;
+        size_t forcedFetches;
     };
 
     struct MergeSortStats : public SpecificStats {
@@ -252,35 +252,35 @@ namespace mongo {
 
         virtual ~MergeSortStats() { }
 
-        uint64_t dupsTested;
-        uint64_t dupsDropped;
+        size_t dupsTested;
+        size_t dupsDropped;
 
         // How many records were we forced to fetch as the result of an invalidation?
-        uint64_t forcedFetches;
+        size_t forcedFetches;
     };
 
     struct ShardingFilterStats : public SpecificStats {
         ShardingFilterStats() : chunkSkips(0) { }
 
-        uint64_t chunkSkips;
+        size_t chunkSkips;
     };
 
     struct TwoDNearStats : public SpecificStats {
         TwoDNearStats() : objectsLoaded(0), nscanned(0) { }
 
-        uint64_t objectsLoaded;
+        size_t objectsLoaded;
 
         // Since 2d's near does all its work in one go we can't divine the real nscanned from
         // anything else.
-        uint64_t nscanned;
+        size_t nscanned;
     };
 
     struct TextStats : public SpecificStats {
         TextStats() : keysExamined(0), fetches(0) { }
 
-        uint64_t keysExamined;
+        size_t keysExamined;
 
-        uint64_t fetches;
+        size_t fetches;
     };
 
 }  // namespace mongo
