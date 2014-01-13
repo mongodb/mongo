@@ -1800,6 +1800,7 @@ namespace mongo {
             if ( isMaster( NULL ) ) {
                 uasserted( 17281, msg );
             }
+            return 2;
         }
         verify( key.dataSize() > 0 );
 
@@ -1889,6 +1890,7 @@ namespace mongo {
                 if ( isMaster( NULL ) ) {
                     uasserted( 17280, msg );
                 }
+                return 3;
             }
         }
 
