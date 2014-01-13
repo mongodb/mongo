@@ -66,6 +66,8 @@ wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(SWIG_SOURCES)
 	(cd $(srcdir) && \
 	    $(SWIG) -Wall -v -java -nodefaultctor -nodefaultdtor -package com.wiredtiger.db -I$(abs_top_builddir) -outdir $(JAVADEST) -o wiredtiger_wrap.c wiredtiger.i)
 
+$(srcdir)/wiredtiger_wrap.c: wiredtiger_wrap.c
+
 $(JDOCDIR)/index.html:	$(dist_java_JAVA)
 	mkdir -p $(JDOCDIR)
 	javadoc -public -d $(JDOCDIR) -link http://docs.oracle.com/javase/6/docs/api $(JAVADESTFULL)/wiredtiger.java $(JAVADESTFULL)/wiredtigerConstants.java $(JAVADESTFULL)/[A-Z]*.java
