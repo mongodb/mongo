@@ -48,6 +48,7 @@ namespace mongo {
         bool stopOnError;
         bool jsonArray;
         bool doimport;
+        int throttleBPS;
     };
 
     extern MongoImportGlobalParams mongoImportGlobalParams;

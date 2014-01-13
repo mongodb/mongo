@@ -48,113 +48,117 @@ namespace mongo {
         }
 
         ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+		if (!ret.isOK()) {
+		    return ret;
+		}
 
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+		ret = addSpecifyDBCollectionToolOptions(options);
+		if (!ret.isOK()) {
+		    return ret;
+		}
 
-        ret = addFieldOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+		ret = addFieldOptions(options);
+		if (!ret.isOK()) {
+		    return ret;
+		}
 
-        options->addOptionChaining("ignoreBlanks", "ignoreBlanks", moe::Switch,
-                "if given, empty fields in csv and tsv will be ignored");
+		options->addOptionChaining("ignoreBlanks", "ignoreBlanks", moe::Switch,
+			"if given, empty fields in csv and tsv will be ignored");
 
-        options->addOptionChaining("type", "type", moe::String,
-                "type of file to import.  default: json (json,csv,tsv)");
+		options->addOptionChaining("type", "type", moe::String,
+			"type of file to import.  default: json (json,csv,tsv)");
 
-        options->addOptionChaining("file", "file", moe::String,
-                "file to import from; if not specified stdin is used")
-                                  .positional(1, 1);
+		options->addOptionChaining("file", "file", moe::String,
+			"file to import from; if not specified stdin is used")
+					  .positional(1, 1);
 
-        options->addOptionChaining("drop", "drop", moe::Switch, "drop collection first ");
+		options->addOptionChaining("drop", "drop", moe::Switch, "drop collection first ");
 
-        options->addOptionChaining("headerline", "headerline", moe::Switch,
-                "first line in input file is a header (CSV and TSV only)");
+		options->addOptionChaining("headerline", "headerline", moe::Switch,
+			"first line in input file is a header (CSV and TSV only)");
 
-        options->addOptionChaining("upsert", "upsert", moe::Switch,
-                "insert or update objects that already exist");
+		options->addOptionChaining("upsert", "upsert", moe::Switch,
+			"insert or update objects that already exist");
 
-        options->addOptionChaining("upsertFields", "upsertFields", moe::String,
-                "comma-separated fields for the query part of the upsert. "
-                "You should make sure this is indexed");
+		options->addOptionChaining("upsertFields", "upsertFields", moe::String,
+			"comma-separated fields for the query part of the upsert. "
+			"You should make sure this is indexed");
 
-        options->addOptionChaining("stopOnError", "stopOnError", moe::Switch,
-                "stop importing at first error rather than continuing");
+		options->addOptionChaining("stopOnError", "stopOnError", moe::Switch,
+			"stop importing at first error rather than continuing");
 
-        options->addOptionChaining("jsonArray", "jsonArray", moe::Switch,
-                "load a json array, not one item per line. Currently limited to 16MB.");
+		options->addOptionChaining("jsonArray", "jsonArray", moe::Switch,
+			"load a json array, not one item per line. Currently limited to 16MB.");
 
-
-        options->addOptionChaining("noimport", "noimport", moe::Switch,
-                "don't actually import. useful for benchmarking parser")
-                                  .hidden();
+		options->addOptionChaining("throttleBPS", "throttleBPS", moe::Int,
+			"throttle to this bytes-per-second value.");
 
 
-        return Status::OK();
-    }
+		options->addOptionChaining("noimport", "noimport", moe::Switch,
+			"don't actually import. useful for benchmarking parser")
+					  .hidden();
 
-    void printMongoImportHelp(std::ostream* out) {
-        *out << "Import CSV, TSV or JSON data into MongoDB.\n" << std::endl;
-        *out << "When importing JSON documents, each document must be a separate line of the input file.\n";
-        *out << "\nExample:\n";
-        *out << "  mongoimport --host myhost --db my_cms --collection docs < mydocfile.json\n" << std::endl;
-        *out << moe::startupOptions.helpString();
-        *out << std::flush;
-    }
 
-    bool handlePreValidationMongoImportOptions(const moe::Environment& params) {
-        if (!handlePreValidationGeneralToolOptions(params)) {
-            return false;
-        }
-        if (params.count("help")) {
-            printMongoImportHelp(&std::cout);
-            return false;
-        }
-        return true;
-    }
+		return Status::OK();
+	    }
 
-    Status storeMongoImportOptions(const moe::Environment& params,
-                                   const std::vector<std::string>& args) {
-        Status ret = storeGeneralToolOptions(params, args);
-        if (!ret.isOK()) {
-            return ret;
-        }
+	    void printMongoImportHelp(std::ostream* out) {
+		*out << "Import CSV, TSV or JSON data into MongoDB.\n" << std::endl;
+		*out << "When importing JSON documents, each document must be a separate line of the input file.\n";
+		*out << "\nExample:\n";
+		*out << "  mongoimport --host myhost --db my_cms --collection docs < mydocfile.json\n" << std::endl;
+		*out << moe::startupOptions.helpString();
+		*out << std::flush;
+	    }
 
-        ret = storeFieldOptions(params, args);
-        if (!ret.isOK()) {
-            return ret;
-        }
+	    bool handlePreValidationMongoImportOptions(const moe::Environment& params) {
+		if (!handlePreValidationGeneralToolOptions(params)) {
+		    return false;
+		}
+		if (params.count("help")) {
+		    printMongoImportHelp(&std::cout);
+		    return false;
+		}
+		return true;
+	    }
 
-        mongoImportGlobalParams.filename = getParam("file");
-        mongoImportGlobalParams.drop = hasParam("drop");
-        mongoImportGlobalParams.ignoreBlanks = hasParam("ignoreBlanks");
+	    Status storeMongoImportOptions(const moe::Environment& params,
+					   const std::vector<std::string>& args) {
+		Status ret = storeGeneralToolOptions(params, args);
+		if (!ret.isOK()) {
+		    return ret;
+		}
 
-        if (hasParam("upsert") || hasParam("upsertFields")) {
-            mongoImportGlobalParams.upsert = true;
+		ret = storeFieldOptions(params, args);
+		if (!ret.isOK()) {
+		    return ret;
+		}
 
-            string uf = getParam("upsertFields");
-            if (uf.empty()) {
-                mongoImportGlobalParams.upsertFields.push_back("_id");
-            }
-            else {
-                StringSplitter(uf.c_str(), ",").split(mongoImportGlobalParams.upsertFields);
-            }
-        }
-        else {
-            mongoImportGlobalParams.upsert = false;
-        }
+		mongoImportGlobalParams.filename = getParam("file");
+		mongoImportGlobalParams.drop = hasParam("drop");
+		mongoImportGlobalParams.ignoreBlanks = hasParam("ignoreBlanks");
 
-        mongoImportGlobalParams.doimport = !hasParam("noimport");
-        mongoImportGlobalParams.type = getParam("type", "json");
-        mongoImportGlobalParams.jsonArray = hasParam("jsonArray");
-        mongoImportGlobalParams.headerLine = hasParam("headerline");
-        mongoImportGlobalParams.stopOnError = hasParam("stopOnError");
+		if (hasParam("upsert") || hasParam("upsertFields")) {
+		    mongoImportGlobalParams.upsert = true;
+
+		    string uf = getParam("upsertFields");
+		    if (uf.empty()) {
+			mongoImportGlobalParams.upsertFields.push_back("_id");
+		    }
+		    else {
+			StringSplitter(uf.c_str(), ",").split(mongoImportGlobalParams.upsertFields);
+		    }
+		}
+		else {
+		    mongoImportGlobalParams.upsert = false;
+		}
+
+		mongoImportGlobalParams.doimport = !hasParam("noimport");
+		mongoImportGlobalParams.type = getParam("type", "json");
+		mongoImportGlobalParams.jsonArray = hasParam("jsonArray");
+		mongoImportGlobalParams.headerLine = hasParam("headerline");
+		mongoImportGlobalParams.stopOnError = hasParam("stopOnError");
+		mongoImportGlobalParams.throttleBPS = getParam("throttleBPS", 0);
 
         return Status::OK();
     }
