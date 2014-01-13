@@ -281,6 +281,28 @@ class Import : public Tool {
         return true;
     }
 
+    void throttleIfNeeded(int num, unsigned int throttleChkFreq, const int throttleBPS, 
+                          int& currTBSize, unsigned long long& tStartMs) {
+        fassert(0, throttleChkFreq != 0);
+        if (num != 0 && num % throttleChkFreq == 0) {
+            int bin_exp = static_cast<int>(log2(static_cast<float>(currTBSize) / throttleBPS));
+            if (bin_exp < 0) {
+                throttleChkFreq <<= -bin_exp;
+            } else if (bin_exp > 0 && throttleChkFreq >> bin_exp != 0) {
+                throttleChkFreq >>= bin_exp;
+            }
+            while (currTBSize > throttleBPS) {
+                unsigned long long tmp_ms = curTimeMillis64();
+                unsigned long long diff_ms = tmp_ms - tStartMs;
+                if (diff_ms < 1000) {
+                    sleepmillis(1000 - diff_ms);
+                }
+                currTBSize -= throttleBPS;
+                tStartMs = tmp_ms;
+           }
+        }
+    }
+
 public:
     Import() : Tool() {
         _type = JSON;
@@ -426,6 +448,10 @@ public:
         int errors = 0;
         lastErrorFailures = 0;
         int len = 0;
+        const int throttleBPS = mongoImportGlobalParams.throttleBPS;
+        int currTBSize = 0;
+        unsigned long long tStartMs = curTimeMillis64();
+        unsigned int throttleChkFreq = 1;
 
         // We have to handle jsonArrays differently since we can't read line by line
         if (_type == JSON && mongoImportGlobalParams.jsonArray) {
@@ -469,6 +495,11 @@ public:
                             // a few more as that won't be too time expensive.
                             checkLastError();
                             lastNumChecked = num;
+                        }
+
+                        if (throttleBPS) {
+                            currTBSize += len;
+                            throttleIfNeeded(num, throttleChkFreq, throttleBPS, currTBSize, tStartMs);
                         }
                     }
 
@@ -535,6 +566,11 @@ public:
                             // a few more as that won't be too time expensive.
                             checkLastError();
                             lastNumChecked = num;
+                        }
+
+                        if (throttleBPS) {
+                            currTBSize += len;
+                            throttleIfNeeded(num, throttleChkFreq, throttleBPS, currTBSize, tStartMs);
                         }
                     }
 

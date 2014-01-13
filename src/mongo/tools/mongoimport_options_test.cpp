@@ -471,6 +471,18 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
+            else if (iterator->_dottedName == "throttleBPS") {
+                ASSERT_EQUALS(iterator->_singleName, "throttleBPS");
+                ASSERT_EQUALS(iterator->_type, moe::Int);
+                ASSERT_EQUALS(iterator->_description, "throttle to this bytes-per-second value.");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
             else if (iterator->_dottedName == "noimport") {
                 ASSERT_EQUALS(iterator->_singleName, "noimport");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
