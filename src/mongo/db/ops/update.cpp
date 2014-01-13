@@ -684,6 +684,10 @@ namespace mongo {
                     opDebug->fastmod = true;
                 }
                 newObj = oldObj;
+
+                // Broadcast the mutation so that query results stay correct.
+                ClientCursor::invalidateDocument(nsString.ns(), collection->details(), loc,
+                                                 INVALIDATION_MUTATION);
             }
             else {
 

@@ -63,7 +63,7 @@ namespace mongo {
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual const std::string& ns();
 

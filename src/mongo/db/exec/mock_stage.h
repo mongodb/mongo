@@ -60,7 +60,7 @@ namespace mongo {
         // have correct yielding behavior.
         virtual void prepareToYield() { }
         virtual void recoverFromYield() { }
-        virtual void invalidate(const DiskLoc& dl) { }
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type) { }
         virtual PlanStageStats* getStats() { return NULL; }
 
         /**

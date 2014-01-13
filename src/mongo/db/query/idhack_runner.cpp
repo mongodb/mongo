@@ -147,9 +147,9 @@ namespace mongo {
     }
 
     // Nothing to do here, holding no state.
-    void IDHackRunner::invalidate(const DiskLoc& dl) {
+    void IDHackRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (_done || _killed) { return; }
-        if (_locFetching == dl) {
+        if (_locFetching == dl && (type == INVALIDATION_DELETION)) {
             _locFetching = DiskLoc();
             _killed = true;
         }

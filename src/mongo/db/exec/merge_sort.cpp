@@ -174,10 +174,10 @@ namespace mongo {
         }
     }
 
-    void MergeSortStage::invalidate(const DiskLoc& dl) {
+    void MergeSortStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl);
+            _children[i]->invalidate(dl, type);
         }
 
         // Go through our data and see if we're holding on to the invalidated loc.

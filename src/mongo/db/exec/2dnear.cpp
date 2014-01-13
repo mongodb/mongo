@@ -131,7 +131,7 @@ namespace mongo {
         // Also nothing to do here.
     }
 
-    void TwoDNear::invalidate(const DiskLoc& dl) {
+    void TwoDNear::invalidate(const DiskLoc& dl, InvalidationType type) {
         // XXX make sure this is ok
         typedef multimap<DiskLoc, WorkingSetID>::iterator MMIT;
         pair<MMIT, MMIT> range = _invalidationMap.equal_range(dl);

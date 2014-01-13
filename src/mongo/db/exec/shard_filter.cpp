@@ -90,9 +90,9 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void ShardFilterStage::invalidate(const DiskLoc& dl) {
+    void ShardFilterStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
     }
 
     PlanStageStats* ShardFilterStage::getStats() {

@@ -116,9 +116,9 @@ namespace mongo {
         return _iter->isEOF();
     }
 
-    void CollectionScan::invalidate(const DiskLoc& dl) {
+    void CollectionScan::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        if (NULL != _iter) {
+        if (NULL != _iter && (INVALIDATION_DELETION == type)) {
             _iter->invalidate(dl);
         }
     }

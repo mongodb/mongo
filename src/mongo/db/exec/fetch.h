@@ -53,7 +53,7 @@ namespace mongo {
 
         virtual void prepareToYield();
         virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         PlanStageStats* getStats();
 

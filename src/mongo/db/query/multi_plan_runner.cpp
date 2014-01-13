@@ -132,11 +132,11 @@ namespace mongo {
         }
     }
 
-    void MultiPlanRunner::invalidate(const DiskLoc& dl) {
+    void MultiPlanRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (_failure || _killed) { return; }
 
         if (NULL != _bestPlan) {
-            _bestPlan->invalidate(dl);
+            _bestPlan->invalidate(dl, type);
             for (list<WorkingSetID>::iterator it = _alreadyProduced.begin();
                  it != _alreadyProduced.end();) {
                 WorkingSetMember* member = _bestPlan->getWorkingSet()->get(*it);
@@ -153,7 +153,7 @@ namespace mongo {
                 }
             }
             if (NULL != _backupPlan) {
-                _backupPlan->invalidate(dl);
+                _backupPlan->invalidate(dl, type);
                 for (list<WorkingSetID>::iterator it = _backupAlreadyProduced.begin();
                         it != _backupAlreadyProduced.end();) {
                     WorkingSetMember* member = _backupPlan->getWorkingSet()->get(*it);
@@ -173,7 +173,7 @@ namespace mongo {
         }
         else {
             for (size_t i = 0; i < _candidates.size(); ++i) {
-                _candidates[i].root->invalidate(dl);
+                _candidates[i].root->invalidate(dl, type);
                 for (list<WorkingSetID>::iterator it = _candidates[i].results.begin();
                      it != _candidates[i].results.end();) {
                     WorkingSetMember* member = _candidates[i].ws->get(*it);

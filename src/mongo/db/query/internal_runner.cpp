@@ -70,8 +70,8 @@ namespace mongo {
         return _ns;
     }
 
-    void InternalRunner::invalidate(const DiskLoc& dl) {
-        _exec->invalidate(dl);
+    void InternalRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
+        _exec->invalidate(dl, type);
     }
 
     void InternalRunner::setYieldPolicy(Runner::YieldPolicy policy) {

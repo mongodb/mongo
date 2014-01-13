@@ -271,7 +271,7 @@ namespace QueryStageFetch {
             WorkingSetMember* member = ws.get(id);
 
             // Invalidate the DL.
-            fetchStage->invalidate(member->loc);
+            fetchStage->invalidate(member->loc, INVALIDATION_DELETION);
 
             bool fetchReturnsInvalidated = false;
             if (fetchReturnsInvalidated) {

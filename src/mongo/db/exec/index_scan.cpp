@@ -248,7 +248,7 @@ namespace mongo {
         }
     }
 
-    void IndexScan::invalidate(const DiskLoc& dl) {
+    void IndexScan::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         // If we see this DiskLoc again, it may not be the same doc. it was before, so we want to

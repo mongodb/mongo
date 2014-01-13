@@ -86,9 +86,9 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void ProjectionStage::invalidate(const DiskLoc& dl) {
+    void ProjectionStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
     }
 
     PlanStageStats* ProjectionStage::getStats() {

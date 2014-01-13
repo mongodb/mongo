@@ -152,10 +152,13 @@ namespace mongo {
 
     bool OplogStart::isEOF() { return _done; }
 
-    void OplogStart::invalidate(const DiskLoc& dl) {
+    void OplogStart::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (_needInit) { return; }
+
+        if (INVALIDATION_DELETION != type) { return; }
+
         if (_backwardsScanning) {
-            _cs->invalidate(dl);
+            _cs->invalidate(dl, type);
         }
         else {
             verify(_extentHopping);

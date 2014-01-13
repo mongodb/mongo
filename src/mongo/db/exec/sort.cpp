@@ -401,9 +401,9 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void SortStage::invalidate(const DiskLoc& dl) {
+    void SortStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
 
         // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
         // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still

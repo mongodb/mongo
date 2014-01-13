@@ -30,6 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/invalidation_type.h"
 
 namespace mongo {
 
@@ -152,13 +153,15 @@ namespace mongo {
         virtual bool isEOF() = 0;
 
         /**
-         * Inform the runner that the provided DiskLoc is about to disappear (or change entirely).
-         * The runner then takes any actions required to continue operating correctly, including
+         * Inform the runner about changes to DiskLoc(s) that occur while the runner is yielded.
+         * The runner must take any actions required to continue operating correctly, including
          * broadcasting the invalidation request to the PlanStage tree being run.
          *
-         * Called from ClientCursor::aboutToDelete.
+         * Called from ClientCursor::invalidateDocument.
+         *
+         * See db/invalidation_type.h for InvalidationType.
          */
-        virtual void invalidate(const DiskLoc& dl) = 0;
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type) = 0;
 
         /**
          * Mark the Runner as no longer valid.  Can happen when a runner yields and the underlying

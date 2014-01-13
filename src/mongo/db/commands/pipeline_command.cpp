@@ -101,7 +101,7 @@ namespace {
 
         // These are all no-ops for PipelineRunners
         virtual void setYieldPolicy(YieldPolicy policy) {}
-        virtual void invalidate(const DiskLoc& dl) {}
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type) {}
         virtual void kill() {}
         virtual void saveState() {}
         virtual bool restoreState() { return true; }

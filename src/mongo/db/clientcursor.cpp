@@ -123,18 +123,6 @@ namespace mongo {
         }
     }
 
-    // static
-    void ClientCursor::assertNoCursors() {
-        recursive_scoped_lock lock(ccmutex);
-        if (clientCursorsById.size() > 0) {
-            log() << "ERROR clientcursors exist but should not at this point" << endl;
-            ClientCursor *cc = clientCursorsById.begin()->second;
-            log() << "first one: " << cc->_cursorid << ' ' << cc->_ns << endl;
-            clientCursorsById.clear();
-            verify(false);
-        }
-    }
-
     void ClientCursor::invalidate(const StringData& ns) {
         Lock::assertWriteLocked(ns);
 
@@ -223,19 +211,16 @@ namespace mongo {
         }
     }
 
-    /* must call this on a delete so we clean up the cursors. */
-    void ClientCursor::aboutToDelete(const StringData& ns,
-                                     const NamespaceDetails* nsd,
-                                     const DiskLoc& dl) {
-        // Begin cursor-only
+    void ClientCursor::invalidateDocument(const StringData& ns,
+                                          const NamespaceDetails* nsd,
+                                          const DiskLoc& dl,
+                                          InvalidationType type) {
+        // TODO: Do we need this pagefault thing still
         NoPageFaultsAllowed npfa;
-        // End cursor-only
-
         recursive_scoped_lock lock(ccmutex);
 
         Database *db = cc().database();
         verify(db);
-
         aboutToDeleteForSharding( ns, db, nsd, dl );
 
         // Check our non-cached active runner list.
@@ -244,7 +229,7 @@ namespace mongo {
 
             Runner* runner = *it;
             if (0 == ns.compare(runner->ns())) {
-                runner->invalidate(dl);
+                runner->invalidate(dl, type);
             }
         }
 
@@ -262,7 +247,7 @@ namespace mongo {
             // We're only interested in cursors over one db.
             if (cc->_db != db) { continue; }
             if (NULL == cc->_runner.get()) { continue; }
-            cc->_runner->invalidate(dl);
+            cc->_runner->invalidate(dl, type);
         }
     }
 
@@ -341,7 +326,7 @@ namespace mongo {
                 CurOp * c = cc().curop();
                 while ( c->parent() )
                     c = c->parent();
-                warning() << "ClientCursor::yield can't unlock b/c of recursive lock"
+                warning() << "ClientCursor::staticYield can't unlock b/c of recursive lock"
                           << " ns: " << ns 
                           << " top: " << c->info()
                           << endl;

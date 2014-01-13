@@ -232,7 +232,7 @@ namespace mongo {
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        ClientCursor::aboutToDelete(_ns.ns(), _details, loc);
+        ClientCursor::invalidateDocument(_ns.ns(), _details, loc, INVALIDATION_DELETION);
 
         _indexCatalog.unindexRecord( doc, loc, noWarn);
 
@@ -304,7 +304,8 @@ namespace mongo {
 
             // unindex old record, don't delete
             // this way, if inserting new doc fails, we can re-index this one
-            ClientCursor::aboutToDelete(_ns.ns(), _details, oldLocation);
+            ClientCursor::invalidateDocument(_ns.ns(), _details, oldLocation,
+                                             INVALIDATION_DELETION);
             _indexCatalog.unindexRecord( objOld, oldLocation, true );
 
             if ( debug ) {
@@ -351,6 +352,10 @@ namespace mongo {
         //  update in place
         int sz = objNew.objsize();
         memcpy(getDur().writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
+
+        // Broadcast the mutation so that query results stay correct.
+        ClientCursor::invalidateDocument(_ns.ns(), _details, oldLocation, INVALIDATION_MUTATION);
+
         return StatusWith<DiskLoc>( oldLocation );
     }
 

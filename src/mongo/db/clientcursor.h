@@ -28,20 +28,15 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/matcher.h"
-#include "mongo/db/projection.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/s/collection_metadata.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/background.h"
-#include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -67,22 +62,16 @@ namespace mongo {
 
         ~ClientCursor();
 
-        /**
-         * Assert that there are no open cursors.
-         * Called from DatabaseHolder::closeAll.
-         */
-        static void assertNoCursors();
-
         //
         // Basic accessors
         //
 
         CursorId cursorid() const { return _cursorid; }
         string ns() const { return _ns; }
-        Database * db() const { return _db; }
+        Database* db() const { return _db; }
 
         //
-        // Invalidation of DiskLocs and dropping of namespaces
+        // Mutation/Invalidation of DiskLocs and dropping of namespaces
         //
 
         /**
@@ -92,12 +81,19 @@ namespace mongo {
         static void invalidate(const StringData& ns);
 
         /**
-         * Called when the provided DiskLoc is about to change state via a deletion or an update.
-         * All runners/cursors that might be using that DiskLoc must adapt.
+         * Broadcast a document invalidation to all relevant Runner(s).
+         *
+         * If the type is INVALIDATION_DELETION, invalidateDocument must called *before* the
+         * provided DiskLoc is about to be deleted.
+         *
+         * If the type is INVALIDATION_MUTATION, invalidateDocument must be called *after* the
+         * provided DiskLoc is mutated.  All in-progress queries that hold that DiskLoc as state
+         * must adapt.
          */
-        static void aboutToDelete(const StringData& ns,
-                                  const NamespaceDetails* nsd,
-                                  const DiskLoc& dl);
+        static void invalidateDocument(const StringData& ns,
+                                       const NamespaceDetails* nsd,
+                                       const DiskLoc& dl,
+                                       InvalidationType type);
 
         /**
          * Register a runner so that it can be notified of deletion/invalidation during yields.
@@ -116,6 +112,7 @@ namespace mongo {
         // 
 
         static void staticYield(int micros, const StringData& ns, const Record* rec);
+        static int suggestYieldMicros();
 
         //
         // Static methods about all ClientCursors  TODO: Document.
@@ -177,7 +174,6 @@ namespace mongo {
         // Sharding-specific data.  TODO: Document.
         //
 
-        // future getMore.
         void setCollMetadata( CollectionMetadataPtr metadata ){ _collMetadata = metadata; }
         CollectionMetadataPtr getCollMetadata(){ return _collMetadata; }
 
@@ -202,43 +198,6 @@ namespace mongo {
         void incPos(int n) { _pos += n; }
         void setPos(int n) { _pos = n; }
 
-        //
-        // Yielding that is DEPRECATED.  Will be removed when we use runners and they yield
-        // internally.
-        //
-
-        /**
-         * DEPRECATED
-         * @param microsToSleep -1 : ask client
-         *                       0 : pthread_yield or equivilant
-         *                      >0 : sleep for that amount
-         * @param recordToLoad after yielding lock, load this record with only mmutex
-         * do a dbtemprelease
-         * note: caller should check matcher.docMatcher().atomic() first and not yield if atomic -
-         *       we don't do herein as this->matcher (above) is only initialized for true queries/getmore.
-         *       (ie not set for remote/update)
-         * @return if the cursor is still valid.
-         *         if false is returned, then this ClientCursor should be considered deleted -
-         *         in fact, the whole database could be gone.
-         */
-        bool yield( int microsToSleep = -1, Record * recordToLoad = 0 );
-
-        enum RecordNeeds {
-            DontNeed = -1 , MaybeCovered = 0 , WillNeed = 100
-        };
-            
-        /**
-         * @param needRecord whether or not the next record has to be read from disk for sure
-         *                   if this is true, will yield of next record isn't in memory
-         * @param yielded true if a yield occurred, and potentially if a yield did not occur
-         * @return same as yield()
-         */
-        bool yieldSometimes( RecordNeeds need, bool *yielded = 0 );
-        struct YieldData { CursorId _id; bool _doingDeletes; };
-        bool prepareToYield( YieldData &data );
-        static bool recoverFromYield( const YieldData &data );
-        static int suggestYieldMicros();
-
         /**
          * Is this ClientCursor backed by an aggregation pipeline. Defaults to false.
          *
@@ -250,9 +209,7 @@ namespace mongo {
         bool isAggCursor;
 
     private:
-        friend class ClientCursorHolder;
         friend class ClientCursorPin;
-        friend struct ClientCursorYieldLock;
         friend class CmdCursorInfo;
 
         // A map from the CursorId to the ClientCursor behind it.
@@ -275,8 +232,7 @@ namespace mongo {
         static boost::recursive_mutex& ccmutex;
 
         /**
-         * Initialization common between Cursor and Runner.
-         * TODO: Remove when we're all-runner.
+         * Initialization common between both constructors for the ClientCursor.
          */
         void init();
 
@@ -290,7 +246,6 @@ namespace mongo {
          * Find the ClientCursor with the provided ID.  Optionally warn if it's not found.
          * Assumes ccmutex is held.
          */
-
         static ClientCursor* find_inlock(CursorId id, bool warn = true);
 
         /**
@@ -345,8 +300,6 @@ namespace mongo {
         //
         // The underlying execution machinery.
         //
-
-        // The new world: a runner.
         scoped_ptr<Runner> _runner;
     };
 

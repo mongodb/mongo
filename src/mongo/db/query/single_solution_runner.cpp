@@ -74,8 +74,8 @@ namespace mongo {
         _exec->setYieldPolicy(policy);
     }
 
-    void SingleSolutionRunner::invalidate(const DiskLoc& dl) {
-        _exec->invalidate(dl);
+    void SingleSolutionRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
+        _exec->invalidate(dl, type);
     }
 
     const std::string& SingleSolutionRunner::ns() {

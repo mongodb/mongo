@@ -135,10 +135,10 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void FetchStage::invalidate(const DiskLoc& dl) {
+    void FetchStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
 
         // If we're holding on to an object that we're waiting for the runner to page in...
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {

@@ -62,8 +62,8 @@ namespace mongo {
         return !_killed;
     }
 
-    void PlanExecutor::invalidate(const DiskLoc& dl) {
-        if (!_killed) { _root->invalidate(dl); }
+    void PlanExecutor::invalidate(const DiskLoc& dl, InvalidationType type) {
+        if (!_killed) { _root->invalidate(dl, type); }
     }
 
     void PlanExecutor::setYieldPolicy(Runner::YieldPolicy policy) {

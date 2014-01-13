@@ -304,9 +304,9 @@ namespace mongo {
         }
     }
 
-    void S2NearStage::invalidate(const DiskLoc& dl) {
+    void S2NearStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (NULL != _child.get()) {
-            _child->invalidate(dl);
+            _child->invalidate(dl, type);
         }
 
         unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher>::iterator it

@@ -111,7 +111,7 @@ namespace mongo {
         }
     }
 
-    void TwoD::invalidate(const DiskLoc& dl) {
+    void TwoD::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (NULL != _browse) {
             _browse->invalidate(dl);
         }

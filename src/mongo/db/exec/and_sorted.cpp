@@ -227,13 +227,13 @@ namespace mongo {
         }
     }
 
-    void AndSortedStage::invalidate(const DiskLoc& dl) {
+    void AndSortedStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl);
+            _children[i]->invalidate(dl, type);
         }
 
         if (dl == _targetLoc) {

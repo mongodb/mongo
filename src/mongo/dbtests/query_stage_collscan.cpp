@@ -507,7 +507,7 @@ namespace QueryStageCollectionScan {
 
             // Remove locs[count].
             scan->prepareToYield();
-            scan->invalidate(locs[count]);
+            scan->invalidate(locs[count], INVALIDATION_DELETION);
             remove(locs[count].obj());
             scan->recoverFromYield();
 
@@ -567,7 +567,7 @@ namespace QueryStageCollectionScan {
 
             // Remove locs[count].
             scan->prepareToYield();
-            scan->invalidate(locs[count]);
+            scan->invalidate(locs[count], INVALIDATION_DELETION);
             remove(locs[count].obj());
             scan->recoverFromYield();
 

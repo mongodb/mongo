@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/invalidation_type.h"
 
 namespace mongo {
 
@@ -207,7 +208,7 @@ namespace mongo {
          *
          * Can only be called after a prepareToYield but before a recoverFromYield.
          */
-        virtual void invalidate(const DiskLoc& dl) = 0;
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type) = 0;
 
         /**
          * Returns a tree of stats.  See plan_stats.h for the details of this structure.  If the

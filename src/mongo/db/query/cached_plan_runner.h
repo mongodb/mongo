@@ -71,7 +71,7 @@ namespace mongo {
 
         virtual bool restoreState();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 

@@ -96,10 +96,10 @@ namespace mongo {
         return _exec->restoreState();
     }
 
-    void CachedPlanRunner::invalidate(const DiskLoc& dl) {
-        _exec->invalidate(dl);
+    void CachedPlanRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
+        _exec->invalidate(dl, type);
         if (NULL != _backupPlan.get()) {
-            _backupPlan->invalidate(dl);
+            _backupPlan->invalidate(dl, type);
         }
     }
 

@@ -82,9 +82,9 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void SkipStage::invalidate(const DiskLoc& dl) {
+    void SkipStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
     }
 
     PlanStageStats* SkipStage::getStats() {
