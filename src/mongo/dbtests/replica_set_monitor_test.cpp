@@ -26,14 +26,11 @@
  *    then also delete it in the license file.
  */
 
-/**
- * This file contains test for ReplicaSetMonitor::Node,
- * ReplicaSetMonitor::selectNode and TagSet
- */
-
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
@@ -59,113 +56,130 @@ using mongo::ReplicaSetMonitorPtr;
 using mongo::ScopedDbConnection;
 using mongo::TagSet;
 
+// Pull nested types to top-level scope
+typedef ReplicaSetMonitor::IsMasterReply IsMasterReply;
+typedef ReplicaSetMonitor::ScanState ScanState;
+typedef ReplicaSetMonitor::ScanStatePtr ScanStatePtr;
+typedef ReplicaSetMonitor::SetState SetState;
+typedef ReplicaSetMonitor::SetStatePtr SetStatePtr;
+typedef ReplicaSetMonitor::Refresher Refresher;
+typedef Refresher::NextStep NextStep;
+typedef ScanState::UnconfirmedReplies UnconfirmedReplies;
+typedef SetState::Node Node;
+typedef SetState::Nodes Nodes;
+
 namespace mongo_test {
+
     const BSONObj SampleIsMasterDoc = BSON("tags"
                                             << BSON("dc" << "NYC"
                                                     << "p" << "2"
                                                     << "region" << "NA"));
+    const BSONObj SampleTags = SampleIsMasterDoc["tags"].Obj();
+    const BSONObj NoTags = BSONObj();
     const BSONObj NoTagIsMasterDoc = BSON("isMaster" << true);
 
     TEST(ReplSetMonitorNode, SimpleGoodMatch) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = BSON("tags" << BSON("dc" << "sf"));
-        ASSERT(node.matchesTag(BSON("dc" << "sf")));
+        Node node(((HostAndPort())));
+        node.tags = BSON("dc" << "sf");
+        ASSERT(node.matches(BSON("dc" << "sf")));
     }
 
     TEST(ReplSetMonitorNode, SimpleBadMatch) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = BSON("tags" << BSON("dc" << "nyc"));
-        ASSERT(!node.matchesTag(BSON("dc" << "sf")));
+        Node node((HostAndPort()));
+        node.tags = BSON("dc" << "nyc");
+        ASSERT(!node.matches(BSON("dc" << "sf")));
     }
 
     TEST(ReplSetMonitorNode, ExactMatch) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(node.matchesTag(SampleIsMasterDoc["tags"].Obj()));
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(node.matches(SampleIsMasterDoc["tags"].Obj()));
     }
 
     TEST(ReplSetMonitorNode, EmptyTag) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(node.matchesTag(BSONObj()));
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(node.matches(BSONObj()));
     }
 
     TEST(ReplSetMonitorNode, MemberNoTagMatchesEmptyTag) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = NoTagIsMasterDoc;
-        ASSERT(node.matchesTag(BSONObj()));
+        Node node((HostAndPort()));
+        node.tags = NoTags;
+        ASSERT(node.matches(BSONObj()));
     }
 
     TEST(ReplSetMonitorNode, MemberNoTagDoesNotMatch) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = NoTagIsMasterDoc.copy();
-        ASSERT(!node.matchesTag(BSON("dc" << "NYC")));
+        Node node((HostAndPort()));
+        node.tags = NoTags;
+        ASSERT(!node.matches(BSON("dc" << "NYC")));
     }
 
     TEST(ReplSetMonitorNode, IncompleteMatch) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(!node.matchesTag(BSON("dc" << "NYC"
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(!node.matches(BSON("dc" << "NYC"
                                      << "p" << "2"
                                      << "hello" << "world")));
     }
 
     TEST(ReplSetMonitorNode, PartialMatch) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(node.matchesTag(BSON("dc" << "NYC"
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(node.matches(BSON("dc" << "NYC"
                                     << "p" << "2")));
     }
 
     TEST(ReplSetMonitorNode, SingleTagCrit) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(node.matchesTag(BSON("p" << "2")));
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(node.matches(BSON("p" << "2")));
     }
 
     TEST(ReplSetMonitorNode, BadSingleTagCrit) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(!node.matchesTag(BSON("dc" << "SF")));
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(!node.matches(BSON("dc" << "SF")));
     }
 
     TEST(ReplSetMonitorNode, NonExistingFieldTag) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(!node.matchesTag(BSON("noSQL" << "Mongo")));
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(!node.matches(BSON("noSQL" << "Mongo")));
     }
 
     TEST(ReplSetMonitorNode, UnorederedMatching) {
-            ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-            node.lastIsMaster = SampleIsMasterDoc.copy();
-            ASSERT(node.matchesTag(BSON("p" << "2" << "dc" << "NYC")));
+            Node node((HostAndPort()));
+            node.tags = SampleTags;
+            ASSERT(node.matches(BSON("p" << "2" << "dc" << "NYC")));
     }
 
     TEST(ReplSetMonitorNode, SameValueDiffKey) {
-        ReplicaSetMonitor::Node node(HostAndPort(), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
-        ASSERT(!node.matchesTag(BSON("datacenter" << "NYC")));
+        Node node((HostAndPort()));
+        node.tags = SampleTags;
+        ASSERT(!node.matches(BSON("datacenter" << "NYC")));
     }
 
+#ifdef OLD_TESTS // TODO
+
     TEST(ReplSetMonitorNode, SimpleToString) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         // Should not throw any exceptions
         ASSERT(!node.toString().empty());
     }
 
     TEST(ReplSetMonitorNode, SimpleToStringWithNoTag)  {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = NoTagIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = NoTags;
 
         // Should not throw any exceptions
         ASSERT(!node.toString().empty());
     }
 
     TEST(ReplSetMonitorNode, PriNodeCompatibleTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = true;
@@ -184,8 +198,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, SecNodeCompatibleTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = false;
@@ -204,8 +218,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, PriNodeNotCompatibleTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = true;
@@ -224,8 +238,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, SecNodeNotCompatibleTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = false;
@@ -244,8 +258,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, PriNodeCompatiblMultiTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = true;
@@ -265,8 +279,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, SecNodeCompatibleMultiTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = false;
@@ -286,8 +300,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, PriNodeNotCompatibleMultiTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = true;
@@ -307,8 +321,8 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorNode, SecNodeNotCompatibleMultiTag) {
-        ReplicaSetMonitor::Node node(HostAndPort("dummy", 3), NULL);
-        node.lastIsMaster = SampleIsMasterDoc.copy();
+        Node node(HostAndPort("dummy", 3));
+        node.tags = SampleTags;
 
         node.ok = true;
         node.ismaster = false;
@@ -329,15 +343,15 @@ namespace mongo_test {
 
     class NodeSetFixtures {
     public:
-        static vector<ReplicaSetMonitor::Node> getThreeMemberWithTags();
+        static vector<Node> getThreeMemberWithTags();
     };
 
-    vector<ReplicaSetMonitor::Node> NodeSetFixtures::getThreeMemberWithTags() {
-        vector<ReplicaSetMonitor::Node> nodes;
+    vector<Node> NodeSetFixtures::getThreeMemberWithTags() {
+        vector<Node> nodes;
 
-        nodes.push_back(ReplicaSetMonitor::Node(HostAndPort("a"), NULL));
-        nodes.push_back(ReplicaSetMonitor::Node(HostAndPort("b"), NULL));
-        nodes.push_back(ReplicaSetMonitor::Node(HostAndPort("c"), NULL));
+        nodes.push_back(Node(HostAndPort("a"), NULL));
+        nodes.push_back(Node(HostAndPort("b"), NULL));
+        nodes.push_back(Node(HostAndPort("c"), NULL));
 
         nodes[0].ok = true;
         nodes[1].ok = true;
@@ -347,9 +361,9 @@ namespace mongo_test {
         nodes[1].ismaster = true;
         nodes[2].secondary = true;
 
-        nodes[0].lastIsMaster = BSON("tags" << BSON("dc" << "nyc" << "p" << "1"));
-        nodes[1].lastIsMaster = BSON("tags" << BSON("dc" << "sf"));
-        nodes[2].lastIsMaster = BSON("tags" << BSON("dc" << "nyc" << "p" << "2"));
+        nodes[0].tags = BSON("tags" << BSON("dc" << "nyc" << "p" << "1");
+        nodes[1].tags = BSON("tags" << BSON("dc" << "sf");
+        nodes[2].tags = BSON("tags" << BSON("dc" << "nyc" << "p" << "2");
 
         return nodes;
     }
@@ -388,7 +402,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PrimaryOnly) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[0].addr;
@@ -403,7 +417,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[0].addr;
@@ -419,7 +433,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PrimaryMissing) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[0].addr;
@@ -435,7 +449,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriPrefWithPriOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
 
         TagSet tags(TagSetFixtures::getDefaultSet());
@@ -451,7 +465,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[1].addr;
@@ -469,7 +483,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecOnly) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[1].addr;
@@ -487,7 +501,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[1].addr;
@@ -504,7 +518,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPref) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[1].addr;
@@ -522,7 +536,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[1].addr;
@@ -541,7 +555,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[1].addr;
@@ -559,7 +573,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, Nearest) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[0].addr;
@@ -579,7 +593,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, NearestNoLocal) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getDefaultSet());
         HostAndPort lastHost = nodes[0].addr;
@@ -597,7 +611,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriOnlyWithTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getP2Tag());
         HostAndPort lastHost = nodes[2].addr;
@@ -613,7 +627,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getP2Tag());
         HostAndPort lastHost = nodes[2].addr;
@@ -631,7 +645,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriPrefPriOkWithTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getSingleNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -646,7 +660,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getSingleNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -662,7 +676,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecOnlyWithTags) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getP2Tag());
         HostAndPort lastHost = nodes[2].addr;
@@ -678,7 +692,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecOnlyWithTagsMatchOnlyPri) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         HostAndPort lastHost = nodes[2].addr;
 
@@ -695,7 +709,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefWithTags) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getP2Tag());
         HostAndPort lastHost = nodes[2].addr;
@@ -711,7 +725,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         HostAndPort lastHost = nodes[1].addr;
 
@@ -732,7 +746,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefPriOkWithTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getSingleNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -747,7 +761,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getSingleNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -763,7 +777,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, SecPrefPriOkWithSecNotMatchTag) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getSingleNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -778,7 +792,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, NearestWithTags) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         HostAndPort lastHost = nodes[1].addr;
 
@@ -797,7 +811,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, NearestWithTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getSingleNoMatchTag());
         HostAndPort lastHost = nodes[1].addr;
@@ -811,7 +825,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, MultiPriOnlyTag) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[1].addr;
@@ -827,7 +841,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[1].addr;
@@ -843,7 +857,7 @@ namespace mongo_test {
     }
 
     TEST(ReplSetMonitorReadPref, PriPrefPriOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
 
         BSONArrayBuilder arrayBuilder;
@@ -864,7 +878,7 @@ namespace mongo_test {
 
     class MultiTags: public mongo::unittest::Test {
     public:
-        vector<ReplicaSetMonitor::Node> getNodes() const {
+        vector<Node> getNodes() const {
             return NodeSetFixtures::getThreeMemberWithTags();
         }
 
@@ -932,7 +946,7 @@ namespace mongo_test {
     };
 
     TEST_F(MultiTags, MultiTagsMatchesFirst) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[1].ok = false;
@@ -948,7 +962,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -965,7 +979,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[1].ok = false;
@@ -981,7 +995,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[1].ok = false;
@@ -998,7 +1012,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[1].ok = false;
@@ -1014,7 +1028,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -1029,7 +1043,7 @@ namespace mongo_test {
     }
 
     TEST(MultiTags, PriPrefPriOkNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
 
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
@@ -1045,7 +1059,7 @@ namespace mongo_test {
     }
 
     TEST(MultiTags, PriPrefPriNotOkNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -1061,7 +1075,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1075,7 +1089,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -1091,7 +1105,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMatchesSecond) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1105,7 +1119,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[2].ok = false;
@@ -1121,7 +1135,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMatchesLast) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1135,7 +1149,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -1149,7 +1163,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMultiTagsWithPriMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         HostAndPort lastHost = nodes[2].addr;
 
@@ -1164,7 +1178,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecOnlyMultiTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -1178,7 +1192,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMatchesFirst) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1192,7 +1206,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -1208,7 +1222,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMatchesSecond) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1222,7 +1236,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[2].ok = false;
@@ -1238,7 +1252,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMatchesLast) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1252,7 +1266,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -1267,7 +1281,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, SecPrefMultiTagsWithPriMatch) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1281,7 +1295,7 @@ namespace mongo_test {
     }
 
     TEST(MultiTags, SecPrefMultiTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -1296,7 +1310,7 @@ namespace mongo_test {
     }
 
     TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -1312,7 +1326,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, NearestMatchesFirst) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1326,7 +1340,7 @@ namespace mongo_test {
     }
 
     TEST(MultiTags, NearestMatchesFirstNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
+        vector<Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
 
         BSONArrayBuilder arrayBuilder;
         arrayBuilder.append(BSON("p" << "1"));
@@ -1348,7 +1362,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, NearestMatchesSecond) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1362,7 +1376,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, NearestMatchesSecondNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
+        vector<Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
         HostAndPort lastHost = nodes[2].addr;
 
         BSONArrayBuilder arrayBuilder;
@@ -1385,7 +1399,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, NearestMatchesLast) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         bool isPrimarySelected = false;
@@ -1399,7 +1413,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, NeatestMatchesLastNotOk) {
-        vector<ReplicaSetMonitor::Node> nodes = getNodes();
+        vector<Node> nodes = getNodes();
         HostAndPort lastHost = nodes[2].addr;
 
         nodes[0].ok = false;
@@ -1413,7 +1427,7 @@ namespace mongo_test {
     }
 
     TEST_F(MultiTags, NearestMultiTagsWithPriMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         HostAndPort lastHost = nodes[2].addr;
 
@@ -1455,7 +1469,7 @@ namespace mongo_test {
     }
 
     TEST(TagSet, NearestMultiTagsNoMatch) {
-        vector<ReplicaSetMonitor::Node> nodes =
+        vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
         HostAndPort lastHost = nodes[2].addr;
@@ -1745,4 +1759,5 @@ namespace mongo_test {
         ASSERT_FALSE(isPrimary);
         ASSERT_EQUALS(secHost, node.toString(true));
     }
+#endif
 }

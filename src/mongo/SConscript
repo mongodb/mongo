@@ -254,6 +254,10 @@ env.Library('clientdriver', [
                      'network',
             ])
 
+env.CppUnitTest("replica_set_monitor_test",
+                ["client/replica_set_monitor_test.cpp"],
+                LIBDEPS=["clientdriver"])
+
 env.Library('lasterror', [
             "db/lasterror.cpp",
             ],

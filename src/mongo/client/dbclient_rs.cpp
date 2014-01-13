@@ -17,23 +17,18 @@
 
 #include "mongo/client/dbclient_rs.h"
 
-#include <fstream>
 #include <memory>
 
-#include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/util/background.h"
-#include "mongo/util/concurrency/mutex.h" // for StaticObserver
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
+namespace {
 
     /*
      * Set of commands that can be used with $readPreference
@@ -144,6 +139,7 @@ namespace mongo {
                 mongo::ReadPreference_SecondaryPreferred : mongo::ReadPreference_PrimaryOnly;
         return new ReadPreferenceSetting(pref, tags);
     }
+} // namespace
 
     // --------------------------------
     // ----- DBClientReplicaSet ---------
@@ -153,7 +149,7 @@ namespace mongo {
 
     DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout )
         : _setName( name ), _so_timeout( so_timeout ) {
-        ReplicaSetMonitor::createIfNeeded( name, servers );
+        ReplicaSetMonitor::createIfNeeded( name, set<HostAndPort>(servers.begin(), servers.end()) );
     }
 
     DBClientReplicaSet::~DBClientReplicaSet() {
@@ -264,16 +260,18 @@ namespace mongo {
 
     DBClientConnection * DBClientReplicaSet::checkMaster() {
         ReplicaSetMonitorPtr monitor = _getMonitor();
-        HostAndPort h = monitor->getMaster();
+        HostAndPort h = monitor->getMasterOrUassert();
 
         if ( h == _masterHost && _master ) {
             // a master is selected.  let's just make sure connection didn't die
             if ( ! _master->isFailed() )
                 return _master.get();
-            monitor->notifyFailure( _masterHost );
+
+            monitor->failedHost( _masterHost );
+            h = monitor->getMasterOrUassert(); // old master failed, try again.
         }
 
-        _masterHost = monitor->getMaster();
+        _masterHost = h;
 
         ConnectionString connStr(_masterHost);
 
@@ -292,7 +290,7 @@ namespace mongo {
         }
 
         if (newConn == NULL || !errmsg.empty()) {
-            monitor->notifyFailure(_masterHost);
+            monitor->failedHost(_masterHost);
             uasserted(13639, str::stream() << "can't connect to new replica set master ["
                       << _masterHost.toString() << "]"
                       << (errmsg.empty()? "" : ", err: ") << errmsg);
@@ -352,7 +350,9 @@ namespace mongo {
     }
 
     bool DBClientReplicaSet::connect() {
-        return _getMonitor()->isAnyNodeOk();
+        // Returns true if there are any up hosts.
+        const ReadPreferenceSetting anyUpHost(ReadPreference_Nearest, TagSet());
+        return !_getMonitor()->getHostOrRefresh(anyUpHost).empty();
     }
 
     static bool isAuthenticationException( const DBException& ex ) {
@@ -599,7 +599,7 @@ namespace mongo {
         // the monitor doesn't exist.
         ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get( _setName );
         if ( monitor ) {
-            monitor->notifyFailure( _masterHost );
+            monitor->failedHost( _masterHost );
         }
         _master.reset(); 
     }
@@ -628,7 +628,7 @@ namespace mongo {
     void DBClientReplicaSet::isntSecondary() {
         log() << "slave no longer has secondary status: " << _lastSlaveOkHost << endl;
         // Failover to next slave
-        _getMonitor()->notifySlaveFailure( _lastSlaveOkHost );
+        _getMonitor()->failedHost( _lastSlaveOkHost );
         _lastSlaveOkConn.reset();
     }
 
@@ -643,9 +643,7 @@ namespace mongo {
         }
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
-        bool isPrimarySelected = false;
-        _lastSlaveOkHost = monitor->selectAndCheckNode(readPref->pref, &readPref->tags,
-                &isPrimarySelected);
+        _lastSlaveOkHost = monitor->getHostOrRefresh(*readPref);
 
         if ( _lastSlaveOkHost.empty() ){
 
@@ -660,7 +658,7 @@ namespace mongo {
         // versioned in mongos. Therefore, we have to make sure that this object
         // maintains only one connection to the primary and use that connection
         // every time we need to talk to the primary.
-        if (isPrimarySelected) {
+        if (monitor->isPrimary(_lastSlaveOkHost)) {
             checkMaster();
             _lastSlaveOkConn = _master;
             _lastSlaveOkHost = _masterHost; // implied, but still assign just to be safe
@@ -956,7 +954,7 @@ namespace mongo {
          * because there are certain exceptions that will not make the connection be labeled
          * as failed. For example, asserts 13079, 13080, 16386
          */
-        _getMonitor()->notifySlaveFailure(_lastSlaveOkHost);
+        _getMonitor()->failedHost(_lastSlaveOkHost);
         _lastSlaveOkHost = HostAndPort();
         _lastSlaveOkConn.reset();
     }

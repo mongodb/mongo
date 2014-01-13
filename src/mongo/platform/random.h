@@ -41,6 +41,22 @@ namespace mongo {
          */
         int32_t nextInt32( int32_t max ) { return nextInt32() % max; }
 
+        /**
+         * @return a number between 0 and max
+         */
+        int64_t nextInt64( int64_t max ) { return nextInt64() % max; }
+
+        /**
+         * @return a number between 0 and max
+         *
+         * This makes PsuedoRandom instances passable as the third argument to std::random_shuffle
+         */
+        intptr_t operator()(intptr_t max) {
+            if (sizeof(intptr_t) == 4)
+                return static_cast<intptr_t>(nextInt32(static_cast<int32_t>(max)));
+            return static_cast<intptr_t>(nextInt64(static_cast<int64_t>(max)));
+        }
+
     private:
         int32_t _x;
         int32_t _y;

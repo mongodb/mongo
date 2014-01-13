@@ -1197,26 +1197,36 @@ namespace mongo {
         }
     }
 
-    void ConfigServer::replicaSetChange( const ReplicaSetMonitor * monitor ) {
-        Shard s = Shard::lookupRSName(monitor->getName());
-        if (s == Shard::EMPTY) {
-            LOG(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
-            return;
+    void ConfigServer::replicaSetChange(const string& setName, const string& newConnectionString) {
+        // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
+        Client::initThread("replSetChange");
+        try {
+            Shard s = Shard::lookupRSName(setName);
+            if (s == Shard::EMPTY) {
+                LOG(1) << "shard not found for set: " << newConnectionString;
+                return;
+            }
+
+            Status result = clusterUpdate(ShardType::ConfigNS,
+                    BSON(ShardType::name(s.getName())),
+                    BSON("$set" << BSON(ShardType::host(newConnectionString))),
+                    false, // upsert
+                    false, // multi
+                    WriteConcernOptions::AllConfigs,
+                    NULL);
+
+            if ( !result.isOK() ) {
+                error() << "RSChangeWatcher: could not update config db for set: "
+                        << setName
+                        << " to: " << newConnectionString
+                        << ": " << result.reason() << endl;
+            }
         }
-
-        Status result = clusterUpdate(ShardType::ConfigNS,
-                BSON(ShardType::name(s.getName())),
-                BSON("$set" << BSON(ShardType::host(monitor->getServerAddress()))),
-                false, // upsert
-                false, // multi
-                WriteConcernOptions::AllConfigs,
-                NULL);
-
-        if ( !result.isOK() ) {
-            error() << "RSChangeWatcher: could not update config db for set: "
-                    << monitor->getName()
-                    << " to: " << monitor->getServerAddress()
-                    << ": " << result.reason() << endl;
+        catch (const std::exception& e) {
+            log() << "caught exception while updating config servers: " << e.what();
+        }
+        catch (...) {
+            log() << "caught unknown exception while updating config servers";
         }
     }
 

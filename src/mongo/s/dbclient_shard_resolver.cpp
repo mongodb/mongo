@@ -28,7 +28,7 @@
 
 #include "mongo/s/dbclient_shard_resolver.h"
 
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/s/config.h"
 #include "mongo/s/shard.h"
 
@@ -82,7 +82,7 @@ namespace mongo {
 
         try {
             // This can throw when we don't find a master!
-            HostAndPort masterHostAndPort = replMonitor->getMaster();
+            HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
             *shardHost = ConnectionString::parse( masterHostAndPort.toString( true ), errMsg );
             dassert( errMsg == "" );
             return Status::OK();

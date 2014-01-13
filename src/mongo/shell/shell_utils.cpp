@@ -19,7 +19,7 @@
 
 #include "mongo/shell/shell_utils.h"
 
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"

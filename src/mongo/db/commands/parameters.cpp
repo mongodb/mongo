@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
@@ -87,7 +87,7 @@ namespace mongo {
             }
             if( all || cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
                 result.append("replMonitorMaxFailedChecks",
-                              ReplicaSetMonitor::getMaxFailedChecks());
+                              ReplicaSetMonitor::maxConsecutiveFailedChecks);
             }
 
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
@@ -150,9 +150,9 @@ namespace mongo {
                 s++;
             }
             if( cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
-                if( s == 0 ) result.append( "was", ReplicaSetMonitor::getMaxFailedChecks() );
-                ReplicaSetMonitor::setMaxFailedChecks(
-                        cmdObj["replMonitorMaxFailedChecks"].numberInt() );
+                if( s == 0 ) result.append( "was", ReplicaSetMonitor::maxConsecutiveFailedChecks );
+                ReplicaSetMonitor::maxConsecutiveFailedChecks =
+                    cmdObj["replMonitorMaxFailedChecks"].numberInt();
                 s++;
             }
 

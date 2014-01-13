@@ -36,6 +36,7 @@
 #include <iomanip>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern.h"

@@ -35,6 +35,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
@@ -130,6 +131,9 @@ namespace {
         MockReplicaSet* replSet = getReplSet();
         DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
 
+        // Need up-to-date view, since either host is valid if view is stale.
+        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+
         Query query;
         query.readPref(mongo::ReadPreference_PrimaryPreferred, BSONArray());
 
@@ -142,6 +146,9 @@ namespace {
     TEST_F(BasicRS, SecondaryPreferred) {
         MockReplicaSet* replSet = getReplSet();
         DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+
+        // Need up-to-date view, since either host is valid if view is stale.
+        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
 
         Query query;
         query.readPref(mongo::ReadPreference_SecondaryPreferred, BSONArray());
@@ -417,6 +424,9 @@ namespace {
     class TaggedFiveMemberRS: public mongo::unittest::Test {
     protected:
         void setUp() {
+            // Tests for pinning behavior require this.
+            ReplicaSetMonitor::useDeterministicHostSelection = true;
+
             ReplicaSetMonitor::cleanup();
             _replSet.reset(new MockReplicaSet("test", 5));
             _originalConnectionHook = ConnectionString::getConnectionHook();
@@ -484,6 +494,8 @@ namespace {
         }
 
         void tearDown() {
+            ReplicaSetMonitor::useDeterministicHostSelection = false;
+
             ConnectionString::setConnectionHook(_originalConnectionHook);
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
@@ -536,6 +548,9 @@ namespace {
 
         DBClientReplicaSet replConn(replSet->getSetName(), seedList);
 
+        // Need up-to-date view to ensure there are multiple valid choices.
+        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+
         string dest;
         {
             Query query;
@@ -564,6 +579,9 @@ namespace {
         seedList.push_back(HostAndPort(replSet->getPrimary()));
 
         DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+
+        // Need up-to-date view to ensure there are multiple valid choices.
+        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
 
         string dest;
         {
@@ -597,6 +615,10 @@ namespace {
         seedList.push_back(HostAndPort(replSet->getPrimary()));
 
         DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+
+        // Need up-to-date view since slaveConn() uses SecondaryPreferred, and this test assumes it
+        // knows about at least one secondary.
+        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
 
         string dest;
         mongo::DBClientConnection& secConn = replConn.slaveConn();

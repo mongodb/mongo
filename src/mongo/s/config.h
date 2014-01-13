@@ -259,7 +259,7 @@ namespace mongo {
             return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
         }
 
-        void replicaSetChange( const ReplicaSetMonitor * monitor );
+        void replicaSetChange(const string& setName, const string& newConnectionString);
 
         static int VERSION;
 

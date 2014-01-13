@@ -17,16 +17,11 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
-#include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
-#include <set>
 #include <utility>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/export_macros.h"
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -35,8 +30,6 @@ namespace mongo {
     class TagSet;
     struct ReadPreferenceSetting;
     typedef shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
-    typedef pair<set<string>,set<int> > NodeDiff;
-
 
     /** Use this class to connect to a replica set of servers.  The class will manage
        checking for which server in a replica set is master, and do failover automatically.
