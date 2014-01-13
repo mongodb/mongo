@@ -246,6 +246,32 @@ namespace mongo {
             }
         }
 
+        // Can't combine a normal sort and a $meta projection on the same field.
+        BSONObjIterator projIt(_proj);
+        while (projIt.more()) {
+            BSONElement projElt = projIt.next();
+            if (isTextScoreMeta(projElt)) {
+                BSONElement sortElt = _sort[projElt.fieldName()];
+                if (!sortElt.eoo() && !isTextScoreMeta(sortElt)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "can't have a non-$meta sort on a $meta projection");
+                }
+            }
+        }
+
+        // All fields with a $meta sort must have a corresponding $meta projection.
+        BSONObjIterator sortIt(_sort);
+        while (sortIt.more()) {
+            BSONElement sortElt = sortIt.next();
+            if (isTextScoreMeta(sortElt)) {
+                BSONElement projElt = _proj[sortElt.fieldName()];
+                if (projElt.eoo() || !isTextScoreMeta(projElt)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "must have $meta projection for all $meta sort keys");
+                }
+            }
+        }
+
         return Status::OK();
     }
 
