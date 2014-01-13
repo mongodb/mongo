@@ -125,7 +125,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	int cmp, depth;
 
 	__cursor_search_clear(cbt);
-
 	srch_key = &cbt->iface.key;
 
 	btree = S2BT(session);
@@ -133,6 +132,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	item = &_item;
 	WT_CLEAR_INLINE(WT_ITEM, *item);
+
+	match = 0;				/* -Wuninitialized */
 
 	/*
 	 * The row-store search routine uses a different comparison API.
@@ -164,37 +165,71 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		if (cmp >= 0)
 			goto descend;
 
-		/* Binary search of internal pages. */
-		for (base = 0, ref = NULL,
-		    limit = page->entries - 1; limit != 0; limit >>= 1) {
-			indx = base + (limit >> 1);
-			ref = page->u.intl.t + indx;
+		/*
+		 * Binary search of internal pages.  There are two versions (a
+		 * default loop and an application-specified collation loop),
+		 * because moving the collation test and error handling inside
+		 * the loop costs about 5%.
+		 */
+		base = 0;
+		ref = NULL;
+		limit = page->entries - 1;
+		if (btree->collator == NULL)
+			for (; limit != 0; limit >>= 1) {
+				indx = base + (limit >> 1);
+				ref = page->u.intl.t + indx;
 
-			/*
-			 * If we're about to compare an application key with the
-			 * 0th index on an internal page, pretend the 0th index
-			 * sorts less than any application key.  This test is so
-			 * we don't have to update internal pages if the
-			 * application stores a new, "smallest" key in the tree.
-			 */
-			if (indx != 0) {
-				__wt_ref_key(
-				    page, ref, &item->data, &item->size);
-				match = WT_MIN(skiplow, skiphigh);
-				WT_ERR(WT_LEX_CMP_SKIP(
-				    session, btree->collator,
-				    srch_key, item, cmp, &match));
-				if (cmp == 0)
-					break;
-				if (cmp < 0) {
-					skiphigh = match;
-					continue;
+				/*
+				 * If about to compare an application key with
+				 * the 0th index on an internal page, pretend
+				 * the 0th index sorts less than any application
+				 * key.  This test is so we don't have to update
+				 * internal pages if the application stores a
+				 * new, "smallest" key in the tree.
+				 */
+				if (indx != 0) {
+					__wt_ref_key(page,
+					    ref, &item->data, &item->size);
+					match = WT_MIN(skiplow, skiphigh);
+					cmp = __wt_lex_compare_skip(
+					    srch_key, item, &match);
+					if (cmp == 0)
+						break;
+					if (cmp < 0) {
+						skiphigh = match;
+						continue;
+					}
+					skiplow = match;
 				}
-				skiplow = match;
+				base = indx + 1;
+				--limit;
 			}
-			base = indx + 1;
-			--limit;
-		}
+		else
+			for (; limit != 0; limit >>= 1) {
+				indx = base + (limit >> 1);
+				ref = page->u.intl.t + indx;
+				/*
+				 * If about to compare an application key with
+				 * the 0th index on an internal page, pretend
+				 * the 0th index sorts less than any application
+				 * key.  This test is so we don't have to update
+				 * internal pages if the application stores a
+				 * new, "smallest" key in the tree.
+				 */
+				if (indx != 0) {
+					__wt_ref_key(page,
+					    ref, &item->data, &item->size);
+					WT_ERR(WT_LEX_CMP_SKIP(
+					    session, btree->collator,
+					    srch_key, item, cmp, &match));
+					if (cmp == 0)
+						break;
+					if (cmp < 0)
+						continue;
+				}
+				base = indx + 1;
+				--limit;
+			}
 
 descend:	WT_ASSERT(session, ref != NULL);
 
@@ -231,29 +266,50 @@ descend:	WT_ASSERT(session, ref != NULL);
 		btree->maximum_depth = depth;
 
 	/*
-	 * Do a binary search of the leaf page; the page might be empty, reset
-	 * the comparison value.
+	 * Binary search of the leaf page.  There are two versions (a default
+	 * loop and an application-specified collation loop), because moving
+	 * the collation test and error handling inside the loop costs about 5%.
+	 *
+	 * The page might be empty, reset the comparison value.
 	 */
 	cmp = -1;
-	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
-		indx = base + (limit >> 1);
-		rip = page->u.row.d + indx;
+	base = 0;
+	limit = page->entries;
+	if (btree->collator == NULL)
+		for (; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			rip = page->u.row.d + indx;
 
-		WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
-		match = WT_MIN(skiplow, skiphigh);
-		WT_ERR(WT_LEX_CMP_SKIP(
-		    session, btree->collator, srch_key, item, cmp, &match));
-		if (cmp == 0)
-			break;
-		if (cmp < 0) {
-			skiphigh = match;
-			continue;
+			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+			match = WT_MIN(skiplow, skiphigh);
+			cmp = __wt_lex_compare_skip(srch_key, item, &match);
+			if (cmp == 0)
+				break;
+			if (cmp < 0) {
+				skiphigh = match;
+				continue;
+			}
+			skiplow = match;
+
+			base = indx + 1;
+			--limit;
 		}
+	else
+		for (; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			rip = page->u.row.d + indx;
 
-		skiplow = match;
-		base = indx + 1;
-		--limit;
-	}
+			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+			WT_ERR(WT_LEX_CMP_SKIP(session,
+			    btree->collator, srch_key, item, cmp, &match));
+			if (cmp == 0)
+				break;
+			if (cmp < 0)
+				continue;
+
+			base = indx + 1;
+			--limit;
+		}
 
 	/*
 	 * We don't expect the search item to have any allocated memory (it's a
