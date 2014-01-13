@@ -39,7 +39,7 @@
 "dropAllUsersFromDatabase",  # Not used for permissions checks, but to id the event in logs.
 "dropCollection",
 "dropDatabase",
-"dropIndex",  # Not used for permissions checks, but to id the event in logs.
+"dropIndex",
 "dropRole",
 "dropUser",
 "emptycapped",
