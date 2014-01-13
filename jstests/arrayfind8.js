@@ -175,7 +175,7 @@ checkBoundsAndMatch( { $gt:4 }, [[ 4, maxNumber ]], [ 3, 7 ], null, null,
 checkBoundsAndMatch( { $gte:5 }, [[ 5, 5 ]], [ 5 ], null, null, { a:{ $elemMatch:{ $lte:5 } } },
                      [[ 5, maxNumber ]] );
 checkBoundsAndMatch( { $in:[ 4, 6 ] }, [[ 6, 6 ]], [ 6 ], null, null,
-                     { a:{ $elemMatch:{ $gt:5 } } }, [[ 4, 4 ], [ 6, 6 ]] );
+                     { a:{ $elemMatch:{ $gt:5 } } }, [[ 5, maxNumber ]] );
 
 // TODO SERVER-1264
 if ( 0 ) {

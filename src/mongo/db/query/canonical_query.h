@@ -37,6 +37,9 @@
 
 namespace mongo {
 
+    // TODO: Is this binary data really?
+    typedef std::string PlanCacheKey;
+
     class CanonicalQuery {
     public:
         static Status canonicalize(const QueryMessage& qm, CanonicalQuery** out);
@@ -81,6 +84,11 @@ namespace mongo {
         const LiteParsedQuery& getParsed() const { return *_pq; }
         const ParsedProjection* getProj() const { return _proj.get(); }
 
+        /**
+         * Get the cache key for this canonical query.
+         */
+        PlanCacheKey getPlanCacheKey() const;
+
         // Debugging
         string toString() const;
 
@@ -92,9 +100,29 @@ namespace mongo {
          */
         static MatchExpression* normalizeTree(MatchExpression* root);
 
+        /**
+         * Traverses expression tree post-order.
+         * Sorts children at each non-leaf node by (MatchType, path(), cacheKey)
+         */
+        static void sortTree(MatchExpression* tree);
+
     private:
         // You must go through canonicalize to create a CanonicalQuery.
         CanonicalQuery() { }
+
+        /**
+         * Normalize this canonical query. This should be done only when a
+         * canonical query is constructed via canonicalize().
+         *
+         * Takes ownership of 'root'.
+         */
+        Status normalize(MatchExpression* root);
+
+        /**
+         * Computes and stores the cache key / query shape
+         * for this query.
+         */
+        void generateCacheKey(void);
 
         // Takes ownership of lpq
         Status init(LiteParsedQuery* lpq);
@@ -105,6 +133,12 @@ namespace mongo {
         scoped_ptr<MatchExpression> _root;
 
         scoped_ptr<ParsedProjection> _proj;
+
+        /**
+         * Cache key is a string-ified combination of the query and sort obfuscated
+         * for minimal user comprehension.
+         */
+        PlanCacheKey _cacheKey;
     };
 
 }  // namespace mongo

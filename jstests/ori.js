@@ -41,11 +41,8 @@ t.save( {a:[1,2],b:1} );
 t.save( {a:10,b:1} );
 
 assert.eq( 2, t.count( {$or:[{a:{$gt:0,$lt:5}},{a:10,b:1}]} ) );
-// Because a:1 is multikey, the value a:10 is scanned with the first clause.
-assert.isnull( t.find( {$or:[{a:{$gt:0,$lt:5}},{a:10,b:1}]} ).explain().clauses );
 
 assert.eq( 2, t.count( {$or:[{a:{$lt:5,$gt:0}},{a:10,b:1}]} ) );
-// Now a:10 is not scanned in the first clause so the second clause is not eliminated.
 
 printjson( t.find( {$or:[{a:{$lt:5,$gt:0}},{a:10,b:1}]} ).explain() )
 assert.eq( 2, t.find( {$or:[{a:{$lt:5,$gt:0}},{a:10,b:1}]} ).explain().clauses.length );

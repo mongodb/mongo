@@ -99,8 +99,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -125,8 +125,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -216,7 +216,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCacheGetUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve a cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -233,8 +233,8 @@ namespace {
                                                fromjson("{_id: 0, a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -278,7 +278,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCacheDropUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve the cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -296,8 +296,8 @@ namespace {
         auto_ptr<CanonicalQuery> cqB(cqRaw);
 
         // Generate 2 cache keys.
-        PlanCacheKey keyA = PlanCache::getPlanCacheKey(*cqA);
-        PlanCacheKey keyB = PlanCache::getPlanCacheKey(*cqB);
+        PlanCacheKey keyA = cqA->getPlanCacheKey();
+        PlanCacheKey keyB = cqB->getPlanCacheKey();
 
         // Create plan cache with 2 entries.
         PlanCache planCache;
@@ -410,7 +410,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCacheListPlansUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve the cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -426,8 +426,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -447,8 +447,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey queryKey = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -485,7 +485,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCachePinPlanUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve the cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -501,8 +501,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey key = cq->getPlanCacheKey();
 
         // Plan cache with 2 entries
         PlanCache planCache;
@@ -558,7 +558,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCacheUnpinPlanUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve the cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -573,8 +573,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey key = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -610,7 +610,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCacheAddPlanUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve the cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -628,8 +628,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey key = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -670,7 +670,7 @@ namespace {
     }
 
     TEST(PlanCacheCommandsTest, planCacheShunPlanUnknownKey) {
-        // Generate a cache key for lookup.
+        // Retrieve the cache key for lookup.
         PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
 
         // Leave the plan cache empty.
@@ -687,8 +687,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey key = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -710,8 +710,8 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Generate a cache key
-        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
+        // Retrieve the cache key
+        PlanCacheKey key = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;

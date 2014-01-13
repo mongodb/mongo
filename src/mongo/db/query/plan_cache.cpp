@@ -36,155 +36,6 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
 
-namespace {
-
-    using std::auto_ptr;
-    using std::ostream;
-    using std::string;
-    using std::stringstream;
-    using namespace mongo;
-
-    void encodePlanCacheKeyTree(const MatchExpression* tree, ostream* os);
-
-    /**
-     * Comparator for MatchExpression nodes. nodes by:
-     * 1) operator type (MatchExpression::MatchType)
-     * 2) path name (MatchExpression::path())
-     * 3) cache key of the subtree
-     *
-     * The third item is needed to break ties, thus ensuring that
-     * match expression trees which should have the same cache key
-     * always sort the same way. If you're wondering when the tuple
-     * (operator type, path name) could ever be equal, consider this
-     * query:
-     *
-     * {$and:[{$or:[{a:1},{a:2}]},{$or:[{b:1},{b:2}]}]}
-     *
-     * The two OR nodes would compare as equal in this case were it
-     * not for tuple item #3 (cache key of the subtree).
-     */
-    bool OperatorAndFieldNameComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
-        // First compare by MatchType
-        MatchExpression::MatchType lhsMatchType = lhs->matchType();
-        MatchExpression::MatchType rhsMatchType = rhs->matchType();
-        if (lhsMatchType != rhsMatchType) {
-            return lhsMatchType < rhsMatchType;
-        }
-        // Second, path.
-        StringData lhsPath = lhs->path();
-        StringData rhsPath = rhs->path();
-        if (lhsPath != rhsPath) {
-            return lhsPath < rhsPath;
-        }
-        // Third, cache key.
-        stringstream ssLeft, ssRight;
-        encodePlanCacheKeyTree(lhs, &ssLeft);
-        encodePlanCacheKeyTree(rhs, &ssRight);
-        return ssLeft.str() < ssRight.str();
-    }
-
-    /**
-     * 2-character encoding of MatchExpression::MatchType.
-     */
-    const char* encodeMatchType(MatchExpression::MatchType mt) {
-        switch(mt) {
-        case MatchExpression::AND: return "an"; break;
-        case MatchExpression::OR: return "or"; break;
-        case MatchExpression::NOR: return "nr"; break;
-        case MatchExpression::NOT: return "nt"; break;
-        case MatchExpression::ALL: return "al"; break;
-        case MatchExpression::ELEM_MATCH_OBJECT: return "eo"; break;
-        case MatchExpression::ELEM_MATCH_VALUE: return "ev"; break;
-        case MatchExpression::SIZE: return "sz"; break;
-        case MatchExpression::LTE: return "le"; break;
-        case MatchExpression::LT: return "lt"; break;
-        case MatchExpression::EQ: return "eq"; break;
-        case MatchExpression::GT: return "gt"; break;
-        case MatchExpression::GTE: return "ge"; break;
-        case MatchExpression::REGEX: return "re"; break;
-        case MatchExpression::MOD: return "mo"; break;
-        case MatchExpression::EXISTS: return "ex"; break;
-        case MatchExpression::MATCH_IN: return "in"; break;
-        case MatchExpression::NIN: return "ni"; break;
-        case MatchExpression::TYPE_OPERATOR: return "ty"; break;
-        case MatchExpression::GEO: return "go"; break;
-        case MatchExpression::WHERE: return "wh"; break;
-        case MatchExpression::ATOMIC: return "at"; break;
-        case MatchExpression::ALWAYS_FALSE: return "af"; break;
-        case MatchExpression::GEO_NEAR: return "gn"; break;
-        case MatchExpression::TEXT: return "te"; break;
-        }
-        // Unreachable code.
-        // All MatchType values have been handled in switch().
-        verify(0);
-        return "";
-    }
-
-    /**
-     * Traverses expression tree pre-order.
-     * Appends an encoding of each node's match type and path name
-     * to the output stream.
-     */
-    void encodePlanCacheKeyTree(const MatchExpression* tree, ostream* os) {
-        // Encode match type and path.
-        *os << encodeMatchType(tree->matchType()) << tree->path();
-        // Traverse child nodes.
-        for (size_t i = 0; i < tree->numChildren(); ++i) {
-            encodePlanCacheKeyTree(tree->getChild(i), os);
-        }
-    }
-
-    /**
-     * Encodes sort order into cache key.
-     * Sort order is normalized because it provided by
-     * LiteParsedQuery.
-     */
-    void encodePlanCacheKeySort(const BSONObj& sortObj, ostream* os) {
-        BSONObjIterator it(sortObj);
-        while (it.more()) {
-            BSONElement elt = it.next();
-            // $meta text score
-            if (LiteParsedQuery::isTextScoreMeta(elt)) {
-                *os << "t";
-            }
-            // Ascending
-            else if (elt.numberInt() == 1) {
-                *os << "a";
-            }
-            // Descending
-            else {
-                *os << "d";
-            }
-            *os << elt.fieldName();
-        }
-    }
-
-    /**
-     * Encodes parsed projection into cache key.
-     * Does a simple toString() on each projected field
-     * in the BSON object.
-     * This handles all the special projection types ($meta, $elemMatch, etc.)
-     */
-    void encodePlanCacheKeyProj(const BSONObj& projObj, ostream* os) {
-        if (projObj.isEmpty()) {
-            return;
-        }
-
-        *os << "p";
-
-        BSONObjIterator it(projObj);
-        while (it.more()) {
-            BSONElement elt = it.next();
-            // BSONElement::toString() arguments
-            // includeFieldName - skip field name (appending after toString() result). false.
-            // full: choose less verbose representation of child/data values. false.
-            *os << elt.toString(false, false);
-            *os << elt.fieldName();
-        }
-    }
-
-} // namespace
-
 namespace mongo {
 
     const int PlanCache::kPlanCacheMaxWriteOperations = 1000;
@@ -222,27 +73,6 @@ namespace mongo {
         }
 
         return true;
-    }
-
-    /**
-     * For every non-leaf node, sorts child nodes by (MatchType, path name).
-     */
-    void PlanCache::normalizeQueryForCache(CanonicalQuery* queryOut) {
-        // Sorting is the only normalization for now.
-        PlanCache::sortTree(queryOut->root());
-    }
-
-    /**
-     * Cache key is a string-ified combination of the query and sort obfuscated
-     * for minimal user comprehension.
-     */
-    PlanCacheKey PlanCache::getPlanCacheKey(const CanonicalQuery& query) {
-        stringstream ss;
-        encodePlanCacheKeyTree(query.root(), &ss);
-        encodePlanCacheKeySort(query.getParsed().getSort(), &ss);
-        encodePlanCacheKeyProj(query.getParsed().getProj(), &ss);
-        PlanCacheKey key(ss.str());
-        return key;
     }
 
     //
@@ -436,7 +266,7 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "no solutions provided");
         }
 
-        PlanCacheKey key = getPlanCacheKey(query);
+        PlanCacheKey key = query.getPlanCacheKey();
         PlanCacheEntry* entry = new PlanCacheEntry(solns, why);
         const LiteParsedQuery& pq = query.getParsed();
         entry->query = pq.getFilter().copy();
@@ -469,7 +299,7 @@ namespace mongo {
     }
 
     Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) const{
-        PlanCacheKey key = getPlanCacheKey(query);
+        PlanCacheKey key = query.getPlanCacheKey();
         return get(key, crOut);
     }
 
@@ -592,17 +422,6 @@ namespace mongo {
 
         *planOut = plan;
         return Status::OK();
-    }
-
-    // static
-    void PlanCache::sortTree(MatchExpression* tree) {
-        for (size_t i = 0; i < tree->numChildren(); ++i) {
-            sortTree(tree->getChild(i));
-        }
-        std::vector<MatchExpression*>* children = tree->getChildVector();
-        if (NULL != children) {
-            std::sort(children->begin(), children->end(), OperatorAndFieldNameComparison);
-        }
     }
 
     Status PlanCache::shunPlan(const PlanCacheKey& key, const PlanID& plan) {

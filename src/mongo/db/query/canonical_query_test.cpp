@@ -35,6 +35,8 @@ using namespace mongo;
 
 namespace {
 
+    static const char* ns = "somebogusns";
+
     /**
      * Utility function to parse the given JSON as a MatchExpression and normalize the expression
      * tree.  Returns the resulting tree, or an error Status.
@@ -236,6 +238,132 @@ namespace {
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+    }
+
+    /**
+     * Utility function to create a CanonicalQuery
+     */
+    CanonicalQuery* canonicalize(const char* queryStr) {
+        BSONObj queryObj = fromjson(queryStr);
+        CanonicalQuery* cq;
+        Status result = CanonicalQuery::canonicalize(ns, queryObj, &cq);
+        ASSERT_OK(result);
+        return cq;
+    }
+
+    CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr,
+                                 const char* projStr) {
+        BSONObj queryObj = fromjson(queryStr);
+        BSONObj sortObj = fromjson(sortStr);
+        BSONObj projObj = fromjson(projStr);
+        CanonicalQuery* cq;
+        Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj,
+                                                     projObj,
+                                                     &cq);
+        ASSERT_OK(result);
+        return cq;
+    }
+
+   /**
+    * Utility function to create MatchExpression
+    */
+    MatchExpression* parseMatchExpression(const BSONObj& obj) {
+        StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+        if (!status.isOK()) {
+            stringstream ss;
+            ss << "failed to parse query: " << obj.toString()
+               << ". Reason: " << status.toString();
+            FAIL(ss.str());
+        }
+        MatchExpression* expr(status.getValue());
+        return expr;
+    }
+
+    void assertEquivalent(const char* queryStr,
+                          const MatchExpression* expected,
+                          const MatchExpression* actual) {
+        if (actual->equivalent(expected)) {
+            return;
+        }
+        stringstream ss;
+        ss << "Match expressions are not equivalent."
+           << "\nOriginal query: " << queryStr
+           << "\nExpected: " << expected->toString()
+           << "\nActual: " << actual->toString();
+        FAIL(ss.str());
+    }
+
+    /**
+     * Test function for CanonicalQuery::normalize.
+     */
+    void testNormalizeQuery(const char* queryStr, const char* expectedExprStr) {
+        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr));
+        MatchExpression* me = cq->root();
+        BSONObj expectedExprObj = fromjson(expectedExprStr);
+        auto_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
+        assertEquivalent(queryStr, expectedExpr.get(), me);
+    }
+
+    TEST(CanonicalQueryTest, NormalizeQuerySort) {
+        // Field names
+        testNormalizeQuery("{b: 1, a: 1}", "{a: 1, b: 1}");
+        // Operator types
+        testNormalizeQuery("{a: {$gt: 5}, a: {$lt: 10}}}", "{a: {$lt: 10}, a: {$gt: 5}}");
+        // Nested queries
+        testNormalizeQuery("{a: {$elemMatch: {c: 1, b:1}}}",
+                           "{a: {$elemMatch: {b: 1, c:1}}}");
+    }
+
+    TEST(CanonicalQueryTest, NormalizeQueryTree) {
+        // Single-child $or elimination.
+        testNormalizeQuery("{$or: [{b: 1}]}", "{b: 1}");
+        // Single-child $and elimination.
+        testNormalizeQuery("{$or: [{$and: [{a: 1}]}, {b: 1}]}", "{$or: [{a: 1}, {b: 1}]}");
+        // $or absorbs $or children.
+        testNormalizeQuery("{$or: [{a: 1}, {$or: [{b: 1}, {$or: [{c: 1}]}]}, {d: 1}]}",
+                           "{$or: [{a: 1}, {b: 1}, {c: 1}, {d: 1}]}");
+        // $and absorbs $and children.
+        testNormalizeQuery("{$and: [{$and: [{a: 1}, {b: 1}]}, {c: 1}]}",
+                           "{$and: [{a: 1}, {b: 1}, {c: 1}]}");
+    }
+
+    /**
+     * Test functions for getPlanCacheKey.
+     * Cache keys are intentionally obfuscated and are meaningful only
+     * within the current lifetime of the server process. Users should treat
+     * plan cache keys as opaque.
+     */
+    void testGetPlanCacheKey(const char* queryStr, const char* sortStr,
+                             const char* projStr,
+                             const char *expectedStr) {
+        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr, sortStr, projStr));
+        PlanCacheKey key = cq->getPlanCacheKey();
+        PlanCacheKey expectedKey(expectedStr);
+        if (key == expectedKey) {
+            return;
+        }
+        stringstream ss;
+        ss << "Unexpected plan cache key. Expected: " << expectedKey << ". Actual: " << key
+           << ". Query: " << cq->toString();
+        FAIL(ss.str());
+    }
+
+    TEST(PlanCacheTest, GetPlanCacheKey) {
+        // Generated cache keys should be treated as opaque to the user.
+        // No sorts
+        testGetPlanCacheKey("{}", "{}", "{}", "an");
+        testGetPlanCacheKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "oreqaeqb");
+        // With sort
+        testGetPlanCacheKey("{}", "{a: 1}", "{}", "anaa");
+        testGetPlanCacheKey("{}", "{a: -1}", "{}", "anda");
+        testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "{}", "anta");
+        // With projection
+        testGetPlanCacheKey("{}", "{}", "{a: 1}", "anp1a");
+        testGetPlanCacheKey("{}", "{}", "{a: 0}", "anp0a");
+        testGetPlanCacheKey("{}", "{}", "{a: 99}", "anp99a");
+        testGetPlanCacheKey("{}", "{}", "{a: 'foo'}", "anp\"foo\"a");
+        testGetPlanCacheKey("{}", "{}", "{a: {$slice: [3, 5]}}", "anp{ $slice: [ 3, 5 ] }a");
+        testGetPlanCacheKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "anp{ $elemMatch: { x: 2 } }a");
     }
 
 }

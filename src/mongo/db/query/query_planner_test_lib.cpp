@@ -55,6 +55,7 @@ namespace {
             return false;
         }
         MatchExpression* root = swme.getValue();
+        CanonicalQuery::sortTree(root);
         return trueFilterNode->filter->equivalent(root);
     }
 

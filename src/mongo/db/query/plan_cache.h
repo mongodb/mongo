@@ -66,9 +66,6 @@ namespace mongo {
         boost::scoped_ptr<PlanStageStats> stats;
     };
 
-    // TODO: Is this binary data really?
-    typedef std::string PlanCacheKey;
-
     // TODO: Replace with opaque type.
     typedef std::string PlanID;
 
@@ -305,13 +302,6 @@ namespace mongo {
         static bool shouldCacheQuery(const CanonicalQuery& query);
 
         /**
-         * Normalizes canonical query for caching.
-         * Current sorts nodes of internal match expression.
-         * Not to be confused with internal function CanonicalQuery::normalizeTree()
-         */
-        static void normalizeQueryForCache(CanonicalQuery* queryOut);
-
-        /**
          * Generates a key for a normalized (for caching) canonical query
          * from the match expression and sort order.
          */
@@ -382,12 +372,6 @@ namespace mongo {
          * Remove *all* entries.
          */
         void clear();
-
-        /**
-         * Traverses expression tree post-order.
-         * Sorts children at each non-leaf node by (MatchType, path(), cacheKey)
-         */
-        static void sortTree(MatchExpression* tree);
 
         /**
          * Retrieves all plan cache keys

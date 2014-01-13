@@ -301,33 +301,6 @@ namespace {
         assertShouldNotCacheQuery(*cq);
     }
 
-    /**
-     * Test functions for normalizeQueryForCache.
-     * Cacheable queries need to go through an additional level of normalization beyong
-     * what's already done in CanonicalQuery::normalizeTree.
-     * The current behavior is to sort the internal nodes of the match expression
-     * to ensure all operator/field name nodes are ordered the same way.
-     */
-
-    void testNormalizeQueryForCache(const char* queryStr, const char* expectedExprStr) {
-        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr));
-        PlanCache::normalizeQueryForCache(cq.get());
-        MatchExpression* me = cq->root();
-        BSONObj expectedExprObj = fromjson(expectedExprStr);
-        auto_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
-        assertEquivalent(queryStr, expectedExpr.get(), me);
-    }
-
-    TEST(PlanCacheTest, NormalizeQueryForCache) {
-        // Field names
-        testNormalizeQueryForCache("{b: 1, a: 1}", "{a: 1, b: 1}");
-        // Operator types
-        testNormalizeQueryForCache("{a: {$gt: 5}, a: {$lt: 10}}}", "{a: {$lt: 10}, a: {$gt: 5}}");
-        // Nested queries
-        testNormalizeQueryForCache("{a: {$elemMatch: {c: 1, b:1}}}",
-                                   "{a: {$elemMatch: {b: 1, c:1}}}");
-    }
-
     // Adding an empty vector of query solutions should fail.
     TEST(PlanCacheTest, AddEmptySolutions) {
         PlanCache planCache;
@@ -400,45 +373,6 @@ namespace {
         planCache.notifyOfWriteOp();
         planCache.getKeys(&keys);
         ASSERT_EQUALS(keys.size(), 1U);
-    }
-    /**
-     * Test functions for getPlanCacheKey.
-     * Cache keys are intentionally obfuscated and are meaningful only
-     * within the current lifetime of the server process. Users should treat
-     * plan cache keys as opaque.
-     */
-    void testGetPlanCacheKey(const char* queryStr, const char* sortStr,
-                             const char* projStr,
-                             const char *expectedStr) {
-        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr, sortStr, projStr));
-        PlanCacheKey key = PlanCache::getPlanCacheKey(*cq);
-        PlanCacheKey expectedKey(expectedStr);
-        if (key == expectedKey) {
-            return;
-        }
-        stringstream ss;
-        ss << "Unexpected plan cache key. Expected: " << expectedKey << ". Actual: " << key
-           << ". Query: " << cq->toString();
-        FAIL(ss.str());
-    }
-
-    TEST(PlanCacheTest, getPlanCacheKey) {
-        // Generated cache keys should be treated as opaque to the user.
-        // No sorts
-        testGetPlanCacheKey("{}", "{}", "{}", "an");
-        testGetPlanCacheKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "oreqaeqb");
-        // With sort
-        testGetPlanCacheKey("{}", "{a: 1}", "{}", "anaa");
-        testGetPlanCacheKey("{}", "{a: -1}", "{}", "anda");
-        testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "{a: {$meta: 'textScore'}}",
-                            "antap{ $meta: \"textScore\" }a");
-        // With projection
-        testGetPlanCacheKey("{}", "{}", "{a: 1}", "anp1a");
-        testGetPlanCacheKey("{}", "{}", "{a: 0}", "anp0a");
-        testGetPlanCacheKey("{}", "{}", "{a: 99}", "anp99a");
-        testGetPlanCacheKey("{}", "{}", "{a: 'foo'}", "anp\"foo\"a");
-        testGetPlanCacheKey("{}", "{}", "{a: {$slice: [3, 5]}}", "anp{ $slice: [ 3, 5 ] }a");
-        testGetPlanCacheKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "anp{ $elemMatch: { x: 2 } }a");
     }
 
     /**

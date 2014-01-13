@@ -22,9 +22,6 @@ assert.eq( 1, t.count({a: {$gt: 2, $lt:5}}) );
 e = t.find({a: {$gt: 2, $lt:5}}).explain();
 assert.eq( 1, e.nscanned );
 assert.eq( 1, e.n );
-assert.eq( 2, e.indexBounds.a[ 0 ][ 0 ] );
-// Check that upper bound is large ( > 5 ).
-assert.lt( 1000, e.indexBounds.a[ 0 ][ 1 ] );
 
 assert.eq( 1, t.count({a: {$lt: 5, $gt:2}}) );
 e = t.find({a: {$lt: 5, $gt:2}}).explain();
@@ -39,8 +36,6 @@ assert.eq( 1, t.count({a: {$gt: 5, $lt:2}}) );
 e = t.find({a: {$gt: 5, $lt:2}}).explain();
 assert.eq( 1, e.nscanned );
 assert.eq( 1, e.n );
-// Check that upper bound is low ( < 2 ).
-assert.contains( [ 5, Infinity ], e.indexBounds.a );
 
 assert.eq( 1, t.count({a: {$lt: 2, $gt:5}}) );
 e = t.find({a: {$lt: 2, $gt:5}}).explain();

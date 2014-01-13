@@ -299,10 +299,6 @@ namespace mongo {
         // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
         MatchExpression* clone = query.root()->shallowClone();
 
-        // Sort the tree in order to ensure that the sort order
-        // makes that of the cached solution.
-        PlanCache::sortTree(clone);
-
         QLOG() << "Tagging the match expression according to cache data: " << endl
                << "Filter:" << endl << clone->toString()
                << "Cache data:" << endl << cacheData->toString();
@@ -693,9 +689,11 @@ namespace mongo {
                 QLOG() << "about to build solntree from tagged tree:\n" << rawTree->toString()
                        << endl;
 
-                // The cached data needs to use a predefined ordering.
+                // The tagged tree produced by the plan enumerator is not guaranteed
+                // to be canonically sorted. In order to be compatible with the cached
+                // data, sort the tagged tree according to CanonicalQuery ordering.
                 boost::scoped_ptr<MatchExpression> clone(rawTree->shallowClone());
-                PlanCache::sortTree(clone.get());
+                CanonicalQuery::sortTree(clone.get());
 
                 PlanCacheIndexTree* cacheData;
                 Status indexTreeStatus = cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
