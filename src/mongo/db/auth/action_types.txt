@@ -7,7 +7,7 @@
 ["addShard",
 "anyAction", # Special ActionType that represents *all* actions
 "appendOplogNote",
-"applicationMessage",  # Not used for permissions checks, but to id the event in logs.
+"applicationMessage",
 "auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "authSchemaUpgrade",
@@ -54,7 +54,7 @@
 "getShardMap",
 "getShardVersion",
 "grantRole",
-"grantPrivilegesToRole",
+"grantPrivilegesToRole",  # Not used for permissions checks, but to id the event in logs.
 "grantRolesToRole",  # Not used for permissions checks, but to id the event in logs.
 "grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
 "hostInfo",
@@ -86,7 +86,7 @@
 "replSetStateChange",
 "resync",
 "revokeRole",
-"revokePrivilegesFromRole",
+"revokePrivilegesFromRole",  # Not used for permissions checks, but to id the event in logs.
 "revokeRolesFromRole",  # Not used for permissions checks, but to id the event in logs.
 "revokeRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
 "serverStatus",
