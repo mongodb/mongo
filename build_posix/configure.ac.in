@@ -9,7 +9,7 @@ AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([RELEASE])
 
-AM_INIT_AUTOMAKE([1.10 foreign])
+AM_INIT_AUTOMAKE([1.10 foreign subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 AM_OPTIONS
 
@@ -124,12 +124,14 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 AC_SUBST(AM_CFLAGS)
 
 # test/format requires an installed Berkeley DB release tree.
-bdbdir=`ls -d "$ac_pwd/db" /usr/local/BerkeleyDB* 2>/dev/null | head -1`
-if ! test -d "$bdbdir" ; then
-	bdbdir="NO_BERKELEY_DB_LIBRARY_FOUND"
-fi
-AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $bdbdir])
-AC_SUBST(BERKELEY_DB_PATH, [$bdbdir])
+AC_MSG_CHECKING([if --with-berkeleydb=DIR option specified])
+AC_ARG_WITH(berkeleydb,
+    [AS_HELP_STRING([--with-berkeleydb=DIR],
+	[Specify installed library directory of Berkeley DB])],
+    [with_berkeleydb="$withval"], [with_berkeleydb="NO_BERKELEY_DB_LIBRARY"])
+AC_MSG_RESULT($with_berkeleydb)
+AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $with_berkeleydb])
+AC_SUBST(BERKELEY_DB_PATH, [$with_berkeleydb])
 
 # test/format optionally supports the MEMRATA KVS library.
 memrata_dir=`ls -d "$ac_pwd/memrata" 2>/dev/null | head -1`

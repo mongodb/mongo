@@ -32,12 +32,19 @@ static DBT key, value;
 static uint8_t *keybuf;
 
 static int
-bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
+bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2
+#if DB_VERSION_MAJOR >= 6
+		, size_t *locp
+#endif
+)
 {
 	int cmp;
 	size_t len;
 
 	WT_UNUSED(dbp);
+#if DB_VERSION_MAJOR >= 6
+	WT_UNUSED(locp);
+#endif
 
 	len = (k1->size < k2->size) ? k1->size : k2->size;
 	if ((cmp = memcmp(k2->data, k1->data, len)) == 0)
