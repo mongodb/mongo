@@ -192,7 +192,9 @@ namespace mongo {
             mb::Element idElem = mb::findFirstChildNamed(root, "_id");
             return Status(
                 ErrorCodes::BadValue,
-                str::stream() << "Cannot apply $inc to a value of non-numeric type. {"
+                str::stream() << "Cannot apply "
+                              << (_mode == MODE_INC ? "$inc" : "$mul")
+                              << " to a value of non-numeric type. {"
                               << idElem.toString()
                               << "} has the field '" <<  _preparedState->elemFound.getFieldName()
                               << "' of non-numeric type "
