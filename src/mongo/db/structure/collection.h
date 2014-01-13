@@ -59,6 +59,7 @@ namespace mongo {
         virtual ~DocWriter() {}
         virtual void writeDocument( char* buf ) const = 0;
         virtual size_t documentSize() const = 0;
+        virtual bool addPadding() const { return true; }
     };
 
     struct CompactOptions {
@@ -88,6 +89,14 @@ namespace mongo {
         bool validateDocuments;
 
         std::string toString() const;
+    };
+
+    struct CompactStats {
+        CompactStats() {
+            corruptDocuments = 0;
+        }
+
+        long long corruptDocuments;
     };
 
     /**
@@ -163,6 +172,11 @@ namespace mongo {
 
         // -----------
 
+        StatusWith<CompactStats> compact( const CompactOptions* options );
+
+        // -----------
+
+
         // this is temporary, moving up from DB for now
         // this will add a new extent the collection
         // the new extent will be returned
@@ -193,6 +207,10 @@ namespace mongo {
          *  - adjust padding
          */
         StatusWith<DiskLoc> _insertDocument( const BSONObj& doc, bool enforceQuota );
+
+        void _compactExtent(const DiskLoc diskloc, int extentNumber,
+                            vector<IndexAccessMethod*>& indexesToInsertTo,
+                            const CompactOptions* compactOptions, CompactStats* stats );
 
         // @return 0 for inf., otherwise a number of files
         int largestFileNumberInQuota() const;

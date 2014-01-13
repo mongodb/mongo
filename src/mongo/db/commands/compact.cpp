@@ -46,9 +46,6 @@
 
 namespace mongo {
 
-    bool compactCollection(Collection* collection, const CompactOptions* compactOptions,
-                           string& errmsg, BSONObjBuilder& result );
-
     // from repl/rs.cpp
     bool isCurrentlyAReplSetPrimary();
 
@@ -144,40 +141,38 @@ namespace mongo {
             if ( cmdObj.hasElement("validate") )
                 compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
-            bool ok = false;
-            {
-                Lock::DBWrite lk(ns.ns());
-                BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
-                Client::Context ctx(ns);
 
-                Collection* collection = ctx.db()->getCollection(ns.ns());
-                if( ! collection ) {
-                    errmsg = "namespace does not exist";
-                    return false;
-                }
+            Lock::DBWrite lk(ns.ns());
+            BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
+            Client::Context ctx(ns);
 
-                if ( collection->isCapped() ) {
-                    errmsg = "cannot compact a capped collection";
-                    return false;
-                }
-
-                log() << "compact " << ns << " begin, options: " << compactOptions.toString();
-
-                std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
-
-                try {
-                    ok = compactCollection(collection, &compactOptions, errmsg, result );
-                }
-                catch(...) {
-                    log() << "compact " << ns << " end (with error)" << endl;
-                    throw;
-                }
-                log() << "compact " << ns << " end" << endl;
-
-                IndexBuilder::restoreIndexes(indexesInProg);
+            Collection* collection = ctx.db()->getCollection(ns.ns());
+            if( ! collection ) {
+                errmsg = "namespace does not exist";
+                return false;
             }
 
-            return ok;
+            if ( collection->isCapped() ) {
+                errmsg = "cannot compact a capped collection";
+                return false;
+            }
+
+            log() << "compact " << ns << " begin, options: " << compactOptions.toString();
+
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
+
+            StatusWith<CompactStats> status = collection->compact( &compactOptions );
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status.getStatus() );
+
+            if ( status.getValue().corruptDocuments > 0 )
+                result.append("invalidObjects", status.getValue().corruptDocuments );
+
+            log() << "compact " << ns << " end";
+
+            IndexBuilder::restoreIndexes(indexesInProg);
+
+            return true;
         }
     };
     static CompactCmd compactCmd;

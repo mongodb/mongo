@@ -209,9 +209,13 @@ namespace mongo {
         return reinterpret_cast<Record*>( df->p() + ofs );
     }
 
-    Extent* ExtentManager::extentFor( const DiskLoc& loc ) const {
+    DiskLoc ExtentManager::extentLocFor( const DiskLoc& loc ) const {
         Record* record = recordFor( loc );
-        DiskLoc extentLoc( loc.a(), record->extentOfs() );
+        return DiskLoc( loc.a(), record->extentOfs() );
+    }
+
+    Extent* ExtentManager::extentFor( const DiskLoc& loc ) const {
+        DiskLoc extentLoc = extentLocFor( loc );
         return getExtent( extentLoc );
     }
 

@@ -57,7 +57,9 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> RecordStore::insertRecord( const DocWriter* doc, int quotaMax ) {
-        int lenWHdr = _details->getRecordAllocationSize( doc->documentSize() + Record::HeaderSize );
+        int lenWHdr = doc->documentSize() + Record::HeaderSize;
+        if ( doc->addPadding() )
+            lenWHdr = _details->getRecordAllocationSize( lenWHdr );
 
         StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
         if ( !loc.isOK() )
