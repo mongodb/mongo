@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -48,11 +48,6 @@ namespace mongo {
      * TODO HK notes
 
      * cache should be LRU with some cap on size
-
-     * write ops should invalidate but tell plan_cache there was a write op, don't enforce policy elsewhere,
-       enforce here.
-
-     * cache key is sort + query shape + projection
 
      * {x:1} and {x:{$gt:7}} not same shape for now -- operator matters
      */
@@ -180,33 +175,12 @@ namespace mongo {
         CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry);
         ~CachedSolution();
 
-        /**
-         * Resolves index of winning solution.
-         * Takes into account pinned and shunned plans.
-         * Pinned plans take precendence over shunned plans.
-         * If a plan is both pinned and shunned, it will be the winning plan.
-         * The reason we provide the index into plannerData is to support the
-         * notion of a backup plan in the multi plan runner. The cache solution
-         * runner could go to the next solution after the winner index.
-         */
-        size_t getWinnerIndex() const;
-
         // Owned here.
         std::vector<SolutionCacheData*> plannerData;
 
         // An index into plannerData indicating the SolutionCacheData which should be
         // used to produce a backup solution in the case of a blocking sort.
         boost::optional<size_t> backupSoln;
-
-        // Pin information
-        bool pinned;
-
-        // Index of pinned plan in plannerData.
-        // Valid if pinned is true.
-        size_t pinnedIndex;
-
-        // Indexes of shunned plans.
-        std::set<size_t> shunnedIndexes;
 
         // Key used to provide feedback on the entry.
         PlanCacheKey key;
@@ -261,16 +235,6 @@ namespace mongo {
         // Annotations from cached runs.  The CachedSolutionRunner provides these stats about its
         // runs when they complete.  TODO: How many of these do we really want to keep?
         std::vector<PlanCacheEntryFeedback*> feedback;
-
-        // Is this pinned in the cache?  If so, we will never remove it as a result of feedback.
-        bool pinned;
-
-        // Index of pinned plan in plannerData.
-        // Valid if pinned is true.
-        size_t pinnedIndex;
-
-        // Indexes of shunned plans.
-        std::set<size_t> shunnedIndexes;
 
         // XXX: Replace with copy of canonical query?
         BSONObj query;
@@ -374,30 +338,17 @@ namespace mongo {
         void clear();
 
         /**
-         * Retrieves all plan cache keys
+         * Returns a vector of all cached solutions.
+         * Caller owns the result vector and is responsible for cleaning up
+         * the cached solutions.
          */
-        void getKeys(std::vector<PlanCacheKey>* keysOut) const;
+        std::vector<CachedSolution*> getAllSolutions() const;
 
         /**
-         * Pins plan on a query in the cache. Subsequent cached solutions
-         * will be generated based on the pinned plan.
+         * Returns number of entries in cache.
+         * Used for testing.
          */
-        Status pin(const PlanCacheKey& key, const PlanID& plan);
-
-        /**
-         * Unpins query. No-op if there is no plan pinned to the query.
-         */
-        Status unpin(const PlanCacheKey& key);
-
-        /**
-         * Adds user-defined plan.
-         */
-        Status addPlan(const PlanCacheKey& key, const BSONObj& details, PlanID* planOut);
-
-        /**
-         * Removes plan from cache entry.
-         */
-        Status shunPlan(const PlanCacheKey& key, const PlanID& plan);
+        size_t size() const;
 
         /**
          *  You must notify the cache if you are doing writes, as query plan utility will change.

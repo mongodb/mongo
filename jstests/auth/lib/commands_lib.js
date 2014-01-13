@@ -1556,7 +1556,7 @@ var authCommandsLib = {
         },
         {
             testname: "planCacheRead",
-            command: {planCacheListKeys: "x"},
+            command: {planCacheListQueryShapes: "x"},
             skipSharded: true,
             setup: function (db) { db.x.save( {} ); },
             teardown: function (db) { db.x.drop(); },

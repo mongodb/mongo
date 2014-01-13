@@ -347,6 +347,7 @@ namespace mongo {
                                        QuerySolution** out,
                                        QuerySolution** backupOut) {
         verify(cachedSoln);
+        verify(!cachedSoln->plannerData.empty());
         verify(out);
         verify(backupOut);
         verify(PlanCache::shouldCacheQuery(query));
@@ -359,9 +360,7 @@ namespace mongo {
         // in multi plan runner using PlanCache::shouldCacheQuery().
 
         // Look up winning solution in cached solution's array.
-        size_t solutionIndex = cachedSoln->getWinnerIndex();
-
-        SolutionCacheData* winnerCacheData = cachedSoln->plannerData[solutionIndex];
+        SolutionCacheData* winnerCacheData = cachedSoln->plannerData[0];
         Status s = planFromCache(query, params, winnerCacheData, out);
         if (!s.isOK()) {
             return s;

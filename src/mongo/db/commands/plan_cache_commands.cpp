@@ -61,7 +61,7 @@ namespace {
      * Retrieves a collection's plan cache from the database.
      */
     Status getPlanCache(Database* db, const string& ns, PlanCache** planCacheOut) {
-        verify(db);
+        invariant(db);
 
         Collection* collection = db->getCollection(ns);
         if (NULL == collection) {
@@ -69,10 +69,10 @@ namespace {
         }
 
         CollectionInfoCache* infoCache = collection->infoCache();
-        verify(infoCache);
+        invariant(infoCache);
 
         PlanCache* planCache = infoCache->getPlanCache();
-        verify(planCache);
+        invariant(planCache);
 
         *planCacheOut = planCache;
         return Status::OK();
@@ -90,16 +90,10 @@ namespace {
         // PlanCacheCommand constructors refer to static ActionType instances.
         // Registering commands in a mongo static initializer ensures that
         // the ActionType construction will be completed first.
-        new PlanCacheListKeys();
+        new PlanCacheListQueryShapes();
         new PlanCacheClear();
-        new PlanCacheGenerateKey();
-        new PlanCacheGet();
         new PlanCacheDrop();
         new PlanCacheListPlans();
-        new PlanCachePinPlan();
-        new PlanCacheUnpinPlan();
-        new PlanCacheAddPlan();
-        new PlanCacheShunPlan();
 
         return Status::OK();
     }
@@ -157,82 +151,8 @@ namespace mongo {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
-    PlanCacheListKeys::PlanCacheListKeys() : PlanCacheCommand("planCacheListKeys",
-        "Displays keys of all cached queries in a collection.",
-        ActionType::planCacheRead) { }
-
-    Status PlanCacheListKeys::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                                  BSONObjBuilder* bob) {
-        // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(ns);
-        Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
-        if (!status.isOK()) {
-            return status;
-        }
-        return listKeys(*planCache, bob);
-    }
-
     // static
-    Status PlanCacheListKeys::listKeys(const PlanCache& planCache, BSONObjBuilder* bob) {
-        verify(bob);
-
-        vector<PlanCacheKey> keys;
-        planCache.getKeys(&keys);
-
-        BSONArrayBuilder arrayBuilder(bob->subarrayStart("queries"));
-        for (vector<PlanCacheKey>::const_iterator i = keys.begin(); i != keys.end(); i++) {
-            const PlanCacheKey& key = *i;
-            arrayBuilder.append(key);
-        }
-        arrayBuilder.doneFast();
-
-        return Status::OK();
-    }
-
-    PlanCacheClear::PlanCacheClear() : PlanCacheCommand("planCacheClear",
-        "Drops all cached queries in a collection.",
-        ActionType::planCacheWrite) { }
-
-    Status PlanCacheClear::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                               BSONObjBuilder* bob) {
-        // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(ns);
-        Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
-        if (!status.isOK()) {
-            return status;
-        }
-        return clear(planCache);
-    }
-
-    // static
-    Status PlanCacheClear::clear(PlanCache* planCache) {
-        verify(planCache);
-
-        planCache->clear();
-
-        return Status::OK();
-    }
-
-    PlanCacheGenerateKey::PlanCacheGenerateKey() : PlanCacheCommand("planCacheGenerateKey",
-        "Returns a key into the cache for a query. "
-        "Similar queries with the same query shape "
-        "will resolve to the same key.",
-        ActionType::planCacheRead) { }
-
-    Status PlanCacheGenerateKey::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                                     BSONObjBuilder* bob) {
-        return generate(ns, cmdObj, bob);
-    }
-
-    // static
-    Status PlanCacheGenerateKey::generate(const string& ns, const BSONObj& cmdObj,
-                                          BSONObjBuilder* bob) {
-        verify(bob);
-
+    Status PlanCacheCommand::makeCacheKey(const string& ns, const BSONObj& cmdObj, PlanCacheKey* keyOut) {
         // query - required
         BSONElement queryElt = cmdObj.getField("query");
         if (queryElt.eoo()) {
@@ -276,17 +196,18 @@ namespace mongo {
 
         // Generate key
         PlanCacheKey key = cq->getPlanCacheKey();
-        bob->append("key", key);
+        *keyOut = key;
 
         return Status::OK();
     }
 
-    PlanCacheGet::PlanCacheGet() : PlanCacheCommand("planCacheGet",
-        "Looks up the query shape, sort order and projection using a cache key.",
+    PlanCacheListQueryShapes::PlanCacheListQueryShapes() : PlanCacheCommand("planCacheListQueryShapes",
+        "Displays all query shapes in a collection.",
         ActionType::planCacheRead) { }
 
-    Status PlanCacheGet::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                             BSONObjBuilder* bob) {
+    Status PlanCacheListQueryShapes::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
+                                                         BSONObjBuilder* bob) {
+        // This is a read lock. The query cache is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
@@ -294,40 +215,63 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        return get(*planCache, cmdObj, bob);
+        return list(*planCache, bob);
     }
 
     // static
-    Status PlanCacheGet::get(const PlanCache& planCache, const BSONObj& cmdObj,
-                             BSONObjBuilder* bob) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
-        }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
+    Status PlanCacheListQueryShapes::list(const PlanCache& planCache, BSONObjBuilder* bob) {
+        invariant(bob);
 
-        CachedSolution* crRaw;
-        Status result = planCache.get(key, &crRaw);
-        if (!result.isOK()) {
-            return result;
-        }
-        scoped_ptr<CachedSolution> cr(crRaw);
+        // Fetch all cached solutions from plan cache.
+        vector<CachedSolution*> solutions = planCache.getAllSolutions();
 
-        // XXX: Fix these field values once we have fleshed out cache entries.
-        bob->append("query", cr->query);
-        bob->append("sort", cr->sort);
-        bob->append("projection", cr->projection);
+        BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
+        for (vector<CachedSolution*>::const_iterator i = solutions.begin(); i != solutions.end(); i++) {
+            CachedSolution* cs = *i;
+            invariant(cs);
+
+            BSONObjBuilder shapeBuilder(arrayBuilder.subobjStart());
+            shapeBuilder.append("query", cs->query);
+            shapeBuilder.append("sort", cs->sort);
+            shapeBuilder.append("projection", cs->projection);
+            shapeBuilder.doneFast();
+
+            // Release resources for cached solution after extracting query shape.
+            delete cs;
+        }
+        arrayBuilder.doneFast();
+
+        return Status::OK();
+    }
+
+    PlanCacheClear::PlanCacheClear() : PlanCacheCommand("planCacheClear",
+        "Drops all cached queries in a collection.",
+        ActionType::planCacheWrite) { }
+
+    Status PlanCacheClear::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
+                                               BSONObjBuilder* bob) {
+        // This is a read lock. The query cache is owned by the collection.
+        Client::ReadContext readCtx(ns);
+        Client::Context& ctx = readCtx.ctx();
+        PlanCache* planCache;
+        Status status = getPlanCache(ctx.db(), ns, &planCache);
+        if (!status.isOK()) {
+            return status;
+        }
+        return clear(planCache);
+    }
+
+    // static
+    Status PlanCacheClear::clear(PlanCache* planCache) {
+        invariant(planCache);
+
+        planCache->clear();
 
         return Status::OK();
     }
 
     PlanCacheDrop::PlanCacheDrop() : PlanCacheCommand("planCacheDrop",
-        "Drops using a cache key.",
+        "Drops query shape from plan cache.",
         ActionType::planCacheWrite) { }
 
     Status PlanCacheDrop::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
@@ -339,21 +283,17 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        return drop(planCache, cmdObj);
+        return drop(planCache, ns, cmdObj);
     }
 
     // static
-    Status PlanCacheDrop::drop(PlanCache* planCache, const BSONObj& cmdObj) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
+    Status PlanCacheDrop::drop(PlanCache* planCache, const string& ns, const BSONObj& cmdObj) {
+        PlanCacheKey key;
+        Status status = makeCacheKey(ns, cmdObj, &key);
+        if (!status.isOK()) {
+            return status;
         }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
+
         Status result = planCache->remove(key);
         if (!result.isOK()) {
             return result;
@@ -374,22 +314,17 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        return list(*planCache, cmdObj, bob);
+        return list(*planCache, ns, cmdObj, bob);
     }
 
     // static
-    Status PlanCacheListPlans::list(const PlanCache& planCache, const BSONObj& cmdObj,
-                                    BSONObjBuilder* bob) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
+    Status PlanCacheListPlans::list(const PlanCache& planCache, const std::string& ns,
+                                    const BSONObj& cmdObj, BSONObjBuilder* bob) {
+        PlanCacheKey key;
+        Status status = makeCacheKey(ns, cmdObj, &key);
+        if (!status.isOK()) {
+            return status;
         }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
 
         CachedSolution* crRaw;
         Status result = planCache.get(key, &crRaw);
@@ -402,9 +337,6 @@ namespace mongo {
         size_t numPlans = cr->plannerData.size();
         for (size_t i = 0; i < numPlans; ++i) {
             BSONObjBuilder planBob(plansBuilder.subobjStart());
-            stringstream ss;
-            ss << "plan" << i;
-            planBob.append("plan", ss.str());
 
             // Create plan details field.
             // Currently, simple string representationg of
@@ -415,201 +347,12 @@ namespace mongo {
             detailsBob.append("solution", scd->toString());
             detailsBob.doneFast();
 
-            bool pinned = (cr->pinned && i == cr->pinnedIndex);
-            bool shunned = (cr->shunnedIndexes.find(i) != cr->shunnedIndexes.end());
-
             // XXX: Fill in rest of fields with bogus data.
             // XXX: Fix these field values once we have fleshed out cache entries.
             planBob.append("reason", BSONObj());
             planBob.append("feedback", BSONObj());
-            planBob.append("pinned", pinned);
-            planBob.append("shunned", shunned);
-            planBob.append("source", "planner");
         }
         plansBuilder.doneFast();
-
-        return Status::OK();
-    }
-
-    PlanCachePinPlan::PlanCachePinPlan() : PlanCacheCommand("planCachePinPlan",
-        "This command allows the user to pin a plan so that "
-        "it will always be used for query execution.",
-        ActionType::planCacheWrite) { }
-
-    Status PlanCachePinPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                                 BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(ns);
-        Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
-        if (!status.isOK()) {
-            return status;
-        }
-        return pin(planCache, cmdObj);
-    }
-
-    // static
-    Status PlanCachePinPlan::pin(PlanCache* planCache, const BSONObj& cmdObj) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
-        }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
-
-        BSONElement planElt = cmdObj.getField("plan");
-        if (planElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field plan missing");
-        }
-        if (mongo::String != planElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field plan must be a string");
-        }
-        PlanID plan = planElt.String();
-
-        Status result = planCache->pin(key, plan);
-        if (!result.isOK()) {
-            return result;
-        }
-
-        return Status::OK();
-    }
-
-    PlanCacheUnpinPlan::PlanCacheUnpinPlan() : PlanCacheCommand("planCacheUnpinPlan",
-        "This command allows the user to unpin any plan that might be pinned to a query.",
-        ActionType::planCacheWrite) { }
-
-    Status PlanCacheUnpinPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                                   BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(ns);
-        Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
-        if (!status.isOK()) {
-            return status;
-        }
-        return unpin(planCache, cmdObj);
-    }
-
-    // static
-    Status PlanCacheUnpinPlan::unpin(PlanCache* planCache, const BSONObj& cmdObj) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
-        }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
-
-        Status result = planCache->unpin(key);
-        if (!result.isOK()) {
-            return result;
-        }
-
-        return Status::OK();
-    }
-
-    PlanCacheAddPlan::PlanCacheAddPlan() : PlanCacheCommand("planCacheAddPlan",
-        "Adds a user-defined plan to an existing query in the cache.",
-        ActionType::planCacheWrite) { }
-
-    Status PlanCacheAddPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                                 BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(ns);
-        Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
-        if (!status.isOK()) {
-            return status;
-        }
-        return add(planCache, cmdObj, bob);
-    }
-
-    // static
-    Status PlanCacheAddPlan::add(PlanCache* planCache, const BSONObj& cmdObj,
-                                 BSONObjBuilder* bob) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
-        }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
-
-        BSONElement detailsElt = cmdObj.getField("details");
-        if (detailsElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field details missing");
-        }
-        if (!detailsElt.isABSONObj()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field details must be an object");
-        }
-        BSONObj details = detailsElt.Obj();
-
-        PlanID plan;
-        Status result = planCache->addPlan(key, details, &plan);
-        if (!result.isOK()) {
-            return result;
-        }
-
-        bob->append("plan", plan);
-        return Status::OK();
-    }
-
-    PlanCacheShunPlan::PlanCacheShunPlan() : PlanCacheCommand("planCacheShunPlan",
-        "Marks a plan as non-executable. This takes the plan out of consideration "
-        "in the plan selection for query execution.",
-        ActionType::planCacheWrite) { }
-
-    Status PlanCacheShunPlan::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
-                                                  BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(ns);
-        Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
-        if (!status.isOK()) {
-            return status;
-        }
-        return shun(planCache, cmdObj);
-    }
-
-    // static
-    Status PlanCacheShunPlan::shun(PlanCache* planCache, const BSONObj& cmdObj) {
-        BSONElement keyElt = cmdObj.getField("key");
-        if (keyElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field key missing");
-        }
-        // This has to be kept in sync with actual type of PlanCacheKey
-        if (mongo::String != keyElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field key must be compatible with cache key type");
-        }
-        PlanCacheKey key = keyElt.String();
-
-        BSONElement planElt = cmdObj.getField("plan");
-        if (planElt.eoo()) {
-            return Status(ErrorCodes::BadValue, "required field plan missing");
-        }
-        if (mongo::String != planElt.type()) {
-            return Status(ErrorCodes::BadValue,
-                          "required field plan must be a string");
-        }
-        PlanID plan = planElt.String();
-
-        Status result = planCache->shunPlan(key, plan);
-        if (!result.isOK()) {
-            return result;
-        }
 
         return Status::OK();
     }

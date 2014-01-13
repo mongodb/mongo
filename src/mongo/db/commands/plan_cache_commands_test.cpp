@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongo;
 
@@ -48,34 +49,44 @@ namespace {
     static const char* ns = "somebogusns";
 
     /**
-     * Tests for planCacheListKeys
+     * Tests for planCacheListQueryShapes
      */
-
-    /**
-     * Functor to extract cache key from BSON element.
-     * Validates cache key during extraction.
-     */
-    struct GetCacheKey {
-        PlanCacheKey operator()(const BSONElement& elt) {
-            string keyStr = elt.String();
-            ASSERT_FALSE(keyStr.empty());
-            return PlanCacheKey(keyStr);
-        }
-    };
 
     /**
      * Utility function to get list of keys in the cache.
      */
-    vector<PlanCacheKey> getKeys(const PlanCache& planCache) {
+    std::vector<BSONObj> getShapes(const PlanCache& planCache) {
         BSONObjBuilder bob;
-        ASSERT_OK(PlanCacheListKeys::listKeys(planCache, &bob));
+        ASSERT_OK(PlanCacheListQueryShapes::list(planCache, &bob));
         BSONObj resultObj = bob.obj();
-        BSONElement queriesElt = resultObj.getField("queries");
-        ASSERT_EQUALS(queriesElt.type(), mongo::Array);
-        vector<BSONElement> keyEltArray = queriesElt.Array();
-        vector<PlanCacheKey> keys(keyEltArray.size());
-        std::transform(keyEltArray.begin(), keyEltArray.end(), keys.begin(), GetCacheKey());
-        return keys;
+        BSONElement shapesElt = resultObj.getField("shapes");
+        ASSERT_EQUALS(shapesElt.type(), mongo::Array);
+        vector<BSONElement> shapesEltArray = shapesElt.Array();
+        vector<BSONObj> shapes;
+        for (vector<BSONElement>::const_iterator i = shapesEltArray.begin();
+             i != shapesEltArray.end(); ++i) {
+             const BSONElement& elt = *i;
+
+             ASSERT_TRUE(elt.isABSONObj());
+             BSONObj obj = elt.Obj();
+
+             // Check required fields.
+             // query
+             BSONElement queryElt = obj.getField("query");
+             ASSERT_TRUE(queryElt.isABSONObj());
+
+             // sort
+             BSONElement sortElt = obj.getField("sort");
+             ASSERT_TRUE(sortElt.isABSONObj());
+
+             // projection
+             BSONElement projectionElt = obj.getField("projection");
+             ASSERT_TRUE(projectionElt.isABSONObj());
+
+             // All fields OK. Append to vector.
+             shapes.push_back(obj.copy());
+        }
+        return shapes;
     }
 
     /**
@@ -87,20 +98,17 @@ namespace {
         return scd.release();
     }
 
-    TEST(PlanCacheCommandsTest, planCacheListKeysEmpty) {
+    TEST(PlanCacheCommandsTest, planCacheListQueryShapesEmpty) {
         PlanCache empty;
-        vector<PlanCacheKey> keys = getKeys(empty);
-        ASSERT_TRUE(keys.empty());
+        vector<BSONObj> shapes = getShapes(empty);
+        ASSERT_TRUE(shapes.empty());
     }
 
-    TEST(PlanCacheCommandsTest, planCacheListKeysOneKey) {
+    TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
         // Create a canonical query
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
         auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey queryKey = cq->getPlanCacheKey();
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -110,9 +118,11 @@ namespace {
         solns.push_back(&qs);
         planCache.add(*cq, solns, new PlanRankingDecision());
 
-        vector<PlanCacheKey> keys = getKeys(planCache);
-        ASSERT_EQUALS(keys.size(), 1U);
-        ASSERT_EQUALS(keys[0], queryKey);
+        vector<BSONObj> shapes = getShapes(planCache);
+        ASSERT_EQUALS(shapes.size(), 1U);
+        ASSERT_EQUALS(shapes[0].getObjectField("query"), cq->getQueryObj());
+        ASSERT_EQUALS(shapes[0].getObjectField("sort"), cq->getParsed().getSort());
+        ASSERT_EQUALS(shapes[0].getObjectField("projection"), cq->getParsed().getProj());
     }
 
     /**
@@ -135,15 +145,15 @@ namespace {
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
         planCache.add(*cq, solns, new PlanRankingDecision());
-        ASSERT_EQUALS(getKeys(planCache).size(), 1U);
+        ASSERT_EQUALS(getShapes(planCache).size(), 1U);
 
         // Clear cache and confirm number of keys afterwards.
         ASSERT_OK(PlanCacheClear::clear(&planCache));
-        ASSERT_EQUALS(getKeys(planCache).size(), 0U);
+        ASSERT_EQUALS(getShapes(planCache).size(), 0U);
     }
 
     /**
-     * Tests for runGetPlanCacheKey
+     * Tests for PlanCacheCommand::makeCacheKey
      * Mostly validation on the input parameters
      */
 
@@ -152,35 +162,33 @@ namespace {
      */
     PlanCacheKey generateKey(const char* cmdStr) {
         BSONObj cmdObj = fromjson(cmdStr);
-        BSONObjBuilder bob;
-        Status status = PlanCacheGenerateKey::generate(ns, cmdObj, &bob);
+        PlanCacheKey key;
+        Status status = PlanCacheCommand::makeCacheKey(ns, cmdObj, &key);
         if (!status.isOK()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "failed to generate cache key. cmdObj: " << cmdStr;
-            FAIL(ss.str());
+            FAIL(ss);
         }
-        BSONObj obj = bob.obj();
-        PlanCacheKey key = obj.getStringField("key");
         if (key.empty()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "zero-length cache key generated. cmdObj: " << cmdStr;
-            FAIL(ss.str());
+            FAIL(ss);
         }
         return key;
     }
 
     TEST(PlanCacheCommandsTest, planCacheGenerateKey) {
         // Invalid parameters
-        BSONObjBuilder ignored;
+        PlanCacheKey ignored;
         // Missing query field
-        ASSERT_NOT_OK(PlanCacheGenerateKey::generate(ns, fromjson("{}"), &ignored));
+        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{}"), &ignored));
         // Query needs to be an object
-        ASSERT_NOT_OK(PlanCacheGenerateKey::generate(ns, fromjson("{query: 1}"), &ignored));
+        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{query: 1}"), &ignored));
         // Sort needs to be an object
-        ASSERT_NOT_OK(PlanCacheGenerateKey::generate(ns, fromjson("{query: {}, sort: 1}"),
+        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{query: {}, sort: 1}"),
                                                      &ignored));
         // Bad query (invalid sort order)
-        ASSERT_NOT_OK(PlanCacheGenerateKey::generate(ns, fromjson("{query: {}, sort: {a: 0}}"),
+        ASSERT_NOT_OK(PlanCacheCommand::makeCacheKey(ns, fromjson("{query: {}, sort: {a: 0}}"),
                                                      &ignored));
 
         // Valid parameters
@@ -201,90 +209,21 @@ namespace {
     }
 
     /**
-     * Tests for planCacheGet
-     */
-
-    TEST(PlanCacheCommandsTest, planCacheGetInvalidParameter) {
-        PlanCache planCache;
-        BSONObjBuilder ignored;
-        // Missing key field is not ok.
-        ASSERT_NOT_OK(PlanCacheGet::get(planCache, BSONObj(), &ignored));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheGet::get(planCache, fromjson("{key: 12345}"), &ignored));
-        ASSERT_NOT_OK(PlanCacheGet::get(planCache, fromjson("{key: /keyisnotregex/}"),
-                                        &ignored));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheGetUnknownKey) {
-        // Retrieve a cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
-        // Leave the plan cache empty.
-        PlanCache planCache;
-
-        BSONObjBuilder ignored;
-        ASSERT_NOT_OK(PlanCacheGet::get(planCache, BSON("key" << queryKey), &ignored));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheGetOneKey) {
-        // Create a canonical query
-        CanonicalQuery* cqRaw;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), fromjson("{a: -1}"),
-                                               fromjson("{_id: 0, a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey queryKey = cq->getPlanCacheKey();
-
-        // Plan cache with one entry
-        PlanCache planCache;
-        QuerySolution qs;
-        qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
-
-        BSONObjBuilder bob;
-        ASSERT_OK(PlanCacheGet::get(planCache, BSON("key" << queryKey), &bob));
-        BSONObj obj = bob.obj();
-
-        // Check required fields in result.
-        // query
-        const LiteParsedQuery& pq = cq->getParsed();
-        BSONElement queryElt = obj.getField("query");
-        ASSERT_TRUE(queryElt.isABSONObj());
-        ASSERT_EQUALS(queryElt.Obj(), pq.getFilter());
-        // sort
-        BSONElement sortElt = obj.getField("sort");
-        ASSERT_TRUE(sortElt.isABSONObj());
-        ASSERT_EQUALS(sortElt.Obj(), pq.getSort());
-        // projection
-        BSONElement projectionElt = obj.getField("projection");
-        ASSERT_TRUE(projectionElt.isABSONObj());
-        ASSERT_EQUALS(projectionElt.Obj(), pq.getProj());
-    }
-
-    /**
      * Tests for planCacheDrop
      */
 
     TEST(PlanCacheCommandsTest, planCacheDropInvalidParameter) {
         PlanCache planCache;
-        // Missing key field is not ok.
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, BSONObj()));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, fromjson("{key: 12345}")));
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, fromjson("{key: /keyisnotregex/}")));
+        // Missing query field is not ok.
+        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, BSONObj()));
+        // Query field type must be PlanCacheKey.
+        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, fromjson("{query: 12345}")));
+        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, fromjson("{query: /keyisnotregex/}")));
     }
 
     TEST(PlanCacheCommandsTest, planCacheDropUnknownKey) {
-        // Retrieve the cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
-        // Leave the plan cache empty.
         PlanCache planCache;
-
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, BSON("key" << queryKey)));
+        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, fromjson("{query: {a: 1}}")));
     }
 
     TEST(PlanCacheCommandsTest, planCacheDropOneKey) {
@@ -309,17 +248,21 @@ namespace {
         planCache.add(*cqB, solns, new PlanRankingDecision());
 
         // Check keys in cache before dropping {b: 1}
-        vector<PlanCacheKey> keysBefore = getKeys(planCache);
-        ASSERT_EQUALS(keysBefore.size(), 2U);
-        ASSERT_TRUE(std::find(keysBefore.begin(), keysBefore.end(), keyA) != keysBefore.end());
-        ASSERT_TRUE(std::find(keysBefore.begin(), keysBefore.end(), keyB) != keysBefore.end());
+        vector<BSONObj> shapesBefore = getShapes(planCache);
+        ASSERT_EQUALS(shapesBefore.size(), 2U);
+        BSONObj shapeA = BSON("query" << cqA->getQueryObj() << "sort" << cqA->getParsed().getSort()
+                           << "projection" << cqA->getParsed().getProj());
+        BSONObj shapeB = BSON("query" << cqB->getQueryObj() << "sort" << cqB->getParsed().getSort()
+                           << "projection" << cqB->getParsed().getProj());
+        ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeA) != shapesBefore.end());
+        ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeB) != shapesBefore.end());
 
         // Drop {b: 1} from cache. Make sure {a: 1} is still in cache afterwards.
         BSONObjBuilder bob;
-        ASSERT_OK(PlanCacheDrop::drop(&planCache, BSON("key" << keyB)));
-        vector<PlanCacheKey> keysAfter = getKeys(planCache);
-        ASSERT_EQUALS(keysAfter.size(), 1U);
-        ASSERT_EQUALS(keysAfter[0], keyA);
+        ASSERT_OK(PlanCacheDrop::drop(&planCache, ns, BSON("query" << cqB->getQueryObj())));
+        vector<BSONObj> shapesAfter = getShapes(planCache);
+        ASSERT_EQUALS(shapesAfter.size(), 1U);
+        ASSERT_EQUALS(shapesAfter[0], shapeA);
     }
 
     /**
@@ -335,8 +278,6 @@ namespace {
      *     details: <plan_details>,
      *     reason: <ranking_stats>,
      *     feedback: <execution_stats>,
-     *     pinned: <pinned>,
-     *     shunned: <shunned>,
      *     source: <source>
      * }
      * Compilation note: GCC 4.4 has issues with getPlan() declared as a function object.
@@ -346,12 +287,6 @@ namespace {
         BSONObj obj = elt.Obj();
 
         // Check required fields.
-        // plan ID
-        BSONElement planElt = obj.getField("plan");
-        ASSERT_EQUALS(planElt.type(), mongo::String);
-        string planStr = planElt.String();
-        ASSERT_FALSE(planStr.empty());
-
         // details
         BSONElement detailsElt = obj.getField("details");
         ASSERT_TRUE(detailsElt.isABSONObj());
@@ -364,30 +299,17 @@ namespace {
         BSONElement feedbackElt = obj.getField("feedback");
         ASSERT_TRUE(feedbackElt.isABSONObj());
 
-        // pinned
-        BSONElement pinnedElt = obj.getField("pinned");
-        ASSERT_TRUE(pinnedElt.isBoolean());
-
-        // shunned
-        BSONElement shunnedElt = obj.getField("shunned");
-        ASSERT_TRUE(shunnedElt.isBoolean());
-
-        // source
-        BSONElement sourceElt = obj.getField("source");
-        ASSERT_EQUALS(sourceElt.type(), mongo::String);
-        string sourceStr = sourceElt.String();
-        ASSERT_TRUE(sourceStr == "planner" || sourceStr == "client");
-
         return obj.copy();
     }
 
     /**
      * Utility function to get list of plan IDs for a query in the cache.
      */
-    vector<BSONObj> getPlans(const PlanCache& planCache, const PlanCacheKey& key) {
+    vector<BSONObj> getPlans(const PlanCache& planCache, const BSONObj& query,
+                             const BSONObj& sort, const BSONObj& projection) {
         BSONObjBuilder bob;
-        BSONObj cmdObj = BSON("key" << key);
-        ASSERT_OK(PlanCacheListPlans::list(planCache, cmdObj, &bob));
+        BSONObj cmdObj = BSON("query" << query << "sort" << sort << "projection" << projection);
+        ASSERT_OK(PlanCacheListPlans::list(planCache, ns, cmdObj, &bob));
         BSONObj resultObj = bob.obj();
         BSONElement plansElt = resultObj.getField("plans");
         ASSERT_EQUALS(plansElt.type(), mongo::Array);
@@ -401,23 +323,22 @@ namespace {
     TEST(PlanCacheCommandsTest, planCacheListPlansInvalidParameter) {
         PlanCache planCache;
         BSONObjBuilder ignored;
-        // Missing key field is not ok.
-        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, BSONObj(), &ignored));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, fromjson("{key: 12345}"), &ignored));
-        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, fromjson("{key: /keyisnotregex/}"),
+        // Missing query field is not ok.
+        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, ns, BSONObj(), &ignored));
+        // Query field type must be BSON object.
+        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, ns, fromjson("{query: 12345}"),
+                                               &ignored));
+        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, ns, fromjson("{query: /keyisnotregex/}"),
                                                &ignored));
     }
 
     TEST(PlanCacheCommandsTest, planCacheListPlansUnknownKey) {
-        // Retrieve the cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
         // Leave the plan cache empty.
         PlanCache planCache;
 
         BSONObjBuilder ignored;
-        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, BSON("key" << queryKey), &ignored));
+        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, ns, fromjson("{query: {a: 1}}"),
+                                               &ignored));
     }
 
     TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
@@ -437,7 +358,8 @@ namespace {
         solns.push_back(&qs);
         planCache.add(*cq, solns, new PlanRankingDecision());
 
-        vector<BSONObj> plans = getPlans(planCache, queryKey);
+        vector<BSONObj> plans = getPlans(planCache, cq->getQueryObj(),
+                                         cq->getParsed().getSort(), cq->getParsed().getProj());
         ASSERT_EQUALS(plans.size(), 1U);
     }
 
@@ -460,293 +382,9 @@ namespace {
         solns.push_back(&qs);
         planCache.add(*cq, solns, new PlanRankingDecision());
 
-        vector<BSONObj> plans = getPlans(planCache, queryKey);
+        vector<BSONObj> plans = getPlans(planCache, cq->getQueryObj(),
+                                         cq->getParsed().getSort(), cq->getParsed().getProj());
         ASSERT_EQUALS(plans.size(), 2U);
-    }
-
-    /**
-     * Tests for planCachePinPlan
-     */
-
-    TEST(PlanCacheCommandsTest, planCachePinPlanInvalidParameter) {
-        PlanCache planCache;
-        // Missing key or plan field is not ok.
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, BSONObj()));
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, fromjson("{key: 'mykey'}")));
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, fromjson("{plan: 'myplan'}")));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, fromjson("{key: 12345, plan: 'p1'}")));
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache,
-                                            fromjson("{key: /myregex/, plan: 'p1'}")));
-        // Plan field type must be string.
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, fromjson("{key: 'mykey', plan: 123}")));
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache,
-                                            fromjson("{key: 'mykey', plan: /myregex/}")));
-    }
-
-    TEST(PlanCacheCommandsTest, planCachePinPlanUnknownKey) {
-        // Retrieve the cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
-        // Leave the plan cache empty.
-        PlanCache planCache;
-
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache,
-                                            BSON("key" << queryKey << "plan" << "myplan")));
-    }
-
-    TEST(PlanCacheCommandsTest, planCachePinPlanOneKey) {
-        // Create a canonical query
-        CanonicalQuery* cqRaw;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey key = cq->getPlanCacheKey();
-
-        // Plan cache with 2 entries
-        PlanCache planCache;
-        QuerySolution qs;
-        qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
-
-        // Get first plan ID
-        PlanID plan = getPlans(planCache, key).front().getStringField("plan");
-
-        // Command with invalid plan ID should raise an error.
-        PlanID badPlan = "BADPLAN_" + plan;
-        ASSERT_NOT_OK(PlanCachePinPlan::pin(&planCache, BSON("key" << key << "plan" << badPlan)));
-
-        // Check pin status before pinning.
-        vector<BSONObj> plansBefore = getPlans(planCache, key);
-        ASSERT_FALSE(plansBefore[0].getBoolField("pinned"));
-        ASSERT_FALSE(plansBefore[1].getBoolField("pinned"));
-
-        ASSERT_OK(PlanCachePinPlan::pin(&planCache, BSON("key" << key << "plan" << plan)));
-
-        // Check pin status after pinning.
-        vector<BSONObj> plansAfter = getPlans(planCache, key);
-        ASSERT_TRUE(plansAfter[0].getBoolField("pinned"));
-        ASSERT_FALSE(plansAfter[1].getBoolField("pinned"));
-
-        // Pin second plan
-        PlanID plan2 = getPlans(planCache, key).back().getStringField("plan");
-
-        ASSERT_OK(PlanCachePinPlan::pin(&planCache, BSON("key" << key << "plan" << plan2)));
-
-        // Check pin status after pinning.
-        vector<BSONObj> plansAfter2 = getPlans(planCache, key);
-        ASSERT_FALSE(plansAfter2[0].getBoolField("pinned"));
-        ASSERT_TRUE(plansAfter2[1].getBoolField("pinned"));
-
-    }
-
-    /**
-     * Tests for planCacheUnpinPlan
-     */
-
-    TEST(PlanCacheCommandsTest, planCacheUnpinPlanInvalidParameter) {
-        PlanCache planCache;
-        // Missing key field is not ok.
-        ASSERT_NOT_OK(PlanCacheUnpinPlan::unpin(&planCache, BSONObj()));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheUnpinPlan::unpin(&planCache, fromjson("{key: 12345}")));
-        ASSERT_NOT_OK(PlanCacheUnpinPlan::unpin(&planCache, fromjson("{key: /myregex/}")));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheUnpinPlanUnknownKey) {
-        // Retrieve the cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
-        // Leave the plan cache empty.
-        PlanCache planCache;
-
-        ASSERT_NOT_OK(PlanCacheUnpinPlan::unpin(&planCache, BSON("key" << queryKey)));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheUnpinPlanOneKey) {
-        // Create a canonical query
-        CanonicalQuery* cqRaw;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey key = cq->getPlanCacheKey();
-
-        // Plan cache with one entry
-        PlanCache planCache;
-        QuerySolution qs;
-        qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
-
-        ASSERT_OK(PlanCacheUnpinPlan::unpin(&planCache, BSON("key" << key)));
-    }
-
-    /**
-     * Tests for planCacheAddPlan
-     */
-
-    TEST(PlanCacheCommandsTest, planCacheAddPlanInvalidParameter) {
-        BSONObjBuilder ignored;
-        PlanCache planCache;
-
-        // Missing key field is not ok.
-        ASSERT_NOT_OK(PlanCacheAddPlan::add(&planCache, BSONObj(), &ignored));
-        // Missing details field is not ok.
-        ASSERT_NOT_OK(PlanCacheAddPlan::add(&planCache, BSON("key" << "mykey"), &ignored));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheAddPlan::add(&planCache, fromjson("{key: 12345, details: {}}"),
-                                            &ignored));
-        ASSERT_NOT_OK(PlanCacheAddPlan::add(&planCache, fromjson("{key: /myregex/, details: {}}"),
-                                            &ignored));
-        // Details field type must be an object.
-        ASSERT_NOT_OK(PlanCacheAddPlan::add(&planCache, fromjson("{key: 'mykey', details: 123}"),
-                                            &ignored));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheAddPlanUnknownKey) {
-        // Retrieve the cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
-        // Leave the plan cache empty.
-        PlanCache planCache;
-
-        BSONObjBuilder ignored;
-        ASSERT_NOT_OK(PlanCacheAddPlan::add(&planCache,
-                                            BSON("key" << queryKey << "details" << BSONObj()),
-                                            &ignored));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheAddPlanOneKey) {
-        // Create a canonical query
-        CanonicalQuery* cqRaw;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey key = cq->getPlanCacheKey();
-
-        // Plan cache with one entry
-        PlanCache planCache;
-        QuerySolution qs;
-        qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
-
-        BSONObjBuilder bob;
-        ASSERT_OK(PlanCacheAddPlan::add(&planCache, BSON("key" << key << "details" << BSONObj()),
-                                        &bob));
-        BSONObj resultObj = bob.obj();
-        BSONElement planElt = resultObj.getField("plan");
-        ASSERT_EQUALS(planElt.type(), mongo::String);
-        PlanID plan(planElt.String());
-        ASSERT_FALSE(plan.empty());
-    }
-
-    /**
-     * Tests for planCacheShunPlan
-     */
-
-    TEST(PlanCacheCommandsTest, planCacheShunPlanInvalidParameter) {
-        PlanCache planCache;
-        // Missing key or plan field is not ok.
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, BSONObj()));
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, fromjson("{key: 'mykey'}")));
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, fromjson("{plan: 'myplan'}")));
-        // Key field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, fromjson("{key: 12345, plan: 'p1'}")));
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache,
-                                              fromjson("{key: /myregex/, plan: 'p1'}")));
-        // Plan field type must be string.
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, fromjson("{key: 'mykey', plan: 123}")));
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache,
-                                              fromjson("{key: 'mykey', plan: /myregex/}")));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheShunPlanUnknownKey) {
-        // Retrieve the cache key for lookup.
-        PlanCacheKey queryKey = generateKey("{query: {a: 1}}");
-
-        // Leave the plan cache empty.
-        PlanCache planCache;
-
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache,
-                                              BSON("key" << queryKey << "plan" << "myplan")));
-    }
-
-    // Attempting shun the only plan cached for a query should fail.
-    TEST(PlanCacheCommandsTest, planCacheShunPlanSinglePlan) {
-        // Create a canonical query
-        CanonicalQuery* cqRaw;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey key = cq->getPlanCacheKey();
-
-        // Plan cache with one entry
-        PlanCache planCache;
-        QuerySolution qs;
-        qs.cacheData.reset(createSolutionCacheData());
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
-
-        // Get first plan ID
-        PlanID plan = getPlans(planCache, key).front().getStringField("plan");
-
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache, BSON("key" << key << "plan" << plan)));
-    }
-
-    TEST(PlanCacheCommandsTest, planCacheShunPlanOneKey) {
-        // Create a canonical query
-        CanonicalQuery* cqRaw;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
-
-        // Retrieve the cache key
-        PlanCacheKey key = cq->getPlanCacheKey();
-
-        // Plan cache with one entry
-        PlanCache planCache;
-        QuerySolution qs;
-        qs.cacheData.reset(createSolutionCacheData());
-        // Add cache entry with 2 solutions.
-        std::vector<QuerySolution*> solns;
-        solns.push_back(&qs);
-        solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
-
-        // Get first plan ID
-        PlanID plan = getPlans(planCache, key).front().getStringField("plan");
-
-        // Command with invalid plan ID should raise an error.
-        PlanID badPlan = "BADPLAN_" + plan;
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache,
-                                              BSON("key" << key << "plan" << badPlan)));
-
-        ASSERT_OK(PlanCacheShunPlan::shun(&planCache, BSON("key" << key << "plan" << plan)));
-
-        // Check plan count after shunning. Should be unchanged.
-        // shunned field should be set to false.
-        vector<BSONObj> plans = getPlans(planCache, key);
-        ASSERT_EQUALS(plans.size(), 2U);
-        ASSERT_TRUE(plans.front().getBoolField("shunned"));
-
-        // Shunning the same plan more than once has no effect.
-        ASSERT_OK(PlanCacheShunPlan::shun(&planCache, BSON("key" << key << "plan" << plan)));
-
-        // Plan entry must have at least one unshunned plan.
-        // Shunning remaining plan should fail.
-        PlanID plan1 = plans[1].getStringField("plan");
-        ASSERT_NOT_OK(PlanCacheShunPlan::shun(&planCache,
-                                              BSON("key" << key << "plan" << plan1)));
     }
 
 }  // namespace

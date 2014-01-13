@@ -156,8 +156,8 @@ namespace mongo {
             // Leaked intentionally: a Command registers itself when constructed.
 
             new ClusterPlanCacheCmd(
-                "planCacheListKeys",
-                "Displays keys of all cached queries in a collection.",
+                "planCacheListQueryShapes",
+                "Displays all query shapes in a collection.",
                 ActionType::planCacheRead );
 
             new ClusterPlanCacheCmd(
@@ -166,48 +166,14 @@ namespace mongo {
                 ActionType::planCacheWrite );
 
             new ClusterPlanCacheCmd(
-                "planCacheGenerateKey",
-                "Returns a key into the cache for a query. "
-                "Similar queries with the same query shape "
-                "will resolve to the same key.",
-                ActionType::planCacheRead );
-
-            new ClusterPlanCacheCmd(
-                "planCacheGet",
-                "Looks up the query shape, sort order and projection using a cache key.",
-                ActionType::planCacheRead );
-
-            new ClusterPlanCacheCmd(
                 "planCacheDrop",
-                "Drops using a cache key.",
+                "Drops query shape from plan cache.",
                 ActionType::planCacheWrite );
 
             new ClusterPlanCacheCmd(
                 "planCacheListPlans",
                 "Displays the cached plans for a query shape.",
                 ActionType::planCacheRead );
-
-            new ClusterPlanCacheCmd(
-                "planCachePinPlan",
-                "This command allows the user to pin a plan so that "
-                "it will always be used for query execution.",
-                ActionType::planCacheWrite );
-
-            new ClusterPlanCacheCmd(
-                "planCacheUnpinPlan",
-                "This command allows the user to unpin any plan that might be pinned to a query.",
-                ActionType::planCacheWrite );
-
-            new ClusterPlanCacheCmd(
-                "planCacheAddPlan",
-                "Adds a user-defined plan to an existing query in the cache.",
-                ActionType::planCacheWrite );
-
-            new ClusterPlanCacheCmd(
-                "planCacheShunPlan",
-                "Marks a plan as non-executable. This takes the plan out of consideration "
-                "in the plan selection for query execution.",
-                ActionType::planCacheWrite );
 
             return Status::OK();
         }

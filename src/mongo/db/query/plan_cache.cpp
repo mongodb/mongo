@@ -82,9 +82,6 @@ namespace mongo {
     CachedSolution::CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry)
         : plannerData(entry.plannerData.size()),
           backupSoln(entry.backupSoln),
-          pinned(entry.pinned),
-          pinnedIndex(entry.pinnedIndex),
-          shunnedIndexes(entry.shunnedIndexes),
           key(key),
           query(entry.query.copy()),
           sort(entry.sort.copy()),
@@ -105,26 +102,6 @@ namespace mongo {
         }
     }
 
-    size_t CachedSolution::getWinnerIndex() const {
-        // Choose pinned plan always (even if shunned).
-        if (pinned) {
-            verify(pinnedIndex < plannerData.size());
-            return pinnedIndex;
-        }
-
-        // Cached solution should contain at least one unshunned plan.
-        verify(shunnedIndexes.size() < plannerData.size());
-        for (size_t i = 0; i < plannerData.size(); ++i) {
-            if (shunnedIndexes.find(i) == shunnedIndexes.end()) {
-                return i;
-            }
-        }
-
-        // Unreachable code.
-        verify(0);
-        return 0;
-    }
-
     //
     // PlanCacheEntry
     //
@@ -143,8 +120,6 @@ namespace mongo {
         }
 
         decision.reset(d);
-        pinned = false;
-        pinnedIndex = 0;
     }
 
     PlanCacheEntry::~PlanCacheEntry() {
@@ -158,7 +133,11 @@ namespace mongo {
 
     string PlanCacheEntry::toString() const {
         stringstream ss;
-        ss << "pinned?: " << pinned << endl;
+        ss << "(query: " << query.toString()
+           << ";sort: " << sort.toString()
+           << ";projection: " << projection.toString()
+           << ";solutions: " << plannerData.size()
+           << ")";
         return ss.str();
     }
 
@@ -285,8 +264,7 @@ namespace mongo {
         }
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        // XXX: Replacing existing entry - revisit when we have real cached solutions.
-        // Delete previous entry
+        // Replace existing entry.
         typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
         ConstIterator i = _cache.find(key);
         if (i != _cache.end()) {
@@ -345,121 +323,23 @@ namespace mongo {
         _writeOperations.store(0);
     }
 
-    void PlanCache::getKeys(std::vector<PlanCacheKey>* keysOut) const {
-        verify(keysOut);
-
+    std::vector<CachedSolution*> PlanCache::getAllSolutions() const {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        std::vector<PlanCacheKey> keys;
+        std::vector<CachedSolution*> solutions;
         typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
         for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
             const PlanCacheKey& key = i->first;
-            keys.push_back(key);
+            PlanCacheEntry* entry = i->second;
+            CachedSolution* cs = new CachedSolution(key, *entry);
+            solutions.push_back(cs);
         }
 
-        // Replace contents of output vector provided in keysOut.
-        keys.swap(*keysOut);
+        return solutions;
     }
 
-    Status PlanCache::pin(const PlanCacheKey& key, const PlanID& plan) {
+    size_t PlanCache::size() const {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(key);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
-        }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
-
-        // search for plan
-        // XXX: remove when we have real cached plans
-        for (size_t i = 0; i < entry->plannerData.size(); i++) {
-            stringstream ss;
-            ss << "plan" << i;
-            PlanID currentPlan(ss.str());
-            if (currentPlan == plan) {
-                entry->pinned = true;
-                entry->pinnedIndex = i;
-                return Status::OK();
-            }
-        }
-
-        return Status(ErrorCodes::BadValue, "no such plan in cache");
-    }
-
-    Status PlanCache::unpin(const PlanCacheKey& key) {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(key);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
-        }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
-
-        entry->pinned = false;
-
-        return Status::OK();
-    }
-
-    Status PlanCache::addPlan(const PlanCacheKey& key, const BSONObj& details, PlanID* planOut) {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(key);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
-        }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
-
-        // XXX: Generate fake plan ID
-        stringstream ss;
-        ss << "plan" << entry->plannerData.size();
-        PlanID plan(ss.str());
-
-        SolutionCacheData* scd = new SolutionCacheData();
-        scd->tree.reset(new PlanCacheIndexTree());
-        entry->plannerData.push_back(scd);
-
-        *planOut = plan;
-        return Status::OK();
-    }
-
-    Status PlanCache::shunPlan(const PlanCacheKey& key, const PlanID& plan) {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(key);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
-        }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
-
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
-        }
-
-        // search for plan
-        for (size_t i = 0; i < entry->plannerData.size(); i++) {
-            stringstream ss;
-            ss << "plan" << i;
-            PlanID currentPlan(ss.str());
-            if (currentPlan == plan) {
-                // Do nothing if plan is already shunned.
-                if (entry->shunnedIndexes.find(i) != entry->shunnedIndexes.end()) {
-                    return Status::OK();
-                }
-
-                // Do not proceed if this is the last unshunned plan.
-                if ((entry->shunnedIndexes.size() + 1U) == entry->plannerData.size()) {
-                    return Status(ErrorCodes::BadValue, "query must have at least one unshunned plan");
-                }
-
-                entry->shunnedIndexes.insert(i);
-                return Status::OK();
-            }
-        }
-
-        return Status(ErrorCodes::BadValue, "no such plan in cache");
+        return _cache.size();
     }
 
     void PlanCache::notifyOfWriteOp() {

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -157,62 +157,6 @@ namespace {
         solns->clear();
     }
 
-    TEST(CachedSolutionTest, GetWinnerIndexNoPinnedOrShunnedPlans) {
-        std::vector<QuerySolution*> solns(5U);
-        for (size_t i = 0; i<solns.size(); ++i) {
-            auto_ptr<QuerySolution> qs(new QuerySolution());
-            qs->cacheData.reset(new SolutionCacheData());
-            qs->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-            qs->cacheData->tree.reset(new PlanCacheIndexTree());
-            solns[i] = qs.release();
-        }
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(0U, cs.getWinnerIndex());
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexWithPinnedPlan) {
-        std::vector<QuerySolution*> solns(5U);
-        std::generate(solns.begin(), solns.end(), GenerateQuerySolution());
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        // Pin 3rd plan.
-        entry.pinned = true;
-        entry.pinnedIndex = 2U;
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(entry.pinnedIndex, cs.getWinnerIndex());
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexWithShunnedPlans) {
-        std::vector<QuerySolution*> solns(5U);
-        std::generate(solns.begin(), solns.end(), GenerateQuerySolution());
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        // Shun first 2 plans.
-        entry.shunnedIndexes.insert(0U);
-        entry.shunnedIndexes.insert(1U);
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(2U, cs.getWinnerIndex());
-    }
-
-    TEST(CachedSolutionTest, GetWinnerIndexWithPinnedAndShunnedPlan) {
-        std::vector<QuerySolution*> solns(5U);
-        std::generate(solns.begin(), solns.end(), GenerateQuerySolution());
-        PlanCacheEntry entry(solns, new PlanRankingDecision());
-        deleteQuerySolutions(&solns);
-        // Pin and shun 2nd plan.
-        entry.pinned = true;
-        entry.pinnedIndex = 1U;
-        entry.shunnedIndexes.insert(1U);
-        PlanCacheKey key("boguskey");
-        CachedSolution cs(key, entry);
-        ASSERT_EQUALS(1U, cs.getWinnerIndex());
-    }
-
     /**
      * Test functions for shouldCacheQuery
      * Use these functions to assert which categories
@@ -318,14 +262,7 @@ namespace {
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
         ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
-        std::vector<PlanCacheKey> keys;
-        planCache.getKeys(&keys);
-        ASSERT_EQUALS(keys.size(), 1U);
-
-        // Calling getKeys() with a non-empty vector
-        // should result in the vector contents being replaced.
-        planCache.getKeys(&keys);
-        ASSERT_EQUALS(keys.size(), 1U);
+        ASSERT_EQUALS(planCache.size(), 1U);
     }
 
     TEST(PlanCacheTest, NotifyOfWriteOp) {
@@ -337,22 +274,18 @@ namespace {
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
         ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
-        std::vector<PlanCacheKey> keys;
-        planCache.getKeys(&keys);
-        ASSERT_EQUALS(keys.size(), 1U);
+        ASSERT_EQUALS(planCache.size(), 1U);
 
         // First (PlanCache::kPlanCacheMaxWriteOperations - 1) notifications should have
         // no effect on cache contents.
         for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
-        planCache.getKeys(&keys);
-        ASSERT_EQUALS(keys.size(), 1U);
+        ASSERT_EQUALS(planCache.size(), 1U);
 
         // 1000th notification will cause cache to be cleared.
         planCache.notifyOfWriteOp();
-        planCache.getKeys(&keys);
-        ASSERT_TRUE(keys.empty());
+        ASSERT_EQUALS(planCache.size(), 0U);
 
         // Clearing the cache should reset the internal write
         // operation counter.
@@ -365,14 +298,12 @@ namespace {
         for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
-        planCache.getKeys(&keys);
-        ASSERT_EQUALS(keys.size(), 1U);
+        ASSERT_EQUALS(planCache.size(), 1U);
         planCache.clear();
         ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
         // Notification after clearing will not flush cache.
         planCache.notifyOfWriteOp();
-        planCache.getKeys(&keys);
-        ASSERT_EQUALS(keys.size(), 1U);
+        ASSERT_EQUALS(planCache.size(), 1U);
     }
 
     /**
