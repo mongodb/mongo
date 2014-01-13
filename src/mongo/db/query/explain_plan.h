@@ -52,4 +52,6 @@ namespace mongo {
      */
     Status explainPlan(const PlanStageStats& stats, TypeExplain** explain, bool fullDetails);
 
+    BSONObj statsToBSON(const PlanStageStats& stats);
+
 } // namespace mongo

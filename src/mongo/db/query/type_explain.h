@@ -185,6 +185,9 @@ namespace mongo {
         bool isServerSet() const;
         const std::string& getServer() const;
 
+        // Opaque stats object
+        BSONObj stats;
+
     private:
         // Convention: (M)andatory, (O)ptional
 

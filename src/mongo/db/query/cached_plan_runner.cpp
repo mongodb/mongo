@@ -65,9 +65,7 @@ namespace mongo {
         // If the plan executor errors before producing any results,
         // and we have a backup plan available, then fall back on the
         // backup plan. This can happen if '_exec' has a blocking sort.
-        if (Runner::RUNNER_ERROR == state
-            && !_alreadyProduced
-            && NULL != _backupPlan.get()) {
+        if (Runner::RUNNER_ERROR == state && !_alreadyProduced && NULL != _backupPlan.get()) {
             _exec.reset(_backupPlan.release());
             state = _exec->getNext(objOut, dlOut);
         }

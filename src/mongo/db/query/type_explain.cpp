@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    // XXX: this doesn't need to be so complicated or serializable...
+
     using mongoutils::str::stream;
 
     const BSONField<std::vector<TypeExplain*> > TypeExplain::clauses("clauses");
@@ -157,6 +159,11 @@ namespace mongo {
         if (_oldPlan.get()) builder.append(oldPlan(), _oldPlan->toBSON());
 
         if (_isServerSet) builder.append(server(), _server);
+
+        // Add this at the end as it can be huge
+        if (!stats.isEmpty()) {
+            builder.append("stats", stats);
+        }
 
         return builder.obj();
     }
