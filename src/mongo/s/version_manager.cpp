@@ -137,7 +137,7 @@ namespace mongo {
 
             ok = conn->runCommand("admin", cmd, result, 0);
         }
-        catch( const DBException& ex ) {
+        catch( const DBException& ) {
 
             if ( conn_in->type() != ConnectionString::SET ) {
                 throw;

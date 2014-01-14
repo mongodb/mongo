@@ -127,7 +127,7 @@ public:
                         boost::lexical_cast<unsigned long>(
                             mongoRestoreGlobalParams.oplogLimit.c_str()),
                         boost::lexical_cast<unsigned long>(oplogInc.c_str())));
-                } catch( const boost::bad_lexical_cast& error) {
+                } catch( const boost::bad_lexical_cast& ) {
                     toolError() << "Could not parse oplogLimit into Timestamp from values ( "
                               << mongoRestoreGlobalParams.oplogLimit << " , " << oplogInc << " )"
                               << std::endl;

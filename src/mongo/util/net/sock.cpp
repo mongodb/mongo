@@ -442,7 +442,7 @@ namespace mongo {
                 try {
                     _sslManager->SSL_shutdown( _sslConnection.get() );
                 }
-                catch (const SocketException& se) { // SSL_shutdown may throw if the connection fails
+                catch (const SocketException&) { // SSL_shutdown may throw if the connection fails
                 }  
             }
 #endif

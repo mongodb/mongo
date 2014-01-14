@@ -115,7 +115,15 @@ namespace mongo {
         StringData stringData() const { return StringData(c_str(), _size); }
 
         static intrusive_ptr<const RCString> create(StringData s);
+
+// MSVC: C4291: 'declaration' : no matching operator delete found; memory will not be freed if 
+// initialization throws an exception
+// We simply rely on the default global placement delete since a local placement delete would be 
+// ambiguous for some compilers
+#pragma warning(push)
+#pragma warning(disable : 4291) 
         void operator delete (void* ptr) { free(ptr); }
+#pragma warning(pop)
 
     private:
         // these can only be created by calling create()

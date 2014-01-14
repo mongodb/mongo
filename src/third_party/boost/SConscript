@@ -8,7 +8,6 @@ boost_thread_source = dict(
     posix=['libs/thread/src/pthread/once.cpp',
            'libs/thread/src/pthread/thread.cpp'],
     win=['libs/thread/src/win32/thread.cpp',
-         'libs/thread/src/win32/tss_dll.cpp',
          'libs/thread/src/win32/tss_pe.cpp']
     ).get(env['OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['OS_FAMILY'])
 

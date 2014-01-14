@@ -99,7 +99,7 @@ namespace {
             testOpts.addOptionChaining("new", "dup", moe::Switch, "dup");
             FAIL("Was able to register duplicate single name");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -110,7 +110,7 @@ namespace {
             testOpts.addOptionChaining("dup", "new", moe::Switch, "dup");
             FAIL("Was able to register duplicate single name");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -123,7 +123,7 @@ namespace {
                                       .positional(1, 1);
             FAIL("Was able to register duplicate positional option");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -134,35 +134,35 @@ namespace {
                                       .positional(-1, 1);
             FAIL("Was able to register positional with negative start for range");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
         try {
             testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
                                       .positional(2, 1);
             FAIL("Was able to register positional with start of range larger than end");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
         try {
             testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
                                       .positional(1, -2);
             FAIL("Was able to register positional with bad end of range");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
         try {
             testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
                                       .positional(0, 1);
             FAIL("Was able to register positional with bad start of range");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
         try {
             testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
                                       .positional(1, 2);
             FAIL("Was able to register multi valued positional with non StringVector type");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -173,7 +173,7 @@ namespace {
                                       .setDefault(moe::Value("String"));
             FAIL("Was able to register default value with wrong type");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -184,7 +184,7 @@ namespace {
                                       .setImplicit(moe::Value("String"));
             FAIL("Was able to register implicit value with wrong type");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -195,7 +195,7 @@ namespace {
                                        "Multiple Values").composing();
             FAIL("Was able to register composable option with wrong type");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -210,7 +210,7 @@ namespace {
                                       .composing();
             FAIL("Was able to register composable option with implicit value");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
 
         try {
@@ -222,7 +222,7 @@ namespace {
                                       .setImplicit(moe::Value(implicitVal));
             FAIL("Was able to set implicit value on composable option");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -237,7 +237,7 @@ namespace {
                                       .composing();
             FAIL("Was able to register composable option with default value");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
 
         try {
@@ -249,7 +249,7 @@ namespace {
                                       .setDefault(moe::Value(defaultVal));
             FAIL("Was able to set default value on composable option");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -262,7 +262,7 @@ namespace {
                                       .validRange(1000, 65535);
             FAIL("Was able to register non numeric option with constraint on range");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 
@@ -273,7 +273,7 @@ namespace {
                                       .format("[0-9]*", "[0-9]*");
             FAIL("Was able to register non string option with constraint on format");
         }
-        catch (::mongo::DBException &e) {
+        catch (::mongo::DBException&) {
         }
     }
 

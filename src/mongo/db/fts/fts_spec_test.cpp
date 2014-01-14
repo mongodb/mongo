@@ -51,7 +51,7 @@ namespace mongo {
                 BSONObj fixed2 = FTSSpec::fixSpec( fixed );
                 ASSERT_EQUALS( fixed, fixed2 );
             }
-            catch ( UserException& e ) {
+            catch ( UserException& ) {
                 ASSERT( false );
             }
         }
@@ -66,7 +66,7 @@ namespace mongo {
                 // fixSpec() on an invalid spec should uassert.
                 BSONObj fixed = FTSSpec::fixSpec( user );
             }
-            catch ( UserException& e ) {
+            catch ( UserException& ) {
                 return;
             }
             ASSERT( false );
