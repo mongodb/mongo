@@ -90,6 +90,9 @@ namespace mongo {
         options->addOptionChaining("jsonArray", "jsonArray", moe::Switch,
                 "load a json array, not one item per line. Currently limited to 16MB.");
 
+        options->addOptionChaining("throttleBPS", "throttleBPS", moe::Int,
+                "throttle to this bytes-per-second value.");
+
 
         options->addOptionChaining("noimport", "noimport", moe::Switch,
                 "don't actually import. useful for benchmarking parser")
@@ -155,6 +158,7 @@ namespace mongo {
         mongoImportGlobalParams.jsonArray = hasParam("jsonArray");
         mongoImportGlobalParams.headerLine = hasParam("headerline");
         mongoImportGlobalParams.stopOnError = hasParam("stopOnError");
+        mongoImportGlobalParams.throttleBPS = getParam("throttleBPS", 0);
 
         return Status::OK();
     }
