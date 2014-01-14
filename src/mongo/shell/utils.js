@@ -877,7 +877,7 @@ shellHelper.show = function (what) {
     }
 
     if (what == "users") {
-        db.system.users.find().forEach(printjson);
+        db.getUsers().forEach(printjson);
         return "";
     }
 
