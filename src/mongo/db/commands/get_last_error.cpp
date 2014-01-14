@@ -189,6 +189,7 @@ namespace mongo {
 
             WriteConcernResult res;
             status = waitForWriteConcern( writeConcern, wOpTime, &res );
+            res.appendTo( &result );
 
             // For backward compatibility with 2.4, wtimeout returns ok : 1.0
             if ( res.wTimedOut ) {

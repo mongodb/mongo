@@ -24,8 +24,8 @@ if (gle.err === null) {
     assert.eq(gle.wtimeout, null);
 }
 else {
-    // "nojournal" is a permissible error here, if journaling is disabled.
-    assert.eq(gle.err, "nojournal");
+    // Bad GLE is a permissible error here, if journaling is disabled.
+    assert(gle.badGLE);
     assert.eq(gle.code, 2);
 }
 
@@ -72,7 +72,7 @@ assert.eq(gle.wtimeout, null);
 
 replTest.stopSet();
 
-// Next check that it still works on a lone mongod 
+// Next check that it still works on a lone mongod
 // Need to start a single server manually to keep this test in the jstests/replsets test suite
 var port = allocatePorts(1)[0];
 var baseName = "SERVER-9005";
@@ -92,14 +92,11 @@ assert.eq(gle.wtime, null);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-gle = sdb.getLastErrorObj(2, 10);
+gle = sdb.runCommand({getLastError : 1, w : 2, wtimeout : 10 });
 print('Trying standalone server with w=2 and 10ms timeout.');
+// This is an error in 2.6
 printjson(gle);
-assert.eq(gle.ok, 1);
-assert.eq(gle.err, "norepl");
-assert.eq(gle.writtenTo, null);
-assert.eq(gle.wtime, null);
-assert.eq(gle.waited, null);
-assert.eq(gle.wtimeout, null);
+assert.eq(gle.ok, 0);
+assert(gle.badGLE);
 
 stopMongod(port);
