@@ -1,11 +1,27 @@
 // Tests tracking of latestOptime and earliestOptime in serverStatus.oplog
 
+function timestampCompare(o1, o2) {
+    if (o1.t < o2.t) {
+        return -1;
+    } else if (o1.t > o2.t) {
+        return 1;
+    } else {
+        if (o1.i < o2.i) {
+            return -1;
+        } else if (o1.i > o2.i) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+}
+
 function optimesAreEqual(replTest) {
     var prevStatus = replTest.nodes[0].getDB('admin').serverStatus({oplog:true}).oplog;
     for (var i = 1; i < replTest.nodes.length; i++) {
         var status = replTest.nodes[i].getDB('admin').serverStatus({oplog:true}).oplog;
-        if (!friendlyEqual(prevStatus.latestOptime, status.latestOptime) ||
-            !friendlyEqual(prevStatus.earliestOptime, status.earliestOptime)) {
+        if (timestampCompare(prevStatus.latestOptime, status.latestOptime) != 0 ||
+            timestampCompare(prevStatus.earliestOptime, status.earliestOptime) != 0) {
             return false;
         }
         prevStatus = status;
@@ -32,8 +48,8 @@ master.getDB('test').getLastError(replTest.nodes.length);
 assert(optimesAreEqual(replTest));
 
 var info = master.getDB('admin').serverStatus({oplog:true}).oplog;
-assert.gt(info.latestOptime, initialInfo.latestOptime);
-assert.eq(info.earliestOptime, initialInfo.earliestOptime);
+assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
+assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 
 // Insert some large documents to force the oplog to roll over
 var largeString = new Array(1024*100).toString();
@@ -45,7 +61,7 @@ assert(optimesAreEqual(replTest));
 
 // Test that earliestOptime was updated
 info = master.getDB('admin').serverStatus({oplog:true}).oplog;
-assert.gt(info.latestOptime, initialInfo.latestOptime);
-assert.gt(info.earliestOptime, initialInfo.earliestOptime);
+assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
+assert.gt(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 
 replTest.stopSet();
