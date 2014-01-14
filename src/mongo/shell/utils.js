@@ -881,6 +881,11 @@ shellHelper.show = function (what) {
         return "";
     }
 
+    if (what == "roles") {
+        db.getRoles({showBuiltinRoles: true}).forEach(printjson);
+        return "";
+    }
+
     if (what == "collections" || what == "tables") {
         db.getCollectionNames().forEach(function (x) { print(x) });
         return "";
