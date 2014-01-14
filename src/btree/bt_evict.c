@@ -248,7 +248,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    bytes_max, bytes_inuse, dirty_inuse,
 		    F_ISSET(cache, WT_EVICT_INTERNAL) ? "yes" : "no");
 
-
 		/*
 		 * When the cache is full, track whether pages are being
 		 * evicted.  This will be cleared by the next thread to
