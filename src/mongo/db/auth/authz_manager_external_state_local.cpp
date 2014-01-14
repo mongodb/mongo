@@ -297,7 +297,8 @@ namespace {
     void addRoleFromDocumentOrWarn(RoleGraph* roleGraph, const BSONObj& doc) {
         Status status = roleGraph->addRoleFromDocument(doc);
         if (!status.isOK()) {
-            warning() << "Skipping invalid role document.  " << status << "; document " << doc;
+            warning() << "Skipping invalid admin.system.roles document while calculating privileges"
+                    " for user-defined roles:  " << status << "; document " << doc;
         }
     }
 
