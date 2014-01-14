@@ -36,7 +36,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

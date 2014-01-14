@@ -35,7 +35,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database_holder.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/platform/bits.h"

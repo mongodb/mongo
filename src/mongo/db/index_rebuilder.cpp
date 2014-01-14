@@ -34,7 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

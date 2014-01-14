@@ -33,7 +33,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {

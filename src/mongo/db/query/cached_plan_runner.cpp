@@ -38,7 +38,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

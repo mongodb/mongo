@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/repl/master_slave.h"  // replAllDead
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"

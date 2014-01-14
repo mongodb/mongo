@@ -30,7 +30,7 @@
 
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

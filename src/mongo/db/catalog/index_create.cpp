@@ -45,7 +45,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {

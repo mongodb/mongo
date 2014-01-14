@@ -31,7 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update_lifecycle.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
 

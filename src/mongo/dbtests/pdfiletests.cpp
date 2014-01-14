@@ -35,7 +35,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {

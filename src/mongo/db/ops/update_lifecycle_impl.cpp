@@ -29,9 +29,9 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 

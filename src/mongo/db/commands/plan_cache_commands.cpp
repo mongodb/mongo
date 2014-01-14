@@ -32,11 +32,11 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/plan_cache_commands.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace {
 

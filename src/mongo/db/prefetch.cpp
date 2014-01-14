@@ -34,7 +34,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_details.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/repl/rs.h"

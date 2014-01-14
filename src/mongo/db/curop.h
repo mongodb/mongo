@@ -35,7 +35,7 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"

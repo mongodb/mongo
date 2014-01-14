@@ -42,7 +42,7 @@
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/dbtests/dbtests.h"

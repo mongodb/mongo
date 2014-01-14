@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
@@ -39,7 +39,7 @@
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/database_holder.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/instance.h"
@@ -48,7 +48,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

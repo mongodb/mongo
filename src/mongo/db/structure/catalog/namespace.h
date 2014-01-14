@@ -78,4 +78,4 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "mongo/db/catalog/ondisk/namespace-inl.h"
+#include "mongo/db/structure/catalog/namespace-inl.h"

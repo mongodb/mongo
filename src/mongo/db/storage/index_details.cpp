@@ -35,9 +35,9 @@
 #include <boost/checked_delete.hpp>
 
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

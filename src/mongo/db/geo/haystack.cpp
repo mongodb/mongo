@@ -32,7 +32,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
@@ -40,7 +40,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details-inl.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 
 /**

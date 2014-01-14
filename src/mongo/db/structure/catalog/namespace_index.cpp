@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/ondisk/namespace_index.h"
+#include "mongo/db/structure/catalog/namespace_index.h"
 
 #include <boost/filesystem/operations.hpp>
 

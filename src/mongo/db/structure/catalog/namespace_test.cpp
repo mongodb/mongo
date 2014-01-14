@@ -30,7 +30,7 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
 

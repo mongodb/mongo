@@ -37,7 +37,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/structure/btree/key.h"
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
 

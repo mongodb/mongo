@@ -54,7 +54,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

@@ -28,13 +28,13 @@
 *    it in the license file.
 */
 
-#include "mongo/db/structure/collection_info_cache.h"
+#include "mongo/db/catalog/collection_info_cache.h"
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/namespace_details-inl.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/debug_util.h"
 
 #include "mongo/db/storage/index_details.h" // XXX

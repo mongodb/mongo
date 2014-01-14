@@ -35,7 +35,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/db/storage/extent.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

@@ -46,7 +46,7 @@
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

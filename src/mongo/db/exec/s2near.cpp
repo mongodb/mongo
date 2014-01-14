@@ -29,7 +29,7 @@
 #include "mongo/db/exec/s2near.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set_common.h"

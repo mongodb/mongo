@@ -72,7 +72,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"

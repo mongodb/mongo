@@ -29,7 +29,7 @@
 #include "mongo/db/query/multi_plan_runner.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -42,7 +42,7 @@
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 

@@ -33,7 +33,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/mock_stage.h"
@@ -41,7 +41,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"

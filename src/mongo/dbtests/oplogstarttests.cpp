@@ -30,7 +30,7 @@
 #include "mongo/db/query/internal_runner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace OplogStartTests {
 

@@ -38,7 +38,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/storage/data_file.h"

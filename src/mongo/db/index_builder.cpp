@@ -30,7 +30,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/str.h"

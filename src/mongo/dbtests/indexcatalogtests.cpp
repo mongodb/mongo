@@ -19,7 +19,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 #include "mongo/dbtests/dbtests.h"
 

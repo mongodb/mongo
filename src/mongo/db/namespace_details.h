@@ -37,8 +37,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/catalog/ondisk/namespace.h"
-#include "mongo/db/catalog/ondisk/namespace_index.h"
+#include "mongo/db/structure/catalog/namespace.h"
+#include "mongo/db/structure/catalog/namespace_index.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {

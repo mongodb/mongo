@@ -51,7 +51,7 @@
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {

@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 
 #include "mongo/db/curop.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/dur_commitjob.h"

@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 
 #include <boost/static_assert.hpp>
 

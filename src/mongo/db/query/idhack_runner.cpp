@@ -39,7 +39,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {

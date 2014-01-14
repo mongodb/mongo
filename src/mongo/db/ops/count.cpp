@@ -32,8 +32,8 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/database.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/get_runner.h"
 
 namespace mongo {

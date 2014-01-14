@@ -42,7 +42,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/hashtab.h"
 #include "mongo/util/startup_test.h"

@@ -28,14 +28,14 @@
 *    it in the license file.
 */
 
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"

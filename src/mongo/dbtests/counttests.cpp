@@ -33,7 +33,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/count.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 #include "mongo/dbtests/dbtests.h"
 

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/field_ref.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {

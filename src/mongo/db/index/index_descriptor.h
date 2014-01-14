@@ -33,7 +33,7 @@
 #include "mongo/db/storage/index_details.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"  // For NamespaceDetails.
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 #include "mongo/util/stacktrace.h"
 

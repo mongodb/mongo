@@ -30,10 +30,10 @@
 
 #include <boost/thread.hpp>
 
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_based_access_method.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/unittest/temp_dir.h"

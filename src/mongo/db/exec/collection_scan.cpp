@@ -28,11 +28,11 @@
 
 #include "mongo/db/exec/collection_scan.h"
 
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/client.h" // XXX-ERH
