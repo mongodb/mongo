@@ -125,6 +125,14 @@ namespace mongo {
         throw e;
     }
 
+    NOINLINE_DECL void invariantFailed(const char *msg, const char *file, unsigned line) {
+        problem() << "Invariant failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        logContext();
+        breakpoint();
+        log() << "\n\n***aborting after invariant() failure\n\n" << endl;
+        abort();
+    }
+
     NOINLINE_DECL void fassertFailed( int msgid ) {
         problem() << "Fatal Assertion " << msgid << endl;
         logContext();

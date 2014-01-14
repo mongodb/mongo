@@ -169,9 +169,8 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(
-            const char *msg, const char *file, unsigned line);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char *msg, const char *file, unsigned line);
     MONGO_CLIENT_API void wasserted(const char *msg, const char *file, unsigned line);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
@@ -233,6 +232,8 @@ namespace mongo {
     /* same as massert except no msgid */
 #define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::verifyFailed(#_Expression, __FILE__, __LINE__), 0) )
 
+#define MONGO_invariant(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::invariantFailed(#_Expression, __FILE__, __LINE__), 0) )
+
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
     */
@@ -245,6 +246,7 @@ namespace mongo {
 #ifdef MONGO_EXPOSE_MACROS
 # define dassert MONGO_dassert
 # define verify MONGO_verify
+# define invariant MONGO_invariant
 # define uassert MONGO_uassert
 # define wassert MONGO_wassert
 # define massert MONGO_massert
