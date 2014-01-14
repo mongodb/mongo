@@ -116,66 +116,6 @@ namespace {
         ASSERT_NOT_OK(result);
     }
 
-    // Helper function which returns the Status of creating a LiteParsedQuery object with the given
-    // parameters.
-    Status makeLiteParsedQuery(const BSONObj& query, const BSONObj& proj, const BSONObj& sort) {
-        LiteParsedQuery* lpqRaw;
-        Status result = LiteParsedQuery::make("testns", 0, 0, 0, query, proj, sort, BSONObj(),
-                                              BSONObj(), BSONObj(), false, &lpqRaw);
-        if (result.isOK()) {
-            boost::scoped_ptr<LiteParsedQuery> lpq(lpqRaw);
-        }
-
-        return result;
-    }
-
-    //
-    // Test compatibility of various projection and sort objects.
-    //
-
-    TEST(LiteParsedQueryTest, ValidSortProj) {
-        Status result = Status::OK();
-
-        result = makeLiteParsedQuery(BSONObj(),
-                                     fromjson("{a: 1}"),
-                                     fromjson("{a: 1}"));
-        ASSERT_OK(result);
-
-        result = makeLiteParsedQuery(BSONObj(),
-                                     fromjson("{a: {$meta: \"textScore\"}}"),
-                                     fromjson("{a: {$meta: \"textScore\"}}"));
-        ASSERT_OK(result);
-
-    }
-
-    TEST(LiteParsedQueryTest, ForbidNonMetaSortOnFieldWithMetaProject) {
-        Status result = Status::OK();
-
-        result = makeLiteParsedQuery(BSONObj(),
-                                     fromjson("{a: {$meta: \"textScore\"}}"),
-                                     fromjson("{a: 1}"));
-        ASSERT_NOT_OK(result);
-
-        result = makeLiteParsedQuery(BSONObj(),
-                                     fromjson("{a: {$meta: \"textScore\"}}"),
-                                     fromjson("{b: 1}"));
-        ASSERT_OK(result);
-    }
-
-    TEST(LiteParsedQueryTest, ForbidMetaSortOnFieldWithoutMetaProject) {
-        Status result = Status::OK();
-
-        result = makeLiteParsedQuery(BSONObj(),
-                                     fromjson("{a: 1}"),
-                                     fromjson("{a: {$meta: \"textScore\"}}"));
-        ASSERT_NOT_OK(result);
-
-        result = makeLiteParsedQuery(BSONObj(),
-                                     fromjson("{b: 1}"),
-                                     fromjson("{a: {$meta: \"textScore\"}}"));
-        ASSERT_NOT_OK(result);
-    }
-
     //
     // Text meta BSON element validation
     //
