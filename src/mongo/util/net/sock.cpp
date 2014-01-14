@@ -852,10 +852,10 @@ namespace mongo {
             // There shouldn't really be any data to recv here, so make sure this
             // is a clean hangup.
 
-            // Used concurrently, but we never actually read this data
-            static char testBuf[1];
+            const int testBufLength = 1024;
+            char testBuf[testBufLength];
 
-            int recvd = ::recv( _fd, testBuf, 1, portRecvFlags );
+            int recvd = ::recv( _fd, testBuf, testBufLength, portRecvFlags );
 
             if ( recvd < 0 ) {
                 // An error occurred during recv, warn and log errno
@@ -868,9 +868,14 @@ namespace mongo {
                 // We got nonzero data from this socket, very weird?
                 // Log and warn at runtime, log and abort at devtime
                 // TODO: Dump the data to the log somehow?
-                error() << "Socket found pending data during connectivity check"
+                error() << "Socket found pending " << recvd
+                        << " bytes of data during connectivity check"
                         << " (idle " << idleTimeSecs << " secs,"
                         << " remote host " << remoteString() << ")" << endl;
+                DEV {
+                    std::string hex = hexdump(testBuf, recvd);
+                    error() << "Hex Dump of stale log data: " << hex << endl;
+                }
                 dassert( false );
             }
             else {
