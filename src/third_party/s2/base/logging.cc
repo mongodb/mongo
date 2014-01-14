@@ -11,28 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "stdio.h"
-#include "time.h"
-
 #include "logging.h"
 
-namespace google_base {
-DateLogger::DateLogger() {
-#if defined(_MSC_VER)
-  _tzset();
-#endif
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
+
+LogMessageFatal::LogMessageFatal(const char* file, int line) :
+    _lsb(mongo::severe()) {
+    _lsb.setBaseMessage(mongoutils::str::stream() << file << ':' << line << ": ");
 }
 
-char* const DateLogger::HumanDate() {
-#if defined(_MSC_VER)
-  _strtime_s(buffer_, sizeof(buffer_));
-#else
-  time_t time_value = time(NULL);
-  struct tm now;
-  localtime_r(&time_value, &now);
-  snprintf(buffer_, sizeof(buffer_), "%02d:%02d:%02d",
-           now.tm_hour, now.tm_min, now.tm_sec);
-#endif
-  return buffer_;
+LogMessageFatal::~LogMessageFatal() {
+    _lsb.~LogstreamBuilder();
+    mongo::fassertFailed(0);
 }
-}  // namespace google_base
