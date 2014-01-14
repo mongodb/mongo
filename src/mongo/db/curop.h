@@ -196,7 +196,7 @@ namespace mongo {
         void leave( Client::Context * context );
         void reset();
         void reset( const HostAndPort& remote, int op );
-        void markCommand() { _command = true; }
+        void markCommand() { _isCommand = true; }
         OpDebug& debug()           { return _debug; }
         int profileLevel() const   { return _dbprofile; }
         const char * getNS() const { return _ns; }
@@ -274,7 +274,10 @@ namespace mongo {
 
         void setQuery(const BSONObj& query) { _query.set( query ); }
         Client * getClient() const { return _client; }
-
+        
+        Command * getCommand() const { return _command; }
+        void setCommand(Command* command) { _command = command; }
+        
         BSONObj info();
 
         // Fetches less information than "info()"; used to search for ops with certain criteria
@@ -327,12 +330,13 @@ namespace mongo {
         static AtomicUInt _nextOpNum;
         Client * _client;
         CurOp * _wrapped;
+        Command * _command;
         unsigned long long _start;
         unsigned long long _end;
         bool _active;
         bool _suppressFromCurop; // unless $all is set
         int _op;
-        bool _command;
+        bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
         char _ns[Namespace::MaxNsLen+2];

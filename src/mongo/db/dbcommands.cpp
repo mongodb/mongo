@@ -1436,6 +1436,8 @@ namespace mongo {
             LOG( 2 ) << "command: " << cmdObj << endl;
         }
 
+        client.curop()->setCommand(c);
+
         if (c->maintenanceMode() && theReplSet) {
             mmSetter.reset(new MaintenanceModeSetter());
         }

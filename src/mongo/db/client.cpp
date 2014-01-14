@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -595,11 +596,24 @@ namespace mongo {
         s << ns.toString();
 
         if ( ! query.isEmpty() ) {
-            if ( iscommand )
+            if ( iscommand ) {
                 s << " command: ";
-            else
+                
+                Command* curCommand = curop.getCommand();
+                if (curCommand) {
+                    mutablebson::Document cmdToLog(curop.query(), 
+                            mutablebson::Document::kInPlaceDisabled);
+                    curCommand->redactForLogging(&cmdToLog);
+                    s << cmdToLog.toString();
+                } 
+                else { // Should not happen but we need to handle curCommand == NULL gracefully
+                    s << query.toString();
+                }
+            }
+            else {
                 s << " query: ";
-            s << query.toString();
+                s << query.toString();
+            }
         }
         
         if ( ! updateobj.isEmpty() ) {
