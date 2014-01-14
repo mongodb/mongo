@@ -66,7 +66,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/instance.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/memconcept.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"

@@ -40,7 +40,6 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/dur_journalformat.h"
-#include "mongo/db/memconcept.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -206,7 +205,6 @@ namespace mongo {
 
         LockMongoFilesExclusive lk;
         privateViews.remove(_view_private);
-        memconcept::invalidate(_view_private);
         _view_write = _view_private = 0;
         MemoryMappedFile::close();
     }

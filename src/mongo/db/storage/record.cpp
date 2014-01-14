@@ -526,16 +526,12 @@ namespace mongo {
     Record* DiskLoc::rec() const {
         // XXX-ERH
         verify(a() != -1);
-        Record *r = cc().database()->getExtentManager().recordFor( *this );
-        memconcept::is(r, memconcept::concept::record);
-        return r;
+        return cc().database()->getExtentManager().recordFor( *this );
     }
 
     DeletedRecord* DiskLoc::drec() const {
         verify( _a != -1 );
-        DeletedRecord* dr = reinterpret_cast<DeletedRecord*>(rec());
-        memconcept::is(dr, memconcept::concept::deletedrecord);
-        return dr;
+        return reinterpret_cast<DeletedRecord*>(rec());
     }
 
     Extent* DiskLoc::ext() const {

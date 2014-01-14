@@ -511,7 +511,6 @@ env.Library('index_set', [ 'db/index_set.cpp' ] )
 # libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/kill_current_op.cpp",
-                    "db/memconcept.cpp",
                     "db/interrupt_status_mongod.cpp",
                     "db/d_globals.cpp",
                     "db/pagefault.cpp",

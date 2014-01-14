@@ -35,7 +35,6 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/memconcept.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/btree/key.h"
 
@@ -1078,7 +1077,6 @@ namespace mongo {
     const BtreeBucket<V> * DiskLoc::btree() const {
         verify( _a != -1 );
         Record *r = rec();
-        memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
         return (const BtreeBucket<V> *) r->data();
     }
 

@@ -34,7 +34,6 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/memconcept.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
@@ -224,7 +223,6 @@ namespace mongo {
         Extent* e = reinterpret_cast<Extent*>( _getOpenFile( loc.a() )->p() + loc.getOfs() );
         if ( doSanityCheck )
             e->assertOk();
-        memconcept::is(e, memconcept::concept::extent);
         return e;
     }
 
