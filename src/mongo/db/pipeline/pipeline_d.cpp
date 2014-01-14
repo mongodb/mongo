@@ -203,14 +203,14 @@ namespace {
             CanonicalQuery* cq;
             // Passing an empty projection since it is faster to use documentFromBsonWithDeps.
             // This will need to change to support covering indexes (SERVER-12015).
-            uassertStatusOK(
+            Status status =
                 CanonicalQuery::canonicalize(pExpCtx->ns,
                                              queryObj,
                                              sortObj,
                                              needQueryProjection ? projection : BSONObj(),
-                                             &cq));
+                                             &cq);
             Runner* rawRunner;
-            if (getRunner(cq, &rawRunner, runnerOptions).isOK()) {
+            if (status.isOK() && getRunner(cq, &rawRunner, runnerOptions).isOK()) {
                 // success: The Runner will handle sorting for us using an index.
                 runner.reset(rawRunner);
                 sortInRunner = true;
