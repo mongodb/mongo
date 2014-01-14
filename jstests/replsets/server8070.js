@@ -136,6 +136,7 @@ assert.soon(
             .next();
         print("primary: " + tojson(last, '', true) + " secondary: " + tojson(last3, '', true));
         print("member 3 collection size: " + member3.getSisterDB("foo").bar.find().itcount());
+        print("curop: " + member3.getSisterDB("foo").currentOp(true));
         return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i))
     },
     "Replication member 3 did not apply ops 25-75"
