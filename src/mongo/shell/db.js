@@ -1259,8 +1259,10 @@ DB.prototype.getUser = function(username) {
     return res.users[0];
 }
 
-DB.prototype.getUsers = function() {
-    var res = this.runCommand({usersInfo: 1});
+DB.prototype.getUsers = function(args) {
+    var cmdObj = {usersInfo: 1};
+    Object.extend(cmdObj, args);
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
