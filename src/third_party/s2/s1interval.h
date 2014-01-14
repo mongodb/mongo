@@ -52,6 +52,12 @@ class S1Interval {
   //   lng_bounds_ = S1Interval(lng_lo, lng_hi);
   inline S1Interval();
 
+  inline std::string toString() const{
+    std::stringstream out;
+    out << this;
+    return out.str();
+  }
+
   // Returns the empty interval.
   static inline S1Interval Empty();
 
