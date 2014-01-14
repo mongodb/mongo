@@ -506,7 +506,7 @@ DBCollection.prototype.createIndex = function( keys , options ){
 DBCollection.prototype.ensureIndex = function( keys , options ){
     var result = this.createIndex(keys, options);
 
-    if ( this._mongo.useWriteCommands() ) {
+    if ( this.getMongo().writeMode() != "legacy" ) {
         return result;
     }
 

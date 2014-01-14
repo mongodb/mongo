@@ -347,10 +347,10 @@ assert.writeOK = function(res, msg) {
 
     if (!res)
         errMsg = "missing first argument, no response to check"
-    else if (!res.getWriteError)
+    else if (!res.getWriteConcernError) // not BulkWriteResult/SingleWriteResult.
         assert.gleOK(res, msg)
     else {
-        if (res.getWriteError()) {
+        if (res.hasWriteErrors()) {
             errMsg = "write failed with errors: " + tojson(res) 
         } else if (res.getWriteConcernError()) {
             errMsg = "write concern failed with errors: " + tojson(res) 
@@ -395,7 +395,7 @@ assert.writeError = function(res, msg) {
         if (!res.err)
             errMsg = "no error" + tojson(res);
     } else {
-        if (!(res.getWriteError() || res.getWriteConcernError()))
+        if (!(res.hasWriteErrors() || res.getWriteConcernError()))
             errMsg = "no write errors : " + tojson(res);
     }
     if (errMsg != "" && msg)
