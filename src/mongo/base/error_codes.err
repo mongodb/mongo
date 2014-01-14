@@ -82,5 +82,6 @@ error_code("CommandResultSchemaViolation", 78)
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)
 error_code("NotMaster", 10107) #this comes from assert_util.h
+error_code("Interrupted", 11601)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
