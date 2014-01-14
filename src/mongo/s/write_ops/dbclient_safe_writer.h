@@ -53,7 +53,7 @@ namespace mongo {
                           BSONObj* gleResponse );
 
         Status enforceWriteConcern( DBClientBase* conn,
-                                    const std::string& dbName,
+                                    const StringData& dbName,
                                     const BSONObj& writeConcern,
                                     BSONObj* gleResponse );
 

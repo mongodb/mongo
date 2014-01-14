@@ -31,6 +31,10 @@
 
 #include "mongo/pch.h"
 
+#include <map>
+#include <set>
+#include <vector>
+
 #include "mongo/db/client_basic.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/writeback_listener.h"
@@ -109,25 +113,6 @@ namespace mongo {
 
         void disableForCommand();
 
-        /**
-         * Uses GLE and the shard hosts and opTimes last written by write commands to enforce a
-         * write concern.
-         *
-         * Returns true if write concern was enforced, false with errMsg if not.
-         */
-        bool enforceWriteConcern( const string& dbName, const BSONObj& options, string* errMsg );
-
-        /**
-         * calls getLastError
-         * resets shards since get last error
-         * @return if the command was ok or if there was an error
-         */
-        bool getLastError( const string& dbName,
-                           const BSONObj& options ,
-                           BSONObjBuilder& result ,
-                           string& errmsg,
-                           bool fromWriteBackListener = false );
-
         /** @return if its ok to auto split from this client */
         bool autoSplitOk() const { return _autoSplitOk && Chunk::ShouldAutoSplit; }
 
@@ -154,8 +139,8 @@ namespace mongo {
                 hostOpTimes.clear();
             }
 
-            set<string> shardHostsWritten;
-            map<string, OpTime> hostOpTimes;
+            std::set<string> shardHostsWritten;
+            std::map<string, OpTime> hostOpTimes;
         };
 
         // we use _a and _b to store info from the current request and the previous request
@@ -168,7 +153,7 @@ namespace mongo {
         RequestInfo* _prev; //  ""
 
 
-        set<string> _sinceLastGetError; // all shards accessed since last getLastError
+        std::set<string> _sinceLastGetError; // all shards accessed since last getLastError
 
         int _lastAccess;
         bool _autoSplitOk;

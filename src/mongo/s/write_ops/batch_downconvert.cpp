@@ -287,4 +287,216 @@ namespace mongo {
         response->setOk( true );
         dassert( response->isValid( NULL ) );
     }
+
+    /**
+     * Suppress the "err" and "code" field if they are coming from a previous write error and
+     * are not related to write concern.  Also removes any write stats information (e.g. "n")
+     *
+     * Also, In some cases, 2.4 GLE w/ wOpTime can give us duplicate "err" and "code" fields b/c of
+     * reporting a previous error.  The later field is what we want - dedup and use later field.
+     *
+     * Returns the stripped GLE response.
+     */
+    BSONObj BatchSafeWriter::stripNonWCInfo( const BSONObj& gleResponse ) {
+
+        BSONObjIterator it( gleResponse );
+        BSONObjBuilder builder;
+
+        BSONElement codeField; // eoo
+        BSONElement errField; // eoo
+
+        while ( it.more() ) {
+            BSONElement el = it.next();
+            StringData fieldName( el.fieldName() );
+            if ( fieldName.compare( "err" ) == 0 ) {
+                errField = el;
+            }
+            else if ( fieldName.compare( "code" ) == 0 ) {
+                codeField = el;
+            }
+            else if ( fieldName.compare( "n" ) == 0 || fieldName.compare( "nModified" ) == 0
+                      || fieldName.compare( "upserted" ) == 0
+                      || fieldName.compare( "updatedExisting" ) == 0 ) {
+                // Suppress field
+            }
+            else {
+                builder.append( el );
+            }
+        }
+
+        if ( !codeField.eoo() ) {
+            if ( !gleResponse["ok"].trueValue() ) {
+                // The last code will be from the write concern
+                builder.append( codeField );
+            }
+            else {
+                // The code is from a non-wc error on this connection - suppress it
+            }
+        }
+
+        if ( !errField.eoo() ) {
+            string err = errField.str();
+            if ( err == "norepl" || err == "noreplset" || err == "timeout" ) {
+                // Append err if it's from a write concern issue
+                builder.append( errField );
+            }
+            else {
+                // Suppress non-write concern err
+            }
+        }
+
+        return builder.obj();
+    }
+
+    namespace {
+
+        /**
+         * Trivial implementation of a BSON serializable object for backwards-compatibility.
+         *
+         * NOTE: This is not a good example of using BSONSerializable.  For anything more complex,
+         * create an implementation with fields defined.
+         */
+        class RawBSONSerializable : public BSONSerializable {
+        MONGO_DISALLOW_COPYING(RawBSONSerializable);
+        public:
+
+            RawBSONSerializable() {
+            }
+
+            RawBSONSerializable( const BSONObj& doc ) :
+                _doc( doc ) {
+            }
+
+            bool isValid( std::string* errMsg ) const {
+                return true;
+            }
+
+            BSONObj toBSON() const {
+                return _doc;
+            }
+
+            bool parseBSON( const BSONObj& source, std::string* errMsg ) {
+                _doc = source.getOwned();
+                return true;
+            }
+
+            void clear() {
+                _doc = BSONObj();
+            }
+
+            string toString() const {
+                return toBSON().toString();
+            }
+
+        private:
+
+            BSONObj _doc;
+        };
+    }
+
+    // Adds a wOpTime field to a set of gle options
+    static BSONObj buildGLECmdWithOpTime( const BSONObj& gleOptions, const OpTime& opTime ) {
+        BSONObjBuilder builder;
+        BSONObjIterator it( gleOptions );
+
+        for ( int i = 0; it.more(); ++i ) {
+            BSONElement el = it.next();
+
+            // Make sure first element is getLastError : 1
+            if ( i == 0 ) {
+                StringData elName( el.fieldName() );
+                if ( !elName.equalCaseInsensitive( "getLastError" ) ) {
+                    builder.append( "getLastError", 1 );
+                }
+            }
+
+            builder.append( el );
+        }
+        builder.appendTimestamp( "wOpTime", opTime.asDate() );
+        return builder.obj();
+    }
+
+    Status enforceLegacyWriteConcern( MultiCommandDispatch* dispatcher,
+                                      const StringData& dbName,
+                                      const BSONObj& options,
+                                      const HostOpTimeMap& hostOpTimes,
+                                      vector<LegacyWCResponse>* legacyWCResponses ) {
+
+        if ( hostOpTimes.empty() ) {
+            return Status::OK();
+        }
+
+        for ( HostOpTimeMap::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end();
+            ++it ) {
+
+            const ConnectionString& shardEndpoint = it->first;
+            const OpTime& opTime = it->second;
+
+            LOG( 3 ) << "enforcing write concern " << options << " on " << shardEndpoint.toString()
+                     << " at opTime " << opTime.toStringPretty() << endl;
+
+            BSONObj gleCmd = buildGLECmdWithOpTime( options, opTime );
+
+            dispatcher->addCommand( shardEndpoint, dbName, RawBSONSerializable( gleCmd ) );
+        }
+
+        dispatcher->sendAll();
+
+        vector<Status> failedStatuses;
+
+        while ( dispatcher->numPending() > 0 ) {
+
+            ConnectionString shardEndpoint;
+            RawBSONSerializable gleResponseSerial;
+
+            Status dispatchStatus = dispatcher->recvAny( &shardEndpoint, &gleResponseSerial );
+            if ( !dispatchStatus.isOK() ) {
+                // We need to get all responses before returning
+                failedStatuses.push_back( dispatchStatus );
+                continue;
+            }
+
+            BSONObj gleResponse = BatchSafeWriter::stripNonWCInfo( gleResponseSerial.toBSON() );
+
+            // Use the downconversion tools to determine if this GLE response is ok, a
+            // write concern error, or an unknown error we should immediately abort for.
+            BatchSafeWriter::GLEErrors errors;
+            Status extractStatus = BatchSafeWriter::extractGLEErrors( gleResponse, &errors );
+            if ( !extractStatus.isOK() ) {
+                failedStatuses.push_back( extractStatus );
+                continue;
+            }
+
+            LegacyWCResponse wcResponse;
+            wcResponse.shardHost = shardEndpoint.toString();
+            wcResponse.gleResponse = gleResponse;
+            if ( errors.wcError.get() ) {
+                wcResponse.errToReport = errors.wcError->getErrMessage();
+            }
+
+            legacyWCResponses->push_back( wcResponse );
+        }
+
+        if ( failedStatuses.empty() ) {
+            return Status::OK();
+        }
+
+        StringBuilder builder;
+        builder << "could not enforce write concern";
+
+        for ( vector<Status>::const_iterator it = failedStatuses.begin();
+            it != failedStatuses.end(); ++it ) {
+            const Status& failedStatus = *it;
+            if ( it == failedStatuses.begin() ) {
+                builder << causedBy( failedStatus.toString() );
+            }
+            else {
+                builder << ":: and ::" << failedStatus.toString();
+            }
+        }
+
+        return Status( failedStatuses.size() == 1u ? failedStatuses.front().code() : 
+                                                     ErrorCodes::MultipleErrorsOccurred, 
+                       builder.str() );
+    }
 }

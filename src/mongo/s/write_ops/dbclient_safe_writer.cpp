@@ -91,19 +91,19 @@ namespace mongo {
     }
 
     Status DBClientSafeWriter::enforceWriteConcern( DBClientBase* conn,
-                                                    const string& dbName,
+                                                    const StringData& dbName,
                                                     const BSONObj& writeConcern,
                                                     BSONObj* gleResponse ) {
 
         try {
             BSONObj resetResponse; // ignored, always ok
-            conn->runCommand( dbName, BSON( "resetError" << 1 ), resetResponse );
+            conn->runCommand( dbName.toString(), BSON( "resetError" << 1 ), resetResponse );
 
             BSONObjBuilder gleCmdB;
             gleCmdB.append( "getLastError", true );
             gleCmdB.appendElements( writeConcern );
 
-            conn->runCommand( dbName, gleCmdB.obj(), *gleResponse );
+            conn->runCommand( dbName.toString(), gleCmdB.obj(), *gleResponse );
         }
         catch ( const DBException& ex ) {
             return ex.toStatus();

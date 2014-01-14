@@ -39,6 +39,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/chunk.h"
@@ -149,69 +150,6 @@ namespace mongo {
 
     static TimerStats gleWtimeStats;
     static ServerStatusMetricField<TimerStats> displayGleLatency( "getLastError.wtime", &gleWtimeStats );
-
-    static BSONObj addOpTimeTo( const BSONObj& options, const OpTime& opTime ) {
-        BSONObjBuilder builder;
-        builder.appendElements( options );
-        builder.appendTimestamp( "wOpTime", opTime.asDate() );
-        return builder.obj();
-    }
-
-    // TODO: Break out of ClientInfo when we have a better place for this
-    bool ClientInfo::enforceWriteConcern( const string& dbName,
-                                          const BSONObj& options,
-                                          string* errMsg ) {
-
-        const map<string, OpTime>& hostOpTimes = getPrevHostOpTimes();
-
-        if ( hostOpTimes.empty() ) {
-            return true;
-        }
-
-        for ( map<string, OpTime>::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end();
-            ++it ) {
-
-            const string& shardHost = it->first;
-            const OpTime& opTime = it->second;
-
-            LOG(5) << "enforcing write concern " << options << " on " << shardHost << endl;
-
-            BSONObj optionsWithOpTime = addOpTimeTo( options, opTime );
-
-            bool ok = false;
-
-            boost::scoped_ptr<ScopedDbConnection> connPtr;
-            try {
-                connPtr.reset( new ScopedDbConnection( shardHost ) );
-                ScopedDbConnection& conn = *connPtr;
-
-                BSONObj result;
-                ok = conn->runCommand( dbName , optionsWithOpTime , result );
-                if ( !ok )
-                    *errMsg = result.toString();
-
-                conn.done();
-            }
-            catch( const DBException& ex ){
-                *errMsg = ex.toString();
-
-                if ( connPtr )
-                    connPtr->done();
-            }
-
-            // Done if anyone fails
-            if ( !ok ) {
-
-                *errMsg = str::stream() << "could not enforce write concern on " << shardHost
-                                        << causedBy( errMsg );
-
-                warning() << *errMsg << endl;
-                return false;
-            }
-        }
-
-        return true;
-    }
 
     boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 

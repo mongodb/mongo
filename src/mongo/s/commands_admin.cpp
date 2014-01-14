@@ -51,12 +51,15 @@
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
+#include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/writeback_listener.h"
+#include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
@@ -1521,27 +1524,132 @@ namespace mongo {
                                                std::vector<Privilege>* out) {} // No auth required
             CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
 
-            virtual bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run( const string& dbName,
+                              BSONObj& cmdObj,
+                              int,
+                              string& errmsg,
+                              BSONObjBuilder& result,
+                              bool ) {
+
+                //
+                // Mongos GLE - finicky.
+                //
+                // To emulate mongod, we first append any write errors we had, then try to append
+                // write concern error if there was no write error.  We need to contact the previous
+                // shards regardless to maintain 2.4 behavior.
+                //
+                // If there are any unexpected or connectivity errors when calling GLE, fail the
+                // command.
+                //
+                // Finally, report the write concern errors IF we don't already have an error.
+                // If we only get one write concern error back, report that, otherwise report an
+                // aggregated error.
+                //
+                // TODO: Do we need to contact the prev shards regardless - do we care that much
+                // about 2.4 behavior?
+                //
+
                 LastError *le = lastError.disableForCommand();
                 verify( le );
 
-
                 // Write commands always have the error stored in the mongos last error
+                bool errorOccurred = false;
                 if ( le->nPrev == 1 ) {
-                    le->appendSelf( result );
-                }
-                else {
-                    result.appendNull( "err" );
+                    errorOccurred = le->appendSelf( result, false );
                 }
 
-                bool wcResult = ClientInfo::get()->enforceWriteConcern( dbName,
-                                                                        cmdObj,
-                                                                        &errmsg );
+                // For compatibility with 2.4 sharded GLE, we always enforce the write concern
+                // across all shards.
+
+                DBClientMultiCommand dispatcher;
+                vector<LegacyWCResponse> wcResponses;
+                Status status = enforceLegacyWriteConcern( &dispatcher,
+                                                           dbName,
+                                                           cmdObj,
+                                                           convertMap( ClientInfo::get()
+                                                               ->getPrevHostOpTimes() ),
+                                                           &wcResponses );
 
                 // Don't forget about our last hosts, reset the client info
                 ClientInfo::get()->disableForCommand();
-                return wcResult;
+
+                // We're now done contacting all remote servers, just report results
+
+                if ( !status.isOK() ) {
+                    // Return immediately if we failed to contact a shard, unexpected GLE issue
+                    // Can't return code, since it may have been set above (2.4 compatibility)
+                    result.append( "errmsg", status.reason() );
+                    return false;
+                }
+
+                // Go through all the write concern responses and find errors
+                BSONArrayBuilder shards;
+                BSONObjBuilder shardRawGLE;
+                BSONArrayBuilder errors;
+                BSONArrayBuilder errorRawGLE;
+
+                int numWCErrors = 0;
+                const LegacyWCResponse* lastErrResponse = NULL;
+
+                for ( vector<LegacyWCResponse>::const_iterator it = wcResponses.begin();
+                    it != wcResponses.end(); ++it ) {
+
+                    const LegacyWCResponse& wcResponse = *it;
+
+                    shards.append( wcResponse.shardHost );
+                    shardRawGLE.append( wcResponse.shardHost, wcResponse.gleResponse );
+
+                    if ( !wcResponse.errToReport.empty() ) {
+                        numWCErrors++;
+                        lastErrResponse = &wcResponse;
+                        errors.append( wcResponse.errToReport );
+                        errorRawGLE.append( wcResponse.gleResponse );
+                    }
+                }
+
+                // Always report what we found to match 2.4 behavior and for debugging
+                if ( wcResponses.size() == 1u ) {
+                    result.append( "singleShard", wcResponses.front().shardHost );
+                }
+                else {
+                    result.append( "shards", shards.arr() );
+                    result.append( "shardRawGLE", shardRawGLE.obj() );
+                }
+
+                // Suppress write concern errors if a write error occurred, to match mongod behavior
+                if ( errorOccurred || numWCErrors == 0 )
+                    return true;
+
+                if ( numWCErrors == 1 ) {
+
+                    // Return the single write concern error we found
+                    result.appendElements( lastErrResponse->gleResponse );
+                    return lastErrResponse->gleResponse["ok"].trueValue();
+                }
+                else {
+
+                    // Return a generic combined WC error message
+                    result.append( "errs", errors.arr() );
+                    result.append( "errObjects", errorRawGLE.arr() );
+
+                    return appendCommandStatus( result,
+                        Status( ErrorCodes::WriteConcernFailed,
+                                "multiple write concern errors occurred" ) );
+                }
             }
+
+        private:
+
+            HostOpTimeMap convertMap( const map<string, OpTime>& rawMap ) {
+                HostOpTimeMap parsedMap;
+                for ( map<string, OpTime>::const_iterator it = rawMap.begin(); it != rawMap.end();
+                    ++it ) {
+                    string errMsg;
+                    parsedMap[ConnectionString::parse( it->first, errMsg )] = it->second;
+                }
+                return parsedMap;
+            }
+
         } cmdGetLastError;
 
     }

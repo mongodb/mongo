@@ -29,7 +29,7 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/s/mock_multi_command.h"
+#include "mongo/s/mock_multi_write_command.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/mock_shard_resolver.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -74,7 +74,7 @@ namespace {
         MockNSTargeter targeter;
         targeter.init( mockRanges );
 
-        MockMultiCommand dispatcher;
+        MockMultiWriteCommand dispatcher;
 
         BatchWriteExec exec( &targeter, &resolver, &dispatcher );
 
@@ -122,7 +122,7 @@ namespace {
         MockNSTargeter targeter;
         targeter.init( mockRanges );
 
-        MockMultiCommand dispatcher;
+        MockMultiWriteCommand dispatcher;
         dispatcher.init( mockEndpoints );
 
         BatchWriteExec exec( &targeter, &resolver, &dispatcher );
@@ -180,7 +180,7 @@ namespace {
         MockNSTargeter targeter;
         targeter.init( mockRanges );
 
-        MockMultiCommand dispatcher;
+        MockMultiWriteCommand dispatcher;
         dispatcher.init( mockEndpoints );
 
         BatchWriteExec exec( &targeter, &resolver, &dispatcher );

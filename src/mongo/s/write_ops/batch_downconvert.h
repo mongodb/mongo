@@ -35,6 +35,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/optime.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/s/multi_command_dispatch.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -67,7 +69,7 @@ namespace mongo {
          * write command emulation.
          */
         virtual Status enforceWriteConcern( DBClientBase* conn,
-                                            const std::string& dbName,
+                                            const StringData& dbName,
                                             const BSONObj& writeConcern,
                                             BSONObj* gleResponse ) = 0;
     };
@@ -90,10 +92,6 @@ namespace mongo {
         void safeWriteBatch( DBClientBase* conn,
                              const BatchedCommandRequest& request,
                              BatchedCommandResponse* response );
-
-        //
-        // Exposed for testing
-        //
 
         // Helper that acts as an auto-ptr for write and wc errors
         struct GLEErrors {
@@ -124,9 +122,33 @@ namespace mongo {
          */
         static void extractGLEStats( const BSONObj& gleResponse, GLEStats* stats );
 
+        /**
+         * Given a GLE response, strips out all non-write-concern related information
+         */
+        static BSONObj stripNonWCInfo( const BSONObj& gleResponse );
+
     private:
 
         SafeWriter* _safeWriter;
     };
 
+    // Used for reporting legacy write concern responses
+    struct LegacyWCResponse {
+        string shardHost;
+        BSONObj gleResponse;
+        string errToReport;
+    };
+
+    /**
+     * Uses GLE and the shard hosts and opTimes last written by write commands to enforce a
+     * write concern across the previously used shards.
+     *
+     * Returns OK with the LegacyWCResponses containing only write concern error information
+     * Returns !OK if there was an error getting a GLE response
+     */
+    Status enforceLegacyWriteConcern( MultiCommandDispatch* dispatcher,
+                                      const StringData& dbName,
+                                      const BSONObj& options,
+                                      const HostOpTimeMap& hostOpTimes,
+                                      vector<LegacyWCResponse>* wcResponses );
 }

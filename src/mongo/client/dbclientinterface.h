@@ -294,6 +294,18 @@ namespace mongo {
             return _connectHook;
         }
 
+        //
+        // FOR TESTING ONLY - useful to be able to directly mock a connection string without
+        // including the entire client library.
+        //
+
+        static ConnectionString mock( const HostAndPort& server ) {
+            ConnectionString connStr;
+            connStr._servers.push_back( server );
+            connStr._string = server.toString( true );
+            return connStr;
+        }
+
     private:
 
         void _fillServers( string s );

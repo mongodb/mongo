@@ -64,7 +64,7 @@ namespace mongo {
      * If an endpoint isn't registered with a MockEndpoint, just returns BatchedCommandResponses
      * with ok : true.
      */
-    class MockMultiCommand : public MultiCommandDispatch {
+    class MockMultiWriteCommand : public MultiCommandDispatch {
     public:
 
         void init( const std::vector<MockEndpoint*> mockEndpoints ) {

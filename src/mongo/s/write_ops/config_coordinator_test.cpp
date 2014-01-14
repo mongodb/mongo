@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/s/mock_multi_command.h"
+#include "mongo/s/mock_multi_write_command.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -44,7 +44,7 @@ namespace {
     //
 
     TEST(ConfigCoordinatorTests, Basic) {
-        MockMultiCommand dispatcher;
+        MockMultiWriteCommand dispatcher;
         vector<ConnectionString> configHosts;
         ConfigCoordinator exec( &dispatcher, configHosts );
     }

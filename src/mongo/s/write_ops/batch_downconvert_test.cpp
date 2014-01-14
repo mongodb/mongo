@@ -33,6 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/s/multi_command_dispatch.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -237,7 +238,7 @@ namespace {
         }
 
         Status enforceWriteConcern( DBClientBase* conn,
-                                    const std::string& dbName,
+                                    const StringData& dbName,
                                     const BSONObj& writeConcern,
                                     BSONObj* gleResponse ) {
             BSONObj response = _gleResponses.front();
@@ -424,5 +425,208 @@ namespace {
         ASSERT_EQUALS( response.getLastOp().toStringPretty(), OpTime(20, 0).toStringPretty() );
     }
 
+    //
+    // Tests of processing and suppressing non-WC related fields from legacy GLE responses
+    //
+
+    TEST(LegacyGLESuppress, Basic) {
+
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null}" );
+
+        BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
+        ASSERT_EQUALS( stripped.nFields(), 1 );
+        ASSERT( stripped["ok"].trueValue() );
+    }
+
+    TEST(LegacyGLESuppress, BasicStats) {
+
+        const BSONObj gleResponse =
+            fromjson( "{ok: 0.0, err: 'message',"
+                      " n: 1, nModified: 1, upserted: 'abc', updatedExisting: true}" );
+
+        BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
+        ASSERT_EQUALS( stripped.nFields(), 1 );
+        ASSERT( !stripped["ok"].trueValue() );
+    }
+
+    TEST(LegacyGLESuppress, ReplError) {
+
+        const BSONObj gleResponse =
+            fromjson( "{ok: 0.0, err: 'norepl', n: 1, wcField: true}" );
+
+        BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
+        ASSERT_EQUALS( stripped.nFields(), 3 );
+        ASSERT( !stripped["ok"].trueValue() );
+        ASSERT_EQUALS( stripped["err"].str(), "norepl" );
+        ASSERT( stripped["wcField"].trueValue() );
+    }
+
+    TEST(LegacyGLESuppress, StripCode) {
+
+        const BSONObj gleResponse =
+            fromjson( "{ok: 1.0, err: 'message', code: 12345}" );
+
+        BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
+        ASSERT_EQUALS( stripped.nFields(), 1 );
+        ASSERT( stripped["ok"].trueValue() );
+    }
+
+    TEST(LegacyGLESuppress, TimeoutDupError24) {
+
+        const BSONObj gleResponse =
+            BSON( "ok" << 0.0 << "err" << "message" << "code" << 12345
+                       << "err" << "timeout" << "code" << 56789 << "wtimeout" << true );
+
+        BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
+        ASSERT_EQUALS( stripped.nFields(), 4 );
+        ASSERT( !stripped["ok"].trueValue() );
+        ASSERT_EQUALS( stripped["err"].str(), "timeout" );
+        ASSERT_EQUALS( stripped["code"].numberInt(), 56789 );
+        ASSERT( stripped["wtimeout"].trueValue() );
+    }
+
+    //
+    // Tests of basic logical dispatching and aggregation for legacy GLE-based write concern
+    //
+
+    class MockCommandDispatch : public MultiCommandDispatch {
+    public:
+
+        MockCommandDispatch( const vector<BSONObj>& gleResponses ) :
+            _gleResponses( gleResponses.begin(), gleResponses.end() ) {
+        }
+
+        virtual ~MockCommandDispatch() {
+        }
+
+        void addCommand( const ConnectionString& endpoint,
+                         const StringData& dbName,
+                         const BSONSerializable& request ) {
+            _gleHosts.push_back( endpoint );
+        }
+
+        void sendAll() {
+            // No-op
+        }
+
+        /**
+         * Returns the number of sent requests that are still waiting to be recv'd.
+         */
+        int numPending() const {
+            return _gleHosts.size();
+        }
+
+        Status recvAny( ConnectionString* endpoint, BSONSerializable* response ) {
+            *endpoint = _gleHosts.front();
+            response->parseBSON( _gleResponses.front(), NULL );
+            _gleHosts.pop_front();
+            _gleResponses.pop_front();
+            return Status::OK();
+        }
+
+    private:
+
+        deque<ConnectionString> _gleHosts;
+        deque<BSONObj> _gleResponses;
+    };
+
+    TEST(LegacyGLEWriteConcern, Basic) {
+
+        HostOpTimeMap hostOpTimes;
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = OpTime();
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] = OpTime();
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+
+        MockCommandDispatch dispatcher( gleResponses );
+        vector<LegacyWCResponse> wcResponses;
+
+        Status status = enforceLegacyWriteConcern( &dispatcher,
+                                                   "db",
+                                                   BSONObj(),
+                                                   hostOpTimes,
+                                                   &wcResponses );
+
+        ASSERT_OK( status );
+        ASSERT_EQUALS( wcResponses.size(), 2u );
+    }
+
+    TEST(LegacyGLEWriteConcern, FailGLE) {
+
+        HostOpTimeMap hostOpTimes;
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = OpTime();
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] = OpTime();
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+
+        MockCommandDispatch dispatcher( gleResponses );
+        vector<LegacyWCResponse> wcResponses;
+
+        Status status = enforceLegacyWriteConcern( &dispatcher,
+                                                   "db",
+                                                   BSONObj(),
+                                                   hostOpTimes,
+                                                   &wcResponses );
+
+        ASSERT_NOT_OK( status );
+        // Ensure we keep getting the rest of the responses
+        ASSERT_EQUALS( wcResponses.size(), 1u );
+    }
+
+    TEST(LegacyGLEWriteConcern, MultiWCErrors) {
+
+        HostOpTimeMap hostOpTimes;
+        hostOpTimes[ConnectionString::mock( HostAndPort( "shardA:1000" ) )] = OpTime();
+        hostOpTimes[ConnectionString::mock( HostAndPort( "shardB:1000" ) )] = OpTime();
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 0.0, err: 'norepl'}" ) );
+        gleResponses.push_back( fromjson( "{ok: 0.0, err: 'timeout', wtimeout: true}" ) );
+
+        MockCommandDispatch dispatcher( gleResponses );
+        vector<LegacyWCResponse> wcResponses;
+
+        Status status = enforceLegacyWriteConcern( &dispatcher,
+                                                   "db",
+                                                   BSONObj(),
+                                                   hostOpTimes,
+                                                   &wcResponses );
+
+        ASSERT_OK( status );
+        ASSERT_EQUALS( wcResponses.size(), 2u );
+        ASSERT_EQUALS( wcResponses[0].shardHost, "shardA:1000" );
+        ASSERT_EQUALS( wcResponses[0].gleResponse["err"].str(), "norepl" );
+        ASSERT_EQUALS( wcResponses[0].errToReport, "norepl" );
+        ASSERT_EQUALS( wcResponses[1].shardHost, "shardB:1000" );
+        ASSERT_EQUALS( wcResponses[1].gleResponse["err"].str(), "timeout" );
+        ASSERT_EQUALS( wcResponses[1].errToReport, "timeout" );
+    }
+
+    TEST(LegacyGLEWriteConcern, MultiFailGLE) {
+
+        HostOpTimeMap hostOpTimes;
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = OpTime();
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] = OpTime();
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );
+        gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );
+
+        MockCommandDispatch dispatcher( gleResponses );
+        vector<LegacyWCResponse> wcResponses;
+
+        Status status = enforceLegacyWriteConcern( &dispatcher,
+                                                   "db",
+                                                   BSONObj(),
+                                                   hostOpTimes,
+                                                   &wcResponses );
+
+        ASSERT_NOT_OK( status );
+        ASSERT_EQUALS( wcResponses.size(), 0u );
+    }
 
 }
