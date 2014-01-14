@@ -129,7 +129,8 @@ namespace mongo {
 
             std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
             if (foundUsers.size() == 0) {
-                return Status(ErrorCodes::UserNotFound, "User not found");
+                return Status(ErrorCodes::UserNotFound,
+                              "User \"" + userName.toString() + "\" not found");
             }
             if (foundUsers.size() > 1) {
                 return Status(ErrorCodes::UserDataInconsistent,
@@ -166,7 +167,19 @@ namespace mongo {
                 if (code == 0) code = ErrorCodes::UnknownError;
                 return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
             }
-            *result = cmdResult["roles"]["0"].Obj().getOwned();
+
+            std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
+            if (foundRoles.size() == 0) {
+                return Status(ErrorCodes::RoleNotFound,
+                              "Role \"" + roleName.toString() + "\" not found");
+            }
+            if (foundRoles.size() > 1) {
+                return Status(ErrorCodes::RoleDataInconsistent,
+                              mongoutils::str::stream() << "Found multiple roles on the \"" <<
+                                      roleName.getDB() << "\" database with name \"" <<
+                                      roleName.getRole() << "\"");
+            }
+            *result = foundRoles[0].Obj().getOwned();
             conn->done();
             return Status::OK();
         } catch (const DBException& e) {
