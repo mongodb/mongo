@@ -716,6 +716,13 @@ __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    __wt_txn_visible_all(session, page->modify->update_txn)) {
 		page->read_gen = WT_READ_GEN_OLDEST;
 		WT_RET(__wt_page_release(session, page));
+                /*
+                 * Forced eviction can create chains of internal pages before
+                 * the cache is full. Setup the eviction server to look for
+                 * internal page merges after we successfully force evict.
+                 */
+                F_SET(S2C(session)->cache, WT_EVICT_INTERNAL);
+                WT_RET(__wt_evict_server_wake(session));
 	} else {
 		WT_RET(__wt_page_release(session, page));
 		__wt_sleep(0, 10000);
