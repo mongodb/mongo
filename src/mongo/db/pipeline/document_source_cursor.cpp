@@ -248,7 +248,7 @@ namespace {
         }
 
 
-        return out.freezeToValue();
+        return Value(DOC(getSourceName() << out.freezeToValue()));
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,
