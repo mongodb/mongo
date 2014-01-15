@@ -118,6 +118,9 @@ namespace mongo {
 
     void CollectionScan::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
+
+        // We don't care about mutations since we apply any filters to the result when we (possibly)
+        // return it.  Deletions can harm the underlying CollectionIterator so we pass them down.
         if (NULL != _iter && (INVALIDATION_DELETION == type)) {
             _iter->invalidate(dl);
         }

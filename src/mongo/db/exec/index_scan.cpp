@@ -49,8 +49,13 @@ namespace mongo {
 
     IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
                          const MatchExpression* filter)
-        : _workingSet(workingSet), _descriptor(params.descriptor), _hitEnd(false), _filter(filter), 
-          _shouldDedup(params.descriptor->isMultikey()), _yieldMovedCursor(false), _params(params),
+        : _workingSet(workingSet),
+          _descriptor(params.descriptor),
+          _hitEnd(false),
+          _filter(filter), 
+          _shouldDedup(params.descriptor->isMultikey()),
+          _yieldMovedCursor(false),
+          _params(params),
           _btreeCursor(NULL) {
 
         string amName;
@@ -251,8 +256,14 @@ namespace mongo {
     void IndexScan::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
-        // If we see this DiskLoc again, it may not be the same doc. it was before, so we want to
-        // return it.
+        // The only state we're responsible for holding is what DiskLocs to drop.  If a document
+        // mutates the underlying index cursor will deal with it.
+        if (INVALIDATION_MUTATION == type) {
+            return;
+        }
+
+        // If we see this DiskLoc again, it may not be the same document it was before, so we want
+        // to return it if we see it again.
         unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _returned.find(dl);
         if (it != _returned.end()) {
             ++_specificStats.seenInvalidated;

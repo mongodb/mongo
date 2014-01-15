@@ -223,17 +223,21 @@ namespace mongo {
             }
         }
 
-        if (!_alreadyProduced.empty()) {
+        // Look for an already produced result that provides the data the caller wants.
+        while (!_alreadyProduced.empty()) {
             WorkingSetID id = _alreadyProduced.front();
             _alreadyProduced.pop_front();
 
             WorkingSetMember* member = _bestPlan->getWorkingSet()->get(id);
+
             // Note that this copies code from PlanExecutor.
             if (NULL != objOut) {
                 if (WorkingSetMember::LOC_AND_IDX == member->state) {
                     if (1 != member->keyData.size()) {
                         _bestPlan->getWorkingSet()->free(id);
-                        return Runner::RUNNER_ERROR;
+                        // If the caller needs the key data and the WSM doesn't have it, drop the
+                        // result and carry on.
+                        continue;
                     }
                     *objOut = member->keyData[0].keyData;
                 }
@@ -241,9 +245,10 @@ namespace mongo {
                     *objOut = member->obj;
                 }
                 else {
-                    // TODO: Checking the WSM for covered fields goes here.
+                    // If the caller needs an object and the WSM doesn't have it, drop and
+                    // try the next result.
                     _bestPlan->getWorkingSet()->free(id);
-                    return Runner::RUNNER_ERROR;
+                    continue;
                 }
             }
 
@@ -252,10 +257,14 @@ namespace mongo {
                     *dlOut = member->loc;
                 }
                 else {
+                    // If the caller needs a DiskLoc and the WSM doesn't have it, drop and carry on.
                     _bestPlan->getWorkingSet()->free(id);
-                    return Runner::RUNNER_ERROR;
+                    continue;
                 }
             }
+
+            // If we're here, the caller has all the data needed and we've set the out
+            // parameters.  Remove the result from the WorkingSet.
             _bestPlan->getWorkingSet()->free(id);
             return Runner::RUNNER_ADVANCED;
         }
