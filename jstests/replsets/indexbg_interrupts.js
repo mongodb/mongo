@@ -44,7 +44,8 @@ var dropAction = [
     {dropIndexes: collection, index: "*"},
     {dropIndexes: collection, index: "i_1"},
     {drop: collection},
-    {dropDatabase: 1 }
+    {dropDatabase: 1 },
+    {convertToCapped: collection, size: 20000}
 ];
 
 
@@ -71,17 +72,12 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     jsTest.log("Index created and system.indexes entry exists on secondary");
 
     jsTest.log("running command " + JSON.stringify(dc));
-    masterDB.runCommand( dc );
+    assert.commandWorked(masterDB.runCommand( dc ));
+    
     jsTest.log("Waiting on replication");
     replTest.awaitReplication();
 
-    // This doesn't assert, but waits for the bg index op to complete
-    assert.soon( function() {
-        return !checkOp(secondDB); }, "index not cancelled on secondary", 30000, 50 );
-    assert.soon( function() { 
-        var idx_count = secondDB.system.indexes.count( {ns:dbname + "." + collection} );
-        return (idx_count == 1 || idx_count == 0);}, 
-    //assert.soon( function() { return 2 == secondDB.system.indexes.count(); }, 
-                 "Index not dropped on secondary", 30000, 50 );
+    var idx_count = secondDB.system.indexes.count( {ns:dbname + "." + collection} );
+    assert(idx_count == 1 || idx_count == 0);
 }
 jsTest.log("indexbg-interrupts.js done");
