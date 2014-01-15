@@ -32,7 +32,6 @@
 
 #include "mongo/db/exec/sort.h"
 
-#include <sstream>
 #include "mongo/db/json.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/unittest/unittest.h"
@@ -41,7 +40,6 @@ using namespace mongo;
 
 namespace {
 
-    using std::stringstream;
 
     TEST(SortStageTest, SortEmptyWorkingSet) {
         WorkingSet ws;
@@ -145,14 +143,14 @@ namespace {
         // Finally, we get to compare the sorted results against what we expect.
         BSONObj expectedObj = fromjson(expectedStr);
         if (outputObj != expectedObj) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             // Even though we have the original string representation of the expected output,
             // we invoke BSONObj::toString() to get a format consistent with outputObj.
             ss << "Unexpected sort result with query=" << queryStr << "; pattern=" << patternStr
                << "; limit=" << limit << ":\n"
                << "Expected: " << expectedObj.toString() << "\n"
                << "Actual:   " << outputObj.toString() << "\n";
-            FAIL(ss.str());
+            FAIL(ss);
         }
     }
 

@@ -64,7 +64,7 @@ namespace mongo {
     }
 
     string OrderedIntervalList::toString() const {
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "['" << name << "']: ";
         for (size_t j = 0; j < intervals.size(); ++j) {
             ss << intervals[j].toString();
@@ -72,11 +72,11 @@ namespace mongo {
                 ss << ", ";
             }
         }
-        return ss.str();
+        return ss;
     }
 
     string IndexBounds::toString() const {
-        stringstream ss;
+        mongoutils::str::stream ss;
         if (isSimpleRange) {
             ss << "[" << startKey.toString() << ", ";
             if (endKey.isEmpty()) {
@@ -91,7 +91,7 @@ namespace mongo {
                     ss << ")";
                 }
             }
-            return ss.str();
+            return ss;
         }
         for (size_t i = 0; i < fields.size(); ++i) {
             if (i > 0) {
@@ -100,7 +100,7 @@ namespace mongo {
             ss << "field #" << i << fields[i].toString();
         }
 
-        return ss.str();
+        return ss;
     }
 
     BSONObj IndexBounds::toBSON() const {

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -52,7 +53,7 @@ namespace mongo {
         Interval();
 
         string toString() const {
-            stringstream ss;
+            mongoutils::str::stream ss;
             if (startInclusive) {
                 ss << "[";
             }
@@ -69,7 +70,7 @@ namespace mongo {
             else {
                 ss << ")";
             }
-            return ss.str();
+            return ss;
         }
 
         /**

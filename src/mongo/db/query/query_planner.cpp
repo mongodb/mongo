@@ -70,7 +70,7 @@ namespace mongo {
     }
 
     string optionString(size_t options) {
-        stringstream ss;
+        mongoutils::str::stream ss;
 
         // These options are all currently mutually exclusive.
         if (QueryPlannerParams::DEFAULT == options) {
@@ -88,7 +88,7 @@ namespace mongo {
         if (options & QueryPlannerParams::NO_BLOCKING_SORT) {
             ss << "NO_BLOCKING_SORT";
         }
-        return ss.str();
+        return ss;
     }
 
     static BSONObj getKeyFromQuery(const BSONObj& keyPattern, const BSONObj& query) {
@@ -176,11 +176,11 @@ namespace mongo {
         if (NULL != taggedTree->getTag()) {
             IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
             if (itag->index >= relevantIndices.size()) {
-                std::stringstream ss;
+                mongoutils::str::stream ss;
                 ss << "Index number is " << itag->index
                    << " but there are only " << relevantIndices.size()
                    << " relevant indices.";
-                return Status(ErrorCodes::BadValue, ss.str());
+                return Status(ErrorCodes::BadValue, ss);
             }
 
             // Make sure not to cache solutions which use '2d' indices.
@@ -228,11 +228,11 @@ namespace mongo {
         verify(NULL == filter->getTag());
 
         if (filter->numChildren() != indexTree->children.size()) {
-            std::stringstream ss;
+            mongoutils::str::stream ss;
             ss << "Cache topology and query did not match: "
                << "query has " << filter->numChildren() << " children "
                << "and cache has " << indexTree->children.size() << " children.";
-            return Status(ErrorCodes::BadValue, ss.str());
+            return Status(ErrorCodes::BadValue, ss);
         }
 
         // Continue the depth-first tree traversal.
@@ -246,9 +246,9 @@ namespace mongo {
         if (NULL != indexTree->entry.get()) {
             map<BSONObj, size_t>::const_iterator got = indexMap.find(indexTree->entry->keyPattern);
             if (got == indexMap.end()) {
-                std::stringstream ss;
+                mongoutils::str::stream ss;
                 ss << "Did not find index with keyPattern: " << indexTree->entry->keyPattern.toString();
-                return Status(ErrorCodes::BadValue, ss.str());
+                return Status(ErrorCodes::BadValue, ss);
             }
             filter->setTag(new IndexTag(got->second, indexTree->index_pos));
         }

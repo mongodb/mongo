@@ -212,18 +212,18 @@ namespace mongo {
 
                 std::string after = mongoutils::str::after(e.fieldName(), ".$");
                 if (mongoutils::str::contains(after, ".$")) {
-                    std::stringstream ss;
+                    mongoutils::str::stream ss;
                     ss << "Positional projection '" << e.fieldName() << "' contains "
                        << "the positional operator more than once.";
-                    return Status(ErrorCodes::BadValue, ss.str());
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 std::string matchfield = mongoutils::str::before(e.fieldName(), '.');
                 if (!_hasPositionalOperatorMatch(query, matchfield)) {
-                    std::stringstream ss;
+                    mongoutils::str::stream ss;
                     ss << "Positional projection '" << e.fieldName() << "' does not "
                        << "match the query document.";
-                    return Status(ErrorCodes::BadValue, ss.str());
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 arrayOpType = ARRAY_OP_POSITIONAL;

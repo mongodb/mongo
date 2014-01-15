@@ -270,10 +270,10 @@ namespace {
     MatchExpression* parseMatchExpression(const BSONObj& obj) {
         StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
         if (!status.isOK()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "failed to parse query: " << obj.toString()
                << ". Reason: " << status.toString();
-            FAIL(ss.str());
+            FAIL(ss);
         }
         MatchExpression* expr(status.getValue());
         return expr;
@@ -285,12 +285,12 @@ namespace {
         if (actual->equivalent(expected)) {
             return;
         }
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "Match expressions are not equivalent."
            << "\nOriginal query: " << queryStr
            << "\nExpected: " << expected->toString()
            << "\nActual: " << actual->toString();
-        FAIL(ss.str());
+        FAIL(ss);
     }
 
     /**
@@ -342,10 +342,10 @@ namespace {
         if (key == expectedKey) {
             return;
         }
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "Unexpected plan cache key. Expected: " << expectedKey << ". Actual: " << key
            << ". Query: " << cq->toString();
-        FAIL(ss.str());
+        FAIL(ss);
     }
 
     TEST(PlanCacheTest, GetPlanCacheKey) {

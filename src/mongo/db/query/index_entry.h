@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <sstream>
 #include <string>
 
 #include "mongo/db/jsobj.h"
@@ -62,7 +61,7 @@ namespace mongo {
         BSONObj infoObj;
 
         std::string toString() const {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "kp: "  << keyPattern.toString();
 
             if (multikey) {
@@ -77,7 +76,7 @@ namespace mongo {
                 ss << " io: " << infoObj.toString();
             }
 
-            return ss.str();
+            return ss;
         }
     };
 

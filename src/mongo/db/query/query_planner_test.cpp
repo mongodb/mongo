@@ -33,7 +33,6 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 
 #include <ostream>
-#include <sstream>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -203,16 +202,12 @@ namespace {
             return solns.size();
         }
 
-        void dumpSolutions(ostream& ost) const {
+        void dumpSolutions(mongoutils::str::stream& ost) const {
             for (vector<QuerySolution*>::const_iterator it = solns.begin();
                     it != solns.end();
                     ++it) {
-                ost << (*it)->toString() << endl;
+                ost << (*it)->toString() << '\n';
             }
-        }
-
-        void dumpSolutions() const {
-            dumpSolutions(std::cout);
         }
 
         /**
@@ -223,11 +218,11 @@ namespace {
             if (getNumSolutions() == expectSolutions) {
                 return;
             }
-            std::stringstream ss;
+            mongoutils::str::stream ss;
             ss << "expected " << expectSolutions << " solutions but got " << getNumSolutions()
-               << " instead. solutions generated: " << std::endl;
+               << " instead. solutions generated: " << '\n';
             dumpSolutions(ss);
-            FAIL(ss.str());
+            FAIL(ss);
         }
 
         size_t numSolutionMatches(const string& solnJson) const {
@@ -256,12 +251,12 @@ namespace {
             if (numMatches == matches) {
                 return;
             }
-            std::stringstream ss;
+            mongoutils::str::stream ss;
             ss << "expected " << numMatches << " matches for solution " << solnJson
                << " but got " << matches
-               << " instead. all solutions generated: " << std::endl;
+               << " instead. all solutions generated: " << '\n';
             dumpSolutions(ss);
-            FAIL(ss.str());
+            FAIL(ss);
         }
 
         /**
@@ -280,12 +275,12 @@ namespace {
             if (1U == matches) {
                 return;
             }
-            std::stringstream ss;
+            mongoutils::str::stream ss;
             ss << "assertHasOneSolutionOf expected one matching solution"
                << " but got " << matches
-               << " instead. all solutions generated: " << std::endl;
+               << " instead. all solutions generated: " << '\n';
             dumpSolutions(ss);
-            FAIL(ss.str());
+            FAIL(ss);
         }
 
         BSONObj queryObj;

@@ -33,7 +33,6 @@
 #include "mongo/db/query/planner_ixselect.h"
 
 #include <memory>
-#include <sstream>
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/index_tag.h"
@@ -45,7 +44,6 @@ using namespace mongo;
 namespace {
 
     using std::auto_ptr;
-    using std::stringstream;
     using std::string;
     using std::vector;
 
@@ -63,7 +61,7 @@ namespace {
      * Utility function to join elements in iterator range with comma
      */
     template <typename Iter> string toString(Iter begin, Iter end) {
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "[";
         for (Iter i = begin; i != end; i++) {
             if (i != begin) {
@@ -72,7 +70,7 @@ namespace {
             ss << *i;
         }
         ss << "]";
-        return ss.str();
+        return ss;
     }
 
     /**
@@ -93,21 +91,21 @@ namespace {
         for (vector<string>::const_iterator i = expectedFields.begin(); i != expectedFields.end();
              i++) {
             if (fields.find(*i) == fields.end()) {
-                stringstream ss;
+                mongoutils::str::stream ss;
                 ss << "getFields(query=" << query << ", prefix=" << prefix << "): unable to find "
                    << *i << " in result: " << toString(fields.begin(), fields.end());
-                FAIL(ss.str());
+                FAIL(ss);
             }
         } 
 
         // Next, confirm that results do not contain any unexpected fields.
         if (fields.size() != expectedFields.size()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "getFields(query=" << query << ", prefix=" << prefix
                << "): unexpected fields in result. expected: "
                << toString(expectedFields.begin(), expectedFields.end())
                << ". actual: " << toString(fields.begin(), fields.end());
-            FAIL(ss.str());
+            FAIL(ss);
         }
     }
 
@@ -163,10 +161,10 @@ namespace {
             tag->debugString(&buf);
             RelevantTag* r = dynamic_cast<RelevantTag*>(tag);
             if (!r) {
-                stringstream ss;
+                mongoutils::str::stream ss;
                 ss << "tag is not instance of RelevantTag. tree: " << root->toString()
                    << "; tag: " << buf.str();
-                FAIL(ss.str());
+                FAIL(ss);
             }
             paths->push_back(r->path);
         }
@@ -205,12 +203,12 @@ namespace {
         // First verify number of paths retrieved.
         vector<string> expectedPaths = StringSplitter::split(expectedPathsStr, ",");
         if (paths.size() != expectedPaths.size()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "rateIndices(query=" << query << ", prefix=" << prefix
                << "): unexpected number of tagged nodes found. expected: "
                << toString(expectedPaths.begin(), expectedPaths.end()) << ". actual: "
                << toString(paths.begin(), paths.end());
-            FAIL(ss.str());
+            FAIL(ss);
         }
 
         // Next, check that value and order of each element match between the two lists.
@@ -219,12 +217,12 @@ namespace {
             if (*i == *j) {
                 continue;
             }
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "rateIndices(query=" << query << ", prefix=" << prefix
                << "): unexpected path found. expected: " << *j << " "
                << toString(expectedPaths.begin(), expectedPaths.end()) << ". actual: "
                << *i << " " << toString(paths.begin(), paths.end());
-            FAIL(ss.str());
+            FAIL(ss);
         }
     }
 

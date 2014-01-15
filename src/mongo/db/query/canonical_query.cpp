@@ -35,12 +35,10 @@
 namespace {
 
     using std::auto_ptr;
-    using std::ostream;
     using std::string;
-    using std::stringstream;
     using namespace mongo;
 
-    void encodePlanCacheKeyTree(const MatchExpression* tree, ostream* os);
+    void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os);
 
     /**
      * Comparator for MatchExpression nodes. nodes by:
@@ -73,10 +71,12 @@ namespace {
             return lhsPath < rhsPath;
         }
         // Third, cache key.
-        stringstream ssLeft, ssRight;
+        mongoutils::str::stream ssLeft, ssRight;
         encodePlanCacheKeyTree(lhs, &ssLeft);
         encodePlanCacheKeyTree(rhs, &ssRight);
-        return ssLeft.str() < ssRight.str();
+        string strLeft(ssLeft);
+        string strRight(ssRight);
+        return strLeft < strRight;
     }
 
     /**
@@ -121,7 +121,7 @@ namespace {
      * Appends an encoding of each node's match type and path name
      * to the output stream.
      */
-    void encodePlanCacheKeyTree(const MatchExpression* tree, ostream* os) {
+    void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os) {
         // Encode match type and path.
         *os << encodeMatchType(tree->matchType()) << tree->path();
         // Traverse child nodes.
@@ -135,7 +135,7 @@ namespace {
      * Sort order is normalized because it provided by
      * LiteParsedQuery.
      */
-    void encodePlanCacheKeySort(const BSONObj& sortObj, ostream* os) {
+    void encodePlanCacheKeySort(const BSONObj& sortObj, mongoutils::str::stream* os) {
         BSONObjIterator it(sortObj);
         while (it.more()) {
             BSONElement elt = it.next();
@@ -161,7 +161,7 @@ namespace {
      * in the BSON object.
      * This handles all the special projection types ($meta, $elemMatch, etc.)
      */
-    void encodePlanCacheKeyProj(const BSONObj& projObj, ostream* os) {
+    void encodePlanCacheKeyProj(const BSONObj& projObj, mongoutils::str::stream* os) {
         if (projObj.isEmpty()) {
             return;
         }
@@ -266,11 +266,11 @@ namespace mongo {
     }
 
     void CanonicalQuery::generateCacheKey(void) {
-        stringstream ss;
+        mongoutils::str::stream ss;
         encodePlanCacheKeyTree(_root.get(), &ss);
         encodePlanCacheKeySort(_pq->getSort(), &ss);
         encodePlanCacheKeyProj(_pq->getProj(), &ss);
-        _cacheKey = ss.str();
+        _cacheKey = ss;
     }
 
     // static
@@ -445,14 +445,14 @@ namespace mongo {
     }
 
     string CanonicalQuery::toString() const {
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn()
-           << " skip=" << _pq->getSkip() << endl;
+           << " skip=" << _pq->getSkip() << '\n';
         // The expression tree puts an endl on for us.
         ss << "Tree: " << _root->toString();
-        ss << "Sort: " << _pq->getSort().toString() << endl;
-        ss << "Proj: " << _pq->getProj().toString() << endl;
-        return ss.str();
+        ss << "Sort: " << _pq->getSort().toString() << '\n';
+        ss << "Proj: " << _pq->getProj().toString() << '\n';
+        return ss;
     }
 
 }  // namespace mongo

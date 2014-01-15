@@ -31,7 +31,6 @@
  */
 
 #include <ostream>
-#include <sstream>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"

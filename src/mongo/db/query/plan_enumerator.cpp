@@ -68,7 +68,7 @@ namespace mongo {
 
     string PlanEnumerator::NodeAssignment::toString() const {
         if (NULL != pred) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "predicate, first indices: [";
             for (size_t i = 0; i < pred->first.size(); ++i) {
                 ss << pred->first[i];
@@ -77,10 +77,10 @@ namespace mongo {
             }
             ss << "], pred: " << pred->expr->toString();
             ss << " indexToAssign: " << pred->indexToAssign;
-            return ss.str();
+            return ss;
         }
         else if (NULL != andAssignment) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "AND enumstate counter " << andAssignment->counter;
             for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
                 ss << "\nchoice " << i << ":\n";
@@ -89,37 +89,37 @@ namespace mongo {
                 for (size_t j = 0; j < state.subnodesToIndex.size(); ++j) {
                     ss << state.subnodesToIndex[j] << " ";
                 }
-                ss << endl;
+                ss << '\n';
                 for (size_t j = 0; j < state.assignments.size(); ++j) {
                     const OneIndexAssignment& oie = state.assignments[j];
                     ss << "\tidx[" << oie.index << "]\n";
 
                     for (size_t k = 0; k < oie.preds.size(); ++k) {
                         ss << "\t\tpos " << oie.positions[k]
-                           << " pred " << oie.preds[k]->toString() << endl;
+                           << " pred " << oie.preds[k]->toString() << '\n';
                     }
                 }
             }
-            return ss.str();
+            return ss;
         }
         else if (NULL != arrayAssignment) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [";
             for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
                 ss << " " << arrayAssignment->subnodes[i];
             }
             ss << "]";
-            return ss.str();
+            return ss;
         }
         else {
             verify(NULL != orAssignment);
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "ALL OF: [";
             for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
                 ss << " " << orAssignment->subnodes[i];
             }
             ss << "]";
-            return ss.str();
+            return ss;
         }
     }
 

@@ -510,11 +510,11 @@ namespace mongo {
             if (details && arrayOpType == ARRAY_OP_POSITIONAL) {
                 // $ positional operator specified
                 if (!details->hasElemMatchKey()) {
-                    stringstream error;
+                    mongoutils::str::stream error;
                     error << "positional operator (" << elt.fieldName()
                           << ".$) requires corresponding field"
                           << " in query specifier";
-                    return Status(ErrorCodes::BadValue, error.str());
+                    return Status(ErrorCodes::BadValue, error);
                 }
 
                 if (elt.embeddedObject()[details->elemMatchKey()].eoo()) {

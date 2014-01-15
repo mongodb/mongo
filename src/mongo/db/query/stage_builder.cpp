@@ -254,9 +254,10 @@ namespace mongo {
             return new ShardFilterStage(shardingState.getCollectionMetadata(qsol.ns), ws, childStage);
         }
         else {
-            stringstream ss;
+            mongoutils::str::stream ss;
             root->appendToString(&ss, 0);
-            warning() << "Could not build exec tree for node " << ss.str() << endl;
+            string nodeStr(ss);
+            warning() << "Could not build exec tree for node " << nodeStr << endl;
             return NULL;
         }
     }

@@ -30,7 +30,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <sstream>
 #include "boost/thread/locks.hpp"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
@@ -132,19 +131,19 @@ namespace mongo {
     }
 
     string PlanCacheEntry::toString() const {
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "(query: " << query.toString()
            << ";sort: " << sort.toString()
            << ";projection: " << projection.toString()
            << ";solutions: " << plannerData.size()
            << ")";
-        return ss.str();
+        return ss;
     }
 
     string CachedSolution::toString() const {
-        stringstream ss;
-        ss << "key: " << key << endl;
-        return ss.str();
+        mongoutils::str::stream ss;
+        ss << "key: " << key << '\n';
+        return ss;
     }
 
     //
@@ -171,24 +170,24 @@ namespace mongo {
     }
 
     std::string PlanCacheIndexTree::toString(int indents) const {
-        std::stringstream ss;
+        mongoutils::str::stream ss;
         if (!children.empty()) {
-            ss << string(3 * indents, '-') << "Node" << std::endl;
+            ss << string(3 * indents, '-') << "Node\n";
             int newIndent = indents + 1;
             for (vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
                     it != children.end(); ++it) {
                 ss << (*it)->toString(newIndent);
             }
-            return ss.str();
+            return ss;
         }
         else {
             ss << string(3 * indents, '-') << "Leaf ";
             if (NULL != entry.get()) {
                 ss << entry->keyPattern.toString() << ", pos: " << index_pos;
             }
-            ss << std::endl;
+            ss << '\n';
         }
-        return ss.str();
+        return ss;
     }
 
     //
@@ -208,7 +207,7 @@ namespace mongo {
     }
 
     std::string SolutionCacheData::toString() const {
-        stringstream ss;
+        mongoutils::str::stream ss;
         switch (this->solnType) {
         case WHOLE_IXSCAN_SOLN:
             verify(this->tree.get());
@@ -226,7 +225,7 @@ namespace mongo {
                << "tree=" << this->tree->toString()
                << ")";
         }
-        return ss.str();
+        return ss;
     }
 
     //

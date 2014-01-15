@@ -34,7 +34,6 @@
 
 #include <algorithm>
 #include <ostream>
-#include <sstream>
 #include <memory>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -51,7 +50,6 @@ using namespace mongo;
 namespace {
 
     using std::auto_ptr;
-    using std::stringstream;
 
     static const char* ns = "somebogusns";
 
@@ -107,10 +105,10 @@ namespace {
     MatchExpression* parseMatchExpression(const BSONObj& obj) {
         StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
         if (!status.isOK()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "failed to parse query: " << obj.toString()
                << ". Reason: " << status.toString();
-            FAIL(ss.str());
+            FAIL(ss);
         }
         MatchExpression* expr(status.getValue());
         return expr;
@@ -120,12 +118,12 @@ namespace {
         if (actual->equivalent(expected)) {
             return;
         }
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "Match expressions are not equivalent."
            << "\nOriginal query: " << queryStr
            << "\nExpected: " << expected->toString()
            << "\nActual: " << actual->toString();
-        FAIL(ss.str());
+        FAIL(ss);
     }
 
     //
@@ -167,18 +165,18 @@ namespace {
         if (PlanCache::shouldCacheQuery(query)) {
             return;
         }
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "Canonical query should be cacheable: " << query.toString();
-        FAIL(ss.str());
+        FAIL(ss);
     }
 
     void assertShouldNotCacheQuery(const CanonicalQuery& query) {
         if (!PlanCache::shouldCacheQuery(query)) {
             return;
         }
-        stringstream ss;
+        mongoutils::str::stream ss;
         ss << "Canonical query should not be cacheable: " << query.toString();
-        FAIL(ss.str());
+        FAIL(ss);
     }
 
     void assertShouldNotCacheQuery(const char* queryStr) {
@@ -425,16 +423,12 @@ namespace {
         // Solution introspection.
         //
 
-        void dumpSolutions(ostream& ost) const {
+        void dumpSolutions(mongoutils::str::stream& ost) const {
             for (vector<QuerySolution*>::const_iterator it = solns.begin();
                     it != solns.end();
                     ++it) {
-                ost << (*it)->toString() << endl;
+                ost << (*it)->toString() << '\n';
             }
-        }
-
-        void dumpSolutions() const {
-            dumpSolutions(std::cout);
         }
 
         /**
@@ -498,11 +492,11 @@ namespace {
                 }
             }
 
-            std::stringstream ss;
+            mongoutils::str::stream ss;
             ss << "Could not find a match for solution " << solnJson
-               << " All solutions generated: " << std::endl;
+               << " All solutions generated: " << '\n';
             dumpSolutions(ss);
-            FAIL(ss.str());
+            FAIL(ss);
 
             return NULL;
         }
@@ -516,10 +510,10 @@ namespace {
         void assertSolutionMatches(QuerySolution* trueSoln, const string& solnJson) const {
             BSONObj testSoln = fromjson(solnJson);
             if (!QueryPlannerTestLib::solutionMatches(testSoln, trueSoln->root.get())) {
-                std::stringstream ss;
+                mongoutils::str::stream ss;
                 ss << "Expected solution " << solnJson << " did not match true solution: "
-                   << trueSoln->toString() << std::endl;
-                FAIL(ss.str());
+                   << trueSoln->toString() << '\n';
+                FAIL(ss);
             }
         }
 

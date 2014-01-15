@@ -32,11 +32,9 @@
 
 #include "mongo/db/query/lite_parsed_query.h"
 
-#include <sstream>
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
-using std::stringstream;
 using namespace mongo;
 
 namespace {
@@ -143,16 +141,16 @@ namespace {
         BSONObj sortOrder = fromjson(sortStr);
         bool valid = LiteParsedQuery::isValidSortOrder(sortOrder);
         if (expectedValid != valid) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << sortStr << ": unexpected validation result. Expected: " << expectedValid;
-            FAIL(ss.str());
+            FAIL(ss);
         }
         BSONObj normalizedSortOrder = LiteParsedQuery::normalizeSortOrder(sortOrder);
         if (fromjson(expectedStr) != normalizedSortOrder) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << sortStr << ": unexpected normalization result. Expected: " << expectedStr
                << ". Actual: " << normalizedSortOrder.toString();
-            FAIL(ss.str());
+            FAIL(ss);
         }
     }
 

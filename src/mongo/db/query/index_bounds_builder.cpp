@@ -76,13 +76,13 @@ namespace mongo {
             }
         }
 
-        stringstream ss;
+        mongoutils::str::stream ss;
 
         while(*regex) {
             char c = *(regex++);
             if ( c == '*' || c == '?' ) {
                 // These are the only two symbols that make the last char optional
-                r = ss.str();
+                r = ss;
                 r = r.substr( 0 , r.size() - 1 );
                 return r; //breaking here fails with /^a?/
             }
@@ -110,7 +110,7 @@ namespace mongo {
                         (c >= '0' && c <= '0') ||
                         (c == '\0')) {
                     // don't know what to do with these
-                    r = ss.str();
+                    r = ss;
                     break;
                 }
                 else {
@@ -120,12 +120,12 @@ namespace mongo {
             }
             else if (strchr("^$.[()+{", c)) {
                 // list of "metacharacters" from man pcrepattern
-                r = ss.str();
+                r = ss;
                 break;
             }
             else if (extended && c == '#') {
                 // comment
-                r = ss.str();
+                r = ss;
                 break;
             }
             else if (extended && isspace(c)) {
@@ -138,7 +138,7 @@ namespace mongo {
         }
 
         if ( r.empty() && *regex == 0 ) {
-            r = ss.str();
+            r = ss;
             *tightnessOut = r.empty() ? IndexBoundsBuilder::INEXACT_COVERED : IndexBoundsBuilder::EXACT;
         }
 

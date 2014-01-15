@@ -32,7 +32,6 @@
 
 #include "mongo/db/exec/projection_exec.h"
 
-#include <sstream>
 #include <memory>
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -43,7 +42,6 @@ using namespace mongo;
 namespace {
 
     using std::auto_ptr;
-    using std::stringstream;
 
     /**
      * Utility function to create MatchExpression
@@ -90,12 +88,12 @@ namespace {
         // There are fewer checks to perform if we are expected a failed status.
         if (!expectedStatusOK) {
             if (status.isOK()) {
-                stringstream ss;
+                mongoutils::str::stream ss;
                 ss << "expected transform() to fail but got success instead."
                    << "\nprojection spec: " << specStr
                    << "\nquery: " << queryStr
                    << "\nobject before projection: " << objStr;
-                FAIL(ss.str());
+                FAIL(ss);
             }
             return;
         }
@@ -103,27 +101,27 @@ namespace {
         // If we are expecting a successful transformation but got a failed status instead,
         // print out status message in assertion message.
         if (!status.isOK()) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "transform() test failed: unexpected failed status: " << status.toString()
                << "\nprojection spec: " << specStr
                << "\nquery: " << queryStr
                << "\nobject before projection: " << objStr
                << "\nexpected object after projection: " << expectedObjStr;
-            FAIL(ss.str());
+            FAIL(ss);
         }
 
         // Finally, we compare the projected object.
         const BSONObj& obj = wsm.obj;
         BSONObj expectedObj = fromjson(expectedObjStr);
         if (obj != expectedObj) {
-            stringstream ss;
+            mongoutils::str::stream ss;
             ss << "transform() test failed: unexpected projected object."
                << "\nprojection spec: " << specStr
                << "\nquery: " << queryStr
                << "\nobject before projection: " << objStr
                << "\nexpected object after projection: " << expectedObjStr
                << "\nactual object after projection: " << obj.toString();
-            FAIL(ss.str());
+            FAIL(ss);
         }
     }
 

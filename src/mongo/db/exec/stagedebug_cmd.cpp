@@ -93,7 +93,7 @@ namespace mongo {
         virtual LockType locktype() const { return READ; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
-        void help(stringstream& h) const { }
+        void help(std::stringstream& h) const { }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
