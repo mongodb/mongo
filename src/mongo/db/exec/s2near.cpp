@@ -154,12 +154,6 @@ namespace mongo {
                 _invalidationMap.erase(it);
             }
 
-            // Drop flagged results.
-            if (_ws->isFlagged(*out)) {
-                _ws->free(*out);
-                return PlanStage::NEED_TIME;
-            }
-
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
@@ -309,6 +303,9 @@ namespace mongo {
             _child->invalidate(dl, type);
         }
 
+        // _results is a queue of results that we will return for the current shell we're on.
+        // If a result is in _results and has a DiskLoc it will be in _invalidationMap as well.
+        // It's safe to return the result w/o the DiskLoc.
         unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher>::iterator it
             = _invalidationMap.find(dl);
 
@@ -316,8 +313,8 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->hasLoc());
             WorkingSetCommon::fetchAndInvalidateLoc(member);
-            _ws->flagForReview(it->second);
             verify(!member->hasLoc());
+            // Don't keep it around in the invalidation map since there's no valid DiskLoc anymore.
             _invalidationMap.erase(it);
         }
     }

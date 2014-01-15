@@ -101,7 +101,13 @@ namespace mongo {
 
         // We know that we've ADVANCED.  See if the WSM is in our table.
         WorkingSetMember* member = _ws->get(*out);
-        verify(member->hasLoc());
+
+        // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+        // with this WSM.
+        if (!member->hasLoc()) {
+            _ws->flagForReview(*out);
+            return PlanStage::NEED_TIME;
+        }
 
         DataMap::iterator it = _dataMap.find(member->loc);
         if (_dataMap.end() == it) {
@@ -143,6 +149,13 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
+
+            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // with this WSM.
+            if (!member->hasLoc()) {
+                _ws->flagForReview(id);
+                return PlanStage::NEED_TIME;
+            }
 
             verify(member->hasLoc());
             verify(_dataMap.end() == _dataMap.find(member->loc));
@@ -187,6 +200,14 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
+
+            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // with this WSM.
+            if (!member->hasLoc()) {
+                _ws->flagForReview(id);
+                return PlanStage::NEED_TIME;
+            }
+
             verify(member->hasLoc());
             if (_dataMap.end() == _dataMap.find(member->loc)) {
                 // Ignore.  It's not in any previous child.
@@ -277,6 +298,12 @@ namespace mongo {
 
         _seenMap.erase(dl);
 
+        // If it's a deletion, we have to forget about the DiskLoc, and since the AND-ing is by
+        // DiskLoc we can't continue processing it even with the object.
+        //
+        // If it's a mutation the predicates implied by the AND-ing may no longer be true.
+        //
+        // So, we flag and try to pick it up later.
         DataMap::iterator it = _dataMap.find(dl);
         if (_dataMap.end() != it) {
             WorkingSetID id = it->second;
@@ -296,7 +323,7 @@ namespace mongo {
             // Add the WSID to the to-be-reviewed list in the WS.
             _ws->flagForReview(id);
 
-            // And don't return it.
+            // And don't return it from this stage.
             _dataMap.erase(it);
         }
     }

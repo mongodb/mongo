@@ -50,7 +50,6 @@ namespace mongo {
         if (!_initted) {
             _initted = true;
 
-            // I hate this.
             Database* database = cc().database();
             if ( !database )
                 return PlanStage::IS_EOF;
@@ -65,7 +64,6 @@ namespace mongo {
 
             _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
             verify( _am );
-            // I hate this.
 
             if (NULL != _params.gq.getGeometry()._cap.get()) {
                 _browse.reset(new twod_exec::GeoCircleBrowse(_params, _am));
@@ -113,7 +111,19 @@ namespace mongo {
 
     void TwoD::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (NULL != _browse) {
-            _browse->invalidate(dl);
+            // If the invalidation actually tossed out a result...
+            if (_browse->invalidate(dl)) {
+                // Create a new WSM
+                WorkingSetID id = _workingSet->allocate();
+                WorkingSetMember* member = _workingSet->get(id);
+                member->loc = dl;
+                member->obj = member->loc.obj();
+                member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+
+                // And flag it for later.
+                WorkingSetCommon::fetchAndInvalidateLoc(member);
+                _workingSet->flagForReview(id);
+            }
         }
     }
 

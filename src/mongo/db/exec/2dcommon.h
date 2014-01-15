@@ -237,7 +237,10 @@ namespace twod_exec {
 
         void notePrefix() { _expPrefixes.push_back(_prefix); }
 
-        void invalidate(const DiskLoc& dl);
+        /**
+         * Returns true if the result was actually invalidated, false otherwise.
+         */
+        bool invalidate(const DiskLoc& dl);
 
         string _type;
         list<GeoPoint> _stack;

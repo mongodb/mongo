@@ -668,6 +668,12 @@ namespace mongo {
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
 
+                    // Broadcast the mutation so that query results stay correct.
+                    ClientCursor::invalidateDocument(nsString.ns(),
+                                                     collection->details(),
+                                                     loc,
+                                                     INVALIDATION_MUTATION);
+
                     collection->details()->paddingFits();
 
                     // All updates were in place. Apply them via durability and writing pointer.
@@ -684,10 +690,6 @@ namespace mongo {
                     opDebug->fastmod = true;
                 }
                 newObj = oldObj;
-
-                // Broadcast the mutation so that query results stay correct.
-                ClientCursor::invalidateDocument(nsString.ns(), collection->details(), loc,
-                                                 INVALIDATION_MUTATION);
             }
             else {
 

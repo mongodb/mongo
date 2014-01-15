@@ -184,7 +184,7 @@ namespace mongo {
         for (list<StageWithValue>::iterator valueIt = _mergingData.begin(); valueIt != _mergingData.end(); valueIt++) {
             WorkingSetMember* member = _ws->get(valueIt->id);
             if (member->hasLoc() && (dl == member->loc)) {
-                // Force a fetch and flag.
+                // Force a fetch and flag.  We could possibly merge this result back in later.
                 WorkingSetCommon::fetchAndInvalidateLoc(member);
                 _ws->flagForReview(valueIt->id);
                 ++_specificStats.forcedFetches;

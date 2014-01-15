@@ -646,11 +646,15 @@ namespace twod_exec {
         // b << "pointsRemovedOnYield" << _nRemovedOnYield;
     }
 
-    void GeoBrowse::invalidate(const DiskLoc& dl) {
-        if (_firstCall) { return; }
+    bool GeoBrowse::invalidate(const DiskLoc& dl) {
+        if (_firstCall) { return false; }
+
+        // Are we tossing out a result that we (probably) would have returned?
+        bool found = false;
 
         if (_cur._loc == dl) {
             advance();
+            found = true;
         }
 
         list<GeoPoint>::iterator it = _stack.begin();
@@ -659,6 +663,7 @@ namespace twod_exec {
                 list<GeoPoint>::iterator old = it;
                 it++;
                 _stack.erase(old);
+                found = true;
             }
             else {
                 it++;
@@ -680,6 +685,8 @@ namespace twod_exec {
             }
             _max.prepareToYield();
         }
+
+        return found;
     }
 
 }  // namespace twod_exec

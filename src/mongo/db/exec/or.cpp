@@ -58,10 +58,9 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
-            verify(member->hasLoc());
 
-            // If we're deduping...
-            if (_dedup) {
+            // If we're deduping (and there's something to dedup by)
+            if (_dedup && member->hasLoc()) {
                 ++_specificStats.dupsTested;
 
                 // ...and we've seen the DiskLoc before
@@ -146,7 +145,7 @@ namespace mongo {
 
         // If we see DL again it is not the same record as it once was so we still want to
         // return it.
-        if (_dedup) {
+        if (_dedup && INVALIDATION_DELETION == type) {
             unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _seen.find(dl);
             if (_seen.end() != it) {
                 ++_specificStats.locsForgotten;

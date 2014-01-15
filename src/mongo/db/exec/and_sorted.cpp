@@ -81,8 +81,13 @@ namespace mongo {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
 
-            // AND only works with DiskLocs.  If we don't have a loc, something went wrong with
-            // query planning.
+            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // with this WSM.
+            if (!member->hasLoc()) {
+                _ws->flagForReview(id);
+                return PlanStage::NEED_TIME;
+            }
+
             verify(member->hasLoc());
 
             // We have a value from one child to AND with.
@@ -128,6 +133,13 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
+
+            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // with this WSM.
+            if (!member->hasLoc()) {
+                _ws->flagForReview(id);
+                return PlanStage::NEED_TIME;
+            }
 
             verify(member->hasLoc());
 
@@ -238,10 +250,12 @@ namespace mongo {
 
         if (dl == _targetLoc) {
             // We're in the middle of moving children forward until they hit _targetLoc, which is no
-            // longer a valid target.  Fetch it, flag for review, and find another _targetLoc.
+            // longer a valid target.  If it's a deletion we can't AND it with anything, if it's a
+            // mutation the predicates implied by the AND may no longer be true.  So no matter what,
+            // fetch it, flag for review, and find another _targetLoc.
             ++_specificStats.flagged;
 
-            // TODO: Do we want to just delete the WSID?
+            // The DiskLoc could still be a valid result so flag it and save it for later.
             WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId));
             _ws->flagForReview(_targetId);
 

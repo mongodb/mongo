@@ -81,14 +81,8 @@ namespace mongo {
         static void invalidate(const StringData& ns);
 
         /**
-         * Broadcast a document invalidation to all relevant Runner(s).
-         *
-         * If the type is INVALIDATION_DELETION, invalidateDocument must called *before* the
-         * provided DiskLoc is about to be deleted.
-         *
-         * If the type is INVALIDATION_MUTATION, invalidateDocument must be called *after* the
-         * provided DiskLoc is mutated.  All in-progress queries that hold that DiskLoc as state
-         * must adapt.
+         * Broadcast a document invalidation to all relevant Runner(s).  invalidateDocument must
+         * called *before* the provided DiskLoc is about to be deleted or mutated.
          */
         static void invalidateDocument(const StringData& ns,
                                        const NamespaceDetails* nsd,

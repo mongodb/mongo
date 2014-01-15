@@ -107,7 +107,8 @@ namespace mongo {
 
         // Remove from invalidation map.
         WorkingSetMember* member = _workingSet->get(*out);
-        // XXX make sure this is ok
+
+        // The WSM may have been mutated or deleted so it may not have a loc.
         if (member->hasLoc()) {
             typedef multimap<DiskLoc, WorkingSetID>::iterator MMIT;
             pair<MMIT, MMIT> range = _invalidationMap.equal_range(member->loc);
@@ -132,11 +133,14 @@ namespace mongo {
     }
 
     void TwoDNear::invalidate(const DiskLoc& dl, InvalidationType type) {
-        // XXX make sure this is ok
+        // We do the same thing for mutation or deletion: fetch the doc and forget about the
+        // DiskLoc.  2d's near search computes all its results in one go so we know that we'll still
+        // return valid data.
         typedef multimap<DiskLoc, WorkingSetID>::iterator MMIT;
         pair<MMIT, MMIT> range = _invalidationMap.equal_range(dl);
         for (MMIT it = range.first; it != range.second; ++it) {
             WorkingSetMember* member = _workingSet->get(it->second);
+            // If it's in the invalidation map it must have a DiskLoc.
             verify(member->hasLoc());
             WorkingSetCommon::fetchAndInvalidateLoc(member);
             verify(!member->hasLoc());

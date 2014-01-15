@@ -349,12 +349,12 @@ namespace mongo {
                 debug->keyUpdates += updatedKeys;
         }
 
+        // Broadcast the mutation so that query results stay correct.
+        ClientCursor::invalidateDocument(_ns.ns(), _details, oldLocation, INVALIDATION_MUTATION);
+
         //  update in place
         int sz = objNew.objsize();
         memcpy(getDur().writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
-
-        // Broadcast the mutation so that query results stay correct.
-        ClientCursor::invalidateDocument(_ns.ns(), _details, oldLocation, INVALIDATION_MUTATION);
 
         return StatusWith<DiskLoc>( oldLocation );
     }

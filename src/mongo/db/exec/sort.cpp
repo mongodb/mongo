@@ -326,11 +326,10 @@ namespace mongo {
                 // Planner must put a fetch before we get here.
                 verify(member->hasObj());
 
-                // TODO: This should always be true...?
+                // We might be sorting something that was invalidated at some point.
                 if (member->hasLoc()) {
                     _wsidByDiskLoc[member->loc] = id;
                 }
-
 
                 // The data remains in the WorkingSet and we wrap the WSID with the sort key.
                 SortableDataItem item;
@@ -380,13 +379,6 @@ namespace mongo {
             _wsidByDiskLoc.erase(member->loc);
         }
 
-        // If it was flagged, we just drop it on the floor, assuming the caller wants a DiskLoc.  We
-        // could make this triggerable somehow.
-        if (_ws->isFlagged(*out)) {
-            _ws->free(*out);
-            return PlanStage::NEED_TIME;
-        }
-
         ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
@@ -405,6 +397,10 @@ namespace mongo {
         ++_commonStats.invalidates;
         _child->invalidate(dl, type);
 
+        // If we have a deletion, we can fetch and carry on.
+        // If we have a mutation, it's easier to fetch and use the previous document.
+        // So, no matter what, fetch and keep the doc in play.
+
         // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
         // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still
         // be at the same spot in the WorkingSet.  As such, we don't need to modify _data.
@@ -416,9 +412,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->loc == dl);
 
-            // Fetch, invalidate, and flag.
             WorkingSetCommon::fetchAndInvalidateLoc(member);
-            _ws->flagForReview(it->second);
 
             // Remove the DiskLoc from our set of active DLs.
             _wsidByDiskLoc.erase(it);

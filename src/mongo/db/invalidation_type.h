@@ -35,7 +35,7 @@ namespace mongo {
         // the DiskLoc after it returns from the invalidate.
         INVALIDATION_DELETION,
 
-        // The DiskLoc's contents have changed.
+        // The DiskLoc's contents are about to change.
         INVALIDATION_MUTATION,
     };
 
