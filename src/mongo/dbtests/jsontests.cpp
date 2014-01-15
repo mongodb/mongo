@@ -1510,11 +1510,11 @@ namespace JsonTests {
         class DateNonzero : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", 100 );
+                b.appendDate( "a", 1000000000 );
                 return b.obj();
             }
             virtual string json() const {
-                return "{ \"a\" : { \"$date\" : 100 } }";
+                return "{ \"a\" : { \"$date\" : 1000000000 } }";
             }
         };
 
@@ -2726,10 +2726,13 @@ namespace JsonTests {
             add< FromJsonTests::BinDataEmptyType >();
             add< FromJsonTests::BinDataNoType >();
             add< FromJsonTests::BinDataInvalidType >();
-            // TODO: The JSON parser doesn't yet support parsing our strict JSON format for dates.
-            // See SERVER-11814.
-            /*add< FromJsonTests::Date >();
-            add< FromJsonTests::DateNegZero >();
+            // DOCS-2539:  We cannot parse dates generated with a Unix timestamp of zero in local
+            // time, since the body of the date may be before the Unix Epoch.  This causes parsing
+            // to fail even if the offset would properly adjust the time.  For example,
+            // "1969-12-31T19:00:00-05:00" actually represents the Unix timestamp of zero, but we
+            // cannot parse it because the body of the date is before 1970.
+            //add< FromJsonTests::Date >();
+            //add< FromJsonTests::DateNegZero >();
             add< FromJsonTests::DateNonzero >();
             add< FromJsonTests::DateStrictTooLong >();
             add< FromJsonTests::DateTooLong >();
@@ -2745,7 +2748,7 @@ namespace JsonTests {
             add< FromJsonTests::DateStrictMaxUnsigned >();
             add< FromJsonTests::DateMaxUnsigned >();
             add< FromJsonTests::DateStrictNegative >();
-            add< FromJsonTests::DateNegative >();*/
+            add< FromJsonTests::DateNegative >();
             add< FromJsonTests::NumberLongTest >();
             add< FromJsonTests::NumberLongMin >();
             add< FromJsonTests::NumberIntTest >();
@@ -2848,11 +2851,9 @@ namespace JsonTests {
             add< FromJsonTests::NumericLimitsBad >();
             add< FromJsonTests::NumericLimitsBad1 >();
             add< FromJsonTests::NegativeNumericTypes >();
-            // TODO: The JSON parser doesn't yet support parsing our strict JSON format for dates.
-            // See SERVER-11814.
-            /*add< FromJsonTests::EmbeddedDatesFormat1 >();
+            add< FromJsonTests::EmbeddedDatesFormat1 >();
             add< FromJsonTests::EmbeddedDatesFormat2 >();
-            add< FromJsonTests::EmbeddedDatesFormat3 >();*/
+            add< FromJsonTests::EmbeddedDatesFormat3 >();
             add< FromJsonTests::NullString >();
             add< FromJsonTests::NullFieldUnquoted >();
         }
