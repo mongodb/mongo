@@ -140,7 +140,7 @@ __session_compact_check_timeout(
 
 /*
  * __compact_file --
- *
+ *	Function to alternate between checkpoints and compaction calls.
  */
 static int
 __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
@@ -200,7 +200,6 @@ err:	__wt_scr_free(&t);
 
 /*
  * __wt_session_compact --
- *	Function to alternate between checkpoints and compaction calls.
  */
 int
 __wt_session_compact(

@@ -1022,6 +1022,12 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		WT_RET_MSG(session, EINVAL,
 		    "LSM compaction requires active merge threads");
 
+	/*
+	 * If another thread started compacting this tree, we're done.
+	 */
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
+		return (0);
+
 	WT_RET(__wt_seconds(session, &begin));
 
 	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
