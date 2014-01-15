@@ -147,7 +147,7 @@ namespace mongo {
                 }
 
                 {
-                    NamespaceDetails *nsd = nsdetails( source );
+                    const NamespaceDetails *nsd = nsdetails( source );
                     indexesInProg = stopIndexBuilds( dbname, cmdObj );
                     capped = nsd->isCapped();
                     if ( capped )

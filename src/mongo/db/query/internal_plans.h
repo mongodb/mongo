@@ -28,10 +28,11 @@
 
 #pragma once
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/pdfile.h"   // for nsdetails(...)
 #include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/internal_runner.h"
 
@@ -64,8 +65,8 @@ namespace mongo {
         static Runner* collectionScan(const StringData& ns,
                                       const Direction direction = FORWARD,
                                       const DiskLoc startLoc = DiskLoc()) {
-            NamespaceDetails* nsd = nsdetails(ns);
-            if (NULL == nsd) { return new EOFRunner(NULL, ns.toString()); }
+            Collection* collection = cc().database()->getCollection(ns);
+            if (NULL == collection) { return new EOFRunner(NULL, ns.toString()); }
 
             CollectionScanParams params;
             params.ns = ns.toString();

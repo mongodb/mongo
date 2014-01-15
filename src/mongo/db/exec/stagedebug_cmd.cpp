@@ -295,7 +295,7 @@ namespace mongo {
                 // What collection?
                 params.ns = dbname + "." + nodeArgs["name"].String();
                 uassert(16962, "Can't find collection " + nodeArgs["name"].String(),
-                        NULL != nsdetails(params.ns));
+                        NULL != cc().database()->getCollection(params.ns));
 
                 // What direction?
                 uassert(16963, "Direction argument must be specified and be a number",

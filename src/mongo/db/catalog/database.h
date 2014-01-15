@@ -140,6 +140,8 @@ namespace mongo {
          */
         Collection* getCollection( const StringData& ns );
 
+        Collection* getCollection( const NamespaceString& ns ) { return getCollection( ns.ns() ); }
+
         Collection* getOrCreateCollection( const StringData& ns );
 
         Status renameCollection( const StringData& fromNS, const StringData& toNS, bool stayTemp );

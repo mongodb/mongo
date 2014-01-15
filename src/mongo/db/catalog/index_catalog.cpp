@@ -35,6 +35,8 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
@@ -50,11 +52,14 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/data_file.h"
+#include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

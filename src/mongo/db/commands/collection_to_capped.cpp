@@ -33,6 +33,7 @@
 #include "mongo/db/clientcursor.h" // XXX-remove
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h" // XXX-remove
+#include "mongo/db/pdfile.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/new_find.h"

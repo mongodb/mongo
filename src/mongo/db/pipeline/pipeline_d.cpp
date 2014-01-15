@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -53,8 +54,8 @@ namespace {
 
         bool isCapped(const NamespaceString& ns) {
             Client::ReadContext ctx(ns.ns());
-            NamespaceDetails* nsd = nsdetails(ns.ns());
-            return nsd && nsd->isCapped();
+            Collection* collection = ctx.ctx().db()->getCollection(ns);
+            return collection && collection->isCapped();
         }
 
     private:
