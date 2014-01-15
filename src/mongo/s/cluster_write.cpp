@@ -350,7 +350,9 @@ namespace mongo {
             bool verboseWC = request.isVerboseWC();
 
             // We only support batch sizes of one and {w:0} write concern for config writes
-            if ( request.sizeWriteOps() != 1 || !validConfigWC( request.getWriteConcern() )) {
+            if ( request.sizeWriteOps() != 1 ||
+                    ( request.isWriteConcernSet() &&
+                            !validConfigWC( request.getWriteConcern() ))) {
                 // Invalid config server write
                 response->setOk( false );
                 response->setErrCode( ErrorCodes::InvalidOptions );
