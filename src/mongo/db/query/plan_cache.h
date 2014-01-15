@@ -59,6 +59,10 @@ namespace mongo {
     struct PlanCacheEntryFeedback {
         // How well did the cached plan perform?
         boost::scoped_ptr<PlanStageStats> stats;
+
+        // The "goodness" score produced by the plan ranker
+        // corresponding to 'stats'.
+        double score;
     };
 
     // TODO: Replace with opaque type.
@@ -223,6 +227,10 @@ namespace mongo {
         // For debugging.
         std::string toString() const;
 
+        //
+        // Planner data
+        //
+
         // Data provided to the planner to allow it to recreate the solutions this entry
         // represents. Each SolutionCacheData is fully owned here, so in order to return
         // it from the cache a deep copy is made and returned inside CachedSolution.
@@ -232,18 +240,40 @@ namespace mongo {
         // used to produce a backup solution in the case of a blocking sort.
         boost::optional<size_t> backupSoln;
 
+        // XXX: Replace with copy of canonical query?
+        // Used by the plan cache commands to display an example query
+        // of the appropriate shape.
+        BSONObj query;
+        BSONObj sort;
+        BSONObj projection;
+
+        //
+        // Performance stats
+        //
+
         // Why the best solution was picked.
         // TODO: Do we want to store other information like the other plans considered?
         boost::scoped_ptr<PlanRankingDecision> decision;
 
         // Annotations from cached runs.  The CachedSolutionRunner provides these stats about its
-        // runs when they complete.  TODO: How many of these do we really want to keep?
+        // runs when they complete.
         std::vector<PlanCacheEntryFeedback*> feedback;
 
-        // XXX: Replace with copy of canonical query?
-        BSONObj query;
-        BSONObj sort;
-        BSONObj projection;
+        // The average score of all stored feedback.
+        boost::optional<double> averageScore;
+
+        // The standard deviation of the scores from stored as feedback.
+        boost::optional<double> stddevScore;
+
+        // Determines the amount of feedback that we are willing to store. Must be >= 1.
+        // TODO: how do we tune this?
+        static const size_t kMaxFeedback;
+
+        // The number of standard deviations which must be exceeded
+        // in order to determine that the cache entry should be removed.
+        // Must be positive. TODO how do we tune this?
+        static const double kStdDevThreshold;
+
     };
 
     /**
@@ -321,6 +351,9 @@ namespace mongo {
          *
          * If the entry corresponding to 'cq' still exists, 'feedback' is added to the run
          * statistics about the plan.  Status::OK() is returned.
+         *
+         * May cause the cache entry to be removed if it is determined that the cached plan
+         * is badly performing.
          */
         Status feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback);
 

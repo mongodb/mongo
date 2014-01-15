@@ -28,6 +28,9 @@
 
 #include "mongo/db/query/cached_plan_runner.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -36,9 +39,9 @@
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
-#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 
@@ -52,7 +55,14 @@ namespace mongo {
           _alreadyProduced(false),
           _updatedCache(false) { }
 
-    CachedPlanRunner::~CachedPlanRunner() { }
+    CachedPlanRunner::~CachedPlanRunner() {
+        // The runner may produce all necessary results without
+        // hitting EOF. In this case, we still want to update
+        // the cache with feedback.
+        if (!_updatedCache) {
+            updateCache();
+        }
+    }
 
     Runner::RunnerState CachedPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         Runner::RunnerState state = _exec->getNext(objOut, dlOut);
@@ -148,23 +158,24 @@ namespace mongo {
 
     void CachedPlanRunner::updateCache() {
         _updatedCache = true;
-#if 0
+
         Database* db = cc().database();
         verify(NULL != db);
         Collection* collection = db->getCollection(_canonicalQuery->ns());
         verify(NULL != collection);
         PlanCache* cache = collection->infoCache()->getPlanCache();
 
-        auto_ptr<CacheEntryFeedback> feedback(new CacheEntryFeedback());
+        std::auto_ptr<PlanCacheEntryFeedback> feedback(new PlanCacheEntryFeedback());
         // XXX: what else can we provide here?
         feedback->stats.reset(_exec->getStats());
-        Status fbs = cache->feedback(_solution->key, feedback.release());
+        feedback->score = PlanRanker::scoreTree(feedback->stats.get());
+
+        Status fbs = cache->feedback(*_canonicalQuery, feedback.release());
 
         if (!fbs.isOK()) {
-            // XXX: probably not a warning, could happen.
-            warning() << "Failed to update cache: " << fbs.toString() << endl;
+            // XXX: what should happen here?
+            warning() << "Failed to update cache with feedback: " << fbs.toString() << endl;
         }
-#endif
     }
 
     void CachedPlanRunner::setBackupPlan(QuerySolution* qs, PlanStage* root, WorkingSet* ws) {

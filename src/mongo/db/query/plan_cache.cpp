@@ -29,6 +29,7 @@
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
+#include <math.h>
 #include <memory>
 #include "boost/thread/locks.hpp"
 #include "mongo/db/query/plan_ranker.h"
@@ -146,6 +147,12 @@ namespace mongo {
         ss << "key: " << key << '\n';
         return ss;
     }
+
+    // static
+    const size_t PlanCacheEntry::kMaxFeedback = 20;
+
+    // static
+    const double PlanCacheEntry::kStdDevThreshold = 2.0;
 
     //
     // PlanCacheIndexTree
@@ -295,9 +302,79 @@ namespace mongo {
         return Status::OK();
     }
 
+    // XXX: Figure out what the right policy is here for determining if
+    // the cached solution is bad.
+    static bool hasCachedPlanPerformanceDegraded(PlanCacheEntry* entry,
+                                                 PlanCacheEntryFeedback* latestFeedback) {
+
+        if (!entry->averageScore) {
+            // We haven't computed baseline performance stats for this cached plan yet.
+            // Let's do that now.
+
+            // Compute mean score.
+            double sum = 0;
+            for (size_t i = 0; i < entry->feedback.size(); ++i) {
+                sum += entry->feedback[i]->score;
+            }
+            double mean = sum / entry->feedback.size();
+
+            // Compute std deviation of scores.
+            double sum_of_squares = 0;
+            for (size_t i = 0; i < entry->feedback.size(); ++i) {
+                double iscore = entry->feedback[i]->score;
+                sum_of_squares += (iscore - mean) * (iscore - mean);
+            }
+            double stddev = sqrt(sum_of_squares / (entry->feedback.size() - 1));
+
+            // If the score has gotten more than a standard deviation lower than
+            // its initial value, we should uncache the entry.
+            double initialScore = entry->decision->score;
+            if ((initialScore - mean) > (PlanCacheEntry::kStdDevThreshold * stddev)) {
+                return true;
+            }
+
+            entry->averageScore.reset(mean);
+            entry->stddevScore.reset(stddev);
+        }
+
+        // If the latest use of this plan cache entry is too far from the expected
+        // performance, then we should uncache the entry.
+        if ((*entry->averageScore - latestFeedback->score)
+             > (PlanCacheEntry::kStdDevThreshold * (*entry->stddevScore))) {
+            return true;
+        }
+
+        return false;
+    }
+
     Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback) {
+        if (NULL == feedback) {
+            return Status(ErrorCodes::BadValue, "feedback is NULL");
+        }
+        std::auto_ptr<PlanCacheEntryFeedback> autoFeedback(feedback);
+
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        return Status(ErrorCodes::BadValue, "not implemented yet");
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(cq.getPlanCacheKey());
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        if (entry->feedback.size() >= PlanCacheEntry::kMaxFeedback) {
+            // If we have enough feedback, then use it to determine whether
+            // we should get rid of the cached solution.
+            if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get())) {
+                _cache.erase(i);
+            }
+        }
+        else {
+            // We don't have enough feedback yet---just store it and move on.
+            entry->feedback.push_back(autoFeedback.release());
+        }
+
+        return Status::OK();
     }
 
     Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {

@@ -55,6 +55,7 @@ namespace mongo {
             QLOG() << "scoring plan " << i << ":\n" << candidates[i].solution->toString();
             double score = scoreTree(statTrees[i]);
             QLOG() << "score = " << score << endl;
+            why->score = score;
             if (score > maxScore) {
                 maxScore = score;
                 bestChild = i;
