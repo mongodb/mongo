@@ -400,7 +400,9 @@ namespace mongo {
             }
 
             if ( !error ) {
-                _le->recordUpdate( stats.upsertedID.isEmpty(), stats.n, stats.upsertedID );
+                _le->recordUpdate( stats.upsertedID.isEmpty() && stats.n > 0,
+                        stats.n,
+                        stats.upsertedID );
             }
         }
         else {
