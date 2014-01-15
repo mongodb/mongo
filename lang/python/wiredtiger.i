@@ -656,12 +656,21 @@ pythonClose(PY_CALLBACK *pcb)
 {
 	int ret;
 
+        /*
+         * Ensure the global interpreter lock is held - so that Python
+         * doesn't shut down threads while we use them.
+         */
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+
 	ret = 0;
 	if (PyObject_SetAttrString(pcb->pyobj, "this", Py_None) == -1) {
 		SWIG_Error(SWIG_RuntimeError, "WT SetAttr failed");
 		ret = EINVAL;  /* any non-zero value will do. */
 	}
 	Py_XDECREF(pcb->pyobj);
+
+        SWIG_PYTHON_THREAD_END_BLOCK;
+
 	return (ret);
 }
 
