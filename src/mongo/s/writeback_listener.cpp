@@ -144,10 +144,6 @@ namespace mongo {
                 if ( data.getBoolField( "writeBack" ) ) {
                     string ns = data["ns"].valuestrsafe();
 
-                    if ( !data["connectionId"].isNumber() || !data["id"].type() == jstOID ) {
-                        warning() << "mongos/mongod version mismatch (1.7.5 is the split)" << endl;
-                    }
-
                     int len; // not used, but needed for next call
                     Message msg( (void*)data["msg"].binData( len ) , false );
 
