@@ -207,7 +207,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
 
         var writeConcern = null;
         if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().tojson();
+            writeConcern = this._mongo.getWriteConcern().toJSON();
         }
 
         result = batch.execute(writeConcern).toSingleResult();
@@ -260,7 +260,7 @@ DBCollection.prototype.remove = function( t , justOne ){
 
         var writeConcern = null;
         if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().tojson();
+            writeConcern = this._mongo.getWriteConcern().toJSON();
         }
 
         result = batch.execute(writeConcern).toSingleResult();
@@ -321,7 +321,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
 
         var writeConcern = null;
         if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().tojson();
+            writeConcern = this._mongo.getWriteConcern().toJSON();
         }
 
         result = batch.execute(writeConcern).toSingleResult();

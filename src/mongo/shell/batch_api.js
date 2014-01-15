@@ -91,8 +91,11 @@ var _batch_api_module = (function() {
       }
     };
 
-    this.tojson = function() {
-      return bulkResult;
+    /**
+     * @return {string}
+     */
+    this.tojson = function(indent, nolint) {
+      return tojson(bulkResult, indent, nolint);
     };
 
     this.toString = function() {
@@ -176,8 +179,11 @@ var _batch_api_module = (function() {
       }
     }
 
-    this.tojson = function() {
-      return bulkResult;
+    /**
+     * @return {string}
+     */
+    this.tojson = function(indent, nolint) {
+      return tojson(bulkResult, indent, nolint);
     }
 
     this.toString = function() {
@@ -217,8 +223,11 @@ var _batch_api_module = (function() {
       return err.op;
     }
 
-    this.tojson = function() {
-      return err;
+    /**
+     * @return {string}
+     */
+    this.tojson = function(indent, nolint) {
+      return tojson(err, indent, nolint);
     }
 
     this.toString = function() {
@@ -241,8 +250,11 @@ var _batch_api_module = (function() {
     defineReadOnlyProperty(this, "errInfo", err.errInfo);
     defineReadOnlyProperty(this, "errmsg", err.errmsg);
 
-    this.tojson = function() {
-      return err;
+    /**
+     * @return {string}
+     */
+    this.tojson = function(indent, nolint) {
+      return tojson(err, indent, nolint);
     }
 
     this.toString = function() {
@@ -781,7 +793,7 @@ if ( ( typeof WriteConcern ) == 'undefined' ){
      *  j: write durably written to journal
      *  w: write replicated to number of servers
      *  wtimeout: how long to wait for replication
-     * 
+     *
      * Accepts { w : x, j : x, wtimeout : x } or w, j, wtimeout
      */
     WriteConcern = function( wValue, jValue, wTimeout ){
@@ -801,12 +813,24 @@ if ( ( typeof WriteConcern ) == 'undefined' ){
         this._wTimeout = NumberInt( wTimeout ).toNumber();
     };
 
-    WriteConcern.prototype.tojson = function() {
+    /**
+     * @return {object} the object representation of this object. Use tojson (small caps) to get
+     *     the string representation instead.
+     */
+    WriteConcern.prototype.toJSON = function() {
         return { w : this._w, j : this._j, wtimeout : this._wTimeout };
     };
 
+    /**
+     * @return {string} the string representation of this object. Use toJSON (capitalized) to get
+     *     the object representation instead.
+     */
+    WriteConcern.prototype.tojson = function(indent, nolint) {
+        return tojson(this.toJSON(), indent, nolint);
+    };
+
     WriteConcern.prototype.toString = function() {
-        return "WriteConcern(" + tojson( this.tojson() ) + ")";
+        return "WriteConcern(" + this.tojson() + ")";
     };
 
     WriteConcern.prototype.shellPrint = function() {
