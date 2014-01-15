@@ -159,7 +159,6 @@ assert.eq(result.err, null);
 myprint("non-existent w");
 result = master.getDB("foo").runCommand({getLastError:1,w:"blahblah",wtimeout:timeout});
 printjson(result);
-assert.eq(result.code, 14830);
 assert.eq(result.ok, 0);
 
 myprint("test mode 2");
