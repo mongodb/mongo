@@ -38,6 +38,10 @@ namespace mongo {
         // Parsing GLE responses is incredibly finicky.
         // The order of testing here is extremely important.
 
+        ///////////////////////////////////////////////////////////////////////
+        // IMPORTANT!
+        // Also update extractGLEErrors in batch_api.js for any changes made here.
+
         const bool isOK = gleResponse["ok"].trueValue();
         const string err = gleResponse["err"].str();
         const string errMsg = gleResponse["errmsg"].str();

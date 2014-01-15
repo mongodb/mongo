@@ -98,8 +98,8 @@ executeTests();
 
 // FAILING currently due to incorrect batch api reading of GLE
 // Use legacy opcodes
-//coll.getMongo().useWriteCommands = function() { return false; };
-//executeTests();
+coll.getMongo().useWriteCommands = function() { return false; };
+executeTests();
 
 jsTest.log("DONE bulk api wc tests");
 rst.stopSet();
