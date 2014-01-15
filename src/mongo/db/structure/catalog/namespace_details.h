@@ -31,7 +31,7 @@
 #include "mongo/pch.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"

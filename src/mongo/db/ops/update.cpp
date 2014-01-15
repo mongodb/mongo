@@ -40,7 +40,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/index_set.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/pagefault.h"

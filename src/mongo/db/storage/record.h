@@ -144,6 +144,7 @@ namespace mongo {
     };
 #pragma pack()
 
+    // TODO: this probably moves to record_store.h
     class DeletedRecord {
     public:
 
@@ -172,6 +173,8 @@ namespace mongo {
         int _extentOfs;
         DiskLoc _nextDeleted;
     };
+
+    BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
     struct RecordStats {
         void record( BSONObjBuilder& b );

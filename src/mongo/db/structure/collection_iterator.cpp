@@ -28,7 +28,7 @@
 
 #include "mongo/db/structure/collection_iterator.h"
 
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/catalog/collection.h"

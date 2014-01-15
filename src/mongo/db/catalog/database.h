@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage_options.h"

@@ -33,7 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/catalog/collection.h"

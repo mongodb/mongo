@@ -44,7 +44,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/storage/extent.h"
-#include "mongo/db/namespace_details-inl.h"
+#include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pdfile_version.h"
 #include "mongo/platform/cstdint.h"

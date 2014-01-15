@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/catalog/index_details.h"
 
 #include <boost/checked_delete.hpp>
 

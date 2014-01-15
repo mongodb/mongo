@@ -28,7 +28,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 #include <algorithm>
 #include <list>

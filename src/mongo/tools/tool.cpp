@@ -41,7 +41,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/json.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file_allocator.h"

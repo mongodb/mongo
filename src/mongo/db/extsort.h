@@ -32,7 +32,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/util/array.h"

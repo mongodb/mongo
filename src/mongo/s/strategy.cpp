@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/max_time.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
