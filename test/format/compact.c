@@ -42,7 +42,7 @@ compact(void *arg)
 	WT_UNUSED(arg);
 
 	/* Compaction isn't supported for all data sources. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
 		return (NULL);
 
 	/* Open a session. */

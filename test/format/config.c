@@ -108,7 +108,7 @@ config_setup(void)
 	if ((g.uri = malloc(256)) == NULL)
 		syserr("malloc");
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
-	if (DATASOURCE("memrata"))
+	if (DATASOURCE("helium"))
 		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
@@ -133,14 +133,14 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
-	/* KVS requires shared libraries. */
+	/* Supporting shared libraries. */
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
 		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
-	if (DATASOURCE("memrata") && access(MEMRATA_PATH, R_OK) != 0)
-		die(errno, "memrata shared library: %s", MEMRATA_PATH);
+	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
+		die(errno, "Levyx/helium shared library: %s", HELIUM_PATH);
 
 	/* KVS doesn't support user-specified collations. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
 		g.c_reverse = 0;
 
 	config_checksum();
@@ -382,9 +382,9 @@ config_single(const char *s, int perm)
 	if (cp->flags & C_STRING) {
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("helium", ep, strlen("helium")) != 0 &&
 		    strncmp("kvsbdb", ep, strlen("kvsbdb")) != 0 &&
 		    strncmp("lsm", ep, strlen("lsm")) != 0 &&
-		    strncmp("memrata", ep, strlen("memrata")) != 0 &&
 		    strncmp("table", ep, strlen("table")) != 0) {
 			    fprintf(stderr,
 				"Invalid data source option: %s\n", ep);

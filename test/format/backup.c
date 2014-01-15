@@ -44,7 +44,7 @@ check_copy(void)
 	 * Open a session and verify the store; some data-sources don't support
 	 * verify.
 	 */
-	if (!DATASOURCE("memrata")) {
+	if (!DATASOURCE("helium")) {
 		if ((ret = conn->open_session(
 		    conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session: %s", g.home_backup);
@@ -104,7 +104,7 @@ hot_backup(void *arg)
 		return (NULL);
 
 	/* Hot backups aren't supported for non-standard data sources. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
 		return (NULL);
 
 	/* Open a session. */

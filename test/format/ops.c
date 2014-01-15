@@ -254,7 +254,7 @@ ops(void *arg)
 			 * else 25% of the time we name the checkpoint.
 			 */
 			if (DATASOURCE("lsm") || DATASOURCE("kvsbdb") ||
-			    DATASOURCE("memrata") || MMRAND(1, 4) == 1)
+			    DATASOURCE("helium") || MMRAND(1, 4) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(config, sizeof(config),

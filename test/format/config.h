@@ -124,7 +124,7 @@ static CONFIG c[] = {
 	  0x0, C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
-	  "data source (file | kvsbdb | lsm | memrata | table)",
+	  "data source (file | helium | kvsbdb | lsm | table)",
 	  0x0, C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",

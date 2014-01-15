@@ -119,17 +119,22 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		g.wt_api = conn->get_extension_api(conn);
 
 	/*
-	 * Load the Memrata shared library: it would be possible to do this as
+	 * Load the Helium shared library: it would be possible to do this as
 	 * part of the extensions configured for wiredtiger_open, there's no
 	 * difference, I am doing it here because it's easier to work with the
 	 * configuration strings.
 	 */
-	if (DATASOURCE("memrata") &&
-	    (ret = conn->load_extension(conn, MEMRATA_PATH,
+	if (DATASOURCE("helium") &&
+	    (ret = conn->load_extension(conn, HELIUM_PATH,
 	    "entry=wiredtiger_extension_init,config=["
-	    "dev1=[kvs_devices=[/dev/loop0,/dev/loop1],kvs_open_o_truncate=1],"
-	    "dev2=[kvs_devices=[/dev/loop2],kvs_open_o_truncate=1]]")) != 0)
-		die(ret, "WT_CONNECTION.load_extension: %s", MEMRATA_PATH);
+	    "dev1=[helium_devices="
+	    "\"he://.//dev/disk3s1,/dev/disk4s1\","
+	    "helium_env_read_cache_size=10mb,helium_o_volume_truncate=1],"
+	    "dev2=[helium_devices="
+	    "\"he://.//dev/disk5s1\","
+	    "helium_env_write_cache_size=10mb,helium_o_volume_truncate=1]]"
+	    )) != 0)
+		die(ret, "WT_CONNECTION.load_extension: %s", HELIUM_PATH);
 
 	*connp = conn;
 }
@@ -300,9 +305,9 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 
-	if (DATASOURCE("memrata"))
+	if (DATASOURCE("helium"))
 		p += snprintf(p, (size_t)(end - p),
-		    ",type=memrata,kvs_open_o_truncate=1");
+		    ",type=helium,helium_o_truncate=1");
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
@@ -331,7 +336,7 @@ wts_dump(const char *tag, int dump_bdb)
 	char *cmd;
 
 	/* Data-sources that don't support dump through the wt utility. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -363,7 +368,7 @@ wts_salvage(void)
 	/*
 	 * Data-sources that don't support salvage.
 	 */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
 		return;
 
 	conn = g.wts_conn;
@@ -394,7 +399,7 @@ wts_verify(const char *tag)
 	/*
 	 * Data-sources that don't support verify.
 	 */
-	if (DATASOURCE("memrata"))
+	if (DATASOURCE("helium"))
 		return;
 
 	conn = g.wts_conn;
@@ -435,7 +440,7 @@ wts_stats(void)
 	int ret;
 
 	/* Data-sources that don't support statistics. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
 		return;
 
 	/* Ignore statistics if they're not configured. */
