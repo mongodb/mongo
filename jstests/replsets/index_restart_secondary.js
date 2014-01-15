@@ -37,7 +37,7 @@ assert.eq(2, masterDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"} ) );
 // Wait for the secondary to get the index entry
 assert.soon( function() { 
     return 2 == secondDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"} ); },
-             "index not created on secondary (prior to restart)", 30000, 50 );
+             "index not created on secondary (prior to restart)", 120000, 50 );
 
 jsTest.log("Index created and system.indexes entry exists on secondary");
 
