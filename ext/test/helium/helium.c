@@ -121,10 +121,10 @@ static int verbose = 1;					/* Verbose messages */
  * open of the volume, that's "WiredTiger.WiredTiger" (outside of the possible
  * application name space).
  */
-#define	WT_NAME_CACHE	".cache"
-#define	WT_NAME_INIT	"WiredTiger.WiredTiger"
 #define	WT_NAME_PREFIX	"WiredTiger."
-#define	WT_NAME_TXN	"WiredTiger.txn"
+#define	WT_NAME_CACHE	"Cache"
+#define	WT_NAME_TXN	"Txn"
+#define	WT_NAME_WT	"WiredTiger"
 
 /*
  * WT_SOURCE --
@@ -2392,68 +2392,6 @@ helium_session_checkpoint(
 }
 
 /*
- * helium_config_read --
- *	Parse the Helium configuration.
- */
-static int
-helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
-    char **devicep, HE_ENV *envp, int *env_setp, uint64_t *flagsp)
-{
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
-	int ret = 0, tret;
-
-	*env_setp = 0;
-	*flagsp = 0;
-
-	/* Set up the scan of the configuration arguments list. */
-	if ((ret = wtext->config_scan_begin(
-	    wtext, NULL, config->str, config->len, &scan)) != 0)
-		ERET(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_begin: %s",
-		    wtext->strerror(ret));
-	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
-		if (STRING_MATCH("helium_devices", k.str, k.len)) {
-			if ((*devicep = calloc(1, v.len + 1)) == NULL)
-				return (os_errno());
-			memcpy(*devicep, v.str, v.len);
-			continue;
-		}
-		if (STRING_MATCH("helium_env_read_cache_size", k.str, k.len)) {
-			envp->read_cache_size = v.val;
-			*env_setp = 1;
-			continue;
-		}
-		if (STRING_MATCH("helium_env_write_cache_size", k.str, k.len)) {
-			envp->write_cache_size = v.val;
-			*env_setp = 1;
-			continue;
-		}
-		if (STRING_MATCH("helium_o_volume_truncate", k.str, k.len)) {
-			if (v.val != 0)
-				*flagsp |= HE_O_TRUNCATE;
-			continue;
-		}
-		EMSG_ERR(wtext, NULL, EINVAL,
-		    "unknown configuration key value pair %.*s=%.*s",
-		    (int)k.len, k.str, (int)v.len, v.str);
-	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	if (ret != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_next: %s",
-		    wtext->strerror(ret));
-
-err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
-		EMSG(wtext, NULL, tret,
-		    "WT_EXTENSION_API.config_scan_end: %s",
-		    wtext->strerror(ret));
-
-	return (ret);
-}
-
-/*
  * helium_source_close --
  *	Discard a HELIUM_SOURCE.
  */
@@ -2484,11 +2422,12 @@ helium_source_close(
 	if (hs->he_txn != NULL && hs->he_owner) {
 		if ((tret = he_close(hs->he_txn)) != 0)
 			EMSG(wtext, session, tret,
-			    "he_close: %s: %s", WT_NAME_TXN, he_strerror(tret));
+			    "he_close: %s: %s",
+			    WT_NAME_PREFIX WT_NAME_TXN, he_strerror(tret));
 		hs->he_txn = NULL;
 	}
 
-	/* Flush and close the KVS source. */
+	/* Flush and close the Helium source. */
 	if (hs->he_volume != NULL) {
 		if ((tret = he_commit(hs->he_volume)) != 0)
 			EMSG(wtext, session, WT_ERROR,
@@ -2599,7 +2538,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 
 	/*
 	 * Push the store to stable storage for correctness.  (It doesn't matter
-	 * what Memrata handle we push, so we just push one of them.)
+	 * what Helium handle we commit, so we just commit one of them.)
 	 */
 	if ((ret = he_commit(ws->he)) != 0)
 		ERET(wtext, NULL, WT_ERROR, "he_commit: %s", he_strerror(ret));
@@ -2704,7 +2643,7 @@ txn_cleaner(WT_CURSOR *wtcursor, he_t he_txn, uint64_t txnmin)
 
 /*
  * fake_cursor --
- *	Fake up enough of a cursor to do KVS operations.
+ *	Fake up enough of a cursor to do Helium operations.
  */
 static int
 fake_cursor(WT_EXTENSION_API *wtext, WT_CURSOR **wtcursorp)
@@ -2840,6 +2779,68 @@ err:	cursor_destroy(cursor);
 }
 
 /*
+ * helium_config_read --
+ *	Parse the Helium configuration.
+ */
+static int
+helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
+    char **devicep, HE_ENV *envp, int *env_setp, uint64_t *flagsp)
+{
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
+	int ret = 0, tret;
+
+	*env_setp = 0;
+	*flagsp = 0;
+
+	/* Set up the scan of the configuration arguments list. */
+	if ((ret = wtext->config_scan_begin(
+	    wtext, NULL, config->str, config->len, &scan)) != 0)
+		ERET(wtext, NULL, ret,
+		    "WT_EXTENSION_API.config_scan_begin: %s",
+		    wtext->strerror(ret));
+	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
+		if (STRING_MATCH("helium_devices", k.str, k.len)) {
+			if ((*devicep = calloc(1, v.len + 1)) == NULL)
+				return (os_errno());
+			memcpy(*devicep, v.str, v.len);
+			continue;
+		}
+		if (STRING_MATCH("helium_env_read_cache_size", k.str, k.len)) {
+			envp->read_cache_size = v.val;
+			*env_setp = 1;
+			continue;
+		}
+		if (STRING_MATCH("helium_env_write_cache_size", k.str, k.len)) {
+			envp->write_cache_size = v.val;
+			*env_setp = 1;
+			continue;
+		}
+		if (STRING_MATCH("helium_o_volume_truncate", k.str, k.len)) {
+			if (v.val != 0)
+				*flagsp |= HE_O_VOLUME_TRUNCATE;
+			continue;
+		}
+		EMSG_ERR(wtext, NULL, EINVAL,
+		    "unknown configuration key value pair %.*s=%.*s",
+		    (int)k.len, k.str, (int)v.len, v.str);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API.config_scan_next: %s",
+		    wtext->strerror(ret));
+
+err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
+		EMSG(wtext, NULL, tret,
+		    "WT_EXTENSION_API.config_scan_end: %s",
+		    wtext->strerror(ret));
+
+	return (ret);
+}
+
+/*
  * helium_source_open --
  *	Allocate and open a Helium source.
  */
@@ -2887,16 +2888,21 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		goto err;
 	if (hs->device == NULL)
 		EMSG_ERR(wtext, NULL,
-		    EINVAL, "%s: no devices specified", hs->name);
+		    EINVAL, "%s: no Helium volumes specified", hs->name);
 
-	/* Open the underlying KVS volume (creating it if necessary). */
-	flags |= HE_O_CREATE | HE_O_VOLUME_CREATE | HE_O_VOLUME_CLEAN;
-	if ((hs->he_volume = he_open(
-	    hs->device, WT_NAME_INIT, flags, env_set ? &env : NULL)) == NULL)
+	/*
+	 * Open the Helium volume, creating it if necessary.  We have to open
+	 * an object at the same time, that's why we have object flags as well
+	 * as volume flags.
+	 */
+	flags |= HE_O_CREATE |
+	    HE_O_TRUNCATE | HE_O_VOLUME_CLEAN | HE_O_VOLUME_CREATE;
+	if ((hs->he_volume = he_open(hs->device,
+	    WT_NAME_PREFIX WT_NAME_WT, flags, env_set ? &env : NULL)) == NULL)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "he_open: %s=%s: %s: %s",
-		    hs->name, hs->device,
-		    WT_NAME_INIT, he_strerror(os_errno()));
+		    "he_open: %s: %s: %s",
+		    hs->name,
+		    WT_NAME_PREFIX WT_NAME_WT, he_strerror(os_errno()));
 
 	/* Insert the new entry at the head of the list. */
 	hs->next = ds->hs_head;
@@ -2933,7 +2939,8 @@ helium_source_open_txn(DATA_SOURCE *ds)
 	hs_txn = NULL;
 	he_txn = NULL;
 	for (hs = ds->hs_head; hs != NULL; hs = hs->next)
-		if ((t = he_open(hs->device, WT_NAME_TXN, 0, NULL)) != NULL) {
+		if ((t = he_open(hs->device,
+		    WT_NAME_PREFIX WT_NAME_TXN, 0, NULL)) != NULL) {
 			if (hs_txn != NULL) {
 				(void)he_close(t);
 				(void)he_close(hs_txn);
@@ -2954,11 +2961,12 @@ helium_source_open_txn(DATA_SOURCE *ds)
 	if ((hs = hs_txn) == NULL) {
 		for (hs = ds->hs_head; hs->next != NULL; hs = hs->next)
 			;
-		if ((he_txn = he_open(
-		    hs->device, WT_NAME_TXN, HE_O_CREATE, NULL)) == NULL)
+		if ((he_txn = he_open(hs->device,
+		    WT_NAME_PREFIX WT_NAME_TXN, HE_O_CREATE, NULL)) == NULL)
 			ERET(wtext, NULL, WT_ERROR,
 			    "he_open: %s: %s",
-			    WT_NAME_TXN, he_strerror(os_errno()));
+			    WT_NAME_PREFIX WT_NAME_TXN,
+			    he_strerror(os_errno()));
 
 		/* Push the change. */
 		if ((ret = he_commit(he_txn)) != 0)
@@ -2966,10 +2974,11 @@ helium_source_open_txn(DATA_SOURCE *ds)
 			    "he_commit: %s", he_strerror(ret));
 	}
 
-	/* Set the owner field, this KVS source has to be closed last. */
+	/* Set the owner field, this Helium source has to be closed last. */
+	VMSG(wtext, NULL, "transactional store on %s", hs->device);
 	hs->he_owner = 1;
 
-	/* Add a reference to the open transaction store in each KVS source. */
+	/* Add a reference to the transaction store in each Helium source. */
 	for (hs = ds->hs_head; hs != NULL; hs = hs->next)
 		hs->he_txn = he_txn;
 
@@ -3005,7 +3014,7 @@ helium_source_recover_namespace(WT_DATA_SOURCE *wtds,
 	 * WiredTiger name: do the reverse process here so we can use the
 	 * standard source-open function.
 	 */
-	p = name + (sizeof(WT_NAME_PREFIX) - 1);
+	p = name + strlen(WT_NAME_PREFIX);
 	len = strlen("helium:") + strlen(hs->name) + strlen(p) + 10;
 	if ((uri = malloc(len)) == NULL) {
 		ret = os_errno();
@@ -3068,16 +3077,16 @@ helium_namespace_list(void *cookie, const char *name)
 	names = cookie;
 
 	/* Ignore any files without a WiredTiger prefix. */
-	if (strncmp(name, WT_NAME_PREFIX, sizeof(WT_NAME_PREFIX) - 1) != 0)
+	if (strncmp(name, WT_NAME_PREFIX, strlen(WT_NAME_PREFIX)) != 0)
 		return (0);
 
-	/* Ignore the transaction store. */
-	if (strcmp(name, WT_NAME_TXN) == 0)
+	/* Ignore the metadata files. */
+	p = name + strlen(WT_NAME_PREFIX);
+	if (strcmp(p, WT_NAME_CACHE) == 0)
 		return (0);
-
-	/* Ignore the "cache" files. */
-	p = name + (sizeof(WT_NAME_PREFIX) - 1);
-	if ((p = strchr(p, '.')) != NULL && strcmp(p, WT_NAME_CACHE) == 0)
+	if (strcmp(p, WT_NAME_TXN) == 0)
+		return (0);
+	if (strcmp(p, WT_NAME_WT) == 0)
 		return (0);
 
 	if (names->list_cnt + 1 >= names->list_max) {
@@ -3108,12 +3117,14 @@ helium_source_recover(
 	u_int i;
 	int ret = 0;
 
+	VMSG(wtext, NULL, "recover %s", hs->name);
+
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
 	memset(&names, 0, sizeof(names));
 
-	/* Get a list of the cache/primary object pairs in the KVS source. */
+	/* Get a list of the cache/primary object pairs in the Helium source. */
 	if ((ret = he_enumerate(
 	    hs->device, helium_namespace_list, &names)) != 0)
 		ERET(wtext, NULL, WT_ERROR,
@@ -3128,7 +3139,8 @@ helium_source_recover(
 	/* Clear the transaction store. */
 	if ((ret = he_truncate(hs->he_txn)) != 0)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "he_truncate: %s: %s", WT_NAME_TXN, he_strerror(ret));
+		    "he_truncate: %s: %s",
+		    WT_NAME_PREFIX WT_NAME_TXN, he_strerror(ret));
 
 err:	for (i = 0; i < names.list_cnt; ++i)
 		free(names.list[i]);
@@ -3268,7 +3280,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	if ((ret = helium_source_open_txn(ds)) != 0)
 		return (ret);
 
-	/* Recover each KVS source. */
+	/* Recover each Helium source. */
 	for (hs = ds->hs_head; hs != NULL; hs = hs->next)
 		if ((ret = helium_source_recover(&ds->wtds, hs, config)) != 0)
 			goto err;
@@ -3304,7 +3316,7 @@ err:	if (ds != NULL)
 
 /*
  * wiredtiger_extension_terminate --
- *	Shutdown the KVS connector code.
+ *	Shutdown the Helium connector code.
  */
 int
 wiredtiger_extension_terminate(WT_CONNECTION *connection)
