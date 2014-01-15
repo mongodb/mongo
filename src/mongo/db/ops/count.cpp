@@ -77,6 +77,8 @@ namespace mongo {
         long long count = 0;
         long long skip = cmd["skip"].numberLong();
         long long limit = cmd["limit"].numberLong();
+        const std::string hint = cmd.getStringField("hint");
+        const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
 
         if (limit < 0) {
             limit = -limit;
@@ -90,16 +92,11 @@ namespace mongo {
         CanonicalQuery* cq;
         // We pass -limit because a positive limit means 'batch size' but negative limit is a
         // hard limit.
-        if (!CanonicalQuery::canonicalize(ns, query, skip, -limit, &cq).isOK()) {
-            uasserted(17220, "could not canonicalize query " + query.toString());
-            return -2;
-        }
+        uassertStatusOK(CanonicalQuery::canonicalize(ns, query, BSONObj(), BSONObj(), 
+                                                     skip, -limit, hintObj, &cq)); 
 
         Runner* rawRunner;
-        if (!getRunner(cq, &rawRunner).isOK()) {
-            uasserted(17221, "could not get runner " + query.toString());
-            return -2;
-        }
+        uassertStatusOK(getRunner(cq, &rawRunner));
 
         auto_ptr<Runner> runner(rawRunner);
 
