@@ -42,7 +42,7 @@
 typedef struct he_env	HE_ENV;
 typedef struct he_item	HE_ITEM;
 
-static int verbose = 1;					/* Verbose messages */
+static int verbose = 0;					/* Verbose messages */
 
 /*
  * Macros to output error  and verbose messages, and set or return an error.
@@ -1724,8 +1724,8 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
  */
 static int
 ws_source_open_object(WT_DATA_SOURCE *wtds, WT_SESSION *session,
-    const char *device, const char *uri, const char *suffix,
-    int flags, he_t *hep)
+    HELIUM_SOURCE *hs,
+    const char *uri, const char *suffix, int flags, he_t *hep)
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
@@ -1742,9 +1742,10 @@ ws_source_open_object(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	/* Open the underlying Helium object. */
 	if ((ret = ws_source_name(wtds, session, uri, suffix, &p)) != 0)
 		return (ret);
-	if ((he = he_open(device, p, flags, NULL)) == NULL)
+	VMSG(wtext, session, "open %s/%s", hs->name, p);
+	if ((he = he_open(hs->device, p, flags, NULL)) == NULL)
 		EMSG(wtext, session, WT_ERROR,
-		    "he_open: %s/%s: %s", device, p, he_strerror(os_errno()));
+		    "he_open: %s/%s: %s", hs->name, p, he_strerror(os_errno()));
 	*hep = he;
 
 	free(p);
@@ -1857,11 +1858,11 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 		    "helium_o_truncate configuration: %s",
 		    wtext->strerror(ret));
 
-	if ((ret = ws_source_open_object(wtds, session,
-	    hs->device, uri, NULL, oflags, &ws->he)) != 0)
+	if ((ret = ws_source_open_object(
+	    wtds, session, hs, uri, NULL, oflags, &ws->he)) != 0)
 		goto err;
-	if ((ret = ws_source_open_object(wtds, session,
-	    hs->device, uri, WT_NAME_CACHE, oflags, &ws->he_cache)) != 0)
+	if ((ret = ws_source_open_object(
+	    wtds, session, hs, uri, WT_NAME_CACHE, oflags, &ws->he_cache)) != 0)
 		goto err;
 	if ((ret = he_commit(ws->he)) != 0)
 		EMSG_ERR(wtext, session, WT_ERROR,
@@ -2857,7 +2858,7 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	wtext = ds->wtext;
 	hs = NULL;
 
-	VMSG(wtext, NULL, "open %.*s=%.*s",
+	VMSG(wtext, NULL, "volume %.*s=%.*s",
 	    (int)k->len, k->str, (int)v->len, v->str);
 
 	/*
@@ -2973,9 +2974,10 @@ helium_source_open_txn(DATA_SOURCE *ds)
 			ERET(wtext, NULL, WT_ERROR,
 			    "he_commit: %s", he_strerror(ret));
 	}
+	VMSG(wtext, NULL, "%stransactional store on %s",
+	    hs_txn == NULL ? "creating " : "", hs->name);
 
 	/* Set the owner field, this Helium source has to be closed last. */
-	VMSG(wtext, NULL, "transactional store on %s", hs->device);
 	hs->he_owner = 1;
 
 	/* Add a reference to the transaction store in each Helium source. */
@@ -3117,12 +3119,11 @@ helium_source_recover(
 	u_int i;
 	int ret = 0;
 
-	VMSG(wtext, NULL, "recover %s", hs->name);
-
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-
 	memset(&names, 0, sizeof(names));
+
+	VMSG(wtext, NULL, "recover %s", hs->name);
 
 	/* Get a list of the cache/primary object pairs in the Helium source. */
 	if ((ret = he_enumerate(
@@ -3264,9 +3265,14 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API.config_scan_begin: config: %s",
 		    wtext->strerror(ret));
-	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0)
+	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
+		if (STRING_MATCH("helium_verbose", k.str, k.len)) {
+			verbose = 1;
+			continue;
+		}
 		if ((ret = helium_source_open(ds, &k, &v)) != 0)
 			goto err;
+	}
 	if (ret != WT_NOTFOUND)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API.config_scan_next: config: %s",

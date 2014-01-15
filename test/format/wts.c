@@ -127,6 +127,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (DATASOURCE("helium") &&
 	    (ret = conn->load_extension(conn, HELIUM_PATH,
 	    "entry=wiredtiger_extension_init,config=["
+	    "helium_verbose=1,"
 	    "dev1=[helium_devices="
 	    "\"he://.//dev/disk3s1,/dev/disk4s1\","
 	    "helium_env_read_cache_size=10mb,helium_o_volume_truncate=1],"
