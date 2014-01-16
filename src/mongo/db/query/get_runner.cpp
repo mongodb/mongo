@@ -266,6 +266,7 @@ namespace mongo {
         }
 
         plannerParams.options |= QueryPlannerParams::INDEX_INTERSECTION;
+        plannerParams.options |= QueryPlannerParams::KEEP_MUTATIONS;
 
         vector<QuerySolution*> solutions;
         Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);

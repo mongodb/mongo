@@ -64,6 +64,10 @@ namespace mongo {
 
             // Set this if you want to turn on index intersection.
             INDEX_INTERSECTION = 1 << 4,
+
+            // Set this if you want to try to keep documents deleted or mutated during the execution
+            // of the query in the query results.
+            KEEP_MUTATIONS = 1 << 5,
         };
 
         // See Options enum above.

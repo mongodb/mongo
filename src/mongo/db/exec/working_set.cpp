@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    WorkingSet::MemberHolder::MemberHolder() : flagged(false), member(NULL) { }
+    WorkingSet::MemberHolder::MemberHolder() : member(NULL) { }
     WorkingSet::MemberHolder::~MemberHolder() {}
 
     WorkingSet::WorkingSet() : _freeList(INVALID_ID) { }
@@ -76,23 +76,16 @@ namespace mongo {
     void WorkingSet::flagForReview(const WorkingSetID& i) {
         WorkingSetMember* member = get(i);
         verify(WorkingSetMember::OWNED_OBJ == member->state);
-        _data[i].flagged = true;
+        _flagged.insert(i);
     }
 
-    unordered_set<WorkingSetID> WorkingSet::getFlagged() const {
-        // This is slow, but it is only for tests.
-        unordered_set<WorkingSetID> out;
-        for (size_t i = 0; i < _data.size(); i++) {
-            if (_data[i].flagged) {
-                out.insert(i);
-            }
-        }
-        return out;
+    const unordered_set<WorkingSetID>& WorkingSet::getFlagged() const {
+        return _flagged;
     }
 
     bool WorkingSet::isFlagged(WorkingSetID id) const {
-        verify(id < _data.size());
-        return _data[id].flagged;
+        invariant(id < _data.size());
+        return _flagged.end() != _flagged.find(id);
     }
 
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }

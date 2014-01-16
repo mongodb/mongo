@@ -567,4 +567,29 @@ namespace mongo {
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
     };
 
+    /**
+     * If documents mutate or are deleted during a query, we can (in some cases) fetch them
+     * and still return them.  This stage merges documents that have been mutated or deleted
+     * into the query result stream.
+     */
+    struct KeepMutationsNode : public QuerySolutionNode {
+        KeepMutationsNode() { }
+        virtual ~KeepMutationsNode() { }
+
+        virtual StageType getType() const { return STAGE_KEEP_MUTATIONS; }
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+        // Any flagged results are OWNED_OBJ and therefore we're covered if our child is.
+        bool fetched() const { return children[0]->fetched(); }
+
+        // Any flagged results are OWNED_OBJ and as such they'll have any field we need.
+        bool hasField(const string& field) const { return children[0]->hasField(field); }
+
+        bool sortedByDiskLoc() const { return false; }
+        const BSONObjSet& getSort() const { return sorts; }
+
+        // Since we merge in flagged results we have no sort order.
+        BSONObjSet sorts;
+    };
+
 }  // namespace mongo

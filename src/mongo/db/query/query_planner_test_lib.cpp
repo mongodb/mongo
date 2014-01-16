@@ -387,6 +387,19 @@ namespace mongo {
             return (limitEl.numberInt() == ln->limit)
                    && solutionMatches(child.Obj(), ln->children[0]);
         }
+        else if (STAGE_KEEP_MUTATIONS == trueSoln->getType()) {
+            const KeepMutationsNode* kn = static_cast<const KeepMutationsNode*>(trueSoln);
+
+            BSONElement el = testSoln["keep"];
+            if (el.eoo() || !el.isABSONObj()) { return false; }
+            BSONObj keepObj = el.Obj();
+
+            // Doesn't have any parameters really.
+            BSONElement child = keepObj["node"];
+            if (child.eoo() || !child.isABSONObj()) { return false; }
+
+            return solutionMatches(child.Obj(), kn->children[0]);
+        }
 
         return false;
     }

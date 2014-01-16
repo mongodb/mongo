@@ -2042,6 +2042,69 @@ namespace {
     }
 
     //
+    // Test that we add a KeepMutations when we should and and we don't add one when we shouldn't.
+    //
+
+    // Collection scan doesn't keep any state, so it can't produce flagged data.
+    TEST_F(QueryPlannerTest, NoMutationsForCollscan) {
+        params.options = QueryPlannerParams::KEEP_MUTATIONS;
+        runQuery(fromjson(""));
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // Collscan + sort doesn't produce flagged data either.
+    TEST_F(QueryPlannerTest, NoMutationsForSort) {
+        params.options = QueryPlannerParams::KEEP_MUTATIONS;
+        runQuerySortProj(fromjson(""), fromjson("{a:1}"), BSONObj());
+        assertSolutionExists("{sort: {pattern: {a: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
+    }
+
+    // An index scan + fetch requires a keep node as it can flag data.  Also make sure we put it in
+    // the right place, under the sort.
+    TEST_F(QueryPlannerTest, MutationsFromFetch) {
+        params.options = QueryPlannerParams::KEEP_MUTATIONS;
+        addIndex(BSON("a" << 1));
+        runQuerySortProj(fromjson("{a: 5}"), fromjson("{b:1}"), BSONObj());
+        assertSolutionExists("{sort: {pattern: {b:1}, limit: 0, node: {keep: {node: "
+                                 "{fetch: {node: {ixscan: {pattern: {a:1}}}}}}}}}");
+    }
+
+    // Index scan w/covering doesn't require a keep node as there's no fetch.
+    TEST_F(QueryPlannerTest, NoFetchNoKeep) {
+        params.options = QueryPlannerParams::KEEP_MUTATIONS;
+        addIndex(BSON("x" << 1));
+        // query, sort, proj
+        runQuerySortProj(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
+
+        // cscan is a soln but we override the params that say to include it.
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{proj: {spec: {_id: 0, x: 1}, node: {ixscan: "
+                                "{filter: null, pattern: {x: 1}}}}}");
+    }
+
+    // No keep with geoNear.
+    TEST_F(QueryPlannerTest, NoKeepWithGeoNear) {
+        params.options = QueryPlannerParams::KEEP_MUTATIONS;
+        addIndex(BSON("a" << "2d"));
+        runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{geoNear2d: {a: '2d'}}");
+    }
+
+    // No keep when we have an indexed sort.
+    TEST_F(QueryPlannerTest, NoKeepWithIndexedSort) {
+        params.options = QueryPlannerParams::KEEP_MUTATIONS;
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}}"),
+                                  BSON("b" << 1), BSONObj(), 0, 1);
+
+        // cscan solution exists but we didn't turn on the "always include a collscan."
+        assertNumSolutions(1);
+        assertSolutionExists("{fetch: {node: {mergeSort: {nodes: "
+                                "[{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: {pattern: {a: 1, b: 1}}}]}}}}");
+    }
+
+    //
     // Test bad input to query planner helpers.
     //
 

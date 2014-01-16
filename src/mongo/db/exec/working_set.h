@@ -97,11 +97,9 @@ namespace mongo {
         bool isFlagged(WorkingSetID id) const;
 
         /**
-         * Return a set of all WSIDs passed to flagForReview.
-         *
-         * ONLY FOR TESTS!
+         * Return the set of all WSIDs passed to flagForReview.
          */
-        unordered_set<WorkingSetID> getFlagged() const;
+        const unordered_set<WorkingSetID>& getFlagged() const;
 
     private:
         struct MemberHolder {
@@ -110,7 +108,7 @@ namespace mongo {
 
             // Free list link if freed. Points to self if in use.
             WorkingSetID nextFreeOrSelf;
-            bool flagged;
+
             // Owning pointer
             WorkingSetMember* member;
         };
@@ -123,6 +121,9 @@ namespace mongo {
         // link. INVALID_ID is the list terminator since 0 is a valid index.
         // If _freeList == INVALID_ID, the free list is empty and all elements in _data are in use.
         WorkingSetID _freeList;
+
+        // An insert-only set of WorkingSetIDs that have been flagged for review.
+        unordered_set<WorkingSetID> _flagged;
     };
 
     /**

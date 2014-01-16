@@ -330,7 +330,11 @@ namespace mongo {
         else if (STAGE_TEXT == type) {
             return "TEXT";
         }
+        else if (STAGE_KEEP_MUTATIONS == type) {
+            return "KEEP_MUTATIONS";
+        }
         else {
+            invariant(0);
             return "UNKNOWN.  SHOULD NOT SEE THIS.";
         }
     }

@@ -599,4 +599,24 @@ namespace mongo {
         children[0]->appendToString(ss, indent + 2);
     }
 
+    //
+    // KeepMutationsNode
+    //
+
+    void KeepMutationsNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "KEEP_MUTATIONS\n";
+        if (NULL != filter) {
+            addIndent(ss, indent + 1);
+            StringBuilder sb;
+            *ss << "filter:\n";
+            filter->debugString(sb, indent + 2);
+            *ss << sb.str();
+        }
+        addCommon(ss, indent);
+        addIndent(ss, indent + 1);
+        *ss << "Child:" << '\n';
+        children[0]->appendToString(ss, indent + 2);
+    }
+
 }  // namespace mongo

@@ -37,12 +37,18 @@ namespace mongo {
         STAGE_AND_HASH,
         STAGE_AND_SORTED,
         STAGE_COLLSCAN,
+
+        // This is more of an "internal-only" stage where we try to keep docs that were mutated
+        // during query execution.
+        STAGE_KEEP_MUTATIONS,
+
         STAGE_FETCH,
 
-        // TODO: This is probably an expression index, but would take even more time than
-        // STAGE_2DSPHERE to straighten out.
+        // TODO: This is secretly an expression index but we need geometry -> covering for our
+        // geohash.
         STAGE_GEO_2D,
-        // The two $geoNear impls imply a fetch+sort and as such are not IXSCANs.
+
+        // The two $geoNear impls imply a fetch+sort and must be stages.
         STAGE_GEO_NEAR_2D,
         STAGE_GEO_NEAR_2DSPHERE,
 

@@ -43,6 +43,7 @@ env.Library(
         "collection_scan.cpp",
         "fetch.cpp",
         "index_scan.cpp",
+        "keep_mutations.cpp",
         "limit.cpp",
         "merge_sort.cpp",
         "oplogstart.cpp",

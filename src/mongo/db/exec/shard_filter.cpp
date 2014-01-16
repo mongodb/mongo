@@ -67,6 +67,7 @@ namespace mongo {
 
             // If we're here either we have shard state and our doc passed, or we have no shard
             // state.  Either way, we advance.
+            ++_commonStats.advanced;
             return status;
         }
         else {

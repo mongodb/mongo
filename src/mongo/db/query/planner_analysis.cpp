@@ -44,6 +44,7 @@ namespace mongo {
     //
 
     namespace {
+
         /**
          * Walk the tree 'root' and output all leaf nodes into 'leafNodes'.
          */
@@ -78,8 +79,8 @@ namespace mongo {
             // more structure (or just explode and recalculate properties and see what happens)
             // but for now we just explode if it's a sure bet.
             //
-            // TODO: Can also try exploding if root is OR and children are ixscans, or root is AND_HASH
-            // (last child dictates order.), or other less obvious cases...
+            // TODO: Can also try exploding if root is OR and children are ixscans, or root is
+            // AND_HASH (last child dictates order.), or other less obvious cases...
             if (STAGE_IXSCAN == solnRoot->getType()) {
                 return true;
             }
@@ -214,6 +215,20 @@ namespace mongo {
                     replaceNodeInTree(&(*root)->children[i], oldNode, newNode);
                 }
             }
+        }
+
+        bool hasNode(QuerySolutionNode* root, StageType type) {
+            if (type == root->getType()) {
+                return true;
+            }
+
+            for (size_t i = 0; i < root->children.size(); ++i) {
+                if (hasNode(root->children[i], type)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
     }  // namespace
@@ -432,6 +447,52 @@ namespace mongo {
         solnRoot = analyzeSort(query, params, solnRoot, &soln->hasSortStage);
         // This can happen if we need to create a blocking sort stage and we're not allowed to.
         if (NULL == solnRoot) { return NULL; }
+
+        // If we can (and should), add the keep mutations stage.
+
+        // We cannot keep mutated documents if:
+        //
+        // 1. The query requires an index to evaluate the predicate ($text).  We can't tell whether
+        // or not the doc actually satisfies the $text predicate since we can't evaluate a
+        // text MatchExpression.
+        //
+        // 2. The query implies a sort ($geoNear).  It would be rather expensive and hacky to merge
+        // the document at the right place.
+        //
+        // 3. There is an index-provided sort.  Ditto above comment about merging.
+        // XXX; do we want some kind of static init for a set of stages we care about & pass that
+        // set into hasNode?
+        bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT)
+                              || hasNode(solnRoot, STAGE_GEO_NEAR_2D)
+                              || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE)
+                              || (!query.getParsed().getSort().isEmpty() && !soln->hasSortStage);
+
+        // Only these stages can produce flagged results.  A stage has to hold state past one call
+        // to work(...) in order to possibly flag a result.
+        bool couldProduceFlagged = hasNode(solnRoot, STAGE_GEO_2D)
+                                || hasNode(solnRoot, STAGE_AND_HASH)
+                                || hasNode(solnRoot, STAGE_AND_SORTED)
+                                || hasNode(solnRoot, STAGE_FETCH);
+
+        bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
+
+        if (shouldAddMutation && (params.options & QueryPlannerParams::KEEP_MUTATIONS)) {
+            KeepMutationsNode* keep = new KeepMutationsNode();
+
+            // We must run the entire expression tree to make sure the document is still valid.
+            keep->filter.reset(query.root()->shallowClone());
+
+            if (STAGE_SORT == solnRoot->getType()) {
+                // We want to insert the invalidated results before the sort stage, if there is one.
+                verify(1 == solnRoot->children.size());
+                keep->children.push_back(solnRoot->children[0]);
+                solnRoot->children[0] = keep;
+            }
+            else {
+                keep->children.push_back(solnRoot);
+                solnRoot = keep;
+            }
+        }
 
         // Project the results.
         if (NULL != query.getProj()) {

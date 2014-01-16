@@ -35,6 +35,7 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/keep_mutations.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
@@ -251,6 +252,12 @@ namespace mongo {
             PlanStage* childStage = buildStages(qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new ShardFilterStage(shardingState.getCollectionMetadata(qsol.ns), ws, childStage);
+        }
+        else if (STAGE_KEEP_MUTATIONS == root->getType()) {
+            const KeepMutationsNode* km = static_cast<const KeepMutationsNode*>(root);
+            PlanStage* childStage = buildStages(qsol, km->children[0], ws);
+            if (NULL == childStage) { return NULL; }
+            return new KeepMutationsStage(km->filter.get(), ws, childStage);
         }
         else {
             mongoutils::str::stream ss;
