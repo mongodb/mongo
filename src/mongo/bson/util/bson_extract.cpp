@@ -123,7 +123,7 @@ namespace mongo {
         long long result = value.safeNumberLong();
         if (result != value.numberDouble()) {
             return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                          "Expected field \"" << fieldName << " to have an value "
+                          "Expected field \"" << fieldName << "\" to have a value "
                           "exactly representable as a 64-bit integer, but found " <<
                           value);
         }
