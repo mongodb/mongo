@@ -442,12 +442,26 @@ namespace mongo {
             uasserted(16840, status.reason());
         }
 
-        return update(request, opDebug, &driver);
+        CanonicalQuery* cq;
+        status = CanonicalQuery::canonicalize(request.getNamespaceString(),
+                                              request.getQuery(),
+                                              &cq);
+        if (!status.isOK()) {
+            uasserted(17242, "could not canonicalize query " + request.getQuery().toString() +
+                      "; " + causedBy(status));
+        }
+        return update(request, opDebug, &driver, cq);
     }
 
-    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver) {
+    UpdateResult update(
+            const UpdateRequest& request,
+            OpDebug* opDebug,
+            UpdateDriver* driver,
+            CanonicalQuery* cq) {
+
         LOG(3) << "processing update : " << request;
 
+        std::auto_ptr<CanonicalQuery> cqHolder(cq);
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
         const CurOp* curOp = cc().curop();
@@ -464,13 +478,8 @@ namespace mongo {
             driver->refreshIndexKeys(lifecycle->getIndexKeys());
         }
 
-        CanonicalQuery* cq;
-        if (!CanonicalQuery::canonicalize(nsString, request.getQuery(), &cq).isOK()) {
-            uasserted(17242, "could not canonicalize query " + request.getQuery().toString());
-        }
-
         Runner* rawRunner;
-        if (!getRunner(collection, cq, &rawRunner).isOK()) {
+        if (!getRunner(collection, cqHolder.release(), &rawRunner).isOK()) {
             uasserted(17243, "could not get runner " + request.getQuery().toString());
         }
 

@@ -80,6 +80,7 @@ error_code("OperationIncomplete", 77)
 error_code("CommandResultSchemaViolation", 78)
 error_code("UnknownReplWriteConcern", 79)
 error_code("RoleDataInconsistent", 80)
+error_code("NoClientContext", 81)
 
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)

@@ -29,7 +29,6 @@
  */
 
 #include "mongo/base/init.h"
-#include "mongo/db/client.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"

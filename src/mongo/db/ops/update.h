@@ -37,11 +37,15 @@
 
 namespace mongo {
 
+    class CanonicalQuery;
     class UpdateDriver;
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug);
 
-    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver);
+    UpdateResult update(const UpdateRequest& request,
+                        OpDebug* opDebug,
+                        UpdateDriver* driver,
+                        CanonicalQuery* cq);
 
     /**
      * takes the from document and returns a new document

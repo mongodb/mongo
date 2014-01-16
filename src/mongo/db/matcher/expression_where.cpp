@@ -161,7 +161,8 @@ namespace mongo {
 
         Client::Context* context = cc().getContext();
         if ( !context )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "no context in $where parsing" );
+            return StatusWithMatchExpression( ErrorCodes::NoClientContext,
+                                              "no context in $where parsing" );
 
         const char* ns = context->ns();
         if ( !ns )
