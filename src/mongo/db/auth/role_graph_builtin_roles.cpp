@@ -182,7 +182,6 @@ namespace {
             << ActionType::replSetGetStatus // clusterManager gets this also
             << ActionType::serverStatus
             << ActionType::top
-            << ActionType::writeBacksQueued
             << ActionType::cursorInfo
             << ActionType::inprog
             << ActionType::shardingState;

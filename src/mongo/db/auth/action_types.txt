@@ -12,7 +12,6 @@
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "authSchemaUpgrade",
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
-"captrunc",
 "changeCustomData",
 "changePassword",
 "changeOwnPassword",
@@ -106,7 +105,5 @@
 "updateUser",  # Not used for permissions checks, but to id the event in logs.
 "validate",
 "viewRole",
-"viewUser",
-"writebacklisten",
-"writeBacksQueued"]
+"viewUser"]
 
