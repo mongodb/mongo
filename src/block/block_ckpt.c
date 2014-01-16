@@ -165,13 +165,19 @@ __wt_block_checkpoint_unload(
 	if (block->verify)
 		WT_TRET(__wt_verify_ckpt_unload(session, block));
 
-	/* If it's the live system, truncate to discard any extended blocks. */
-	if (!checkpoint)
+	/*
+	 * If it's the live system, truncate to discard any extended blocks and
+	 * discard the active extent lists.  Hold the lock even though we're
+	 * unloading the live checkpoint, there could be readers active in
+	 * other checkpoints.
+	 */
+	if (!checkpoint) {
 		WT_TRET(__wt_ftruncate(session, block->fh, block->fh->size));
 
-	/* If it's the live system, discard the active extent lists. */
-	if (!checkpoint)
+		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);
+		__wt_spin_unlock(session, &block->live_lock);
+	}
 
 	return (ret);
 }
