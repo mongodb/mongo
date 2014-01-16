@@ -82,17 +82,23 @@ static int verbose = 0;					/* Verbose messages */
 	ESET(v);							\
 	goto err;							\
 } while (0)
+#undef	VERBOSE_L1
+#define	VERBOSE_L1	1
+#undef	VERBOSE_L2
+#define	VERBOSE_L2	2
 #undef	VMSG
-#define	VMSG(wtext, session, ...) do {					\
-	if (verbose)							\
+#define	VMSG(wtext, session, v, ...) do {				\
+	if (verbose >= v)						\
 		(void)wtext->						\
 		    msg_printf(wtext, session, "helium: " __VA_ARGS__);	\
 } while (0)
 
-/*
- * STRING_MATCH --
- *	Return if a string matches a bytestring of a specified length.
- */
+/* Check if a string matches a prefix. */
+#undef	PREFIX_MATCH
+#define	PREFIX_MATCH(str, pfx)						\
+	(strncmp(str, pfx, strlen(pfx)) == 0)
+
+/* Check if a string matches a byte string of len bytes. */
 #undef	STRING_MATCH
 #define	STRING_MATCH(str, bytes, len)					\
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
@@ -114,17 +120,18 @@ static int verbose = 0;					/* Verbose messages */
 #define	WIREDTIGER_HELIUM_MINOR	0
 
 /*
- * WiredTiger name space on the Helium store: the primary objects are named
- * "WiredTiger.[name]", the cache objects are "WiredTiger.[name].cache", and
- * the per-device transaction file is "WiredTiger.txn".  When we first open
- * a Helium store, we open/close a file in order to apply flags for the first
- * open of the volume, that's "WiredTiger.WiredTiger" (outside of the possible
- * application name space).
+ * WiredTiger name space on the Helium store: all objects are named with the
+ * WiredTiger prefix (we don't require the Helium store be exclusive to our
+ * files).  Primary objects are named "WiredTiger.[name]", associated cache
+ * objects are "WiredTiger.[name].cache".  The per-connection transaction
+ * object is "WiredTiger.WiredTigerTxn".  When we first open a Helium volume,
+ * we open/close a file in order to apply flags for the first open of the
+ * volume, that's "WiredTiger.WiredTigerInit".
  */
 #define	WT_NAME_PREFIX	"WiredTiger."
-#define	WT_NAME_CACHE	"Cache"
-#define	WT_NAME_TXN	"Txn"
-#define	WT_NAME_WT	"WiredTiger"
+#define	WT_NAME_INIT	"WiredTiger.WiredTigerInit"
+#define	WT_NAME_TXN	"WiredTiger.WiredTigerTxn"
+#define	WT_NAME_CACHE	".cache"
 
 /*
  * WT_SOURCE --
@@ -373,15 +380,17 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 
 #if 1
 static void
-he_dump_print(uint8_t *p, size_t len, FILE *fp)
+he_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
 {
+	(void)fprintf(stderr, "%s %3zu: ", pfx, len);
 	for (; len > 0; --len, ++p)
 		if (!isspace(*p) && isprint(*p))
-			putc(*p, fp);
+			(void)putc(*p, fp);
 		else if (len == 1 && *p == '\0')	/* Skip string nuls. */
 			continue;
 		else
-			fprintf(fp, "%#x", *p);
+			(void)fprintf(fp, "%#x", *p);
+	(void)putc('\n', fp);
 }
 
 /*
@@ -393,33 +402,29 @@ he_dump(he_t he, const char *tag)
 {
 	FILE *fp;
 	HE_ITEM *r, _r;
-	size_t maxbuf = 4 * 1024;
+	uint8_t k[4 * 1024], v[4 * 1024];
 	int ret = 0;
 
 	r = &_r;
 	memset(r, 0, sizeof(*r));
-	r->key = malloc(maxbuf);
-	r->n_key = 0;
-	r->val = malloc(maxbuf);
-	r->n_val = maxbuf;
-
+	r->key = k;
+	r->val = v;
+#if 0
 	(void)snprintf(r->val, maxbuf, "dump.%s", tag);
 	fp = fopen(r->val, "w");
-	fprintf(fp, "== %s\n", tag);
+#else
+	fp = stderr;
+#endif
+	(void)fprintf(fp, "== %s\n", tag);
 
-	while ((ret = he_next(he, r, (uint64_t)0, (uint64_t)maxbuf)) == 0) {
-		he_dump_print(r->key, r->n_key, fp);
-		putc('\t', fp);
-		he_dump_print(r->val, r->n_val, fp);
-		putc('\n', fp);
-
-		r->n_val = maxbuf;
+	while ((ret = he_next(he, r, (uint64_t)0, (uint64_t)sizeof(v))) == 0) {
+		he_dump_print("K: ", r->key, r->n_key, fp);
+		he_dump_print("V: ", r->val, r->n_val, fp);
 	}
 	if (ret == HE_ERR_ITEM_NOT_FOUND)
 		ret = 0;
-	fprintf(fp, "========================== (%d)\n", ret);
-	fclose(fp);
 
+	(void)fclose(fp);
 	free(r->key);
 	free(r->val);
 
@@ -1390,6 +1395,9 @@ helium_cursor_insert(WT_CURSOR *wtcursor)
 	if ((ret = copyin_key(wtcursor, 1)) != 0)
 		return (ret);
 
+	VMSG(wtext, session, VERBOSE_L2,
+	    "I %.*s.%.*s", (int)r->n_key, r->key, (int)r->n_val, r->val);
+
 	/* Clear the value, assume we're adding the first cache entry. */
 	cursor->len = 0;
 
@@ -1444,13 +1452,11 @@ helium_cursor_insert(WT_CURSOR *wtcursor)
 	}
 
 	/*
-	 * Create a new cache value based on the current cache record plus the
-	 * WiredTiger cursor's value.
+	 * Create a new value using the current cache record plus the WiredTiger
+	 * cursor's value, and update the cache.
 	 */
 	if ((ret = cache_value_append(wtcursor, 0)) != 0)
 		goto err;
-
-	/* Push the record into the cache. */
 	if ((ret = he_update(ws->he_cache, r)) != 0)
 		EMSG(wtext, session, WT_ERROR,
 		    "he_update: %s", he_strerror(ret));
@@ -1497,6 +1503,11 @@ update(WT_CURSOR *wtcursor, int remove_op)
 	/* Get the WiredTiger cursor's key. */
 	if ((ret = copyin_key(wtcursor, 0)) != 0)
 		return (ret);
+
+	VMSG(wtext, session, VERBOSE_L2,
+	    "%c %.*s.%.*s",
+	    remove_op ? 'R' : 'U',
+	    (int)r->n_key, r->key, (int)r->n_val, r->val);
 
 	/* Clear the value, assume we're adding the first cache entry. */
 	cursor->len = 0;
@@ -1660,8 +1671,7 @@ ws_source_name(WT_DATA_SOURCE *wtds,
 	 * and the device name isn't interesting.  Convert to "WiredTiger:name",
 	 * and add an optional suffix.
 	 */
-	if (strncmp(uri, "helium:", sizeof("helium:") - 1) != 0 ||
-	    (p = strchr(uri, '/')) == NULL)
+	if (!PREFIX_MATCH(uri, "helium:") || (p = strchr(uri, '/')) == NULL)
 		ERET(wtext, session, EINVAL, "%s: illegal Helium URI", uri);
 	++p;
 
@@ -1742,7 +1752,7 @@ ws_source_open_object(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	/* Open the underlying Helium object. */
 	if ((ret = ws_source_name(wtds, session, uri, suffix, &p)) != 0)
 		return (ret);
-	VMSG(wtext, session, "open %s/%s", hs->name, p);
+	VMSG(wtext, session, VERBOSE_L1, "open %s/%s", hs->name, p);
 	if ((he = he_open(hs->device, p, flags, NULL)) == NULL)
 		EMSG(wtext, session, WT_ERROR,
 		    "he_open: %s/%s: %s", hs->name, p, he_strerror(os_errno()));
@@ -1783,7 +1793,7 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	 * The URI will be "helium:" followed by a Helium name and object name
 	 * pair separated by a slash, for example, "helium:volume/object".
 	 */
-	if (strncmp(uri, "helium:", strlen("helium:")) != 0)
+	if (!PREFIX_MATCH(uri, "helium:"))
 		goto bad_name;
 	p = uri + strlen("helium:");
 	if (p[0] == '/' || (t = strchr(p, '/')) == NULL || t[1] == '\0')
@@ -2423,8 +2433,8 @@ helium_source_close(
 	if (hs->he_txn != NULL && hs->he_owner) {
 		if ((tret = he_close(hs->he_txn)) != 0)
 			EMSG(wtext, session, tret,
-			    "he_close: %s: %s",
-			    WT_NAME_PREFIX WT_NAME_TXN, he_strerror(tret));
+			    "he_close: %s: %s: %s",
+			    hs->name, WT_NAME_TXN, he_strerror(tret));
 		hs->he_txn = NULL;
 	}
 
@@ -2437,7 +2447,8 @@ helium_source_close(
 
 		if ((tret = he_close(hs->he_volume)) != 0)
 			EMSG(wtext, session, WT_ERROR,
-			    "he_close: %s: %s", hs->device, he_strerror(tret));
+			    "he_close: %s: %s: %s",
+			    hs->name, WT_NAME_INIT, he_strerror(tret));
 		hs->he_volume = NULL;
 	}
 
@@ -2858,7 +2869,7 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	wtext = ds->wtext;
 	hs = NULL;
 
-	VMSG(wtext, NULL, "volume %.*s=%.*s",
+	VMSG(wtext, NULL, VERBOSE_L1, "volume %.*s=%.*s",
 	    (int)k->len, k->str, (int)v->len, v->str);
 
 	/*
@@ -2898,12 +2909,11 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	 */
 	flags |= HE_O_CREATE |
 	    HE_O_TRUNCATE | HE_O_VOLUME_CLEAN | HE_O_VOLUME_CREATE;
-	if ((hs->he_volume = he_open(hs->device,
-	    WT_NAME_PREFIX WT_NAME_WT, flags, env_set ? &env : NULL)) == NULL)
+	if ((hs->he_volume = he_open(
+	    hs->device, WT_NAME_INIT, flags, env_set ? &env : NULL)) == NULL)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
 		    "he_open: %s: %s: %s",
-		    hs->name,
-		    WT_NAME_PREFIX WT_NAME_WT, he_strerror(os_errno()));
+		    hs->name, WT_NAME_INIT, he_strerror(os_errno()));
 
 	/* Insert the new entry at the head of the list. */
 	hs->next = ds->hs_head;
@@ -2940,8 +2950,7 @@ helium_source_open_txn(DATA_SOURCE *ds)
 	hs_txn = NULL;
 	he_txn = NULL;
 	for (hs = ds->hs_head; hs != NULL; hs = hs->next)
-		if ((t = he_open(hs->device,
-		    WT_NAME_PREFIX WT_NAME_TXN, 0, NULL)) != NULL) {
+		if ((t = he_open(hs->device, WT_NAME_TXN, 0, NULL)) != NULL) {
 			if (hs_txn != NULL) {
 				(void)he_close(t);
 				(void)he_close(hs_txn);
@@ -2962,19 +2971,18 @@ helium_source_open_txn(DATA_SOURCE *ds)
 	if ((hs = hs_txn) == NULL) {
 		for (hs = ds->hs_head; hs->next != NULL; hs = hs->next)
 			;
-		if ((he_txn = he_open(hs->device,
-		    WT_NAME_PREFIX WT_NAME_TXN, HE_O_CREATE, NULL)) == NULL)
+		if ((he_txn = he_open(
+		    hs->device, WT_NAME_TXN, HE_O_CREATE, NULL)) == NULL)
 			ERET(wtext, NULL, WT_ERROR,
-			    "he_open: %s: %s",
-			    WT_NAME_PREFIX WT_NAME_TXN,
-			    he_strerror(os_errno()));
+			    "he_open: %s: %s: %s",
+			    hs->name, WT_NAME_TXN, he_strerror(os_errno()));
 
 		/* Push the change. */
 		if ((ret = he_commit(he_txn)) != 0)
 			ERET(wtext, NULL, WT_ERROR,
 			    "he_commit: %s", he_strerror(ret));
 	}
-	VMSG(wtext, NULL, "%stransactional store on %s",
+	VMSG(wtext, NULL, VERBOSE_L1, "%stransactional store on %s",
 	    hs_txn == NULL ? "creating " : "", hs->name);
 
 	/* Set the owner field, this Helium source has to be closed last. */
@@ -3073,22 +3081,22 @@ static int
 helium_namespace_list(void *cookie, const char *name)
 {
 	struct helium_namespace_cookie *names;
-	const char *p;
 	void *allocp;
 
 	names = cookie;
 
-	/* Ignore any files without a WiredTiger prefix. */
-	if (strncmp(name, WT_NAME_PREFIX, strlen(WT_NAME_PREFIX)) != 0)
+	/*
+	 * Ignore any files without a WiredTiger prefix.
+	 * Ignore the metadata and cache files.
+	 */
+	if (!PREFIX_MATCH(name, WT_NAME_PREFIX))
 		return (0);
-
-	/* Ignore the metadata files. */
-	p = name + strlen(WT_NAME_PREFIX);
-	if (strcmp(p, WT_NAME_CACHE) == 0)
+	if (strcmp(name, WT_NAME_INIT) == 0)
 		return (0);
-	if (strcmp(p, WT_NAME_TXN) == 0)
+	if (strcmp(name, WT_NAME_TXN) == 0)
 		return (0);
-	if (strcmp(p, WT_NAME_WT) == 0)
+	if (STRING_MATCH(
+	    strrchr(name, '.'), WT_NAME_CACHE, strlen(WT_NAME_CACHE)))
 		return (0);
 
 	if (names->list_cnt + 1 >= names->list_max) {
@@ -3123,7 +3131,7 @@ helium_source_recover(
 	wtext = ds->wtext;
 	memset(&names, 0, sizeof(names));
 
-	VMSG(wtext, NULL, "recover %s", hs->name);
+	VMSG(wtext, NULL, VERBOSE_L1, "recover %s", hs->name);
 
 	/* Get a list of the cache/primary object pairs in the Helium source. */
 	if ((ret = he_enumerate(
@@ -3140,8 +3148,8 @@ helium_source_recover(
 	/* Clear the transaction store. */
 	if ((ret = he_truncate(hs->he_txn)) != 0)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "he_truncate: %s: %s",
-		    WT_NAME_PREFIX WT_NAME_TXN, he_strerror(ret));
+		    "he_truncate: %s: %s: %s",
+		    hs->name, WT_NAME_TXN, he_strerror(ret));
 
 err:	for (i = 0; i < names.list_cnt; ++i)
 		free(names.list[i]);
@@ -3267,7 +3275,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    wtext->strerror(ret));
 	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
 		if (STRING_MATCH("helium_verbose", k.str, k.len)) {
-			verbose = 1;
+			verbose = v.val;
 			continue;
 		}
 		if ((ret = helium_source_open(ds, &k, &v)) != 0)
