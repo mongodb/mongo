@@ -125,14 +125,14 @@ namespace mongo {
 
     static void emptyOplog() {
         Client::WriteContext ctx(rsoplog);
-        NamespaceDetails *d = nsdetails(rsoplog);
+        Collection* collection = ctx.ctx().db()->getCollection(rsoplog);
 
         // temp
-        if( d && d->numRecords() == 0 )
+        if( collection->numRecords() == 0 )
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;
-        d->emptyCappedCollection(rsoplog);
+        collection->details()->emptyCappedCollection(rsoplog);
     }
 
     bool Member::syncable() const {

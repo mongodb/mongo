@@ -228,9 +228,6 @@ namespace mongo {
         verify( Lock::isLocked() );
         Client::Context c(rsoplog);
 
-        NamespaceDetails *nsd = nsdetails(rsoplog);
-        verify(nsd);
-
         boost::scoped_ptr<Runner> runner(
             InternalPlanner::collectionScan(rsoplog, InternalPlanner::BACKWARD));
 
@@ -468,8 +465,10 @@ namespace mongo {
 
         sethbmsg("rollback 4.7");
         Client::Context c(rsoplog);
-        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
-        uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
+        Collection* oplogCollection = c.db()->getCollection( rsoplog );
+        uassert(13423,
+                str::stream() << "replSet error in rollback can't find " << rsoplog,
+                oplogCollection);
 
         map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
 
@@ -508,9 +507,9 @@ namespace mongo {
                     /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
                     deletes++;
 
-                    NamespaceDetails *nsd = nsdetails(d.ns);
-                    if( nsd ) {
-                        if( nsd->isCapped() ) {
+                    Collection* collection = c.db()->getCollection(d.ns);
+                    if( collection ) {
+                        if( collection->isCapped() ) {
                             /* can't delete from a capped collection - so we truncate instead. if this item must go,
                             so must all successors!!! */
                             try {
@@ -520,6 +519,7 @@ namespace mongo {
                                 DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
                                 if( Listener::getElapsedTimeMillis() - start > 200 )
                                     log() << "replSet warning roll back slow no _id index for " << d.ns << " perhaps?" << rsLog;
+                                NamespaceDetails* nsd = collection->details();
                                 //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
                                 if( !loc.isNull() ) {
                                     try {
@@ -550,7 +550,7 @@ namespace mongo {
                             }
                         }
                         // did we just empty the collection?  if so let's check if it even exists on the source.
-                        if( nsd->numRecords() == 0 ) {
+                        if( collection->numRecords() == 0 ) {
                             try {
                                 string sys = cc().database()->name() + ".system.namespaces";
                                 bo o = them->findOne(sys, QUERY("name"<<d.ns));
@@ -605,7 +605,7 @@ namespace mongo {
         // clean up oplog
         LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
-        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+        oplogCollection->details()->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 
         Status status = getGlobalAuthorizationManager()->initialize();
         if (!status.isOK()) {

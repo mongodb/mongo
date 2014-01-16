@@ -51,8 +51,8 @@ namespace mongo {
         const char *ns = o.getStringField("ns");
 
         // capped collections
-        NamespaceDetails *nsd = nsdetails(ns);
-        if ( nsd && nsd->isCapped() ) {
+        Collection* collection = cc().database()->getCollection(ns);
+        if ( collection && collection->isCapped() ) {
             log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return BSONObj();
         }
