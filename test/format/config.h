@@ -187,6 +187,10 @@ static CONFIG c[] = {
 	  "the number of threads to perform merge operations",
 	  0x0, 0x0, 1, 4, 10, &g.c_merge_threads, NULL },
 
+	{ "mmap",
+	  "configure for mmap operations",			/* 90% */
+	 0x0, C_BOOL, 90, 0, 0, &g.c_mmap, NULL },
+
 	{ "ops",
 	  "the number of modification operations done per run",
 	  0x0, 0x0, 0, M(2), M(100), &g.c_ops, NULL },

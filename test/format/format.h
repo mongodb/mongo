@@ -166,6 +166,7 @@ typedef struct {
 	uint32_t c_leaf_page_max;
 	uint32_t c_merge_max;
 	uint32_t c_merge_threads;
+	uint32_t c_mmap;
 	uint32_t c_ops;
 	uint32_t c_prefix_compression;
 	uint32_t c_prefix_compression_min;
