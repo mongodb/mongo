@@ -1114,6 +1114,11 @@ namespace mongo {
                 }
 
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+                int authzVersion = authzManager->getAuthorizationVersion();
+                NamespaceString usersNamespace =
+                        authzVersion== AuthorizationManager::schemaVersion26Final ?
+                                AuthorizationManager::usersCollectionNamespace :
+                                AuthorizationManager::usersAltCollectionNamespace;
                 BSONObjBuilder projection;
                 if (!args.showCredentials) {
                     projection.append("credentials", 0);
@@ -1122,7 +1127,7 @@ namespace mongo {
                         &BSONArrayBuilder::append<BSONObj>;
                 const boost::function<void(const BSONObj&)> function =
                         boost::bind(appendBSONObj, &usersArrayBuilder, _1);
-                authzManager->queryAuthzDocument(AuthorizationManager::usersCollectionNamespace,
+                authzManager->queryAuthzDocument(usersNamespace,
                                                  queryBuilder.done(),
                                                  projection.done(),
                                                  function);
