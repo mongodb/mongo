@@ -437,7 +437,8 @@ namespace mongo {
 
             BSONObj gleCmd = buildGLECmdWithOpTime( options, opTime );
 
-            dispatcher->addCommand( shardEndpoint, dbName, RawBSONSerializable( gleCmd ) );
+            RawBSONSerializable gleCmdSerial( gleCmd );
+            dispatcher->addCommand( shardEndpoint, dbName, gleCmdSerial );
         }
 
         dispatcher->sendAll();
