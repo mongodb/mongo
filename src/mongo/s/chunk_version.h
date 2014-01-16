@@ -188,6 +188,31 @@ namespace mongo {
             return otherVersion._combined == _combined;
         }
 
+        /**
+         * Returns true if the otherVersion is the same as this version and enforces strict epoch
+         * checking (empty epochs are not wildcards).
+         */
+        bool isStrictlyEqualTo( const ChunkVersion& otherVersion ) const {
+            if ( otherVersion._epoch != _epoch )
+                return false;
+            return otherVersion._combined == _combined;
+        }
+
+        /**
+         * Returns true if this version is (strictly) in the same epoch as the other version and
+         * this version is older.  Returns false if we're not sure because the epochs are different
+         * or if this version is newer.
+         */
+        bool isOlderThan( const ChunkVersion& otherVersion ) const {
+            if ( otherVersion._epoch != _epoch )
+                return false;
+            
+            if ( _major != otherVersion._major )
+                return _major < otherVersion._major;
+	
+            return _minor < otherVersion._minor;
+        }
+
         // Is this in the same epoch?
         bool hasCompatibleEpoch( const ChunkVersion& otherVersion ) const {
             return hasCompatibleEpoch( otherVersion._epoch );

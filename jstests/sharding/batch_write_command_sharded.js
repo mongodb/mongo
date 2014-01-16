@@ -13,31 +13,73 @@ st.stopBalancer();
 var mongos = st.s0;
 var admin = mongos.getDB( "admin" );
 var config = mongos.getDB( "config" );
+var shards = config.shards.find().toArray();
+var configConnStr = st._configDB;
 
-jsTest.log("Starting insert tests...");
-
-var request;
-var result;
-
-function resultOK( result ) {
-    return result.ok &&
-           !( 'code' in result ) &&
-           !( 'errmsg' in result ) &&
-           !( 'errInfo' in result ) &&
-           !( 'writeErrors' in result );
-};
-
-function resultNOK( result ) {
-    return !result.ok &&
-           typeof( result.code ) == 'number' &&
-           typeof( result.errmsg ) == 'string';
-}
-
+jsTest.log("Starting sharding batch write tests...");
 
 var request;
 var result;
 
 // NOTE: ALL TESTS BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
+
+//
+//
+// Stale config progress tests
+// Set up a new collection across two shards, then revert the chunks to an earlier state to put
+// mongos and mongod permanently out of sync.
+
+// START SETUP
+var brokenColl = mongos.getCollection( "broken.coll" );
+assert.commandWorked(admin.runCommand({ enableSharding : brokenColl.getDB().toString() }));
+printjson(admin.runCommand({ movePrimary : brokenColl.getDB().toString(), to : shards[0]._id }));
+assert.commandWorked(admin.runCommand({ shardCollection : brokenColl.toString(), 
+                                        key : { _id : 1 } }));
+assert.commandWorked(admin.runCommand({ split : brokenColl.toString(), 
+                                        middle : { _id : 0 } }));
+
+var oldChunks = config.chunks.find().toArray();
+
+// Start a new mongos and bring it up-to-date with the chunks so far
+
+var staleMongos = MongoRunner.runMongos({ configdb : configConnStr });
+brokenColl = staleMongos.getCollection(brokenColl.toString());
+brokenColl.insert({ hello : "world" });
+assert.eq(null, brokenColl.getDB().getLastError());
+
+// Modify the chunks to make shards at a higher version
+
+assert.commandWorked(admin.runCommand({ moveChunk : brokenColl.toString(), 
+                                        find : { _id : 0 },
+                                        to : shards[1]._id }));
+
+// Rewrite the old chunks back to the config server
+
+config.chunks.remove();
+assert.eq(null, config.getLastError());
+for ( var i = 0; i < oldChunks.length; i++ )
+    config.chunks.insert(oldChunks[i]);
+assert.eq(null, config.getLastError());
+
+// Stale mongos can no longer bring itself up-to-date! 
+// END SETUP
+
+//
+// Config server insert, repeatedly stale
+printjson( request = {insert : brokenColl.getName(),
+                      documents: [{_id:-1}]} );
+printjson( result = brokenColl.runCommand(request) );
+assert(!result.ok);
+assert.eq(result.code, 82); // No Progress Made
+
+//
+// Config server insert to other shard, repeatedly stale
+printjson( request = {insert : brokenColl.getName(),
+                   documents: [{_id:1}]} );
+printjson( result = brokenColl.runCommand(request) );
+assert(!result.ok);
+assert.eq(result.code, 82); // No Progress Made
+
 
 //
 //
@@ -50,7 +92,7 @@ configColl.remove({});
 printjson( request = {insert : configColl.getName(),
                       documents: [{a:1}]} );
 printjson( result = configColl.runCommand(request) );
-assert(resultOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, st.config0.getCollection(configColl + "").count());
 assert.eq(1, st.config1.getCollection(configColl + "").count());
@@ -63,7 +105,7 @@ configColl.insert({a:1});
 printjson( request = {update : configColl.getName(),
                       updates: [{q: {a:1}, u: {$set: {b:2}}}]} );
 printjson( result = configColl.runCommand(request) );
-assert(resultOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, st.config0.getCollection(configColl + "").count({b:2}));
 assert.eq(1, st.config1.getCollection(configColl + "").count({b:2}));
@@ -76,7 +118,7 @@ configColl.insert({a:1});
 printjson( request = {'delete' : configColl.getName(),
                       deletes: [{q: {a:1}, limit: 0}]} );
 printjson( result = configColl.runCommand(request) );
-assert(resultOK(result));
+assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(0, st.config0.getCollection(configColl + "").count());
 assert.eq(0, st.config1.getCollection(configColl + "").count());
@@ -89,7 +131,7 @@ configColl.remove({});
 printjson( request = {insert : configColl.getName(),
                       documents: [{a:1}]} );
 printjson( result = configColl.runCommand(request) );
-assert(resultNOK(result));
+assert(!result.ok);
 assert(result.errmsg != null);
 
 //
@@ -99,7 +141,8 @@ configColl.insert({a:1});
 printjson( request = {update : configColl.getName(),
                       updates: [{q: {a:1}, u: {$set: {b:2}}}]} );
 printjson( result = configColl.runCommand(request) );
-assert(resultNOK(result));
+assert(!result.ok);
+assert(result.errmsg != null);
 
 //
 // Config server delete with 2nd config down.
@@ -108,7 +151,7 @@ configColl.insert({a:1});
 printjson( request = {delete : configColl.getName(),
                       deletes: [{q: {a:1}, limit: 0}]} );
 printjson( result = configColl.runCommand(request) );
-assert(!resultOK(result));
+assert(!result.ok);
 assert(result.errmsg != null);
 
 //
@@ -119,7 +162,8 @@ printjson( request = { insert: configColl.getName(),
                        // { w: 0 } has special meaning for config servers
                        writeConcern: { w: 0 }} );
 printjson( result = configColl.runCommand(request) );
-assert(resultNOK(result));
+assert(!result.ok);
+assert(result.errmsg != null);
 
 //
 // Config server update with 2nd config down while bypassing fsync check.
@@ -130,7 +174,8 @@ printjson( request = { update: configColl.getName(),
                        // { w: 0 } has special meaning for config servers
                        writeConcern: { w: 0 }} );
 printjson( result = configColl.runCommand(request) );
-assert(resultNOK(result));
+assert(!result.ok);
+assert(result.errmsg != null);
 
 //
 // Config server update with 2nd config down while bypassing fsync check.
@@ -141,13 +186,10 @@ printjson( request = { delete: configColl.getName(),
                        // { w: 0 } has special meaning for config servers
                        writeConcern: { w: 0 }} );
 printjson( result = configColl.runCommand(request) );
-assert(resultNOK(result));
+assert(!result.ok);
 assert(result.errmsg != null);
 
-//
-// TODO: More tests to come
-//
-
 jsTest.log("DONE!");
-st.stop();
 
+MongoRunner.stopMongos( staleMongos );
+st.stop();

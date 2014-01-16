@@ -397,7 +397,7 @@ namespace mongo {
         if ( !response.getOk() ) {
             WriteErrorDetail batchError;
             cloneBatchErrorTo( response, &batchError );
-            _batchCommandError.reset( new ShardError( targetedBatch.getEndpoint(),
+            _batchError.reset( new ShardError( targetedBatch.getEndpoint(),
                                                       batchError ));
             cancelBatch( targetedBatch, _writeOps, batchError );
             return;
@@ -495,8 +495,12 @@ namespace mongo {
         noteBatchResponse( targetedBatch, response, NULL );
     }
 
+    void BatchWriteOp::setBatchError( const WriteErrorDetail& error ) {
+        _batchError.reset( new ShardError( ShardEndpoint(), error ) );
+    }
+
     bool BatchWriteOp::isFinished() {
-        if ( _batchCommandError.get() ) return true;
+        if ( _batchError.get() ) return true;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         bool orderedOps = _clientRequest->getOrdered();
@@ -517,15 +521,18 @@ namespace mongo {
 
         dassert( isFinished() );
 
-        if ( _batchCommandError.get() ) {
+        if ( _batchError.get() ) {
+
             batchResp->setOk( false );
+            batchResp->setErrCode( _batchError->error.getErrCode() );
 
-            const WriteErrorDetail& error = _batchCommandError->error;
-            batchResp->setErrCode( error.getErrCode() );
+            stringstream msg;
+            msg << _batchError->error.getErrMessage();
+            if ( !_batchError->endpoint.shardName.empty() ) {
+                msg << " at " << _batchError->endpoint.shardName;
+            }
 
-            string errMsg( str::stream() << error.getErrMessage() << " at "
-                                         << _batchCommandError->endpoint.shardName );
-            batchResp->setErrMessage( errMsg );
+            batchResp->setErrMessage( msg.str() );
             dassert( batchResp->isValid( NULL ) );
             return;
         }
@@ -632,6 +639,24 @@ namespace mongo {
             ::operator delete[]( _writeOps );
             _writeOps = NULL;
         }
+    }
+
+    int BatchWriteOp::numWriteOps() const {
+        return static_cast<int>( _clientRequest->sizeWriteOps() );
+    }
+
+    int BatchWriteOp::numWriteOpsIn( WriteOpState opState ) const {
+
+        // TODO: This could be faster, if we tracked this info explicitly
+        size_t numWriteOps = _clientRequest->sizeWriteOps();
+        int count = 0;
+        for ( size_t i = 0; i < numWriteOps; ++i ) {
+            WriteOp& writeOp = _writeOps[i];
+            if ( writeOp.getWriteState() == opState )
+                ++count;
+        }
+
+        return count;
     }
 
     void TrackedErrors::startTracking( int errCode ) {

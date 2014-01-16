@@ -140,8 +140,10 @@ namespace mongo {
             // No-op
         }
 
-        Status refreshIfNeeded() {
+        Status refreshIfNeeded( bool* wasChanged ) {
             // No-op
+            if ( wasChanged )
+                *wasChanged = false;
             return Status::OK();
         }
 

@@ -30,6 +30,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h" // ConnectionString (header-only)
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
@@ -66,9 +67,21 @@ namespace mongo {
         for ( vector<ShardError*>::const_iterator it = staleErrors.begin(); it != staleErrors.end();
             ++it ) {
             const ShardError* error = *it;
-            targeter->noteStaleResponse( error->endpoint, error->error.getErrInfo() );
+            targeter->noteStaleResponse( error->endpoint,
+                                         error->error.isErrInfoSet() ? error->error.getErrInfo() :
+                                                                       BSONObj() );
         }
     }
+
+    static bool isShardMetadataChanging( const vector<ShardError*>& staleErrors ) {
+        if ( !staleErrors.empty() && staleErrors.back()->error.isErrInfoSet() )
+            return staleErrors.back()->error.getErrInfo()["inCriticalSection"].trueValue();
+        return false;
+    }
+
+    // The number of times we'll try to continue a batch op if no progress is being made
+    // This only applies when no writes are occurring and metadata is not changing on reload
+    static const int kMaxRoundsWithoutProgress( 5 );
 
     void BatchWriteExec::executeBatch( const BatchedCommandRequest& clientRequest,
                                        BatchedCommandResponse* clientResponse ) {
@@ -76,32 +89,16 @@ namespace mongo {
         BatchWriteOp batchOp;
         batchOp.initClientRequest( &clientRequest );
 
-        int numTargetErrors = 0;
-        int numStaleBatches = 0;
-        int numResolveFailures = 0;
+        // Current batch status
+        bool refreshedTargeter = false;
+        int rounds = 0;
+        int numCompletedOps = 0;
+        int numRoundsWithoutProgress = 0;
 
-        for ( int rounds = 0; !batchOp.isFinished(); rounds++ ) {
-
-            //
-            // Refresh the targeter if we need to (no-op if nothing stale)
-            //
-
-            Status refreshStatus = _targeter->refreshIfNeeded();
-
-            if ( !refreshStatus.isOK() ) {
-
-                // It's okay if we can't refresh, we'll just record errors for the ops if
-                // needed.
-                warning() << "could not refresh targeter" << causedBy( refreshStatus.reason() )
-                          << endl;
-            }
+        while ( !batchOp.isFinished() ) {
 
             //
-            // Get child batches to send
-            //
-
-            vector<TargetedWriteBatch*> childBatches;
-
+            // Get child batches to send using the targeter
             //
             // Targeting errors can be caused by remote metadata changing (the collection could have
             // been dropped and recreated, for example with a new shard key).  If a remote metadata
@@ -123,16 +120,21 @@ namespace mongo {
             //    deliver in this case, since for all the client knows we may have gotten the batch
             //    exactly when the metadata changed.
             //
-            // If we've had a targeting error or stale error, we've refreshed the metadata once and
-            // can record target errors.
-            bool recordTargetErrors = numTargetErrors > 0 || numStaleBatches > 0;
+
+            vector<TargetedWriteBatch*> childBatches;
+
+            // If we've already had a targeting error, we've refreshed the metadata once and can
+            // record target errors definitively.
+            bool recordTargetErrors = refreshedTargeter;
             Status targetStatus = batchOp.targetBatch( *_targeter,
                                                        recordTargetErrors,
                                                        &childBatches );
             if ( !targetStatus.isOK() ) {
+                // Don't do anything until a targeter refresh
                 _targeter->noteCouldNotTarget();
-                ++numTargetErrors;
-                continue;
+                refreshedTargeter = true;
+                ++_stats->numTargetErrors;
+                dassert( childBatches.size() == 0u );
             }
 
             //
@@ -141,6 +143,7 @@ namespace mongo {
 
             size_t numSent = 0;
             size_t numToSend = childBatches.size();
+            bool remoteMetadataChanging = false;
             while ( numSent != numToSend ) {
 
                 // Collect batches out on the network, mapped by endpoint
@@ -169,7 +172,7 @@ namespace mongo {
                                                                        &shardHost );
                     if ( !resolveStatus.isOK() ) {
 
-                        ++numResolveFailures;
+                        ++_stats->numResolveErrors;
 
                         // Record a resolve failure
                         // TODO: It may be necessary to refresh the cache if stale, or maybe just
@@ -246,7 +249,12 @@ namespace mongo {
 
                         if ( staleErrors.size() > 0 ) {
                             noteStaleResponses( staleErrors, _targeter );
-                            ++numStaleBatches;
+                            ++_stats->numStaleBatches;
+                        }
+
+                        // Remember if the shard is actively changing metadata right now
+                        if ( isShardMetadataChanging( staleErrors ) ) {
+                            remoteMetadataChanging = true;
                         }
 
                         // Remember that we successfully wrote to this shard
@@ -264,6 +272,57 @@ namespace mongo {
                         batchOp.noteBatchError( *batch, error );
                     }
                 }
+            }
+
+            ++rounds;
+            ++_stats->numRounds;
+
+            // If we're done, get out
+            if ( batchOp.isFinished() )
+                break;
+
+            // MORE WORK TO DO
+
+            //
+            // Refresh the targeter if we need to (no-op if nothing stale)
+            //
+
+            bool targeterChanged = false;
+            Status refreshStatus = _targeter->refreshIfNeeded( &targeterChanged );
+
+            if ( !refreshStatus.isOK() ) {
+
+                // It's okay if we can't refresh, we'll just record errors for the ops if
+                // needed.
+                warning() << "could not refresh targeter" << causedBy( refreshStatus.reason() )
+                          << endl;
+            }
+
+            //
+            // Ensure progress is being made toward completing the batch op
+            //
+
+            int currCompletedOps = batchOp.numWriteOpsIn( WriteOpState_Completed );
+            if ( currCompletedOps == numCompletedOps && !targeterChanged
+                 && !remoteMetadataChanging ) {
+                ++numRoundsWithoutProgress;
+            }
+            else {
+                numRoundsWithoutProgress = 0;
+            }
+            numCompletedOps = currCompletedOps;
+
+            if ( numRoundsWithoutProgress > kMaxRoundsWithoutProgress ) {
+
+                stringstream msg;
+                msg << "no progress was made executing batch write op in " << clientRequest.getNS()
+                    << " after " << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
+                    << " ops completed in " << rounds << " rounds total)";
+
+                WriteErrorDetail error;
+                buildErrorFrom( Status( ErrorCodes::NoProgressMade, msg.str() ), &error );
+                batchOp.setBatchError( error );
+                break;
             }
         }
 

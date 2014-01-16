@@ -84,9 +84,11 @@ namespace mongo {
          * information is stale WRT the noted stale responses or a remote refresh is needed due
          * to a targeting failure, will contact the config servers to reload the metadata.
          *
+         * Reports wasChanged = true if the metadata is different after this reload.
+         *
          * Also see NSTargeter::refreshIfNeeded().
          */
-        Status refreshIfNeeded();
+        Status refreshIfNeeded( bool* wasChanged );
 
         /**
          * Returns the stats. Note that the returned stats object is still owned by this targeter.

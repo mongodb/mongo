@@ -41,15 +41,25 @@ namespace mongo {
      * A ConnectionString endpoint registered with some kind of error, to simulate returning when
      * the endpoint is used.
      */
-    struct MockEndpoint {
+    struct MockWriteResult {
 
-        MockEndpoint( const ConnectionString& endpoint, const WriteErrorDetail& error ) :
-            endpoint( endpoint ) {
-            error.cloneTo( &this->error );
+        MockWriteResult( const ConnectionString& endpoint, const WriteErrorDetail& error ) :
+                endpoint( endpoint ) {
+            WriteErrorDetail* errorCopy = new WriteErrorDetail;
+            error.cloneTo( errorCopy );
+            errorCopy->setIndex( 0 );
+            response.setOk(true);
+            response.setN(0);
+            response.addToErrDetails( errorCopy );
+        }
+
+        MockWriteResult( const ConnectionString& endpoint, const BatchedCommandResponse& response ) :
+                endpoint( endpoint ) {
+            response.cloneTo( &this->response );
         }
 
         const ConnectionString endpoint;
-        WriteErrorDetail error;
+        BatchedCommandResponse response;
     };
 
     /**
@@ -67,7 +77,7 @@ namespace mongo {
     class MockMultiWriteCommand : public MultiCommandDispatch {
     public:
 
-        void init( const std::vector<MockEndpoint*> mockEndpoints ) {
+        void init( const std::vector<MockWriteResult*> mockEndpoints ) {
             ASSERT( !mockEndpoints.empty() );
             _mockEndpoints.mutableVector().insert( _mockEndpoints.mutableVector().end(),
                                                    mockEndpoints.begin(),
@@ -98,39 +108,35 @@ namespace mongo {
                 static_cast<BatchedCommandResponse*>( response );
 
             *endpoint = _pending.front();
-            MockEndpoint* mockEndpoint = releaseByHost( _pending.front() );
+            MockWriteResult* mockResponse = releaseByHost( _pending.front() );
             _pending.pop_front();
 
-            if ( NULL == mockEndpoint ) {
+            if ( NULL == mockResponse ) {
                 batchResponse->setOk( true );
                 batchResponse->setN( 0 ); // TODO: Make this accurate
             }
             else {
-                batchResponse->setOk( false );
-                batchResponse->setN( 0 );
-                batchResponse->setErrCode( mockEndpoint->error.getErrCode() );
-                batchResponse->setErrMessage( mockEndpoint->error.getErrMessage() );
-                delete mockEndpoint;
+                mockResponse->response.cloneTo( batchResponse );
+                delete mockResponse;
             }
 
-            string errMsg;
-            ASSERT( batchResponse->isValid( &errMsg ) );
+            ASSERT( batchResponse->isValid( NULL ) );
             return Status::OK();
         }
 
-        const std::vector<MockEndpoint*>& getEndpoints() const {
+        const std::vector<MockWriteResult*>& getEndpoints() const {
             return _mockEndpoints.vector();
         }
 
     private:
 
         // Find a MockEndpoint* by host, and release it so we don't see it again
-        MockEndpoint* releaseByHost( const ConnectionString& endpoint ) {
-            std::vector<MockEndpoint*>& endpoints = _mockEndpoints.mutableVector();
+        MockWriteResult* releaseByHost( const ConnectionString& endpoint ) {
+            std::vector<MockWriteResult*>& endpoints = _mockEndpoints.mutableVector();
 
-            for ( std::vector<MockEndpoint*>::iterator it = endpoints.begin();
+            for ( std::vector<MockWriteResult*>::iterator it = endpoints.begin();
                 it != endpoints.end(); ++it ) {
-                MockEndpoint* storedEndpoint = *it;
+                MockWriteResult* storedEndpoint = *it;
                 if ( storedEndpoint->endpoint.toString().compare( endpoint.toString() ) == 0 ) {
                     endpoints.erase( it );
                     return storedEndpoint;
@@ -141,7 +147,7 @@ namespace mongo {
         }
 
         // Manually-stored ranges
-        OwnedPointerVector<MockEndpoint> _mockEndpoints;
+        OwnedPointerVector<MockWriteResult> _mockEndpoints;
 
         std::deque<ConnectionString> _pending;
     };

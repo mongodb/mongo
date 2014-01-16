@@ -72,11 +72,7 @@ namespace mongo {
          * Executes a client batch write request by sending child batches to several shard
          * endpoints, and returns a client batch write response.
          *
-         * Several network round-trips are generally required to execute a write batch.
-         *
          * This function does not throw, any errors are reported via the clientResponse.
-         *
-         * TODO: Stats?
          */
         void executeBatch( const BatchedCommandRequest& clientRequest,
                            BatchedCommandResponse* clientResponse );
@@ -113,11 +109,24 @@ namespace mongo {
     class BatchWriteExecStats {
     public:
 
-        // TODO: Other stats can go here
+        BatchWriteExecStats() :
+           numRounds( 0 ), numTargetErrors( 0 ), numResolveErrors( 0 ), numStaleBatches( 0 ) {
+        }
 
         void noteWriteAt( const ConnectionString& host, OpTime opTime );
 
         const HostOpTimeMap& getWriteOpTimes() const;
+
+        // Expose via helpers if this gets more complex
+
+        // Number of round trips required for the batch
+        int numRounds;
+        // Number of times targeting failed
+        int numTargetErrors;
+        // Number of times host resolution failed
+        int numResolveErrors;
+        // Number of stale batches
+        int numStaleBatches;
 
     private:
 

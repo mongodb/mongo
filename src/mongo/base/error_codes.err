@@ -81,6 +81,7 @@ error_code("CommandResultSchemaViolation", 78)
 error_code("UnknownReplWriteConcern", 79)
 error_code("RoleDataInconsistent", 80)
 error_code("NoClientContext", 81)
+error_code("NoProgressMade", 82)
 
 # Non-sequential error codes (for compatibility only)
 error_code("DuplicateKey", 11000)

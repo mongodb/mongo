@@ -135,6 +135,13 @@ namespace mongo {
                              const WriteErrorDetail& error );
 
         /**
+         * Sets a command error for this batch op directly.
+         *
+         * Should only be used when there are no outstanding batches to return.
+         */
+        void setBatchError( const WriteErrorDetail& error );
+
+        /**
          * Returns false if the batch write op needs more processing.
          */
         bool isFinished();
@@ -143,6 +150,14 @@ namespace mongo {
          * Fills a batch response to send back to the client.
          */
         void buildClientResponse( BatchedCommandResponse* batchResp );
+
+        //
+        // Accessors
+        //
+
+        int numWriteOps() const;
+
+        int numWriteOpsIn( WriteOpState state ) const;
 
     private:
 
@@ -162,8 +177,10 @@ namespace mongo {
         // Upserted ids for the whole write batch
         OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
 
-        // Use to store the error from the last shard that returned { ok: 0 }.
-        scoped_ptr<ShardError> _batchCommandError;
+        // Use to store a top-level error indicating that the batch aborted unexpectedly and we
+        // can't report on any of the writes sent.  May also include a ShardEndpoint indicating
+        // where the root problem was.
+        scoped_ptr<ShardError> _batchError;
 
         // Stats for the entire batch op
         scoped_ptr<BatchWriteStats> _stats;

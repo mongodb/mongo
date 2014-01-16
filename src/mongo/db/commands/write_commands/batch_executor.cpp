@@ -42,6 +42,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
@@ -52,6 +53,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    // TODO: Determine queueing behavior we want here
+    MONGO_EXPORT_SERVER_PARAMETER( queueForMigrationCommit, bool, true );
 
     using mongoutils::str::stream;
 
@@ -88,6 +92,14 @@ namespace mongo {
         error->setErrMessage( status.reason() );
 
         return error;
+    }
+
+    static void noteInCriticalSection( WriteErrorDetail* staleError ) {
+        BSONObjBuilder builder;
+        if ( staleError->isErrInfoSet() )
+            builder.appendElements( staleError->getErrInfo() );
+        builder.append( "inCriticalSection", true );
+        staleError->setErrInfo( builder.obj() );
     }
 
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
@@ -162,8 +174,6 @@ namespace mongo {
         bool staleBatch = !writeErrors.empty()
                           && writeErrors.back()->getErrCode() == ErrorCodes::StaleShardVersion;
 
-        // TODO: Audit where we want to queue here - the shardingState calls may block for remote
-        // data
         if ( staleBatch ) {
 
             const BatchedRequestMetadata* requestMetadata = request.getMetadata();
@@ -171,11 +181,53 @@ namespace mongo {
 
             // Make sure our shard name is set or is the same as what was set previously
             if ( shardingState.setShardName( requestMetadata->getShardName() ) ) {
-                // Refresh our shard version
+
+                //
+                // First, we refresh metadata if we need to based on the requested version.
+                //
+
                 ChunkVersion latestShardVersion;
                 shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
                                                        requestMetadata->getShardVersion(),
                                                        &latestShardVersion );
+
+                // Report if we're still changing our metadata
+                // TODO: Better reporting per-collection
+                if ( shardingState.inCriticalMigrateSection() ) {
+                    noteInCriticalSection( writeErrors.back() );
+                }
+
+                if ( queueForMigrationCommit ) {
+
+                    //
+                    // Queue up for migration to end - this allows us to be sure that clients will
+                    // not repeatedly try to refresh metadata that is not yet written to the config
+                    // server.  Not necessary for correctness.
+                    // Exposed as optional parameter to allow testing of queuing behavior with
+                    // different network timings.
+                    //
+
+                    const ChunkVersion& requestShardVersion = requestMetadata->getShardVersion();
+
+                    //
+                    // Only wait if we're an older version (in the current collection epoch) and
+                    // we're not write compatible, implying that the current migration is affecting
+                    // writes.
+                    //
+
+                    if ( requestShardVersion.isOlderThan( latestShardVersion ) &&
+                         !requestShardVersion.isWriteCompatibleWith( latestShardVersion ) ) {
+
+                        while ( shardingState.inCriticalMigrateSection() ) {
+
+                            log() << "write request to old shard version "
+                                  << requestMetadata->getShardVersion().toString()
+                                  << " waiting for migration commit" << endl;
+
+                            shardingState.waitTillNotInCriticalSection( 10 /* secs */);
+                        }
+                    }
+                }
             }
             else {
                 // If our shard name is stale, our version must have been stale as well
