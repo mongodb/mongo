@@ -53,7 +53,8 @@ namespace mongo {
           _solution(solution),
           _exec(new PlanExecutor(ws, root)),
           _alreadyProduced(false),
-          _updatedCache(false) { }
+          _updatedCache(false),
+          _killed(false) { }
 
     CachedPlanRunner::~CachedPlanRunner() {
         // The runner may produce all necessary results without
@@ -125,6 +126,7 @@ namespace mongo {
     }
 
     void CachedPlanRunner::kill() {
+        _killed = true;
         _exec->kill();
         if (NULL != _backupPlan.get()) {
             _backupPlan->kill();
@@ -158,6 +160,10 @@ namespace mongo {
 
     void CachedPlanRunner::updateCache() {
         _updatedCache = true;
+
+        if (_killed) {
+            return;
+        }
 
         Database* db = cc().database();
         verify(NULL != db);

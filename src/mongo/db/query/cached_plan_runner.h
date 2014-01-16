@@ -112,7 +112,8 @@ namespace mongo {
         // Have we updated the cache with our plan stats yet?
         bool _updatedCache;
 
-        // CacheKey _cacheKey;
+        // Has the runner been killed?
+        bool _killed;
     };
 
 }  // namespace mongo
