@@ -30,18 +30,9 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/curop-inl.h"
-#include "mongo/util/array.h"
-
-#define MONGO_USE_NEW_SORTER 1
-
-#if MONGO_USE_NEW_SORTER
-#   include "mongo/db/sorter/sorter.h"
-#endif
+#include "mongo/db/diskloc.h"
+#include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
 
@@ -57,7 +48,6 @@ namespace mongo {
         virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const = 0;
     };
 
-#if MONGO_USE_NEW_SORTER
     // TODO This class will probably disappear in the future or be replaced with a typedef
     class BSONObjExternalSorter : boost::noncopyable {
     public:
@@ -82,113 +72,4 @@ namespace mongo {
         shared_ptr<bool> _mayInterrupt;
         scoped_ptr<Sorter<BSONObj, DiskLoc> > _sorter;
     };
-#else
-    /**
-       for external (disk) sorting by BSONObj and attaching a value
-     */
-    class BSONObjExternalSorter : boost::noncopyable {
-    public:
-        BSONObjExternalSorter(const ExternalSortComparison* cmp,
-                              long maxFileSize = 1024 * 1024 * 100 );
-        ~BSONObjExternalSorter();
- 
-    private:
-        static HLMutex _extSortMutex;
-
-        static int _compare(const ExternalSortComparison* cmp, const ExternalSortDatum& l,
-                            const ExternalSortDatum& r);
-
-        class MyCmp {
-        public:
-            MyCmp(const ExternalSortComparison* cmp) : _cmp(cmp) { }
-            bool operator()( const ExternalSortDatum &l, const ExternalSortDatum &r ) const {
-                return _cmp->compare(l, r) < 0;
-            };
-        private:
-            const ExternalSortComparison* _cmp;
-        };
-
-        static bool extSortMayInterrupt;
-        static int extSortComp( const void *lv, const void *rv );
-        static const ExternalSortComparison* staticExtSortCmp;
-
-        class FileIterator : boost::noncopyable {
-        public:
-            FileIterator( const std::string& file );
-            ~FileIterator();
-            bool more();
-            ExternalSortDatum next();
-        private:
-            bool _read( char* buf, long long count );
-
-            int _file;
-            unsigned long long _length;
-            unsigned long long _readSoFar;
-        };
-
-    public:
-
-        typedef FastArray<ExternalSortDatum> InMemory;
-
-        class Iterator : boost::noncopyable {
-        public:
-
-            Iterator( BSONObjExternalSorter * sorter );
-            ~Iterator();
-            bool more();
-            ExternalSortDatum next();
-
-        private:
-            MyCmp _cmp;
-            vector<FileIterator*> _files;
-            vector< pair<ExternalSortDatum,bool> > _stash;
-
-            InMemory * _in;
-            InMemory::iterator _it;
-
-        };
-
-        void add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt );
-
-        /* call after adding values, and before fetching the iterator */
-        void sort( bool mayInterrupt );
-
-        auto_ptr<Iterator> iterator() {
-            uassert( 10052 ,  "not sorted" , _sorted );
-            return auto_ptr<Iterator>( new Iterator( this ) );
-        }
-
-        int numFiles() {
-            return _files.size();
-        }
-
-        long getCurSizeSoFar() { return _curSizeSoFar; }
-
-        void hintNumObjects( long long numObjects ) {
-            if ( numObjects < _arraySize )
-                _arraySize = (int)(numObjects + 100);
-        }
-
-    private:
-
-        void _sortInMem( bool mayInterrupt );
-
-        void sort( const std::string& file );
-        void finishMap( bool mayInterrupt );
-
-        const ExternalSortComparison* _cmp;
-        long _maxFilesize;
-        boost::filesystem::path _root;
-
-        int _arraySize;
-        InMemory * _cur;
-        long _curSizeSoFar;
-
-        list<string> _files;
-        bool _sorted;
-
-        static unsigned long long _compares;
-        static unsigned long long _uniqueNumber;
-    };
-#endif
 }

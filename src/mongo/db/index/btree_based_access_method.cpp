@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/btree_interface.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/structure/btree/btreebuilder.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 

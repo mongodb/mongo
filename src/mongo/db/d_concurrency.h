@@ -248,15 +248,4 @@ namespace mongo {
         ~writelocktry();
         bool got() const { return _got; }
     };
-
-    /** a mutex, but reported in curop() - thus a "high level" (HL) one
-        some overhead so we don't use this for everything.  the externalobjsort mutex
-        uses this, as it can be held for eons. implementation still needed. */
-    class HLMutex : public SimpleMutex {
-        LockStat ls;
-    public:
-        HLMutex(const char *name);
-    };
-
-
 }

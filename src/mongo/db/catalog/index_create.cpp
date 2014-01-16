@@ -35,6 +35,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/structure/btree/btreebuilder.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/kill_current_op.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
