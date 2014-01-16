@@ -294,7 +294,7 @@ namespace QueryStageSortTests {
             }
             ss->recoverFromYield();
 
-            // After invalidating all our data, we have nothing left to sort.
+            // Invalidation of data in the sort stage fetches it but passes it through.
             int count = 0;
             while (!ss->isEOF()) {
                 WorkingSetID id;
@@ -306,8 +306,8 @@ namespace QueryStageSortTests {
                 ++count;
             }
 
-            // Therefore, we expect an empty result set from running the sort stage to completion.
-            ASSERT_EQUALS(0, count);
+            // Returns all docs.
+            ASSERT_EQUALS(limit() ? limit() : numObj(), count);
         }
     };
 
