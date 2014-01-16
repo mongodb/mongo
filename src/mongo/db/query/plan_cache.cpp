@@ -32,6 +32,7 @@
 #include <math.h>
 #include <memory>
 #include "boost/thread/locks.hpp"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
@@ -84,9 +85,9 @@ namespace mongo {
         : plannerData(entry.plannerData.size()),
           backupSoln(entry.backupSoln),
           key(key),
-          query(entry.query.copy()),
-          sort(entry.sort.copy()),
-          projection(entry.projection.copy()) {
+          query(entry.query.getOwned()),
+          sort(entry.sort.getOwned()),
+          projection(entry.projection.getOwned()) {
         // CachedSolution should not having any references into
         // cache entry. All relevant data should be cloned/copied.
         for (size_t i = 0; i < entry.plannerData.size(); ++i) {
@@ -108,19 +109,20 @@ namespace mongo {
     //
 
     PlanCacheEntry::PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
-                                   PlanRankingDecision* d)
-        : plannerData(solutions.size()) {
+                                   PlanRankingDecision* why)
+        : plannerData(solutions.size()),
+          decision(why) {
+        invariant(why);
+
         // The caller of this constructor is responsible for ensuring
         // that the QuerySolution 's' has valid cacheData. If there's no
         // data to cache you shouldn't be trying to construct a PlanCacheEntry.
 
         // Copy the solution's cache data into the plan cache entry.
         for (size_t i = 0; i < solutions.size(); ++i) {
-            verify(solutions[i]->cacheData.get());
+            invariant(solutions[i]->cacheData.get());
             plannerData[i] = solutions[i]->cacheData->clone();
         }
-
-        decision.reset(d);
     }
 
     PlanCacheEntry::~PlanCacheEntry() {
@@ -130,6 +132,34 @@ namespace mongo {
         for (size_t i = 0; i < plannerData.size(); ++i) {
             delete plannerData[i];
         }
+    }
+
+    PlanCacheEntry* PlanCacheEntry::clone() const {
+        OwnedPointerVector<QuerySolution> solutions;
+        for (size_t i = 0; i < plannerData.size(); ++i) {
+            QuerySolution* qs = new QuerySolution();
+            qs->cacheData.reset(plannerData[i]->clone());
+            solutions.mutableVector().push_back(qs);
+        }
+        PlanCacheEntry* entry = new PlanCacheEntry(solutions.vector(), decision->clone());
+
+        entry->backupSoln = backupSoln;
+
+        // Copy query shape.
+        entry->query = query.getOwned();
+        entry->sort = sort.getOwned();
+        entry->projection = projection.getOwned();
+
+        // Copy performance stats.
+        for (size_t i = 0; i < feedback.size(); ++i) {
+            PlanCacheEntryFeedback* fb = new PlanCacheEntryFeedback();
+            fb->stats.reset(feedback[i]->stats->clone());
+            fb->score = feedback[i]->score;
+            entry->feedback.push_back(fb);
+        }
+        entry->averageScore = averageScore;
+        entry->stddevScore = stddevScore;
+        return entry;
     }
 
     string PlanCacheEntry::toString() const {
@@ -247,17 +277,32 @@ namespace mongo {
 
     Status PlanCache::add(const CanonicalQuery& query, const std::vector<QuerySolution*>& solns,
                           PlanRankingDecision* why) {
-        verify(why);
+        invariant(why);
 
         if (solns.empty()) {
             return Status(ErrorCodes::BadValue, "no solutions provided");
         }
 
+        if (why->stats.size() != solns.size()) {
+            return Status(ErrorCodes::BadValue,
+                          "number of stats in decision must match solutions");
+        }
+
+        if (why->scores.size() != solns.size()) {
+            return Status(ErrorCodes::BadValue,
+                          "number of scores in decision must match solutions");
+        }
+
+        if (why->candidateOrder.size() != solns.size()) {
+            return Status(ErrorCodes::BadValue,
+                          "candidate ordering entries in decision must match solutions");
+        }
+
         PlanCacheEntry* entry = new PlanCacheEntry(solns, why);
         const LiteParsedQuery& pq = query.getParsed();
-        entry->query = pq.getFilter().copy();
-        entry->sort = pq.getSort().copy();
-        entry->projection = pq.getProj().copy();
+        entry->query = pq.getFilter().getOwned();
+        entry->sort = pq.getSort().getOwned();
+        entry->projection = pq.getProj().getOwned();
 
         // If the winning solution uses a blocking sort, then try and
         // find a fallback solution that has no blocking sort.
@@ -328,7 +373,7 @@ namespace mongo {
 
             // If the score has gotten more than a standard deviation lower than
             // its initial value, we should uncache the entry.
-            double initialScore = entry->decision->score;
+            double initialScore = entry->decision->scores[0];
             if ((initialScore - mean) > (PlanCacheEntry::kStdDevThreshold * stddev)) {
                 return true;
             }
@@ -398,18 +443,34 @@ namespace mongo {
         _writeOperations.store(0);
     }
 
-    std::vector<CachedSolution*> PlanCache::getAllSolutions() const {
+    Status PlanCache::getEntry(const CanonicalQuery& query, PlanCacheEntry** entryOut) const {
+        const PlanCacheKey& key = query.getPlanCacheKey();
+        verify(entryOut);
+
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        std::vector<CachedSolution*> solutions;
+        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        ConstIterator i = _cache.find(key);
+        if (i == _cache.end()) {
+            return Status(ErrorCodes::BadValue, "no such key in cache");
+        }
+        PlanCacheEntry* entry = i->second;
+        verify(entry);
+
+        *entryOut = entry->clone();
+
+        return Status::OK();
+    }
+
+    std::vector<PlanCacheEntry*> PlanCache::getAllEntries() const {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        std::vector<PlanCacheEntry*> entries;
         typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
         for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
-            const PlanCacheKey& key = i->first;
             PlanCacheEntry* entry = i->second;
-            CachedSolution* cs = new CachedSolution(key, *entry);
-            solutions.push_back(cs);
+            entries.push_back(entry->clone());
         }
 
-        return solutions;
+        return entries;
     }
 
     size_t PlanCache::size() const {

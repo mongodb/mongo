@@ -37,6 +37,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/plan_ranker.h"
 
 namespace {
 
@@ -220,21 +222,21 @@ namespace mongo {
         invariant(bob);
 
         // Fetch all cached solutions from plan cache.
-        vector<CachedSolution*> solutions = planCache.getAllSolutions();
+        vector<PlanCacheEntry*> solutions = planCache.getAllEntries();
 
         BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
-        for (vector<CachedSolution*>::const_iterator i = solutions.begin(); i != solutions.end(); i++) {
-            CachedSolution* cs = *i;
-            invariant(cs);
+        for (vector<PlanCacheEntry*>::const_iterator i = solutions.begin(); i != solutions.end(); i++) {
+            PlanCacheEntry* entry = *i;
+            invariant(entry);
 
             BSONObjBuilder shapeBuilder(arrayBuilder.subobjStart());
-            shapeBuilder.append("query", cs->query);
-            shapeBuilder.append("sort", cs->sort);
-            shapeBuilder.append("projection", cs->projection);
+            shapeBuilder.append("query", entry->query);
+            shapeBuilder.append("sort", entry->sort);
+            shapeBuilder.append("projection", entry->projection);
             shapeBuilder.doneFast();
 
             // Release resources for cached solution after extracting query shape.
-            delete cs;
+            delete entry;
         }
         arrayBuilder.doneFast();
 
@@ -325,15 +327,17 @@ namespace mongo {
         }
 
         scoped_ptr<CanonicalQuery> cq(cqRaw);
-        CachedSolution* crRaw;
-        Status result = planCache.get(*cq, &crRaw);
+        PlanCacheEntry* entryRaw;
+        Status result = planCache.getEntry(*cq, &entryRaw);
         if (!result.isOK()) {
             return result;
         }
-        scoped_ptr<CachedSolution> cr(crRaw);
+        scoped_ptr<PlanCacheEntry> entry(entryRaw);
 
         BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
-        size_t numPlans = cr->plannerData.size();
+        size_t numPlans = entry->plannerData.size();
+        invariant(numPlans == entry->decision->stats.size());
+        invariant(numPlans == entry->decision->scores.size());
         for (size_t i = 0; i < numPlans; ++i) {
             BSONObjBuilder planBob(plansBuilder.subobjStart());
 
@@ -341,16 +345,40 @@ namespace mongo {
             // Currently, simple string representationg of
             // SolutionCacheData. Need to revisit format when we
             // need to parse user-provided plan details for planCacheAddPlan.
-            SolutionCacheData* scd = cr->plannerData[i];
+            SolutionCacheData* scd = entry->plannerData[i];
             BSONObjBuilder detailsBob(planBob.subobjStart("details"));
             detailsBob.append("solution", scd->toString());
             detailsBob.doneFast();
 
-            // XXX: Fix these field values once we have fleshed out cache entries.
-            //      reason should contain initial plan stats and score from ranking process.
-            //      feedback should contain execution stats from running the query to completion.
-            planBob.append("reason", BSONObj());
-            planBob.append("feedback", BSONObj());
+            // reason is comprised of score and initial stats provided by
+            // multi plan runner.
+            BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
+            reasonBob.append("score", entry->decision->scores[i]);
+            BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
+            PlanStageStats* stats = entry->decision->stats.vector()[i];
+            if (stats) {
+                statsToBSON(*stats, &statsBob);
+            }
+            statsBob.doneFast();
+            reasonBob.doneFast();
+
+            // BSON object for 'feedback' field is created from query executions
+            // and shows number of executions since this cached solution was
+            // created as well as score data (average and standard deviation).
+            BSONObjBuilder feedbackBob(planBob.subobjStart("feedback"));
+            if (i == 0U) {
+                feedbackBob.append("nfeedback", int(entry->feedback.size()));
+                feedbackBob.append("averageScore", entry->averageScore.get_value_or(0));
+                feedbackBob.append("stdDevScore",entry->stddevScore.get_value_or(0));
+                BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
+                for (size_t i = 0; i < entry->feedback.size(); ++i) {
+                    BSONObjBuilder scoreBob(scoresBob.subobjStart());
+                    scoreBob.append("score", entry->feedback[i]->score);
+                }
+                scoresBob.doneFast();
+            }
+            feedbackBob.doneFast();
+
             planBob.append("hint", scd->adminHintApplied);
         }
         plansBuilder.doneFast();

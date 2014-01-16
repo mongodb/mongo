@@ -144,15 +144,18 @@ namespace {
     };
 
     /**
-     * Clean up query solutions vector.
+     * Utility function to create a PlanRankingDecision
      */
-    void deleteQuerySolutions(std::vector<QuerySolution*>* solns) {
-        for (std::vector<QuerySolution*>::const_iterator i = solns->begin();
-             i != solns->end(); ++i) {
-            QuerySolution* qs = *i;
-            delete qs;
+    PlanRankingDecision* createDecision(size_t numPlans) {
+        auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+        for (size_t i = 0; i < numPlans; ++i) {
+            auto_ptr<PlanStageStats> stats(new PlanStageStats(CommonStats(), STAGE_COLLSCAN));
+            stats->specific.reset(new CollectionScanStats());
+            why->stats.mutableVector().push_back(stats.release());
+            why->scores.push_back(0U);
+            why->candidateOrder.push_back(i);
         }
-        solns->clear();
+        return why.release();
     }
 
     /**
@@ -248,7 +251,7 @@ namespace {
         PlanCache planCache;
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
         std::vector<QuerySolution*> solns;
-        ASSERT_NOT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_NOT_OK(planCache.add(*cq, solns, createDecision(1U)));
     }
 
     TEST(PlanCacheTest, AddValidSolution) {
@@ -259,7 +262,7 @@ namespace {
         qs.cacheData->tree.reset(new PlanCacheIndexTree());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
         ASSERT_EQUALS(planCache.size(), 1U);
     }
 
@@ -271,7 +274,7 @@ namespace {
         qs.cacheData->tree.reset(new PlanCacheIndexTree());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
         ASSERT_EQUALS(planCache.size(), 1U);
 
         // First (PlanCache::kPlanCacheMaxWriteOperations - 1) notifications should have
@@ -292,13 +295,13 @@ namespace {
         // Add cache entry again.
         // After clearing and adding a new entry, the next write operation should not
         // clear the cache.
-        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
         for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
         ASSERT_EQUALS(planCache.size(), 1U);
         planCache.clear();
-        ASSERT_OK(planCache.add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
         // Notification after clearing will not flush cache.
         planCache.notifyOfWriteOp();
         ASSERT_EQUALS(planCache.size(), 1U);
@@ -464,7 +467,7 @@ namespace {
             qs.cacheData.reset(soln.cacheData->clone());
             std::vector<QuerySolution*> solutions;
             solutions.push_back(&qs);
-            PlanCacheEntry entry(solutions, new PlanRankingDecision());
+            PlanCacheEntry entry(solutions, createDecision(1U));
             CachedSolution cachedSoln(ck, entry);
 
             QuerySolution *out, *backupOut;

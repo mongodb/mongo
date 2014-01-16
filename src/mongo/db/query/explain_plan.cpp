@@ -115,7 +115,9 @@ namespace mongo {
 
         if (fullDetails) {
             res->setNYields(stats.common.yields);
-            res->stats = statsToBSON(stats);
+            BSONObjBuilder bob;
+            statsToBSON(stats, &bob);
+            res->stats = bob.obj();
         }
 
         *explain = res.release();
@@ -273,7 +275,9 @@ namespace mongo {
         // TODO: if we can get this from the runner, we can kill "detailed mode"
         if (fullDetails) {
             res->setNYields(root->common.yields);
-            res->stats = statsToBSON(*root);
+            BSONObjBuilder bob;
+            statsToBSON(*root, &bob);
+            res->stats = bob.obj();
         }
 
         *explain = res.release();
@@ -339,103 +343,102 @@ namespace mongo {
         }
     }
 
-    BSONObj statsToBSON(const PlanStageStats& stats) {
-        BSONObjBuilder bob;
+    void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob) {
+        invariant(bob);
 
         // Common details.
-        bob.append("type", stageTypeString(stats.stageType));
-        bob.appendNumber("works", stats.common.works);
-        bob.appendNumber("yields", stats.common.yields);
-        bob.appendNumber("unyields", stats.common.unyields);
-        bob.appendNumber("invalidates", stats.common.invalidates);
-        bob.appendNumber("advanced", stats.common.advanced);
-        bob.appendNumber("needTime", stats.common.needTime);
-        bob.appendNumber("needFetch", stats.common.needFetch);
-        bob.appendNumber("isEOF", stats.common.isEOF);
+        bob->append("type", stageTypeString(stats.stageType));
+        bob->appendNumber("works", stats.common.works);
+        bob->appendNumber("yields", stats.common.yields);
+        bob->appendNumber("unyields", stats.common.unyields);
+        bob->appendNumber("invalidates", stats.common.invalidates);
+        bob->appendNumber("advanced", stats.common.advanced);
+        bob->appendNumber("needTime", stats.common.needTime);
+        bob->appendNumber("needFetch", stats.common.needFetch);
+        bob->appendNumber("isEOF", stats.common.isEOF);
 
         // Stage-specific stats
         if (STAGE_AND_HASH == stats.stageType) {
             AndHashStats* spec = static_cast<AndHashStats*>(stats.specific.get());
-            bob.appendNumber("flaggedButPassed", spec->flaggedButPassed);
-            bob.appendNumber("flaggedInProgress", spec->flaggedInProgress);
+            bob->appendNumber("flaggedButPassed", spec->flaggedButPassed);
+            bob->appendNumber("flaggedInProgress", spec->flaggedInProgress);
             for (size_t i = 0; i < spec->mapAfterChild.size(); ++i) {
-                bob.appendNumber(string(stream() << "mapAfterChild_" << i), spec->mapAfterChild[i]);
+                bob->appendNumber(string(stream() << "mapAfterChild_" << i), spec->mapAfterChild[i]);
             }
         }
         else if (STAGE_AND_SORTED == stats.stageType) {
             AndSortedStats* spec = static_cast<AndSortedStats*>(stats.specific.get());
-            bob.appendNumber("flagged", spec->flagged);
-            bob.appendNumber("matchTested", spec->matchTested);
+            bob->appendNumber("flagged", spec->flagged);
+            bob->appendNumber("matchTested", spec->matchTested);
             for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
-                bob.appendNumber(string(stream() << "failedAnd_" << i), spec->failedAnd[i]);
+                bob->appendNumber(string(stream() << "failedAnd_" << i), spec->failedAnd[i]);
             }
         }
         else if (STAGE_COLLSCAN == stats.stageType) {
             CollectionScanStats* spec = static_cast<CollectionScanStats*>(stats.specific.get());
-            bob.appendNumber("docsTested", spec->docsTested);
+            bob->appendNumber("docsTested", spec->docsTested);
         }
         else if (STAGE_FETCH == stats.stageType) {
             FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
-            bob.appendNumber("alreadyHasObj", spec->alreadyHasObj);
-            bob.appendNumber("forcedFetches", spec->forcedFetches);
-            bob.appendNumber("matchTested", spec->matchTested);
+            bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
+            bob->appendNumber("forcedFetches", spec->forcedFetches);
+            bob->appendNumber("matchTested", spec->matchTested);
         }
         else if (STAGE_GEO_NEAR_2D == stats.stageType) {
             TwoDNearStats* spec = static_cast<TwoDNearStats*>(stats.specific.get());
-            bob.appendNumber("objectsLoaded", spec->objectsLoaded);
-            bob.appendNumber("nscanned", spec->nscanned);
+            bob->appendNumber("objectsLoaded", spec->objectsLoaded);
+            bob->appendNumber("nscanned", spec->nscanned);
         }
         else if (STAGE_IXSCAN == stats.stageType) {
             IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
             // XXX: how much do we really want here?  runtime stats vs. tree structure (soln
             // tostring).
-            bob.append("keyPattern", spec->keyPattern.toString());
-            bob.append("bounds", spec->indexBounds);
-            bob.appendNumber("isMultiKey", spec->isMultiKey);
+            bob->append("keyPattern", spec->keyPattern.toString());
+            bob->append("bounds", spec->indexBounds);
+            bob->appendNumber("isMultiKey", spec->isMultiKey);
 
-            bob.appendNumber("yieldMovedCursor", spec->yieldMovedCursor);
-            bob.appendNumber("dupsTested", spec->dupsTested);
-            bob.appendNumber("dupsDropped", spec->dupsDropped);
-            bob.appendNumber("seenInvalidated", spec->seenInvalidated);
-            bob.appendNumber("matchTested", spec->matchTested);
-            bob.appendNumber("keysExamined", spec->keysExamined);
+            bob->appendNumber("yieldMovedCursor", spec->yieldMovedCursor);
+            bob->appendNumber("dupsTested", spec->dupsTested);
+            bob->appendNumber("dupsDropped", spec->dupsDropped);
+            bob->appendNumber("seenInvalidated", spec->seenInvalidated);
+            bob->appendNumber("matchTested", spec->matchTested);
+            bob->appendNumber("keysExamined", spec->keysExamined);
         }
         else if (STAGE_OR == stats.stageType) {
             OrStats* spec = static_cast<OrStats*>(stats.specific.get());
-            bob.appendNumber("dupsTested", spec->dupsTested);
-            bob.appendNumber("dupsDropped", spec->dupsDropped);
-            bob.appendNumber("locsForgotten", spec->locsForgotten);
+            bob->appendNumber("dupsTested", spec->dupsTested);
+            bob->appendNumber("dupsDropped", spec->dupsDropped);
+            bob->appendNumber("locsForgotten", spec->locsForgotten);
             for (size_t i = 0 ; i < spec->matchTested.size(); ++i) {
-                bob.appendNumber(string(stream() << "matchTested_" << i), spec->matchTested[i]);
+                bob->appendNumber(string(stream() << "matchTested_" << i), spec->matchTested[i]);
             }
         }
         else if (STAGE_SHARDING_FILTER == stats.stageType) {
             ShardingFilterStats* spec = static_cast<ShardingFilterStats*>(stats.specific.get());
-            bob.appendNumber("chunkSkips", spec->chunkSkips);
+            bob->appendNumber("chunkSkips", spec->chunkSkips);
         }
         else if (STAGE_SORT == stats.stageType) {
             SortStats* spec = static_cast<SortStats*>(stats.specific.get());
-            bob.appendNumber("forcedFetches", spec->forcedFetches);
+            bob->appendNumber("forcedFetches", spec->forcedFetches);
         }
         else if (STAGE_SORT_MERGE == stats.stageType) {
             MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
-            bob.appendNumber("dupsTested", spec->dupsTested);
-            bob.appendNumber("dupsDropped", spec->dupsDropped);
-            bob.appendNumber("forcedFetches", spec->forcedFetches);
+            bob->appendNumber("dupsTested", spec->dupsTested);
+            bob->appendNumber("dupsDropped", spec->dupsDropped);
+            bob->appendNumber("forcedFetches", spec->forcedFetches);
         }
         else if (STAGE_TEXT == stats.stageType) {
             TextStats* spec = static_cast<TextStats*>(stats.specific.get());
-            bob.appendNumber("keysExamined", spec->keysExamined);
-            bob.appendNumber("fetches", spec->fetches);
+            bob->appendNumber("keysExamined", spec->keysExamined);
+            bob->appendNumber("fetches", spec->fetches);
         }
 
-        BSONArrayBuilder childBob(bob.subarrayStart("children"));
+        BSONArrayBuilder childrenBob(bob->subarrayStart("children"));
         for (size_t i = 0; i < stats.children.size(); ++i) {
-            childBob.append(statsToBSON(*stats.children[i]));
+            BSONObjBuilder childBob(childrenBob.subobjStart());
+            statsToBSON(*stats.children[i], &childBob);
         }
-
-        childBob.done();
-        return bob.obj();
+        childrenBob.doneFast();
     }
 
 } // namespace mongo

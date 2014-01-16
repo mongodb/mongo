@@ -40,7 +40,17 @@
 
 namespace mongo {
 
-    struct SpecificStats;
+    /**
+     * The interface all specific-to-stage stats provide.
+     */
+    struct SpecificStats {
+        virtual ~SpecificStats() { }
+
+        /**
+         * Make a deep copy.
+         */
+        virtual SpecificStats* clone() const = 0;
+    };
 
     // Every stage has CommonStats.
     struct CommonStats {
@@ -85,6 +95,21 @@ namespace mongo {
             }
         }
 
+        /**
+         * Make a deep copy.
+         */
+        PlanStageStats* clone() const {
+            PlanStageStats* stats = new PlanStageStats(common, stageType);
+            if (specific.get()) {
+                stats->specific.reset(specific->clone());
+            }
+            for (size_t i = 0; i < children.size(); ++i) {
+                invariant(children[i]);
+                stats->children.push_back(children[i]->clone());
+            }
+            return stats;
+        }
+
         // See query/stage_type.h
         StageType stageType;
 
@@ -101,18 +126,16 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(PlanStageStats);
     };
 
-    /**
-     * The interface all specific-to-stage stats provide.
-     */
-    struct SpecificStats {
-        virtual ~SpecificStats() { }
-    };
-
     struct AndHashStats : public SpecificStats {
         AndHashStats() : flaggedButPassed(0),
                          flaggedInProgress(0) { }
 
         virtual ~AndHashStats() { }
+
+        virtual SpecificStats* clone() const {
+            AndHashStats* specific = new AndHashStats(*this);
+            return specific;
+        }
 
         // Invalidation counters.
         // How many results had the AND fully evaluated but were invalidated?
@@ -136,6 +159,11 @@ namespace mongo {
 
         virtual ~AndSortedStats() { }
 
+        virtual SpecificStats* clone() const {
+            AndSortedStats* specific = new AndSortedStats(*this);
+            return specific;
+        }
+
         // How many results from each child did not pass the AND?
         std::vector<size_t> failedAnd;
 
@@ -149,6 +177,11 @@ namespace mongo {
     struct CollectionScanStats : public SpecificStats {
         CollectionScanStats() : docsTested(0) { }
 
+        virtual SpecificStats* clone() const {
+            CollectionScanStats* specific = new CollectionScanStats(*this);
+            return specific;
+        }
+
         // How many documents did we check against our filter?
         size_t docsTested;
     };
@@ -159,6 +192,11 @@ namespace mongo {
                        matchTested(0) { }
 
         virtual ~FetchStats() { }
+
+        virtual SpecificStats* clone() const {
+            FetchStats* specific = new FetchStats(*this);
+            return specific;
+        }
 
         // Have we seen anything that already had an object?
         size_t alreadyHasObj;
@@ -184,6 +222,14 @@ namespace mongo {
                            keysExamined(0) { }
 
         virtual ~IndexScanStats() { }
+
+        virtual SpecificStats* clone() const {
+            IndexScanStats* specific = new IndexScanStats(*this);
+            // BSON objects have to be explicitly copied.
+            specific->keyPattern = keyPattern.getOwned();
+            specific->indexBounds = indexBounds.getOwned();
+            return specific;
+        }
 
         // Index type being used.
         std::string indexType;
@@ -226,6 +272,11 @@ namespace mongo {
 
         virtual ~OrStats() { }
 
+        virtual SpecificStats* clone() const {
+            OrStats* specific = new OrStats(*this);
+            return specific;
+        }
+
         size_t dupsTested;
         size_t dupsDropped;
 
@@ -241,6 +292,11 @@ namespace mongo {
 
         virtual ~SortStats() { }
 
+        virtual SpecificStats* clone() const {
+            SortStats* specific = new SortStats(*this);
+            return specific;
+        }
+
         // How many records were we forced to fetch as the result of an invalidation?
         size_t forcedFetches;
     };
@@ -252,6 +308,11 @@ namespace mongo {
 
         virtual ~MergeSortStats() { }
 
+        virtual SpecificStats* clone() const {
+            MergeSortStats* specific = new MergeSortStats(*this);
+            return specific;
+        }
+
         size_t dupsTested;
         size_t dupsDropped;
 
@@ -262,11 +323,21 @@ namespace mongo {
     struct ShardingFilterStats : public SpecificStats {
         ShardingFilterStats() : chunkSkips(0) { }
 
+        virtual SpecificStats* clone() const {
+            ShardingFilterStats* specific = new ShardingFilterStats(*this);
+            return specific;
+        }
+
         size_t chunkSkips;
     };
 
     struct TwoDNearStats : public SpecificStats {
         TwoDNearStats() : objectsLoaded(0), nscanned(0) { }
+
+        virtual SpecificStats* clone() const {
+            TwoDNearStats* specific = new TwoDNearStats(*this);
+            return specific;
+        }
 
         size_t objectsLoaded;
 
@@ -277,6 +348,11 @@ namespace mongo {
 
     struct TextStats : public SpecificStats {
         TextStats() : keysExamined(0), fetches(0) { }
+
+        virtual SpecificStats* clone() const {
+            TextStats* specific = new TextStats(*this);
+            return specific;
+        }
 
         size_t keysExamined;
 

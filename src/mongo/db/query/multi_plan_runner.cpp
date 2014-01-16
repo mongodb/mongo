@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
+#include <memory>
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
@@ -319,8 +320,14 @@ namespace mongo {
 
         if (_failure || _killed) { return false; }
 
-        auto_ptr<PlanRankingDecision> ranking(new PlanRankingDecision());
+        // After picking best plan, ranking will own plan stats from
+        // candidate solutions (winner and losers).
+        std::auto_ptr<PlanRankingDecision> ranking(new PlanRankingDecision);
         size_t bestChild = PlanRanker::pickBestPlan(_candidates, ranking.get());
+
+        // Copy candidate order. We will need this to sort candidate stats for explain
+        // after transferring ownership of 'ranking' to plan cache.
+        std::vector<size_t> candidateOrder = ranking->candidateOrder;
 
         // Run the best plan.  Store it.
         _bestPlan.reset(new PlanExecutor(_candidates[bestChild].ws,
@@ -357,9 +364,12 @@ namespace mongo {
             // Create list of candidate solutions for the cache with
             // the best solution at the front.
             std::vector<QuerySolution*> solutions;
-            solutions.push_back(_bestSolution.get());
-            for (size_t i = 0; i < _candidates.size(); ++i) {
-                if (i == bestChild) { continue; }
+
+            // Generate solutions and ranking decisions sorted by score.
+            for (size_t orderingIndex = 0;
+                 orderingIndex < candidateOrder.size(); ++orderingIndex) {
+                // index into candidates/ranking
+                size_t i = candidateOrder[orderingIndex];
                 solutions.push_back(_candidates[i].solution);
             }
 
@@ -382,7 +392,12 @@ namespace mongo {
         }
 
         // Clear out the candidate plans, leaving only stats as we're all done w/them.
-        for (size_t i = 0; i < _candidates.size(); ++i) {
+        // Traverse candidate plans in order or score
+        for (size_t orderingIndex = 0;
+             orderingIndex < candidateOrder.size(); ++orderingIndex) {
+            // index into candidates/ranking
+            size_t i = candidateOrder[orderingIndex];
+
             if (i == bestChild) { continue; }
             if (i == backupChild) { continue; }
 

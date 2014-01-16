@@ -31,6 +31,7 @@
 #include <list>
 #include <vector>
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
@@ -48,7 +49,9 @@ namespace mongo {
     public:
         /**
          * Returns index in 'candidates' of which plan is best.
-         * If 'why' is not NULL, populates it with information relevant to why that plan was picked.
+         * Populates 'why' with information relevant to how each plan fared in the ranking process.
+         * Caller owns pointers in 'why'.
+         * 'candidateOrder' holds indices into candidates ordered by score (winner in first element).
          */
         static size_t pickBestPlan(const vector<CandidatePlan>& candidates,
                                    PlanRankingDecision* why);
@@ -86,18 +89,36 @@ namespace mongo {
      * and used by the CachedPlanRunner to compare expected performance with actual.
      */
     struct PlanRankingDecision {
-        PlanRankingDecision() : statsOfWinner(NULL), score(0), onlyOneSolution(false) { }
+        /**
+         * Make a deep copy.
+         */
+        PlanRankingDecision* clone() const {
+            PlanRankingDecision* decision = new PlanRankingDecision();
+            for (size_t i = 0; i < stats.size(); ++i) {
+                PlanStageStats* s = stats.vector()[i];
+                invariant(s);
+                decision->stats.mutableVector().push_back(s->clone());
+            }
+            decision->scores = scores;
+            decision->candidateOrder = candidateOrder;
+            return decision;
+        }
 
+        // Stats of all plans sorted in descending order by score.
         // Owned by us.
-        PlanStageStats* statsOfWinner;
+        OwnedPointerVector<PlanStageStats> stats;
 
-        // The "goodness" score corresponging to 'statsOfWinner'.
-        double score;
+        // The "goodness" score corresponding to 'stats'.
+        // Sorted in descending order.
+        std::vector<double> scores;
 
-        bool onlyOneSolution;
-
-        // TODO: We can place anything we want here.  What's useful to the cache?  What's useful to
-        // planning and optimization?
+        // Ordering of original plans in descending of score.
+        // Filled in by PlanRanker::pickBestPlan(candidates, ...)
+        // so that candidates[candidateOrder[0]] refers to the best plan
+        // with corresponding cores[0] and stats[0]. Runner-up would be
+        // candidates[candidateOrder[1]] followed by
+        // candidates[candidateOrder[2]], ...
+        std::vector<size_t> candidateOrder;
     };
 
 }  // namespace mongo

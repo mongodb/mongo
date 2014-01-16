@@ -42,7 +42,7 @@ namespace mongo {
         for (std::vector<BSONObj>::const_iterator i = indexKeyPatterns.begin();
              i != indexKeyPatterns.end(); ++i) {
             const BSONObj& indexKeyPattern = *i;
-            this->indexKeyPatterns.push_back(indexKeyPattern.copy());
+            this->indexKeyPatterns.push_back(indexKeyPattern.getOwned());
         }
     }
 
@@ -55,13 +55,13 @@ namespace mongo {
     AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query, const BSONObj& sort,
                                    const BSONObj& projection,
                                    const std::vector<BSONObj>& indexKeyPatterns)
-        : query(query.copy()),
-          sort(sort.copy()),
-          projection(projection.copy()) {
+        : query(query.getOwned()),
+          sort(sort.getOwned()),
+          projection(projection.getOwned()) {
         for (std::vector<BSONObj>::const_iterator i = indexKeyPatterns.begin();
              i != indexKeyPatterns.end(); ++i) {
             const BSONObj& indexKeyPattern = *i;
-            this->indexKeyPatterns.push_back(indexKeyPattern.copy());
+            this->indexKeyPatterns.push_back(indexKeyPattern.getOwned());
         }
     }
 

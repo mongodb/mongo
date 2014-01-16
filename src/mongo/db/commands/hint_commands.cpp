@@ -30,6 +30,7 @@
 #include <sstream>
 
 #include "mongo/base/init.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
@@ -44,30 +45,6 @@ namespace {
     using std::string;
     using std::vector;
     using namespace mongo;
-
-    /**
-     * Releases memory for container of pointers.
-     * XXX: move elsewhere when something similar is available in util libraries.
-     */
-    template <typename T>
-    class ContainerPointersDeleter {
-    public:
-        ContainerPointersDeleter(T* container) : _container(container) {
-            invariant(_container);
-        }
-
-        ~ContainerPointersDeleter() {
-            for (typename T::const_iterator i = _container->begin();
-                 i != _container->end(); ++i) {
-                invariant(*i);
-                delete *i;
-            }
-            _container->clear();
-        }
-    private:
-        MONGO_DISALLOW_COPYING(ContainerPointersDeleter);
-        T* _container;
-    };
 
     /**
      * Utility function to extract error code and message from status
@@ -224,9 +201,8 @@ namespace mongo {
         //         }
         //  }
         BSONArrayBuilder hintsBuilder(bob->subarrayStart("hints"));
-        vector<AllowedIndexEntry*> entries = querySettings.getAllAllowedIndices();
-        // Frees resources in entries on destruction.
-        ContainerPointersDeleter<vector<AllowedIndexEntry*> > deleter(&entries);
+        OwnedPointerVector<AllowedIndexEntry> entries;
+        entries.mutableVector() = querySettings.getAllAllowedIndices();
         for (vector<AllowedIndexEntry*>::const_iterator i = entries.begin();
              i != entries.end(); ++i) {
             AllowedIndexEntry* entry = *i;
@@ -302,9 +278,8 @@ namespace mongo {
 
         // Get entries from query settings. We need to remove corresponding entries from the plan
         // cache shortly.
-        vector<AllowedIndexEntry*> entries = querySettings->getAllAllowedIndices();
-        // Frees resources in entries on destruction.
-        ContainerPointersDeleter<vector<AllowedIndexEntry*> > deleter(&entries);
+        OwnedPointerVector<AllowedIndexEntry> entries;
+        entries.mutableVector() = querySettings->getAllAllowedIndices();
 
         // OK to proceed with clearing entire cache.
         querySettings->clearAllowedIndices();
@@ -385,7 +360,7 @@ namespace mongo {
             if (obj.isEmpty()) {
                 return Status(ErrorCodes::BadValue, "index specification cannot be empty");
             }
-            indexes.push_back(obj.copy());
+            indexes.push_back(obj.getOwned());
         }
 
         CanonicalQuery* cqRaw;

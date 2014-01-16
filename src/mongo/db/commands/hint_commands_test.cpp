@@ -82,10 +82,25 @@ namespace {
             ASSERT_EQUALS(indexesElt.type(), mongo::Array);
 
             // All fields OK. Append to vector.
-            hints.push_back(obj.copy());
+            hints.push_back(obj.getOwned());
         }
 
         return hints;
+    }
+
+    /**
+     * Utility function to create a PlanRankingDecision
+     */
+    PlanRankingDecision* createDecision(size_t numPlans) {
+        auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+        for (size_t i = 0; i < numPlans; ++i) {
+            auto_ptr<PlanStageStats> stats(new PlanStageStats(CommonStats(), STAGE_COLLSCAN));
+            stats->specific.reset(new CollectionScanStats());
+            why->stats.mutableVector().push_back(stats.release());
+            why->scores.push_back(0U);
+            why->candidateOrder.push_back(i);
+        }
+        return why.release();
     }
 
     /**
@@ -107,7 +122,7 @@ namespace {
         qs.cacheData->tree.reset(new PlanCacheIndexTree());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        ASSERT_OK(planCache->add(*cq, solns, new PlanRankingDecision()));
+        ASSERT_OK(planCache->add(*cq, solns, createDecision(1U)));
     }
 
     /**
@@ -124,19 +139,26 @@ namespace {
         ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, sortObj, projectionObj, &cqRaw));
         scoped_ptr<CanonicalQuery> cq(cqRaw);
 
-        // Retrieve cached solutions from plan cache.
-        vector<CachedSolution*> solutions = planCache.getAllSolutions();
+        // Retrieve cache entries from plan cache.
+        vector<PlanCacheEntry*> entries = planCache.getAllEntries();
 
         // Search keys.
         bool found = false;
-        for (vector<CachedSolution*>::const_iterator i = solutions.begin(); i != solutions.end(); i++) {
-            CachedSolution* cs = *i;
-            const PlanCacheKey& currentKey = cs->key;
+        for (vector<PlanCacheEntry*>::const_iterator i = entries.begin(); i != entries.end(); i++) {
+            PlanCacheEntry* entry = *i;
+
+            // Canonicalizing query shape in cache entry to get cache key.
+            // Alternatively, we could add key to PlanCacheEntry but that would be used in one place only.
+            ASSERT_OK(CanonicalQuery::canonicalize(ns, entry->query, entry->sort,
+                                                   entry->projection, &cqRaw));
+            scoped_ptr<CanonicalQuery> currentQuery(cqRaw);
+
+            const PlanCacheKey& currentKey = currentQuery->getPlanCacheKey();
             if (currentKey == cq->getPlanCacheKey()) {
                 found = true;
             }
-            // Release resources for cached solution after extracting key.
-            delete cs;
+            // Release resources for cache entry after extracting key.
+            delete entry;
         }
         return found;
     }

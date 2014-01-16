@@ -26,7 +26,9 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <vector>
+#include <utility>
 
 #include "mongo/db/query/plan_ranker.h"
 
@@ -35,49 +37,71 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
 
+namespace {
+
+    /**
+     * Comparator for (scores, candidateIndex) in pickBestPlan().
+     */
+    bool scoreComparator(const std::pair<double, size_t>& lhs,
+                         const std::pair<double, size_t>& rhs) {
+        // Just compare score in lhs.first and rhs.first;
+        // Ignore candidate array index in lhs.second and rhs.second.
+        return lhs.first > rhs.first;
+    }
+
+} // namespace
+
 namespace mongo {
+
+    using std::vector;
 
     // static 
     size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates,
                                     PlanRankingDecision* why) {
+        invariant(!candidates.empty());
+        invariant(why);
+
         // Each plan will have a stat tree.
         vector<PlanStageStats*> statTrees;
 
         // Get stat trees from each plan.
+        // Copy stats trees instead of transferring ownership
+        // because multi plan runner will need its own stats
+        // trees for explain.
         for (size_t i = 0; i < candidates.size(); ++i) {
             statTrees.push_back(candidates[i].root->getStats());
         }
 
+        // Holds (score, candidateInndex).
+        // Used to derive scores and candidate ordering.
+        vector<std::pair<double, size_t> > scoresAndCandidateindices;
+
         // Compute score for each tree.  Record the best.
-        double maxScore = 0;
-        size_t bestChild = numeric_limits<size_t>::max();
         for (size_t i = 0; i < statTrees.size(); ++i) {
             QLOG() << "scoring plan " << i << ":\n" << candidates[i].solution->toString();
             double score = scoreTree(statTrees[i]);
             QLOG() << "score = " << score << endl;
-            why->score = score;
-            if (score > maxScore) {
-                maxScore = score;
-                bestChild = i;
-            }
+            scoresAndCandidateindices.push_back(std::make_pair(score, i));
         }
 
-        // Make sure we got something.
-        verify(numeric_limits<size_t>::max() != bestChild);
+        // Sort (scores, candidateIndex). Get best child and populate candidate ordering.
+        std::stable_sort(scoresAndCandidateindices.begin(), scoresAndCandidateindices.end(),
+                         scoreComparator);
 
-        if (NULL != why) {
-            // Record the stats of the winner.
-            why->statsOfWinner = statTrees[bestChild];
+        // Update results in 'why'
+        // Stats and scores in 'why' are sorted in descending order by score.
+        why->stats.clear();
+        why->scores.clear();
+        why->candidateOrder.clear();
+        for (size_t i = 0; i < scoresAndCandidateindices.size(); ++i) {
+            double score = scoresAndCandidateindices[i].first;
+            size_t candidateIndex = scoresAndCandidateindices[i].second;
+            why->stats.mutableVector().push_back(statTrees[candidateIndex]);
+            why->scores.push_back(score);
+            why->candidateOrder.push_back(candidateIndex);
         }
 
-        // Clean up stats of losers.
-        for (size_t i = 0; i < statTrees.size(); ++i) {
-            // If why is null we're not saving the bestChild's stats and we can delete it.
-            if (i != bestChild || NULL == why) {
-                delete statTrees[i];
-            }
-        }
-
+        size_t bestChild = scoresAndCandidateindices[0].second;
         return bestChild;
     }
 

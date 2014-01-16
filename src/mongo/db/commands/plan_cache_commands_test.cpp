@@ -84,7 +84,7 @@ namespace {
              ASSERT_TRUE(projectionElt.isABSONObj());
 
              // All fields OK. Append to vector.
-             shapes.push_back(obj.copy());
+             shapes.push_back(obj.getOwned());
         }
         return shapes;
     }
@@ -96,6 +96,21 @@ namespace {
         auto_ptr<SolutionCacheData> scd(new SolutionCacheData());
         scd->tree.reset(new PlanCacheIndexTree());
         return scd.release();
+    }
+
+    /**
+     * Utility function to create a PlanRankingDecision
+     */
+    PlanRankingDecision* createDecision(size_t numPlans) {
+        auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+        for (size_t i = 0; i < numPlans; ++i) {
+            auto_ptr<PlanStageStats> stats(new PlanStageStats(CommonStats(), STAGE_COLLSCAN));
+            stats->specific.reset(new CollectionScanStats());
+            why->stats.mutableVector().push_back(stats.release());
+            why->scores.push_back(0U);
+            why->candidateOrder.push_back(i);
+        }
+        return why.release();
     }
 
     TEST(PlanCacheCommandsTest, planCacheListQueryShapesEmpty) {
@@ -116,7 +131,7 @@ namespace {
         qs.cacheData.reset(createSolutionCacheData());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, solns, createDecision(1U));
 
         vector<BSONObj> shapes = getShapes(planCache);
         ASSERT_EQUALS(shapes.size(), 1U);
@@ -141,7 +156,7 @@ namespace {
         qs.cacheData.reset(createSolutionCacheData());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, solns, createDecision(1U));
         ASSERT_EQUALS(getShapes(planCache).size(), 1U);
 
         // Clear cache and confirm number of keys afterwards.
@@ -223,8 +238,8 @@ namespace {
         qs.cacheData.reset(createSolutionCacheData());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        planCache.add(*cqA, solns, new PlanRankingDecision());
-        planCache.add(*cqB, solns, new PlanRankingDecision());
+        planCache.add(*cqA, solns, createDecision(1U));
+        planCache.add(*cqB, solns, createDecision(1U));
 
         // Check keys in cache before dropping {b: 1}
         vector<BSONObj> shapesBefore = getShapes(planCache);
@@ -278,7 +293,7 @@ namespace {
         BSONElement feedbackElt = obj.getField("feedback");
         ASSERT_TRUE(feedbackElt.isABSONObj());
 
-        return obj.copy();
+        return obj.getOwned();
     }
 
     /**
@@ -332,7 +347,7 @@ namespace {
         qs.cacheData.reset(createSolutionCacheData());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, solns, createDecision(1U));
 
         vector<BSONObj> plans = getPlans(planCache, cq->getQueryObj(),
                                          cq->getParsed().getSort(), cq->getParsed().getProj());
@@ -353,7 +368,7 @@ namespace {
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
         solns.push_back(&qs);
-        planCache.add(*cq, solns, new PlanRankingDecision());
+        planCache.add(*cq, solns, createDecision(2U));
 
         vector<BSONObj> plans = getPlans(planCache, cq->getQueryObj(),
                                          cq->getParsed().getSort(), cq->getParsed().getProj());

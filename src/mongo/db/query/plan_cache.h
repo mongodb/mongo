@@ -205,24 +205,27 @@ namespace mongo {
     };
 
     /**
-     * Used internally by the cache to track entries and their performance over time.
+     * Used by the cache to track entries and their performance over time.
+     * Also used by the plan cache commands to display plan cache state.
      */
     class PlanCacheEntry {
     private:
         MONGO_DISALLOW_COPYING(PlanCacheEntry);
     public:
-        // TODO: Do we want to store more information about the query here?
-
         /**
          * Create a new PlanCacheEntry.
          * Grabs any planner-specific data required from the solutions.
          * Takes ownership of the PlanRankingDecision that placed the plan in the cache.
-         * XXX: what else should this take?
          */
         PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
-                   PlanRankingDecision* d);
+                       PlanRankingDecision* why);
 
         ~PlanCacheEntry();
+
+        /**
+         * Make a deep copy.
+         */
+        PlanCacheEntry* clone() const;
 
         // For debugging.
         std::string toString() const;
@@ -251,8 +254,8 @@ namespace mongo {
         // Performance stats
         //
 
-        // Why the best solution was picked.
-        // TODO: Do we want to store other information like the other plans considered?
+        // Information that went into picking the winning plan and also why
+        // the other plans lost.
         boost::scoped_ptr<PlanRankingDecision> decision;
 
         // Annotations from cached runs.  The CachedSolutionRunner provides these stats about its
@@ -298,16 +301,6 @@ namespace mongo {
          * suitable for lookup/inclusion in the cache.
          */
         static bool shouldCacheQuery(const CanonicalQuery& query);
-
-        /**
-         * Generates a key for a normalized (for caching) canonical query
-         * from the match expression and sort order.
-         * This is an expensive operation because it clones and sorts
-         * the expression tree in order to generate a string from
-         * the normalized expression tree. The string generation is also
-         * potentially expensive.
-         */
-        static PlanCacheKey getPlanCacheKey(const CanonicalQuery& query);
 
         PlanCache() { }
 
@@ -369,11 +362,23 @@ namespace mongo {
         void clear();
 
         /**
-         * Returns a vector of all cached solutions.
-         * Caller owns the result vector and is responsible for cleaning up
-         * the cached solutions.
+         * Returns a copy of a cache entry.
+         * Used by planCacheListPlans to display plan details.
+          *
+         * If there is no entry in the cache for the 'query', returns an error Status.
+         *
+         * If there is an entry in the cache, populates 'entryOut' and returns Status::OK().  Caller
+         * owns '*entryOut'.
          */
-        std::vector<CachedSolution*> getAllSolutions() const;
+        Status getEntry(const CanonicalQuery& cq, PlanCacheEntry** entryOut) const;
+
+        /**
+         * Returns a vector of all cache entries.
+         * Caller owns the result vector and is responsible for cleaning up
+         * the cache entry copies.
+         * Used by planCacheListQueryShapes and hint_commands_test.cpp.
+         */
+        std::vector<PlanCacheEntry*> getAllEntries() const;
 
         /**
          * Returns number of entries in cache.

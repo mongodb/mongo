@@ -91,10 +91,12 @@ var plans = getPlans(queryA1, sortA1, projectionA1);
 assert.eq(2, plans.length, 'unexpected number of plans cached for query');
 
 // Print every plan
+// Plan details/feedback verified separately in section after Query Plan Revision tests.
 print('planCacheListPlans result:');
 for (var i = 0; i < plans.length; i++) {
     print('plan ' + i + ': ' + tojson(plans[i]));
 }
+
 
 
 //
@@ -155,3 +157,41 @@ assert.eq(0, getShapes().length, 'plan cache should be empty after adding index'
 
 // Case 4: The mongod process restarts
 // Not applicable.
+
+
+
+//
+// Tests for plan reason and feedback in planCacheListPlans
+//
+
+// Generate more plans for test query by adding indexes (compound and sparse).
+// This will also clear the plan cache.
+t.ensureIndex({a: -1}, {sparse: true});
+t.ensureIndex({a: 1, b: 1});
+
+// Implementation note: feedback stats is calculated after 20 executions.
+// See PlanCacheEntry::kMaxFeedback.
+var numExecutions = 100;
+for (var i = 0; i < numExecutions; i++) {
+    assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'query failed');
+}
+
+plans = getPlans(queryA1, sortA1, projectionA1);
+
+// This should be obvious but feedback is available only for the first (winning) plan.
+print('planCacheListPlans result (after adding indexes and completing 20 executions):');
+for (var i = 0; i < plans.length; i++) {
+    print('plan ' + i + ': ' + tojson(plans[i]));
+    assert.gt(plans[i].reason.score, 0, 'plan ' + i + ' score is invalid');
+    if (i > 0) {
+        assert.lte(plans[i].reason.score, plans[i-1].reason.score,
+                   'plans not sorted by score in descending order. ' +
+                   'plan ' + i + ' has a score that is greater than that of the previous plan');
+    }
+    assert(plans[i].reason.stats.hasOwnProperty('type'), 'no stats inserted for plan ' + i);
+}
+
+// feedback meaningful only for plan 0
+// feedback is capped at 20
+assert.eq(20, plans[0].feedback.nfeedback, 'incorrect nfeedback');
+assert.gt(plans[0].feedback.averageScore, 0, 'invalid average score');
