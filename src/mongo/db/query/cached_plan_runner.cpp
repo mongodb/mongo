@@ -166,9 +166,14 @@ namespace mongo {
         }
 
         Database* db = cc().database();
-        verify(NULL != db);
+        // XXX: We need to check for NULL because this is called upon
+        // destruction of the CachedPlanRunner. In some cases, the db
+        // or collection could be dropped without kill() being called
+        // on the runner (for example, timeout of a ClientCursor holding
+        // the runner).
+        if (NULL == db) { return; }
         Collection* collection = db->getCollection(_canonicalQuery->ns());
-        verify(NULL != collection);
+        if (NULL == collection) { return; }
         PlanCache* cache = collection->infoCache()->getPlanCache();
 
         std::auto_ptr<PlanCacheEntryFeedback> feedback(new PlanCacheEntryFeedback());
