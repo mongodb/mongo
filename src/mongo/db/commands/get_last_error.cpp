@@ -120,6 +120,9 @@ namespace mongo {
             // There is a special case when "wOpTime" is explicitly provided by the user - in this
             // we *only* enforce the write concern if it is valid.
             //
+            // We always need to either report "err" (if ok : 1) or "errmsg" (if ok : 0), even if
+            // err is null.
+            //
 
             LastError *le = lastError.disableForCommand();
 
@@ -130,17 +133,17 @@ namespace mongo {
             // for sharding; also useful in general for debugging
             result.appendNumber( "connectionId" , c.getConnectionId() );
 
-            bool errorOccured = false;
+            bool errorOccurred = false;
             BSONObj writeConcernDoc = cmdObj;
 
             // Errors aren't reported when wOpTime is used
             if ( cmdObj["wOpTime"].eoo() ) {
                 if ( le->nPrev != 1 ) {
-                    errorOccured = LastError::noError.appendSelf( result, false );
+                    errorOccurred = LastError::noError.appendSelf( result, false );
                     le->appendSelfStatus( result );
                 }
                 else {
-                    errorOccured = le->appendSelf( result, false );
+                    errorOccurred = le->appendSelf( result, false );
                 }
             }
 
@@ -170,7 +173,7 @@ namespace mongo {
             }
 
             // Don't wait for replication if there was an error reported - this matches 2.4 behavior
-            if ( errorOccured ) {
+            if ( errorOccurred ) {
                 dassert( cmdObj["wOpTime"].eoo() );
                 return true;
             }
@@ -187,17 +190,23 @@ namespace mongo {
 
             cc().curop()->setMessage( "waiting for write concern" );
 
-            WriteConcernResult res;
-            status = waitForWriteConcern( writeConcern, wOpTime, &res );
-            res.appendTo( &result );
+            WriteConcernResult wcResult;
+            status = waitForWriteConcern( writeConcern, wOpTime, &wcResult );
+            wcResult.appendTo( &result );
 
             // For backward compatibility with 2.4, wtimeout returns ok : 1.0
-            if ( res.wTimedOut ) {
+            if ( wcResult.wTimedOut ) {
+                dassert( !wcResult.err.empty() ); // so we always report err
                 dassert( !status.isOK() );
                 result.append( "errmsg", "timed out waiting for slaves" );
                 result.append( "code", status.code() );
                 return true;
             }
+
+            // Always need an err field appended
+            dassert( wcResult.err.empty() );
+            if ( !errorOccurred )
+                result.appendNull( "err" );
 
             return appendCommandStatus( result, status );
         }

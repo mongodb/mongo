@@ -1617,12 +1617,16 @@ namespace mongo {
                 }
 
                 // Suppress write concern errors if a write error occurred, to match mongod behavior
-                if ( errorOccurred || numWCErrors == 0 )
+                if ( errorOccurred || numWCErrors == 0 ) {
+                    // Still need to return err
+                    if ( !errorOccurred ) result.appendNull( "err" );
                     return true;
+                }
 
                 if ( numWCErrors == 1 ) {
 
-                    // Return the single write concern error we found
+                    // Return the single write concern error we found, err should be set or not
+                    // from gle response
                     result.appendElements( lastErrResponse->gleResponse );
                     return lastErrResponse->gleResponse["ok"].trueValue();
                 }
@@ -1631,6 +1635,9 @@ namespace mongo {
                     // Return a generic combined WC error message
                     result.append( "errs", errors.arr() );
                     result.append( "errObjects", errorRawGLE.arr() );
+
+                    // Need to always return err
+                    result.appendNull( "err" );
 
                     return appendCommandStatus( result,
                         Status( ErrorCodes::WriteConcernFailed,

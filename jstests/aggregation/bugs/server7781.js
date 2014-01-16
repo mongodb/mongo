@@ -41,7 +41,7 @@ function checkOutput(cmdOut, aggOut, expectedNum) {
 
     assert(allSame);
 }
-    
+
 // We use this to generate points. Using a single global to avoid reseting RNG in each pass.
 var pointMaker = new GeoNearRandomTest(coll);
 
@@ -60,8 +60,14 @@ function test(db, sharded, indexType) {
             db.adminCommand({moveChunk: db[coll].getFullName(), find: {rand: i/10},
                                                                 to: shards[i%shards.length]});
         }
-
+try{
         assert.eq(config.chunks.count({'ns': db[coll].getFullName()}), 10);
+}
+catch( e) {
+    printjson(e);
+    printjson(configD.find().toArray());
+    throw e;
+}
     }
 
     // insert points
@@ -118,7 +124,9 @@ function test(db, sharded, indexType) {
 test(db, false, '2d');
 test(db, false, '2dsphere');
 
-var sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1});
+sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1, verbose : 3 });
+configD = sharded.c0.getCollection("config.chunks");
+assert.neq(null, configD);
 sharded.stopBalancer();
 sharded.adminCommand( { enablesharding : "test" } );
 

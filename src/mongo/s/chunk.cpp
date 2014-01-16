@@ -938,6 +938,7 @@ namespace mongo {
             ChunkMap::const_iterator last = boost::prior(it);
 
             if (!(it->second->getMin() == last->second->getMax())) {
+                PRINT(last->second->toString());
                 PRINT(it->second->toString());
                 PRINT(it->second->getMin());
                 PRINT(last->second->getMax());

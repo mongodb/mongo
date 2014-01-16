@@ -434,7 +434,7 @@ namespace {
         const BSONObj gleResponse = fromjson( "{ok: 1.0, err: null}" );
 
         BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 1 );
+        ASSERT_EQUALS( stripped.nFields(), 2 ); // with err, ok : true
         ASSERT( stripped["ok"].trueValue() );
     }
 
@@ -467,7 +467,7 @@ namespace {
             fromjson( "{ok: 1.0, err: 'message', code: 12345}" );
 
         BSONObj stripped = BatchSafeWriter::stripNonWCInfo( gleResponse );
-        ASSERT_EQUALS( stripped.nFields(), 1 );
+        ASSERT_EQUALS( stripped.nFields(), 2 ); // with err, ok : true
         ASSERT( stripped["ok"].trueValue() );
     }
 
