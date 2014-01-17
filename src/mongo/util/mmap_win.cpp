@@ -71,7 +71,7 @@ namespace mongo {
     }
 
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex(new mutex("flushMutex")) {
+        : _flushMutex(new mutex("flushMutex")), _uniqueId(0) {
         fd = 0;
         maphandle = 0;
         len = 0;

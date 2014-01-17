@@ -113,6 +113,8 @@ namespace mongo {
         string filename() const { return _filename; }
         void setFilename(const std::string& fn);
 
+        virtual uint64_t getUniqueId() const = 0;
+
     private:
         string _filename;
         static int _flushAll( bool sync ); // returns n flushed
@@ -210,6 +212,8 @@ namespace mongo {
         { }
 #endif
 
+        virtual uint64_t getUniqueId() const { return _uniqueId; }
+
     private:
         static void updateLength( const char *filename, unsigned long long &length );
 
@@ -217,7 +221,7 @@ namespace mongo {
         HANDLE maphandle;
         std::vector<void *> views;
         unsigned long long len;
-
+        const uint64_t _uniqueId;
 #ifdef _WIN32
         boost::shared_ptr<mutex> _flushMutex;
         void clearWritableBits(void *privateView);

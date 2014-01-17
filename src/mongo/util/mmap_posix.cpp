@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
@@ -31,6 +32,10 @@
 
 using namespace mongoutils;
 
+namespace {
+    mongo::AtomicUInt64 mmfNextId(0);
+}
+
 namespace mongo {
     static size_t fetchMinOSPageSizeBytes() {
         size_t minOSPageSizeBytes = sysconf( _SC_PAGESIZE );
@@ -38,8 +43,10 @@ namespace mongo {
         return minOSPageSizeBytes;
     }
     const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
+        
+    
 
-    MemoryMappedFile::MemoryMappedFile() {
+    MemoryMappedFile::MemoryMappedFile() : _uniqueId(mmfNextId.fetchAndAdd(1)) {
         fd = 0;
         maphandle = 0;
         len = 0;
@@ -207,8 +214,8 @@ namespace mongo {
 
     class PosixFlushable : public MemoryMappedFile::Flushable {
     public:
-        PosixFlushable( MemoryMappedFile* theFile, void* view , HANDLE fd , long len )
-            : _theFile( theFile ), _view( view ) , _fd( fd ) , _len(len) {
+        PosixFlushable( MemoryMappedFile* theFile, void* view , HANDLE fd , long len)
+            : _theFile( theFile ), _view( view ), _fd(fd), _len(len), _id(_theFile->getUniqueId()) {
         }
 
         void flush() {
@@ -225,7 +232,9 @@ namespace mongo {
 
             // some error, lets see if we're supposed to exist
             LockMongoFilesShared mmfilesLock;
-            if ( MongoFile::getAllFiles().count( _theFile ) == 0 ) {
+            std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
+            std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
+            if ( (it == mmfs.end()) || ((*it)->getUniqueId() != _id) ) {
                 log() << "msync failed with: " << errnoWithDescription()
                       << " but file doesn't exist anymore, so ignoring";
                 // this was deleted while we were unlocked
@@ -241,10 +250,11 @@ namespace mongo {
         void * _view;
         HANDLE _fd;
         long _len;
+        const uint64_t _id;
     };
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new PosixFlushable( this, viewForFlushing() , fd , len );
+        return new PosixFlushable( this, viewForFlushing(), fd, len);
     }
 
 
