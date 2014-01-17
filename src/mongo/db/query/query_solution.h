@@ -354,9 +354,6 @@ namespace mongo {
         BSONObj indexKeyPattern;
         bool indexIsMultiKey;
 
-        // Only set for 2d.
-        int limit;
-
         int direction;
 
         // maxScan option to .find() limits how many docs we look at.

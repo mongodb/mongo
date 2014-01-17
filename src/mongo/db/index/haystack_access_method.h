@@ -58,9 +58,6 @@ namespace mongo {
         HaystackAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~HaystackAccessMethod() { }
 
-        // Not implemented.
-        virtual Status newCursor(IndexCursor** out) const;
-
     protected:
         friend class GeoHaystackSearchCommand;
         void searchCommand(const BSONObj& nearObj, double maxDistance, const BSONObj& search,

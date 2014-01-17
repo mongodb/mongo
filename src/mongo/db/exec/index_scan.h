@@ -47,8 +47,6 @@ namespace mongo {
     struct IndexScanParams {
         IndexScanParams() : descriptor(NULL),
                             direction(1),
-                            limit(0),
-                            forceBtreeAccessMethod(false),
                             doNotDedup(false),
                             maxScan(0),
                             addKeyMetadata(false) { }
@@ -58,12 +56,6 @@ namespace mongo {
         IndexBounds bounds;
 
         int direction;
-
-        // This only matters for 2d indices and will be ignored by every other index.
-        int limit;
-
-        // Special indices internally open an IndexCursor over themselves but as a straight Btree.
-        bool forceBtreeAccessMethod;
 
         bool doNotDedup;
 
@@ -77,6 +69,11 @@ namespace mongo {
     /**
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
      * filter.  Internally dedups on DiskLoc.
+     *
+     * XXX: we probably should split this into 2 stages: one btree-only "fast" ixscan and one
+     *      that strictly talks through the index API.  Need to figure out what we really want
+     *      to ship down through that API predicate-wise though, currently is a BSONObj but that's
+     *      not going to be enough. See SERVER-12397 for tracking.
      *
      * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
      */

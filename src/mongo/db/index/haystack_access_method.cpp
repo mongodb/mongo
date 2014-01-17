@@ -137,10 +137,6 @@ namespace mongo {
         keys->insert(buf.obj());
     }
 
-    Status HaystackAccessMethod::newCursor(IndexCursor** out) const {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on Haystack");
-    }
-
     void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
                                              const BSONObj& search, BSONObjBuilder* result,
                                              unsigned limit) {

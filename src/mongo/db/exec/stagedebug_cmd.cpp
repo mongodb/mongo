@@ -187,8 +187,6 @@ namespace mongo {
                 params.bounds.endKey = nodeArgs["endKey"].Obj();
                 params.bounds.endKeyInclusive = nodeArgs["endKeyInclusive"].Bool();
                 params.direction = nodeArgs["direction"].numberInt();
-                params.limit = nodeArgs["limit"].numberInt();
-                params.forceBtreeAccessMethod = false;
 
                 return new IndexScan(params, workingSet, matcher);
             }

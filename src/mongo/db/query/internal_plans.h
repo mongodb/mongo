@@ -103,9 +103,6 @@ namespace mongo {
             params.bounds.startKey = startKey;
             params.bounds.endKey = endKey;
             params.bounds.endKeyInclusive = endKeyInclusive;
-            // This always as 'true' as this is the new btreecursor.  Even if the underlying index
-            // is 'special' (ie, expression) we treat it like a Btree.
-            params.forceBtreeAccessMethod = true;
 
             WorkingSet* ws = new WorkingSet();
             IndexScan* ix = new IndexScan(params, ws, NULL);

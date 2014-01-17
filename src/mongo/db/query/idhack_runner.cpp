@@ -66,7 +66,9 @@ namespace mongo {
             return Runner::RUNNER_EOF;
         }
 
-        BtreeBasedAccessMethod* accessMethod = catalog->getBtreeBasedIndex( idDesc );
+        // XXX: This may not be valid always.  See SERVER-12397.
+        BtreeBasedAccessMethod* accessMethod =
+            static_cast<BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
 
         BSONObj key = _query->getQueryObj()["_id"].wrap();
 

@@ -70,9 +70,4 @@ namespace mongo {
         _keyGenerator->getKeys(obj, keys);
     }
 
-    Status BtreeAccessMethod::newCursor(IndexCursor** out) const {
-        *out = new BtreeIndexCursor(_btreeState, _interface);
-        return Status::OK();
-    }
-
 }  // namespace mongo

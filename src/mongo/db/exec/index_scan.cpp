@@ -58,24 +58,7 @@ namespace mongo {
           _params(params),
           _btreeCursor(NULL) {
 
-        string amName;
-
-        // If the query is using complex bounds, we must use a Btree access method, since that's the
-        // only one that handles complex bounds.
-        if (params.forceBtreeAccessMethod || !_params.bounds.isSimpleRange) {
-            _iam = _descriptor->getIndexCatalog()->getBtreeIndex(_descriptor);
-            amName = "";
-        }
-        else {
-            amName = _descriptor->getIndexCatalog()->getAccessMethodName(_descriptor->keyPattern());
-            _iam = _descriptor->getIndexCatalog()->getIndex(_descriptor);
-        }
-
-        if (IndexNames::GEO_2D == amName || IndexNames::GEO_2DSPHERE == amName) {
-            // _endKey is meaningless for 2d and 2dsphere.
-            verify(_params.bounds.isSimpleRange);
-            verify(_params.bounds.endKey.isEmpty());
-        }
+        _iam = _descriptor->getIndexCatalog()->getIndex(_descriptor);
 
         if (_params.doNotDedup) {
             _shouldDedup = false;

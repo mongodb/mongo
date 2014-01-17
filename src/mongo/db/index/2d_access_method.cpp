@@ -191,8 +191,4 @@ namespace mongo {
         }
     }
 
-    Status TwoDAccessMethod::newCursor(IndexCursor** out) const {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2");
-    }
-
 }  // namespace mongo

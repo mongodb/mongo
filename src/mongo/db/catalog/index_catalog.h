@@ -101,10 +101,6 @@ namespace mongo {
         // never returns NULL
         IndexAccessMethod* getIndex( const IndexDescriptor* desc );
 
-        BtreeBasedAccessMethod* getBtreeBasedIndex( const IndexDescriptor* desc );
-
-        IndexAccessMethod* getBtreeIndex( const IndexDescriptor* desc );
-
         class IndexIterator {
         public:
             bool more();

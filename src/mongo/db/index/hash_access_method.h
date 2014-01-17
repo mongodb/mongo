@@ -48,8 +48,6 @@ namespace mongo {
         HashAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~HashAccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out) const;
-
         // This is a NO-OP.
         virtual Status setOptions(const CursorOptions& options) {
             return Status::OK();

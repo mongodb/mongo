@@ -38,8 +38,4 @@ namespace mongo {
         fts::FTSIndexFormat::getKeys(_ftsSpec, obj, keys);
     }
 
-    Status FTSAccessMethod::newCursor(IndexCursor** out) const {
-        return Status::OK();
-    }
-
 }  // namespace mongo

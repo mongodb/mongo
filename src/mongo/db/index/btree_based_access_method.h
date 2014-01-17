@@ -47,9 +47,12 @@ namespace mongo {
      * Any access method that is Btree based subclasses from this.
      *
      * Subclassers must:
-     * 1. Call the constructor for this class from their constructors,
-     * 2. override newCursor, and
-     * 3. override getKeys.
+     * 1. Call the constructor for this class from their constructors, and
+     * 2. override getKeys.
+     *
+     * XXX: Should really think of the sub-class as providing an expression mapping of the input,
+     * don't need so many AMs, just really precomputing some data and mapping doc for getKeys(?).
+     * See SERVER-12397 for tracking.
      */
     class BtreeBasedAccessMethod : public IndexAccessMethod {
         MONGO_DISALLOW_COPYING( BtreeBasedAccessMethod );
@@ -76,7 +79,7 @@ namespace mongo {
 
         virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated);
 
-        virtual Status newCursor(IndexCursor **out) const = 0;
+        virtual Status newCursor(IndexCursor **out) const;
 
         virtual Status initializeAsEmpty();
 

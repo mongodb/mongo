@@ -1076,35 +1076,6 @@ namespace mongo {
         return entry->accessMethod();
     }
 
-    IndexAccessMethod* IndexCatalog::getBtreeIndex( const IndexDescriptor* desc ) {
-        IndexCatalogEntry* entry = _entries.find( desc );
-        massert( 17335, "cannot find index entry", entry );
-        if ( !entry->forcedBtreeIndex() ) {
-            entry->setForcedBtreeIndex( new BtreeAccessMethod( entry ) );
-        }
-        return entry->forcedBtreeIndex();
-    }
-
-    BtreeBasedAccessMethod* IndexCatalog::getBtreeBasedIndex( const IndexDescriptor* desc ) {
-
-        string type = _getAccessMethodName(desc->keyPattern());
-
-        if (IndexNames::HASHED == type ||
-            IndexNames::GEO_2DSPHERE == type ||
-            IndexNames::TEXT == type ||
-            IndexNames::GEO_HAYSTACK == type ||
-            "" == type ||
-            IndexNames::GEO_2D == type ) {
-            IndexAccessMethod* iam = getIndex( desc );
-            return dynamic_cast<BtreeBasedAccessMethod*>( iam );
-        }
-
-        error() << "getBtreeBasedIndex with a non btree index (" << type << ")";
-        invariant(0);
-        return NULL;
-    }
-
-
     IndexAccessMethod* IndexCatalog::_createAccessMethod( const IndexDescriptor* desc,
                                                           IndexCatalogEntry* entry ) {
         string type = _getAccessMethodName(desc->keyPattern());

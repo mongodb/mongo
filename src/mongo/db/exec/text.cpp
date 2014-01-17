@@ -137,7 +137,6 @@ namespace mongo {
             params.bounds.endKeyInclusive = true;
             params.bounds.isSimpleRange = true;
             params.descriptor = idxMatches[0];
-            params.forceBtreeAccessMethod = true;
             params.direction = -1;
             IndexScan* ixscan = new IndexScan(params, _ws, NULL);
             scanners.push_back(ixscan);

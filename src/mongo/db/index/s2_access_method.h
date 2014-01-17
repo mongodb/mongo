@@ -46,8 +46,6 @@ namespace mongo {
         S2AccessMethod(IndexCatalogEntry* btreeState);
         virtual ~S2AccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out) const;
-
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 

@@ -122,6 +122,11 @@ namespace mongo {
         return ret;
     }
 
+    Status BtreeBasedAccessMethod::newCursor(IndexCursor **out) const {
+        *out = new BtreeIndexCursor(_btreeState, _interface);
+        return Status::OK();
+    }
+
     // Remove the provided doc from the index.
     Status BtreeBasedAccessMethod::remove(const BSONObj &obj, const DiskLoc& loc,
         const InsertDeleteOptions &options, int64_t* numDeleted) {
@@ -343,6 +348,7 @@ namespace mongo {
         virtual Status newCursor(IndexCursor **out) const {
             return _notAllowed();
         }
+
         virtual Status initializeAsEmpty() {
             return _notAllowed();
         }

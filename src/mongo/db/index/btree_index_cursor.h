@@ -78,7 +78,7 @@ namespace mongo {
 
     private:
         // We keep the constructor private and only allow the AM to create us.
-        friend class BtreeAccessMethod;
+        friend class BtreeBasedAccessMethod;
 
         // For handling bucket deletion.
         static unordered_set<BtreeIndexCursor*> _activeCursors;

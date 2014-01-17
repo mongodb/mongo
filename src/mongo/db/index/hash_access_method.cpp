@@ -78,10 +78,6 @@ namespace mongo {
         _hashedField = firstElt.fieldName();
     }
 
-    Status HashAccessMethod::newCursor(IndexCursor** out) const {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on hash");
-    }
-
     void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
         getKeysImpl(obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
     }

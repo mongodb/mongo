@@ -236,7 +236,6 @@ namespace twod_exec {
         // Two scans: one for min one for max.
         IndexScanParams minParams;
         minParams.direction = -1;
-        minParams.forceBtreeAccessMethod = true;
         minParams.descriptor = descriptor;
         minParams.bounds.fields.resize(descriptor->keyPattern().nFields());
         minParams.doNotDedup = true;
@@ -247,7 +246,6 @@ namespace twod_exec {
         minParams.bounds.fields[0].intervals.push_back(Interval(firstBob.obj(), false, true));
 
         IndexScanParams maxParams;
-        maxParams.forceBtreeAccessMethod = true;
         maxParams.direction = 1;
         maxParams.descriptor = descriptor;
         maxParams.bounds.fields.resize(descriptor->keyPattern().nFields());

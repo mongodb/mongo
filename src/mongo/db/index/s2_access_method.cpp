@@ -85,10 +85,6 @@ namespace mongo {
                 geoFields >= 1);
     }
 
-    Status S2AccessMethod::newCursor(IndexCursor** out) const {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on S2");
-    }
-
     void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
         BSONObjSet keysToAdd;
         // We output keys in the same order as the fields we index.

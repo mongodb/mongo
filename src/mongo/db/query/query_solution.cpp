@@ -308,7 +308,7 @@ namespace mongo {
     //
 
     IndexScanNode::IndexScanNode()
-        : indexIsMultiKey(false), limit(0), direction(1), maxScan(0), addKeyMetadata(false) { }
+        : indexIsMultiKey(false), direction(1), maxScan(0), addKeyMetadata(false) { }
 
     void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);

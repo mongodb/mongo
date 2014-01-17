@@ -72,8 +72,6 @@ namespace mongo {
         TwoDAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~TwoDAccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out) const;
-
     private:
         friend class TwoDIndexCursor;
         friend class twod_internal::GeoPoint;

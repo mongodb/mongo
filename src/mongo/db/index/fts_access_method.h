@@ -41,9 +41,6 @@ namespace mongo {
         FTSAccessMethod(IndexCatalogEntry* btreeState );
         virtual ~FTSAccessMethod() { }
 
-        // Not implemented:
-        virtual Status newCursor(IndexCursor** out) const;
-
         const fts::FTSSpec& getSpec() const { return _ftsSpec; }
 
     private:
