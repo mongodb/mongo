@@ -84,8 +84,6 @@ use_clang = False
 
 options = {}
 
-options_topass = {}
-
 def add_option( name, help, nargs, contributesToVariantDir,
                 dest=None, default = None, type="string", choices=None, metavar=None ):
 
@@ -114,7 +112,7 @@ def add_option( name, help, nargs, contributesToVariantDir,
 def get_option( name ):
     return GetOption( name )
 
-def _has_option( name ):
+def has_option( name ):
     x = get_option( name )
     if x is None:
         return False
@@ -127,19 +125,12 @@ def _has_option( name ):
 
     return True
 
-def has_option( name ):
-    x = _has_option(name)
-
-    if name not in options_topass:
-        # if someone already set this, don't overwrite
-        options_topass[name] = x
-
-    return x
-
 def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
 
 def get_variant_dir():
+    if has_option('variant-dir'):
+        return "#build/" + get_option('variant-dir') 
 
     substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
 
@@ -192,6 +183,7 @@ add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
 add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
 add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
+add_option( "variant-dir", "override variant subdirectory", 1, False )
 
 add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
 add_option( "full", "include client and headers when doing scons install", 0 , False )
@@ -221,9 +213,6 @@ add_option( "libpath", "Library path if you have libraries in a nonstandard dire
 add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" , 1 , True )
 add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , True )
 add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , True )
-
-add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
-add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
 add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , False )
 
@@ -608,21 +597,8 @@ if has_option( "durableDefaultOn" ):
 if has_option( "durableDefaultOff" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
-boostCompiler = GetOption( "boostCompiler" )
-if boostCompiler is None:
-    boostCompiler = ""
-else:
-    boostCompiler = "-" + boostCompiler
-
-boostVersion = GetOption( "boostVersion" )
-if boostVersion is None:
-    boostVersion = ""
-else:
-    boostVersion = "-" + boostVersion
-
 if ( not ( usev8 or justClientLib) ):
     usev8 = True
-    options_topass["usev8"] = True
 
 extraLibPlaces = []
 
@@ -1383,11 +1359,12 @@ def doConfigure(myenv):
             Exit(1)
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
+
+        # Note that on Windows with using-system-boost builds, the following 
+        # FindSysLibDep calls do nothing useful (but nothing problematic either)
         for b in boostLibs:
-            l = "boost_" + b
-            conf.FindSysLibDep(l,
-                [ l + boostCompiler + "-mt" + boostVersion,
-                  l + boostCompiler + boostVersion ], language='C++' )
+            boostlib = "boost_" + b
+            conf.FindSysLibDep( boostlib, [ boostlib + "-mt", boostlib ], language='C++' )
 
     if conf.CheckHeader('unistd.h'):
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
