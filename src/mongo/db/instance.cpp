@@ -632,7 +632,7 @@ namespace mongo {
             cqRaw = NULL;
         }
         else if (!status.isOK()) {
-            uasserted(0,
+            uasserted(17349,
                       "could not canonicalize query " + query.toString() + "; " + causedBy(status));
         }
         std::auto_ptr<CanonicalQuery> cq(cqRaw);
@@ -653,7 +653,7 @@ namespace mongo {
         if (!cq.get()) {
             status = CanonicalQuery::canonicalize(requestNs, query, &cqRaw);
             if (!status.isOK()) {
-                uasserted(0,
+                uasserted(17350,
                           "could not canonicalize query " + query.toString() + "; " +
                           causedBy(status));
             }
