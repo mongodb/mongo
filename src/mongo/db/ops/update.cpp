@@ -453,6 +453,18 @@ namespace mongo {
         return update(request, opDebug, &driver, cq);
     }
 
+    static bool isQueryIsolated(const BSONObj& query) {
+        BSONObjIterator iter(query);
+        while (iter.more()) {
+            BSONElement elt = iter.next();
+            if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
+                return true;
+            if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
+                return true;
+        }
+        return false;
+    }
+
     UpdateResult update(
             const UpdateRequest& request,
             OpDebug* opDebug,
@@ -479,9 +491,12 @@ namespace mongo {
         }
 
         Runner* rawRunner;
-        if (!getRunner(collection, cqHolder.release(), &rawRunner).isOK()) {
-            uasserted(17243, "could not get runner " + request.getQuery().toString());
-        }
+        Status status = cq ?
+            getRunner(collection, cqHolder.release(), &rawRunner) :
+            getRunner(collection, nsString.ns(), request.getQuery(), &rawRunner, &cq);
+        uassert(17243,
+                "could not get runner " + request.getQuery().toString() + "; " + causedBy(status),
+                status.isOK());
 
         // Create the runner and setup all deps.
         auto_ptr<Runner> runner(rawRunner);
@@ -495,7 +510,9 @@ namespace mongo {
 
         // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
         // yield while evaluating the update loop below.
-        const bool isolated = QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC);
+        const bool isolated =
+            (cq && QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC)) ||
+            isQueryIsolated(request.getQuery());
 
         //
         // We'll start assuming we have one or more documents for this update. (Otherwise,
@@ -606,6 +623,18 @@ namespace mongo {
                 MatchDetails matchDetails;
                 matchDetails.requestElemMatchKey();
 
+                if (!cq) {
+                    dassert(!cqHolder.get());
+                    status = CanonicalQuery::canonicalize(request.getNamespaceString(),
+                                                          request.getQuery(),
+                                                          &cq);
+                    if (!status.isOK()) {
+                        uasserted(17353, "could not canonicalize query " +
+                                  request.getQuery().toString() + "; " + causedBy(status));
+                    }
+
+                    cqHolder.reset(cq);
+                }
                 verify(cq->root()->matchesBSON(oldObj, &matchDetails));
 
                 string matchedField;
@@ -781,19 +810,27 @@ namespace mongo {
 
         // Calling createFromQuery will populate the 'doc' with fields from the query which
         // creates the base of the update for the inserterd doc (because upsert was true)
-        uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
-        if (!driver->isDocReplacement()) {
-            opDebug->fastmodinsert = true;
-            // We need all the fields from the query to compare against for validation below.
-            original = doc.getObject();
+        if (cq) {
+            uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
+            if (!driver->isDocReplacement()) {
+                opDebug->fastmodinsert = true;
+                // We need all the fields from the query to compare against for validation below.
+                original = doc.getObject();
+            }
+            else {
+                original = request.getQuery();
+            }
         }
         else {
-            original = request.getQuery();
+            fassert(17354, CanonicalQuery::isSimpleIdQuery(request.getQuery()));
+            BSONElement idElt = request.getQuery()["_id"];
+            original = idElt.wrap();
+            fassert(17352, doc.root().appendElement(idElt));
         }
 
         // Apply the update modifications and then log the update as an insert manually.
         FieldRefSet updatedFields;
-        Status status = driver->update(StringData(), &doc, NULL, &updatedFields);
+        status = driver->update(StringData(), &doc, NULL, &updatedFields);
         if (!status.isOK()) {
             uasserted(16836, status.reason());
         }

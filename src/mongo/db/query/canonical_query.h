@@ -73,6 +73,12 @@ namespace mongo {
                                    const BSONObj& minObj, const BSONObj& maxObj,
                                    bool snapshot, CanonicalQuery** out);
 
+        /**
+         * Returns true if "query" describes an exact-match query on _id, possibly with
+         * the $isolated/$atomic modifier.
+         */
+        static bool isSimpleIdQuery(const BSONObj& query);
+
         // What namespace is this query over?
         const string& ns() const { return _pq->ns(); }
 

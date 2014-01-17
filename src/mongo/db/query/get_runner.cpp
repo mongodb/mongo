@@ -46,49 +46,10 @@
 
 namespace mongo {
 
-    static bool isSimpleIdQuery(const BSONObj& query) {
-        bool hasID = false;
-
-        // Must have _id field, and optionally can have either
-        // $isolated or $atomic.
-        if (query.nFields() > 2) {
-            return false;
-        }
-
-        BSONObjIterator it(query);
-        while (it.more()) {
-            BSONElement elt = it.next();
-            if (mongoutils::str::equals("_id", elt.fieldName())) {
-                // Verify that the query on _id is a simple equality.
-                hasID = true;
-
-                if (elt.type() == Object) {
-                    // If the value is an object, it can't have a query operator
-                    // (must be a literal object match).
-                    if (elt.Obj().firstElementFieldName()[0] == '$') {
-                        return false;
-                    }
-                }
-                else if (!elt.isSimpleType() && BinData != elt.type()) {
-                    // The _id fild cannot be something like { _id : { $gt : ...
-                    // But it can be BinData.
-                    return false;
-                }
-            }
-            else if (!(mongoutils::str::equals("$isolated", elt.fieldName()) ||
-                       mongoutils::str::equals("$atomic", elt.fieldName()))) {
-                // If the field is not _id, it must be $isolated/$atomic.
-                return false;
-            }
-        }
-
-        return hasID;
-    }
-
     static bool canUseIDHack(const CanonicalQuery& query) {
         return !query.getParsed().isExplain()
             && !query.getParsed().showDiskLoc()
-            && isSimpleIdQuery(query.getParsed().getFilter())
+            && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
             && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }
 
@@ -132,6 +93,35 @@ namespace mongo {
                          rawCanonicalQuery,
                          out,
                          plannerOptions);
+    }
+
+    Status getRunner(Collection* collection,
+                     const std::string& ns,
+                     const BSONObj& unparsedQuery,
+                     Runner** outRunner,
+                     CanonicalQuery** outCanonicalQuery,
+                     size_t plannerOptions) {
+
+        if (!collection) {
+            *outCanonicalQuery = NULL;
+            *outRunner = new EOFRunner(NULL, ns);
+            return Status::OK();
+        }
+        if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
+            !collection->getIndexCatalog()->findIdIndex()) {
+
+            Status status = CanonicalQuery::canonicalize(
+                    collection->ns(),
+                    unparsedQuery,
+                    outCanonicalQuery);
+            if (!status.isOK())
+                return status;
+            return getRunner(collection, *outCanonicalQuery, outRunner, plannerOptions);
+        }
+
+        *outCanonicalQuery = NULL;
+        *outRunner = new IDHackRunner(collection, unparsedQuery["_id"].wrap());
+        return Status::OK();
     }
 
     /**

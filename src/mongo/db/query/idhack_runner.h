@@ -52,6 +52,8 @@ namespace mongo {
         /** Takes ownership of all the arguments. */
         IDHackRunner(Collection* collection, CanonicalQuery* query);
 
+        IDHackRunner(Collection* collection, const BSONObj& key);
+
         virtual ~IDHackRunner();
 
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
@@ -77,6 +79,9 @@ namespace mongo {
     private:
         // Not owned here.
         Collection* _collection;
+
+        // The value to match against the _id field.
+        BSONObj _key;
 
         // TODO: When we combine the canonicalize and getRunner steps into one we can get rid of
         // this.

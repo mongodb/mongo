@@ -46,11 +46,19 @@ namespace mongo {
 
     IDHackRunner::IDHackRunner(Collection* collection, CanonicalQuery* query)
         : _collection(collection),
+          _key(query->getQueryObj()["_id"].wrap()),
           _query(query),
           _killed(false),
           _done(false),
           _nscanned(0),
           _nscannedObjects(0) { }
+
+    IDHackRunner::IDHackRunner(Collection* collection, const BSONObj& key)
+        : _collection(collection),
+          _key(key),
+          _query(NULL),
+          _killed(false),
+          _done(false) { }
 
     IDHackRunner::~IDHackRunner() { }
 
@@ -72,10 +80,8 @@ namespace mongo {
         BtreeBasedAccessMethod* accessMethod =
             static_cast<BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
 
-        BSONObj key = _query->getQueryObj()["_id"].wrap();
-
         // Look up the key by going directly to the Btree.
-        DiskLoc loc = accessMethod->findSingle( key );
+        DiskLoc loc = accessMethod->findSingle( _key );
 
         _done = true;
 
@@ -113,8 +119,8 @@ namespace mongo {
             *objOut = loc.obj();
 
             // If we're sharded make sure the key belongs to us.  We need the object to do this.
-            if (shardingState.needCollectionMetadata(_query->ns())) {
-                CollectionMetadataPtr m = shardingState.getCollectionMetadata(_query->ns());
+            if (shardingState.needCollectionMetadata(_collection->ns().ns())) {
+                CollectionMetadataPtr m = shardingState.getCollectionMetadata(_collection->ns().ns());
                 if (m) {
                     KeyPattern kp(m->getKeyPattern());
                     if (!m->keyBelongsToMe( kp.extractSingleKey(*objOut))) {
@@ -125,7 +131,7 @@ namespace mongo {
             }
 
             // If there is a projection...
-            if (NULL != _query->getProj()) {
+            if (_query && _query->getProj()) {
                 // Create something to execute it.
                 auto_ptr<ProjectionExec> projExec(new ProjectionExec(_query->getParsed().getProj(),
                                                                      _query->root()));
@@ -164,7 +170,7 @@ namespace mongo {
     }
 
     const std::string& IDHackRunner::ns() {
-        return _query->getParsed().ns();
+        return _collection->ns().ns();
     }
 
     void IDHackRunner::kill() {

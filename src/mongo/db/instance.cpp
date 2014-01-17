@@ -626,14 +626,21 @@ namespace mongo {
         }
 
         const NamespaceString requestNs(ns);
+        const bool isSimpleIdQuery = CanonicalQuery::isSimpleIdQuery(query);
         CanonicalQuery* cqRaw;
-        status = CanonicalQuery::canonicalize(requestNs, query, &cqRaw);
-        if (status == ErrorCodes::NoClientContext) {
+        if (isSimpleIdQuery) {
             cqRaw = NULL;
         }
-        else if (!status.isOK()) {
-            uasserted(17349,
-                      "could not canonicalize query " + query.toString() + "; " + causedBy(status));
+        else {
+            status = CanonicalQuery::canonicalize(requestNs, query, &cqRaw);
+            if (status == ErrorCodes::NoClientContext) {
+                cqRaw = NULL;
+            }
+            else if (!status.isOK()) {
+                uasserted(17349,
+                          "could not canonicalize query " + query.toString() + "; " +
+                          causedBy(status));
+            }
         }
         std::auto_ptr<CanonicalQuery> cq(cqRaw);
 
@@ -650,7 +657,7 @@ namespace mongo {
 
         Client::Context ctx( ns );
 
-        if (!cq.get()) {
+        if (!isSimpleIdQuery && !cq.get()) {
             status = CanonicalQuery::canonicalize(requestNs, query, &cqRaw);
             if (!status.isOK()) {
                 uasserted(17350,

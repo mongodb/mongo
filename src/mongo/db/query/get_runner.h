@@ -66,6 +66,21 @@ namespace mongo {
                      Runner** out, size_t plannerOptions = 0);
 
     /**
+     * Gets a runner for a query described as an unparsed BSON object over the named and optionally
+     * supplied collection.
+     *
+     * If necessary, parses a CanonicalQuery out of 'unparsedQuery'.
+     *
+     * Returns Status::OK() on success, in which case '*outRunner' points to a runner now owned by
+     * the caller, and '*outCanonicalQuery' is either NULL or points to a canonical query owned by
+     * the returned runner.  On failure, returns other status values, and '*outRunner' and
+     * '*outCanonicalQuery' have unspecified values.
+     */
+    Status getRunner(Collection* collection, const std::string& ns, const BSONObj& unparsedQuery,
+                     Runner** outRunner, CanonicalQuery** outCanonicalQuery,
+                     size_t plannerOptions = 0);
+
+    /**
      * RAII approach to ensuring that runners are deregistered in newRunQuery.
      *
      * While retrieving the first bach of results, newRunQuery manually registers the runner with

@@ -261,6 +261,46 @@ namespace mongo {
         return Status::OK();
     }
 
+    // static
+    bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
+        bool hasID = false;
+
+        // Must have _id field, and optionally can have either
+        // $isolated or $atomic.
+        if (query.nFields() > 2) {
+            return false;
+        }
+
+        BSONObjIterator it(query);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            if (mongoutils::str::equals("_id", elt.fieldName())) {
+                // Verify that the query on _id is a simple equality.
+                hasID = true;
+
+                if (elt.type() == Object) {
+                    // If the value is an object, it can't have a query operator
+                    // (must be a literal object match).
+                    if (elt.Obj().firstElementFieldName()[0] == '$') {
+                        return false;
+                    }
+                }
+                else if (!elt.isSimpleType() && BinData != elt.type()) {
+                    // The _id fild cannot be something like { _id : { $gt : ...
+                    // But it can be BinData.
+                    return false;
+                }
+            }
+            else if (!(mongoutils::str::equals("$isolated", elt.fieldName()) ||
+                       mongoutils::str::equals("$atomic", elt.fieldName()))) {
+                // If the field is not _id, it must be $isolated/$atomic.
+                return false;
+            }
+        }
+
+        return hasID;
+    }
+
     const PlanCacheKey& CanonicalQuery::getPlanCacheKey() const {
         return _cacheKey;
     }
