@@ -127,7 +127,10 @@ DBCollection.prototype._massageObject = function( q ){
 }
 
 
-DBCollection._validateObject = function( o ){
+DBCollection.prototype._validateObject = function( o ){
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
     if (typeof(o) != "object")
         throw "attempted to save a " + typeof(o) + " value.  document expected.";
 
@@ -137,8 +140,11 @@ DBCollection._validateObject = function( o ){
 
 DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
-DBCollection._validateForStorage = function( o ){
-    DBCollection._validateObject( o );
+DBCollection.prototype._validateForStorage = function( o ){
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
+    this._validateObject( o );
     for ( var k in o ){
         if ( k.indexOf( "." ) >= 0 ) {
             throw "can't have . in field names [" + k + "]" ;
@@ -149,11 +155,10 @@ DBCollection._validateForStorage = function( o ){
         }
 
         if ( o[k] !== null && typeof( o[k] ) === "object" ) {
-            DBCollection._validateForStorage( o[k] );
+            this._validateForStorage( o[k] );
         }
     }
 };
-
 
 DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
     var cursor = new DBQuery( this._mongo , this._db , this ,
@@ -198,11 +203,11 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
 
         if (Array.isArray(obj)) {
             obj.forEach(function(doc) {
-                batch.insert(doc, _allow_dot);
+                batch.insert(doc);
             });
         }
         else {
-            batch.insert(obj, _allow_dot);
+            batch.insert(obj);
         }
 
         var writeConcern = null;
@@ -214,7 +219,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     }
     else {
         if ( ! _allow_dot ) {
-            DBCollection._validateForStorage( obj );
+            this._validateForStorage( obj );
         }
 
         if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
@@ -233,12 +238,15 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     return result;
 };
 
-DBCollection._validateRemoveDoc = function(doc) {
-  for ( var k in doc ){
-    if ( k == "_id" && typeof( doc[k] ) == "undefined" ){
-      throw new Error("can't have _id set to undefined in a remove expression");
+DBCollection.prototype._validateRemoveDoc = function(doc) {
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
+    for (var k in doc) {
+        if (k == "_id" && typeof( doc[k] ) == "undefined") {
+          throw new Error("can't have _id set to undefined in a remove expression");
+        }
     }
-  }
 };
 
 DBCollection.prototype.remove = function( t , justOne ){
@@ -266,7 +274,7 @@ DBCollection.prototype.remove = function( t , justOne ){
         result = batch.execute(writeConcern).toSingleResult();
     }
     else {
-        DBCollection._validateRemoveDoc(t);
+        this._validateRemoveDoc(t);
         this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
     }
 
@@ -274,16 +282,19 @@ DBCollection.prototype.remove = function( t , justOne ){
     return result;
 }
 
-DBCollection._validateUpdateDoc = function(doc) {
+DBCollection.prototype._validateUpdateDoc = function(doc) {
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
     var firstKey = null;
     for (var key in doc) { firstKey = key; break; }
 
     if (firstKey != null && firstKey[0] == '$') {
         // for mods we only validate partially, for example keys may have dots
-        DBCollection._validateObject( doc );
+        this._validateObject( doc );
     } else {
         // we're basically inserting a brand new object, do full validation
-        DBCollection._validateForStorage( doc );
+        this._validateForStorage( doc );
     }
 };
 
@@ -327,7 +338,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         result = batch.execute(writeConcern).toSingleResult();
     }
     else {
-        DBCollection._validateUpdateDoc(obj);
+        this._validateUpdateDoc(obj);
         this._mongo.update(this._fullName, query, obj,
                            upsert ? true : false, multi ? true : false );
     }

@@ -398,9 +398,8 @@ var _batch_api_module = (function() {
      * @param document {Object} the document to insert.
      */
     this.insert = function(document) {
-      if (!collection.getMongo().useWriteCommands() && !IndexCollPattern.test(namespace)) {
-        // Validation is done on server for write commands.
-        DBCollection._validateForStorage(document);
+      if (!IndexCollPattern.test(namespace)) {
+        collection._validateForStorage(document);
       }
 
       return addToOperationsList(INSERT, document);
@@ -410,10 +409,7 @@ var _batch_api_module = (function() {
     // Find based operations
     var findOperations = {
       update: function(updateDocument) {
-        if (!collection.getMongo().useWriteCommands()) {
-          // Validation is done on server for write commands.
-          DBCollection._validateUpdateDoc(updateDocument);
-        }
+        collection._validateUpdateDoc(updateDocument);
 
         // Set the top value for the update 0 = multi true, 1 = multi false
         var upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
@@ -432,10 +428,7 @@ var _batch_api_module = (function() {
       },
 
       updateOne: function(updateDocument) {
-        if (!collection.getMongo().useWriteCommands()) {
-          // Validation is done on server for write commands.
-          DBCollection._validateUpdateDoc(updateDocument);
-        }
+        collection._validateUpdateDoc(updateDocument);
 
         // Set the top value for the update 0 = multi true, 1 = multi false
         var upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
@@ -464,10 +457,7 @@ var _batch_api_module = (function() {
       },
 
       removeOne: function() {
-        if (!collection.getMongo().useWriteCommands()) {
-          // Validation is done on server for write commands.
-          DBCollection._validateRemoveDoc(currentOp.selector);
-        }
+        collection._validateRemoveDoc(currentOp.selector);
 
         // Establish the update command
         var document = {
@@ -482,10 +472,7 @@ var _batch_api_module = (function() {
       },
 
       remove: function() {
-        if (!collection.getMongo().useWriteCommands()) {
-          // Validation is done on server for write commands.
-          DBCollection._validateRemoveDoc(currentOp.selector);
-        }
+        collection._validateRemoveDoc(currentOp.selector);
 
         // Establish the update command
         var document = {
