@@ -100,8 +100,15 @@ namespace mongo {
             }
 
             CanonicalQuery* cq;
-            // XXX: project out just the field we're distinct-ing.  May be covered...
-            if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
+
+            // We only care about the field that we're projecting over.  Have to drop the _id field
+            // explicitly because those are .find() semantics.
+            //
+            // Applying a projection allows the planner to try to give us covered plans.
+            BSONObj projection = BSON("_id" << 0 << key << 1);
+
+            // Apply a projection of the key.  Empty BSONObj() is for the sort.
+            if (!CanonicalQuery::canonicalize(ns, query, BSONObj(), projection, &cq).isOK()) {
                 uasserted(17215, "Can't canonicalize query " + query.toString());
                 return 0;
             }
@@ -120,6 +127,11 @@ namespace mongo {
             BSONObj obj;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                // Distinct expands arrays.
+                //
+                // If our query is covered, each value of the key should be in the index key and
+                // available to us without this.  If a collection scan is providing the data, we may
+                // have to expand an array.
                 BSONElementSet elts;
                 obj.getFieldsDotted(key, elts);
 
