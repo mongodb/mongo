@@ -43,8 +43,8 @@
 
 using namespace std;
 
-#include "../assert_util.h"
-#include "../time_support.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 #include "rwlockimpl.h"
 #include "simplerwlock.h"
 #include "threadlocal.h"

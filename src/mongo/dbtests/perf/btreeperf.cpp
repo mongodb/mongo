@@ -28,7 +28,7 @@
 #include <boost/random/uniform_int.hpp>
 
 #include "client/dbclient.h"
-#include "../../util/timer.h"
+#include "mongo/util/timer.h"
 
 using namespace std;
 using namespace mongo;

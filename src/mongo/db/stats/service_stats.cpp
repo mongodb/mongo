@@ -30,7 +30,7 @@
 
 #include <sstream>
 
-#include "../../util/histogram.h"
+#include "mongo/util/histogram.h"
 #include "service_stats.h"
 
 namespace mongo {

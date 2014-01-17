@@ -323,7 +323,7 @@ namespace mongo {
     }
 }
 
-#include "../client/connpool.h"
+#include "mongo/client/connpool.h"
 
 namespace mongo {
 
