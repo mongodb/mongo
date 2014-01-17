@@ -250,7 +250,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    ,
 	{ "checkpoint_sync", "boolean", NULL, NULL},
 	{ "create", "boolean", NULL, NULL},
-	{ "direct_io", "list", "choices=[\"data\",\"log\"]", NULL},
+	{ "direct_io", "list",
+	    "choices=[\"checkpoint\",\"data\",\"log\"]",
+	    NULL},
 	{ "error_prefix", "string", NULL, NULL},
 	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
 	{ "eviction_target", "int", "min=10,max=99", NULL},
@@ -426,7 +428,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "wiredtiger_open",
 	  "buffer_alignment=-1,cache_size=100MB,"
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),"
-	  "checkpoint_sync=,create=0,direct_io=,error_prefix=,"
+	  "checkpoint_sync=,create=0,direct_io=checkpoint,error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
 	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
