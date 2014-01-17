@@ -109,6 +109,7 @@ namespace mongo {
         if ( 0 == readOnlyMapAddress ) {
             DWORD dosError = GetLastError();
             log() << "MapViewOfFileEx for " << filename()
+                    << " at address " << thisAddress
                     << " failed with error " << errnoWithDescription( dosError )
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createReadOnlyMap"
@@ -199,6 +200,7 @@ namespace mongo {
             if ( view == 0 ) {
                 DWORD dosError = GetLastError();
                 log() << "MapViewOfFileEx for " << filename
+                        << " at address " << thisAddress
                         << " failed with " << errnoWithDescription( dosError )
                         << " (file size is " << length << ")"
                         << " in MemoryMappedFile::map"
