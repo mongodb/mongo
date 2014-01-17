@@ -418,8 +418,8 @@ he_dump(he_t he, const char *tag)
 	(void)fprintf(fp, "== %s\n", tag);
 
 	while ((ret = he_next(he, r, (uint64_t)0, (uint64_t)sizeof(v))) == 0) {
-		he_dump_print("K: ", r->key, r->n_key, fp);
-		he_dump_print("V: ", r->val, r->n_val, fp);
+		he_dump_print("K: ", r->key, r->key_len, fp);
+		he_dump_print("V: ", r->val, r->val_len, fp);
 	}
 	if (ret == HE_ERR_ITEM_NOT_FOUND)
 		ret = 0;
@@ -476,16 +476,16 @@ restart:
 	 * key/value disappears.
 	 */
 	for (;;) {
-		if (cursor->mem_len >= r->n_val) {
-			cursor->len = r->n_val;
+		if (cursor->mem_len >= r->val_len) {
+			cursor->len = r->val_len;
 			return (0);
 		}
 
 		/* Grow the value buffer. */
-		if ((p = realloc(cursor->v, r->n_val + 32)) == NULL)
+		if ((p = realloc(cursor->v, r->val_len + 32)) == NULL)
 			return (os_errno());
 		cursor->v = r->val = p;
-		cursor->mem_len = r->n_val + 32;
+		cursor->mem_len = r->val_len + 32;
 
 		if ((ret = he_lookup(
 		    he, r, (uint64_t)0, (uint64_t)cursor->mem_len)) != 0) {
@@ -519,10 +519,10 @@ txn_state_set(WT_EXTENSION_API *wtext,
 	 */
 	memset(&txn, 0, sizeof(txn));
 	txn.key = &txnid;
-	txn.n_key = sizeof(txnid);
+	txn.key_len = sizeof(txnid);
 	val = commit ? TXN_COMMITTED : TXN_ABORTED;
 	txn.val = &val;
-	txn.n_val = sizeof(val);
+	txn.val_len = sizeof(val);
 
 	if ((ret = he_update(hs->he_txn, &txn)) != 0)
 		ERET(wtext, session,
@@ -565,9 +565,9 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
 
 	memset(&txn, 0, sizeof(txn));
 	txn.key = &txnid;
-	txn.n_key = sizeof(txnid);
+	txn.key_len = sizeof(txnid);
 	txn.val = val_buf;
-	txn.n_val = sizeof(val_buf);
+	txn.val_len = sizeof(val_buf);
 
 	if (he_lookup(
 	    hs->he_txn, &txn, (uint64_t)0, (uint64_t)sizeof(val_buf)) == 0)
@@ -655,7 +655,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 
 	/* Update the underlying Helium record. */
 	r->val = cursor->v;
-	r->n_val = cursor->len;
+	r->val_len = cursor->len;
 
 	return (0);
 }
@@ -995,7 +995,7 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		    (ret = wtext->struct_pack(wtext, session,
 		    r->key, HE_MAX_KEY_LEN, "r", wtcursor->recno)) != 0)
 			return (ret);
-		r->n_key = size;
+		r->key_len = size;
 	} else {
 		/* I'm not sure this test is necessary, but it's cheap. */
 		if (wtcursor->key.size > HE_MAX_KEY_LEN)
@@ -1011,7 +1011,7 @@ copyin_key(WT_CURSOR *wtcursor, int allocate_key)
 		 * WT_CURSOR key's data.
 		 */
 		memcpy(r->key, wtcursor->key.data, wtcursor->key.size);
-		r->n_key = wtcursor->key.size;
+		r->key_len = wtcursor->key.size;
 	}
 	return (0);
 }
@@ -1038,11 +1038,11 @@ copyout_key(WT_CURSOR *wtcursor)
 	r = &cursor->record;
 	if (ws->config_recno) {
 		if ((ret = wtext->struct_unpack(wtext,
-		    session, r->key, r->n_key, "r", &wtcursor->recno)) != 0)
+		    session, r->key, r->key_len, "r", &wtcursor->recno)) != 0)
 			return (ret);
 	} else {
 		wtcursor->key.data = r->key;
-		wtcursor->key.size = (size_t)r->n_key;
+		wtcursor->key.size = (size_t)r->key_len;
 	}
 	return (0);
 }
@@ -1114,14 +1114,14 @@ skip_deleted:
 	 *
 	 * First, copy the key.
 	 */
-	if (cursor->t1.mem_len < r->n_key) {
-		if ((p = realloc(cursor->t1.v, r->n_key)) == NULL)
+	if (cursor->t1.mem_len < r->key_len) {
+		if ((p = realloc(cursor->t1.v, r->key_len)) == NULL)
 			return (os_errno());
 		cursor->t1.v = p;
-		cursor->t1.mem_len = r->n_key;
+		cursor->t1.mem_len = r->key_len;
 	}
-	memcpy(cursor->t1.v, r->key, r->n_key);
-	cursor->t1.len = r->n_key;
+	memcpy(cursor->t1.v, r->key, r->key_len);
+	cursor->t1.len = r->key_len;
 
 	/*
 	 * Move through the cache until we either find a record with a visible
@@ -1150,14 +1150,14 @@ skip_deleted:
 		 * Copy the cache key.   If the cache's entry wasn't a delete,
 		 * copy the value as well, we may return the cache entry.
 		 */
-		if (cursor->t2.mem_len < r->n_key) {
-			if ((p = realloc(cursor->t2.v, r->n_key)) == NULL)
+		if (cursor->t2.mem_len < r->key_len) {
+			if ((p = realloc(cursor->t2.v, r->key_len)) == NULL)
 				return (os_errno());
 			cursor->t2.v = p;
-			cursor->t2.mem_len = r->n_key;
+			cursor->t2.mem_len = r->key_len;
 		}
-		memcpy(cursor->t2.v, r->key, r->n_key);
-		cursor->t2.len = r->n_key;
+		memcpy(cursor->t2.v, r->key, r->key_len);
+		cursor->t2.len = r->key_len;
 
 		if (cache_rm)
 			break;
@@ -1179,7 +1179,7 @@ skip_deleted:
 
 	/* Copy the original key back into place. */
 	memcpy(r->key, cursor->t1.v, cursor->t1.len);
-	r->n_key = cursor->t1.len;
+	r->key_len = cursor->t1.len;
 
 cache_clean:
 	/* Get the next/prev entry from the store. */
@@ -1197,7 +1197,7 @@ cache_clean:
 	 */
 	if (cache_ret == 0 && ret == 0) {
 		a.data = r->key;		/* a is the primary */
-		a.size = (uint32_t)r->n_key;
+		a.size = (uint32_t)r->key_len;
 		b.data = cursor->t2.v;		/* b is the cache */
 		b.size = (uint32_t)cursor->t2.len;
 		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
@@ -1223,14 +1223,14 @@ cache_clean:
 	 */
 	if (cache_ret == 0 && cache_rm) {
 		memcpy(r->key, cursor->t2.v, cursor->t2.len);
-		r->n_key = cursor->t2.len;
+		r->key_len = cursor->t2.len;
 		goto skip_deleted;
 	}
 
 	/* If taking the cache's entry, copy the value into place. */
 	if (cache_ret == 0) {
 		memcpy(r->key, cursor->t2.v, cursor->t2.len);
-		r->n_key = cursor->t2.len;
+		r->key_len = cursor->t2.len;
 
 		memcpy(cursor->v, cursor->t3.v, cursor->t3.len);
 		cursor->len = cursor->t3.len;
@@ -1281,7 +1281,7 @@ helium_cursor_reset(WT_CURSOR *wtcursor)
 	 * Reset the cursor by setting the key length to 0, causing subsequent
 	 * next/prev operations to return the first/last record of the object.
 	 */
-	r->n_key = 0;
+	r->key_len = 0;
 	return (0);
 }
 
@@ -1396,7 +1396,7 @@ helium_cursor_insert(WT_CURSOR *wtcursor)
 		return (ret);
 
 	VMSG(wtext, session, VERBOSE_L2,
-	    "I %.*s.%.*s", (int)r->n_key, r->key, (int)r->n_val, r->val);
+	    "I %.*s.%.*s", (int)r->key_len, r->key, (int)r->val_len, r->val);
 
 	/* Clear the value, assume we're adding the first cache entry. */
 	cursor->len = 0;
@@ -1507,7 +1507,7 @@ update(WT_CURSOR *wtcursor, int remove_op)
 	VMSG(wtext, session, VERBOSE_L2,
 	    "%c %.*s.%.*s",
 	    remove_op ? 'R' : 'U',
-	    (int)r->n_key, r->key, (int)r->n_val, r->val);
+	    (int)r->key_len, r->key, (int)r->val_len, r->val);
 
 	/* Clear the value, assume we're adding the first cache entry. */
 	cursor->len = 0;
@@ -2497,7 +2497,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 	 * For every cache key where all updates are globally visible:
 	 *	Migrate the most recent update value to the primary store.
 	 */
-	for (r->n_key = 0; (ret =
+	for (r->key_len = 0; (ret =
 	    helium_call(wtcursor, "he_next", ws->he_cache, he_next)) == 0;) {
 		/*
 		 * Unmarshall the value, and if all of the updates are globally
@@ -2535,7 +2535,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 			    "he_remove: %s", he_strerror(ret));
 		} else {
 			r->val = cp->v;
-			r->n_val = cp->len;
+			r->val_len = cp->len;
 			if ((ret = he_update(ws->he, r)) == 0)
 				continue;
 			ERET(wtext, NULL, WT_ERROR,
@@ -2574,7 +2574,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 		goto err;
 	locked = 1;
 
-	for (r->n_key = 0; (ret =
+	for (r->key_len = 0; (ret =
 	    helium_call(wtcursor, "he_next", ws->he_cache, he_next)) == 0;) {
 		/*
 		 * Unmarshall the value, and if all of the updates are globally
@@ -2638,7 +2638,7 @@ txn_cleaner(WT_CURSOR *wtcursor, he_t he_txn, uint64_t txnmin)
 	 * Remove all entries from the transaction store that are before the
 	 * oldest transaction ID that appears anywhere in any cache.
 	 */
-	for (r->n_key = 0;
+	for (r->key_len = 0;
 	    (ret = helium_call(wtcursor, "he_next", he_txn, he_next)) == 0;) {
 		memcpy(&txnid, r->key, sizeof(txnid));
 		if (txnid < txnmin && (ret = he_delete(he_txn, r)) != 0)
@@ -3245,10 +3245,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if HE_VERSION_MAJOR != 1 || HE_VERSION_MINOR != 8
+#if HE_VERSION_MAJOR != 1 || HE_VERSION_MINOR != 9
 	ERET(wtext, NULL, EINVAL,
 	    "unsupported Levyx/Helium library version %d.%d, expected "
-	    "version 1.8",
+	    "version 1.9",
 	    HE_VERSION_MAJOR, HE_VERSION_MINOR);
 #endif
 
