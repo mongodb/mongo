@@ -3237,7 +3237,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
 	WT_EXTENSION_API *wtext;
-	int ret = 0;
+	int major, minor, ret = 0;
 	const char **p;
 
 	ds = NULL;
@@ -3247,10 +3247,14 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 						/* Check the library version */
 #if HE_VERSION_MAJOR != 1 || HE_VERSION_MINOR != 9
 	ERET(wtext, NULL, EINVAL,
-	    "unsupported Levyx/Helium library version %d.%d, expected "
-	    "version 1.9",
+	    "unsupported Levyx/Helium header file %d.%d, expected version 1.9",
 	    HE_VERSION_MAJOR, HE_VERSION_MINOR);
 #endif
+	he_version(&major, &minor);
+	if (major != 1 || minor != 9)
+		ERET(wtext, NULL, EINVAL,
+		    "unsupported Levyx/Helium library version %d.%d, expected "
+		    "version 1.9", major, minor);
 
 	/* Allocate and initialize the local data-source structure. */
 	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
