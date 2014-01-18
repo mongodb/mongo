@@ -99,6 +99,8 @@ typedef struct {
 	char *home_stats;			/* Statistics file path */
 	char *home_salvage_copy;		/* Salvage copy command */
 
+	char *helium_mount;			/* Helium volume */
+
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
 

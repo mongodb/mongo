@@ -60,7 +60,7 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	home = NULL;
-	while ((ch = getopt(argc, argv, "1C:c:h:Llqrt:")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -70,6 +70,9 @@ main(int argc, char *argv[])
 			break;
 		case 'c':			/* Configuration from a file */
 			config = optarg;
+			break;
+		case 'H':
+			g.helium_mount = optarg;
 			break;
 		case 'h':
 			home = optarg;

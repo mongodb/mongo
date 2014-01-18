@@ -124,19 +124,21 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 * difference, I am doing it here because it's easier to work with the
 	 * configuration strings.
 	 */
-	if (DATASOURCE("helium") &&
-	    (ret = conn->load_extension(conn, HELIUM_PATH,
-	    "entry=wiredtiger_extension_init,config=["
-	    "helium_verbose=0,"
-	    "dev1=[helium_devices="
-	    "\"he://.//dev/disk3s1,/dev/disk4s1\","
-	    "helium_o_volume_truncate=1],"
-	    "dev2=[helium_devices="
-	    "\"he://.//dev/disk5s1\","
-	    "helium_o_volume_truncate=1]]"
-	    )) != 0)
-		die(ret, "WT_CONNECTION.load_extension: %s", HELIUM_PATH);
-
+	if (DATASOURCE("helium")) {
+		if (g.helium_mount == NULL)
+			die(EINVAL, "no Helium mount point specified");
+		(void)snprintf(config, sizeof(config),
+		    "entry=wiredtiger_extension_init,config=["
+		    "helium_verbose=0,"
+		    "dev1=[helium_devices=\"he://./%s\","
+		    "helium_o_volume_truncate=1]]",
+		    g.helium_mount);
+		if ((ret =
+		    conn->load_extension(conn, HELIUM_PATH, config)) != 0)
+			die(ret,
+			   "WT_CONNECTION.load_extension: %s:%s",
+			   HELIUM_PATH, config);
+	}
 	*connp = conn;
 }
 
@@ -154,12 +156,6 @@ wts_create(void)
 	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
-
-	/*
-	 * Create the underlying store.
-	 */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
 
 	/*
 	 * Ensure that we can service at least one operation per-thread
@@ -310,9 +306,13 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    ",type=helium,helium_o_truncate=1");
 
+	/*
+	 * Create the underlying store.
+	 */
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die(ret, "connection.open_session");
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
-
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
