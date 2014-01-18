@@ -24,7 +24,7 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 
 	/*
 	 * This function exists as a place for this comment: named checkpoints
-	 * are only supported on file objects, and not on LSM trees or Memrata
+	 * are only supported on file objects, and not on LSM trees or Helium
 	 * devices.  If a target list is configured for the checkpoint, this
 	 * function is called with each target list entry; check the entry to
 	 * make sure it's backed by a file.  If no target list is configured,
@@ -148,11 +148,11 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DATA_SOURCE *dsrc;
 
 	/*
-	 * A place-holder, to support Memrata devices: we assume calling the
+	 * A place-holder, to support Helium devices: we assume calling the
 	 * underlying data-source session checkpoint function is sufficient to
 	 * checkpoint all objects in the data source, open or closed, and we
 	 * don't attempt to optimize the checkpoint of individual targets.
-	 * Those assumptions is correct for the Memrata device, but it's not
+	 * Those assumptions is correct for the Helium device, but it's not
 	 * necessarily going to be true for other data sources.
 	 *
 	 * It's not difficult to support data-source checkpoints of individual

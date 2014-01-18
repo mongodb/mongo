@@ -31,7 +31,6 @@ Lameter
 MERCHANTABILITY
 MVCC's
 Makefiles
-Memrata
 Mewhort
 NOTFOUND
 NUMA
@@ -207,7 +206,6 @@ maxleafpage
 memalloc
 memfree
 memp
-memrata
 metadata
 minkey
 mkdir

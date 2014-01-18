@@ -155,7 +155,6 @@ MUTEX
 MVCC
 Manos
 Marsaglia's
-Memrata
 Metadata
 Mewhort
 Multi
@@ -607,7 +606,6 @@ membar
 memcpy
 memfree
 memmove
-memrata
 memset
 memsize
 mergeable
