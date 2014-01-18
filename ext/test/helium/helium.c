@@ -135,7 +135,7 @@ static int verbose = 0;					/* Verbose messages */
 
 /*
  * WT_SOURCE --
- *	A WiredTiger source, supporting any number of cursors.
+ *	A WiredTiger source, supporting one or more cursors.
  */
 typedef struct __wt_source {
 	char *uri;				/* Unique name */
@@ -169,7 +169,7 @@ typedef struct __wt_source {
 
 /*
  * HELIUM_SOURCE --
- *	A Helium volume, supporting any number of WT_SOURCEs.
+ *	A Helium volume, supporting one or more WT_SOURCE objects.
  */
 typedef struct __he_source {
 	/*
@@ -221,7 +221,7 @@ typedef struct __he_source {
 
 /*
  * DATA_SOURCE --
- *	A WiredTiger data source, supporting any number of HELIUM_SOURCEs.
+ *	A WiredTiger data source, supporting one or more HELIUM_SOURCE objects.
  */
 typedef struct __data_source {
 	WT_DATA_SOURCE wtds;			/* Must come first */
@@ -1695,7 +1695,7 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 
 	/*
 	 * Warn if open cursors: it shouldn't happen because the upper layers of
-	 * WildTiger prevent it, so we don't do anything more than warn.
+	 * WiredTiger prevent it, so we don't do anything more than warn.
 	 */
 	if (ws->ref != 0)
 		EMSG(wtext, session, WT_ERROR,
@@ -2220,7 +2220,7 @@ helium_session_drop(WT_DATA_SOURCE *wtds,
 
 	/*
 	 * Get a locked reference to the data source: hold the global lock,
-	 * we changing a HELIUM_SOURCE's list of WT_SOURCE objects.
+	 * we're changing the HELIUM_SOURCE's list of WT_SOURCE objects.
 	 *
 	 * Remove the entry from the WT_SOURCE list -- it's a singly-linked
 	 * list, find the reference to it.
@@ -2982,7 +2982,7 @@ helium_source_open_txn(DATA_SOURCE *ds)
 			ERET(wtext, NULL, WT_ERROR,
 			    "he_commit: %s", he_strerror(ret));
 	}
-	VMSG(wtext, NULL, VERBOSE_L1, "%stransactional store on %s",
+	VMSG(wtext, NULL, VERBOSE_L1, "%s" "transactional store on %s",
 	    hs_txn == NULL ? "creating " : "", hs->name);
 
 	/* Set the owner field, this Helium source has to be closed last. */
@@ -3043,8 +3043,7 @@ helium_source_recover_namespace(WT_DATA_SOURCE *wtds,
 
 	/* Fake up a cursor. */
 	if ((ret = fake_cursor(wtext, &wtcursor)) != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "hs_source_recover_namespace: %s", strerror(ret));
+		EMSG_ERR(wtext, NULL, ret, "recovery: %s", strerror(ret));
 	cursor = (CURSOR *)wtcursor;
 	cursor->ws = ws;
 

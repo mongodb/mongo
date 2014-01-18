@@ -19,7 +19,7 @@ he.h
 % ./configure --with-helium=/usr/local/lib/Helium && make
 @endcode
 
-@section heliumload Loading the WiredTiger Helium Support
+@section helium_load Loading the WiredTiger Helium Support
 
 Next, add code to your application to load the Helium shared library.
 
@@ -46,7 +46,7 @@ required for that to be possible.)
 In this example, both Helium volumes are configured to be truncated when
 first opened, and all previously existing contents discarded.
 
-When configurign a Helium volume, the following non-standard configuration
+When configuring a Helium volume, the following non-standard configuration
 strings are supported:
 
 <table>
