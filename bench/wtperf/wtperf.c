@@ -114,7 +114,15 @@ static void	*worker(void *);
 static uint64_t	 wtperf_rand(CONFIG *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
-/* We use a couple of WiredTiger library routines to simplify portability. */
+#define	HELIUM_NAME	"dev1"
+#define	HELIUM_PATH							\
+	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
+#define	HELIUM_CONFIG	",type=helium"
+
+/*
+ * wtperf uses a couple of internal WiredTiger library routines for timing
+ * and generating random numbers.
+ */
 extern int	__wt_epoch(void *, struct timespec *);
 extern uint32_t	__wt_random(void);
 
@@ -1015,14 +1023,15 @@ main(int argc, char *argv[])
 	size_t len;
 	uint64_t req_len, total_ops;
 	int ch, monitor_created, ret, t_ret;
-	const char *opts = "C:O:T:h:o:SML";
+	const char *helium_mount;
+	const char *opts = "C:H:h:LMO:o:ST:";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
 	session = NULL;
 	monitor_created = ret = 0;
-	user_cconfig = user_tconfig = NULL;
+	helium_mount = user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
 	/* Setup the default configuration values. */
@@ -1045,9 +1054,9 @@ main(int argc, char *argv[])
 
 	/*
 	 * Create a temporary directory underneath the test directory in which
-	 * we do an initial WiredTiger open, because we need a connection and
-	 * session in order to use the extension configuration parser.  We will
-	 * open the real WiredTiger database after parsing the options.
+	 * we do an initial WiredTiger open, because we need a connection in
+	 * order to use the extension configuration parser.  We will open the
+	 * real WiredTiger database after parsing the options.
 	 */
 	len = strlen(cfg->home) + strlen(wtperftmp_subdir) + 2;
 	if ((tmphome = malloc(len)) == NULL) {
@@ -1068,11 +1077,6 @@ main(int argc, char *argv[])
 	if ((ret = wiredtiger_open(
 	    tmphome, NULL, "create", &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "wiredtiger_open: %s", tmphome);
-		goto err;
-	}
-	if ((ret = cfg->conn->open_session(
-	    cfg->conn, NULL, NULL, &session)) != 0) {
-		lprintf(cfg, ret, 0, "Error creating session");
 		goto err;
 	}
 
@@ -1108,13 +1112,16 @@ main(int argc, char *argv[])
 	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
+		case 'C':
+			user_cconfig = optarg;
+			break;
+		case 'H':
+			helium_mount = optarg;
+			break;
 		case 'o':
 			/* Allow -o key=value */
 			if (config_opt_line(cfg, optarg) != 0)
 				goto einval;
-			break;
-		case 'C':
-			user_cconfig = optarg;
 			break;
 		case 'T':
 			user_tconfig = optarg;
@@ -1122,12 +1129,16 @@ main(int argc, char *argv[])
 		}
 
 	/* Build the URI from the table name. */
-	req_len = strlen("table:") + strlen(cfg->table_name) + 1;
+	req_len = strlen("table:") +
+	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
 	if ((cfg->uri = calloc(req_len, 1)) == NULL) {
 		ret = enomem(cfg);
 		goto err;
 	}
-	snprintf(cfg->uri, req_len, "table:%s", cfg->table_name);
+	snprintf(cfg->uri, req_len, "table:%s%s%s",
+	    helium_mount == NULL ? "" : HELIUM_NAME,
+	    helium_mount == NULL ? "" : "/",
+	    cfg->table_name);
 	
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
@@ -1152,36 +1163,31 @@ main(int argc, char *argv[])
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg->verbose > 1 || user_tconfig != NULL) {
-		req_len = strlen(cfg->table_config) + strlen(debug_tconfig) + 3;
+	if (cfg->verbose > 1 || helium_mount != NULL || user_tconfig != NULL) {
+		req_len = strlen(cfg->table_config) +
+		    strlen(HELIUM_CONFIG) + strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
 		}
-		snprintf(tc_buf, req_len, "%s%s%s%s%s",
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s",
 		    cfg->table_config,
 		    cfg->verbose > 1 ? "," : "",
 		    cfg->verbose > 1 ? debug_tconfig : "",
-		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
+		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "",
+		    helium_mount == NULL ? "" : HELIUM_CONFIG);
 		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
 			goto err;
 	}
 
-	ret = session->close(session, NULL);
-	session = NULL;
-	if (ret != 0) {
-		lprintf(cfg, ret, 0, "WT_SESSION.close");
-		goto err;
-	}
 	ret = cfg->conn->close(cfg->conn, NULL);
 	cfg->conn = NULL;
 	if (ret != 0) {
 		lprintf(cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
 		goto err;
 	}
-
 					/* Sanity-check the configuration */
 	if (config_sanity(cfg) != 0)
 		goto err;
@@ -1193,6 +1199,19 @@ main(int argc, char *argv[])
 	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "Error connecting to %s", cfg->home);
 		goto err;
+	}
+
+	if (helium_mount != NULL) {	/* Configure optional Helium volume. */
+		char helium_buf[256];
+		snprintf(helium_buf, sizeof(helium_buf),
+		    "entry=wiredtiger_extension_init,config=["
+		    "%s=[helium_devices=\"he://./%s\","
+		    "helium_o_volume_truncate=1]]",
+		    HELIUM_NAME, helium_mount);
+		if ((ret = cfg->conn->load_extension(
+		    cfg->conn, HELIUM_PATH, helium_buf)) != 0)
+			lprintf(cfg,
+			    ret, 0, "Error loading Helium: %s", helium_buf);
 	}
 
 	if (cfg->create != 0) {		/* If creating, create the table. */
