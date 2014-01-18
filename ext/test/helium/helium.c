@@ -3214,6 +3214,9 @@ helium_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
+#if 0
+	extern int he_sys_trace_enabled;
+#endif
 	/*
 	 * List of the WT_DATA_SOURCE methods -- it's static so it breaks at
 	 * compile-time should the structure change underneath us.
@@ -3242,6 +3245,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	WT_EXTENSION_API *wtext;
 	int vmajor, vminor, ret = 0;
 	const char **p;
+
+#if 0
+	he_sys_trace_enabled = 1;
+#endif
 
 	ds = NULL;
 
