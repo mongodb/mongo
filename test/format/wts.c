@@ -132,7 +132,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "\"he://.//dev/disk3s1,/dev/disk4s1\","
 	    "helium_env_read_cache_size=10mb,helium_o_volume_truncate=1],"
 	    "dev2=[helium_devices="
-	    "he://.//dev/disk5s1,"
+	    "\"he://.//dev/disk5s1\","
 	    "helium_env_write_cache_size=10mb,helium_o_volume_truncate=1]]"
 	    )) != 0)
 		die(ret, "WT_CONNECTION.load_extension: %s", HELIUM_PATH);
