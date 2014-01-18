@@ -93,16 +93,6 @@ static int verbose = 0;					/* Verbose messages */
 		    msg_printf(wtext, session, "helium: " __VA_ARGS__);	\
 } while (0)
 
-/* Check if a string matches a prefix. */
-#undef	PREFIX_MATCH
-#define	PREFIX_MATCH(str, pfx)						\
-	(strncmp(str, pfx, strlen(pfx)) == 0)
-
-/* Check if a string matches a byte string of len bytes. */
-#undef	STRING_MATCH
-#define	STRING_MATCH(str, bytes, len)					\
-	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
-
 /*
  * OVERWRITE_AND_FREE --
  *	Make sure we don't re-use a structure after it's dead.
@@ -289,6 +279,26 @@ typedef struct __cursor {
 } CURSOR;
 
 /*
+ * prefix_match --
+ *	Return if a string matches a prefix.
+ */
+static inline int
+prefix_match(const char *str, const char *pfx)
+{
+	return (strncmp(str, pfx, strlen(pfx)) == 0);
+}
+
+/*
+ * string_match --
+ *	Return if a string matches a byte string of len bytes.
+ */
+static inline int
+string_match(const char *str, const char *bytes, size_t len)
+{
+	return (strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0');
+}
+
+/*
  * cursor_destroy --
  *	Free a cursor's memory, and optionally the cursor itself.
  */
@@ -378,7 +388,7 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 	return (0);
 }
 
-#if 1
+#if 0
 static void
 he_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
 {
@@ -813,10 +823,8 @@ cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
-	WT_SESSION *session;
 	u_int i;
 
-	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
 
 	/*
@@ -1616,7 +1624,7 @@ helium_cursor_remove(WT_CURSOR *wtcursor)
 	 */
 	if (ws->config_bitfield) {
 		wtcursor->value.size = 1;
-		wtcursor->value.data = "\0";
+		wtcursor->value.data = "";
 		return (update(wtcursor, 0));
 	}
 	return (update(wtcursor, 1));
@@ -1671,7 +1679,7 @@ ws_source_name(WT_DATA_SOURCE *wtds,
 	 * and the device name isn't interesting.  Convert to "WiredTiger:name",
 	 * and add an optional suffix.
 	 */
-	if (!PREFIX_MATCH(uri, "helium:") || (p = strchr(uri, '/')) == NULL)
+	if (!prefix_match(uri, "helium:") || (p = strchr(uri, '/')) == NULL)
 		ERET(wtext, session, EINVAL, "%s: illegal Helium URI", uri);
 	++p;
 
@@ -1793,7 +1801,7 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	 * The URI will be "helium:" followed by a Helium name and object name
 	 * pair separated by a slash, for example, "helium:volume/object".
 	 */
-	if (!PREFIX_MATCH(uri, "helium:"))
+	if (!prefix_match(uri, "helium:"))
 		goto bad_name;
 	p = uri + strlen("helium:");
 	if (p[0] == '/' || (t = strchr(p, '/')) == NULL || t[1] == '\0')
@@ -1802,7 +1810,7 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 
 	/* Find a matching Helium device. */
 	for (hs = ds->hs_head; hs != NULL; hs = hs->next)
-		if (STRING_MATCH(hs->name, p, len))
+		if (string_match(hs->name, p, len))
 			break;
 	if (hs == NULL)
 		ERET(wtext, NULL,
@@ -2268,7 +2276,6 @@ helium_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, const char *newuri, WT_CONFIG_ARG *config)
 {
 	DATA_SOURCE *ds;
-	HELIUM_SOURCE *hs;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
 	int ret = 0;
@@ -2285,7 +2292,6 @@ helium_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = ws_source_open(wtds, session, uri, config,
 	    WS_SOURCE_OPEN_BUSY | WS_SOURCE_OPEN_GLOBAL, &ws)) != 0)
 		return (ret);
-	hs = ws->hs;
 
 	/* Get a copy of the new name for the WT_SOURCE structure. */
 	if ((p = strdup(newuri)) == NULL) {
@@ -2796,7 +2802,7 @@ err:	cursor_destroy(cursor);
  */
 static int
 helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
-    char **devicep, HE_ENV *envp, int *env_setp, uint64_t *flagsp)
+    char **devicep, HE_ENV *envp, int *env_setp, int *flagsp)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
@@ -2812,23 +2818,23 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 		    "WT_EXTENSION_API.config_scan_begin: %s",
 		    wtext->strerror(ret));
 	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
-		if (STRING_MATCH("helium_devices", k.str, k.len)) {
+		if (string_match("helium_devices", k.str, k.len)) {
 			if ((*devicep = calloc(1, v.len + 1)) == NULL)
 				return (os_errno());
 			memcpy(*devicep, v.str, v.len);
 			continue;
 		}
-		if (STRING_MATCH("helium_env_read_cache_size", k.str, k.len)) {
-			envp->read_cache_size = v.val;
+		if (string_match("helium_env_read_cache_size", k.str, k.len)) {
+			envp->read_cache_size = (uint64_t)v.val;
 			*env_setp = 1;
 			continue;
 		}
-		if (STRING_MATCH("helium_env_write_cache_size", k.str, k.len)) {
-			envp->write_cache_size = v.val;
+		if (string_match("helium_env_write_cache_size", k.str, k.len)) {
+			envp->write_cache_size = (uint64_t)v.val;
 			*env_setp = 1;
 			continue;
 		}
-		if (STRING_MATCH("helium_o_volume_truncate", k.str, k.len)) {
+		if (string_match("helium_o_volume_truncate", k.str, k.len)) {
 			if (v.val != 0)
 				*flagsp |= HE_O_VOLUME_TRUNCATE;
 			continue;
@@ -2862,9 +2868,7 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	struct he_env env;
 	HELIUM_SOURCE *hs;
 	WT_EXTENSION_API *wtext;
-	int64_t cache;
-	uint64_t flags;
-	int env_set, ret = 0;
+	int env_set, flags, ret = 0;
 
 	wtext = ds->wtext;
 	hs = NULL;
@@ -2879,7 +2883,7 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	 * we only check the key, that is, the top-level WiredTiger name.
 	 */
 	for (hs = ds->hs_head; hs != NULL; hs = hs->next)
-		if (STRING_MATCH(hs->name, k->str, k->len))
+		if (string_match(hs->name, k->str, k->len))
 			ERET(wtext, NULL,
 			    EINVAL, "%s: device already open", hs->name);
 
@@ -3088,13 +3092,13 @@ helium_namespace_list(void *cookie, const char *name)
 	 * Ignore any files without a WiredTiger prefix.
 	 * Ignore the metadata and cache files.
 	 */
-	if (!PREFIX_MATCH(name, WT_NAME_PREFIX))
+	if (!prefix_match(name, WT_NAME_PREFIX))
 		return (0);
 	if (strcmp(name, WT_NAME_INIT) == 0)
 		return (0);
 	if (strcmp(name, WT_NAME_TXN) == 0)
 		return (0);
-	if (STRING_MATCH(
+	if (string_match(
 	    strrchr(name, '.'), WT_NAME_CACHE, strlen(WT_NAME_CACHE)))
 		return (0);
 
@@ -3214,7 +3218,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 * List of the WT_DATA_SOURCE methods -- it's static so it breaks at
 	 * compile-time should the structure change underneath us.
 	 */
-	static WT_DATA_SOURCE wtds = {
+	static const WT_DATA_SOURCE wtds = {
 		helium_session_create,		/* session.create */
 		NULL,				/* No session.compaction */
 		helium_session_drop,		/* session.drop */
@@ -3236,7 +3240,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
 	WT_EXTENSION_API *wtext;
-	int major, minor, ret = 0;
+	int vmajor, vminor, ret = 0;
 	const char **p;
 
 	ds = NULL;
@@ -3249,11 +3253,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	    "unsupported Levyx/Helium header file %d.%d, expected version 1.9",
 	    HE_VERSION_MAJOR, HE_VERSION_MINOR);
 #endif
-	he_version(&major, &minor);
-	if (major != 1 || minor != 9)
+	he_version(&vmajor, &vminor);
+	if (vmajor != 1 || vminor != 9)
 		ERET(wtext, NULL, EINVAL,
 		    "unsupported Levyx/Helium library version %d.%d, expected "
-		    "version 1.9", major, minor);
+		    "version 1.9", vmajor, vminor);
 
 	/* Allocate and initialize the local data-source structure. */
 	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
@@ -3277,8 +3281,8 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    "WT_EXTENSION_API.config_scan_begin: config: %s",
 		    wtext->strerror(ret));
 	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
-		if (STRING_MATCH("helium_verbose", k.str, k.len)) {
-			verbose = v.val;
+		if (string_match("helium_verbose", k.str, k.len)) {
+			verbose = v.val == 0 ? 0 : 1;
 			continue;
 		}
 		if ((ret = helium_source_open(ds, &k, &v)) != 0)
