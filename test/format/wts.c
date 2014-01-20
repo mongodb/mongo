@@ -84,14 +84,15 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
-	    "%s,%s,"
+	    "%s,%s,%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
-	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
+	    g.c_mmap ? "mmap=true" : "mmap=false",
+	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",

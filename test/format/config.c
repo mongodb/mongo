@@ -60,29 +60,21 @@ config_setup(void)
 			config_single("data_source=file", 0);
 			break;
 		case 2:
-#if 0
 			config_single("data_source=lsm", 0);
 			break;
-#endif
 		case 3:
 			config_single("data_source=table", 0);
 			break;
 		}
 
 	if (!config_find_is_perm("file_type", strlen("file_type")))
-		switch (MMRAND(1, 3)) {
+		switch (DATASOURCE("lsm") ? 3 : MMRAND(1, 3)) {
 		case 1:
-			if (!DATASOURCE("lsm")) {
-				config_single("file_type=fix", 0);
-				break;
-			}
-			/* FALLTHROUGH */
+			config_single("file_type=fix", 0);
+			break;
 		case 2:
-			if (!DATASOURCE("lsm")) {
-				config_single("file_type=var", 0);
-				break;
-			}
-			/* FALLTHROUGH */
+			config_single("file_type=var", 0);
+			break;
 		case 3:
 			config_single("file_type=row", 0);
 			break;
@@ -163,8 +155,15 @@ config_setup(void)
 			g.c_delete_pct = 0;
 	}
 
-	/* If it's an LSM run, crank up the insert percentage. */
+	/*
+	 * If this is an LSM run, set the cache size and crank up the insert
+	 * percentage.
+	 */
 	if (DATASOURCE("lsm")) {
+		cp = config_find("cache", strlen("cache"));
+		if (!(cp->flags & C_PERM))
+			g.c_cache = 30 * g.c_chunk_size;
+
 		cp = config_find("insert_pct", strlen("insert_pct"));
 		if (cp->name != NULL &&
 		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))

@@ -57,7 +57,7 @@ from packing import pack, unpack
 }
 
 %typemap(in, numinputs=0) WT_EVENT_HANDLER * %{
-        $1 = &pyApiEventHandler;
+	$1 = &pyApiEventHandler;
 %}
 
 /* Set the return value to the returned connection, session, or cursor */
@@ -528,8 +528,8 @@ typedef int int_void;
 
 %extend __wt_session {
 	int log_printf(const char *msg) {
-                return self->log_printf(self, "%s", msg);
-        }
+		return self->log_printf(self, "%s", msg);
+	}
 
 	int _freecb() {
 		return (sessionFreeHandler(self));
@@ -601,7 +601,7 @@ writeToPythonStream(const char *streamname, const char *message)
 	strcpy(&msg[msglen], "\n");
 
 	/* Acquire python Global Interpreter Lock. Otherwise can segfault. */
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
+	SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
 
 	ret = 1;
 	if ((sys = PyImport_ImportModule("sys")) == NULL)
@@ -617,7 +617,7 @@ writeToPythonStream(const char *streamname, const char *message)
 	ret = 0;
 
 err:    /* Release python Global Interpreter Lock */
-        SWIG_PYTHON_THREAD_END_BLOCK;
+	SWIG_PYTHON_THREAD_END_BLOCK;
 
 	if (arglist)
 		Py_XDECREF(arglist);
@@ -656,12 +656,21 @@ pythonClose(PY_CALLBACK *pcb)
 {
 	int ret;
 
+	/*
+	 * Ensure the global interpreter lock is held - so that Python
+	 * doesn't shut down threads while we use them.
+	 */
+	SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+
 	ret = 0;
 	if (PyObject_SetAttrString(pcb->pyobj, "this", Py_None) == -1) {
 		SWIG_Error(SWIG_RuntimeError, "WT SetAttr failed");
 		ret = EINVAL;  /* any non-zero value will do. */
 	}
 	Py_XDECREF(pcb->pyobj);
+
+	SWIG_PYTHON_THREAD_END_BLOCK;
+
 	return (ret);
 }
 
