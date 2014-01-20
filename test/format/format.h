@@ -64,7 +64,7 @@ extern WT_EXTENSION_API *wt_api;
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
 #define	HELIUM_PATH							\
-	EXTPATH "test/helium/.libs/libwiredtiger_helium.so"
+	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"

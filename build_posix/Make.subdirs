@@ -12,7 +12,7 @@ ext/collators/reverse
 ext/compressors/bzip2 BZIP2
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
-ext/test/helium HAVE_HELIUM
+ext/datasources/helium HAVE_HELIUM
 ext/test/kvs_bdb HAVE_BERKELEY_DB
 lang/java JAVA
 lang/python PYTHON
