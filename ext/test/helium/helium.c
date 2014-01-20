@@ -427,7 +427,7 @@ he_dump(he_t he, const char *tag)
 #endif
 	(void)fprintf(fp, "== %s\n", tag);
 
-	while ((ret = he_next(he, r, (uint64_t)0, (uint64_t)sizeof(v))) == 0) {
+	while ((ret = he_next(he, r, (size_t)0, sizeof(v))) == 0) {
 		he_dump_print("K: ", r->key, r->key_len, fp);
 		he_dump_print("V: ", r->val, r->val_len, fp);
 	}
@@ -448,7 +448,7 @@ he_dump(he_t he, const char *tag)
  */
 static inline int
 helium_call(WT_CURSOR *wtcursor, const char *fname,
-    he_t he, int (*f)(he_t, HE_ITEM *, uint64_t, uint64_t))
+    he_t he, int (*f)(he_t, HE_ITEM *, size_t, size_t))
 {
 	CURSOR *cursor;
 	HE_ITEM *r;
@@ -465,7 +465,7 @@ helium_call(WT_CURSOR *wtcursor, const char *fname,
 	r->val = cursor->v;
 
 restart:
-	if ((ret = f(he, r, (uint64_t)0, (uint64_t)cursor->mem_len)) != 0) {
+	if ((ret = f(he, r, (size_t)0, cursor->mem_len)) != 0) {
 		if (ret == HE_ERR_ITEM_NOT_FOUND)
 			return (WT_NOTFOUND);
 		ERET(wtext,
@@ -497,8 +497,7 @@ restart:
 		cursor->v = r->val = p;
 		cursor->mem_len = r->val_len + 32;
 
-		if ((ret = he_lookup(
-		    he, r, (uint64_t)0, (uint64_t)cursor->mem_len)) != 0) {
+		if ((ret = he_lookup(he, r, (size_t)0, cursor->mem_len)) != 0) {
 			if (ret == HE_ERR_ITEM_NOT_FOUND)
 				goto restart;
 			ERET(wtext, session,
@@ -579,8 +578,7 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
 	txn.val = val_buf;
 	txn.val_len = sizeof(val_buf);
 
-	if (he_lookup(
-	    hs->he_txn, &txn, (uint64_t)0, (uint64_t)sizeof(val_buf)) == 0)
+	if (he_lookup(hs->he_txn, &txn, (size_t)0, sizeof(val_buf)) == 0)
 		return (val_buf[0]);
 	return (TXN_UNRESOLVED);
 }
@@ -1082,7 +1080,7 @@ copyout_val(WT_CURSOR *wtcursor, CACHE_RECORD *cp)
  */
 static int
 nextprev(WT_CURSOR *wtcursor, const char *fname,
-    int (*f)(he_t, HE_ITEM *, uint64_t, uint64_t))
+    int (*f)(he_t, HE_ITEM *, size_t, size_t))
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
@@ -2538,7 +2536,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 				continue;
 			}
 			ERET(wtext, NULL, WT_ERROR,
-			    "he_remove: %s", he_strerror(ret));
+			    "he_delete: %s", he_strerror(ret));
 		} else {
 			r->val = cp->v;
 			r->val_len = cp->len;
@@ -2591,7 +2589,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 		if (cache_value_visible_all(wtcursor, oldest)) {
 			if ((ret = he_delete(ws->he_cache, r)) != 0)
 				EMSG_ERR(wtext, NULL, WT_ERROR,
-				    "he_remove: %s", he_strerror(ret));
+				    "he_delete: %s", he_strerror(ret));
 			continue;
 		}
 
@@ -3214,9 +3212,6 @@ helium_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-#if 0
-	extern int he_sys_trace_enabled;
-#endif
 	/*
 	 * List of the WT_DATA_SOURCE methods -- it's static so it breaks at
 	 * compile-time should the structure change underneath us.
@@ -3246,25 +3241,21 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	int vmajor, vminor, ret = 0;
 	const char **p;
 
-#if 0
-	he_sys_trace_enabled = 1;
-#endif
-
 	ds = NULL;
 
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if HE_VERSION_MAJOR != 1 || HE_VERSION_MINOR != 9
+#if HE_VERSION_MAJOR != 2 || HE_VERSION_MINOR != 0
 	ERET(wtext, NULL, EINVAL,
-	    "unsupported Levyx/Helium header file %d.%d, expected version 1.9",
+	    "unsupported Levyx/Helium header file %d.%d, expected version 2.0",
 	    HE_VERSION_MAJOR, HE_VERSION_MINOR);
 #endif
 	he_version(&vmajor, &vminor);
-	if (vmajor != 1 || vminor != 9)
+	if (vmajor != 2 || vminor != 0)
 		ERET(wtext, NULL, EINVAL,
 		    "unsupported Levyx/Helium library version %d.%d, expected "
-		    "version 1.9", vmajor, vminor);
+		    "version 2.0", vmajor, vminor);
 
 	/* Allocate and initialize the local data-source structure. */
 	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
