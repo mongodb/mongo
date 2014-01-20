@@ -260,7 +260,7 @@ wts_create(void)
 		break;
 	}
 
-	/* Configure internal key truncation. */
+	/* Configure Btree internal key truncation. */
 	p += snprintf(
 	    p, (size_t)(end - p), ",internal_key_truncate=%s",
 	    g.c_internal_key_truncation ? "true" : "false");
@@ -272,7 +272,11 @@ wts_create(void)
 	p += snprintf(p, (size_t)(end - p),
 	    ",split_pct=%" PRIu32, g.c_split_pct);
 
-	/* Configure data types. */
+	/* Configure LSM and data-sources. */
+	if (DATASOURCE("helium"))
+		p += snprintf(p, (size_t)(end - p),
+		    ",type=helium,helium_o_truncate=1");
+
 	if (DATASOURCE("kvsbdb"))
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
 
@@ -302,10 +306,6 @@ wts_create(void)
 		    "merge_threads=%" PRIu32 ",", g.c_merge_threads);
 		p += snprintf(p, (size_t)(end - p), ",)");
 	}
-
-	if (DATASOURCE("helium"))
-		p += snprintf(p, (size_t)(end - p),
-		    ",type=helium,helium_o_truncate=1");
 
 	/*
 	 * Create the underlying store.
@@ -337,8 +337,8 @@ wts_dump(const char *tag, int dump_bdb)
 	int ret;
 	char *cmd;
 
-	/* Data-sources that don't support dump through the wt utility. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
+	/* Some data-sources don't support dump through the wt utility. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -367,10 +367,8 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/*
-	 * Data-sources that don't support salvage.
-	 */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
+	/* Some data-sources don't support salvage. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;
@@ -397,12 +395,6 @@ wts_verify(const char *tag)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
-
-	/*
-	 * Data-sources that don't support verify.
-	 */
-	if (DATASOURCE("helium"))
-		return;
 
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
@@ -441,12 +433,12 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	/* Data-sources that don't support statistics. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
-		return;
-
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)
+		return;
+
+	/* Some data-sources don't support statistics. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;

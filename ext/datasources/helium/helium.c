@@ -2367,16 +2367,11 @@ static int
 helium_session_verify(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
-	DATA_SOURCE *ds;
-	WT_EXTENSION_API *wtext;
-
+	(void)wtds;
+	(void)session;
 	(void)uri;
 	(void)config;
-
-	ds = (DATA_SOURCE *)wtds;
-	wtext = ds->wtext;
-
-	ERET(wtext, session, ENOTSUP, "verify: %s", strerror(ENOTSUP));
+	return (0);
 }
 
 /*

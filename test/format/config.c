@@ -125,14 +125,14 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
-	/* Supporting shared libraries. */
-	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
-		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
+	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
 		die(errno, "Levyx/helium shared library: %s", HELIUM_PATH);
+	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
+		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
-	/* KVS doesn't support user-specified collations. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("helium"))
+	/* Some data-sources don't support user-specified collations. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		g.c_reverse = 0;
 
 	config_checksum();
