@@ -142,6 +142,7 @@ LSN
 LSNs
 LZO
 LeafGreen
+Levyx
 Llqr
 Llqrt
 LoadLoad
@@ -155,7 +156,6 @@ MUTEX
 MVCC
 Manos
 Marsaglia's
-Memrata
 Metadata
 Mewhort
 Multi
@@ -213,6 +213,7 @@ SIMD
 SLIST
 SLVG
 SML
+SOURCE's
 SPINLOCK
 SQL
 SSD
@@ -255,6 +256,7 @@ Unmarshall
 Unregister
 VARCHAR
 VLDB
+VMSG
 Vanishingly
 Vc
 Vixie
@@ -269,8 +271,10 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerHome
+WiredTigerInit
 WiredTigerLog
 WiredTigerStat
+WiredTigerTxn
 WithSeeds
 Wmissing
 Wuninitialized
@@ -607,7 +611,6 @@ membar
 memcpy
 memfree
 memmove
-memrata
 memset
 memsize
 mergeable

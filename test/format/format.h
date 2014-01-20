@@ -63,8 +63,8 @@ extern WT_EXTENSION_API *wt_api;
 
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
-#define	MEMRATA_PATH							\
-	EXTPATH "test/memrata/.libs/libwiredtiger_memrata.so"
+#define	HELIUM_PATH							\
+	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
@@ -98,6 +98,8 @@ typedef struct {
 	char *home_run;				/* Run file path */
 	char *home_stats;			/* Statistics file path */
 	char *home_salvage_copy;		/* Salvage copy command */
+
+	char *helium_mount;			/* Helium volume */
 
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */

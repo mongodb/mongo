@@ -28,18 +28,20 @@ LIBS
 LSB
 LSM
 Lameter
+Levyx
 MERCHANTABILITY
 MVCC's
 Makefiles
-Memrata
 Mewhort
 NOTFOUND
 NUMA
 NoSQL
+README
 RepMgr
 Rrx
 Seward's
 SiS
+TXT
 URIs
 Vv
 WiredTiger
@@ -87,6 +89,7 @@ command's
 comparator
 cond
 config
+configurign
 conn
 const
 control's
@@ -181,6 +184,7 @@ lastname
 len
 li
 libdir
+libhe
 libkvs
 libtool
 libwiredtiger
@@ -207,7 +211,6 @@ maxleafpage
 memalloc
 memfree
 memp
-memrata
 metadata
 minkey
 mkdir
