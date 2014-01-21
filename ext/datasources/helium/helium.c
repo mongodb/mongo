@@ -57,17 +57,32 @@ static int verbose = 0;					/* Verbose messages */
  */
 #undef	ESET
 #define	ESET(a) do {							\
-	int __ret;							\
-	if ((__ret = (a)) != 0 &&					\
-	    (__ret == WT_PANIC ||					\
-	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
-		ret = __ret;						\
+	int __v;							\
+	if ((__v = (a)) != 0) {						\
+		/*							\
+		 * On error, check for a panic (it overrides all other	\
+		 * returns).  Else, if there's no return value or the	\
+		 * return value is not strictly an error, override it	\
+		 * with the error.					\
+		 */							\
+		if (__v == WT_PANIC ||					\
+		    ret == 0 ||						\
+		    ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND)	\
+			ret = __v;					\
+		/*							\
+		 * If we're set to a Helium error at the end of the day,\
+		 * switch to a generic WiredTiger error.		\
+		 */							\
+		if (ret < 0 && ret > -31,800)				\
+			ret = WT_ERROR;					\
+	}								\
 } while (0)
 #undef	ERET
 #define	ERET(wtext, session, v, ...) do {				\
 	(void)								\
 	    wtext->err_printf(wtext, session, "helium: " __VA_ARGS__);	\
-	return (v);							\
+	ESET(v);							\
+	return (ret);							\
 } while (0)
 #undef	EMSG
 #define	EMSG(wtext, session, v, ...) do {				\
@@ -390,7 +405,7 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 
 #if 0
 static void
-he_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
+helium_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
 {
 	(void)fprintf(stderr, "%s %3zu: ", pfx, len);
 	for (; len > 0; --len, ++p)
@@ -408,9 +423,8 @@ he_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
  *	Dump the records in a Helium store.
  */
 static int
-he_dump(he_t he, const char *tag)
+helium_dump(he_t he, const char *tag)
 {
-	FILE *fp;
 	HE_ITEM *r, _r;
 	uint8_t k[4 * 1024], v[4 * 1024];
 	int ret = 0;
@@ -419,25 +433,16 @@ he_dump(he_t he, const char *tag)
 	memset(r, 0, sizeof(*r));
 	r->key = k;
 	r->val = v;
-#if 0
-	(void)snprintf(r->val, maxbuf, "dump.%s", tag);
-	fp = fopen(r->val, "w");
-#else
-	fp = stderr;
-#endif
-	(void)fprintf(fp, "== %s\n", tag);
 
+	(void)fprintf(stderr, "== %s\n", tag);
 	while ((ret = he_next(he, r, (size_t)0, sizeof(v))) == 0) {
-		he_dump_print("K: ", r->key, r->key_len, fp);
-		he_dump_print("V: ", r->val, r->val_len, fp);
+		he_dump_print("K: ", r->key, r->key_len, stderr);
+		he_dump_print("V: ", r->val, r->val_len, stderr);
 	}
-	if (ret == HE_ERR_ITEM_NOT_FOUND)
-		ret = 0;
-
-	(void)fclose(fp);
-	free(r->key);
-	free(r->val);
-
+	if (ret != HE_ERR_ITEM_NOT_FOUND) {
+		fprintf(stderr, "== error: %s\n", he_strerror(ret)); 
+		ret = WT_ERROR;
+	}
 	return (ret);
 }
 #endif
@@ -468,8 +473,7 @@ restart:
 	if ((ret = f(he, r, (size_t)0, cursor->mem_len)) != 0) {
 		if (ret == HE_ERR_ITEM_NOT_FOUND)
 			return (WT_NOTFOUND);
-		ERET(wtext,
-		    session, WT_ERROR, "%s: %s", fname, he_strerror(ret));
+		ERET(wtext, session, ret, "%s: %s", fname, he_strerror(ret));
 	}
 
 	/*
@@ -500,8 +504,8 @@ restart:
 		if ((ret = he_lookup(he, r, (size_t)0, cursor->mem_len)) != 0) {
 			if (ret == HE_ERR_ITEM_NOT_FOUND)
 				goto restart;
-			ERET(wtext, session,
-			    WT_ERROR, "he_lookup: %s", he_strerror(ret));
+			ERET(wtext,
+			    session, ret, "he_lookup: %s", he_strerror(ret));
 		}
 	}
 	/* NOTREACHED */
@@ -534,12 +538,10 @@ txn_state_set(WT_EXTENSION_API *wtext,
 	txn.val_len = sizeof(val);
 
 	if ((ret = he_update(hs->he_txn, &txn)) != 0)
-		ERET(wtext, session,
-		    WT_ERROR, "he_update: %s", he_strerror(ret));
+		ERET(wtext, session, ret, "he_update: %s", he_strerror(ret));
 
 	if (commit && (ret = he_commit(hs->he_txn)) != 0)
-		ERET(wtext, session,
-		    WT_ERROR, "he_commit: %s", he_strerror(ret));
+		ERET(wtext, session, ret, "he_commit: %s", he_strerror(ret));
 	return (0);
 }
 
@@ -937,6 +939,8 @@ cache_value_txnmin(WT_CURSOR *wtcursor, uint64_t *txnminp)
 static int
 key_max_err(WT_EXTENSION_API *wtext, WT_SESSION *session, size_t len)
 {
+	int ret = 0;
+
 	ERET(wtext, session, EINVAL,
 	    "key length (%zu bytes) larger than the maximum Helium "
 	    "key length of %d bytes",
@@ -1464,8 +1468,7 @@ helium_cursor_insert(WT_CURSOR *wtcursor)
 	if ((ret = cache_value_append(wtcursor, 0)) != 0)
 		goto err;
 	if ((ret = he_update(ws->he_cache, r)) != 0)
-		EMSG(wtext, session, WT_ERROR,
-		    "he_update: %s", he_strerror(ret));
+		EMSG(wtext, session, ret, "he_update: %s", he_strerror(ret));
 
 	/* Update the state while still holding the lock. */
 	ws->he_cache_inuse = 1;
@@ -1578,8 +1581,7 @@ update(WT_CURSOR *wtcursor, int remove_op)
 
 	/* Push the record into the cache. */
 	if ((ret = he_update(ws->he_cache, r)) != 0)
-		EMSG(wtext, session, WT_ERROR,
-		    "he_update: %s", he_strerror(ret));
+		EMSG(wtext, session, ret, "he_update: %s", he_strerror(ret));
 	ws->he_cache_inuse = 1;
 
 	/* Discard the lock. */
@@ -1666,6 +1668,7 @@ ws_source_name(WT_DATA_SOURCE *wtds,
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
 	size_t len;
+	int ret = 0;
 	const char *p;
 
 	ds = (DATA_SOURCE *)wtds;
@@ -1710,16 +1713,16 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 
 	if (ws->he != NULL) {
 		if ((tret = he_commit(ws->he)) != 0)
-			EMSG(wtext, session, WT_ERROR,
+			EMSG(wtext, session, tret,
 			    "he_commit: %s: %s", ws->uri, he_strerror(tret));
 		if ((tret = he_close(ws->he)) != 0)
-			EMSG(wtext, session, WT_ERROR,
+			EMSG(wtext, session, tret,
 			    "he_close: %s: %s", ws->uri, he_strerror(tret));
 		ws->he = NULL;
 	}
 	if (ws->he_cache != NULL) {
 		if ((tret = he_close(ws->he_cache)) != 0)
-			EMSG(wtext, session, WT_ERROR,
+			EMSG(wtext, session, tret,
 			    "he_close: %s(cache): %s",
 			    ws->uri, he_strerror(tret));
 		ws->he_cache = NULL;
@@ -1759,9 +1762,11 @@ ws_source_open_object(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = ws_source_name(wtds, session, uri, suffix, &p)) != 0)
 		return (ret);
 	VMSG(wtext, session, VERBOSE_L1, "open %s/%s", hs->name, p);
-	if ((he = he_open(hs->device, p, flags, NULL)) == NULL)
-		EMSG(wtext, session, WT_ERROR,
-		    "he_open: %s/%s: %s", hs->name, p, he_strerror(os_errno()));
+	if ((he = he_open(hs->device, p, flags, NULL)) == NULL) {
+		ret = os_errno();
+		EMSG(wtext, session, ret,
+		    "he_open: %s/%s: %s", hs->name, p, he_strerror(ret));
+	}
 	*hep = he;
 
 	free(p);
@@ -1881,7 +1886,7 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 	    wtds, session, hs, uri, WT_NAME_CACHE, oflags, &ws->he_cache)) != 0)
 		goto err;
 	if ((ret = he_commit(ws->he)) != 0)
-		EMSG_ERR(wtext, session, WT_ERROR,
+		EMSG_ERR(wtext, session, ret,
 		    "he_commit: %s", he_strerror(ret));
 
 	/* Optionally trade the global lock for the object lock. */
@@ -2349,10 +2354,10 @@ helium_session_truncate(WT_DATA_SOURCE *wtds,
 
 	/* Truncate the underlying namespaces. */
 	if ((tret = he_truncate(ws->he)) != 0)
-		EMSG(wtext, session, WT_ERROR,
+		EMSG(wtext, session, tret,
 		    "he_truncate: %s: %s", ws->uri, he_strerror(tret));
 	if ((tret = he_truncate(ws->he_cache)) != 0)
-		EMSG(wtext, session, WT_ERROR,
+		EMSG(wtext, session, tret,
 		    "he_truncate: %s: %s", ws->uri, he_strerror(tret));
 
 	ESET(unlock(wtext, session, &ws->lock));
@@ -2395,7 +2400,7 @@ helium_session_checkpoint(
 	/* Flush all volumes. */
 	if ((hs = ds->hs_head) != NULL &&
 	    (ret = he_commit(hs->he_volume)) != 0)
-		ERET(wtext, session, WT_ERROR,
+		ERET(wtext, session, ret,
 		    "he_commit: %s: %s", hs->device, he_strerror(ret));
 
 	return (0);
@@ -2440,12 +2445,12 @@ helium_source_close(
 	/* Flush and close the Helium source. */
 	if (hs->he_volume != NULL) {
 		if ((tret = he_commit(hs->he_volume)) != 0)
-			EMSG(wtext, session, WT_ERROR,
+			EMSG(wtext, session, tret,
 			    "he_commit: %s: %s",
 			    hs->device, he_strerror(tret));
 
 		if ((tret = he_close(hs->he_volume)) != 0)
-			EMSG(wtext, session, WT_ERROR,
+			EMSG(wtext, session, tret,
 			    "he_close: %s: %s: %s",
 			    hs->name, WT_NAME_INIT, he_strerror(tret));
 		hs->he_volume = NULL;
@@ -2530,14 +2535,14 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 				ret = 0;
 				continue;
 			}
-			ERET(wtext, NULL, WT_ERROR,
+			ERET(wtext, NULL, ret,
 			    "he_delete: %s", he_strerror(ret));
 		} else {
 			r->val = cp->v;
 			r->val_len = cp->len;
 			if ((ret = he_update(ws->he, r)) == 0)
 				continue;
-			ERET(wtext, NULL, WT_ERROR,
+			ERET(wtext, NULL, ret,
 			    "he_update: %s", he_strerror(ret));
 		}
 	}
@@ -2545,14 +2550,14 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	if (ret != 0)
-		ERET(wtext, NULL, WT_ERROR, "he_next: %s", he_strerror(ret));
+		ERET(wtext, NULL, ret, "he_next: %s", he_strerror(ret));
 
 	/*
 	 * Push the store to stable storage for correctness.  (It doesn't matter
 	 * what Helium handle we commit, so we just commit one of them.)
 	 */
 	if ((ret = he_commit(ws->he)) != 0)
-		ERET(wtext, NULL, WT_ERROR, "he_commit: %s", he_strerror(ret));
+		ERET(wtext, NULL, ret, "he_commit: %s", he_strerror(ret));
 
 	/*
 	 * If we're performing recovery, that's all we need to do, we're going
@@ -2583,7 +2588,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 			goto err;
 		if (cache_value_visible_all(wtcursor, oldest)) {
 			if ((ret = he_delete(ws->he_cache, r)) != 0)
-				EMSG_ERR(wtext, NULL, WT_ERROR,
+				EMSG_ERR(wtext, NULL, ret,
 				    "he_delete: %s", he_strerror(ret));
 			continue;
 		}
@@ -2607,8 +2612,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	if (ret != 0)
-		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "he_next: %s", he_strerror(ret));
+		EMSG_ERR(wtext, NULL, ret, "he_next: %s", he_strerror(ret));
 
 err:	if (locked)
 		ESET(unlock(wtext, NULL, &ws->lock));
@@ -2641,13 +2645,13 @@ txn_cleaner(WT_CURSOR *wtcursor, he_t he_txn, uint64_t txnmin)
 	    (ret = helium_call(wtcursor, "he_next", he_txn, he_next)) == 0;) {
 		memcpy(&txnid, r->key, sizeof(txnid));
 		if (txnid < txnmin && (ret = he_delete(he_txn, r)) != 0)
-			ERET(wtext, NULL, WT_ERROR,
+			ERET(wtext, NULL, ret,
 			    "he_delete: %s", he_strerror(ret));
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	if (ret != 0)
-		ERET(wtext, NULL, WT_ERROR, "he_next: %s", he_strerror(ret));
+		ERET(wtext, NULL, ret, "he_next: %s", he_strerror(ret));
 
 	return (0);
 }
@@ -2846,7 +2850,7 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
 		EMSG(wtext, NULL, tret,
 		    "WT_EXTENSION_API.config_scan_end: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(tret));
 
 	return (ret);
 }
@@ -2907,10 +2911,12 @@ helium_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	flags |= HE_O_CREATE |
 	    HE_O_TRUNCATE | HE_O_VOLUME_CLEAN | HE_O_VOLUME_CREATE;
 	if ((hs->he_volume = he_open(
-	    hs->device, WT_NAME_INIT, flags, env_set ? &env : NULL)) == NULL)
-		EMSG_ERR(wtext, NULL, WT_ERROR,
+	    hs->device, WT_NAME_INIT, flags, env_set ? &env : NULL)) == NULL) {
+		ret = os_errno();
+		EMSG_ERR(wtext, NULL, ret,
 		    "he_open: %s: %s: %s",
-		    hs->name, WT_NAME_INIT, he_strerror(os_errno()));
+		    hs->name, WT_NAME_INIT, he_strerror(ret));
+	}
 
 	/* Insert the new entry at the head of the list. */
 	hs->next = ds->hs_head;
@@ -2951,7 +2957,7 @@ helium_source_open_txn(DATA_SOURCE *ds)
 			if (hs_txn != NULL) {
 				(void)he_close(t);
 				(void)he_close(hs_txn);
-				ERET(wtext, NULL, WT_ERROR,
+				ERET(wtext, NULL, WT_PANIC,
 				    "found multiple transaction stores, "
 				    "unable to proceed");
 			}
@@ -2969,14 +2975,16 @@ helium_source_open_txn(DATA_SOURCE *ds)
 		for (hs = ds->hs_head; hs->next != NULL; hs = hs->next)
 			;
 		if ((he_txn = he_open(
-		    hs->device, WT_NAME_TXN, HE_O_CREATE, NULL)) == NULL)
-			ERET(wtext, NULL, WT_ERROR,
+		    hs->device, WT_NAME_TXN, HE_O_CREATE, NULL)) == NULL) {
+			ret = os_errno();
+			ERET(wtext, NULL, ret,
 			    "he_open: %s: %s: %s",
-			    hs->name, WT_NAME_TXN, he_strerror(os_errno()));
+			    hs->name, WT_NAME_TXN, he_strerror(ret));
+		}
 
 		/* Push the change. */
 		if ((ret = he_commit(he_txn)) != 0)
-			ERET(wtext, NULL, WT_ERROR,
+			ERET(wtext, NULL, ret,
 			    "he_commit: %s", he_strerror(ret));
 	}
 	VMSG(wtext, NULL, VERBOSE_L1, "%s" "transactional store on %s",
@@ -3048,7 +3056,7 @@ helium_source_recover_namespace(WT_DATA_SOURCE *wtds,
 	if ((ret = cache_cleaner(wtext, wtcursor, 0, NULL)) != 0)
 		goto err;
 	if ((ret = he_truncate(ws->he_cache)) != 0)
-		EMSG_ERR(wtext, NULL, WT_ERROR,
+		EMSG_ERR(wtext, NULL, ret,
 		    "he_truncate: %s(cache): %s", ws->uri, he_strerror(ret));
 
 	/* Close the underlying WiredTiger sources. */
@@ -3132,7 +3140,7 @@ helium_source_recover(
 	/* Get a list of the cache/primary object pairs in the Helium source. */
 	if ((ret = he_enumerate(
 	    hs->device, helium_namespace_list, &names)) != 0)
-		ERET(wtext, NULL, WT_ERROR,
+		ERET(wtext, NULL, ret,
 		    "he_enumerate: %s: %s", hs->name, he_strerror(ret));
 
 	/* Recover the objects. */
@@ -3143,7 +3151,7 @@ helium_source_recover(
 
 	/* Clear the transaction store. */
 	if ((ret = he_truncate(hs->he_txn)) != 0)
-		EMSG_ERR(wtext, NULL, WT_ERROR,
+		EMSG_ERR(wtext, NULL, ret,
 		    "he_truncate: %s: %s: %s",
 		    hs->name, WT_NAME_TXN, he_strerror(ret));
 
