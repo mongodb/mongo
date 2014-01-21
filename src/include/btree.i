@@ -528,6 +528,41 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 }
 
 /*
+ * __wt_eviction_force_check --
+ *	Check if a page matches the criteria for forced eviction.
+ */
+static inline int
+__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
+
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR &&
+	    page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off, although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that has
+	 * never been modified, but check to be sure.
+	 */
+	if (page->modify == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
  * __wt_page_release --
  *	Release a reference to a page.
  */
@@ -557,7 +592,11 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-		ret = __wt_evict_page(session, page);
+		ret = (page->type == WT_PAGE_ROW_LEAF &&
+		    !F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) &&
+		    __wt_eviction_force_check(session, page)) ?
+		    __wt_split_page_inmem(session, page) :
+		    __wt_evict_page(session, page);
 		if (ret == 0)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -639,41 +678,6 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 				return (hp);
 	}
 	return (NULL);
-}
-
-/*
- * __wt_eviction_force_check --
- *	Check if a page matches the criteria for forced eviction.
- */
-static inline int
-__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
-	/* Leaf pages only. */
-	if (page->type != WT_PAGE_COL_FIX &&
-	    page->type != WT_PAGE_COL_VAR &&
-	    page->type != WT_PAGE_ROW_LEAF)
-		return (0);
-
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * It's hard to imagine a page with a huge memory footprint that has
-	 * never been modified, but check to be sure.
-	 */
-	if (page->modify == NULL)
-		return (0);
-
-	return (1);
 }
 
 /*

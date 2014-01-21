@@ -332,17 +332,19 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		 * In the normal case where there are live children spread
 		 * through the subtree, create two child pages.
 		 *
-		 * Handle the case where the only live child is first / last
-		 * specially: put the live child into the top-level page.
+		 * Handle the case where the live children are all near the
+		 * beginning / end specially: put the last live child into the
+		 * top-level page, to avoid getting much deeper during
+		 * append-only workloads.
 		 *
 		 * Set SPLIT_MERGE on the internal pages if there are any live
 		 * children: they can't be evicted, so there is no point
 		 * permanently deepening the tree.
 		 */
-		if (visit_state.first_live == visit_state.last_live &&
-		    (visit_state.first_live == 0 ||
-		    visit_state.first_live == refcnt - 1))
-			split = (visit_state.first_live == 0) ? 1 : refcnt - 1;
+		if (visit_state.last_live <= refcnt / 10)
+			split = 1;
+		else if (visit_state.first_live >= (9 * refcnt) / 10)
+			split = refcnt - 1;
 		else
 			split = (refcnt + 1) / 2;
 
