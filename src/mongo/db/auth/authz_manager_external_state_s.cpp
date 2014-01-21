@@ -32,6 +32,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
+#include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
@@ -70,40 +71,11 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(int* outVersion) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::usersCollectionNamespace));
-            BSONObj cmdResult;
-            conn->get()->runCommand(
-                    "admin",
-                    BSON("getParameter" << 1 <<
-                         AuthorizationManager::schemaVersionServerParameter << 1),
-                    cmdResult);
-            if (!cmdResult["ok"].trueValue()) {
-                std::string errmsg = cmdResult["errmsg"].str();
-                if (errmsg == "no option found to get" ||
-                    StringData(errmsg).startsWith("no such cmd")) {
-
-                    *outVersion = 1;
-                    conn->done();
-                    return Status::OK();
-                }
-                int code = cmdResult["code"].numberInt();
-                if (code == 0) {
-                    code = ErrorCodes::UnknownError;
-                }
-                return Status(ErrorCodes::Error(code), errmsg);
-            }
-            BSONElement versionElement =
-                cmdResult[AuthorizationManager::schemaVersionServerParameter];
-            if (versionElement.eoo())
-                return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
-            *outVersion = versionElement.numberInt();
-            conn->done();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                AuthorizationManager::usersCollectionNamespace));
+        Status status = auth::getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
+        conn->done();
+        return status;
     }
 
     Status AuthzManagerExternalStateMongos::getUserDescription(const UserName& userName,

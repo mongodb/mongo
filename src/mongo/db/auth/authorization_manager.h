@@ -95,11 +95,6 @@ namespace mongo {
         static const BSONObj versionDocumentQuery;
 
         /**
-         * Name of the server parameter used to report the auth schema version (via getParameter).
-         */
-        static const std::string schemaVersionServerParameter;
-
-        /**
          * Name of the field in the auth schema version document containing the current schema
          * version.
          */

@@ -81,6 +81,10 @@ namespace mongo {
         options->addOptionChaining("noIndexRestore", "noIndexRestore", moe::Switch,
                 "don't restore indexes");
 
+        options->addOptionChaining("restoreDbUsersAndRoles", "restoreDbUsersAndRoles", moe::Switch,
+                "Restore user and role definitions for the given database")
+                        .requires("db").incompatibleWith("collection");
+
         options->addOptionChaining("w", "w", moe::Int, "minimum number of replicas per write")
                                   .setDefault(moe::Value(0));
 
@@ -143,6 +147,20 @@ namespace mongo {
         if (!params.count("db")) {
             toolGlobalParams.db = "";
         }
+
+        if (hasParam("restoreDbUsersAndRoles") && toolGlobalParams.db == "admin") {
+            return Status(ErrorCodes::BadValue,
+                          "Cannot provide --restoreDbUsersAndRoles when restoring the admin db as "
+                          "user and role definitions for the whole server are restored by "
+                          "default (if present) when restoring the admin db");
+        }
+
+        // Always restore users and roles if doing a full restore.  If doing a db restore, only
+        // restore users and roles if --restoreDbUsersAndRoles provided or you're restoring the
+        // admin db
+        mongoRestoreGlobalParams.restoreUsersAndRoles = hasParam("restoreDbUsersAndRoles") ||
+                (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty()) ||
+                (toolGlobalParams.db == "admin" && toolGlobalParams.coll.empty());
 
         return Status::OK();
     }

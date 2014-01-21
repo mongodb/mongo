@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
+#include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/server_parameters.h"
@@ -52,7 +53,7 @@ namespace {
                               MONGO_NO_PREREQUISITES,
                               ("BeginStartupOptionParsing"))(InitializerContext*) {
         new AuthzVersionParameter(ServerParameterSet::getGlobal(),
-                                  AuthorizationManager::schemaVersionServerParameter);
+                                  auth::schemaVersionServerParameter);
         return Status::OK();
     }
 

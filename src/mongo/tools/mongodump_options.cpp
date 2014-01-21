@@ -72,6 +72,9 @@ namespace mongo {
         options->addOptionChaining("forceTableScan", "forceTableScan", moe::Switch,
                 "force a table scan (do not use $snapshot)");
 
+        options->addOptionChaining("dumpDbUsersAndRoles", "dumpDbUsersAndRoles", moe::Switch,
+                "Dump user and role definitions for the given database")
+                        .requires("db").incompatibleWith("collection");
 
         return Status::OK();
     }
@@ -128,6 +131,19 @@ namespace mongo {
         if (!params.count("db")) {
             toolGlobalParams.db = "";
         }
+
+        if (hasParam("dumpDbUsersAndRoles") && toolGlobalParams.db == "admin") {
+            return Status(ErrorCodes::BadValue,
+                          "Cannot provide --dumpDbUsersAndRoles when dumping the admin db as "
+                          "user and role definitions for the whole server are dumped by default "
+                          "when dumping the admin db");
+        }
+
+        // Always dump users and roles if doing a full dump.  If doing a db dump, only dump users
+        // and roles if --dumpDbUsersAndRoles provided or you're dumping the admin db.
+        mongoDumpGlobalParams.dumpUsersAndRoles = hasParam("dumpDbUsersAndRoles") ||
+                (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty()) ||
+                (toolGlobalParams.db == "admin" && toolGlobalParams.coll.empty());
 
         if (mongoDumpGlobalParams.outputDirectory == "-") {
             // write output to standard error to avoid mangling output

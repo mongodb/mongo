@@ -15,7 +15,9 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/export_macros.h"
 
 namespace mongo {
@@ -27,6 +29,26 @@ namespace auth {
      */
     std::string MONGO_CLIENT_API createPasswordDigest(const StringData& username,
                                      const StringData& clearTextPassword);
+
+    /**
+     * Retrieves the schema version of the persistent data describing users and roles from the
+     * remote server connected to with conn.
+     */
+    Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion);
+
+    /**
+     * Given a schemaVersion24 user document and its source database, return the query and update
+     * specifier needed to upsert a schemaVersion26 version of the user.
+     */
+    void getUpdateToUpgradeUser(const StringData& sourceDB,
+                                const BSONObj& oldUserDoc,
+                                BSONObj* query,
+                                BSONObj* update);
+
+    /**
+     * Name of the server parameter used to report the auth schema version (via getParameter).
+     */
+    extern const std::string schemaVersionServerParameter;
 
 }  // namespace auth
 }  // namespace mongo

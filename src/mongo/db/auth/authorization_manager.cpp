@@ -40,6 +40,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
@@ -96,7 +97,6 @@ namespace mongo {
 
     const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id" << "authSchema");
 
-    const std::string AuthorizationManager::schemaVersionServerParameter = "authSchemaVersion";
     const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
 
 #ifndef _MSC_EXTENSIONS
@@ -923,92 +923,10 @@ namespace {
         if (oldUserSource == "local")
             return;  // Skips users from "local" database, which cannot be upgraded.
 
-        const std::string oldUserName = oldUserDoc["user"].String();
-        BSONObj query = BSON("_id" << oldUserSource + "." + oldUserName);
+        BSONObj query;
+        BSONObj update;
+        auth::getUpdateToUpgradeUser(sourceDB, oldUserDoc, &query, &update);
 
-        BSONObjBuilder updateBuilder;
-
-        {
-            BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
-            toSetBuilder << "user" << oldUserName << "db" << oldUserSource;
-            BSONElement pwdElement = oldUserDoc["pwd"];
-            if (!pwdElement.eoo()) {
-                toSetBuilder << "credentials" << BSON("MONGODB-CR" << pwdElement.String());
-            }
-            else if (oldUserSource == "$external") {
-                toSetBuilder << "credentials" << BSON("external" << true);
-            }
-        }
-        {
-            BSONObjBuilder pushAllBuilder(updateBuilder.subobjStart("$pushAll"));
-            BSONArrayBuilder rolesBuilder(pushAllBuilder.subarrayStart("roles"));
-
-            const bool readOnly = oldUserDoc["readOnly"].trueValue();
-            const BSONElement rolesElement = oldUserDoc["roles"];
-            if (readOnly) {
-                // Handles the cases where there is a truthy readOnly field, which is a 2.2-style
-                // read-only user.
-                if (sourceDB == "admin") {
-                    rolesBuilder << BSON("role" << "readAnyDatabase" << "db" << "admin");
-                }
-                else {
-                    rolesBuilder << BSON("role" << "read" << "db" << sourceDB);
-                }
-            }
-            else if (rolesElement.eoo()) {
-                // Handles the cases where the readOnly field is absent or falsey, but the
-                // user is known to be 2.2-style because it lacks a roles array.
-                if (sourceDB == "admin") {
-                    rolesBuilder << BSON("role" << "root" << "db" << "admin");
-                }
-                else {
-                    rolesBuilder << BSON("role" << "dbOwner" << "db" << sourceDB);
-                }
-            }
-            else {
-                // Handles 2.4-style user documents, with roles arrays and (optionally, in admin db)
-                // otherDBRoles objects.
-                uassert(17252,
-                        "roles field in v2.4 user documents must be an array",
-                        rolesElement.type() == Array);
-                for (BSONObjIterator oldRoles(rolesElement.Obj());
-                     oldRoles.more();
-                     oldRoles.next()) {
-
-                    BSONElement roleElement = *oldRoles;
-                    rolesBuilder << BSON("role" << roleElement.String() << "db" << sourceDB);
-                }
-
-                BSONElement otherDBRolesElement = oldUserDoc["otherDBRoles"];
-                if (sourceDB == "admin" && !otherDBRolesElement.eoo()) {
-                    uassert(17253,
-                            "otherDBRoles field in v2.4 user documents must be an object.",
-                            otherDBRolesElement.type() == Object);
-
-                    for (BSONObjIterator otherDBs(otherDBRolesElement.Obj());
-                         otherDBs.more();
-                         otherDBs.next()) {
-
-                        BSONElement otherDBRoles = *otherDBs;
-                        if (otherDBRoles.fieldNameStringData() == "local")
-                            continue;
-                        uassert(17254,
-                                "Member fields of otherDBRoles objects must be arrays.",
-                                otherDBRoles.type() == Array);
-                        for (BSONObjIterator oldRoles(otherDBRoles.Obj());
-                             oldRoles.more();
-                             oldRoles.next()) {
-
-                            BSONElement roleElement = *oldRoles;
-                            rolesBuilder << BSON("role" << roleElement.String() <<
-                                                 "db" << otherDBRoles.fieldNameStringData());
-                        }
-                    }
-                }
-            }
-        }
-
-        BSONObj update = updateBuilder.done();
         uassertStatusOK(externalState->updateOne(
                                 AuthorizationManager::usersAltCollectionNamespace,
                                 query,

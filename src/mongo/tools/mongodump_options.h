@@ -43,6 +43,7 @@ namespace mongo {
         bool useOplog;
         bool repair;
         bool snapShotQuery;
+        bool dumpUsersAndRoles;
     };
 
     extern MongoDumpGlobalParams mongoDumpGlobalParams;

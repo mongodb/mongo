@@ -34,13 +34,17 @@
 #include <fstream>
 #include <map>
 
+#include "mongo/base/status.h"
+#include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongo;
 
@@ -85,9 +89,7 @@ public:
         ProgressMeter* _m;
     };
 
-    void doCollection( const string coll , FILE* out , ProgressMeter *m ) {
-        Query q = _query;
-
+    void doCollection( const string coll , Query q, FILE* out , ProgressMeter *m ) {
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
@@ -113,7 +115,7 @@ public:
         }
     }
 
-    void writeCollectionFile( const string coll , boost::filesystem::path outputFile ) {
+    void writeCollectionFile( const string coll , Query q, boost::filesystem::path outputFile ) {
         toolInfoLog() << "\t" << coll << " to " << outputFile.string() << std::endl;
 
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
@@ -123,7 +125,7 @@ public:
         m.setName("Collection File Writing Progress");
         m.setUnits("objects");
 
-        doCollection(coll, f, &m);
+        doCollection(coll, q, f, &m);
 
         toolInfoLog() << "\t\t " << m.done() << " objects" << std::endl;
     }
@@ -163,12 +165,16 @@ public:
 
 
     void writeCollectionStdout( const string coll ) {
-        doCollection(coll, stdout, NULL);
+        doCollection(coll, _query, stdout, NULL);
     }
 
-    void go( const string db , const boost::filesystem::path outdir ) {
-        toolInfoLog() << "DATABASE: " << db << "\t to \t" << outdir.string() << std::endl;
-
+    void go(const string& db,
+            const string& coll,
+            const Query& query,
+            const boost::filesystem::path& outdir,
+            const string& outFilename) {
+        // Can only provide outFilename if db and coll are provided
+        fassert(17368, outFilename.empty() || (!coll.empty() && !db.empty()));
         boost::filesystem::create_directories( outdir );
 
         map <string, BSONObj> collectionOptions;
@@ -194,7 +200,7 @@ public:
             }
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
-            if (toolGlobalParams.coll == "" && name.find(".$") != string::npos) {
+            if (coll == "" && name.find(".$") != string::npos) {
                 if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
                     toolInfoLog() << "\tskipping collection: " << name << std::endl;
                 }
@@ -204,9 +210,7 @@ public:
             const string filename = name.substr( db.size() + 1 );
 
             //if a particular collections is specified, and it's not this one, skip it
-            if (toolGlobalParams.coll != "" &&
-                db + "." + toolGlobalParams.coll != name &&
-                toolGlobalParams.coll != name) {
+            if (coll != "" && db + "." + coll != name && coll != name) {
                 continue;
             }
 
@@ -221,18 +225,23 @@ public:
             if (nsToCollectionSubstring(name) == "system.indexes") {
               // Create system.indexes.bson for compatibility with pre 2.2 mongorestore
               const string filename = name.substr( db.size() + 1 );
-              writeCollectionFile( name.c_str() , outdir / ( filename + ".bson" ) );
+              writeCollectionFile( name.c_str() , query, outdir / ( filename + ".bson" ) );
               // Don't dump indexes as *.metadata.json
               continue;
             }
-            
+
+            if (nsToCollectionSubstring(name) == "system.users" &&
+                    !mongoDumpGlobalParams.dumpUsersAndRoles) {
+                continue;
+            }
+
             collections.push_back(name);
         }
         
         for (vector<string>::iterator it = collections.begin(); it != collections.end(); ++it) {
             string name = *it;
-            const string filename = name.substr( db.size() + 1 );
-            writeCollectionFile( name , outdir / ( filename + ".bson" ) );
+            const string filename = outFilename != "" ? outFilename : name.substr( db.size() + 1 );
+            writeCollectionFile( name , query, outdir / ( filename + ".bson" ) );
             writeMetadataFile( name, outdir / (filename + ".metadata.json"), collectionOptions, indexes);
         }
 
@@ -429,6 +438,17 @@ public:
             }
         }
 
+        if (mongoDumpGlobalParams.dumpUsersAndRoles) {
+            uassertStatusOK(auth::getRemoteStoredAuthorizationVersion(&conn(true),
+                                                                      &_serverAuthzVersion));
+            uassert(17369,
+                    mongoutils::str::stream() << "Backing up users and roles is only supported for "
+                            "clusters with auth schema versions 1 or 3, found: " <<
+                            _serverAuthzVersion,
+                    _serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+        }
+
         string opLogName = "";
         unsigned long long opLogStart = 0;
         if (mongoDumpGlobalParams.useOplog) {
@@ -508,11 +528,26 @@ public:
                 if ( (string)dbName == "local" )
                     continue;
 
-                go ( dbName , root / dbName );
+                boost::filesystem::path outdir = root / dbName;
+                toolInfoLog() << "DATABASE: " << dbName << "\t to \t" << outdir.string()
+                        << std::endl;
+                go ( dbName , "", _query, outdir, "" );
             }
         }
         else {
-            go(toolGlobalParams.db, root / toolGlobalParams.db);
+            boost::filesystem::path outdir = root / toolGlobalParams.db;
+            toolInfoLog() << "DATABASE: " << toolGlobalParams.db << "\t to \t" << outdir.string()
+                    << std::endl;
+            go(toolGlobalParams.db, toolGlobalParams.coll, _query, outdir, "");
+            if (mongoDumpGlobalParams.dumpUsersAndRoles &&
+                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
+                    toolGlobalParams.db != "admin") {
+                toolInfoLog() << "Backing up user and role data for the " << toolGlobalParams.db <<
+                        " database";
+                Query query = Query(BSON("db" << toolGlobalParams.db));
+                go("admin", "system.users", query, outdir, "$admin.system.users");
+                go("admin", "system.roles", query, outdir, "$admin.system.roles");
+            }
         }
 
         if (!opLogName.empty()) {
@@ -521,13 +556,14 @@ public:
 
             _query = BSON("ts" << b.obj());
 
-            writeCollectionFile( opLogName , root / "oplog.bson" );
+            writeCollectionFile( opLogName , _query, root / "oplog.bson" );
         }
 
         return 0;
     }
 
     bool _usingMongos;
+    int _serverAuthzVersion;
     BSONObj _query;
 };
 

@@ -44,6 +44,7 @@ namespace mongo {
         bool keepIndexVersion;
         bool restoreOptions;
         bool restoreIndexes;
+        bool restoreUsersAndRoles;
         int w;
         std::string restoreDirectory;
     };

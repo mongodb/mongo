@@ -415,7 +415,8 @@ MongoRunner.mongoOptions = function( opts ){
     }
     
     // Default for waitForConnect is true
-    if (waitForConnect == undefined || waitForConnect == null) opts.waitForConnect = true;
+    opts.waitForConnect = (waitForConnect == undefined || waitForConnect == null) ?
+        true : waitForConnect;
     
     if( jsTestOptions().useSSL ) {
         if (!opts.sslMode) opts.sslMode = "requireSSL";
@@ -706,6 +707,14 @@ MongoRunner.runMongoTool = function( binaryName, opts ){
 
     return runMongoProgram.apply(null, argsArray);
 
+}
+
+// Given a test name figures out a directory for that test to use for dump files and makes sure
+// that directory exists and is empty.
+MongoRunner.getAndPrepareDumpDirectory = function(testName) {
+    var dir = MongoRunner.dataPath + testName + "_external/";
+    resetDbpath(dir);
+    return dir;
 }
 
 startMongodTest = function (port, dirname, restart, extraOptions ) {

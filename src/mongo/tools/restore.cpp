@@ -36,7 +36,12 @@
 #include <fstream>
 #include <set>
 
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/tools/mongorestore_options.h"
@@ -57,11 +62,15 @@ public:
     string _curns;
     string _curdb;
     string _curcoll;
-    set<string> _users; // For restoring users with --drop
+    string _userDBFieldName;
+    set<UserName> _users; // Holds users that are already in the cluster when restoring with --drop
+    set<RoleName> _roles; // Holds roles that are already in the cluster when restoring with --drop
     scoped_ptr<Matcher> _opmatcher; // For oplog replay
     scoped_ptr<OpTime> _oplogLimitTS; // for oplog replay (limit)
     int _oplogEntrySkips; // oplog entries skipped
     int _oplogEntryApplies; // oplog entries applied
+    int _serverAuthzVersion; // authSchemaVersion of the cluster being restored into.
+    int _dumpFileAuthzVersion; // version extracted from admin.system.version file in dump.
     Restore() : BSONTool() { }
 
     virtual void printHelp(ostream& out) {
@@ -80,6 +89,64 @@ public:
         if (isMongos() && toolGlobalParams.db == "" && exists(root / "config")) {
             toolError() << "Cannot do a full restore on a sharded system" << std::endl;
             return -1;
+        }
+
+        if (mongoRestoreGlobalParams.restoreUsersAndRoles) {
+            Status status = auth::getRemoteStoredAuthorizationVersion(&conn(),
+                                                                      &_serverAuthzVersion);
+            uassertStatusOK(status);
+            uassert(17370,
+                    mongoutils::str::stream() << "Restoring users and roles is only supported for "
+                            "clusters with auth schema versions " <<
+                            AuthorizationManager::schemaVersion24 << " or " <<
+                            AuthorizationManager::schemaVersion26Final << ", found: " <<
+                            _serverAuthzVersion,
+                    _serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+
+            // Now that we know the schema version of the server we can pick whether to use
+            // "userSource" or "db" to identify users.
+            _userDBFieldName = _serverAuthzVersion == AuthorizationManager::schemaVersion26Final ?
+                    "db" : "userSource";
+
+            if (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty() &&
+                    exists(root / "admin" / "system.version.bson")) {
+                // Will populate _dumpFileAuthzVersion
+                processFileAndMetadata(root / "admin" / "system.version.bson",
+                                       "admin.system.version");
+                uassert(17371,
+                        mongoutils::str::stream() << "Server's authorization data schema version "
+                                "does not match that of the data in the dump file.  Server's schema"
+                                " version: " << _serverAuthzVersion << ", schema version in dump: "
+                                << _dumpFileAuthzVersion,
+                        _serverAuthzVersion == _dumpFileAuthzVersion);
+            } else if (!toolGlobalParams.db.empty()) {
+                // DB-specific restore
+                if (exists(root / "$admin.system.users.bson")) {
+                    uassert(17372,
+                            mongoutils::str::stream() << "$admin.system.users.bson file found, "
+                                    "which implies that the dump was taken from a system with "
+                                    "schema version " << AuthorizationManager::schemaVersion26Final
+                                    << " users, but server has authorization schema version "
+                                    << _serverAuthzVersion,
+                            _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+                    toolInfoLog() << "Restoring users for the " << toolGlobalParams.db <<
+                            " database to admin.system.users" << endl;
+                    processFileAndMetadata(root / "$admin.system.users.bson", "admin.system.users");
+                }
+                if (exists(root / "$admin.system.roles.bson")) {
+                    uassert(17373,
+                            mongoutils::str::stream() << "$admin.system.roles.bson file found, "
+                                    "which implies that the dump was taken from a system with  "
+                                    "schema version " << AuthorizationManager::schemaVersion26Final
+                                    << " authorization data, but server has authorization schema "
+                                    "version " << _serverAuthzVersion,
+                            _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+                    toolInfoLog() << "Restoring roles for the " << toolGlobalParams.db <<
+                            " database to admin.system.roles" << endl;
+                    processFileAndMetadata(root / "$admin.system.roles.bson", "admin.system.roles");
+                }
+            }
         }
 
         if (mongoRestoreGlobalParams.oplogReplay) {
@@ -268,22 +335,11 @@ public:
             return;
         }
 
-        if ( endsWith( root.string().c_str() , ".metadata.json" ) ) {
-            // Metadata files are handled when the corresponding .bson file is handled
-            return;
-        }
-
-        if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
-                 endsWith( root.string().c_str() , ".bin" ) ) ) {
-            toolError() << "don't know what to do with file [" << root.string() << "]" << std::endl;
-            return;
-        }
-
-        toolInfoLog() << root.string() << std::endl;
-
-        if ( root.leaf() == "system.profile.bson" ) {
-            toolInfoLog() << "\t skipping system.profile.bson" << std::endl;
-            return;
+        if (oplogReplayLimit) {
+            toolError() << "The oplogLimit option cannot be used if "
+                      << "normal databases/collections exist in the dump directory."
+                      << std::endl;
+            exit(EXIT_FAILURE);
         }
 
         string ns;
@@ -307,32 +363,107 @@ public:
             ns += "." + oldCollName;
         }
 
-        if (oplogReplayLimit) {
-            toolError() << "The oplogLimit option cannot be used if "
-                      << "normal databases/collections exist in the dump directory."
-                      << std::endl;
-            exit(EXIT_FAILURE);
+        if ( endsWith( root.string().c_str() , ".metadata.json" ) ) {
+            // Metadata files are handled when the corresponding .bson file is handled
+            return;
         }
 
-        toolInfoLog() << "\tgoing into namespace [" << ns << "]" << std::endl;
+        if ((root.leaf() == "system.version.bson" && toolGlobalParams.db.empty()) ||
+                root.leaf() == "$admin.system.users.bson" ||
+                root.leaf() == "$admin.system.roles.bson") {
+            // These files were already explicitly handled at the beginning of the restore.
+            return;
+        }
 
+        if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
+                 endsWith( root.string().c_str() , ".bin" ) ) ) {
+            toolError() << "don't know what to do with file [" << root.string() << "]" << std::endl;
+            return;
+        }
+
+        toolInfoLog() << root.string() << std::endl;
+
+        if ( root.leaf() == "system.profile.bson" ) {
+            toolInfoLog() << "\t skipping system.profile.bson" << std::endl;
+            return;
+        }
+
+        processFileAndMetadata(root, ns);
+    }
+
+    /**
+     * 1) Drop collection if --drop was specified.  For system.users or system.roles collections,
+     * however, you don't want to remove all the users/roles up front as some of them may be needed
+     * by the restore.  Instead, keep a set of all the users/roles originally in the server, then
+     * after restoring the users/roles from the dump, remove any users roles that were present in
+     * the system originally but aren't in the dump.
+     *
+     * 2) Parse metadata file (if present) and if the collection doesn't exist (or was just dropped
+     * b/c we're using --drop), create the collection with the options from the metadata file
+     *
+     * 3) Restore the data from the dump file for this collection
+     *
+     * 4) If the user asked to drop this collection, then at this point the _users and _roles sets
+     * will contain users and roles that were in the collection but not in the dump we are
+     * restoring. Iterate these sets and delete any users and roles that are there.
+     *
+     * 5) Restore indexes based on index definitions from the metadata file.
+     */
+    void processFileAndMetadata(const boost::filesystem::path& root, const std::string& ns) {
+
+        _curns = ns;
+        _curdb = nsToDatabase(_curns);
+        _curcoll = nsToCollectionSubstring(_curns).toString();
+
+        toolInfoLog() << "\tgoing into namespace [" << _curns << "]" << std::endl;
+
+        // 1) Drop collection if needed.  Save user and role data if this is a system.users or
+        // system.roles collection
         if (mongoRestoreGlobalParams.drop) {
-            if (root.leaf() != "system.users.bson" ) {
-                toolInfoLog() << "\t dropping" << std::endl;
-                conn().dropCollection( ns );
-            } else {
+            if (_curcoll == "system.users") {
                 // Create map of the users currently in the DB
-                BSONObj fields = BSON("user" << 1);
-                scoped_ptr<DBClientCursor> cursor(conn().query(ns, Query(), 0, 0, &fields));
+                BSONObj fields = BSON("user" << 1 << _userDBFieldName << 1);
+                scoped_ptr<DBClientCursor> cursor(conn().query(_curns, Query(), 0, 0, &fields));
                 while (cursor->more()) {
                     BSONObj user = cursor->next();
-                    _users.insert(user["user"].String());
+                    string userDB;
+                    uassertStatusOK(bsonExtractStringFieldWithDefault(user,
+                                                                      _userDBFieldName,
+                                                                      _curdb,
+                                                                      &userDB));
+                    _users.insert(UserName(user["user"].String(), userDB));
                 }
+            }
+            else if (_curns == "admin.system.roles") {
+                // Create map of the roles currently in the DB
+                BSONObj fields = BSON("role" << 1 << "db" << 1);
+                scoped_ptr<DBClientCursor> cursor(conn().query(_curns, Query(), 0, 0, &fields));
+                while (cursor->more()) {
+                    BSONObj role = cursor->next();
+                    _roles.insert(RoleName(role["role"].String(), role["db"].String()));
+                }
+            }
+            else {
+                toolInfoLog() << "\t dropping" << std::endl;
+                conn().dropCollection( ns );
+            }
+        } else {
+            // If drop is not used, warn if the collection exists.
+            scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces",
+                                                           Query(BSON("name" << ns))));
+            if (cursor->more()) {
+                // collection already exists show warning
+                toolError() << "Restoring to " << ns << " without dropping. Restored data "
+                        << "will be inserted without raising errors; check your server log"
+                        << std::endl;
             }
         }
 
+        // 2) Create collection with options from metadata file if present
         BSONObj metadataObject;
         if (mongoRestoreGlobalParams.restoreOptions || mongoRestoreGlobalParams.restoreIndexes) {
+            string oldCollName = root.leaf().string(); // Name of collection that was dumped from
+            oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
             boost::filesystem::path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
             if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
@@ -345,37 +476,50 @@ public:
             }
         }
 
-        _curns = ns.c_str();
-        _curdb = nsToDatabase(_curns);
-        _curcoll = nsToCollectionSubstring(_curns).toString();
-
-        // If drop is not used, warn if the collection exists.
-         if (!mongoRestoreGlobalParams.drop) {
-             scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces",
-                                                             Query(BSON("name" << ns))));
-             if (cursor->more()) {
-                 // collection already exists show warning
-                 toolError() << "Restoring to " << ns << " without dropping. Restored data "
-                           << "will be inserted without raising errors; check your server log"
-                           << std::endl;
-             }
-         }
-
         if (mongoRestoreGlobalParams.restoreOptions && metadataObject.hasField("options")) {
             // Try to create collection with given options
             createCollectionWithOptions(metadataObject["options"].Obj());
         }
 
+        // 3) Actually restore the BSONObjs inside the dump file
         processFile( root );
-        if (mongoRestoreGlobalParams.drop && root.leaf() == "system.users.bson") {
+
+        // 4) If running with --drop, remove any users/roles that were in the system at the
+        // beginning of the restore but weren't found in the dump file
+        if (mongoRestoreGlobalParams.drop && _curcoll == "system.users") {
             // Delete any users that used to exist but weren't in the dump file
-            for (set<string>::iterator it = _users.begin(); it != _users.end(); ++it) {
-                BSONObj userMatch = BSON("user" << *it);
-                conn().remove(ns, Query(userMatch));
+            for (set<UserName>::iterator it = _users.begin(); it != _users.end(); ++it) {
+                const UserName& name = *it;
+                string dbFieldName = _userDBFieldName;
+                if (_curdb != "admin") {
+                    // Always use userSource when restoring to the legacy system.users collections
+                    // found in non-admin databases, even if the system is otherwise upgrade to v3.
+                    dbFieldName = "userSource";
+                }
+
+                BSONObjBuilder queryBuilder;
+                queryBuilder << "user" << name.getUser();
+                if (dbFieldName == "userSource" && name.getDB() == _curdb) {
+                    // userSource field won't be present for v1 users docs in the same db as the
+                    // user is defined on.
+                    queryBuilder << "userSource" << BSONNULL;
+                } else {
+                    queryBuilder << dbFieldName << name.getDB();
+                }
+                conn().remove(_curns, Query(queryBuilder.done()));
             }
             _users.clear();
         }
+        if (mongoRestoreGlobalParams.drop && _curns == "admin.system.roles") {
+            // Delete any roles that used to exist but weren't in the dump file
+            for (set<RoleName>::iterator it = _roles.begin(); it != _roles.end(); ++it) {
+                const RoleName& name = *it;
+                conn().remove(ns, Query(BSON("role" << name.getRole() << "db" << name.getDB())));
+            }
+            _roles.clear();
+        }
 
+        // 5) Restore indexes
         if (mongoRestoreGlobalParams.restoreIndexes && metadataObject.hasField("indexes")) {
             vector<BSONElement> indexes = metadataObject["indexes"].Array();
             for (vector<BSONElement>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
@@ -410,28 +554,93 @@ public:
                     toolError() << "Error while replaying oplog: " << err << std::endl;
                 }
             }
+            return;
         }
-        else if (nsToCollectionSubstring(_curns) == "system.indexes") {
+
+        if (nsToCollectionSubstring(_curns) == "system.indexes") {
             createIndex(obj, true);
         }
         else if (mongoRestoreGlobalParams.drop &&
-                 nsToCollectionSubstring(_curns) == ".system.users" &&
-                 _users.count(obj["user"].String())) {
+                 _curns == "admin.system.roles" &&
+                 _roles.count(RoleName(obj["role"].String(), obj["db"].String()))) {
             // Since system collections can't be dropped, we have to manually
-            // replace the contents of the system.users collection
-            BSONObj userMatch = BSON("user" << obj["user"].String());
-            conn().update(_curns, Query(userMatch), obj);
-            _users.erase(obj["user"].String());
+            // replace the contents of the system.roles collection
+            BSONObj roleMatch = BSON("role" << obj["role"].String() << "db" << obj["db"].String());
+            conn().update(_curns, Query(roleMatch), obj);
+            _roles.erase(RoleName(obj["role"].String(), obj["db"].String()));
+        }
+        else if (_curcoll == "system.users") {
+            string userDB;
+            uassertStatusOK(bsonExtractStringFieldWithDefault(obj,
+                                                              _userDBFieldName,
+                                                              _curdb,
+                                                              &userDB));
+
+            if (_curdb == "admin" && obj.hasField("credentials")) { // Treat non-admin db like 2.4
+                if (_serverAuthzVersion == AuthorizationManager::schemaVersion24) {
+                    // v3 user, v1 system
+                    toolError() << "Server has authorization schema version " <<
+                            AuthorizationManager::schemaVersion24 << ", but found a schema "
+                            "version " << AuthorizationManager::schemaVersion26Final << " user: " <<
+                            obj.toString() << endl;
+                    exit(EXIT_FAILURE);
+                } else {
+                    // v3 user, v3 system
+                    if (mongoRestoreGlobalParams.drop && _users.count(UserName(obj["user"].String(),
+                                                                               userDB))) {
+                        // Since system collections can't be dropped, we have to manually
+                        // replace the contents of the system.users collection
+                        BSONObj userMatch = BSON("user" << obj["user"].String() << "db" << userDB);
+                        conn().update(_curns, Query(userMatch), obj);
+                        _users.erase(UserName(obj["user"].String(), userDB));
+                    } else {
+                        conn().insert(_curns, obj);
+                    }
+                }
+            } else {
+                if (_serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                        _curdb != "admin") { // Restoring 2.4 schema users to non-admin dbs is OK
+                    // v1 user, v1 system
+                    if (mongoRestoreGlobalParams.drop && _users.count(UserName(obj["user"].String(),
+                                                                               userDB))) {
+                        // Since system collections can't be dropped, we have to manually
+                        // replace the contents of the system.users collection
+                        BSONObj userMatch = BSON("user" << obj["user"].String() <<
+                                                 "userSource" << userDB);
+                        conn().update(_curns, Query(userMatch), obj);
+                        _users.erase(UserName(obj["user"].String(), userDB));
+                    } else {
+                        conn().insert(_curns, obj);
+                    }
+                } else {
+                    // v1 user, v3 system
+                    // TODO(spencer): SERVER-12491 Rather than failing here, we should convert the
+                    // v1 user to an equivalent v3 schema user
+                    toolError() << "Server has authorization schema version " <<
+                            AuthorizationManager::schemaVersion26Final << ", but found a schema "
+                            "version " << AuthorizationManager::schemaVersion24 << " user: " <<
+                            obj.toString() << endl;
+                    exit(EXIT_FAILURE);
+                }
+            }
         }
         else {
-            conn().insert( _curns , obj );
+            if (_curns == "admin.system.version") {
+                long long authVersion;
+                uassertStatusOK(bsonExtractIntegerField(obj,
+                                                        AuthorizationManager::schemaVersionFieldName,
+                                                        &authVersion));
+                _dumpFileAuthzVersion = static_cast<int>(authVersion);
+            }
+            conn().insert(_curns, obj);
+        }
 
-            // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
-            if (mongoRestoreGlobalParams.w > 0) {
-                string err = conn().getLastError(_curdb, false, false, mongoRestoreGlobalParams.w);
-                if (!err.empty()) {
-                    toolError() << err << std::endl;
-                }
+        // wait for insert (or update) to propagate to "w" nodes (doesn't warn if w used
+        // without replset)
+        if (mongoRestoreGlobalParams.w > 0) {
+            string err = conn().getLastError(_curdb, false, false, mongoRestoreGlobalParams.w);
+            if (!err.empty()) {
+                toolError() << err << std::endl;
             }
         }
     }

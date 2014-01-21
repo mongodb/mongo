@@ -471,8 +471,9 @@ namespace {
                 Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
 
         ActionSet clusterActions;
-        clusterActions << ActionType::listDatabases
-                       << ActionType::appendOplogNote;
+        clusterActions << ActionType::getParameter // To check authSchemaVersion
+                       << ActionType::listDatabases
+                       << ActionType::appendOplogNote; // For BRS
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges, Privilege(ResourcePattern::forClusterResource(), clusterActions));
 
@@ -569,6 +570,11 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.namespaces"),
                           ActionType::find));
+
+        // Need to be able to run getParameter to check authSchemaVersion
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges, Privilege(ResourcePattern::forClusterResource(),
+                                      ActionType::getParameter));
     }
 
     void addRootRolePrivileges(PrivilegeVector* privileges) {
