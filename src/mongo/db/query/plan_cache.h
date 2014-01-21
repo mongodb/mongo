@@ -35,6 +35,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -296,15 +297,20 @@ namespace mongo {
         static const int kPlanCacheMaxWriteOperations;
 
         /**
+         * The maximum number of plan cache entries allowed.
+         */
+        static const int kMaxCacheSize;
+
+        /**
          * We don't want to cache every possible query. This function
          * encapsulates the criteria for what makes a canonical query
          * suitable for lookup/inclusion in the cache.
          */
         static bool shouldCacheQuery(const CanonicalQuery& query);
 
-        PlanCache() { }
+        PlanCache() : _cache(kMaxCacheSize) { };
 
-        ~PlanCache();
+        ~PlanCache() { };
 
         /**
          * Record solutions for query. Best plan is first element in list.
@@ -401,7 +407,7 @@ namespace mongo {
          */
         void _clear();
 
-        unordered_map<PlanCacheKey, PlanCacheEntry*> _cache;
+        LRUKeyValue<PlanCacheKey, PlanCacheEntry> _cache;
 
         /**
          * Protects _cache.

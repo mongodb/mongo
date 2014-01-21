@@ -160,6 +160,15 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="lru_key_value_test",
+    source=[
+        "lru_key_value_test.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.CppUnitTest(
     target="parsed_projection_test",
     source=[
         "parsed_projection_test.cpp"

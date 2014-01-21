@@ -42,6 +42,8 @@ namespace mongo {
 
     const int PlanCache::kPlanCacheMaxWriteOperations = 1000;
 
+    const int PlanCache::kMaxCacheSize = 200;
+
     //
     // Cache-related functions for CanonicalQuery
     //
@@ -271,10 +273,6 @@ namespace mongo {
     // PlanCache
     //
 
-    PlanCache::~PlanCache() {
-        _clear();
-    }
-
     Status PlanCache::add(const CanonicalQuery& query, const std::vector<QuerySolution*>& solns,
                           PlanRankingDecision* why) {
         invariant(why);
@@ -316,31 +314,21 @@ namespace mongo {
         }
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        // Replace existing entry.
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        const PlanCacheKey& key = query.getPlanCacheKey();
-        ConstIterator i = _cache.find(key);
-        if (i != _cache.end()) {
-            PlanCacheEntry* previousEntry = i->second;
-            delete previousEntry;
-        }
-        _cache[key] = entry;
-
+        _cache.add(query.getPlanCacheKey(), entry);
         return Status::OK();
     }
 
-    Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) const{
+    Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) const {
         const PlanCacheKey& key = query.getPlanCacheKey();
         verify(crOut);
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(key);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
+        PlanCacheEntry* entry;
+        Status cacheStatus = _cache.get(key, &entry);
+        if (!cacheStatus.isOK()) {
+            return cacheStatus;
         }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
+        invariant(entry);
 
         *crOut = new CachedSolution(key, *entry);
 
@@ -397,21 +385,21 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "feedback is NULL");
         }
         std::auto_ptr<PlanCacheEntryFeedback> autoFeedback(feedback);
+        const PlanCacheKey& ck = cq.getPlanCacheKey();
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(cq.getPlanCacheKey());
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
+        PlanCacheEntry* entry;
+        Status cacheStatus = _cache.get(ck, &entry);
+        if (!cacheStatus.isOK()) {
+            return cacheStatus;
         }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
+        invariant(entry);
 
         if (entry->feedback.size() >= PlanCacheEntry::kMaxFeedback) {
             // If we have enough feedback, then use it to determine whether
             // we should get rid of the cached solution.
             if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get())) {
-                _cache.erase(i);
+                _cache.remove(ck);
             }
         }
         else {
@@ -424,22 +412,12 @@ namespace mongo {
 
     Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        const PlanCacheKey& ck = canonicalQuery.getPlanCacheKey();
-        ConstIterator i = _cache.find(ck);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
-        }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
-        _cache.erase(i);
-        delete entry;
-        return Status::OK();
+        return _cache.remove(canonicalQuery.getPlanCacheKey());
     }
 
     void PlanCache::clear() {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        _clear();
+        _cache.clear();
         _writeOperations.store(0);
     }
 
@@ -448,13 +426,12 @@ namespace mongo {
         verify(entryOut);
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        ConstIterator i = _cache.find(key);
-        if (i == _cache.end()) {
-            return Status(ErrorCodes::BadValue, "no such key in cache");
+        PlanCacheEntry* entry;
+        Status cacheStatus = _cache.get(key, &entry);
+        if (!cacheStatus.isOK()) {
+            return cacheStatus;
         }
-        PlanCacheEntry* entry = i->second;
-        verify(entry);
+        invariant(entry);
 
         *entryOut = entry->clone();
 
@@ -464,7 +441,7 @@ namespace mongo {
     std::vector<PlanCacheEntry*> PlanCache::getAllEntries() const {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         std::vector<PlanCacheEntry*> entries;
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
+        typedef std::list< std::pair<PlanCacheKey, PlanCacheEntry*> >::const_iterator ConstIterator;
         for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
             PlanCacheEntry* entry = i->second;
             entries.push_back(entry->clone());
@@ -485,15 +462,6 @@ namespace mongo {
             return;
         }
         clear();
-    }
-
-    void PlanCache::_clear() {
-        typedef unordered_map<PlanCacheKey, PlanCacheEntry*>::const_iterator ConstIterator;
-        for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
-            PlanCacheEntry* entry = i->second;
-            delete entry;
-        }
-        _cache.clear();
     }
 
 }  // namespace mongo
