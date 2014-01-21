@@ -30,6 +30,10 @@ namespace mongo {
     class PidFileWiper {
     public:
         ~PidFileWiper() {
+            if (path.empty()) {
+                return;
+            }
+
             ofstream out( path.c_str() , ios_base::out );
             out.close();
         }
