@@ -308,6 +308,7 @@ DBQuery.prototype.explain = function (verbose) {
 
         delete obj.allPlans;
         delete obj.oldPlan;
+        delete obj.stats;
 
         if (typeof(obj.length) == 'number'){
             for (var i=0; i < obj.length; i++){
