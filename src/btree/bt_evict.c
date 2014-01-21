@@ -932,7 +932,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			 */
 			if (LF_ISSET(WT_EVICT_PASS_INTERNAL) &&
 			    __wt_btree_mergeable(page->parent) &&
-			    __wt_btree_mergeable(page->parent))
+			    __wt_btree_mergeable(page->parent->parent))
 				continue;
 
 			/* The remaining checks don't apply to merges. */
