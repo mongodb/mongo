@@ -38,8 +38,8 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class Command;
+    struct DepsTracker;
     class DocumentSource;
-    class DepsTracker;
     struct ExpressionContext;
     class Privilege;
 
