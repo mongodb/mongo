@@ -887,7 +887,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (WT_PAGE_IS_ROOT(page))
 			continue;
 
-		/* Look for a split-merge (grand)parent page to merge. */
+		/*
+		 * Look for a split-merge (grand)parent page to merge.
+		 *
+		 * Only look for a parent at exactly the right height above: if
+		 * the stack is deep enough, we'll find it eventually, and we
+		 * don't want to do too much work on every level.
+		 */
 		levels = 0;
 		if (__wt_btree_mergeable(page))
 			for (levels = 1;
@@ -900,85 +906,95 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/*
-		 * Only look for a parent at exactly the right height above: if
-		 * the stack is deep enough, we'll find it eventually, and we
-		 * don't want to do too much work on every level.
-		 *
-		 * !!!
-		 * Don't restrict ourselves to only the top-most page (that is,
-		 * don't require that page->parent is not mergeable).  If there
-		 * is a big, busy enough split-merge tree, the top-level merge
-		 * will only happen if we can lock the whole subtree
-		 * exclusively.  Consider smaller merges in case locking the
-		 * whole tree fails.
-		 */
-		if (levels != 0 && levels != WT_MERGE_STACK_MIN)
-			continue;
-
-		/*
-		 * If this page has never been considered for eviction, set its
-		 * read generation to a little bit in the future and move on,
-		 * give readers a chance to start updating the read generation.
-		 */
-		if (page->read_gen == WT_READ_GEN_NOTSET) {
-			page->read_gen = __wt_cache_read_gen_set(session);
-			continue;
-		}
-
-		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
 
-		/* The following checks apply to eviction but not merges. */
-		if (levels == 0) {
-			/*
-			 * If the file is being checkpointed, there's a period
-			 * of time where we can't discard any page with a
-			 * modification structure because it might race with
-			 * the checkpointing thread.
-			 *
-			 * During this phase, there is little point trying to
-			 * evict dirty pages: we might be lucky and find an
-			 * internal page that has not yet been checkpointed,
-			 * but much more likely is that we will waste effort
-			 * considering dirty leaf pages that cannot be evicted
-			 * because they have modifications more recent than the
-			 * checkpoint.
-			 */
-			modified = __wt_page_is_modified(page);
-			if (modified && btree->checkpointing)
-				continue;
-
-			/* Optionally ignore clean pages. */
-			if (!modified && LF_ISSET(WT_EVICT_PASS_DIRTY))
+		/*
+		 * !!!
+		 * In normal operation, don't restrict ourselves to only the
+		 * top-most page (that is, don't require that page->parent is
+		 * not mergeable).  If there is a big, busy enough split-merge
+		 * tree, the top-level merge will only happen if we can lock
+		 * the whole subtree exclusively.  Consider smaller merges in
+		 * case locking the whole tree fails.
+		 */
+		if (levels != 0) {
+			if (levels < WT_MERGE_STACK_MIN)
 				continue;
 
 			/*
-			 * If the oldest transaction hasn't changed since the
-			 * last time this page was written, it's unlikely that
-			 * we can make progress.  Similarly, if the most recent
-			 * update on the page is not yet globally visible,
-			 * eviction will fail.  These heuristics attempt to
-			 * avoid repeated attempts to evict the same page.
-			 *
-			 * That said, if eviction is stuck, or the file is
-			 * being checkpointed, try anyway: maybe a transaction
-			 * that were running last time we wrote the page has
-			 * since rolled back, or we can help get the checkpoint
-			 * completed sooner.
+			 * Concentrate near the top of a stack -- with forced
+			 * eviction, stacks of split-merge pages can get very
+			 * deep, and merging near the bottom isn't helpful.
 			 */
-			if (modified && !F_ISSET(cache, WT_EVICT_STUCK) &&
-			    (page->modify->disk_snap_min ==
-			    S2C(session)->txn_global.oldest_id ||
-			    !__wt_txn_visible_all(session,
-			    page->modify->update_txn)))
+			if (LF_ISSET(WT_EVICT_PASS_INTERNAL) &&
+			    __wt_btree_mergeable(page->parent) &&
+			    __wt_btree_mergeable(page->parent))
 				continue;
+
+			/* The remaining checks don't apply to merges. */
+			goto add;
 		}
 
-		WT_ASSERT(session, evict->page == NULL);
+		/*
+		 * If this page has never been considered for eviction,
+		 * set its read generation to a little bit in the
+		 * future and move on, give readers a chance to start
+		 * updating the read generation.
+		 */
+		if (page->read_gen == WT_READ_GEN_NOTSET) {
+			page->read_gen =
+			    __wt_cache_read_gen_set(session);
+			continue;
+		}
+
+		/*
+		 * If the file is being checkpointed, there's a period
+		 * of time where we can't discard any page with a
+		 * modification structure because it might race with
+		 * the checkpointing thread.
+		 *
+		 * During this phase, there is little point trying to
+		 * evict dirty pages: we might be lucky and find an
+		 * internal page that has not yet been checkpointed,
+		 * but much more likely is that we will waste effort
+		 * considering dirty leaf pages that cannot be evicted
+		 * because they have modifications more recent than the
+		 * checkpoint.
+		 */
+		modified = __wt_page_is_modified(page);
+		if (modified && btree->checkpointing)
+			continue;
+
+		/* Optionally ignore clean pages. */
+		if (!modified && LF_ISSET(WT_EVICT_PASS_DIRTY))
+			continue;
+
+		/*
+		 * If the oldest transaction hasn't changed since the
+		 * last time this page was written, it's unlikely that
+		 * we can make progress.  Similarly, if the most recent
+		 * update on the page is not yet globally visible,
+		 * eviction will fail.  These heuristics attempt to
+		 * avoid repeated attempts to evict the same page.
+		 *
+		 * That said, if eviction is stuck, or the file is
+		 * being checkpointed, try anyway: maybe a transaction
+		 * that were running last time we wrote the page has
+		 * since rolled back, or we can help get the checkpoint
+		 * completed sooner.
+		 */
+		if (modified && !F_ISSET(cache, WT_EVICT_STUCK) &&
+		    (page->modify->disk_snap_min ==
+		    S2C(session)->txn_global.oldest_id ||
+		    !__wt_txn_visible_all(session,
+		    page->modify->update_txn)))
+			continue;
+
+add:		WT_ASSERT(session, evict->page == NULL);
 		__evict_init_candidate(session, evict, page);
 		++evict;
 
