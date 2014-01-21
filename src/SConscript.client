@@ -49,6 +49,7 @@ clientSourceBasic = [
     'mongo/client/connpool.cpp',
     'mongo/client/dbclient.cpp',
     'mongo/client/dbclient_rs.cpp',
+    'mongo/client/replica_set_monitor.cpp',
     'mongo/client/dbclientcursor.cpp',
     'mongo/client/gridfs.cpp',
     'mongo/client/init.cpp',

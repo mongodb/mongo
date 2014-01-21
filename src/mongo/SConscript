@@ -245,6 +245,7 @@ env.Library('clientdriver', [
             "client/dbclient.cpp",
             "client/dbclient_rs.cpp",
             "client/dbclientcursor.cpp",
+            "client/replica_set_monitor.cpp",
             'client/sasl_client_authenticate.cpp',
             "client/syncclusterconnection.cpp",
             "db/dbmessage.cpp"
