@@ -63,7 +63,7 @@ namespace mongo {
          */
         static Status planFromCache(const CanonicalQuery& query,
                                     const QueryPlannerParams& params,
-                                    SolutionCacheData* cacheData,
+                                    const SolutionCacheData& cacheData,
                                     QuerySolution** out);
 
         /**
@@ -81,7 +81,7 @@ namespace mongo {
          */
         static Status planFromCache(const CanonicalQuery& query,
                                     const QueryPlannerParams& params,
-                                    CachedSolution* cachedSoln,
+                                    const CachedSolution& cachedSoln,
                                     QuerySolution** out,
                                     QuerySolution** backupOut);
 

@@ -243,8 +243,9 @@ namespace mongo {
         if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
             collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
             // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+            boost::scoped_ptr<CachedSolution> cs(rawCS);
             QuerySolution *qs, *backupQs;
-            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, rawCS,
+            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
                                                         &qs, &backupQs);
             if (status.isOK()) {
                 WorkingSet* ws;

@@ -259,17 +259,12 @@ namespace mongo {
     // static
     Status QueryPlanner::planFromCache(const CanonicalQuery& query,
                                        const QueryPlannerParams& params,
-                                       SolutionCacheData* cacheData,
+                                       const SolutionCacheData& cacheData,
                                        QuerySolution** out) {
-        if (NULL == cacheData) {
-            return Status(ErrorCodes::BadValue,
-                          "planner data does not exist in the cached solution");
-        }
-
-        if (SolutionCacheData::WHOLE_IXSCAN_SOLN == cacheData->solnType) {
+        if (SolutionCacheData::WHOLE_IXSCAN_SOLN == cacheData.solnType) {
             // The solution can be constructed by a scan over the entire index.
-            QuerySolution* soln = buildWholeIXSoln(*cacheData->tree->entry,
-                query, params, cacheData->wholeIXSolnDir);
+            QuerySolution* soln = buildWholeIXSoln(*cacheData.tree->entry,
+                query, params, cacheData.wholeIXSolnDir);
             if (soln == NULL) {
                 return Status(ErrorCodes::BadValue,
                               "plan cache error: soln that uses index to provide sort");
@@ -279,7 +274,7 @@ namespace mongo {
                 return Status::OK();
             }
         }
-        else if (SolutionCacheData::COLLSCAN_SOLN == cacheData->solnType) {
+        else if (SolutionCacheData::COLLSCAN_SOLN == cacheData.solnType) {
             // The cached solution is a collection scan. We don't cache collscans
             // with tailable==true, hence the false below.
             QuerySolution* soln = buildCollscanSoln(query, false, params);
@@ -301,7 +296,7 @@ namespace mongo {
 
         QLOG() << "Tagging the match expression according to cache data: " << endl
                << "Filter:" << endl << clone->toString()
-               << "Cache data:" << endl << cacheData->toString();
+               << "Cache data:" << endl << cacheData.toString();
 
         // Map from index name to index number.
         // TODO: can we assume that the index numbering has the same lifetime
@@ -313,7 +308,7 @@ namespace mongo {
             QLOG() << "Index " << i << ": " << ie.keyPattern.toString() << endl;
         }
 
-        Status s = tagAccordingToCache(clone, cacheData->tree.get(), indexMap);
+        Status s = tagAccordingToCache(clone, cacheData.tree.get(), indexMap);
         if (!s.isOK()) {
             return s;
         }
@@ -343,11 +338,10 @@ namespace mongo {
     // static
     Status QueryPlanner::planFromCache(const CanonicalQuery& query,
                                        const QueryPlannerParams& params,
-                                       CachedSolution* cachedSoln,
+                                       const CachedSolution& cachedSoln,
                                        QuerySolution** out,
                                        QuerySolution** backupOut) {
-        verify(cachedSoln);
-        verify(!cachedSoln->plannerData.empty());
+        verify(!cachedSoln.plannerData.empty());
         verify(out);
         verify(backupOut);
         verify(PlanCache::shouldCacheQuery(query));
@@ -360,15 +354,15 @@ namespace mongo {
         // in multi plan runner using PlanCache::shouldCacheQuery().
 
         // Look up winning solution in cached solution's array.
-        SolutionCacheData* winnerCacheData = cachedSoln->plannerData[0];
-        Status s = planFromCache(query, params, winnerCacheData, out);
+        SolutionCacheData* winnerCacheData = cachedSoln.plannerData[0];
+        Status s = planFromCache(query, params, *winnerCacheData, out);
         if (!s.isOK()) {
             return s;
         }
 
-        if (cachedSoln->backupSoln) {
-            SolutionCacheData* backupCacheData = cachedSoln->plannerData[*cachedSoln->backupSoln];
-            Status backupStatus = planFromCache(query, params, backupCacheData, backupOut);
+        if (cachedSoln.backupSoln) {
+            SolutionCacheData* backupCacheData = cachedSoln.plannerData[*cachedSoln.backupSoln];
+            Status backupStatus = planFromCache(query, params, *backupCacheData, backupOut);
             if (!backupStatus.isOK()) {
                 return backupStatus;
             }

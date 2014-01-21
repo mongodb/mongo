@@ -468,7 +468,7 @@ namespace {
             CachedSolution cachedSoln(ck, entry);
 
             QuerySolution *out, *backupOut;
-            s = QueryPlanner::planFromCache(*scopedCq.get(), params, &cachedSoln,
+            s = QueryPlanner::planFromCache(*scopedCq.get(), params, cachedSoln,
                                             &out, &backupOut);
             ASSERT_OK(s);
 
