@@ -246,7 +246,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64 " Internal: %s",
 		    bytes_max, bytes_inuse, dirty_inuse,
-		    F_ISSET(cache, WT_EVICT_INTERNAL) ? "yes" : "no");
+		    LF_ISSET(WT_EVICT_PASS_INTERNAL) ? "yes" : "no");
 
 		/*
 		 * When the cache is full, track whether pages are being
@@ -858,7 +858,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	    btree->evict_page->ref->state == WT_REF_EVICT_WALK);
 
 	walk_flags = WT_TREE_EVICT;
-	if (F_ISSET(cache, WT_EVICT_INTERNAL))
+	if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
 		walk_flags |= WT_TREE_SKIP_LEAF;
 	/*
 	 * Get some more eviction candidate pages.
@@ -937,7 +937,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 
 			/* The remaining checks don't apply to merges. */
 			goto add;
-		}
+		} else if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
+			continue;
 
 		/*
 		 * If this page has never been considered for eviction,
