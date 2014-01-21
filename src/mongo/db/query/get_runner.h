@@ -79,11 +79,22 @@ namespace mongo {
     Status getRunner(Collection* collection, const std::string& ns, const BSONObj& unparsedQuery,
                      Runner** outRunner, CanonicalQuery** outCanonicalQuery,
                      size_t plannerOptions = 0);
+    /*
+     * Get a runner for a query executing as part of a distinct command.
+     *
+     * Distinct is unique in that it doesn't care about getting all the results; it just wants all
+     * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
+     * body of method for detail).
+     */
+    Status getRunnerDistinct(Collection* collection,
+                             const BSONObj& query,
+                             const std::string& field,
+                             Runner** out);
 
     /**
      * RAII approach to ensuring that runners are deregistered in newRunQuery.
      *
-     * While retrieving the first bach of results, newRunQuery manually registers the runner with
+     * While retrieving the first batch of results, newRunQuery manually registers the runner with
      * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
      * fail to deregister the runner, we will call invalidate/kill on the
      * still-registered-yet-deleted runner.

@@ -226,35 +226,6 @@ namespace mongo {
     }
 
     // static
-    void QueryPlannerAccess::alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir) {
-        BSONObjIterator it(kp);
-        size_t oilIdx = 0;
-        while (it.more()) {
-            BSONElement elt = it.next();
-            int direction = (elt.numberInt() >= 0) ? 1 : -1;
-            direction *= scanDir;
-            if (-1 == direction) {
-                vector<Interval>& iv = bounds->fields[oilIdx].intervals;
-                // Step 1: reverse the list.
-                std::reverse(iv.begin(), iv.end());
-                // Step 2: reverse each interval.
-                for (size_t i = 0; i < iv.size(); ++i) {
-                    QLOG() << "reversing " << iv[i].toString() << endl;
-                    iv[i].reverse();
-                }
-            }
-            ++oilIdx;
-        }
-
-        if (!bounds->isValidFor(kp, scanDir)) {
-            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl;
-            QLOG() << "kp = " << kp.toString() << endl;
-            QLOG() << "scanDir = " << scanDir << endl;
-            verify(0);
-        }
-    }
-
-    // static
     void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
@@ -290,7 +261,7 @@ namespace mongo {
 
         // All fields are filled out with bounds, nothing to do.
         if (firstEmptyField == bounds->fields.size()) {
-            alignBounds(bounds, index.keyPattern);
+            IndexBoundsBuilder::alignBounds(bounds, index.keyPattern);
             return;
         }
 
@@ -322,7 +293,7 @@ namespace mongo {
 
         // We create bounds assuming a forward direction but can easily reverse bounds to align
         // according to our desired direction.
-        alignBounds(bounds, index.keyPattern);
+        IndexBoundsBuilder::alignBounds(bounds, index.keyPattern);
     }
 
     // static
@@ -879,18 +850,10 @@ namespace mongo {
         IndexScanNode* isn = new IndexScanNode();
         isn->indexKeyPattern = index.keyPattern;
         isn->indexIsMultiKey = index.multikey;
-        isn->bounds.fields.resize(index.keyPattern.nFields());
         isn->maxScan = query.getParsed().getMaxScan();
         isn->addKeyMetadata = query.getParsed().returnKey();
 
-        // TODO: can we use simple bounds with this compound idx?
-        BSONObjIterator it(isn->indexKeyPattern);
-        int field = 0;
-        while (it.more()) {
-            IndexBoundsBuilder::allValuesForField(it.next(), &isn->bounds.fields[field]);
-            ++field;
-        }
-        alignBounds(&isn->bounds, isn->indexKeyPattern);
+        IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds);
 
         if (-1 == direction) {
             QueryPlannerCommon::reverseScans(isn);

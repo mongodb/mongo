@@ -157,6 +157,19 @@ namespace mongo {
         static void unionize(OrderedIntervalList* oilOut);
         static void intersectize(const OrderedIntervalList& arg,
                                  OrderedIntervalList* oilOut);
+
+        /**
+         * Fills out 'bounds' with the bounds for an index scan over all values of the
+         * index described by 'keyPattern' in the default forward direction.
+         */
+        static void allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds);
+
+        /**
+         * Assumes each OIL in 'bounds' is increasing.
+         *
+         * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
+         */
+        static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
     };
 
 }  // namespace mongo

@@ -41,6 +41,7 @@ env.Library(
         "and_hash.cpp",
         "and_sorted.cpp",
         "collection_scan.cpp",
+        "distinct_scan.cpp",
         "fetch.cpp",
         "index_scan.cpp",
         "keep_mutations.cpp",

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/keep_mutations.h"
@@ -258,6 +259,25 @@ namespace mongo {
             PlanStage* childStage = buildStages(qsol, km->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new KeepMutationsStage(km->filter.get(), ws, childStage);
+        }
+        else if (STAGE_DISTINCT == root->getType()) {
+            const DistinctNode* dn = static_cast<const DistinctNode*>(root);
+
+            Database* db = cc().database();
+            Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
+            if (NULL == collection) {
+                warning() << "Can't distinct-scan null ns " << qsol.ns << endl;
+                return NULL;
+            }
+
+            DistinctParams params;
+
+            params.descriptor =
+                collection->getIndexCatalog()->findIndexByKeyPattern(dn->indexKeyPattern);
+            params.direction = dn->direction;
+            params.bounds = dn->bounds;
+            params.fieldNo = dn->fieldNo;
+            return new DistinctScan(params, ws);
         }
         else {
             mongoutils::str::stream ss;

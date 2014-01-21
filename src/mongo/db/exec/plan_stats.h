@@ -186,6 +186,17 @@ namespace mongo {
         size_t docsTested;
     };
 
+    struct DistinctScanStats : public SpecificStats {
+        DistinctScanStats() : keysExamined(0) { }
+
+        virtual SpecificStats* clone() const {
+            return new DistinctScanStats(*this);
+        }
+
+        // How many keys did we look at while distinct-ing?
+        size_t keysExamined;
+    };
+
     struct FetchStats : public SpecificStats {
         FetchStats() : alreadyHasObj(0),
                        forcedFetches(0),

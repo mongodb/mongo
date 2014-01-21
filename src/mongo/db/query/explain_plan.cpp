@@ -262,6 +262,15 @@ namespace mongo {
             res->setIsMultiKey(indexStats->isMultiKey);
             res->setIndexOnly(covered);
         }
+        else if (leaf->stageType == STAGE_DISTINCT) {
+            DistinctScanStats* dss = static_cast<DistinctScanStats*>(leaf->specific.get());
+            verify(dss);
+            res->setCursor("DistinctCursor");
+            res->setN(dss->keysExamined);
+            res->setNScanned(dss->keysExamined);
+            // Distinct hack stage is fully covered.
+            res->setNScannedObjects(0);
+        }
         else {
             return Status(ErrorCodes::InternalError, "cannot interpret execution plan");
         }
@@ -286,60 +295,45 @@ namespace mongo {
 
     // XXX: where does this really live?  stage_types.h?
     string stageTypeString(StageType type) {
-        if (STAGE_AND_HASH == type) {
+        switch (type) {
+        case STAGE_AND_HASH:
             return "AND_HASH";
-        }
-        else if (STAGE_AND_SORTED == type) {
+        case STAGE_AND_SORTED:
             return "AND_SORTED";
-        }
-        else if (STAGE_COLLSCAN == type) {
+        case STAGE_COLLSCAN:
             return "COLLSCAN";
-        }
-        else if (STAGE_FETCH == type) {
+        case STAGE_FETCH:
             return "FETCH";
-        }
-        else if (STAGE_GEO_2D == type) {
+        case STAGE_GEO_2D:
             return "GEO_2D";
-        }
-        else if (STAGE_GEO_NEAR_2D == type) {
+        case STAGE_GEO_NEAR_2D:
             return "GEO_NEAR_2D";
-        }
-        else if (STAGE_GEO_NEAR_2DSPHERE == type) {
+        case STAGE_GEO_NEAR_2DSPHERE:
             return "GEO_NEAR_2DSPHERE";
-        }
-        else if (STAGE_IXSCAN == type) {
+        case STAGE_IXSCAN:
             return "IXSCAN";
-        }
-        else if (STAGE_LIMIT == type) {
+        case STAGE_LIMIT:
             return "LIMIT";
-        }
-        else if (STAGE_OR == type) {
+        case STAGE_OR:
             return "OR";
-        }
-        else if (STAGE_PROJECTION == type) {
+        case STAGE_PROJECTION:
             return "PROJECTION";
-        }
-        else if (STAGE_SHARDING_FILTER == type) {
+        case STAGE_SHARDING_FILTER:
             return "SHARDING_FILTER";
-        }
-        else if (STAGE_SKIP == type) {
+        case STAGE_SKIP:
             return "SKIP";
-        }
-        else if (STAGE_SORT == type) {
+        case STAGE_SORT:
             return "SORT";
-        }
-        else if (STAGE_SORT_MERGE == type) {
+        case STAGE_SORT_MERGE:
             return "SORT_MERGE";
-        }
-        else if (STAGE_TEXT == type) {
+        case STAGE_TEXT:
             return "TEXT";
-        }
-        else if (STAGE_KEEP_MUTATIONS == type) {
+        case STAGE_KEEP_MUTATIONS:
             return "KEEP_MUTATIONS";
-        }
-        else {
+        case STAGE_DISTINCT:
+            return "STAGE_DISTINCT";
+        default:
             invariant(0);
-            return "UNKNOWN.  SHOULD NOT SEE THIS.";
         }
     }
 

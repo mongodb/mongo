@@ -703,4 +703,47 @@ namespace mongo {
         }
     }
 
+    // static
+    void IndexBoundsBuilder::allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds) {
+        bounds->fields.resize(keyPattern.nFields());
+
+        BSONObjIterator it(keyPattern);
+        int field = 0;
+        while (it.more()) {
+            IndexBoundsBuilder::allValuesForField(it.next(), &bounds->fields[field]);
+            ++field;
+        }
+
+        alignBounds(bounds, keyPattern);
+    }
+
+    // static
+    void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir) {
+        BSONObjIterator it(kp);
+        size_t oilIdx = 0;
+        while (it.more()) {
+            BSONElement elt = it.next();
+            int direction = (elt.numberInt() >= 0) ? 1 : -1;
+            direction *= scanDir;
+            if (-1 == direction) {
+                vector<Interval>& iv = bounds->fields[oilIdx].intervals;
+                // Step 1: reverse the list.
+                std::reverse(iv.begin(), iv.end());
+                // Step 2: reverse each interval.
+                for (size_t i = 0; i < iv.size(); ++i) {
+                    QLOG() << "reversing " << iv[i].toString() << endl;
+                    iv[i].reverse();
+                }
+            }
+            ++oilIdx;
+        }
+
+        if (!bounds->isValidFor(kp, scanDir)) {
+            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl;
+            QLOG() << "kp = " << kp.toString() << endl;
+            QLOG() << "scanDir = " << scanDir << endl;
+            verify(0);
+        }
+    }
+
 }  // namespace mongo

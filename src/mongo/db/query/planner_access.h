@@ -159,13 +159,6 @@ namespace mongo {
          */
         static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
 
-        /**
-         * Assumes each OIL in bounds is increasing.
-         *
-         * Aligns OILs (and bounds) according to the kp direction * the scanDir.
-         */
-        static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
-
     private:
         /**
          * Add the filter 'match' to the query solution node 'node'. Takes

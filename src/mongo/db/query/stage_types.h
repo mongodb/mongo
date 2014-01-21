@@ -38,6 +38,10 @@ namespace mongo {
         STAGE_AND_SORTED,
         STAGE_COLLSCAN,
 
+        // If we're running a distinct, we only care about one value for each key.  The distinct
+        // stage is an ixscan with some key-skipping behvaior that only distinct uses.
+        STAGE_DISTINCT,
+
         // This is more of an "internal-only" stage where we try to keep docs that were mutated
         // during query execution.
         STAGE_KEEP_MUTATIONS,

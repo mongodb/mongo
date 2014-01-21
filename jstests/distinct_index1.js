@@ -35,18 +35,18 @@ assert.eq( 1000 , x.stats.nscannedObjects , "AC3" )
 t.ensureIndex( { a : 1 } )
 
 x = d( "a" );
-assert.eq( 1000 , x.stats.n , "BA1" )
-assert.eq( 1000 , x.stats.nscanned , "BA2" )
-// QUERY_MIGRATION: pending projection support
-//assert.eq( 0 , x.stats.nscannedObjects , "BA3" )
+// There are only 10 values.  We use the fast distinct hack and only examine each value once.
+assert.eq( 10 , x.stats.n , "BA1" )
+assert.eq( 10 , x.stats.nscanned , "BA2" )
 
 x = d( "a" , { a : { $gt : 5 } } );
-assert.eq( 398 , x.stats.n , "BB1" )
-assert.eq( 398 , x.stats.nscanned , "BB2" )
-// QUERY_MIGRATION: pending projection support
-// assert.eq( 0 , x.stats.nscannedObjects , "BB3" )
+// Only 4 values of a are >= 5 and we use the fast distinct hack.
+assert.eq(4, x.stats.n , "BB1" )
+assert.eq(4, x.stats.nscanned , "BB2" )
+assert.eq(0, x.stats.nscannedObjects , "BB3" )
 
 x = d( "b" , { a : { $gt : 5 } } );
+// We can't use the fast distinct hack here because we're distinct-ing over 'b'.
 assert.eq( 398 , x.stats.n , "BC1" )
 assert.eq( 398 , x.stats.nscanned , "BC2" )
 assert.eq( 398 , x.stats.nscannedObjects , "BC3" )
@@ -55,10 +55,8 @@ assert.eq( 398 , x.stats.nscannedObjects , "BC3" )
 t.dropIndexes();
 t.ensureIndex( { a : 1, b : 1 } );
 x = d( "b" , { a : { $gt : 5 }, b : { $gt : 5 } } );
-// QUERY_MIGRATION: we show the actual cursor used
-// assert.eq( "QueryOptimizerCursor", x.stats.cursor );
-assert.eq( 171 , x.stats.n )
-// QUERY_MIGRATION: our nscanned is lower...
-// assert.eq( 275 , x.stats.nscanned )
-// Disable temporarily - exact value doesn't matter.
-// assert.eq( 266 , x.stats.nscannedObjects )
+printjson(x);
+// 171 is the # of results we happen to scan when we don't use a distinct
+// hack.  When we use the distinct hack we scan 16, currently.
+assert.lte(x.stats.n, 171);
+assert.eq( 0 , x.stats.nscannedObjects , "BB3" )

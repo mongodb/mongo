@@ -592,4 +592,30 @@ namespace mongo {
         BSONObjSet sorts;
     };
 
+    /**
+     * Distinct queries only want one value for a given field.  We run an index scan but
+     * *always* skip over the current key to the next key.
+     */
+    struct DistinctNode : public QuerySolutionNode {
+        DistinctNode() { }
+        virtual ~DistinctNode() { }
+
+        virtual StageType getType() const { return STAGE_DISTINCT; }
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+        // This stage is created "on top" of normal planning and as such the properties
+        // below don't really matter.
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return !indexKeyPattern[field].eoo(); }
+        bool sortedByDiskLoc() const { return false; }
+        const BSONObjSet& getSort() const { return sorts; }
+        BSONObjSet sorts;
+
+        BSONObj indexKeyPattern;
+        int direction;
+        IndexBounds bounds;
+        // We are distinct-ing over the 'fieldNo'-th field of 'indexKeyPattern'.
+        int fieldNo;
+    };
+
 }  // namespace mongo

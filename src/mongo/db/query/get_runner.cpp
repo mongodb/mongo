@@ -34,9 +34,11 @@
 #include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/idhack_runner.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -150,16 +152,14 @@ namespace mongo {
         // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
         QueryPlannerParams plannerParams;
 
-        {
-            IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator( false );
-            while ( ii.more() ) {
-                const IndexDescriptor* desc = ii.next();
-                plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
-                                                           desc->isMultikey(),
-                                                           desc->isSparse(),
-                                                           desc->indexName(),
-                                                           desc->infoObj()));
-            }
+        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
+        while (ii.more()) {
+            const IndexDescriptor* desc = ii.next();
+            plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
+                                                       desc->isMultikey(),
+                                                       desc->isSparse(),
+                                                       desc->indexName(),
+                                                       desc->infoObj()));
         }
 
         // If query supports admin hint, filter params.indices by indexes in query settings.
@@ -212,7 +212,9 @@ namespace mongo {
 
         // If the caller wants a shard filter, make sure we're actually sharded.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            CollectionMetadataPtr collMetadata = shardingState.getCollectionMetadata(canonicalQuery->ns());
+            CollectionMetadataPtr collMetadata =
+                shardingState.getCollectionMetadata(canonicalQuery->ns());
+
             if (collMetadata) {
                 plannerParams.shardKey = collMetadata->getKeyPattern();
             }
@@ -306,6 +308,192 @@ namespace mongo {
             *out = mpr.release();
             return Status::OK();
         }
+    }
+
+    //
+    // Distinct hack
+    //
+
+    /**
+     * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
+     * to provide results for the distinct command.
+     *
+     * If the provided solution could be mutated successfully, returns true, otherwise returns
+     * false.
+     */
+    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
+        QuerySolutionNode* root = soln->root.get();
+
+        // We're looking for a project on top of an ixscan.
+        if (STAGE_PROJECTION == root->getType() && (STAGE_IXSCAN == root->children[0]->getType())) {
+            IndexScanNode* isn = static_cast<IndexScanNode*>(root->children[0]);
+
+            // An additional filter must be applied to the data in the key, so we can't just skip
+            // all the keys with a given value; we must examine every one to find the one that (may)
+            // pass the filter.
+            if (NULL != isn->filter.get()) {
+                return false;
+            }
+
+            // We only set this when we have special query modifiers (.max() or .min()) or other
+            // special cases.  Don't want to handle the interactions between those and distinct.
+            // Don't think this will ever really be true but if it somehow is, just ignore this
+            // soln.
+            if (isn->bounds.isSimpleRange) {
+                return false;
+            }
+
+            // Make a new DistinctNode.  We swap this for the ixscan in the provided solution.
+            DistinctNode* dn = new DistinctNode();
+            dn->indexKeyPattern = isn->indexKeyPattern;
+            dn->direction = isn->direction;
+            dn->bounds = isn->bounds;
+
+            // Figure out which field we're skipping to the next value of.  TODO: We currently only
+            // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
+            // over.  Consider removing this code if we stick with that policy.
+            dn->fieldNo = 0;
+            BSONObjIterator it(isn->indexKeyPattern);
+            while (it.more()) {
+                if (field == it.next().fieldName()) {
+                    break;
+                }
+                dn->fieldNo++;
+            }
+
+            // Delete the old index scan, set the child of project to the fast distinct scan.
+            delete root->children[0];
+            root->children[0] = dn;
+            return true;
+        }
+
+        return false;
+    }
+
+    Status getRunnerDistinct(Collection* collection,
+                             const BSONObj& query,
+                             const string& field,
+                             Runner** out) {
+
+        Database* db = cc().database();
+        verify(db);
+
+        // This should'a been checked by the distinct command.
+        verify(collection);
+
+        // TODO: check for idhack here?
+
+        // When can we do a fast distinct hack?
+        // 1. There is a plan with just one leaf and that leaf is an ixscan.
+        // 2. The ixscan indexes the field we're interested in.
+        // 2a: We are correct if the index contains the field but for now we look for prefix.
+        // 3. The query is covered/no fetch.
+        //
+        // We go through normal planning (with limited parameters) to see if we can produce
+        // a soln with the above properties.
+
+        QueryPlannerParams plannerParams;
+        plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
+        while (ii.more()) {
+            const IndexDescriptor* desc = ii.next();
+            // The distinct hack can work if any field is in the index but it's not always clear
+            // if it's a win unless it's the first field.
+            if (desc->keyPattern().firstElement().fieldName() == field) {
+                plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
+                                                           desc->isMultikey(),
+                                                           desc->isSparse(),
+                                                           desc->indexName(),
+                                                           desc->infoObj()));
+            }
+        }
+
+        // We only care about the field that we're projecting over.  Have to drop the _id field
+        // explicitly because those are .find() semantics.
+        //
+        // Applying a projection allows the planner to try to give us covered plans.
+        BSONObj projection;
+        if ("_id" == field) {
+            projection = BSON("_id" << 1);
+        }
+        else {
+            projection = BSON("_id" << 0 << field << 1);
+        }
+
+        // Apply a projection of the key.  Empty BSONObj() is for the sort.
+        CanonicalQuery* cq;
+        Status status = CanonicalQuery::canonicalize(collection->ns().ns(), query, BSONObj(), projection, &cq);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // No index has the field we're looking for.  Punt to normal planning.
+        if (plannerParams.indices.empty()) {
+            // Takes ownership of cq.
+            return getRunner(cq, out);
+        }
+
+        // If we're here, we have an index prefixed by the field we're distinct-ing over.
+
+        // If there's no query, we can just distinct-scan one of the indices.
+        if (query.isEmpty()) {
+            DistinctNode* dn = new DistinctNode();
+            dn->indexKeyPattern = plannerParams.indices[0].keyPattern;
+            dn->direction = 1;
+            IndexBoundsBuilder::allValuesBounds(dn->indexKeyPattern, &dn->bounds);
+            dn->fieldNo = 0;
+
+            QueryPlannerParams params;
+
+            // Takes ownership of 'dn'.
+            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn);
+            verify(soln);
+
+            WorkingSet* ws;
+            PlanStage* root;
+            verify(StageBuilder::build(*soln, &root, &ws));
+            *out = new SingleSolutionRunner(cq, soln, root, ws);
+            return Status::OK();
+        }
+
+        // See if we can answer the query in a fast-distinct compatible fashion.
+        vector<QuerySolution*> solutions;
+        status = QueryPlanner::plan(*cq, plannerParams, &solutions);
+        if (!status.isOK()) {
+            return getRunner(cq, out);
+        }
+
+        // XXX: why do we need to do this?  planner should prob do this internally
+        cq->root()->resetTag();
+
+        // We look for a solution that has an ixscan we can turn into a distinctixscan
+        for (size_t i = 0; i < solutions.size(); ++i) {
+            if (turnIxscanIntoDistinctIxscan(solutions[i], field)) {
+                // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
+                for (size_t j = 0; j < solutions.size(); ++j) {
+                    if (j != i) {
+                        delete solutions[j];
+                    }
+                }
+
+                // Build and return the SSR over solutions[i].
+                WorkingSet* ws;
+                PlanStage* root;
+                verify(StageBuilder::build(*solutions[i], &root, &ws));
+                *out = new SingleSolutionRunner(cq, solutions[i], root, ws);
+                return Status::OK();
+            }
+        }
+
+        // If we're here, the planner made a soln with the restricted index set but we couldn't
+        // translate any of them into a distinct-compatible soln.  So, delete the solutions and just
+        // go through normal planning.
+        for (size_t i = 0; i < solutions.size(); ++i) {
+            delete solutions[i];
+        }
+
+        return getRunner(cq, out);
     }
 
     ScopedRunnerRegistration::ScopedRunnerRegistration(Runner* runner)

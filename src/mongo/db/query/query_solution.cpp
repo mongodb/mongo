@@ -619,4 +619,19 @@ namespace mongo {
         children[0]->appendToString(ss, indent + 2);
     }
 
+    //
+    // DistinctNode
+    //
+
+    void DistinctNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "DISTINCT\n";
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "direction = " << direction << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "bounds = " << bounds.toString() << '\n';
+    }
+
 }  // namespace mongo
