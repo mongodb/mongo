@@ -52,7 +52,7 @@ namespace mongo {
             }
             else {
                 error() << "Could not generate role graph from admin.system.roles; "
-                    "only system roles available. TODO EXPLAIN REMEDY. " << status;
+                    "only system roles available: " << status;
             }
         }
 
