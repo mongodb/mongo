@@ -10,15 +10,15 @@ To perform a hot backup:
 1. Open a cursor on the backup data source, which begins the process of
 a hot backup.
 
-2. Copy each file returned by the WT_CURSOR::next method into a
-different directory.
+2. Copy each file returned by the WT_CURSOR::next method to the hot
+backup location, for example, a different directory.
 
 3. Close the cursor; the cursor must not be closed until all of the
 files have been copied.
 
-The directory to which the files are copied may subsequently be
-specified as an directory to the ::wiredtiger_open function and accessed
-as a WiredTiger database home.
+A directory to which the files are copied may subsequently be specified
+as an directory to the ::wiredtiger_open function and accessed as a
+WiredTiger database home.
 
 Notes:
 
