@@ -41,6 +41,7 @@
 
 typedef struct he_env	HE_ENV;
 typedef struct he_item	HE_ITEM;
+typedef struct he_stats	HE_STATS;
 
 static int verbose = 0;					/* Verbose messages */
 
@@ -436,14 +437,37 @@ helium_dump(he_t he, const char *tag)
 
 	(void)fprintf(stderr, "== %s\n", tag);
 	while ((ret = he_next(he, r, (size_t)0, sizeof(v))) == 0) {
-		he_dump_print("K: ", r->key, r->key_len, stderr);
-		he_dump_print("V: ", r->val, r->val_len, stderr);
+		helium_dump_print("K: ", r->key, r->key_len, stderr);
+		helium_dump_print("V: ", r->val, r->val_len, stderr);
 	}
 	if (ret != HE_ERR_ITEM_NOT_FOUND) {
-		fprintf(stderr, "== error: %s\n", he_strerror(ret)); 
+		fprintf(stderr, "== error: %s\n", he_strerror(ret));
 		ret = WT_ERROR;
 	}
 	return (ret);
+}
+
+/*
+ * helium_stats --
+ *	Display Helium statistics for a datastore.
+ */
+static int
+helium_stats(
+    WT_EXTENSION_API *wtext, WT_SESSION *session, he_t he, const char *tag)
+{
+	HE_STATS stats;
+	int ret = 0;
+
+	if ((ret = he_stats(he, &stats)) != 0)
+		ERET(wtext, session, ret, "he_stats: %s", he_strerror(ret));
+	fprintf(stderr, "== %s\n", tag);
+	fprintf(stderr, "name=%s\n", stats.name);
+	fprintf(stderr, "deleted_items=%" PRIu64 "\n", stats.deleted_items);
+	fprintf(stderr, "locked_items=%" PRIu64 "\n", stats.locked_items);
+	fprintf(stderr, "valid_items=%" PRIu64 "\n", stats.valid_items);
+	fprintf(stderr, "capacity=%" PRIu64 "B\n", stats.capacity);
+	fprintf(stderr, "size=%" PRIu64 "B\n", stats.size);
+	return (0);
 }
 #endif
 
