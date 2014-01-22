@@ -75,13 +75,13 @@ namespace mongo {
                               deleteDoc->getLimit() == 1 /*just one*/);
             }
 
-            const StringData& dbName = NamespaceString( request->getNS() ).db();
-
             BSONObjBuilder gleCmdB;
             gleCmdB.append( "getLastError", true );
             gleCmdB.appendElements( writeConcern );
 
-            conn->runCommand( dbName.toString(), gleCmdB.obj(), *gleResponse );
+            conn->runCommand( nsToDatabase( request->getNS() ),
+                              gleCmdB.obj(),
+                              *gleResponse );
         }
         catch ( const DBException& ex ) {
             return ex.toStatus();
