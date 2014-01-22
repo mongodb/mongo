@@ -664,8 +664,8 @@ namespace {
                         params["security.keyFile"].as<string>()).generic_string();
         }
 
-        if ( params.count("processManagement.pidfilepath")) {
-            serverGlobalParams.pidFile = params["processManagement.pidfilepath"].as<string>();
+        if ( params.count("processManagement.pidFilePath")) {
+            serverGlobalParams.pidFile = params["processManagement.pidFilePath"].as<string>();
         }
 
         if (params.count("setParameter")) {
