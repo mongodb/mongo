@@ -448,9 +448,12 @@ else:
 
 static = has_option( "static" )
 
-noshell = has_option( "noshell" ) 
-
 disable_scripting = has_option( "disable-scripting" )
+
+if not disable_scripting:
+    noshell = has_option( "noshell" )
+else:
+    noshell = True
 
 asio = has_option( "asio" )
 
@@ -1686,6 +1689,7 @@ Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("installSetup mongoCodeVersion")
 Export("usev8")
+Export("disable_scripting")
 Export("darwin windows solaris linux freebsd nix")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
