@@ -57,7 +57,7 @@ typedef struct {
 } ZLIB_COMPRESSOR;
 
 /*
- * Bzip gives us a cookie to pass to the underlying allocation functions; we
+ * zlib gives us a cookie to pass to the underlying allocation functions; we
  * we need two handles, package them up.
  */
 typedef struct {
@@ -185,6 +185,10 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (0);
 }
 
+/*
+ * zlib_find_slot --
+ *	Find the slot containing the target offset (binary search).
+ */
 static inline uint32_t
 zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 {
@@ -210,7 +214,7 @@ zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 
 /*
  * zlib_compress_raw --
- *	Test function for the test/format utility.
+ *	Pack records into a specified on-disk page size.
  */
 static int
 zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
@@ -246,6 +250,10 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	zs.next_in = src;
 	zs.next_out = dst;
+	/*
+	 * Experimentally derived, reserve this many bytes for zlib to finish
+	 * up a buffer.
+	 */
 #define	WT_ZLIB_RESERVED	6
 	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
 	last_zs = zs;
