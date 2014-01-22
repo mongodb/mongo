@@ -20,6 +20,12 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/util/assert_util.h"
 
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && (__GNUC_MINOR__ >= 8)))
+#define NO_FUSED_MULTIPLY_ADD __attribute__((optimize("fp-contract=off")))
+#else
+#define NO_FUSED_MULTIPLY_ADD
+#endif
+
 /**
  * These classes provide online descriptive statistics estimator capable
  * of computing the mean, standard deviation and quantiles.
@@ -112,7 +118,7 @@ namespace mongo {
     public:
         DistributionEstimators();
 
-        DistributionEstimators& operator <<(const double sample);
+        DistributionEstimators& operator <<(const double sample) NO_FUSED_MULTIPLY_ADD;
 
         /**
          * Number of computed quantiles, excluding minimum and maximum.
