@@ -1416,7 +1416,11 @@ def doConfigure(myenv):
 
     conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
     if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
-        "sasl2", "sasl/sasl.h", "C", "sasl_version_info(0, 0, 0, 0, 0, 0);", autoadd=False ):
+            "sasl2", 
+            ["stddef.h","sasl/sasl.h"], 
+            "C", 
+            "sasl_version_info(0, 0, 0, 0, 0, 0);", 
+            autoadd=False ):
         Exit(1)
 
     # requires ports devel/libexecinfo to be installed
