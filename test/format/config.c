@@ -36,6 +36,7 @@ static int	   config_find_is_perm(const char *, size_t);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
+static void	   config_sanity(void);
 
 /*
  * config_setup --
@@ -172,6 +173,9 @@ config_setup(void)
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
+
+	/* Perform any final sanity checks. */
+	config_sanity();
 }
 
 /*
@@ -532,4 +536,17 @@ config_file_type(u_int type)
 		break;
 	}
 	return ("error: unknown file type");
+}
+
+/*
+ * config_sanity --
+ *	Once configuration is done, any remaining sanity checks.
+ */
+static void
+config_sanity(void)
+{
+	if (g.c_key_min > g.c_key_max)
+		die(EINVAL, "key_min may not be larger than key_max");
+	if (g.c_value_min > g.c_value_max)
+		die(EINVAL, "value_min may not be larger than value_max");
 }
