@@ -307,6 +307,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
+#if 0
 	/*
 	 * Don't allow split merges to generate arbitrarily large pages.
 	 * Ideally we would choose a size based on the internal_page_max
@@ -315,6 +316,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 */
 	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
 		return (EBUSY);
+#endif
 
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
@@ -391,17 +393,15 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		}
 	} else {
 		/*
-		 * Create a new split-merge page for small merges, or if the
-		 * page above is a split merge page.  When we do a big enough
-		 * merge, we create a real page at the top and don't consider
-		 * it as a merge candidate again.  Over time with an insert
-		 * workload the tree will grow deeper, but that's inevitable,
-		 * and this keeps individual merges small.
+		 * Create a new split-merge page for small merges.  When we do
+		 * a big enough merge, we create a real page at the top and
+		 * don't consider it as a merge candidate again.  Over time
+		 * with an insert workload the tree will grow deeper, but
+		 * that's inevitable, and this keeps individual merges small.
 		 */
 		WT_ERR(__wt_btree_new_modified_page(
 		    session, page_type, refcnt,
-		    refcnt < WT_MERGE_FULL_PAGE ||
-		    __wt_btree_mergeable(top->parent),
+		    refcnt < WT_MERGE_FULL_PAGE,
 		    &newtop));
 
 		visit_state.first = newtop;
