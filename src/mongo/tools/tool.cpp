@@ -44,6 +44,7 @@
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
@@ -363,6 +364,7 @@ namespace mongo {
 // and makes them available through the argv() and envp() members.  This enables toolMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    setWindowsUnhandledExceptionFilter();
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
     auto_ptr<Tool> instance = (*Tool::createInstance)();
     int exitCode = instance->main(argc, wcl.argv(), wcl.envp());

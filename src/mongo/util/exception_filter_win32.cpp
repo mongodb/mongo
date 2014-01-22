@@ -42,11 +42,38 @@ namespace mongo {
 
     /* create a process dump.
         To use, load up windbg.  Set your symbol and source path.
-        Open the crash dump file.  To see the crashing context, use .ecxr
+        Open the crash dump file.  To see the crashing context, use .ecxr in windbg
+        TODO: consider using WER local dumps in the future
         */
     void doMinidump(struct _EXCEPTION_POINTERS* exceptionInfo) {
-        LPCWSTR dumpFilename = L"mongo.dmp";
-        HANDLE hFile = CreateFileW(dumpFilename,
+        WCHAR moduleFileName[MAX_PATH];
+
+        DWORD ret = GetModuleFileNameW(NULL, &moduleFileName[0], ARRAYSIZE(moduleFileName));
+        if (ret == 0) {
+            int gle = GetLastError();
+            log() << "GetModuleFileName failed " << errnoWithDescription(gle);
+
+            // Fallback name
+            wcscpy_s(moduleFileName, L"mongo");
+        }
+        else {
+            WCHAR* dotStr = wcschr(&moduleFileName[0], L'.');
+            if (dotStr != NULL) {
+                *dotStr = L'\0';
+            }
+        }
+
+        std::wstring dumpName(moduleFileName);
+
+        std::string currentTime = terseCurrentTime(false);
+
+        dumpName += L".";
+
+        dumpName += toWideString(currentTime.c_str());
+
+        dumpName += L".mdmp";
+
+        HANDLE hFile = CreateFileW(dumpName.c_str(),
             GENERIC_WRITE,
             0,
             NULL,
@@ -55,7 +82,7 @@ namespace mongo {
             NULL);
         if ( INVALID_HANDLE_VALUE == hFile ) {
             DWORD lasterr = GetLastError();
-            log() << "failed to open minidump file " << toUtf8String(dumpFilename) << " : "
+            log() << "failed to open minidump file " << toUtf8String(dumpName.c_str()) << " : "
                   << errnoWithDescription( lasterr ) << std::endl;
             return;
         }
@@ -63,13 +90,23 @@ namespace mongo {
         MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
         aMiniDumpInfo.ThreadId = GetCurrentThreadId();
         aMiniDumpInfo.ExceptionPointers = exceptionInfo;
-        aMiniDumpInfo.ClientPointers = TRUE;
+        aMiniDumpInfo.ClientPointers = FALSE;
 
-        log() << "writing minidump diagnostic file " << toUtf8String(dumpFilename) << std::endl;
+        MINIDUMP_TYPE miniDumpType =
+#ifdef _DEBUG
+            MiniDumpWithFullMemory;
+#else
+            static_cast<MINIDUMP_TYPE>(
+            MiniDumpNormal
+            | MiniDumpWithIndirectlyReferencedMemory
+            | MiniDumpWithProcessThreadData);
+#endif
+        log() << "writing minidump diagnostic file " << toUtf8String(dumpName.c_str()) << std::endl;
+
         BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
             GetCurrentProcessId(),
             hFile,
-            MiniDumpNormal,
+            miniDumpType,
             &aMiniDumpInfo,
             NULL,
             NULL);
@@ -115,7 +152,12 @@ namespace mongo {
         }
 
         log() << "*** stack trace for unhandled exception:" << std::endl;
-        printWindowsStackTrace( *excPointers->ContextRecord );
+
+        // Create a copy of context record because printWindowsStackTrace will mutate it.
+        CONTEXT contextCopy(*(excPointers->ContextRecord));
+
+        printWindowsStackTrace( contextCopy );
+
         doMinidump(excPointers);
 
         // Don't go through normal shutdown procedure. It may make things worse.
