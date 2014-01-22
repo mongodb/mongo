@@ -706,7 +706,9 @@ int _main( int argc, char* argv[], char **envp ) {
 
     if (!shellGlobalParams.nodb && shellGlobalParams.username.size()) {
         authStringStream << "var username = \"" << shellGlobalParams.username << "\";" << endl;
-        authStringStream << "var password = \"" << shellGlobalParams.password << "\";" << endl;
+        if (shellGlobalParams.usingPassword) {
+            authStringStream << "var password = \"" << shellGlobalParams.password << "\";" << endl;
+        }
         if (shellGlobalParams.authenticationDatabase.empty()) {
             authStringStream << "var authDb = db;" << endl;
         }
@@ -715,8 +717,11 @@ int _main( int argc, char* argv[], char **envp ) {
                              << shellGlobalParams.authenticationDatabase << "\");" << endl;
         }
         authStringStream << "authDb._authOrThrow({ " <<
-            saslCommandUserFieldName << ": username, " <<
-            saslCommandPasswordFieldName << ": password });" << endl;
+            saslCommandUserFieldName << ": username ";
+        if (shellGlobalParams.usingPassword) { 
+            authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
+        }
+        authStringStream << "});" << endl;
     }
     authStringStream << "}())";
     mongo::shell_utils::_dbAuth = authStringStream.str();
