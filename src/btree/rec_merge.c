@@ -372,7 +372,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		else {
 			WT_ERR(__wt_btree_new_modified_page(
 			    session, page_type, split,
-			    visit_state.first_live < split, &lchild));
+			    split < WT_MERGE_FULL_PAGE, &lchild));
 			visit_state.first = lchild;
 		}
 
@@ -382,8 +382,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			visit_state.second_ref = &newtop->u.intl.t[1];
 		} else {
 			WT_ERR(__wt_btree_new_modified_page(
-			    session, page_type,
-			    refcnt - split, visit_state.last_live >= split,
+			    session, page_type, refcnt - split,
+			    refcnt - split < WT_MERGE_FULL_PAGE,
 			    &rchild));
 			visit_state.second = rchild;
 			visit_state.second_ref =
