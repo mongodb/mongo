@@ -94,6 +94,12 @@ namespace mongo {
         // If we're yielding to fetch a document, what is it's diskloc?  It may be invalidated
         // while we're yielded.
         DiskLoc _locFetching;
+
+        // Number of index keys scanned: should be either 0 or 1.
+        int _nscanned;
+
+        // Number of objects scanned: should be either 0 or 1.
+        int _nscannedObjects;
     };
 
 }  // namespace mongo

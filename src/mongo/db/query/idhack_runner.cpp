@@ -48,7 +48,9 @@ namespace mongo {
         : _collection(collection),
           _query(query),
           _killed(false),
-          _done(false) { }
+          _done(false),
+          _nscanned(0),
+          _nscannedObjects(0) { }
 
     IDHackRunner::~IDHackRunner() { }
 
@@ -82,9 +84,13 @@ namespace mongo {
             return Runner::RUNNER_EOF;
         }
 
+        _nscanned++;
+
         // Set out parameters and note that we're done w/lookup.
         if (NULL != objOut) {
             Record* record = loc.rec();
+
+            _nscannedObjects++;
 
             // If the record isn't in memory...
             if (!Record::likelyInPhysicalMemory(record->dataNoThrowing())) {
@@ -169,6 +175,9 @@ namespace mongo {
         // The explain plan simply indicates that the plan is idhack.
         *explain = new TypeExplain();
         (*explain)->setIDHack(true);
+        (*explain)->setN(_nscanned);
+        (*explain)->setNScanned(_nscanned);
+        (*explain)->setNScannedObjects(_nscannedObjects);
         return Status::OK();
     }
 
