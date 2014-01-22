@@ -630,7 +630,7 @@ namespace mongo {
             }
             serverGlobalParams.rest = true;
         }
-        if (params.count("net.http.JSONPenabled")) {
+        if (params.count("net.http.JSONPEnabled")) {
 
             // If we are explicitly setting httpinterface to false in the config file (the source of
             // "net.http.enabled") and not overriding it on the command line (the source of
