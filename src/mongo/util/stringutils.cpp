@@ -107,7 +107,7 @@ namespace mongo {
                                           sd2.rawData() + s2,
                                           len1 );
                         if ( result )
-                            return result;
+                            return ( result > 0) ? 1 : -1;
                     }
 
                     // otherwise, the numbers are equal
