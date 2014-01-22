@@ -54,6 +54,23 @@
 
 namespace mongo {
 
+    static bool initWireVersion( DBClientBase* conn, std::string* errMsg ) {
+        BSONObj response;
+        if ( !conn->runCommand( "admin", BSON("isMaster" << 1), response )) {
+            *errMsg = str::stream() << "Failed to determine wire version "
+                                    << "for internal connection: " << response;
+            return false;
+        }
+
+        if ( response.hasField("minWireVersion") && response.hasField("maxWireVersion") ) {
+            int minWireVersion = response["minWireVersion"].numberInt();
+            int maxWireVersion = response["maxWireVersion"].numberInt();
+            conn->setWireVersions( minWireVersion, maxWireVersion );
+        }
+
+        return true;
+    }
+
     class StaticShardInfo {
     public:
         StaticShardInfo() : _mutex("StaticShardInfo"), _rsMutex("RSNameMap") { }
@@ -446,18 +463,29 @@ namespace mongo {
                      result );
         }
 
-        if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {
+        if ( _shardedConnections ) {
+            if ( versionManager.isVersionableCB( conn )) {
+                // We must initialize sharding on all connections, so that we get exceptions
+                // if sharding is enabled on the collection.
+                BSONObj result;
+                bool ok = versionManager.initShardVersionCB( conn, result );
 
-            // We must initialize sharding on all connections, so that we get exceptions if sharding is enabled on
-            // the collection.
-            BSONObj result;
-            bool ok = versionManager.initShardVersionCB( conn, result );
-
-            // assert that we actually successfully setup sharding
-            uassert( 15907, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
-                        ( result["errmsg"].type() == String ? causedBy( result["errmsg"].String() ) :
-                                                              causedBy( (string)"unknown failure : " + result.toString() ) ), ok );
-
+                // assert that we actually successfully setup sharding
+                uassert( 15907,
+                         str::stream() << "could not initialize sharding on connection "
+                             << conn->toString() << ( result["errmsg"].type() == String ?
+                                  causedBy( result["errmsg"].String() ) :
+                                  causedBy( (string)"unknown failure : " + result.toString() ) ),
+                         ok );
+            }
+            else {
+                // Initialize the wire protocol version of the connection to find out if we
+                // can send write commands to this connection.
+                string errMsg;
+                if ( !initWireVersion( conn, &errMsg )) {
+                    uasserted( 17363, errMsg );
+                }
+            }
         }
 
         // For every DBClient created by mongos, add a hook that will append impersonated users
