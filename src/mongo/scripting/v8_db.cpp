@@ -743,7 +743,7 @@ namespace mongo {
                 return v8AssertionException("Timestamp increment must be a number");
             }
             int64_t t = args[0]->IntegerValue();
-            int64_t largestVal = ((2039LL-1970LL) *365*24*60*60); //seconds between 1970-2038
+            int64_t largestVal = int64_t(OpTime::max().getSecs());
             if( t > largestVal )
                 return v8AssertionException( str::stream()
                         << "The first argument must be in seconds; "

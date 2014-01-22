@@ -1283,7 +1283,7 @@ namespace mongo {
         case Date:
             appendDate( fieldName , numeric_limits<long long>::max() ); return;
         case Timestamp: // TODO integrate with Date SERVER-3304
-            appendTimestamp( fieldName , numeric_limits<unsigned long long>::max() ); return;
+            append( fieldName , OpTime::max() ); return;
         case Undefined: // shared with EOO
             appendUndefined( fieldName ); return;
 

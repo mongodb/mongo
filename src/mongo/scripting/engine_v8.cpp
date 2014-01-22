@@ -1442,10 +1442,21 @@ namespace mongo {
             argv[1] = v8::String::New(ss.str().c_str());
             return BinDataFT()->GetFunction()->NewInstance(2, argv);
         }
-        case mongo::Timestamp:
+        case mongo::Timestamp: {
+            v8::TryCatch tryCatch;
+
             argv[0] = v8::Number::New(elem.timestampTime() / 1000);
             argv[1] = v8::Number::New(elem.timestampInc());
-            return TimestampFT()->GetFunction()->NewInstance(2,argv);
+
+            v8::Handle<v8::Value> ret = TimestampFT()->GetFunction()->NewInstance(2,argv);
+            uassert(17355, str::stream() << "Error converting " << elem.toString(false)
+                                         << " in field " << elem.fieldName()
+                                         << " to a JS Timestamp object: "
+                                         << toSTLString(tryCatch.Exception()),
+                    !tryCatch.HasCaught());
+
+            return ret;
+        }
         case mongo::NumberLong:
             nativeUnsignedLong = elem.numberLong();
             // values above 2^53 are not accurately represented in JS

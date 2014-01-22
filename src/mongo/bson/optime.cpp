@@ -16,6 +16,7 @@
 #include "mongo/bson/optime.h"
 
 #include <iostream>
+#include <limits>
 #include <ctime>
 
 #include "mongo/bson/inline_decls.h"
@@ -71,6 +72,12 @@ namespace mongo {
 
     OpTime OpTime::getLast(const mongo::mutex::scoped_lock&) {
         return last;
+    }
+
+    OpTime OpTime::max() {
+        unsigned int t = static_cast<unsigned int>(std::numeric_limits<int32_t>::max());
+        unsigned int i = std::numeric_limits<uint32_t>::max();
+        return OpTime(t, i);
     }
 
     void OpTime::waitForDifferent(unsigned millis){

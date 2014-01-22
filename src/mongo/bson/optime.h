@@ -92,6 +92,9 @@ namespace mongo {
 
         static OpTime getLast(const mongo::mutex::scoped_lock&);
 
+        // Maximum OpTime value.
+        static OpTime max();
+
         // Waits for global OpTime to be different from *this
         void waitForDifferent(unsigned millis);
 
