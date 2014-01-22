@@ -86,7 +86,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "buffer_alignment=512,error_prefix=\"%s\","
 	    "%s,%s,%s,"
 	    "extensions="
-	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
+	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
@@ -99,6 +99,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    (access(RAW_PATH, R_OK) == 0 &&
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
@@ -257,6 +258,10 @@ wts_create(void)
 	case COMPRESS_SNAPPY:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"snappy\"");
+		break;
+	case COMPRESS_ZLIB:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"zlib\"");
 		break;
 	}
 

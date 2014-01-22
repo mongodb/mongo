@@ -57,6 +57,8 @@ extern WT_EXTENSION_API *wt_api;
 	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	SNAPPY_PATH							\
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#define	ZLIB_PATH							\
+	EXTPATH "compressors/zlib/.libs/libwiredtiger_zlib.so"
 
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
@@ -198,6 +200,7 @@ typedef struct {
 #define	COMPRESS_LZO		3
 #define	COMPRESS_RAW		4
 #define	COMPRESS_SNAPPY		5
+#define	COMPRESS_ZLIB		6
 	u_int c_compression_flag;		/* Compression flag value */
 
 	uint64_t key_cnt;			/* Keys loaded so far */

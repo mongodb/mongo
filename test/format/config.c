@@ -223,9 +223,9 @@ config_compression(void)
 	if (!(cp->flags & C_PERM)) {
 		cstr = "compression=none";
 		switch (MMRAND(1, 10)) {
-		case 1:					/* 10% */
+		case 1: case 2: case 3:			/* 30% */
 			break;
-		case 2: case 3: case 4: case 5:		/* 40% */
+		case 4: case 5:				/* 20% */
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=bzip";
 			break;
@@ -233,9 +233,13 @@ config_compression(void)
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=raw";
 			break;
-		case 7: case 8: case 9: case 10:	/* 40% */
+		case 7: case 8:				/* 20% */
 			if (access(SNAPPY_PATH, R_OK) == 0)
 				cstr = "compression=snappy";
+			break;
+		case 9: case 10:			/* 20% */
+			if (access(ZLIB_PATH, R_OK) == 0)
+				cstr = "compression=zlib";
 			break;
 		}
 		config_single(cstr, 0);
@@ -254,6 +258,11 @@ config_compression(void)
 	case COMPRESS_SNAPPY:
 		if (access(SNAPPY_PATH, R_OK) != 0)
 			die(0, "snappy library not found or not readable");
+		break;
+	case COMPRESS_ZLIB:
+		if (access(ZLIB_PATH, R_OK) != 0)
+			die(0, "zlib library not found or not readable");
+		break;
 	}
 }
 
@@ -482,6 +491,8 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_RAW;
 	else if (strcmp(s, "snappy") == 0)
 		*vp = COMPRESS_SNAPPY;
+	else if (strcmp(s, "zlib") == 0)
+		*vp = COMPRESS_ZLIB;
 	else
 		die(EINVAL, "illegal compression configuration: %s", s);
 }
