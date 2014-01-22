@@ -6,6 +6,7 @@ import os
 import itertools
 from buildscripts import utils
 
+Import("disable_scripting")
 Import("env")
 Import("shellEnv")
 Import("testEnv")
@@ -1041,7 +1042,8 @@ test = testEnv.Install(
                       if not str(f).endswith('framework.cpp') and
                          not str(f).endswith('framework_options.cpp') and
                          not str(f).endswith('framework_options_init.cpp') and
-                         not str(f).endswith('framework_options_test.cpp') ],
+                         not str(f).endswith('framework_options_test.cpp') and
+                         not (str(f).endswith('jstests.cpp') and disable_scripting)],
                     LIBDEPS = [
                        "mutable_bson_test_utils",
                        "mongocommon",

@@ -233,7 +233,7 @@ add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
 
 # library choices
-add_option( "usev8" , "use v8 for javascript" , 0 , True )
+add_option( "disable-scripting" , "do not build support for javascript" , 0 , True )
 add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
 # mongo feature options
@@ -448,9 +448,12 @@ else:
 
 static = has_option( "static" )
 
-noshell = has_option( "noshell" ) 
+disable_scripting = has_option( "disable-scripting" )
 
-usev8 = has_option( "usev8" ) 
+if not disable_scripting:
+    noshell = has_option( "noshell" )
+else:
+    noshell = True
 
 asio = has_option( "asio" )
 
@@ -620,7 +623,9 @@ if boostVersion is None:
 else:
     boostVersion = "-" + boostVersion
 
-if ( not ( usev8 or justClientLib) ):
+if disable_scripting or justClientLib:
+    usev8 = False
+else:
     usev8 = True
     options_topass["usev8"] = True
 
@@ -1684,6 +1689,7 @@ Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("installSetup mongoCodeVersion")
 Export("usev8")
+Export("disable_scripting")
 Export("darwin windows solaris linux freebsd nix")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
