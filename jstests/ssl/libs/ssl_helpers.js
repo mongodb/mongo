@@ -53,14 +53,19 @@ function mixedShardTest(options1, options2, shouldSucceed) {
             config : [options1],
             shards : [options1, options2]
         });
+        st.stopBalancer();
 
+        // Test mongos talking to config servers
         var r = st.adminCommand({enableSharding: "test"});
         assert.eq(r, true, "error enabling sharding for this configuration");
+
+        r = st.adminCommand({ movePrimary: 'test', to: 'shard0001' });
 
         db1 = st.getDB("test");
         r = st.adminCommand({ shardCollection : "test.col" , key : { _id : 1 } });
         assert.eq(r, true, "error sharding collection for this configuration");
 
+	// Test mongos talking to shards
         var bigstr = Array(1024*1024).join("#");
 
         for(var i = 0; i < 128; i++){
@@ -68,14 +73,12 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         }
         db1.getLastError();
         assert.eq(128, db1.col.count(), "error retrieving documents from cluster");
-        st.config.shards.find().forEach(function(z){printjson(z);});
-        var shardDict = {};
-        st.config.chunks.find().forEach(function(z){
-            printjson(z);
-            shardDict[z.shard] = 1;
-        });
-        assert.eq(1, shardDict["shard0000"], "shards not properly utilized by cluster");
-        assert.eq(1, shardDict["shard0001"], "shards not properly utilized by cluster");
+
+        // Test shards talking to each other
+        r = st.getDB('test').adminCommand({ moveChunk: 'test.col',
+                                            find: { _id: 0 }, to: 'shard0000' });
+        assert(r.ok, "error moving chunks: " + tojson(r));
+
         db1.col.remove();
 
     } catch(e) {
