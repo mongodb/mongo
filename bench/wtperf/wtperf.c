@@ -213,6 +213,7 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
+	trk = NULL;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");

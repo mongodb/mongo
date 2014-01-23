@@ -122,4 +122,21 @@ pthread_logging|pthreads_logging)
 esac
 AC_MSG_RESULT($with_spinlock)
 
+AC_MSG_CHECKING(if --enable-zlib option specified)
+AC_ARG_ENABLE(zlib,
+	[AS_HELP_STRING([--enable-zlib],
+	    [Build the zlib compressor extension.])], r=$enableval, r=no)
+case "$r" in
+no)	wt_cv_enable_zlib=no;;
+*)	wt_cv_enable_zlib=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_zlib)
+if test "$wt_cv_enable_zlib" = "yes"; then
+	AC_CHECK_HEADER(zlib.h,,
+	    [AC_MSG_ERROR([--enable-zlib requires zlib.h])])
+	AC_CHECK_LIB(z, deflate,,
+	    [AC_MSG_ERROR([--enable-zlib requires zlib library])])
+fi
+AM_CONDITIONAL([ZLIB], [test "$wt_cv_enable_zlib" = "yes"])
+
 ])

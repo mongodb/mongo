@@ -398,6 +398,7 @@ database's
 datalen
 datasets
 datasource
+datastore
 dbc
 decile
 deciles
@@ -405,6 +406,8 @@ decl
 decr
 decrement
 decrementing
+deflateEnd
+deflateInit
 defno
 del
 delfmt
@@ -538,6 +541,8 @@ indices
 indirects
 indx
 infeasible
+inflateEnd
+inflateInit
 init
 initn
 initsize
@@ -938,4 +943,5 @@ xff
 xxxx
 xxxxx
 xxxxxx
+zlib
 zu
