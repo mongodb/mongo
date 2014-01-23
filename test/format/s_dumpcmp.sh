@@ -55,6 +55,10 @@ snappy_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
 if test -e $snappy_ext ; then
         ext="$ext,\"$snappy_ext\""
 fi
+zlib_ext="$top/ext/compressors/zlib/.libs/libwiredtiger_zlib.so"
+if test -e $zlib_ext ; then
+        ext="$ext,\"$zlib_ext\""
+fi
 
 config='extensions=['$ext']'
 
