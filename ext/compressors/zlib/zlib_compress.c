@@ -38,14 +38,14 @@ static int
 zlib_compress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
 static int
+zlib_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
+    size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
+    size_t *, uint32_t *);
+static int
 zlib_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 static int
 zlib_terminate(WT_COMPRESSOR *, WT_SESSION *);
-static int
-zlib_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
-    size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
-    size_t *, uint32_t *);
 
 /* Local compressor structure. */
 typedef struct {
@@ -53,12 +53,12 @@ typedef struct {
 
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 
-	int zlib_level;			/* Configuration */
+	int zlib_level;				/* Configuration */
 } ZLIB_COMPRESSOR;
 
 /*
  * zlib gives us a cookie to pass to the underlying allocation functions; we
- * we need two handles, package them up.
+ * need two handles, package them up.
  */
 typedef struct {
 	WT_COMPRESSOR *compressor;
@@ -76,12 +76,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		return (errno);
 
 	zlib_compressor->compressor.compress = zlib_compress;
-#if 1
 	zlib_compressor->compressor.compress_raw = zlib_compress_raw;
-#else
-	(void)zlib_compress_raw;
-	zlib_compressor->compressor.compress_raw = NULL;
-#endif
 	zlib_compressor->compressor.decompress = zlib_decompress;
 	zlib_compressor->compressor.pre_size = NULL;
 	zlib_compressor->compressor.terminate = zlib_terminate;
