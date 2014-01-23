@@ -224,7 +224,7 @@ namespace mongo {
 
             // Fill in nscanned from the explain.
             TypeExplain* bareExplain;
-            Status res = runner->getExplainPlan(&bareExplain);
+            Status res = runner->getInfo(&bareExplain, NULL);
             if (res.isOK()) {
                 auto_ptr<TypeExplain> explain(bareExplain);
                 stats.append("nscanned", explain->getNScanned());

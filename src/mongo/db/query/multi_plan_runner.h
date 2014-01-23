@@ -47,6 +47,7 @@ namespace mongo {
     class PlanStage;
     struct QuerySolution;
     class TypeExplain;
+    struct PlanInfo;
     class WorkingSet;
 
     /**
@@ -96,13 +97,14 @@ namespace mongo {
         virtual const Collection* collection() { return _collection; }
 
         /**
-         * Returns OK, allocating and filling in '*explain' with details of the "winner"
-         * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
-         * the error.
+         * Returns OK, allocating and filling in '*explain' and '*planInfo' with details of
+         * the "winner" plan. Caller takes ownership of '*explain' and '*planInfo'. Otherwise,
+         * return a status describing the error.
          *
          * TOOD: fill in the explain of all candidate plans
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
         /**

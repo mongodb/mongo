@@ -244,7 +244,7 @@ namespace {
             runner->restoreState();
 
             TypeExplain* explainRaw;
-            explainStatus = runner->getExplainPlan(&explainRaw);
+            explainStatus = runner->getInfo(&explainRaw, NULL);
             if (explainStatus.isOK())
                 plan.reset(explainRaw);
 

@@ -37,6 +37,7 @@ namespace mongo {
     class Collection;
     class DiskLoc;
     class TypeExplain;
+    struct PlanInfo;
 
     /**
      * A runner runs a query.
@@ -198,11 +199,15 @@ namespace mongo {
         virtual const Collection* collection() = 0;
 
         /**
-         * Returns OK, allocating and filling '*explain' with a description of the chosen plan.
-         * Caller takes onwership of '*explain'. Otherwise, returns false with a detailed error
-         * status.
+         * Returns OK, allocating and filling '*explain' or '*planInfo' with a description of the
+         * chosen plan, depending on which is non-NULL (one of the two should be NULL). Caller
+         * takes onwership of either '*explain' and '*planInfo'. Otherwise, returns false
+         * a detailed error status.
+         *
+         * If 'explain' is NULL, then this out-parameter is ignored. Similarly, if 'staticInfo'
+         * is NULL, then no static debug information is produced.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const = 0;
+        virtual Status getInfo(TypeExplain** explain, PlanInfo** planInfo) const = 0;
     };
 
 }  // namespace mongo

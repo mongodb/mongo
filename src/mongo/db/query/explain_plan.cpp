@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/explain_plan.h"
 
+#include <boost/algorithm/string/join.hpp>
+
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/util/mongoutils/str.h"
@@ -78,7 +80,7 @@ namespace mongo {
 
     }  // namespace
 
-    Status explainIntersectPlan(const PlanStageStats& stats, TypeExplain** explain, bool fullDetails) {
+    Status explainIntersectPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails) {
         auto_ptr<TypeExplain> res(new TypeExplain);
         res->setCursor("Complex Plan");
         res->setN(stats.common.advanced);
@@ -120,17 +122,17 @@ namespace mongo {
             res->stats = bob.obj();
         }
 
-        *explain = res.release();
+        *explainOut = res.release();
         return Status::OK();
     }
 
-    Status explainPlan(const PlanStageStats& stats, TypeExplain** explain, bool fullDetails) {
+    Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails) {
         //
         // Temporary explain for index intersection
         //
 
         if (isIntersectPlan(stats)) {
-            return explainIntersectPlan(stats, explain, fullDetails);
+            return explainIntersectPlan(stats, explainOut, fullDetails);
         }
 
         //
@@ -289,7 +291,7 @@ namespace mongo {
             res->stats = bob.obj();
         }
 
-        *explain = res.release();
+        *explainOut = res.release();
         return Status::OK();
     }
 
@@ -433,6 +435,61 @@ namespace mongo {
             statsToBSON(*stats.children[i], &childBob);
         }
         childrenBob.doneFast();
+    }
+
+    namespace {
+
+        /**
+         * Given a tree of stats, traverses the tree to the leaves. Appends a
+         * debug string for each leaf in the plan to the out-parameter 'leaves'.
+         */
+        void getLeafStrings(const QuerySolutionNode* node, std::vector<std::string>& leaves) {
+            if (node->children.empty()) {
+                // This is a leaf, append a string describing it.
+                mongoutils::str::stream leafInfo;
+                leafInfo << stageTypeString(node->getType());
+
+                // If the leaf is an index scan, also add the key pattern.
+                if (STAGE_IXSCAN == node->getType()) {
+                    const IndexScanNode* ixn = static_cast<const IndexScanNode*>(node);
+                    leafInfo << " " << ixn->indexKeyPattern;
+                }
+                else if (STAGE_GEO_2D == node->getType()) {
+                    const Geo2DNode* g2d = static_cast<const Geo2DNode*>(node);
+                    leafInfo << " " << g2d->indexKeyPattern;
+                }
+                else if (STAGE_GEO_NEAR_2D == node->getType()) {
+                    const GeoNear2DNode* g2dnear = static_cast<const GeoNear2DNode*>(node);
+                    leafInfo << " " << g2dnear->indexKeyPattern;
+                }
+                else if (STAGE_GEO_NEAR_2DSPHERE == node->getType()) {
+                    const GeoNear2DSphereNode* g2dsphere =
+                        static_cast<const GeoNear2DSphereNode*>(node);
+                    leafInfo << " " << g2dsphere->indexKeyPattern;
+                }
+                else if (STAGE_TEXT == node->getType()) {
+                    const TextNode* textNode = static_cast<const TextNode*>(node);
+                    leafInfo << " " << textNode->_indexKeyPattern;
+                }
+
+                leaves.push_back(leafInfo);
+            }
+
+            for (size_t i = 0; i < node->children.size(); ++i) {
+                getLeafStrings(node->children[i], leaves);
+            }
+        }
+
+    } // namespace
+
+    void getPlanInfo(const QuerySolution& soln, PlanInfo** infoOut) {
+        if (NULL == infoOut) { return; }
+
+        *infoOut = new PlanInfo();
+
+        std::vector<std::string> leaves;
+        getLeafStrings(soln.root.get(), leaves);
+        (*infoOut)->planSummary = boost::algorithm::join(leaves, ", ");
     }
 
 } // namespace mongo

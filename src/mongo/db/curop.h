@@ -101,6 +101,7 @@ namespace mongo {
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert
         int keyUpdates;
+        std::string planSummary; // a brief string describing the query solution
 
         // New Query Framework debugging/profiling info
         // XXX: should this really be an opaque BSONObj?  Not sure.

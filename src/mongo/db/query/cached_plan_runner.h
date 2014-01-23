@@ -44,6 +44,7 @@ namespace mongo {
     class PlanExecutor;
     class PlanStage;
     class TypeExplain;
+    struct PlanInfo;
     class WorkingSet;
 
     /**
@@ -82,11 +83,12 @@ namespace mongo {
 
         virtual const Collection* collection() { return _collection; }
         /**
-         * Returns OK, allocating and filling in '*explain' with details of the cached
-         * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
-         * the error.
+         * Returns OK, allocating and filling in '*explain' and '*planInfo' with details of
+         * the cached plan. Caller takes ownership of '*explain' and '*planInfo'. Otherwise,
+         * return a status describing the error.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
         /**
          * Takes ownership of all arguments.

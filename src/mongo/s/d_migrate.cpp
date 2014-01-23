@@ -667,7 +667,7 @@ namespace mongo {
                 invariant( false );
                 return NULL;
             }
-            virtual Status getExplainPlan(TypeExplain** explain) const {
+            virtual Status getInfo(TypeExplain** explain, PlanInfo** planInfo) const {
                 return Status( ErrorCodes::InternalError, "no" );
             }
 

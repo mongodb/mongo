@@ -101,27 +101,34 @@ namespace mongo {
         _collection = NULL;
     }
 
-    Status InternalRunner::getExplainPlan(TypeExplain** explain) const {
-        verify(_exec.get());
+    Status InternalRunner::getInfo(TypeExplain** explain,
+                                   PlanInfo** planInfo) const {
+        if (NULL != explain) {
+            verify(_exec.get());
 
-        scoped_ptr<PlanStageStats> stats(_exec->getStats());
-        if (NULL == stats.get()) {
-            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
-        }
+            scoped_ptr<PlanStageStats> stats(_exec->getStats());
+            if (NULL == stats.get()) {
+                return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+            }
 
-        Status status = explainPlan(*stats, explain, true /* full details */);
-        if (!status.isOK()) {
-            return status;
-        }
+            Status status = explainPlan(*stats, explain, true /* full details */);
+            if (!status.isOK()) {
+                return status;
+            }
 
-        // Fill in explain fields that are accounted by on the runner level.
-        TypeExplain* chosenPlan = NULL;
-        explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (chosenPlan) {
-            (*explain)->addToAllPlans(chosenPlan);
+            // Fill in explain fields that are accounted by on the runner level.
+            TypeExplain* chosenPlan = NULL;
+            explainPlan(*stats, &chosenPlan, false /* no full details */);
+            if (chosenPlan) {
+                (*explain)->addToAllPlans(chosenPlan);
+            }
+            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
+            (*explain)->setNScannedAllPlans((*explain)->getNScanned());
         }
-        (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
-        (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+        else if (NULL != planInfo) {
+            *planInfo = new PlanInfo();
+            (*planInfo)->planSummary = "INTERNAL";
+        }
 
         return Status::OK();
     }

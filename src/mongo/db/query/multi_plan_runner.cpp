@@ -516,64 +516,74 @@ namespace mongo {
         }
     }
 
-    Status MultiPlanRunner::getExplainPlan(TypeExplain** explain) const {
-        if (NULL == _bestPlan.get()) {
-            return Status(ErrorCodes::InternalError, "No plan available to provide stats");
-        }
-
-        //
-        // Explain for the winner plan
-        //
-
-        scoped_ptr<PlanStageStats> stats(_bestPlan->getStats());
-        if (NULL == stats.get()) {
-            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
-        }
-
-        Status status = explainPlan(*stats, explain, true /* full details */);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // TODO Hook the cached plan if there was one.
-        // (*explain)->setOldPlan(???);
-
-        //
-        // Alternative plans' explains
-        //
-        // We get information about all the plans considered and hook them up the the main
-        // explain structure. If we fail to get any of them, we still return the main explain.
-        // Make sure we initialize the "*AllPlans" fields with the plan that was chose.
-        //
-
-        TypeExplain* chosenPlan = NULL;
-        status = explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        (*explain)->addToAllPlans(chosenPlan); // ownership xfer
-
-        size_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
-        size_t nScannedAllPlans = chosenPlan->getNScanned();
-        for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
-             it != _candidateStats.end();
-             ++it) {
-
-            TypeExplain* candidateExplain = NULL;
-            status = explainPlan(**it, &candidateExplain, false /* no full details */);
-            if (status != Status::OK()) {
-                continue;
+    Status MultiPlanRunner::getInfo(TypeExplain** explain,
+                                    PlanInfo** planInfo) const {
+        if (NULL != explain) {
+            if (NULL == _bestPlan.get()) {
+                return Status(ErrorCodes::InternalError, "No plan available to provide stats");
             }
 
-            (*explain)->addToAllPlans(candidateExplain); // ownership xfer
+            //
+            // Explain for the winner plan
+            //
 
-            nScannedObjectsAllPlans += candidateExplain->getNScannedObjects();
-            nScannedAllPlans += candidateExplain->getNScanned();
+            scoped_ptr<PlanStageStats> stats(_bestPlan->getStats());
+            if (NULL == stats.get()) {
+                return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+            }
+
+            Status status = explainPlan(*stats, explain, true /* full details */);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // TODO Hook the cached plan if there was one.
+            // (*explain)->setOldPlan(???);
+
+            //
+            // Alternative plans' explains
+            //
+            // We get information about all the plans considered and hook them up the the main
+            // explain structure. If we fail to get any of them, we still return the main explain.
+            // Make sure we initialize the "*AllPlans" fields with the plan that was chose.
+            //
+
+            TypeExplain* chosenPlan = NULL;
+            status = explainPlan(*stats, &chosenPlan, false /* no full details */);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            (*explain)->addToAllPlans(chosenPlan); // ownership xfer
+
+            size_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
+            size_t nScannedAllPlans = chosenPlan->getNScanned();
+            for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
+                 it != _candidateStats.end();
+                 ++it) {
+
+                TypeExplain* candidateExplain = NULL;
+                status = explainPlan(**it, &candidateExplain, false /* no full details */);
+                if (status != Status::OK()) {
+                    continue;
+                }
+
+                (*explain)->addToAllPlans(candidateExplain); // ownership xfer
+
+                nScannedObjectsAllPlans += candidateExplain->getNScannedObjects();
+                nScannedAllPlans += candidateExplain->getNScanned();
+            }
+
+            (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
+            (*explain)->setNScannedAllPlans(nScannedAllPlans);
         }
-
-        (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
-        (*explain)->setNScannedAllPlans(nScannedAllPlans);
+        else if (NULL != planInfo) {
+            if (NULL == _bestSolution.get()) {
+                return Status(ErrorCodes::InternalError,
+                              "no best solution available for plan info");
+            }
+            getPlanInfo(*_bestSolution, planInfo);
+        }
 
         return Status::OK();
     }

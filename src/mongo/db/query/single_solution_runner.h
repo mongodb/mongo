@@ -77,11 +77,12 @@ namespace mongo {
 
         virtual const Collection* collection() { return _collection; }
         /**
-         * Returns OK, allocating and filling in '*explain' with the details of the plan used
-         * by this runner. Caller takes ownership of '*explain'. Otherwise, return a status
-         * describing the error.
+         * Returns OK, allocating and filling in '*explain' and '*staticInfo' with the details
+         * of the plan used by this runner. Caller takes ownership of '*explain' and
+         * '*staticInfo'. Otherwise, return a status describing the error.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
         const Collection* _collection;

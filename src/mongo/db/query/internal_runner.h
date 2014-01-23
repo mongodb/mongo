@@ -43,6 +43,7 @@ namespace mongo {
     class PlanStage;
     struct QuerySolution;
     class TypeExplain;
+    struct PlanInfo;
     class WorkingSet;
 
     /**
@@ -81,14 +82,16 @@ namespace mongo {
 
         /**
          * Returns OK, allocating and filling in '*explain' with details of the plan used by
-         * this runner. Caller takes ownership of '*explain'. Otherwise, return a status
-         * describing the error.
+         * this runner. Caller takes ownership of '*explain'. Similarly fills in '*planInfo',
+         * which the caller takes ownership of. Otherwise, return a status describing the
+         * error.
          *
          * Strictly speaking, an InternalRunner's explain is never exposed, simply because an
          * InternalRunner itself is not exposed. But we implement the explain here anyway so
          * to help in debugging situations.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
         const Collection* _collection;

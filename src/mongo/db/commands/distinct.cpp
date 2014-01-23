@@ -135,7 +135,7 @@ namespace mongo {
                 }
             }
             TypeExplain* bareExplain;
-            Status res = runner->getExplainPlan(&bareExplain);
+            Status res = runner->getInfo(&bareExplain, NULL);
             if (res.isOK()) {
                 auto_ptr<TypeExplain> explain(bareExplain);
                 if (explain->isCursorSet()) {

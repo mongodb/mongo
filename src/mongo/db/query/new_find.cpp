@@ -493,6 +493,18 @@ namespace mongo {
         // to fill in explain information
         const bool isExplain = pq.isExplain();
 
+        // Try to get information about the plan which the runner
+        // will use to execute the query.
+        bool gotPlanInfo = false;
+        PlanInfo* rawInfo;
+        boost::scoped_ptr<PlanInfo> planInfo;
+        Status infoStatus = runner->getInfo(NULL, &rawInfo);
+        if (infoStatus.isOK()) {
+            gotPlanInfo = true;
+            planInfo.reset(rawInfo);
+            curop.debug().planSummary = planInfo->planSummary;
+        }
+
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
             // Add result to output buffer. This is unnecessary if explain info is requested
             if (!isExplain) {
@@ -501,6 +513,22 @@ namespace mongo {
 
             // Count the result.
             ++numResults;
+
+            // In the case of the multi plan runner, we may not be able to
+            // successfully retrieve plan info until after the query starts
+            // to run. This is because the multi plan runner doesn't know what
+            // plan it will end up using until it runs candidates and selects
+            // the best.
+            //
+            // TODO: Do we ever want to output what the MPR is comparing?
+            if (!gotPlanInfo) {
+                infoStatus = runner->getInfo(NULL, &rawInfo);
+                if (infoStatus.isOK()) {
+                    gotPlanInfo = true;
+                    planInfo.reset(rawInfo);
+                    curop.debug().planSummary = planInfo->planSummary;
+                }
+            }
 
             // Possibly note slave's position in the oplog.
             if (pq.hasOption(QueryOption_OplogReplay)) {
@@ -579,7 +607,7 @@ namespace mongo {
         if (isExplain || ctx.ctx().db()->getProfilingLevel() > 0) {
             // Ask the runner to produce explain information.
             TypeExplain* bareExplain;
-            Status res = runner->getExplainPlan(&bareExplain);
+            Status res = runner->getInfo(&bareExplain, NULL);
             if (res.isOK()) {
                 explain.reset(bareExplain);
             }

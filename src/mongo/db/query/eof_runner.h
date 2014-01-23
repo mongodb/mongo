@@ -40,6 +40,7 @@ namespace mongo {
     class CanonicalQuery;
     class DiskLoc;
     class TypeExplain;
+    struct PlanInfo;
 
     /**
      * EOFRunner is EOF immediately and doesn't do anything except return EOF and possibly die
@@ -74,9 +75,11 @@ namespace mongo {
 
         /**
          * Always returns OK, allocating and filling in '*explain' with a fake ("zeroed")
-         * collection scan plan. Caller owns '*explain', though.
+         * collection scan plan. Fills in '*planInfo' with information indicating an
+         * EOF runner. Caller owns '*explain', though.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
         boost::scoped_ptr<CanonicalQuery> _cq;

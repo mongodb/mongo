@@ -36,6 +36,21 @@
 namespace mongo {
 
     /**
+     * Contains query debug information that describes the
+     * query plan. Generally this information depends only on
+     * the planning process that happens without running the
+     * query. The exception is the multi plan runner, in which
+     * case plan selection depends on actually running the query.
+     *
+     * Currently, just a summary string describing the plan
+     * used to run the query.
+     */
+    struct PlanInfo {
+        PlanInfo() : planSummary("") { }
+        std::string planSummary;
+    };
+
+    /**
      * This class represents the layout and content of a TypeExplain runCommand,
      * the response side.
      */

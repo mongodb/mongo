@@ -576,6 +576,7 @@ namespace mongo {
         fastmodinsert = false;
         upsert = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
+        planSummary = "";
         
         exceptionInfo.reset();
         
@@ -614,6 +615,10 @@ namespace mongo {
                 s << " query: ";
                 s << query.toString();
             }
+        }
+
+        if (!planSummary.empty()) {
+            s << " planSummary: " << planSummary;
         }
         
         if ( ! updateobj.isEmpty() ) {

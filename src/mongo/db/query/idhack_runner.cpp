@@ -178,13 +178,21 @@ namespace mongo {
         _collection = NULL;
     }
 
-    Status IDHackRunner::getExplainPlan(TypeExplain** explain) const {
+    Status IDHackRunner::getInfo(TypeExplain** explain,
+                                 PlanInfo** planInfo) const {
         // The explain plan simply indicates that the plan is idhack.
-        *explain = new TypeExplain();
-        (*explain)->setIDHack(true);
-        (*explain)->setN(_nscanned);
-        (*explain)->setNScanned(_nscanned);
-        (*explain)->setNScannedObjects(_nscannedObjects);
+        if (NULL != explain) {
+            *explain = new TypeExplain();
+            (*explain)->setIDHack(true);
+            (*explain)->setN(_nscanned);
+            (*explain)->setNScanned(_nscanned);
+            (*explain)->setNScannedObjects(_nscannedObjects);
+        }
+        else if (NULL != planInfo) {
+            *planInfo = new PlanInfo();
+            (*planInfo)->planSummary = "IDHACK";
+        }
+
         return Status::OK();
     }
 

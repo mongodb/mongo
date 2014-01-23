@@ -232,6 +232,10 @@ namespace mongo {
             _query.append(b , "query");
         }
 
+        if ( !debug().planSummary.empty() ) {
+            b.append( "planSummary" , debug().planSummary );
+        }
+
         if( !_remote.empty() ) {
             b.append("client", _remote.toString());
         }

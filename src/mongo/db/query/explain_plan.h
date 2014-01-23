@@ -30,15 +30,17 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
     class TypeExplain;
+    struct PlanInfo;
 
     /**
-     * Returns OK, allocating and filling in '*explain' describing the access paths used in
+     * Returns OK, allocating and filling in '*explainOut' describing the access paths used in
      * the 'stats' tree of a given query solution. The caller has the ownership of
-     * '*explain', on success. Otherwise return an error status describing the problem.
+     * '*explainOut', on success. Otherwise return an error status describing the problem.
      *
      * If 'fullDetails' was requested, the explain will return all available information about
      * the plan, otherwise, just a summary. The fields in the summary are: 'cursor', 'n',
@@ -50,7 +52,18 @@ namespace mongo {
      *
      * TODO: Currently, only working for single-leaf plans.
      */
-    Status explainPlan(const PlanStageStats& stats, TypeExplain** explain, bool fullDetails);
+    Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails);
+
+    /**
+     * If the out-parameter 'info' is non-null, fills in '*infoOut' with information
+     * from the query solution tree 'soln' that can be determined before the query is done
+     * running. Whereas 'explainPlan(...)' above is for collecting runtime debug information,
+     * this function is for collecting static debug information that is known prior
+     * to query runtime.
+     *
+     * The caller is responsible for deleting '*infoOut'.
+     */
+    void getPlanInfo(const QuerySolution& soln, PlanInfo** infoOut);
 
     void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob);
 

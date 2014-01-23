@@ -94,7 +94,8 @@ namespace {
             return _pipeline->getContext()->ns.ns();
         }
 
-        virtual Status getExplainPlan(TypeExplain** explain) const {
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const {
             // This should never get called in practice anyway.
             return Status(ErrorCodes::InternalError,
                           "PipelineCursor doesn't implement getExplainPlan");

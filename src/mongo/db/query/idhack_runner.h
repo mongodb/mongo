@@ -43,6 +43,7 @@ namespace mongo {
     class DiskLoc;
     class PlanStage;
     class TypeExplain;
+    struct PlanInfo;
 
     /**
      */
@@ -74,9 +75,8 @@ namespace mongo {
 
         virtual const Collection* collection() { return _collection; }
 
-        /**
-         */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
         // Not owned here.
