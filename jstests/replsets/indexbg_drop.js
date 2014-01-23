@@ -71,9 +71,19 @@ masterDB.runCommand( {dropIndexes: collection, index: "*"});
 jsTest.log("Waiting on replication");
 replTest.awaitReplication();
 
+print("index list on master:");
 masterDB.system.indexes.find().forEach(printjson);
-secondDB.system.indexes.find().forEach(printjson);
 
-assert.eq(1, secondDB.system.indexes.count());
+// we need to assert.soon because the drop only marks the index for removal
+// the removal itself is asynchronous and may take another moment before it happens
+var i = 0;
+assert.soon( function() {
+    print("index list on secondary (run " + i + "):");
+    secondDB.system.indexes.find().forEach(printjson);
+    
+    i++;
+    return 1 === secondDB.system.indexes.count();
+    }, "secondary did not drop index"
+);
 
 replTest.stopSet();
