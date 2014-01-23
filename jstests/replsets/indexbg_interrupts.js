@@ -77,7 +77,11 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     jsTest.log("Waiting on replication");
     replTest.awaitReplication();
 
-    var idx_count = secondDB.system.indexes.count( {ns:dbname + "." + collection} );
-    assert(idx_count == 1 || idx_count == 0);
+    // we need to assert.soon because the drop only marks the index for removal
+    // the removal itself is asynchronous and may take another moment before it happens
+    assert.soon( function() {
+        var idx_count = secondDB.system.indexes.count( {ns:dbname + "." + collection} );
+        return idx_count == 1 || idx_count == 0;
+    }, "secondary did not drop index for " + dc.toString());
 }
 jsTest.log("indexbg-interrupts.js done");
