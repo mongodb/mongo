@@ -206,15 +206,13 @@ namespace mongo {
          *
          * If updateFields is empty then it was replacement and/or we need to check all fields
          */
-        inline Status validate(const bool idRequired,
-                               const BSONObj& original,
+        inline Status validate(const BSONObj& original,
                                const FieldRefSet& updatedFields,
                                const mb::Document& updated,
                                const std::vector<FieldRef*>* immutableAndSingleValueFields,
                                const ModifierInterface::Options& opts) {
 
             LOG(3) << "update validate options -- "
-                   << " id required: " << idRequired
                    << " updatedFields: " << updatedFields
                    << " immutableAndSingleValueFields.size:"
                    << (immutableAndSingleValueFields ? immutableAndSingleValueFields->size() : 0)
@@ -300,7 +298,7 @@ namespace mongo {
                 if (!newElem.ok()) {
                     if (original.isEmpty()) {
                         // If the _id is missing and not required, then skip this check
-                        if (!(current.dottedField() == idFieldName && idRequired))
+                        if (!(current.dottedField() == idFieldName))
                             return Status(ErrorCodes::NoSuchKey,
                                           mongoutils::str::stream()
                                           << "After applying the update, the new"
@@ -310,8 +308,7 @@ namespace mongo {
 
                     }
                     else {
-                        if (current.dottedField() != idFieldName ||
-                                (current.dottedField() != idFieldName && idRequired))
+                        if (current.dottedField() != idFieldName)
                             return Status(ErrorCodes::ImmutableField,
                                           mongoutils::str::stream()
                                           << "After applying the update to the document with "
@@ -416,6 +413,35 @@ namespace mongo {
             return Status::OK();
         }
 
+        Status ensureIdAndFirst(mb::Document& doc) {
+            mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
+
+            // Move _id as first element if it exists
+            if (idElem.ok()) {
+                if (idElem.leftSibling().ok()) {
+                    Status s = idElem.remove();
+                    if (!s.isOK())
+                        return s;
+                    s = doc.root().pushFront(idElem);
+                    if (!s.isOK())
+                        return s;
+                }
+            }
+            else {
+                // Create _id if the document does not currently have one.
+                idElem = doc.makeElementNewOID(idFieldName);
+                if (!idElem.ok())
+                    return Status(ErrorCodes::BadValue,
+                                  "Could not create new _id ObjectId element.",
+                                  17268);
+                Status s = doc.root().pushFront(idElem);
+                if (!s.isOK())
+                    return s;
+            }
+
+            return Status::OK();
+
+        }
     } // namespace
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug) {
@@ -653,17 +679,8 @@ namespace mongo {
                 uasserted(16837, status.reason());
             }
 
-            const bool idRequired = collection->getIndexCatalog()->haveIdIndex();
-
-            // Move _id as first element
-            mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
-            if (idElem.ok()) {
-                if (idElem.leftSibling().ok()) {
-                    uassertStatusOK(idElem.remove());
-                    uassertStatusOK(doc.root().pushFront(idElem));
-                }
-            }
-
+            // Ensure _id exists and is first
+            uassertStatusOK(ensureIdAndFirst(doc));
 
             // If the driver applied the mods in place, we can ask the mutable for what
             // changed. We call those changes "damages". :) We use the damages to inform the
@@ -688,8 +705,7 @@ namespace mongo {
                     if (lifecycle)
                         immutableFields = lifecycle->getImmutableFields();
 
-                    uassertStatusOK(validate(idRequired,
-                                             oldObj,
+                    uassertStatusOK(validate(oldObj,
                                              updatedFields,
                                              doc,
                                              immutableFields,
@@ -832,30 +848,8 @@ namespace mongo {
             uasserted(16836, status.reason());
         }
 
-        // If the collection doesn't exist or has an _id index, then an _id is required
-        const bool idRequired = collection ? collection->getIndexCatalog()->haveIdIndex() : true;
-
-        mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
-
-        // Move _id as first element if it exists
-        if (idElem.ok()) {
-            if (idElem.leftSibling().ok()) {
-                uassertStatusOK(idElem.remove());
-                uassertStatusOK(doc.root().pushFront(idElem));
-            }
-        }
-        else {
-            // Create _id if an _id is required but the document does not currently have one.
-            if (idRequired) {
-                idElem = doc.makeElementNewOID(idFieldName);
-                if (!idElem.ok())
-                    uasserted(17268, "Could not create new _id ObjectId element.");
-                Status s = doc.root().pushFront(idElem);
-                if (!s.isOK())
-                    uasserted(17269,
-                            str::stream() << "Could not create new _id for insert: " << s.reason());
-            }
-        }
+        // Ensure _id exists and is first
+        uassertStatusOK(ensureIdAndFirst(doc));
 
         // Validate that the object replacement or modifiers resulted in a document
         // that contains all the immutable keys and can be stored.
@@ -864,8 +858,7 @@ namespace mongo {
             if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
 
-            uassertStatusOK(validate(idRequired,
-                                     original,
+            uassertStatusOK(validate(original,
                                      updatedFields,
                                      doc,
                                      immutableFields,

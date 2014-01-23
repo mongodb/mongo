@@ -162,7 +162,8 @@ namespace mongo {
         if ( _indexCatalog.findIdIndex() ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
-                                            "Collection::insertDocument got document without _id" );
+                                            str::stream() << "Collection::insertDocument got "
+                                            "document without _id for ns:" << _ns.ns() );
             }
         }
 
