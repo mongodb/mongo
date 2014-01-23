@@ -623,12 +623,17 @@ function CollectionMetadataGenerator(options) {
         "capped" : true,
         "size" : 100000,
         "max" : 2000,
+        "usePowerOf2Sizes" : true,
         //"autoIndexId" : false // XXX: this doesn't exist in 2.4
     }
+    // We need to explicitly enable usePowerOf2Sizes, since it's the default in 2.4 but not in 2.6
+    var normalCollectionMetadata = {
+        "usePowerOf2Sizes" : true
+    };
 
     return {
         "get" : function () {
-            return capped ? cappedCollectionMetadata : {};
+            return capped ? cappedCollectionMetadata : normalCollectionMetadata;
         }
     }
 }

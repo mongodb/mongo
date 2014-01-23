@@ -29,7 +29,7 @@ createCollectionWithData = function (db, collectionName, dataGenerator) {
 
     print("db.createCollection(\"" + collectionName + "\", " +
           JSON.stringify(dataGenerator.collectionMetadata.get()) + ");");
-    db.createCollection(collectionName, dataGenerator.collectionMetadata.get());
+    assert.eq(db.createCollection(collectionName, dataGenerator.collectionMetadata.get()).ok, 1);
 
     var collection = db.getCollection(collectionName);
 
