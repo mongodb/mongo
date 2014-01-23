@@ -132,8 +132,12 @@ assert.eq(coll.count(), 0);
 // Successful bulk insert on two hosts, host changes before gle (error contacting host)
 coll.remove({});
 coll.insert([{ _id : 1 }, { _id : -1 }]);
+// Wait for write to be written to shards before shutting it down.
+printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
+
 st.rs0.stop(st.rs0.getPrimary(), true); // wait for stop
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
+// Should get an error about contacting dead host.
 assert(!gle.ok);
 assert(gle.errmsg);
 assert.eq(coll.count({ _id : 1 }), 1);
