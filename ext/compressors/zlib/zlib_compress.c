@@ -142,7 +142,6 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	ZLIB_COMPRESSOR *zlib_compressor;
 	ZLIB_OPAQUE opaque;
 	z_stream zs;
-	size_t result_len;
 	int ret;
 
 	zlib_compressor = (ZLIB_COMPRESSOR *)compressor;
@@ -164,12 +163,7 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_out = (uint32_t)dst_len - 1;
 	if ((ret = deflate(&zs, Z_FINISH)) == Z_STREAM_END) {
 		*compression_failed = 0;
-		result_len = zs.total_out;
-		/* Append 1: there is a single block to decompress. */
-#if 0
-		dst[result_len++] = 1;
-#endif
-		*result_lenp = result_len;
+		*result_lenp = zs.total_out;
 	} else
 		*compression_failed = 1;
 
@@ -331,7 +325,7 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.next_out = dst;
 	zs.avail_out = (uint32_t)dst_len;
 	if ((ret = inflate(&zs, Z_FINISH)) == Z_STREAM_END) {
-		*result_lenp = dst_len - zs.avail_out;
+		*result_lenp = zs.total_out;
 		ret = Z_OK;
 	}
 
