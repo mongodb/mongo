@@ -626,7 +626,7 @@ function CollectionMetadataGenerator(options) {
         "usePowerOf2Sizes" : true,
         //"autoIndexId" : false // XXX: this doesn't exist in 2.4
     }
-    // We need to explicitly enable usePowerOf2Sizes, since it's the default in 2.4 but not in 2.6
+    // We need to explicitly enable usePowerOf2Sizes, since it's the default in 2.6 but not in 2.4
     var normalCollectionMetadata = {
         "usePowerOf2Sizes" : true
     };
