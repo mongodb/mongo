@@ -206,7 +206,7 @@ namespace {
             }
             else if (iterator->_dottedName == "port") {
                 ASSERT_EQUALS(iterator->_singleName, "port");
-                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_type, moe::Int);
                 ASSERT_EQUALS(iterator->_description, "server port. Can also use --host hostname:port");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
