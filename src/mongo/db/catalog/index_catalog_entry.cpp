@@ -103,8 +103,11 @@ namespace mongo {
             return;
         NamespaceDetails* nsd = _collection->details();
         int idxNo = _indexNo();
-        if ( nsd->setIndexIsMultikey( idxNo, true ) )
+        if ( nsd->setIndexIsMultikey( idxNo, true ) ) {
+            LOG(1) << _collection->ns().ns() << ": clearing plan cache - index "
+                   << _descriptor->keyPattern() << " set to multi key.";
             _collection->infoCache()->clearQueryCache();
+        }
         _isMultikey = true;
     }
 

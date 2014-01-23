@@ -308,9 +308,14 @@ namespace mongo {
          */
         static bool shouldCacheQuery(const CanonicalQuery& query);
 
-        PlanCache() : _cache(kMaxCacheSize) { };
+        /**
+         * If omitted, namespace set to empty string.
+         */
+        PlanCache();
 
-        ~PlanCache() { };
+        PlanCache(const std::string& ns);
+
+        ~PlanCache();
 
         /**
          * Record solutions for query. Best plan is first element in list.
@@ -419,6 +424,11 @@ namespace mongo {
          * Starts at 0.
          */
         AtomicInt32 _writeOperations;
+
+        /**
+         * Full namespace of collection.
+         */
+        std::string _ns;
     };
 
 }  // namespace mongo

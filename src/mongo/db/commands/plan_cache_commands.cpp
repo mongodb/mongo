@@ -257,14 +257,16 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        return clear(planCache);
+        return clear(ns, planCache);
     }
 
     // static
-    Status PlanCacheClear::clear(PlanCache* planCache) {
+    Status PlanCacheClear::clear(const std::string& ns, PlanCache* planCache) {
         invariant(planCache);
 
         planCache->clear();
+
+        LOG(1) << ns << ": cleared plan cache";
 
         return Status::OK();
     }
@@ -298,6 +300,11 @@ namespace mongo {
         if (!result.isOK()) {
             return result;
         }
+
+        LOG(1) << ns << ": removed plan cache entry - " << cq->getQueryObj().toString()
+               << "(sort: " << cq->getParsed().getSort()
+               << "; projection: " << cq->getParsed().getProj() << ")";
+
         return Status::OK();
     }
 

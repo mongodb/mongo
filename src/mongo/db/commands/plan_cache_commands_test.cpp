@@ -160,7 +160,7 @@ namespace {
         ASSERT_EQUALS(getShapes(planCache).size(), 1U);
 
         // Clear cache and confirm number of keys afterwards.
-        ASSERT_OK(PlanCacheClear::clear(&planCache));
+        ASSERT_OK(PlanCacheClear::clear(ns, &planCache));
         ASSERT_EQUALS(getShapes(planCache).size(), 0U);
     }
 

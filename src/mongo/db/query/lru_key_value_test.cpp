@@ -95,7 +95,8 @@ namespace {
         int maxSize = 10;
         LRUKeyValue<int, int> cache(maxSize);
         for (int i = 0; i < maxSize; ++i) {
-            cache.add(i, new int(i));
+            std::auto_ptr<int> evicted = cache.add(i, new int(i));
+            ASSERT(NULL == evicted.get());
         }
         ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -107,8 +108,10 @@ namespace {
         }
 
         // Adding another entry causes an eviction.
-        cache.add(maxSize + 1, new int(maxSize + 1));
+        std::auto_ptr<int> evicted = cache.add(maxSize + 1, new int(maxSize + 1));
         ASSERT_EQUALS(cache.size(), (size_t)maxSize);
+        ASSERT(NULL != evicted.get());
+        ASSERT_EQUALS(*evicted, evictKey);
 
         // Check that the least recently accessed has been evicted.
         for (int i = 0; i < maxSize; ++i) {
@@ -131,7 +134,8 @@ namespace {
         int maxSize = 10;
         LRUKeyValue<int, int> cache(maxSize);
         for (int i = 0; i < maxSize; ++i) {
-            cache.add(i, new int(i));
+            std::auto_ptr<int> evicted = cache.add(i, new int(i));
+            ASSERT(NULL == evicted.get());
         }
         ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -141,7 +145,8 @@ namespace {
 
         // Evict all but one of the original entries.
         for (int i = maxSize; i < (maxSize + maxSize - 1); ++i) {
-            cache.add(i, new int(i));
+            std::auto_ptr<int> evicted = cache.add(i, new int(i));
+            ASSERT(NULL != evicted.get());
         }
         ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 

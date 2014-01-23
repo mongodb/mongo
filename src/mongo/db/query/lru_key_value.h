@@ -30,6 +30,7 @@
 
 #include <boost/unordered_map.hpp>
 #include <list>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/util/assert_util.h"
@@ -37,7 +38,7 @@
 namespace mongo {
 
     /**
-     * A key-valye store structure with a least recently used (LRU) replacement
+     * A key-value store structure with a least recently used (LRU) replacement
      * policy. The number of entries allowed in the kv-store is set as a constant
      * upon construction.
      *
@@ -85,8 +86,11 @@ namespace mongo {
          *
          * The least recently used entry is evicted if the
          * kv-store is full prior to the add() operation.
+         *
+         * If an entry is evicted, it will be returned in
+         * an auto_ptr for the caller to use before disposing.
          */
-        void add(const K& key, V* entry) {
+        std::auto_ptr<V> add(const K& key, V* entry) {
             // If the key already exists, delete it first.
             KVMapConstIt i = _kvMap.find(key);
             if (i != _kvMap.end()) {
@@ -104,12 +108,20 @@ namespace mongo {
             // If the store has grown beyond its allowed size,
             // evict the least recently used entry.
             if (_currentSize > _maxSize) {
-                delete _kvList.back().second;
+                V* evictedEntry = _kvList.back().second;
+                invariant(evictedEntry);
+
                 _kvMap.erase(_kvList.back().first);
                 _kvList.pop_back();
                 _currentSize--;
                 invariant(_currentSize == _maxSize);
+
+                // Pass ownership of evicted entry to caller.
+                // If caller chooses to ignore this auto_ptr,
+                // the evicted entry will be deleted automatically.
+                return std::auto_ptr<V>(evictedEntry);
             }
+            return std::auto_ptr<V>();
         }
 
         /**

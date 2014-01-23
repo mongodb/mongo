@@ -131,7 +131,7 @@ namespace mongo {
         /**
          * Clears collection's plan cache.
          */
-        static Status clear(PlanCache* planCache);
+        static Status clear(const std::string& ns, PlanCache* planCache);
     };
 
     /**

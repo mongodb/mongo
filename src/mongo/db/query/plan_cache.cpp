@@ -273,6 +273,12 @@ namespace mongo {
     // PlanCache
     //
 
+    PlanCache::PlanCache() : _cache(kMaxCacheSize) { }
+
+    PlanCache::PlanCache(const std::string& ns) : _cache(kMaxCacheSize), _ns(ns) { }
+
+    PlanCache::~PlanCache() { }
+
     Status PlanCache::add(const CanonicalQuery& query, const std::vector<QuerySolution*>& solns,
                           PlanRankingDecision* why) {
         invariant(why);
@@ -314,7 +320,14 @@ namespace mongo {
         }
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        _cache.add(query.getPlanCacheKey(), entry);
+        std::auto_ptr<PlanCacheEntry> evictedEntry = _cache.add(query.getPlanCacheKey(), entry);
+
+        if (NULL != evictedEntry.get()) {
+            LOG(1) << _ns << ": plan cache maximum size exceeded - "
+                   << "removed least recently used entry "
+                   << evictedEntry->toString();
+        }
+
         return Status::OK();
     }
 
@@ -399,6 +412,8 @@ namespace mongo {
             // If we have enough feedback, then use it to determine whether
             // we should get rid of the cached solution.
             if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get())) {
+                LOG(1) << _ns << ": removing plan cache entry " << entry->toString()
+                       << " - detected degradation in performance of cached solution.";
                 _cache.remove(ck);
             }
         }
@@ -461,6 +476,8 @@ namespace mongo {
         if (_writeOperations.addAndFetch(1) < kPlanCacheMaxWriteOperations) {
             return;
         }
+        LOG(1) << _ns << ": clearing collection plan cache - " << kPlanCacheMaxWriteOperations
+               << " write operations on detected since last refresh.";
         clear();
     }
 
