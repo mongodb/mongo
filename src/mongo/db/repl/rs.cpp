@@ -147,6 +147,8 @@ namespace {
             OpTime::setLast( lastOp[ "ts" ].date() );
         }
 
+        // Generate new election unique id
+        elect.setElectionId(OID::gen());
         changeState(MemberState::RS_PRIMARY);
 
         // This must be done after becoming primary but before releasing the write lock. This adds

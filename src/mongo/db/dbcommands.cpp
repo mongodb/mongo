@@ -1368,6 +1368,15 @@ namespace mongo {
         bool _impersonation;
     };
 
+    namespace {
+        void appendGLEHelperData(BSONObjBuilder& bob, const OpTime& opTime, const OID& oid) {
+            BSONObjBuilder subobj(bob.subobjStart("$gleHelpers"));
+            subobj.appendTimestamp("lastOptime", opTime.asDate());
+            subobj.appendOID("electionId", const_cast<OID*>(&oid));
+            subobj.done();
+        }
+    }
+
     /**
      * this handles
      - auth
@@ -1522,6 +1531,15 @@ namespace mongo {
         }
 
         appendCommandStatus(result, retval, errmsg);
+        
+        // For commands from mongos, append some info to help getLastError(w) work.
+        if (theReplSet) {
+            // Detect mongos connections by looking for setShardVersion to have been run previously
+            // on this connection.
+            if (!shardingState.needCollectionMetadata(dbname)) {
+                appendGLEHelperData(result, client.getLastOp(), theReplSet->getElectionId());
+            }
+        }
         return;
     }
 

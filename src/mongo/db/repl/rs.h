@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/bson/oid.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -177,6 +178,7 @@ namespace mongo {
     };
 
     class Consensus {
+    private:
         ReplSetImpl &rs;
         struct LastYea {
             LastYea() : when(0), who(0xffffffff) { }
@@ -190,6 +192,10 @@ namespace mongo {
         void _electSelf();
         bool weAreFreshest(bool& allUp, int& nTies);
         bool sleptLast; // slept last elect() pass
+
+        // This is a unique id that is changed each time we transition to PRIMARY, as the
+        // result of an election.
+        OID _electionId;
     public:
         Consensus(ReplSetImpl *t) : rs(*t) {
             sleptLast = false;
@@ -207,6 +213,9 @@ namespace mongo {
         void electSelf();
         void electCmdReceived(BSONObj, BSONObjBuilder*);
         void multiCommand(BSONObj cmd, list<Target>& L);
+
+        OID getElectionId() const { return _electionId; }
+        void setElectionId(OID oid) { _electionId = oid; }
     };
 
     /**
@@ -382,6 +391,8 @@ namespace mongo {
         void veto(const string& host, unsigned secs=10);
         bool gotForceSync();
         void goStale(const Member* m, const BSONObj& o);
+
+        OID getElectionId() const { return elect.getElectionId(); }
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();

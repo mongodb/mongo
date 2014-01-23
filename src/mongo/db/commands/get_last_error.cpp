@@ -31,7 +31,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/write_concern.h"
 
 namespace mongo {
@@ -117,8 +119,9 @@ namespace mongo {
             // 4.  Finally, we actually enforce the write concern.  All errors *except* timeout are
             // reported with ok : 0.0, to match legacy behavior.
             //
-            // There is a special case when "wOpTime" is explicitly provided by the user - in this
-            // we *only* enforce the write concern if it is valid.
+            // There is a special case when "wOpTime" and "wElectionId" are explicitly provided by 
+            // the client (mongos) - in this case we *only* enforce the write concern if it is 
+            // valid.
             //
             // We always need to either report "err" (if ok : 1) or "errmsg" (if ok : 0), even if
             // err is null.
@@ -133,11 +136,36 @@ namespace mongo {
             // for sharding; also useful in general for debugging
             result.appendNumber( "connectionId" , c.getConnectionId() );
 
+            OpTime lastOpTime;
+            BSONField<OpTime> wOpTimeField("wOpTime");
+            FieldParser::FieldState extracted = FieldParser::extract(cmdObj, wOpTimeField, 
+                                                                     &lastOpTime, &errmsg);
+            if (!extracted) {
+                result.append("badGLE", cmdObj);
+                appendCommandStatus(result, false, errmsg);
+                return false;
+            }
+            bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
+            if (!lastOpTimePresent) {
+                // Use the client opTime if no wOpTime is specified
+                lastOpTime = cc().getLastOp();
+            }
+            
+            OID electionId;
+            BSONField<OID> wElectionIdField("wElectionId");
+            extracted = FieldParser::extract(cmdObj, wElectionIdField, 
+                                             &electionId, &errmsg);
+            if (!extracted) {
+                result.append("badGLE", cmdObj);
+                appendCommandStatus(result, false, errmsg);
+                return false;
+            }
+
+            bool electionIdPresent = extracted != FieldParser::FIELD_NONE;
             bool errorOccurred = false;
-            BSONObj writeConcernDoc = cmdObj;
 
             // Errors aren't reported when wOpTime is used
-            if ( cmdObj["wOpTime"].eoo() ) {
+            if ( !lastOpTimePresent ) {
                 if ( le->nPrev != 1 ) {
                     errorOccurred = LastError::noError.appendSelf( result, false );
                     le->appendSelfStatus( result );
@@ -147,9 +175,12 @@ namespace mongo {
                 }
             }
 
-            // Use the default options if we have no gle options aside from wOpTime
-            bool useDefaultGLEOptions = cmdObj.nFields() == 1
-                                        || ( cmdObj.nFields() == 2 && !cmdObj["wOpTime"].eoo() );
+            BSONObj writeConcernDoc = cmdObj;
+            // Use the default options if we have no gle options aside from wOpTime/wElectionId
+            const int nFields = cmdObj.nFields();
+            bool useDefaultGLEOptions = (nFields == 1) || 
+                (nFields == 2 && lastOpTimePresent) ||
+                (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
             if ( useDefaultGLEOptions && getLastErrorDefault ) {
                 writeConcernDoc = *getLastErrorDefault;
@@ -174,7 +205,7 @@ namespace mongo {
 
             // Don't wait for replication if there was an error reported - this matches 2.4 behavior
             if ( errorOccurred ) {
-                dassert( cmdObj["wOpTime"].eoo() );
+                dassert( !lastOpTimePresent );
                 return true;
             }
 
@@ -182,20 +213,31 @@ namespace mongo {
             dassert( result.asTempObj()["err"].eoo() );
             dassert( result.asTempObj()["code"].eoo() );
 
-            OpTime wOpTime;
-            if ( cmdObj["wOpTime"].type() == Timestamp ) {
-                // Get the wOpTime from the command if it exists
-                wOpTime = OpTime( cmdObj["wOpTime"].date() );
-            }
-            else {
-                // Use the client opTime if no wOpTime is specified
-                wOpTime = cc().getLastOp();
+            // If we got an electionId, make sure it matches
+            if (electionIdPresent) {
+                if (!theReplSet) {
+                    // Ignore electionIds of 0 from mongos.
+                    if (electionId != OID()) {
+                        errmsg = "wElectionId passed but no replication active";
+                        result.append("code", ErrorCodes::NoReplicationEnabled);
+                        return false;
+                    }
+                } 
+                else {
+                    if (electionId != theReplSet->getElectionId()) {
+                        LOG(3) << "oid passed in is " << electionId
+                               << ", but our id is " << theReplSet->getElectionId();
+                        errmsg = "election occurred after write";
+                        result.append("code", ErrorCodes::OperationIncomplete);
+                        return false;
+                    }
+                }
             }
 
             cc().curop()->setMessage( "waiting for write concern" );
 
             WriteConcernResult wcResult;
-            status = waitForWriteConcern( writeConcern, wOpTime, &wcResult );
+            status = waitForWriteConcern( writeConcern, lastOpTime, &wcResult );
             wcResult.appendTo( &result );
 
             // For backward compatibility with 2.4, wtimeout returns ok : 1.0
