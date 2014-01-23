@@ -73,7 +73,7 @@ namespace mongo {
     void ClientInfo::addHostOpTimes( const HostOpTimeMap& hostOpTimes ) {
         for ( HostOpTimeMap::const_iterator it = hostOpTimes.begin();
             it != hostOpTimes.end(); ++it ) {
-            _cur->hostOpTimes[it->first.toString()] = it->second;
+            _cur->hostOpTimes[it->first] = it->second;
         }
     }
 

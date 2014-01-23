@@ -1567,8 +1567,7 @@ namespace mongo {
                 Status status = enforceLegacyWriteConcern( &dispatcher,
                                                            dbName,
                                                            cmdObj,
-                                                           convertMap( ClientInfo::get()
-                                                               ->getPrevHostOpTimes() ),
+                                                           ClientInfo::get()->getPrevHostOpTimes(),
                                                            &wcResponses );
 
                 // Don't forget about our last hosts, reset the client info
@@ -1644,18 +1643,6 @@ namespace mongo {
                         Status( ErrorCodes::WriteConcernFailed,
                                 "multiple write concern errors occurred" ) );
                 }
-            }
-
-        private:
-
-            HostOpTimeMap convertMap( const map<string, OpTime>& rawMap ) {
-                HostOpTimeMap parsedMap;
-                for ( map<string, OpTime>::const_iterator it = rawMap.begin(); it != rawMap.end();
-                    ++it ) {
-                    string errMsg;
-                    parsedMap[ConnectionString::parse( it->first, errMsg )] = it->second;
-                }
-                return parsedMap;
             }
 
         } cmdGetLastError;

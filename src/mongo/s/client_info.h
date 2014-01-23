@@ -91,7 +91,7 @@ namespace mongo {
         /**
          * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
          */
-        const map<string, OpTime>& getPrevHostOpTimes() const {
+        const HostOpTimeMap& getPrevHostOpTimes() const {
             return _prev->hostOpTimes;
         }
 
@@ -140,7 +140,7 @@ namespace mongo {
             }
 
             std::set<string> shardHostsWritten;
-            std::map<string, OpTime> hostOpTimes;
+            HostOpTimeMap hostOpTimes;
         };
 
         // we use _a and _b to store info from the current request and the previous request
