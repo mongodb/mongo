@@ -872,6 +872,8 @@ if nix:
     if debugBuild:
         if not optBuild:
             env.Append( CCFLAGS=["-fstack-protector"] )
+            env.Append( LINKFLAGS=["-fstack-protector"] )
+            env.Append( SHLINKFLAGS=["-fstack-protector"] )
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
         env.Append( CPPDEFINES=["_DEBUG"] );
 
