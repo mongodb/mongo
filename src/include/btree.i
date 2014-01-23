@@ -592,11 +592,23 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-		ret = (page->type == WT_PAGE_ROW_LEAF &&
+		/*
+		 * Before the first attempt at forced eviction, try splitting
+		 * the page in memory.
+		 */
+		if (page->type == WT_PAGE_ROW_LEAF &&
 		    !F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) &&
-		    __wt_eviction_force_check(session, page)) ?
-		    __wt_split_page_inmem(session, page) :
-		    __wt_evict_page(session, page);
+		    __wt_eviction_force_check(session, page)) {
+			if ((ret = __wt_split_page_inmem(session, page)) == 0) {
+				WT_STAT_FAST_CONN_INCR(
+				    session, cache_inmem_split);
+				WT_STAT_FAST_DATA_INCR(
+				    session, cache_inmem_split);
+				return (0);
+			} else if (ret == EBUSY)
+				ret = 0;
+		}
+		WT_TRET(__wt_evict_page(session, page));
 		if (ret == 0)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -682,7 +694,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_eviction_force --
- *      Check if the current transaction permits forced eviction of a page.
+ *	Check if the current transaction permits forced eviction of a page.
  */
 static inline int
 __wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -706,7 +718,7 @@ __wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_eviction_force --
- *      Forcefully evict a page, if possible.
+ *	Forcefully evict a page, if possible.
  */
 static inline int
 __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -856,7 +868,7 @@ __wt_lex_compare_skip(
 
 /*
  * __wt_btree_mergeable --
- *      Determines whether the given page is a candidate for merging.
+ *	Determines whether the given page is a candidate for merging.
  */
 static inline int
 __wt_btree_mergeable(WT_PAGE *page)
