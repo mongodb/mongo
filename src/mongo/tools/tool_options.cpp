@@ -75,9 +75,8 @@ namespace mongo {
         options->addOptionChaining("host", "host,h", moe::String,
                 "mongo host to connect to ( <set name>/s1,s2 for sets)");
 
-        options->addOptionChaining("port", "port", moe::Int,
-                "server port. Can also use --host hostname:port")
-                                  .validRange(0, 65535);
+        options->addOptionChaining("port", "port", moe::String,
+                "server port. Can also use --host hostname:port");
 
         options->addOptionChaining("ipv6", "ipv6", moe::Switch,
                 "enable IPv6 support (disabled by default)");
