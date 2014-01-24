@@ -3273,16 +3273,16 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if HE_VERSION_MAJOR != 2 || HE_VERSION_MINOR != 0
+#if HE_VERSION_MAJOR != 2 || HE_VERSION_MINOR != 1
 	ERET(wtext, NULL, EINVAL,
-	    "unsupported Levyx/Helium header file %d.%d, expected version 2.0",
+	    "unsupported Levyx/Helium header file %d.%d, expected version 2.1",
 	    HE_VERSION_MAJOR, HE_VERSION_MINOR);
 #endif
 	he_version(&vmajor, &vminor);
-	if (vmajor != 2 || vminor != 0)
+	if (vmajor != 2 || vminor != 1)
 		ERET(wtext, NULL, EINVAL,
 		    "unsupported Levyx/Helium library version %d.%d, expected "
-		    "version 2.0", vmajor, vminor);
+		    "version 2.1", vmajor, vminor);
 
 	/* Allocate and initialize the local data-source structure. */
 	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
