@@ -293,6 +293,18 @@ namespace mongo {
             }
         } dropIndexesCmd;
 
+        class CreateIndexesCmd : public AllShardsCollectionCommand {
+        public:
+            CreateIndexesCmd() :  AllShardsCollectionCommand("createIndexes") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::createIndex);
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+            }
+        } createIndexesCmd;
+
         class ReIndexCmd : public AllShardsCollectionCommand {
         public:
             ReIndexCmd() :  AllShardsCollectionCommand("reIndex") {}
