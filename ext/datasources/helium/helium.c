@@ -154,13 +154,14 @@ typedef struct __wt_source {
 
 	uint64_t append_recno;			/* Allocation record number */
 
-	int	 config_recno;			/* config "key_format=r" */
 	int	 config_bitfield;		/* config "value_format=#t" */
+	int	 config_compress;		/* config "helium_o_compress" */
+	int	 config_recno;			/* config "key_format=r" */
 
 	/*
 	 * Each WiredTiger object has a "primary" namespace in a Helium store
 	 * plus a "cache" namespace, which has not-yet-resolved updates.  There
-	 * is a dirty flag so we can ignore the cache until it's used.
+	 * is a dirty flag so read-only data sets can ignore the cache.
 	 */
 	he_t	he;				/* Underlying Helium object */
 	he_t	he_cache;			/* Underlying Helium cache */
@@ -2015,7 +2016,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
     WT_SESSION *session, const char *uri, WT_CONFIG_ARG *config)
 {
 	DATA_SOURCE *ds;
-	WT_CONFIG_ITEM a, b;
+	WT_CONFIG_ITEM a, b, c;
 	WT_EXTENSION_API *wtext;
 	int exclusive, ret = 0;
 	char value[1024];
@@ -2053,15 +2054,27 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 			    wtext->strerror(ret));
 	}
 
+	/* Get the compression configuration. */
+	if ((ret = wtext->config_get(
+	    wtext, session, config, "helium_o_compress", &c)) != 0) {
+		if (ret == WT_NOTFOUND)
+			c.val = 0;
+		else
+			ERET(wtext, session, ret,
+			    "helium_o_compress configuration: %s",
+			    wtext->strerror(ret));
+	}
+
 	/*
 	 * Create a new reference using insert (which fails if the record
-	 * already exists).  If that succeeds, we just used up a unique ID,
-	 * update the master ID record.
+	 * already exists).
 	 */
 	(void)snprintf(value, sizeof(value),
-	    "version=(major=%d,minor=%d),key_format=%.*s,value_format=%.*s",
+	    "wiredtiger_helium_version=(major=%d,minor=%d),"
+	    "key_format=%.*s,value_format=%.*s,"
+	    "helium_o_compress=%d",
 	    WIREDTIGER_HELIUM_MAJOR, WIREDTIGER_HELIUM_MINOR,
-	    (int)a.len, a.str, (int)b.len, b.str);
+	    (int)a.len, a.str, (int)b.len, b.str, c.val ? 1 : 0);
 	if ((ret = wtext->metadata_insert(wtext, session, uri, value)) == 0)
 		return (0);
 	if (ret == WT_DUPLICATE_KEY)
@@ -2160,6 +2173,13 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			    wtext->strerror(ret));
 		ws->config_bitfield =
 		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
+
+		if ((ret = wtext->config_strget(
+		    wtext, session, value, "helium_o_compress", &v)) != 0)
+			EMSG_ERR(wtext, session, ret,
+			    "helium_o_compress configuration: %s",
+			    wtext->strerror(ret));
+		ws->config_compress = v.val ? 1 : 0;
 
 		/*
 		 * If it's a record-number key, read the last record from the
@@ -2564,8 +2584,17 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 		} else {
 			r->val = cp->v;
 			r->val_len = cp->len;
-			if ((ret = he_update(ws->he, r)) == 0)
+			/*
+			 * If compression configured for this datastore, set the
+			 * compression flag, we're updating the "real" store.
+			 */
+			if (ws->config_compress)
+				r->flags |= HE_I_COMPRESS;
+			ret = he_update(ws->he, r);
+			r->flags = 0;
+			if (ret == 0)
 				continue;
+
 			ERET(wtext, NULL, ret,
 			    "he_update: %s", he_strerror(ret));
 		}
@@ -3257,6 +3286,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		helium_terminate		/* termination */
 	};
 	static const char *session_create_opts[] = {
+		"helium_o_compress=0",		/* HE_I_COMPRESS */
 		"helium_o_truncate=0",		/* HE_O_TRUNCATE */
 		NULL
 	};

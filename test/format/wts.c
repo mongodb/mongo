@@ -280,7 +280,8 @@ wts_create(void)
 	/* Configure LSM and data-sources. */
 	if (DATASOURCE("helium"))
 		p += snprintf(p, (size_t)(end - p),
-		    ",type=helium,helium_o_truncate=1");
+		    ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
+		    (int)MMRAND(0, 1));
 
 	if (DATASOURCE("kvsbdb"))
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");

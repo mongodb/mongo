@@ -90,7 +90,8 @@ the following additional configuration strings are supported:
 
 <table>
 @hrow{String, Type, Meaning}
-@row{helium_open_o_truncate, boolean, HE_O_TRUNCATE flag}
+@row{helium_o_compress, boolean, HE_I_COMPRESS flag}
+@row{helium_o_truncate, boolean, HE_O_TRUNCATE flag}
 </table>
 
 See the Helium device documentation for details on their use.
