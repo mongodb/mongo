@@ -104,6 +104,12 @@ namespace mongo {
         static bool blockInMemory(const void* start);
 
         /**
+         * This is a OS specific call, which determines whether files should be zero-filled at 
+         * allocation time in order to avoid Microsoft KB 2731284.
+         */
+        static bool isDataFileZeroingNeeded();
+
+        /**
          * @return a pointer aligned to the start of the page the provided pointer belongs to.
          *
          * NOTE requires blockCheckSupported() == true

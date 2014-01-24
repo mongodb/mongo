@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <psapi.h>
+#include <VersionHelpers.h>
 
 #include "mongo/util/processinfo.h"
 
@@ -98,7 +99,7 @@ namespace mongo {
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         BSONObjBuilder bExtra;
         stringstream verstr;
-        OSVERSIONINFOEX osvi;   // os version 
+        OSVERSIONINFOEX osvi;   // os version
         MEMORYSTATUSEX mse;     // memory stats
         SYSTEM_INFO ntsysinfo;  //system stats
 
@@ -277,6 +278,19 @@ namespace mongo {
         if ( result )
             if ( wsinfo.VirtualAttributes.Valid )
                 return true;
+        return false;
+    }
+
+    bool ProcessInfo::isDataFileZeroingNeeded() {
+        // Windows 6.1 is either Windows 7 or Windows 2008 R2. The last argument is the SP
+        // version. There is no SP2 for either of these two operating systems, but the check 
+        // will hold if one were released. This code assumes that SP2 will include fix for 
+        // http://support.microsoft.com/kb/2731284.
+        //
+        if (::IsWindowsVersionOrGreater(6, 1, 0) && !IsWindowsVersionOrGreater(6, 1, 2)) {
+            return true;
+        }
+
         return false;
     }
 

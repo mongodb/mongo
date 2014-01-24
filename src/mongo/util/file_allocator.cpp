@@ -41,6 +41,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -197,6 +198,15 @@ namespace mongo {
                      size - 1 == lseek(fd, size - 1, SEEK_SET) );
             uassert( 10442 ,  str::stream() << "Unable to allocate new file of size " << size << ' ' << errnoWithDescription(),
                      1 == write(fd, "", 1) );
+
+            // File expansion is completed here. Do not do the zeroing out on OS-es where there
+            // is no risk of triggering allocation-related bugs such as
+            // http://support.microsoft.com/kb/2731284.
+            //
+            if (!ProcessInfo::isDataFileZeroingNeeded()) {
+                return;
+            }
+
             lseek(fd, 0, SEEK_SET);
 
             const long z = 256 * 1024;
