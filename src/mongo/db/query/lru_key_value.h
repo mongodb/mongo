@@ -138,7 +138,7 @@ namespace mongo {
         Status get(const K& key, V** entryOut) const {
             KVMapConstIt i = _kvMap.find(key);
             if (i == _kvMap.end()) {
-                return Status(ErrorCodes::BadValue, "no such key in LRU key-value store");
+                return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
             }
             KVListIt found = i->second;
             V* foundEntry = found->second;

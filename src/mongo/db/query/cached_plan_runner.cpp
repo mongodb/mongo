@@ -40,6 +40,7 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
 
@@ -187,8 +188,12 @@ namespace mongo {
         Status fbs = cache->feedback(*_canonicalQuery, feedback.release());
 
         if (!fbs.isOK()) {
-            // XXX: what should happen here?
-            warning() << "Failed to update cache with feedback: " << fbs.toString() << endl;
+            QLOG() << _canonicalQuery->ns() << ": Failed to update cache with feedback: "
+                   << fbs.toString() << " - "
+                   << "(query: " << _canonicalQuery->getQueryObj()
+                   << "; sort: " << _canonicalQuery->getParsed().getSort()
+                   << "; projection: " << _canonicalQuery->getParsed().getProj()
+                   << ") is no longer in plan cache.";
         }
     }
 
