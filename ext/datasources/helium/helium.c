@@ -347,8 +347,7 @@ os_errno(void)
  *	Initialize a lock.
  */
 static int
-lock_init(
-    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
+lock_init(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
 	int ret = 0;
 
@@ -379,8 +378,7 @@ lock_destroy(
  *	Acquire a write lock.
  */
 static inline int
-writelock(
-    WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
+writelock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 {
 	int ret = 0;
 
