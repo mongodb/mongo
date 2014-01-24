@@ -183,12 +183,12 @@ zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 {
 	uint32_t base, indx, limit;
 
+	indx = 0;
+
 	/* Figure out which slot we got to: binary search */
-	if (target < offsets[1])
-		indx = 0;
-	else if (target >= offsets[slots])
+	if (target >= offsets[slots])
 		indx = slots;
-	else
+	else if (target >= offsets[1])
 		for (base = 1, limit = slots - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 
