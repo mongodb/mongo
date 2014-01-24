@@ -65,7 +65,7 @@ namespace mongo {
 
         std::string host; // --host
         bool hostSet;
-        std::string port; // --port
+        int port; // --port
         bool portSet;
         std::string connectionString; // --host and --port after processing
         std::string dbpath;

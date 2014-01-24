@@ -384,10 +384,14 @@ namespace mongo {
                     string host = ss.next();
                     if ( showPorts && host.find( ":" ) == string::npos) {
                         // port supplied, but not for this host.  use default.
-                        if (toolGlobalParams.portSet)
-                            host += ":" + toolGlobalParams.port;
-                        else
-                            host += ":27017";
+                        StringBuilder sb;
+                        if (toolGlobalParams.portSet) {
+                            sb << host << ":" << toolGlobalParams.port;
+                        }
+                        else {
+                            sb << host << ":27017";
+                        }
+                        host = sb.str();
                     }
                     _add( threads , host );
                 }
