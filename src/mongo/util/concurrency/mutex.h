@@ -139,7 +139,7 @@ namespace mongo {
 #if defined(_WIN32)
     class SimpleMutex : boost::noncopyable {
     public:
-        SimpleMutex( const char * ) { InitializeCriticalSection( &_cs ); }
+        SimpleMutex( const StringData& ) { InitializeCriticalSection( &_cs ); }
         void dassertLocked() const { }
         void lock() { EnterCriticalSection( &_cs ); }
         void unlock() { LeaveCriticalSection( &_cs ); }
@@ -158,7 +158,7 @@ namespace mongo {
     class SimpleMutex : boost::noncopyable {
     public:
         void dassertLocked() const { }
-        SimpleMutex(const char* name) { verify( pthread_mutex_init(&_lock,0) == 0 ); }
+        SimpleMutex(const StringData& name) { verify( pthread_mutex_init(&_lock,0) == 0 ); }
         ~SimpleMutex(){ 
             if ( ! StaticObserver::_destroyingStatics ) { 
                 verify( pthread_mutex_destroy(&_lock) == 0 ); 
@@ -186,7 +186,7 @@ namespace mongo {
      */
     class RecursiveMutex : boost::noncopyable {
     public:
-        RecursiveMutex(const char* name) : m(name) { }
+        RecursiveMutex(const StringData& name) : m(name) { }
         bool isLocked() const { return n.get() > 0; }
         class scoped_lock : boost::noncopyable {
             RecursiveMutex& rm;
