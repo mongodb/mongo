@@ -750,7 +750,7 @@ namespace mongo {
                 result << "collectionsharded" << ns;
 
                 // only initially move chunks when using a hashed shard key
-                if (isHashedShardKey) {
+                if (isHashedShardKey && isEmpty) {
 
                     // Reload the new config info.  If we created more than one initial chunk, then
                     // we need to move them around to balance.
