@@ -167,7 +167,7 @@ namespace mongo {
                        << " ns: " << _collection->ns().ns() );
     }
 
-    bool IndexCatalog::_shouldOverridePlugin(const BSONObj& keyPattern) {
+    bool IndexCatalog::_shouldOverridePlugin(const BSONObj& keyPattern) const {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
 
@@ -200,7 +200,7 @@ namespace mongo {
         return false;
     }
 
-    string IndexCatalog::_getAccessMethodName(const BSONObj& keyPattern) {
+    string IndexCatalog::_getAccessMethodName(const BSONObj& keyPattern) const {
         if ( _shouldOverridePlugin(keyPattern) ) {
             return "";
         }
@@ -703,7 +703,7 @@ namespace mongo {
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
-        ClientCursor::invalidate( _collection->ns().ns() );
+        _collection->cursorCache()->invalidateAll( false );
 
         // make sure nothing in progress
         massert( 17348,
@@ -808,7 +808,7 @@ namespace mongo {
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
-        ClientCursor::invalidate( _collection->ns().ns() );
+        _collection->cursorCache()->invalidateAll( false );
 
         // wipe out stats
         _collection->infoCache()->reset();
@@ -1073,6 +1073,12 @@ namespace mongo {
     IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) {
         IndexCatalogEntry* entry = _entries.find( desc );
         massert( 17334, "cannot find index entry", entry );
+        return entry->accessMethod();
+    }
+
+    const IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) const {
+        const IndexCatalogEntry* entry = _entries.find( desc );
+        massert( 17357, "cannot find index entry", entry );
         return entry->accessMethod();
     }
 

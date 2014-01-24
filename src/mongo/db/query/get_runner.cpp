@@ -243,7 +243,8 @@ namespace mongo {
                 WorkingSet* ws;
                 PlanStage* root;
                 verify(StageBuilder::build(*qs, &root, &ws));
-                CachedPlanRunner* cpr = new CachedPlanRunner(canonicalQuery.release(), qs,
+                CachedPlanRunner* cpr = new CachedPlanRunner(collection,
+                                                             canonicalQuery.release(), qs,
                                                              root, ws);
 
                 if (NULL != backupQs) {
@@ -277,9 +278,11 @@ namespace mongo {
 
         // We cannot figure out how to answer the query.  Should this ever happen?
         if (0 == solutions.size()) {
-            return Status(ErrorCodes::BadValue, 
-                          "error processing query: " + canonicalQuery->toString() +
-                          " No query solutions");
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                          << "error processing query: "
+                          << canonicalQuery->toString()
+                          << " No query solutions");
         }
 
         if (1 == solutions.size()) {
@@ -289,12 +292,13 @@ namespace mongo {
             verify(StageBuilder::build(*solutions[0], &root, &ws));
 
             // And, run the plan.
-            *out = new SingleSolutionRunner(canonicalQuery.release(), solutions[0], root, ws);
+            *out = new SingleSolutionRunner(collection,
+                                            canonicalQuery.release(),solutions[0], root, ws);
             return Status::OK();
         }
         else {
             // Many solutions.  Let the MultiPlanRunner pick the best, update the cache, and so on.
-            auto_ptr<MultiPlanRunner> mpr(new MultiPlanRunner(canonicalQuery.release()));
+            auto_ptr<MultiPlanRunner> mpr(new MultiPlanRunner(collection,canonicalQuery.release()));
             for (size_t i = 0; i < solutions.size(); ++i) {
                 WorkingSet* ws;
                 PlanStage* root;
@@ -453,7 +457,7 @@ namespace mongo {
             WorkingSet* ws;
             PlanStage* root;
             verify(StageBuilder::build(*soln, &root, &ws));
-            *out = new SingleSolutionRunner(cq, soln, root, ws);
+            *out = new SingleSolutionRunner(collection, cq, soln, root, ws);
             return Status::OK();
         }
 
@@ -481,7 +485,7 @@ namespace mongo {
                 WorkingSet* ws;
                 PlanStage* root;
                 verify(StageBuilder::build(*solutions[i], &root, &ws));
-                *out = new SingleSolutionRunner(cq, solutions[i], root, ws);
+                *out = new SingleSolutionRunner(collection, cq, solutions[i], root, ws);
                 return Status::OK();
             }
         }
@@ -498,11 +502,14 @@ namespace mongo {
 
     ScopedRunnerRegistration::ScopedRunnerRegistration(Runner* runner)
         : _runner(runner) {
-        ClientCursor::registerRunner(_runner);
+        // Collection can be null for EOFRunner, or other places where registration is not needed
+        if ( _runner->collection() )
+            _runner->collection()->cursorCache()->registerRunner( runner );
     }
 
     ScopedRunnerRegistration::~ScopedRunnerRegistration() {
-        ClientCursor::deregisterRunner(_runner);
+        if ( _runner->collection() )
+            _runner->collection()->cursorCache()->deregisterRunner( _runner );
     }
 
 }  // namespace mongo

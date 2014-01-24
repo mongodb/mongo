@@ -206,7 +206,7 @@ assert.eq(db.ts1.find().sort({_id:1}).toArray(),
           outCollection.find().sort({_id:1}).toArray());
 
 // Make sure we error out if $out collection is sharded
-assertErrorCode(db.outCollection, [{$out: db.ts1.getName()}], 17017);
+assertErrorCode(outCollection, [{$out: db.ts1.getName()}], 17017);
 
 db.literal.save({dollar:false});
 

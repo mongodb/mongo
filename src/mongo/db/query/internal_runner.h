@@ -56,8 +56,8 @@ namespace mongo {
     class InternalRunner : public Runner {
     public:
 
-        /** Takes ownership of all arguments. */
-        InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws);
+        /** Takes ownership of root and ws. */
+        InternalRunner(const Collection* collection, PlanStage* root, WorkingSet* ws);
 
         virtual ~InternalRunner();
 
@@ -77,6 +77,8 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
+
         /**
          * Returns OK, allocating and filling in '*explain' with details of the plan used by
          * this runner. Caller takes ownership of '*explain'. Otherwise, return a status
@@ -89,7 +91,7 @@ namespace mongo {
         virtual Status getExplainPlan(TypeExplain** explain) const;
 
     private:
-        std::string _ns;
+        const Collection* _collection;
 
         boost::scoped_ptr<PlanExecutor> _exec;
         Runner::YieldPolicy _policy;

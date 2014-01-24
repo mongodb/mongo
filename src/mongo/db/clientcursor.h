@@ -42,6 +42,7 @@ namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     class ClientCursor;
+    class Collection;
     class CurOp;
     class Database;
     class NamespaceDetails;
@@ -56,9 +57,10 @@ namespace mongo {
      */
     class ClientCursor : private boost::noncopyable {
     public:
-        ClientCursor(Runner* runner, int qopts = 0, const BSONObj query = BSONObj());
+        ClientCursor(const Collection* collection, Runner* runner,
+                     int qopts = 0, const BSONObj query = BSONObj());
 
-        ClientCursor(const string& ns);
+        ClientCursor(const Collection* collection);
 
         ~ClientCursor();
 
@@ -68,88 +70,27 @@ namespace mongo {
 
         CursorId cursorid() const { return _cursorid; }
         string ns() const { return _ns; }
-        Database* db() const { return _db; }
-
-        //
-        // Mutation/Invalidation of DiskLocs and dropping of namespaces
-        //
+        const Collection* collection() const { return _collection; }
 
         /**
-         * Get rid of cursors for namespaces 'ns'. When dropping a db, ns is "dbname." Used by drop,
-         * dropIndexes, dropDatabase.
+         * This is called when someone is dropping a collection or something else that
+         * goes through killing cursors.
+         * It removes the responsiilibty of de-registering from ClientCursor.
+         * Responsibility for deleting the ClientCursor doesn't change from this call
+         * see Runner::kill.
          */
-        static void invalidate(const StringData& ns);
-
-        /**
-         * Broadcast a document invalidation to all relevant Runner(s).  invalidateDocument must
-         * called *before* the provided DiskLoc is about to be deleted or mutated.
-         */
-        static void invalidateDocument(const StringData& ns,
-                                       const NamespaceDetails* nsd,
-                                       const DiskLoc& dl,
-                                       InvalidationType type);
-
-        /**
-         * Register a runner so that it can be notified of deletion/invalidation during yields.
-         * Must be called before a runner yields.  If a runner is cached (inside a ClientCursor) it
-         * MUST NOT be registered; the two are mutually exclusive.
-         */
-        static void registerRunner(Runner* runner);
-
-        /**
-         * Remove a runner from the runner registry.
-         */
-        static void deregisterRunner(Runner* runner);
+        void kill();
 
         //
         // Yielding.
-        // 
+        //
 
         static void staticYield(int micros, const StringData& ns, const Record* rec);
         static int suggestYieldMicros();
 
         //
-        // Static methods about all ClientCursors  TODO: Document.
-        //
-
-        static void appendStats( BSONObjBuilder& result );
-
-        //
-        // ClientCursor creation/deletion.
-        //
-
-        static unsigned numCursors() { return clientCursorsById.size(); }
-        static void find( const string& ns , set<CursorId>& all );
-        static ClientCursor* find(CursorId id, bool warn = true);
-
-        // Same as erase but checks to make sure this thread has read permission on the cursor's
-        // namespace.  This should be called when receiving killCursors from a client.  This should
-        // not be called when ccmutex is held.
-        static int eraseIfAuthorized(int n, long long* ids);
-        static bool eraseIfAuthorized(CursorId id);
-
-        /**
-         * @return number of cursors found
-         */
-        static int erase(int n, long long* ids);
-
-        /**
-         * Deletes the cursor with the provided @param 'id' if one exists.
-         * @throw if the cursor with the provided id is pinned.
-         * This does not do any auth checking and should be used only when erasing cursors as part
-         * of cleaning up internal operations.
-         */
-        static bool erase(CursorId id);
-
-        //
         // Timing and timeouts
         //
-
-        /**
-         * called every 4 seconds.  millis is amount of idle time passed since the last call --
-         * could be zero
-         */
-        static void idleTimeReport(unsigned millis);
 
         /**
          * @param millis amount of idle passed time since last call
@@ -202,50 +143,19 @@ namespace mongo {
          */
         bool isAggCursor;
 
+        unsigned pinValue() const { return _pinValue; }
+
+        static long long totalOpen();
+
     private:
+        friend class ClientCursorMonitor;
         friend class ClientCursorPin;
         friend class CmdCursorInfo;
-
-        // A map from the CursorId to the ClientCursor behind it.
-        // TODO: Consider making this per-connection.
-        typedef map<CursorId, ClientCursor*> CCById;
-        static CCById clientCursorsById;
-
-        // A list of NON-CACHED runners.  Any runner that yields must be put into this map before
-        // yielding in order to be notified of invalidation and namespace deletion.  Before the
-        // runner is deleted, it must be removed from this map.
-        //
-        // TODO: This is temporary and as such is highly NOT optimized.
-        typedef unordered_set<Runner*> RunnerSet;
-        static RunnerSet nonCachedRunners;
-
-        // How many cursors have timed out?
-        static long long numberTimedOut;
-
-        // This must be held when modifying any static member.
-        static boost::recursive_mutex& ccmutex;
 
         /**
          * Initialization common between both constructors for the ClientCursor.
          */
         void init();
-
-        /**
-         * Allocates a new CursorId.
-         * Called from init(...).  Assumes ccmutex held.
-         */
-        static CursorId allocCursorId_inlock();
-
-        /**
-         * Find the ClientCursor with the provided ID.  Optionally warn if it's not found.
-         * Assumes ccmutex is held.
-         */
-        static ClientCursor* find_inlock(CursorId id, bool warn = true);
-
-        /**
-         * Delete the ClientCursor with the provided ID.  masserts if the cursor is pinned.
-         */
-        static void _erase_inlock(ClientCursor* cursor);
 
         //
         // ClientCursor-specific data, independent of the underlying execution type.
@@ -263,8 +173,10 @@ namespace mongo {
         // The namespace we're operating on.
         string _ns;
 
-        // The database we're operating on.
-        Database* _db;
+        const Collection* _collection;
+
+        // if we've added it to the total open counter yet
+        bool _countedYet;
 
         // How many objects have been returned by the find() so far?
         int _pos;
@@ -303,18 +215,20 @@ namespace mongo {
      * against two getMore requests on the same cursor executing at the same time - which might be
      * bad.  That should never happen, but if a client driver had a bug, it could (or perhaps some
      * sort of attack situation).
+     * Must have a read lock on the collection already
     */
     class ClientCursorPin : boost::noncopyable {
     public:
-        ClientCursorPin( long long cursorid );
+        ClientCursorPin( const Collection* collection, long long cursorid );
         ~ClientCursorPin();
-        // This just releases the pin, does not delete the underlying.
+        // This just releases the pin, does not delete the underlying
+        // unless ownership has passed to us after kill
         void release();
         // Call this to delete the underlying ClientCursor.
         void deleteUnderlying();
         ClientCursor *c() const;
     private:
-        CursorId _cursorid;
+        ClientCursor* _cursor;
     };
 
     /** thread for timing out old cursors */

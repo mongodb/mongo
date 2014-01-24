@@ -126,6 +126,8 @@ namespace mongo {
 
         // This is a read lock.
         scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
+        Collection* collection = ctx->ctx().db()->getCollection(ns);
+        uassert( 17356, "collection dropped between getMore calls", collection );
 
         QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
 
@@ -138,7 +140,7 @@ namespace mongo {
         // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
         // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
         // CC, so don't delete it.
-        ClientCursorPin ccPin(cursorid);
+        ClientCursorPin ccPin(collection, cursorid);
         ClientCursor* cc = ccPin.c();
 
         // These are set in the QueryResult msg we return.
@@ -291,13 +293,17 @@ namespace mongo {
         return qr;
     }
 
-    Status getOplogStartHack(CanonicalQuery* cq, Runner** runnerOut) {
+    Status getOplogStartHack(Collection* collection, CanonicalQuery* cq, Runner** runnerOut) {
+        if ( collection == NULL )
+            return Status(ErrorCodes::InternalError,
+                          "getOplogStartHack called with a NULL collection" );
+
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
         OplogStart* stage = new OplogStart(cq->ns(), cq->root(), oplogws);
 
         // Takes ownership of ws and stage.
-        auto_ptr<InternalRunner> runner(new InternalRunner(cq->ns(), stage, oplogws));
+        auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
         runner->setYieldPolicy(Runner::YIELD_AUTO);
 
         // The stage returns a DiskLoc of where to start.
@@ -325,7 +331,7 @@ namespace mongo {
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(params, ws, cq->root());
         // Takes ownership of cq, cs, ws.
-        *runnerOut = new SingleSolutionRunner(cq, NULL, cs, ws);
+        *runnerOut = new SingleSolutionRunner(collection, cq, NULL, cs, ws);
         return Status::OK();
     }
 
@@ -381,6 +387,7 @@ namespace mongo {
         // where-specific parsing code assumes we have a lock and creates execution machinery that
         // requires it.
         Client::ReadContext ctx(q.ns);
+        Collection* collection = ctx.ctx().db()->getCollection( ns );
 
         // Parse the qm into a CanonicalQuery.
         CanonicalQuery* cq;
@@ -412,11 +419,11 @@ namespace mongo {
         // Otherwise we go through the selection of which runner is most suited to the
         // query + run-time context at hand.
         Status status = Status::OK();
-        if (ctx.ctx().db()->getCollection(cq->ns()) == NULL) {
+        if (collection == NULL) {
             rawRunner = new EOFRunner(cq, cq->ns());
         }
         else if (pq.hasOption(QueryOption_OplogReplay)) {
-            status = getOplogStartHack(cq, &rawRunner);
+            status = getOplogStartHack(collection, cq, &rawRunner);
         }
         else {
             // Takes ownership of cq.
@@ -617,7 +624,8 @@ namespace mongo {
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(runner.get(), cq->getParsed().getOptions(),
+            ClientCursor* cc = new ClientCursor(collection, runner.get(),
+                                                cq->getParsed().getOptions(),
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 

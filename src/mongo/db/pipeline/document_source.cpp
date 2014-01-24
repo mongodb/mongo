@@ -63,6 +63,12 @@ namespace mongo {
         }
     }
 
+    void DocumentSource::kill() {
+        if ( pSource ) {
+            pSource->kill();
+        }
+    }
+
     void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const {
         Value entry = serialize(explain);
         if (!entry.missing()) {

@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-    IDHackRunner::IDHackRunner(Collection* collection, CanonicalQuery* query)
+    IDHackRunner::IDHackRunner(const Collection* collection, CanonicalQuery* query)
         : _collection(collection),
           _key(query->getQueryObj()["_id"].wrap()),
           _query(query),
@@ -67,18 +67,18 @@ namespace mongo {
         if (_done) { return Runner::RUNNER_EOF; }
 
         // Use the index catalog to get the id index.
-        IndexCatalog* catalog = _collection->getIndexCatalog();
+        const IndexCatalog* catalog = _collection->getIndexCatalog();
 
         // Find the index we use.
-        const IndexDescriptor* idDesc = catalog->findIdIndex();
+        IndexDescriptor* idDesc = catalog->findIdIndex();
         if (NULL == idDesc) {
             _done = true;
             return Runner::RUNNER_EOF;
         }
 
         // XXX: This may not be valid always.  See SERVER-12397.
-        BtreeBasedAccessMethod* accessMethod =
-            static_cast<BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
+        const BtreeBasedAccessMethod* accessMethod =
+            static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
 
         // Look up the key by going directly to the Btree.
         DiskLoc loc = accessMethod->findSingle( _key );
@@ -175,6 +175,7 @@ namespace mongo {
 
     void IDHackRunner::kill() {
         _killed = true;
+        _collection = NULL;
     }
 
     Status IDHackRunner::getExplainPlan(TypeExplain** explain) const {

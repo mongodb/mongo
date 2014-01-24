@@ -49,8 +49,8 @@ namespace mongo {
     class IDHackRunner : public Runner {
     public:
 
-        /** Takes ownership of all the arguments. */
-        IDHackRunner(Collection* collection, CanonicalQuery* query);
+        /** Takes ownership of all the arguments -collection. */
+        IDHackRunner(const Collection* collection, CanonicalQuery* query);
 
         IDHackRunner(Collection* collection, const BSONObj& key);
 
@@ -72,13 +72,15 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
+
         /**
          */
         virtual Status getExplainPlan(TypeExplain** explain) const;
 
     private:
         // Not owned here.
-        Collection* _collection;
+        const Collection* _collection;
 
         // The value to match against the _id field.
         BSONObj _key;

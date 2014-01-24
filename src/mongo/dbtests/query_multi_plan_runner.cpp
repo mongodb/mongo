@@ -130,7 +130,7 @@ namespace QueryMultiPlanRunner {
             CanonicalQuery* cq = NULL;
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
-            MultiPlanRunner mpr(cq);
+            MultiPlanRunner mpr(ctx.ctx().db()->getCollection(ns()),cq);
             mpr.addPlan(createQuerySolution(), firstRoot.release(), firstWs.release());
             mpr.addPlan(createQuerySolution(), secondRoot.release(), secondWs.release());
 

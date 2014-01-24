@@ -47,8 +47,9 @@
 
 namespace mongo {
 
-    MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _killed(false),
+    MultiPlanRunner::MultiPlanRunner(const Collection* collection, CanonicalQuery* query)
+        : _collection(collection),
+          _killed(false),
           _failure(false),
           _failureCount(0),
           _policy(Runner::YIELD_MANUAL),
@@ -208,6 +209,7 @@ namespace mongo {
 
     void MultiPlanRunner::kill() {
         _killed = true;
+        _collection = NULL;
         if (NULL != _bestPlan) { _bestPlan->kill(); }
     }
 

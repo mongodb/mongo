@@ -77,7 +77,8 @@ namespace QuerySingleSolutionRunner {
          *
          * The caller takes ownership of the returned SingleSolutionRunner*.
          */
-        SingleSolutionRunner* makeCollScanRunner(BSONObj& filterObj) {
+        SingleSolutionRunner* makeCollScanRunner(Client::Context& ctx,
+                                                 BSONObj& filterObj) {
             CollectionScanParams csparams;
             csparams.ns = ns();
             csparams.direction = CollectionScanParams::FORWARD;
@@ -94,8 +95,11 @@ namespace QuerySingleSolutionRunner {
             verify(NULL != cq);
 
             // Hand the plan off to the single solution runner.
-            SingleSolutionRunner* ssr = new SingleSolutionRunner(cq, new QuerySolution(),
-                                            root.release(), ws.release());
+            SingleSolutionRunner* ssr = new SingleSolutionRunner(ctx.db()->getCollection(ns()),
+                                                                 cq,
+                                                                 new QuerySolution(),
+                                                                 root.release(),
+                                                                 ws.release());
             return ssr;
         }
 
@@ -112,7 +116,8 @@ namespace QuerySingleSolutionRunner {
          *
          * The caller takes ownership of the returned SingleSolutionRunner*.
          */
-        SingleSolutionRunner* makeIndexScanRunner(BSONObj& indexSpec, int start, int end) {
+        SingleSolutionRunner* makeIndexScanRunner(Client::Context& context,
+                                                  BSONObj& indexSpec, int start, int end) {
             // Build the index scan stage.
             IndexScanParams ixparams;
             ixparams.descriptor = getIndex(indexSpec);
@@ -130,11 +135,32 @@ namespace QuerySingleSolutionRunner {
             verify(NULL != cq);
 
             // Hand the plan off to the single solution runner.
-            return new SingleSolutionRunner(cq, new QuerySolution(),
+            return new SingleSolutionRunner(context.db()->getCollection(ns()),
+                                            cq, new QuerySolution(),
                                             root.release(), ws.release());
         }
 
         static const char* ns() { return "unittests.QueryStageSingleSolutionRunner"; }
+
+        size_t numCursors() {
+            Client::ReadContext ctx( ns() );
+            Collection* collection = ctx.ctx().db()->getCollection( ns() );
+            if ( !collection )
+                return 0;
+            return collection->cursorCache()->numCursors();
+        }
+
+        void registerRunner( Runner* runner ) {
+            Client::ReadContext ctx( ns() );
+            Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns() );
+            return collection->cursorCache()->registerRunner( runner );
+        }
+
+        void deregisterRunner( Runner* runner ) {
+            Client::ReadContext ctx( ns() );
+            Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns() );
+            return collection->cursorCache()->deregisterRunner( runner );
+        }
 
     private:
         IndexDescriptor* getIndex(const BSONObj& obj) {
@@ -159,10 +185,10 @@ namespace QuerySingleSolutionRunner {
             insert(BSON("_id" << 2));
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
-            scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(filterObj));
+            scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(ctx.ctx(),filterObj));
 
             // Set up autoyielding.
-            ClientCursor::registerRunner(ssr.get());
+            registerRunner(ssr.get());
             ssr->setYieldPolicy(Runner::YIELD_AUTO);
 
             BSONObj objOut;
@@ -174,7 +200,7 @@ namespace QuerySingleSolutionRunner {
             dropCollection();
             ASSERT_EQUALS(Runner::RUNNER_DEAD, ssr->getNext(&objOut, NULL));
 
-            ClientCursor::deregisterRunner(ssr.get());
+            deregisterRunner(ssr.get());
         }
     };
 
@@ -192,10 +218,10 @@ namespace QuerySingleSolutionRunner {
             BSONObj indexSpec = BSON("a" << 1);
             addIndex(indexSpec);
 
-            scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(indexSpec, 7, 10));
+            scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(ctx.ctx(), indexSpec, 7, 10));
 
             // Set up autoyielding.
-            ClientCursor::registerRunner(ssr.get());
+            registerRunner(ssr.get());
             ssr->setYieldPolicy(Runner::YIELD_AUTO);
 
             BSONObj objOut;
@@ -207,7 +233,7 @@ namespace QuerySingleSolutionRunner {
             dropCollection();
             ASSERT_EQUALS(Runner::RUNNER_DEAD, ssr->getNext(&objOut, NULL));
 
-            ClientCursor::deregisterRunner(ssr.get());
+            deregisterRunner(ssr.get());
         }
     };
 
@@ -263,7 +289,7 @@ namespace QuerySingleSolutionRunner {
             setupCollection();
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(filterObj));
+            scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(ctx.ctx(),filterObj));
 
             BSONObj objOut;
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
@@ -290,7 +316,7 @@ namespace QuerySingleSolutionRunner {
             addIndex(indexSpec);
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(indexSpec, 2, 5));
+            scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(ctx.ctx(), indexSpec, 2, 5));
 
             BSONObj objOut;
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
@@ -319,16 +345,17 @@ namespace QuerySingleSolutionRunner {
                 insert(BSON("a" << 1 << "b" << 1));
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                SingleSolutionRunner* ssr = makeCollScanRunner(filterObj);
+                SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
 
                 // Make a client cursor from the runner.
-                new ClientCursor(ssr, 0, BSONObj());
+                new ClientCursor(ctx.ctx().db()->getCollection(ns()),
+                                 ssr, 0, BSONObj());
 
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
-                ASSERT_EQUALS(1U, ClientCursor::numCursors());
-                ClientCursor::invalidate(ns());
-                ASSERT_EQUALS(0U, ClientCursor::numCursors());
+                ASSERT_EQUALS(1U, numCursors());
+                ctx.ctx().db()->getCollection( ns() )->cursorCache()->invalidateAll(false);
+                ASSERT_EQUALS(0U, numCursors());
             }
         };
 
@@ -342,18 +369,21 @@ namespace QuerySingleSolutionRunner {
                 Client::WriteContext ctx(ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
+                Collection* collection = ctx.ctx().db()->getCollection(ns());
+
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                SingleSolutionRunner* ssr = makeCollScanRunner(filterObj);
+                SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
 
                 // Make a client cursor from the runner.
-                ClientCursor* cc = new ClientCursor(ssr, 0, BSONObj());
-                ClientCursorPin ccPin(cc->cursorid());
+                ClientCursor* cc = new ClientCursor(collection,
+                                                    ssr, 0, BSONObj());
+                ClientCursorPin ccPin(collection,cc->cursorid());
 
                 // If the cursor is pinned, it sticks around,
                 // even after invalidation.
-                ASSERT_EQUALS(1U, ClientCursor::numCursors());
-                ClientCursor::invalidate(ns());
-                ASSERT_EQUALS(1U, ClientCursor::numCursors());
+                ASSERT_EQUALS(1U, numCursors());
+                collection->cursorCache()->invalidateAll(false);
+                ASSERT_EQUALS(1U, numCursors());
 
                 // The invalidation should have killed the runner.
                 BSONObj objOut;
@@ -362,7 +392,7 @@ namespace QuerySingleSolutionRunner {
                 // Deleting the underlying cursor should cause the
                 // number of cursors to return to 0.
                 ccPin.deleteUnderlying();
-                ASSERT_EQUALS(0U, ClientCursor::numCursors());
+                ASSERT_EQUALS(0U, numCursors());
             }
         };
 
@@ -380,19 +410,20 @@ namespace QuerySingleSolutionRunner {
 
                 {
                     Client::ReadContext ctx(ns());
+                    Collection* collection = ctx.ctx().db()->getCollection(ns());
 
                     BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                    SingleSolutionRunner* ssr = makeCollScanRunner(filterObj);
+                    SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
 
                     // Make a client cursor from the runner.
-                    new ClientCursor(ssr, 0, BSONObj());
+                    new ClientCursor(collection, ssr, 0, BSONObj());
                 }
 
                 // There should be one cursor before timeout,
                 // and zero cursors after timeout.
-                ASSERT_EQUALS(1U, ClientCursor::numCursors());
-                ClientCursor::idleTimeReport(600001);
-                ASSERT_EQUALS(0U, ClientCursor::numCursors());
+                ASSERT_EQUALS(1U, numCursors());
+                CollectionCursorCache::timeoutCursorsGlobal(600001);
+                ASSERT_EQUALS(0U, numCursors());
             }
         };
 

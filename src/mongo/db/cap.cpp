@@ -466,8 +466,8 @@ namespace mongo {
         }
 
         // Clear all references to this namespace.
-        ClientCursor::invalidate( ns );
         Collection* collection = cc().database()->getCollection( ns );
+        collection->cursorCache()->invalidateAll( false );
         verify( collection->details() == this );
         collection->infoCache()->reset();
 

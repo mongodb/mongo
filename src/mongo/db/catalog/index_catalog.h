@@ -100,6 +100,7 @@ namespace mongo {
 
         // never returns NULL
         IndexAccessMethod* getIndex( const IndexDescriptor* desc );
+        const IndexAccessMethod* getIndex( const IndexDescriptor* desc ) const;
 
         class IndexIterator {
         public:
@@ -251,14 +252,14 @@ namespace mongo {
 
         int _removeFromSystemIndexes( const StringData& indexName );
 
-        bool _shouldOverridePlugin( const BSONObj& keyPattern );
+        bool _shouldOverridePlugin( const BSONObj& keyPattern ) const;
 
         /**
          * This differs from IndexNames::findPluginName in that returns the plugin name we *should*
          * use, not the plugin name inside of the provided key pattern.  To understand when these
          * differ, see shouldOverridePlugin.
          */
-        string _getAccessMethodName(const BSONObj& keyPattern);
+        string _getAccessMethodName(const BSONObj& keyPattern) const;
 
         IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 

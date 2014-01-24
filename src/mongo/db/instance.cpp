@@ -532,7 +532,7 @@ namespace mongo {
             verify( n < 30000 );
         }
 
-        int found = ClientCursor::eraseIfAuthorized(n, (long long *) x);
+        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(n, (long long *) x);
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
@@ -561,7 +561,6 @@ namespace mongo {
         /* important: kill all open cursors on the database */
         string prefix(db);
         prefix += '.';
-        ClientCursor::invalidate(prefix.c_str());
 
         dbHolderW().erase( db, path );
         ctx->_clear();
@@ -788,7 +787,7 @@ namespace mongo {
                     // because it may now be out of sync with the client's iteration state.
                     // SERVER-7952
                     // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                    ClientCursor::erase( cursorid );
+                    CollectionCursorCache::eraseCursorGlobal( cursorid );
                 }
                 ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                 ok = false;
@@ -1063,7 +1062,7 @@ namespace {
     }
 
     void DBDirectClient::killCursor( long long id ) {
-        ClientCursor::erase( id );
+        CollectionCursorCache::eraseCursorGlobal( id );
     }
 
     HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );

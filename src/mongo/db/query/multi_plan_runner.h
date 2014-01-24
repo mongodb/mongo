@@ -57,7 +57,7 @@ namespace mongo {
         /**
          * Takes ownership of query.
          */
-        MultiPlanRunner(CanonicalQuery* query);
+        MultiPlanRunner(const Collection* collection, CanonicalQuery* query);
         virtual ~MultiPlanRunner();
 
         /**
@@ -93,6 +93,8 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
+
         /**
          * Returns OK, allocating and filling in '*explain' with details of the "winner"
          * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
@@ -109,6 +111,8 @@ namespace mongo {
         bool workAllPlans();
         void allPlansSaveState();
         void allPlansRestoreState();
+
+        const Collection* _collection;
 
         // Were we killed by an invalidate?
         bool _killed;

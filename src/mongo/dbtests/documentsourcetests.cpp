@@ -32,6 +32,8 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -158,12 +160,15 @@ namespace DocumentSourceTests {
             { _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp"; }
         protected:
             void createSource() {
-                Client::ReadContext ctx (ns);
+                Client::WriteContext ctx (ns);
+                Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns );
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
                 Runner* runner;
                 uassertStatusOK(getRunner(cq, &runner));
-                auto_ptr<ClientCursor> cc(new ClientCursor(runner, QueryOption_NoCursorTimeout));
+                auto_ptr<ClientCursor> cc(new ClientCursor(collection,
+                                                           runner,
+                                                           QueryOption_NoCursorTimeout));
                 verify(cc->getRunner());
                 cc->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
                 CursorId cursorId = cc->cursorid();
@@ -196,9 +201,13 @@ namespace DocumentSourceTests {
             }
         private:
             void assertNumClientCursors( unsigned int expected ) {
-                set<CursorId> nsCursors;
-                ClientCursor::find( ns, nsCursors );
-                ASSERT_EQUALS( expected, nsCursors.size() );
+                Client::ReadContext ctx( ns );
+                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                if ( !collection ) {
+                    ASSERT( 0 == expected );
+                    return;
+                }
+                ASSERT_EQUALS( expected, collection->cursorCache()->numCursors() );
             }
         };
 

@@ -141,6 +141,16 @@ namespace {
         // Create the necessary context to use a Runner, including taking a namespace read lock.
         // Note: this may throw if the sharding version for this connection is out of date.
         Client::ReadContext context(fullName);
+        Collection* collection = context.ctx().db()->getCollection(fullName);
+        if ( !collection ) {
+            intrusive_ptr<DocumentSource> source(DocumentSourceBsonArray::create(BSONObj(),
+                                                                                 pExpCtx));
+            while (!sources.empty() && source->coalesce(sources.front())) {
+                sources.pop_front();
+            }
+            pPipeline->addInitialSource( source );
+            return;
+        }
 
         // Create the Runner.
         //
@@ -205,8 +215,9 @@ namespace {
         }
 
         // Now wrap the Runner in ClientCursor
-        auto_ptr<ClientCursor> cursor(
-            new ClientCursor(runner.release(), QueryOption_NoCursorTimeout));
+        auto_ptr<ClientCursor> cursor(new ClientCursor(collection,
+                                                       runner.release(),
+                                                       QueryOption_NoCursorTimeout));
         verify(cursor->getRunner());
         CursorId cursorId = cursor->cursorid();
 

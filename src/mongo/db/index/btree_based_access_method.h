@@ -94,7 +94,7 @@ namespace mongo {
         virtual Status validate(int64_t* numKeys);
 
         // XXX: consider migrating callers to use IndexCursor instead
-        virtual DiskLoc findSingle( const BSONObj& key );
+        virtual DiskLoc findSingle( const BSONObj& key ) const;
 
         // exposed for testing, used for bulk commit
         static ExternalSortComparison* getComparison(int version,

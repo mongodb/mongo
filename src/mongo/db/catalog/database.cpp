@@ -321,7 +321,6 @@ namespace mongo {
         verify( collection->_details->getTotalIndexCount() == 0 );
         LOG(1) << "\t dropIndexes done" << endl;
 
-        ClientCursor::invalidate( fullns );
         Top::global.collectionDropped( fullns );
 
         Status s = _dropNS( fullns );
@@ -361,7 +360,7 @@ namespace mongo {
         if ( it == _collections.end() )
             return;
 
-        delete it->second;
+        delete it->second; // this also deletes all cursors + runners
         _collections.erase( it );
     }
 
@@ -474,9 +473,6 @@ namespace mongo {
             _clearCollectionCache_inlock( fromNSString );
             _clearCollectionCache_inlock( toNSString );
         }
-
-        ClientCursor::invalidate( fromNSString.c_str() );
-        ClientCursor::invalidate( toNSString.c_str() );
 
         // at this point, we haven't done anything destructive yet
 

@@ -238,7 +238,7 @@ namespace QueryTests {
                 // Check internal server handoff to getmore.
                 Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
-                ClientCursorPin clientCursor( cursorId );
+                ClientCursorPin clientCursor( ctx.db()->getCollection(ns), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
@@ -290,9 +290,11 @@ namespace QueryTests {
             killCurrentOp.reset();
 
             // Check that the cursor has been removed.
-            set<CursorId> ids;
-            ClientCursor::find( ns, ids );
-            ASSERT_EQUALS( 0U, ids.count( cursorId ) );
+            {
+                Client::ReadContext ctx( ns );
+                ASSERT( 0 == ctx.ctx().db()->getCollection( ns )->cursorCache()->numCursors() );
+            }
+            ASSERT_FALSE( CollectionCursorCache::eraseCursorGlobal( cursorId ) );
 
             // Check that a subsequent get more fails with the cursor removed.
             ASSERT_THROWS( client().getMore( ns, cursorId ), UserException );
@@ -337,10 +339,12 @@ namespace QueryTests {
                       cursor->getCursorId() );
 
             // Check that the cursor still exists
-            set<CursorId> ids;
-            ClientCursor::find( ns, ids );
-            ASSERT_EQUALS( 1U, ids.count( cursorId ) );
-            
+            {
+                Client::ReadContext ctx( ns );
+                ASSERT( 1 == ctx.ctx().db()->getCollection( ns )->cursorCache()->numCursors() );
+                ASSERT( ctx.ctx().db()->getCollection( ns )->cursorCache()->find( cursorId ) );
+            }
+
             // Check that the cursor can be iterated until all documents are returned.
             while( cursor->more() ) {
                 cursor->next();
@@ -597,7 +601,7 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursorPin clientCursor( cursorId );
+            ClientCursorPin clientCursor( ctx.db()->getCollection( ns ), cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
     };
@@ -1096,6 +1100,14 @@ namespace QueryTests {
             return (int) client().count( ns() );
         }
 
+        size_t numCursorsOpen() {
+            Client::ReadContext ctx( _ns );
+            Collection* collection = ctx.ctx().db()->getCollection( _ns );
+            if ( !collection )
+                return 0;
+            return collection->cursorCache()->numCursors();
+        }
+
         const char * ns() {
             return _ns.c_str();
         }
@@ -1297,7 +1309,7 @@ namespace QueryTests {
         }
 
         void run() {
-            unsigned startNumCursors = ClientCursor::numCursors();
+            size_t startNumCursors = numCursorsOpen();
 
             BSONObj info;
             ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
@@ -1317,7 +1329,7 @@ namespace QueryTests {
                 }
             }
 
-            ASSERT_EQUALS( startNumCursors, ClientCursor::numCursors() );
+            ASSERT_EQUALS( startNumCursors, numCursorsOpen() );
         }
     };
     
@@ -1330,7 +1342,7 @@ namespace QueryTests {
         FindingStartStale() : CollectionBase( "findingstart" ) {}
 
         void run() {
-            unsigned startNumCursors = ClientCursor::numCursors();
+            size_t startNumCursors = numCursorsOpen();
 
             // Check OplogReplay mode with missing collection.
             auto_ptr< DBClientCursor > c0 = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
@@ -1350,7 +1362,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 100, c->next()[ "ts" ].numberInt() );
 
             // Check that no persistent cursors outlast our queries above.
-            ASSERT_EQUALS( startNumCursors, ClientCursor::numCursors() );
+            ASSERT_EQUALS( startNumCursors, numCursorsOpen() );
         }
     };
 
@@ -1412,7 +1424,9 @@ namespace QueryTests {
             
             ClientCursor *clientCursor = 0;
             {
-                ClientCursorPin clientCursorPointer( cursorId );
+                Client::ReadContext ctx( ns() );
+                ClientCursorPin clientCursorPointer( ctx.ctx().db()->getCollection( ns() ),
+                                                     cursorId );
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
             }
@@ -1449,7 +1463,7 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx( ns() );
-                ClientCursorPin pinCursor( cursorId );
+                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( ns() ), cursorId );
   
                 ASSERT_THROWS( client().killCursor( cursorId ), MsgAssertionException );
                 string expectedAssertion =

@@ -58,7 +58,8 @@ namespace mongo {
          * Takes ownership of all arguments.
          * XXX: what args should this really take?  probably a cachekey as well?
          */
-        CachedPlanRunner(CanonicalQuery* canonicalQuery, QuerySolution* solution,
+        CachedPlanRunner(const Collection* collection,
+                         CanonicalQuery* canonicalQuery, QuerySolution* solution,
                          PlanStage* root, WorkingSet* ws);
 
         virtual ~CachedPlanRunner();
@@ -79,6 +80,7 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
         /**
          * Returns OK, allocating and filling in '*explain' with details of the cached
          * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
@@ -93,6 +95,8 @@ namespace mongo {
 
     private:
         void updateCache();
+
+        const Collection* _collection;
 
         boost::scoped_ptr<CanonicalQuery> _canonicalQuery;
         boost::scoped_ptr<QuerySolution> _solution;

@@ -116,7 +116,7 @@ namespace mongo {
         void addInitialSource(intrusive_ptr<DocumentSource> source);
 
         /// The source that represents the output. Returns a non-owning pointer.
-        DocumentSource* output() { return sources.back().get(); }
+        DocumentSource* output() { invariant( !sources.empty() ); return sources.back().get(); }
 
         /// Returns true if this pipeline only uses features that work in mongos.
         bool canRunInMongos() const;

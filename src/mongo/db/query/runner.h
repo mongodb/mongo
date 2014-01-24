@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+    class Collection;
     class DiskLoc;
     class TypeExplain;
 
@@ -162,7 +163,7 @@ namespace mongo {
          * The runner must take any actions required to continue operating correctly, including
          * broadcasting the invalidation request to the PlanStage tree being run.
          *
-         * Called from ClientCursor::invalidateDocument.
+         * Called from CollectionCursorCache::invalidateDocument.
          *
          * See db/invalidation_type.h for InvalidationType.
          */
@@ -190,6 +191,11 @@ namespace mongo {
          * Return the NS that the query is running over.
          */
         virtual const string& ns() = 0;
+
+        /**
+         * Return the Collection that the query is running over.
+         */
+        virtual const Collection* collection() = 0;
 
         /**
          * Returns OK, allocating and filling '*explain' with a description of the chosen plan.

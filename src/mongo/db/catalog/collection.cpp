@@ -75,7 +75,8 @@ namespace mongo {
         : _ns( fullNS ),
           _recordStore( _ns.ns() ),
           _infoCache( this ),
-          _indexCatalog( this, details ) {
+          _indexCatalog( this, details ),
+          _cursorCache( fullNS ) {
         _details = details;
         _database = database;
         _recordStore.init( _details,
@@ -232,7 +233,7 @@ namespace mongo {
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        ClientCursor::invalidateDocument(_ns.ns(), _details, loc, INVALIDATION_DELETION);
+        _cursorCache.invalidateDocument(loc, INVALIDATION_DELETION);
 
         _indexCatalog.unindexRecord( doc, loc, noWarn);
 
@@ -304,8 +305,7 @@ namespace mongo {
 
             // unindex old record, don't delete
             // this way, if inserting new doc fails, we can re-index this one
-            ClientCursor::invalidateDocument(_ns.ns(), _details, oldLocation,
-                                             INVALIDATION_DELETION);
+            _cursorCache.invalidateDocument(oldLocation, INVALIDATION_DELETION);
             _indexCatalog.unindexRecord( objOld, oldLocation, true );
 
             if ( debug ) {
@@ -350,7 +350,7 @@ namespace mongo {
         }
 
         // Broadcast the mutation so that query results stay correct.
-        ClientCursor::invalidateDocument(_ns.ns(), _details, oldLocation, INVALIDATION_MUTATION);
+        _cursorCache.invalidateDocument(oldLocation, INVALIDATION_MUTATION);
 
         //  update in place
         int sz = objNew.objsize();

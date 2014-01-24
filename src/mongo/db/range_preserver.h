@@ -48,12 +48,13 @@ namespace mongo {
          * object does.  The ClientCursorPin guarantees that the underlying ClientCursor is not
          * deleted until this object goes out of scope.
          */
-        RangePreserver(const string& ns) {
+        RangePreserver(const Collection* collection) {
+            invariant( collection );
             // Not a memory leak.  Cached in a static structure by CC's ctor.
-            ClientCursor* cc = new ClientCursor(ns);
+            ClientCursor* cc = new ClientCursor(collection);
 
             // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
-            _pin.reset(new ClientCursorPin(cc->cursorid()));
+            _pin.reset(new ClientCursorPin(collection, cc->cursorid()));
         }
 
         ~RangePreserver() {

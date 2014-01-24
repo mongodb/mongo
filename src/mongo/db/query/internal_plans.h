@@ -62,7 +62,7 @@ namespace mongo {
         /**
          * Return a collection scan.  Caller owns pointer.
          */
-        static Runner* collectionScan(const StringData& ns,
+        static Runner* collectionScan(const StringData& ns, // TODO: make this a Collection*
                                       const Direction direction = FORWARD,
                                       const DiskLoc startLoc = DiskLoc()) {
             Collection* collection = cc().database()->getCollection(ns);
@@ -81,7 +81,7 @@ namespace mongo {
 
             WorkingSet* ws = new WorkingSet();
             CollectionScan* cs = new CollectionScan(params, ws, NULL);
-            return new InternalRunner(ns.toString(), cs, ws);
+            return new InternalRunner(collection, cs, ws);
         }
 
         /**
@@ -92,9 +92,8 @@ namespace mongo {
                                  const BSONObj& startKey, const BSONObj& endKey,
                                  bool endKeyInclusive, Direction direction = FORWARD,
                                  int options = 0) {
-            verify(descriptor);
-
-            const NamespaceString& ns = collection->ns();
+            invariant(collection);
+            invariant(descriptor);
 
             IndexScanParams params;
             params.descriptor = descriptor;
@@ -108,10 +107,10 @@ namespace mongo {
             IndexScan* ix = new IndexScan(params, ws, NULL);
 
             if (IXSCAN_FETCH & options) {
-                return new InternalRunner(ns.toString(), new FetchStage(ws, ix, NULL), ws);
+                return new InternalRunner(collection, new FetchStage(ws, ix, NULL), ws);
             }
             else {
-                return new InternalRunner(ns.toString(), ix, ws);
+                return new InternalRunner(collection, ix, ws);
             }
         }
     };

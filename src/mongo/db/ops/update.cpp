@@ -707,10 +707,7 @@ namespace mongo {
                 if (!damages.empty() ) {
 
                     // Broadcast the mutation so that query results stay correct.
-                    ClientCursor::invalidateDocument(nsString.ns(),
-                                                     collection->details(),
-                                                     loc,
-                                                     INVALIDATION_MUTATION);
+                    collection->cursorCache()->invalidateDocument(loc, INVALIDATION_MUTATION);
 
                     collection->details()->paddingFits();
 

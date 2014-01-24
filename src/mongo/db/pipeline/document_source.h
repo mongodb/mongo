@@ -76,6 +76,11 @@ namespace mongo {
         virtual void dispose();
 
         /**
+         * See ClientCursor::kill()
+         */
+        virtual void kill();
+
+        /**
            Get the source's name.
 
            @returns the string name of the source as a constant string;
@@ -345,6 +350,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual bool isValidInitialSource() const { return true; }
         virtual void dispose();
+        virtual void kill();
 
         /**
          * Create a document source based on a passed-in cursor.
@@ -423,6 +429,7 @@ namespace mongo {
 
         string _ns; // namespace
         CursorId _cursorId;
+        bool _killed;
     };
 
 

@@ -30,6 +30,8 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
@@ -64,9 +66,21 @@ namespace mongo {
         return out;
     }
 
+    void DocumentSourceCursor::kill() {
+        _killed = true;
+        _cursorId = 0;
+    }
+
     void DocumentSourceCursor::dispose() {
         if (_cursorId) {
-            ClientCursor::erase(_cursorId);
+            Lock::DBRead lk(_ns);
+            Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+            Collection* collection = ctx.db()->getCollection( _ns );
+            if ( collection ) {
+                ClientCursor* cc = collection->cursorCache()->find( _cursorId );
+                if ( cc )
+                    collection->cursorCache()->deregisterCursor( cc );
+            }
             _cursorId = 0;
         }
 
@@ -74,6 +88,11 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::loadBatch() {
+
+        Lock::DBRead lk(_ns);
+
+        uassert( 17361, "collection or index disappeared when cursor yielded", !_killed );
+
         if (!_cursorId) {
             dispose();
             return;
@@ -81,10 +100,11 @@ namespace mongo {
 
         // We have already validated the sharding version when we constructed the cursor
         // so we shouldn't check it again.
-        Lock::DBRead lk(_ns);
         Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+        Collection* collection = ctx.db()->getCollection( _ns );
+        uassert( 17358, "Collection dropped.", collection );
 
-        ClientCursorPin pin(_cursorId);
+        ClientCursorPin pin(collection, _cursorId);
         ClientCursor* cursor = pin.c();
 
         uassert(16950, "Cursor deleted. Was the collection or database dropped?",
@@ -211,8 +231,10 @@ namespace {
         {
             Lock::DBRead lk(_ns);
             Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+            Collection* collection = ctx.db()->getCollection( _ns );
+            uassert( 17362, "Collection dropped.", collection );
 
-            ClientCursorPin pin(_cursorId);
+            ClientCursorPin pin(collection, _cursorId);
             ClientCursor* cursor = pin.c();
 
             uassert(17135, "Cursor deleted. Was the collection or database dropped?",
@@ -258,6 +280,7 @@ namespace {
         , _docsAddedToBatches(0)
         , _ns(ns)
         , _cursorId(cursorId)
+        , _killed(false)
     {}
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(

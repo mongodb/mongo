@@ -40,11 +40,13 @@
 
 namespace mongo {
 
-    SingleSolutionRunner::SingleSolutionRunner(CanonicalQuery* canonicalQuery,
+    SingleSolutionRunner::SingleSolutionRunner(const Collection* collection,
+                                               CanonicalQuery* canonicalQuery,
                                                QuerySolution* soln,
                                                PlanStage* root,
                                                WorkingSet* ws)
-        : _canonicalQuery(canonicalQuery),
+        : _collection( collection ),
+          _canonicalQuery(canonicalQuery),
           _solution(soln),
           _exec(new PlanExecutor(ws, root)) { }
 
@@ -84,6 +86,7 @@ namespace mongo {
 
     void SingleSolutionRunner::kill() {
         _exec->kill();
+        _collection = NULL;
     }
 
     Status SingleSolutionRunner::getExplainPlan(TypeExplain** explain) const {

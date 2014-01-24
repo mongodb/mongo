@@ -1215,7 +1215,9 @@ namespace mongo {
                 auto_ptr<RangePreserver> rangePreserver;
                 {
                     Client::ReadContext ctx(config.ns);
-                    rangePreserver.reset(new RangePreserver(config.ns));
+                    Collection* collection = ctx.ctx().db()->getCollection( config.ns );
+                    if ( collection )
+                        rangePreserver.reset(new RangePreserver(collection));
 
                     // Get metadata before we check our version, to make sure it doesn't increment
                     // in the meantime.  Need to do this in the same lock scope as the block.

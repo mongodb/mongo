@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_cursor_cache.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -123,6 +124,8 @@ namespace mongo {
 
         const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
         IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
+
+        CollectionCursorCache* cursorCache() const { return &_cursorCache; }
 
         bool requiresIdIndex() const;
 
@@ -226,6 +229,11 @@ namespace mongo {
         RecordStore _recordStore;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
+
+        // this is mutable because read only users of the Collection class
+        // use it keep state.  This seems valid as const correctness of Collection
+        // should be about the data.
+        mutable CollectionCursorCache _cursorCache;
 
         friend class Database;
         friend class FlatIterator;

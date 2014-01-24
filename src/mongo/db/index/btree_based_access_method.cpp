@@ -210,7 +210,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    DiskLoc BtreeBasedAccessMethod::findSingle( const BSONObj& key ) {
+    DiskLoc BtreeBasedAccessMethod::findSingle( const BSONObj& key ) const {
         DiskLoc head = _btreeState->head();
         Record* record = _btreeState->recordStore()->recordFor( head );
 

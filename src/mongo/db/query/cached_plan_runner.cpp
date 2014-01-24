@@ -45,11 +45,13 @@
 
 namespace mongo {
 
-    CachedPlanRunner::CachedPlanRunner(CanonicalQuery* canonicalQuery,
+    CachedPlanRunner::CachedPlanRunner(const Collection* collection,
+                                       CanonicalQuery* canonicalQuery,
                                        QuerySolution* solution,
                                        PlanStage* root,
                                        WorkingSet* ws)
-        : _canonicalQuery(canonicalQuery),
+        : _collection(collection),
+          _canonicalQuery(canonicalQuery),
           _solution(solution),
           _exec(new PlanExecutor(ws, root)),
           _alreadyProduced(false),
@@ -127,6 +129,7 @@ namespace mongo {
 
     void CachedPlanRunner::kill() {
         _killed = true;
+        _collection = NULL;
         _exec->kill();
         if (NULL != _backupPlan.get()) {
             _backupPlan->kill();
