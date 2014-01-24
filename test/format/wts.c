@@ -281,7 +281,7 @@ wts_create(void)
 	if (DATASOURCE("helium"))
 		p += snprintf(p, (size_t)(end - p),
 		    ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
-		    g.c_compression_flag == COMPRESS_NONE : 0 : 1);
+		    g.c_compression_flag == COMPRESS_NONE ? 0 : 1);
 
 	if (DATASOURCE("kvsbdb"))
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
