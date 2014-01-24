@@ -103,6 +103,8 @@ namespace mongo {
 
         /**
          * Returns the normalized version of the subtree rooted at 'root'.
+         *
+         * Takes ownership of 'root'.
          */
         static MatchExpression* normalizeTree(MatchExpression* root);
 
@@ -115,14 +117,6 @@ namespace mongo {
     private:
         // You must go through canonicalize to create a CanonicalQuery.
         CanonicalQuery() { }
-
-        /**
-         * Normalize this canonical query. This should be done only when a
-         * canonical query is constructed via canonicalize().
-         *
-         * Takes ownership of 'root'.
-         */
-        Status normalize(MatchExpression* root);
 
         /**
          * Computes and stores the cache key / query shape

@@ -374,12 +374,6 @@ namespace mongo {
         }
     }
 
-    Status CanonicalQuery::normalize(MatchExpression* root) {
-        _root.reset(normalizeTree(root));
-        sortTree(_root.get());
-        return isValid(_root.get());
-    }
-
     size_t countNodes(MatchExpression* root, MatchExpression::MatchType type) {
         size_t sum = 0;
         if (type == root->matchType()) {
@@ -464,17 +458,22 @@ namespace mongo {
         StatusWithMatchExpression swme = MatchExpressionParser::parse(_pq->getFilter());
         if (!swme.isOK()) { return swme.getStatus(); }
 
+        // Normalize, sort and validate tree.
         MatchExpression* root = swme.getValue();
-        Status validStatus = this->normalize(root);
+        root = normalizeTree(root);
+        sortTree(root);
+        Status validStatus = isValid(root);
         if (!validStatus.isOK()) {
             return validStatus;
         }
+        _root.reset(root);
+
         this->generateCacheKey();
 
         // Validate the projection if there is one.
         if (!_pq->getProj().isEmpty()) {
             ParsedProjection* pp;
-            Status projStatus = ParsedProjection::make(_pq->getProj(), root, &pp);
+            Status projStatus = ParsedProjection::make(_pq->getProj(), _root.get(), &pp);
             if (!projStatus.isOK()) {
                 return projStatus;
             }
