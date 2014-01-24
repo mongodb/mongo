@@ -293,8 +293,8 @@ namespace mongo {
 
             if (params.count("port")) {
                 toolGlobalParams.portSet = true;
-                toolGlobalParams.port = params["port"].as<int>();
-                toolGlobalParams.connectionString += ':' + params["port"].as<int>();
+                toolGlobalParams.port = params["port"].as<string>();
+                toolGlobalParams.connectionString += ':' + params["port"].as<string>();
             }
         }
         else {
