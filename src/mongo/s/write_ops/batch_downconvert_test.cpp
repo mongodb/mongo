@@ -533,8 +533,10 @@ namespace {
     TEST(LegacyGLEWriteConcern, Basic) {
 
         HostOpTimeMap hostOpTimes;
-        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = OpTime();
-        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] = OpTime();
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = 
+            std::make_pair(OpTime(), OID());
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] =
+            std::make_pair(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
@@ -556,8 +558,10 @@ namespace {
     TEST(LegacyGLEWriteConcern, FailGLE) {
 
         HostOpTimeMap hostOpTimes;
-        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = OpTime();
-        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] = OpTime();
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = 
+            std::make_pair(OpTime(), OID());
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] =
+            std::make_pair(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );
@@ -580,8 +584,10 @@ namespace {
     TEST(LegacyGLEWriteConcern, MultiWCErrors) {
 
         HostOpTimeMap hostOpTimes;
-        hostOpTimes[ConnectionString::mock( HostAndPort( "shardA:1000" ) )] = OpTime();
-        hostOpTimes[ConnectionString::mock( HostAndPort( "shardB:1000" ) )] = OpTime();
+        hostOpTimes[ConnectionString::mock( HostAndPort( "shardA:1000" ) )] =
+            std::make_pair(OpTime(), OID());
+        hostOpTimes[ConnectionString::mock( HostAndPort( "shardB:1000" ) )] = 
+            std::make_pair(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, err: 'norepl'}" ) );
@@ -609,8 +615,10 @@ namespace {
     TEST(LegacyGLEWriteConcern, MultiFailGLE) {
 
         HostOpTimeMap hostOpTimes;
-        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = OpTime();
-        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] = OpTime();
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = 
+            std::make_pair(OpTime(), OID());
+        hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] =
+            std::make_pair(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );

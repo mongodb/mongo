@@ -400,8 +400,10 @@ namespace mongo {
         };
     }
 
-    // Adds a wOpTime field to a set of gle options
-    static BSONObj buildGLECmdWithOpTime( const BSONObj& gleOptions, const OpTime& opTime ) {
+    // Adds a wOpTime and a wElectionId field to a set of gle options
+    static BSONObj buildGLECmdWithOpTime( const BSONObj& gleOptions,
+                                          const OpTime& opTime,
+                                          const OID& electionId ) {
         BSONObjBuilder builder;
         BSONObjIterator it( gleOptions );
 
@@ -419,6 +421,7 @@ namespace mongo {
             builder.append( el );
         }
         builder.appendTimestamp( "wOpTime", opTime.asDate() );
+        builder.appendOID( "wElectionId", const_cast<OID*>(&electionId) );
         return builder.obj();
     }
 
@@ -436,12 +439,14 @@ namespace mongo {
             ++it ) {
 
             const ConnectionString& shardEndpoint = it->first;
-            const OpTime& opTime = it->second;
+            const OpTime& opTime = it->second.first;
+            const OID& electionId = it->second.second;
 
             LOG( 3 ) << "enforcing write concern " << options << " on " << shardEndpoint.toString()
-                     << " at opTime " << opTime.toStringPretty() << endl;
+                     << " at opTime " << opTime.toStringPretty() << " with electionID "
+                     << electionId;
 
-            BSONObj gleCmd = buildGLECmdWithOpTime( options, opTime );
+            BSONObj gleCmd = buildGLECmdWithOpTime( options, opTime, electionId );
 
             RawBSONSerializable gleCmdSerial( gleCmd );
             dispatcher->addCommand( shardEndpoint, dbName, gleCmdSerial );

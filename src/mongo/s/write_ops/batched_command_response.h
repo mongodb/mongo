@@ -60,6 +60,7 @@ namespace mongo {
         static const BSONField<long long> nModified;
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<OpTime> lastOp;
+        static const BSONField<OID> electionId;
         static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
         static const BSONField<WCErrorDetail*> writeConcernError;
 
@@ -125,6 +126,11 @@ namespace mongo {
         bool isLastOpSet() const;
         OpTime getLastOp() const;
 
+        void setElectionId(const OID& electionId);
+        void unsetElectionId();
+        bool isElectionIdSet() const;
+        OID getElectionId() const;
+
         void setErrDetails(const std::vector<WriteErrorDetail*>& errDetails);
         // errDetails ownership is transferred to here.
         void addToErrDetails(WriteErrorDetail* errDetails);
@@ -171,9 +177,19 @@ namespace mongo {
         //      Should only be present if _singleUpserted is not.
         boost::scoped_ptr<std::vector<BatchedUpsertDetail*> >_upsertDetails;
 
-        // (O)  XXX What is lastop?
+        // (O)  Timestamp assigned to the write op when it was written to the oplog.
+        //      Normally, getLastError can use Client::_lastOp, but this is not valid for
+        //      mongos which loses track of the session due to RCAR.  Therefore, we must
+        //      keep track of the lastOp manually ourselves.
         OpTime _lastOp;
         bool _isLastOpSet;
+
+        // (O)  In addition to keeping track of the above lastOp timestamp, we must also keep
+        //      track of the primary we talked to.  This is because if the primary moves,
+        //      subsequent calls to getLastError are invalid.  The only way we know if an
+        //      election has occurred is to use the unique electionId.
+        OID _electionId;
+        bool _isElectionIdSet;
 
         // (O)  Array of item-level error information
         boost::scoped_ptr<std::vector<WriteErrorDetail*> >_writeErrorDetails;

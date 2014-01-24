@@ -43,6 +43,7 @@ namespace mongo {
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
     const BSONField<OpTime> BatchedCommandResponse::lastOp("lastOp");
+    const BSONField<OID> BatchedCommandResponse::electionId("electionId");
     const BSONField<std::vector<WriteErrorDetail*> >
         BatchedCommandResponse::writeErrors("writeErrors");
     const BSONField<WCErrorDetail*> BatchedCommandResponse::writeConcernError("writeConcernError");
@@ -94,6 +95,7 @@ namespace mongo {
         }
 
         if (_isLastOpSet) builder.append(lastOp(), _lastOp);
+        if (_isElectionIdSet) builder.appendOID(electionId(), const_cast<OID*>(&_electionId));
 
         if (_writeErrorDetails.get()) {
             BSONArrayBuilder errDetailsBuilder(builder.subarrayStart(writeErrors()));
@@ -173,6 +175,10 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isLastOpSet = fieldState == FieldParser::FIELD_SET;
 
+        fieldState = FieldParser::extract(source, electionId, &_electionId, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isElectionIdSet = fieldState == FieldParser::FIELD_SET;
+
         std::vector<WriteErrorDetail*>* tempErrDetails = NULL;
         fieldState = FieldParser::extract(source, writeErrors, &tempErrDetails, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -215,6 +221,9 @@ namespace mongo {
 
         _lastOp = OpTime();
         _isLastOpSet = false;
+
+        _electionId = OID();
+        _isElectionIdSet = false;
 
         if (_writeErrorDetails.get()) {
             for(std::vector<WriteErrorDetail*>::const_iterator it = _writeErrorDetails->begin();
@@ -262,6 +271,9 @@ namespace mongo {
 
         other->_lastOp = _lastOp;
         other->_isLastOpSet = _isLastOpSet;
+
+        other->_electionId = _electionId;
+        other->_isElectionIdSet = _isElectionIdSet;
 
         other->unsetErrDetails();
         if (_writeErrorDetails.get()) {
@@ -452,6 +464,24 @@ namespace mongo {
     OpTime BatchedCommandResponse::getLastOp() const {
         dassert(_isLastOpSet);
         return _lastOp;
+    }
+
+    void BatchedCommandResponse::setElectionId(const OID& electionId) {
+        _electionId = electionId;
+        _isElectionIdSet = true;
+    }
+
+    void BatchedCommandResponse::unsetElectionId() {
+         _isElectionIdSet = false;
+     }
+
+    bool BatchedCommandResponse::isElectionIdSet() const {
+         return _isElectionIdSet;
+    }
+
+    OID BatchedCommandResponse::getElectionId() const {
+        dassert(_isElectionIdSet);
+        return _electionId;
     }
 
     void BatchedCommandResponse::setErrDetails(const std::vector<WriteErrorDetail*>& errDetails) {

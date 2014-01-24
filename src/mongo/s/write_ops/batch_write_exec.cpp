@@ -262,7 +262,9 @@ namespace mongo {
                         // or delete any documents, which preserves old behavior but is conservative
                         _stats->noteWriteAt( shardHost,
                                              response.isLastOpSet() ? 
-                                             response.getLastOp() : OpTime() );
+                                             response.getLastOp() : OpTime(),
+                                             response.isElectionIdSet() ?
+                                             response.getElectionId() : OID());
                     }
                     else {
 
@@ -337,8 +339,10 @@ namespace mongo {
         return _stats.release();
     }
 
-    void BatchWriteExecStats::noteWriteAt( const ConnectionString& host, OpTime opTime ) {
-        _writeOpTimes[host] = opTime;
+    void BatchWriteExecStats::noteWriteAt(const ConnectionString& host,
+                                          OpTime opTime,
+                                          const OID& electionId) {
+        _writeOpTimes[host] = std::make_pair(opTime, electionId);
     }
 
     const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {

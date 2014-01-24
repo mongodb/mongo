@@ -42,6 +42,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
@@ -259,6 +260,9 @@ namespace mongo {
 
             if ( anyReplEnabled() ) {
                 response->setLastOp( _client->getLastOp() );
+                if (theReplSet) {
+                    response->setElectionId( theReplSet->getElectionId() );
+                }
             }
 
             // Set the stats for the response

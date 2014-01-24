@@ -104,7 +104,7 @@ namespace mongo {
         }
     };
 
-    typedef std::map<ConnectionString, OpTime, ConnectionStringComp> HostOpTimeMap;
+    typedef std::map<ConnectionString, std::pair<OpTime, OID>, ConnectionStringComp> HostOpTimeMap;
 
     class BatchWriteExecStats {
     public:
@@ -113,7 +113,7 @@ namespace mongo {
            numRounds( 0 ), numTargetErrors( 0 ), numResolveErrors( 0 ), numStaleBatches( 0 ) {
         }
 
-        void noteWriteAt( const ConnectionString& host, OpTime opTime );
+        void noteWriteAt(const ConnectionString& host, OpTime opTime, const OID& electionId);
 
         const HostOpTimeMap& getWriteOpTimes() const;
 
