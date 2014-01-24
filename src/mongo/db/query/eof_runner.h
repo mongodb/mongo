@@ -70,7 +70,7 @@ namespace mongo {
         virtual void kill();
 
         // this can return NULL since we never yield or anything over it
-        virtual Collection* collection() { return NULL; }
+        virtual const Collection* collection() { return NULL; }
 
         /**
          * Always returns OK, allocating and filling in '*explain' with a fake ("zeroed")
