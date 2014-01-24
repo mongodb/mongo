@@ -1605,7 +1605,12 @@ update(WT_CURSOR *wtcursor, int remove_op)
 	/* Push the record into the cache. */
 	if ((ret = he_update(ws->he_cache, r)) != 0)
 		EMSG(wtext, session, ret, "he_update: %s", he_strerror(ret));
+
+	/* Update the state while still holding the lock. */
 	ws->he_cache_inuse = 1;
+	if (!remove_op)
+		ws->cleaner_bytes += wtcursor->value.size;
+	++ws->cleaner_ops;
 
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
