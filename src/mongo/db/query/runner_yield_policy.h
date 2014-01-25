@@ -79,7 +79,7 @@ namespace mongo {
             if ( runner->collection() ) {
                 // if the runner was killed, runner->collection() will return NULL
                 // so we don't deregister as it was done when killed
-                runner->collection()->cursorCache()->registerRunner( _runnerYielding );
+                runner->collection()->cursorCache()->deregisterRunner( _runnerYielding );
             }
             _runnerYielding = NULL;
             _elapsedTracker.resetLastTime();
