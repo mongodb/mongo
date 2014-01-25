@@ -122,7 +122,7 @@ namespace mongo {
         typedef unordered_set<Runner*> RunnerSet;
         RunnerSet _nonCachedRunners;
 
-        typedef unordered_map<CursorId,ClientCursor*> CursorMap;
+        typedef std::map<CursorId,ClientCursor*> CursorMap;
         CursorMap _cursors;
     };
 
