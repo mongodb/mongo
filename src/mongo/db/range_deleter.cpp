@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/s/range_arithmetic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/range_deleter_stats.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/mongoutils/str.h"
@@ -397,6 +398,9 @@ namespace mongo {
     }
 
     void RangeDeleter::doWork() {
+        if ( currentClient.get() == NULL )
+            Client::initThread( "RangeDeleter" );
+
         while (!inShutdown() && !stopRequested()) {
             string errMsg;
 
