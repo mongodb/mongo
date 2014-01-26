@@ -389,6 +389,7 @@ namespace mongo {
     void _appendCursorStats( BSONObjBuilder& b ) {
         b.append( "note" , "deprecated, use server status metrics" );
 
+        b.appendNumber("clientCursors_size", cursorStatsOpen.get() );
         b.appendNumber("totalOpen", cursorStatsOpen.get() );
         b.appendNumber("pinned", cursorStatsOpenPinned.get() );
         b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get() );
@@ -417,7 +418,6 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl ) {
             _appendCursorStats( result );
-            result.append( "note", "deprecated, get from serverStatus().cursors" );
             return true;
         }
     } cmdCursorInfo;
