@@ -200,7 +200,6 @@ namespace mongo {
 
     class MigrateFromStatus {
     public:
-
         MigrateFromStatus() : _mutex("MigrateFromStatus") {
             _active = false;
             _inCriticalSection = false;
@@ -243,6 +242,10 @@ namespace mongo {
         void done() {
             log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
                     "section" << endl;
+
+
+            _dummyRunner.reset( NULL );
+
             Lock::GlobalWrite lk;
             log() << "MigrateFromStatus::done Global lock acquired" << endl;
 
@@ -396,6 +399,8 @@ namespace mongo {
                 return false;
             }
 
+            _dummyRunner.reset( new DummyRunner( _ns, collection ) );
+
             IndexDescriptor *idx =
                 collection->getIndexCatalog()->findIndexByPrefix( _shardKeyPattern ,
                                                                   true );  /* require single key */
@@ -541,17 +546,7 @@ namespace mongo {
             return true;
         }
 
-        void aboutToDelete( const Database* db , const DiskLoc& dl ) {
-            verify(db);
-            Lock::assertWriteLocked(db->name());
-
-            if ( ! _getActive() )
-                return;
-
-            if ( ! db->ownsNS( _ns ) )
-                return;
-
-            
+        void aboutToDelete( const DiskLoc& dl ) {
             // not needed right now
             // but trying to prevent a future bug
             scoped_spinlock lk( _trackerLocks ); 
@@ -627,7 +622,70 @@ namespace mongo {
         bool _getActive() const { scoped_lock l(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock l(_mutex); _active = b; }
 
+
+        class DummyRunner : public Runner {
+        public:
+            DummyRunner( const StringData& ns,
+                         Collection* collection ) {
+                _ns = ns.toString();
+                _collection = collection;
+                _collection->cursorCache()->registerRunner( this );
+            }
+            ~DummyRunner() {
+                if ( !_collection )
+                    return;
+                Client::ReadContext ctx( _ns );
+                Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                invariant( _collection == collection );
+                _collection->cursorCache()->deregisterRunner( this );
+            }
+            virtual void setYieldPolicy(YieldPolicy policy) {
+                invariant( false );
+            }
+            virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
+                invariant( false );
+            }
+            virtual bool isEOF() {
+                invariant( false );
+                return false;
+            }
+            virtual void kill() {
+                _collection = NULL;
+            }
+            virtual void saveState() {
+                invariant( false );
+            }
+            virtual bool restoreState() {
+                invariant( false );
+            }
+            virtual const string& ns() {
+                invariant( false );
+                
+            }
+            virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+            virtual const Collection* collection() { 
+                invariant( false );
+                return NULL;
+            }
+            virtual Status getExplainPlan(TypeExplain** explain) const {
+                return Status( ErrorCodes::InternalError, "no" );
+            }
+
+        private:
+            string _ns;
+            Collection* _collection;
+        };
+
+        scoped_ptr<DummyRunner> _dummyRunner;
+
     } migrateFromStatus;
+
+    void MigrateFromStatus::DummyRunner::invalidate(const DiskLoc& dl,
+                                                    InvalidationType type) {
+        if ( type == INVALIDATION_DELETION ) {
+            migrateFromStatus.aboutToDelete( dl );
+        }
+    }
 
     struct MigrateStatusHolder {
         MigrateStatusHolder( const std::string& ns ,
@@ -658,17 +716,6 @@ namespace mongo {
                           bool notInActiveChunk) {
         // TODO: include fullObj?
         migrateFromStatus.logOp(opstr, ns, obj, patt, notInActiveChunk);
-    }
-
-    void aboutToDeleteForSharding( const StringData& ns,
-                                   const Database* db,
-                                   const NamespaceDetails* nsd,
-                                   const DiskLoc& dl )
-    {
-        // Note: namespace is currently unused since we only have a single migration per host,
-        // but will be needed for parallel migrations.
-        if ( nsd->isCapped() ) return;
-        migrateFromStatus.aboutToDelete( db, dl );
     }
 
     class TransferModsCommand : public ChunkCommandHelper {

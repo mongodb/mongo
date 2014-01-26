@@ -70,11 +70,6 @@ namespace mongo {
     static ServerStatusMetricField<Counter64> dCursorStatusTimedout( "cursor.timedOut",
                                                                      &cursorStatsTimedOut );
 
-    void aboutToDeleteForSharding(const StringData& ns,
-                                  const Database* db,
-                                  const NamespaceDetails* nsd,
-                                  const DiskLoc& dl ); // from s/d_logic.h
-
     long long ClientCursor::totalOpen() {
         return cursorStatsOpen.get();
     }

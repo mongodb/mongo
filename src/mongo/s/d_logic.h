@@ -372,6 +372,4 @@ namespace mongo {
                            const BSONObj* fullObj,
                            bool forMigrateCleanup );
 
-    void aboutToDeleteForSharding( const StringData& ns, const Database* db , const DiskLoc& dl );
-
 }
