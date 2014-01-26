@@ -213,6 +213,7 @@ namespace mongo {
 
         cursor->kill();
         collection->cursorCache()->deregisterCursor( cursor );
+        delete cursor;
         return true;
     }
 
