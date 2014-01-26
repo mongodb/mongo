@@ -12,7 +12,7 @@ function check(shouldExist) {
     var dbs = m.getDBNames();
     assert.eq(Array.contains(dbs, baseName), shouldExist,
               "DB " + baseName + " should " + (shouldExist ? "" : "not ") + "exist."
-              + " dbs: " + tojson(dbs));
+              + " dbs: " + tojson(dbs) + "\n" + tojson( m.getDBs() ) );
 }
 
 ddb.c.save( {} );
