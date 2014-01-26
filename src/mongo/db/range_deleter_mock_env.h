@@ -60,6 +60,8 @@ namespace mongo {
     public:
         RangeDeleterMockEnv();
 
+        void initThread() {}
+
         //
         // Environment modification methods.
         //

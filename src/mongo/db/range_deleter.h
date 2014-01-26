@@ -274,6 +274,8 @@ namespace mongo {
     struct RangeDeleterEnv {
         virtual ~RangeDeleterEnv() {}
 
+        virtual void initThread() = 0;
+
         /**
          * Deletes the documents from the given range. This method should be
          * responsible for making sure that the proper contexts are setup

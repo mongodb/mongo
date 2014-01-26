@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/rs.h"
@@ -37,6 +38,11 @@
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
+
+    void RangeDeleterDBEnv::initThread() {
+        if ( currentClient.get() == NULL )
+            Client::initThread( "RangeDeleter" );
+    }
 
     /**
      * Outline of the delete process:
