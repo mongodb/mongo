@@ -33,6 +33,8 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/repl/replication_server_status.h"  // time out
+
 
 namespace mongo {
 
@@ -67,9 +69,6 @@ namespace mongo {
         BSONObj getLastOp(const char *ns) {
             return findOne(ns, Query().sort(reverseNaturalObj));
         }
-
-        /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */
-        static const int tcp_timeout = 30;
 
         /* ok to call if already connected */
         bool connect(const std::string& hostname);
@@ -156,9 +155,9 @@ namespace mongo {
         BSONObj nextSafe() { return cursor->nextSafe(); }
         BSONObj next() { return cursor->next(); }
         void putBack(BSONObj op) { cursor->putBack(op); }
-        
+
     private:
-        /** @return true iff connection was successful */ 
+        /** @return true iff connection was successful */
         bool commonConnect(const string& hostName);
         bool passthroughHandshake(const mongo::OID& rid, const int f);
     };

@@ -57,6 +57,8 @@ namespace mongo {
 
         int slavedelay;
 
+        int oplogtimeout;
+
         long long oplogSize;   // --oplogSize
 
         // for master/slave replication
@@ -87,6 +89,7 @@ namespace mongo {
             fastsync(),
             autoresync(false),
             slavedelay(),
+            oplogtimeout(30), /* SO_TIMEOUT (send/recv time out) for oplog database connections, default is seconds */
             oplogSize(0),
             pretouch(0),
             discoveredSeeds(),

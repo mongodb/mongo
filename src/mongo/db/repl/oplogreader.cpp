@@ -85,7 +85,7 @@ namespace mongo {
     OplogReader::OplogReader() {
         _tailingQueryOptions = QueryOption_SlaveOk;
         _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
-        
+
         /* TODO: slaveOk maybe shouldn't use? */
         _tailingQueryOptions |= QueryOption_AwaitData;
 
@@ -96,7 +96,7 @@ namespace mongo {
         if( conn() == 0 ) {
             _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
                                                                           0,
-                                                                          tcp_timeout));
+                                                                          replSettings.oplogtimeout));
             string errmsg;
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
                  (getGlobalAuthorizationManager()->isAuthEnabled() &&

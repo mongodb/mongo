@@ -306,6 +306,10 @@ namespace mongo {
                 "specify delay (in seconds) to be used when applying master ops to slave")
                                     .setSources(moe::SourceAllLegacy);
 
+        ms_options.addOptionChaining("oplogtimeout","oplogtimeout",moe::Int,
+				"specify oplog query timeout (in seconds) to be used when query oplog in master")
+									.setSources(moe::SourceAllLegacy);
+
         ms_options.addOptionChaining("autoresync", "autoresync", moe::Switch,
                 "automatically resync if slave data is stale")
                                     .setSources(moe::SourceAllLegacy);
@@ -702,6 +706,9 @@ namespace mongo {
         }
         if (params.count("slavedelay")) {
             replSettings.slavedelay = params["slavedelay"].as<int>();
+        }
+        if (params.count("oplogtimeout")){
+            replSettings.oplogtimeout = params["oplogtimeout"].as<int>();
         }
         if (params.count("fastsync")) {
             replSettings.fastsync = true;
