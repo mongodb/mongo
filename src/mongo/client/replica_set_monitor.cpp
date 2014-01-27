@@ -279,8 +279,7 @@ namespace {
     }
 
     HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
-        const TagSet matchAnything(BSON_ARRAY(BSONObj()));
-        const ReadPreferenceSetting masterOnly(ReadPreference_PrimaryOnly, matchAnything);
+        const ReadPreferenceSetting masterOnly(ReadPreference_PrimaryOnly, TagSet());
         HostAndPort master = getHostOrRefresh(masterOnly);
         uassert(10009, str::stream() << "ReplicaSetMonitor no master found for set: " << getName(),
                 !master.empty());

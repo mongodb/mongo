@@ -119,25 +119,23 @@ namespace {
                         tagsElem.type() == mongo::Array);
 
                 TagSet tags(BSONArray(tagsElem.Obj().getOwned()));
-                if (pref == mongo::ReadPreference_PrimaryOnly && !tags.isExhausted()) {
+                if (pref == mongo::ReadPreference_PrimaryOnly && !tags.getTagBSON().isEmpty()) {
                     uassert(16384, "Only empty tags are allowed with primary read preference",
-                            tags.getCurrentTag().isEmpty());
+                            tags.getTagBSON().firstElement().Obj().isEmpty());
                 }
 
                 return new ReadPreferenceSetting(pref, tags);
             }
             else {
-                TagSet tags(BSON_ARRAY(BSONObj()));
-                return new ReadPreferenceSetting(pref, tags);
+                return new ReadPreferenceSetting(pref, TagSet());
             }
         }
 
         // Default read pref is primary only or secondary preferred with slaveOK
-        TagSet tags(BSON_ARRAY(BSONObj()));
         ReadPreference pref =
             queryOptions & QueryOption_SlaveOk ?
                 mongo::ReadPreference_SecondaryPreferred : mongo::ReadPreference_PrimaryOnly;
-        return new ReadPreferenceSetting(pref, tags);
+        return new ReadPreferenceSetting(pref, TagSet());
     }
 } // namespace
 
@@ -337,10 +335,8 @@ namespace {
     }
 
     DBClientConnection& DBClientReplicaSet::slaveConn() {
-        BSONArray emptyArray(BSON_ARRAY(BSONObj()));
-        TagSet tags(emptyArray);
         shared_ptr<ReadPreferenceSetting> readPref(
-                new ReadPreferenceSetting(ReadPreference_SecondaryPreferred, tags));
+                new ReadPreferenceSetting(ReadPreference_SecondaryPreferred, TagSet()));
         DBClientConnection* conn = selectNodeUsingTags(readPref);
 
         uassert( 16369, str::stream() << "No good nodes available for set: "
@@ -363,9 +359,8 @@ namespace {
 
         // We prefer to authenticate against a primary, but otherwise a secondary is ok too
         // Empty tag matches every secondary
-        TagSet tags(BSON_ARRAY(BSONObj()));
         shared_ptr<ReadPreferenceSetting> readPref(
-            new ReadPreferenceSetting( ReadPreference_PrimaryPreferred, tags ) );
+            new ReadPreferenceSetting( ReadPreference_PrimaryPreferred, TagSet() ) );
 
         LOG(3) << "dbclient_rs authentication of " << _getMonitor()->getName() << endl;
 
@@ -959,62 +954,9 @@ namespace {
         _lastSlaveOkConn.reset();
     }
 
-    TagSet::TagSet():
-            _isExhausted(true),
-            _tagIterator(new BSONArrayIteratorSorted(_tags)) {
-    }
-
-    TagSet::TagSet(const TagSet& other) :
-            _isExhausted(false),
-            _tags(other._tags.getOwned()),
-            _tagIterator(new BSONArrayIteratorSorted(_tags)) {
-        next();
-    }
-
-    TagSet::TagSet(const BSONArray& tags) :
-            _isExhausted(false),
-            _tags(tags.getOwned()),
-            _tagIterator(new BSONArrayIteratorSorted(_tags)) {
-        next();
-    }
-
-    void TagSet::next() {
-        if (_tagIterator->more()) {
-            const BSONElement& nextTag = _tagIterator->next();
-            uassert(16357, "Tags should be a BSON object", nextTag.isABSONObj());
-            _currentTag = nextTag.Obj();
-        }
-        else {
-            _isExhausted = true;
-        }
-    }
-
-    void TagSet::reset() {
-        _isExhausted = false;
-        _tagIterator.reset(new BSONArrayIteratorSorted(_tags));
-        next();
-    }
-
-    const BSONObj& TagSet::getCurrentTag() const {
-        verify(!_isExhausted);
-        return _currentTag;
-    }
-
-    bool TagSet::isExhausted() const {
-        return _isExhausted;
-    }
-
-    BSONObjIterator* TagSet::getIterator() const {
-        return new BSONObjIterator(_tags);
-    }
-
-    bool TagSet::equals(const TagSet& other) const {
-        return _tags.equal(other._tags);
-    }
-
-    const BSONArray& TagSet::getTagBSON() const {
-        return _tags;
-    }
+    // trying to optimize for the common dont-care-about-tags case.
+    static const BSONArray tagsMatchesAll = BSON_ARRAY(BSONObj());
+    TagSet::TagSet() : _tags(tagsMatchesAll) {}
 
     string readPrefToString( ReadPreference pref ) {
         switch ( pref ) {

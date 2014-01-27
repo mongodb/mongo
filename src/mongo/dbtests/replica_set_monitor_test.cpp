@@ -1358,34 +1358,7 @@ namespace mongo_test {
         ASSERT_EQUALS("b", host.host());
     }
 
-    TEST(TagSet, CopyConstructor) {
-        TagSet* copy;
-
-        {
-            BSONArrayBuilder builder;
-            builder.append(BSON("dc" << "nyc"));
-            builder.append(BSON("priority" << "1"));
-            TagSet original(builder.arr());
-
-            original.next();
-
-            copy = new TagSet(original);
-        }
-
-        ASSERT_FALSE(copy->isExhausted());
-        ASSERT(copy->getCurrentTag().equal(BSON("dc" << "nyc")));
-        copy->next();
-
-        ASSERT_FALSE(copy->isExhausted());
-        ASSERT(copy->getCurrentTag().equal(BSON("priority" << "1")));
-        copy->next();
-
-        ASSERT(copy->isExhausted());
-
-        delete copy;
-    }
-
-    TEST(TagSet, NearestMultiTagsNoMatch) {
+    TEST(MultiTags, NearestMultiTagsNoMatch) {
         vector<Node> nodes =
                 NodeSetFixtures::getThreeMemberWithTags();
         TagSet tags(TagSetFixtures::getMultiNoMatchTag());
@@ -1398,77 +1371,9 @@ namespace mongo_test {
         ASSERT(host.empty());
     }
 
-    TEST(TagSet, SingleTagSet) {
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "nyc"));
-
-        TagSet tags(BSONArray(builder.done()));
-
-        ASSERT(!tags.isExhausted());
-        ASSERT(tags.getCurrentTag().equal(BSON("dc" << "nyc")));
-
-        ASSERT(!tags.isExhausted());
-        tags.next();
-
-        ASSERT(tags.isExhausted());
-#if !(defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF))
-        // TODO: remove this guard once SERVER-6317 is fixed
-        ASSERT_THROWS(tags.getCurrentTag(), mongo::AssertionException);
-#endif
-    }
-
-    TEST(TagSet, MultiTagSet) {
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "nyc"));
-        builder.append(BSON("dc" << "sf"));
-        builder.append(BSON("dc" << "ma"));
-
-        TagSet tags(BSONArray(builder.done()));
-
-        ASSERT(!tags.isExhausted());
-        ASSERT(tags.getCurrentTag().equal(BSON("dc" << "nyc")));
-
-        ASSERT(!tags.isExhausted());
-        tags.next();
-        ASSERT(tags.getCurrentTag().equal(BSON("dc" << "sf")));
-
-        ASSERT(!tags.isExhausted());
-        tags.next();
-        ASSERT(tags.getCurrentTag().equal(BSON("dc" << "ma")));
-
-        ASSERT(!tags.isExhausted());
-        tags.next();
-
-        ASSERT(tags.isExhausted());
-#if !(defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF))
-        // TODO: remove this guard once SERVER-6317 is fixed
-        ASSERT_THROWS(tags.getCurrentTag(), mongo::AssertionException);
-#endif
-    }
-
-    TEST(TagSet, EmptyArrayTags) {
-        BSONArray emptyArray;
-        TagSet tags(emptyArray);
-
-        ASSERT(tags.isExhausted());
-#if !(defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF))
-        // TODO: remove this guard once SERVER-6317 is fixed
-        ASSERT_THROWS(tags.getCurrentTag(), mongo::AssertionException);
-#endif
-    }
-
-    TEST(TagSet, Reset) {
-        BSONArrayBuilder builder;
-        builder.append(BSON("dc" << "nyc"));
-
-        TagSet tags(BSONArray(builder.done()));
-        tags.next();
-        ASSERT(tags.isExhausted());
-
-        tags.reset();
-
-        ASSERT(!tags.isExhausted());
-        ASSERT(tags.getCurrentTag().equal(BSON("dc" << "nyc")));
+    TEST(TagSet, DefaultConstructorMatchesAll) {
+        TagSet tags;
+        ASSERT_EQUALS(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
     }
 
 
@@ -1645,9 +1550,8 @@ namespace mongo_test {
 
         replSet->restore(secHost);
 
-        TagSet tags(BSON_ARRAY(BSONObj()));
         HostAndPort node = monitor->getHostOrRefresh(
-            ReadPreferenceSetting(mongo::ReadPreference_SecondaryOnly, tags));
+            ReadPreferenceSetting(mongo::ReadPreference_SecondaryOnly, TagSet()));
 
         ASSERT_FALSE(monitor->isPrimary(node));
         ASSERT_EQUALS(secHost, node.toString(true));

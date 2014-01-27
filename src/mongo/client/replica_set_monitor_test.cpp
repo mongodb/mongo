@@ -327,8 +327,7 @@ TEST(ReplicaSetMonitorTests, SlavesUsableEvenIfNoMaster) {
     SetStatePtr state = boost::make_shared<SetState>("name", seeds);
     Refresher refresher(state);
 
-    const TagSet any(BSON_ARRAY(BSONObj()));
-    const ReadPreferenceSetting secondary(ReadPreference_SecondaryOnly, any);
+    const ReadPreferenceSetting secondary(ReadPreference_SecondaryOnly, TagSet());
 
     // Mock a reply from the only host we know about and have it claim to not be master or know
     // about any other hosts. This leaves the scan with no more hosts to scan, but all hosts are

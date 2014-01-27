@@ -255,84 +255,35 @@ namespace mongo {
     };
 
     /**
-     * A simple object for representing the list of tags. The initial state will
-     * have a valid current tag as long as the list is not empty.
+     * A simple object for representing the list of tags requested by a $readPreference.
      */
     class MONGO_CLIENT_API TagSet {
     public:
         /**
-         * Creates an empty tag list that is initially exhausted.
+         * Creates a TagSet that matches any nodes.
+         *
+         * Do not call during static init.
          */
         TagSet();
 
         /**
-         * Creates a copy of the given TagSet. The new copy will have the
-         * iterator pointing at the initial position.
-         */
-        explicit TagSet(const TagSet& other);
-
-        /**
-         * Creates a tag set object that lazily iterates over the tag list.
+         * Creates a TagSet from a BSONArray of tags.
          *
          * @param tags the list of tags associated with this option. This object
          *     will get a shared copy of the list. Therefore, it is important
          *     for the the given tag to live longer than the created tag set.
          */
-        explicit TagSet(const BSONArray& tags);
+        explicit TagSet(const BSONArray& tags) : _tags(tags) {}
 
         /**
-         * Advance to the next tag.
-         *
-         * @throws AssertionException if iterator is exhausted before this is called.
+         * Returns the BSONArray listing all tags that should be accepted.
          */
-        void next();
+        const BSONArray& getTagBSON() const { return _tags; }
 
-        /**
-         * Rests the iterator to point to the first element (if there is a tag).
-         */
-        void reset();
-
-        //
-        // Getters
-        //
-
-        /**
-         * @return the current tag. Returned tag is invalid if isExhausted is true.
-         */
-        const BSONObj& getCurrentTag() const;
-
-        /**
-         * @return true if the iterator has been exhausted.
-         */
-        bool isExhausted() const;
-
-        /**
-         * @return an unordered iterator to the tag list. The caller is responsible for
-         *     destroying the returned iterator.
-         */
-        BSONObjIterator* getIterator() const;
-
-        /**
-         * @returns true if the other TagSet has the same tag set specification with
-         *     this tag set, disregarding where the current iterator is pointing to.
-         */
-        bool equals(const TagSet& other) const;
-
-        const BSONArray& getTagBSON() const;
+        bool operator==(const TagSet& other) const { return _tags == other._tags; }
 
     private:
-        /**
-         * This is purposely undefined as the semantics for assignment can be
-         * confusing. This is because BSONArrayIteratorSorted shouldn't be
-         * copied (because of how it manages internal buffer).
-         */
-        TagSet& operator=(const TagSet& other);
-        BSONObj _currentTag;
-        bool _isExhausted;
-
-        // Important: do not re-order _tags & _tagIterator
         BSONArray _tags;
-        scoped_ptr<BSONArrayIteratorSorted> _tagIterator;
     };
 
     struct MONGO_CLIENT_API ReadPreferenceSetting {
@@ -348,7 +299,7 @@ namespace mongo {
         }
 
         inline bool equals(const ReadPreferenceSetting& other) const {
-            return pref == other.pref && tags.equals(other.tags);
+            return pref == other.pref && tags == other.tags;
         }
 
         BSONObj toBSON() const;
