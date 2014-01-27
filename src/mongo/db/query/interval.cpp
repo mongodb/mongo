@@ -134,6 +134,11 @@ namespace mongo {
         return _intervalData.nFields() == 0;
     }
 
+    // XXX: move the stuff in the anonymous namespace into 'this' and clean this file up in general.
+    bool Interval::equals(const Interval& other) const {
+        return exact(*this, other);
+    }
+
     // TODO: shortcut number of comparisons
     Interval::IntervalComparison Interval::compare(const Interval& other) const {
         //

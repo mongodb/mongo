@@ -86,6 +86,8 @@ t.save( { a:1, b:2 } );
 t.save( { a:2, b:1 } );
 t.save( { a:2, b:3 } );
 t.save( { a:3, b:4 } );
+assert.eq( 1, t.count( { a:1 }));
+assert.eq( 2, t.count( { a:2 }));
 assert.eq( 1, t.count( { a:{ $gt:2 } } ) );
 assert.eq( 1, t.count( { a:{ $lt:2 } } ) );
 assert.eq( 2, t.count( { a:2, b:{ $gt:0 } } ) );

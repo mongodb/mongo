@@ -89,6 +89,13 @@ namespace mongo {
             PlanStage::StageState code = _root->work(&id);
 
             if (PlanStage::ADVANCED == code) {
+                // Fast count.
+                if (WorkingSet::INVALID_ID == id) {
+                    invariant(NULL == objOut);
+                    invariant(NULL == dlOut);
+                    return Runner::RUNNER_ADVANCED;
+                }
+
                 WorkingSetMember* member = _workingSet->get(id);
                 bool hasRequestedData = true;
 

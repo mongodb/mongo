@@ -68,6 +68,10 @@ namespace mongo {
             // Set this if you want to try to keep documents deleted or mutated during the execution
             // of the query in the query results.
             KEEP_MUTATIONS = 1 << 5,
+
+            // Nobody should set this above the getRunner interface.  Internal flag set as a hint to
+            // the planner that the caller is actually the count command.
+            PRIVATE_IS_COUNT = 1 << 6,
         };
 
         // See Options enum above.

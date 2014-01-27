@@ -618,4 +618,30 @@ namespace mongo {
         int fieldNo;
     };
 
+    /**
+     * Some count queries reduce to counting how many keys are between two entries in a
+     * Btree.
+     */
+    struct CountNode : public QuerySolutionNode {
+        CountNode() { }
+        virtual ~CountNode() { }
+
+        virtual StageType getType() const { return STAGE_COUNT; }
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
+        bool sortedByDiskLoc() const { return false; }
+        const BSONObjSet& getSort() const { return sorts; }
+        BSONObjSet sorts;
+
+        BSONObj indexKeyPattern;
+
+        BSONObj startKey;
+        bool startKeyInclusive;
+
+        BSONObj endKey;
+        bool endKeyInclusive;
+    };
+
 }  // namespace mongo

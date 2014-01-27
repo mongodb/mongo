@@ -53,7 +53,9 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.  Deletes
      * rawCanonicalQuery.
      */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions = 0);
+    Status getRunner(CanonicalQuery* rawCanonicalQuery,
+                     Runner** out,
+                     size_t plannerOptions = 0);
 
     /**
      * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
@@ -62,8 +64,10 @@ namespace mongo {
      * work to obtain the Collection has already been done by the caller. The 'collection'
      * argument may be NULL.
      */
-    Status getRunner(Collection* collection, CanonicalQuery* rawCanonicalQuery,
-                     Runner** out, size_t plannerOptions = 0);
+    Status getRunner(Collection* collection,
+                     CanonicalQuery* rawCanonicalQuery,
+                     Runner** out,
+                     size_t plannerOptions = 0);
 
     /**
      * Gets a runner for a query described as an unparsed BSON object over the named and optionally
@@ -79,6 +83,7 @@ namespace mongo {
     Status getRunner(Collection* collection, const std::string& ns, const BSONObj& unparsedQuery,
                      Runner** outRunner, CanonicalQuery** outCanonicalQuery,
                      size_t plannerOptions = 0);
+
     /*
      * Get a runner for a query executing as part of a distinct command.
      *
@@ -90,6 +95,17 @@ namespace mongo {
                              const BSONObj& query,
                              const std::string& field,
                              Runner** out);
+    /*
+     * Get a runner for a query executing as part of a count command.
+     *
+     * Count doesn't care about actually examining its results; it just wants to walk through them.
+     * As such, with certain covered queries, we can skip the overhead of fetching etc. when
+     * executing a count.
+     */
+    Status getRunnerCount(Collection* collection,
+                          const BSONObj& query,
+                          const BSONObj& hintObj,
+                          Runner** out);
 
     /**
      * RAII approach to ensuring that runners are deregistered in newRunQuery.

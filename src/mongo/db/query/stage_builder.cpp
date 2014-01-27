@@ -33,6 +33,7 @@
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/count.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
@@ -278,6 +279,32 @@ namespace mongo {
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
             return new DistinctScan(params, ws);
+        }
+        else if (STAGE_COUNT == root->getType()) {
+            const CountNode* cn = static_cast<const CountNode*>(root);
+
+            Database* db = cc().database();
+            if (NULL == db) {
+                warning() << "Can't fast-count null ns (db null)" << qsol.ns << endl;
+                return NULL;
+            }
+
+            Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
+            if (NULL == collection) {
+                warning() << "Can't fast-count null ns (coll null)" << qsol.ns << endl;
+                return NULL;
+            }
+
+            CountParams params;
+
+            params.descriptor =
+                collection->getIndexCatalog()->findIndexByKeyPattern(cn->indexKeyPattern);
+            params.startKey = cn->startKey;
+            params.startKeyInclusive = cn->startKeyInclusive;
+            params.endKey = cn->endKey;
+            params.endKeyInclusive = cn->endKeyInclusive;
+
+            return new Count(params, ws);
         }
         else {
             mongoutils::str::stream ss;

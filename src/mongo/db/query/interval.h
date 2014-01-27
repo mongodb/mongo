@@ -98,6 +98,9 @@ namespace mongo {
             return (!startInclusive || !endInclusive) && 0 == start.woCompare(end, false);
         }
 
+        /** Returns true if 'this' is the same interval as 'other' */
+        bool equals(const Interval& other) const;
+
         /**
          * Swap start and end points of interval.
          */

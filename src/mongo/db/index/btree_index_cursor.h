@@ -45,10 +45,6 @@ namespace mongo {
 
         bool isEOF() const;
 
-        // See nasty comment in .cpp
-        virtual DiskLoc getBucket() const;
-        virtual int getKeyOfs() const;
-
         /**
          * Called from btree.cpp when we're about to delete a Btree bucket.
          */
@@ -62,6 +58,14 @@ namespace mongo {
         Status seek(const vector<const BSONElement*>& position,
                     const vector<bool>& inclusive);
 
+        /**
+         * Seek to the key 'position'.  If 'afterKey' is true, seeks to the first
+         * key that is oriented after 'position'.
+         *
+         * Btree-specific.
+         */
+        void seek(const BSONObj& position, bool afterKey);
+
         Status skip(const BSONObj &keyBegin, int keyBeginLen, bool afterKey,
                     const vector<const BSONElement*>& keyEnd,
                     const vector<bool>& keyEndInclusive);
@@ -69,6 +73,13 @@ namespace mongo {
         virtual BSONObj getKey() const;
         virtual DiskLoc getValue() const;
         virtual void next();
+
+        /**
+         * BtreeIndexCursor-only.
+         * Returns true if 'this' points at the same exact key as 'other'.
+         * Returns false otherwise.
+         */
+        bool pointsAt(const BtreeIndexCursor& other);
 
         virtual Status savePosition();
 

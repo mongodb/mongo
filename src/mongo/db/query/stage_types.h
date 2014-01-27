@@ -38,6 +38,11 @@ namespace mongo {
         STAGE_AND_SORTED,
         STAGE_COLLSCAN,
 
+        // If we're running a .count(), the query is fully covered by one ixscan, and the ixscan is
+        // from one key to another, we can just skip through the keys without bothering to examine
+        // them.
+        STAGE_COUNT,
+
         // If we're running a distinct, we only care about one value for each key.  The distinct
         // stage is an ixscan with some key-skipping behvaior that only distinct uses.
         STAGE_DISTINCT,

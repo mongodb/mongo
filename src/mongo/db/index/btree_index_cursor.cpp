@@ -45,8 +45,11 @@ namespace mongo {
     // Go forward by default.
     BtreeIndexCursor::BtreeIndexCursor(const IndexCatalogEntry* btreeState,
                                        BtreeInterface *interface)
-        : _direction(1), _btreeState(btreeState), _interface(interface),
-          _bucket(btreeState->head()), _keyOffset(0) {
+        : _direction(1),
+          _btreeState(btreeState),
+          _interface(interface),
+          _bucket(btreeState->head()),
+          _keyOffset(0) {
 
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);
         _activeCursors.insert(this);
@@ -58,10 +61,6 @@ namespace mongo {
     }
 
     bool BtreeIndexCursor::isEOF() const { return _bucket.isNull(); }
-
-    // XXX TWO SHORT TERM HACKS THAT MUST DIE USED BY 2D INDEX:
-    DiskLoc BtreeIndexCursor::getBucket() const { return _bucket; }
-    int BtreeIndexCursor::getKeyOfs() const { return _keyOffset; }
 
     void BtreeIndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);
@@ -101,6 +100,32 @@ namespace mongo {
         skipUnusedKeys();
 
         return Status::OK();
+    }
+
+    void BtreeIndexCursor::seek(const BSONObj& position, bool afterKey) {
+        _keyOffset = 0;
+
+        // Unused out parameter.
+        bool found;
+
+        // Find our key.
+        _bucket = _interface->locate(_btreeState,
+                                     _btreeState->head(),
+                                     position,
+                                     _keyOffset,
+                                     found,
+                                     afterKey ? maxDiskLoc : minDiskLoc,
+                                     1);
+        skipUnusedKeys();
+    }
+
+    bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
+        // XXX: do we need this
+        if (isEOF()) {
+            return other.isEOF();
+        }
+
+        return _bucket == other._bucket && _keyOffset == other._keyOffset;
     }
 
     Status BtreeIndexCursor::seek(const vector<const BSONElement*>& position,

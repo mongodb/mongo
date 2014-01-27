@@ -68,42 +68,30 @@ namespace mongo {
         // Lock 'ns'.
         Client::Context cx(ns);
         Collection* collection = cx.db()->getCollection(ns);
+
         if (NULL == collection) {
             err = "ns missing";
             return -1;
         }
 
         BSONObj query = cmd.getObjectField("query");
-        long long count = 0;
-        long long skip = cmd["skip"].numberLong();
-        long long limit = cmd["limit"].numberLong();
         const std::string hint = cmd.getStringField("hint");
         const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
-
-        if (limit < 0) {
-            limit = -limit;
-        }
         
         // count of all objects
         if (query.isEmpty()) {
             return applySkipLimit(collection->numRecords(), cmd);
         }
 
-        CanonicalQuery* cq;
-        // We pass -limit because a positive limit means 'batch size' but negative limit is a
-        // hard limit.
-        uassertStatusOK(CanonicalQuery::canonicalize(ns, query, BSONObj(), BSONObj(), 
-                                                     skip, -limit, hintObj, &cq)); 
-
         Runner* rawRunner;
-        uassertStatusOK(getRunner(cq, &rawRunner));
-
+        uassertStatusOK(getRunnerCount(collection, query, hintObj, &rawRunner));
         auto_ptr<Runner> runner(rawRunner);
 
         try {
             const ScopedRunnerRegistration safety(runner.get());
             runner->setYieldPolicy(Runner::YIELD_AUTO);
 
+            long long count = 0;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
                 ++count;
@@ -111,7 +99,7 @@ namespace mongo {
 
             // Emulate old behavior and return the count even if the runner was killed.  This
             // happens when the underlying collection is dropped.
-            return count;
+            return applySkipLimit(count, cmd);
         }
         catch (const DBException &e) {
             err = e.toString();

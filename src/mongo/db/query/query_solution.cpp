@@ -634,4 +634,19 @@ namespace mongo {
         *ss << "bounds = " << bounds.toString() << '\n';
     }
 
+    //
+    // CountNode
+    //
+
+    void CountNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "COUNT\n";
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "startKey = " << startKey << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "endKey = " << endKey << '\n';
+    }
+
 }  // namespace mongo
