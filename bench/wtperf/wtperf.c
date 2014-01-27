@@ -107,6 +107,7 @@ static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
+static void	randomize_value(CONFIG *, char *);
 static int	 start_threads(CONFIG *,
 		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
@@ -131,6 +132,21 @@ static inline uint64_t
 get_next_incr(void)
 {
 	return (ATOMIC_ADD(g_insert_key, 1));
+}
+
+static void
+randomize_value(CONFIG *cfg, char *value_buf)
+{
+	uint32_t i;
+
+	/*
+	 * Each time we're called overwrite value_buf[0] and one
+	 * other randomly chosen uint32_t.
+	 */
+	i = __wt_random() % (cfg->value_sz / sizeof(uint32_t));
+	value_buf[0] = __wt_random();
+	value_buf[i] = __wt_random();
+	return;
 }
 
 /*
@@ -215,7 +231,8 @@ worker(void *arg)
 	session = NULL;
 	trk = NULL;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+	if ((ret = conn->open_session(
+	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
@@ -299,6 +316,8 @@ worker(void *arg)
 
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
+			if (cfg->random_value)
+				randomize_value(cfg, value_buf);
 			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) == 0)
 				break;
@@ -311,11 +330,13 @@ worker(void *arg)
 					    "get_value in update.");
 					goto err;
 				}
-				memcpy(value_buf, value, cfg->value_sz);
+				memcpy(value_buf, value, strlen(value));
 				if (value_buf[0] == 'a')
 					value_buf[0] = 'b';
 				else
 					value_buf[0] = 'a';
+				if (cfg->random_value)
+					randomize_value(cfg, value_buf);
 				cursor->set_value(cursor, value_buf);
 				if ((ret = cursor->update(cursor)) == 0)
 					break;
@@ -495,7 +516,8 @@ populate_thread(void *arg)
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+	if ((ret = conn->open_session(
+	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
 		goto err;
 	}
@@ -517,6 +539,8 @@ populate_thread(void *arg)
 
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 			cursor->set_key(cursor, key_buf);
+			if (cfg->random_value)
+				randomize_value(cfg, value_buf);
 			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Failed inserting");
@@ -541,6 +565,8 @@ populate_thread(void *arg)
 			}
 			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 			cursor->set_key(cursor, key_buf);
+			if (cfg->random_value)
+				randomize_value(cfg, value_buf);
 			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Failed inserting");
@@ -698,7 +724,8 @@ checkpoint_worker(void *arg)
 	conn = cfg->conn;
 	session = NULL;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+	if ((ret = conn->open_session(
+	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "open_session failed in checkpoint thread.");
 		goto err;
@@ -755,7 +782,7 @@ execute_populate(CONFIG *cfg)
 	struct timespec start, stop;
 	double secs;
 	uint64_t last_ops;
-	uint32_t interval;
+	uint32_t interval, total;
 	int elapsed, ret;
 
 	session = NULL;
@@ -775,7 +802,7 @@ execute_populate(CONFIG *cfg)
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
 		return (ret);
 	}
-	for (elapsed = 0, interval = 0, last_ops = 0;
+	for (elapsed = 0, interval = 0, last_ops = 0, total = 0;
 	    g_insert_key < cfg->icount && g_error == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
@@ -789,12 +816,13 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
+		total += cfg->report_interval;
 		g_insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
-		    PRIu32 ") in %" PRIu32 " secs",
+		    PRIu32 ") in %" PRIu32 " secs (%" PRIu32 " total secs)",
 		    g_insert_ops - last_ops, g_insert_ops,
-		    cfg->icount, cfg->report_interval);
+		    cfg->icount, cfg->report_interval, total);
 		last_ops = g_insert_ops;
 	}
 	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
@@ -826,7 +854,7 @@ execute_populate(CONFIG *cfg)
 	 */
 	if (cfg->compact) {
 		if ((ret = cfg->conn->open_session(
-		    cfg->conn, NULL, NULL, &session)) != 0) {
+		    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
 			lprintf(cfg, ret, 0,
 			     "execute_populate: WT_CONNECTION.open_session");
 			return (ret);
@@ -869,7 +897,7 @@ execute_workload(CONFIG *cfg)
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
-	uint32_t interval, run_ops, run_time;
+	uint32_t interval, run_ops, run_time, total;
 	u_int i;
 	int ret, t_ret;
 
@@ -906,7 +934,7 @@ execute_workload(CONFIG *cfg)
 		threads += workp->threads;
 	}
 
-	for (interval = cfg->report_interval,
+	for (interval = cfg->report_interval, total = 0,
 	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
 		/*
 		 * Sleep for one second at a time.
@@ -936,15 +964,17 @@ execute_workload(CONFIG *cfg)
 		if (interval == 0 || --interval > 0)
 			continue;
 		interval = cfg->report_interval;
+		total += cfg->report_interval;
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
-		    " updates, %" PRIu64 " checkpoints in %" PRIu32 " secs",
+		    " updates, %" PRIu64 " checkpoints in %" PRIu32
+		    " secs (%" PRIu32 " total secs)",
 		    g_read_ops - last_reads,
 		    g_insert_ops - last_inserts,
 		    g_update_ops - last_updates,
 		    g_ckpt_ops - last_ckpts,
-		    cfg->report_interval);
+		    cfg->report_interval, total);
 		last_reads = g_read_ops;
 		last_inserts = g_insert_ops;
 		last_updates = g_update_ops;
@@ -983,7 +1013,8 @@ find_table_count(CONFIG *cfg)
 
 	conn = cfg->conn;
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+	if ((ret = conn->open_session(
+	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "open_session failed finding existing table count");
 		goto err;
@@ -1217,7 +1248,7 @@ main(int argc, char *argv[])
 
 	if (cfg->create != 0) {		/* If creating, create the table. */
 		if ((ret = cfg->conn->open_session(
-		    cfg->conn, NULL, NULL, &session)) != 0) {
+		    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error opening a session on %s", cfg->home);
 			goto err;
@@ -1280,14 +1311,20 @@ main(int argc, char *argv[])
 		total_ops = g_read_ops + g_insert_ops + g_update_ops;
 
 		lprintf(cfg, 0, 1,
-		    "Executed %" PRIu64 " read operations (%" PRIu64 "%%)",
-		    g_read_ops, (g_read_ops * 100) / total_ops);
+		    "Executed %" PRIu64 " read operations (%" PRIu64
+		    "%%) %" PRIu64 " ops/sec",
+		    g_read_ops, (g_read_ops * 100) / total_ops,
+		    g_read_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
-		    "Executed %" PRIu64 " insert operations (%" PRIu64 "%%)",
-		    g_insert_ops, (g_insert_ops * 100) / total_ops);
+		    "Executed %" PRIu64 " insert operations (%" PRIu64
+		    "%%) %" PRIu64 " ops/sec",
+		    g_insert_ops, (g_insert_ops * 100) / total_ops,
+		    g_insert_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
-		    "Executed %" PRIu64 " update operations (%" PRIu64 "%%)",
-		    g_update_ops, (g_update_ops * 100) / total_ops);
+		    "Executed %" PRIu64 " update operations (%" PRIu64
+		    "%%) %" PRIu64 " ops/sec",
+		    g_update_ops, (g_update_ops * 100) / total_ops,
+		    g_update_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations",
 		    g_ckpt_ops);
@@ -1352,7 +1389,7 @@ static int
 start_threads(CONFIG *cfg,
     WORKLOAD *workp, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
 {
-	u_int i;
+	u_int end, i, j;
 	int ret;
 
 	for (i = 0; i < num; ++i, ++thread) {
@@ -1368,7 +1405,12 @@ start_threads(CONFIG *cfg,
 			return (enomem(cfg));
 		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
-		memset(thread->value_buf, 'a', cfg->value_sz - 1);
+		if (cfg->random_value) {
+			end = cfg->value_sz / sizeof(uint32_t);
+			for (j = 0; j < end; j+= sizeof(uint32_t))
+				thread->value_buf[j] = __wt_random();
+		} else
+			memset(thread->value_buf, 'a', cfg->value_sz - 1);
 
 		/*
 		 * Every thread gets tracking information and is initialized
