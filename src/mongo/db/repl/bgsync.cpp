@@ -503,6 +503,7 @@ namespace replset {
             log() << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
         }
         LOG(3) << "replSet remoteOldestOp: " << remoteTs.toStringLong() << rsLog;
+        LOG(3) << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
 
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
