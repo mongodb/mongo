@@ -66,8 +66,7 @@ namespace mongo {
 #endif
         }
         void ThreadLocalIntents::_unspool() {
-            if ( intents.size() == 0 )
-                return;
+            dassert( intents.size() );
 
             for( unsigned j = 0; j < intents.size(); j++ ) {
                 commitJob.note(intents[j].start(), intents[j].length());

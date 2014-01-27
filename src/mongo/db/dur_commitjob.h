@@ -121,10 +121,10 @@ namespace mongo {
             enum { N = 21 };
             std::vector<dur::WriteIntent> intents;
             bool condense();
+            void _unspool();
         public:
             ThreadLocalIntents() : intents(N) { intents.clear(); }
             ~ThreadLocalIntents();
-            void _unspool();
             void unspool();
             void push(const WriteIntent& i);
             int n_informational() const { return intents.size(); }
