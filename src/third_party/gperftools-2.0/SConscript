@@ -12,6 +12,8 @@ files = [
     'src/base/atomicops-internals-x86.cc',
     'src/base/sysinfo.cc',
     'src/base/spinlock.cc',
+    'src/base/vdso_support.cc',
+    'src/base/elf_mem_image.cc',
     'src/malloc_hook.cc',
     'src/span.cc',
     'src/maybe_threads.cc',
