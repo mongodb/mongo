@@ -446,11 +446,24 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
 
 DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
-    this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+
+    if ( this._mongo.useWriteCommands() ) {
+        delete o.ns; // ns is passed to the first element in the command.
+        return this._db.runCommand({ createIndexes: this.getName(), indexes: [o] });
+    }
+    else {
+        this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+    }
 }
 
 DBCollection.prototype.ensureIndex = function( keys , options ){
-    this.createIndex(keys, options);
+    var result = this.createIndex(keys, options);
+
+    if (result != null) {
+        if (result.errmsg != null) return result.errmsg;
+        return;
+    }
+
     err = this.getDB().getLastErrorObj();
     if (err.err) {
         return err;
