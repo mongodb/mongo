@@ -20,7 +20,7 @@ assert.eq( 2, explain.n );
 assert.eq( 2, explain.nscanned );
 assert.eq( 2, explain.nscannedObjects );
 // nscannedAllPlans reports the combined total of all plans.
-assert.eq( 6, explain.nscannedAllPlans );
+assert.eq( 8, explain.nscannedAllPlans );
 // nscannedObjectsAllPlans reports the total for the set of interleaved plans.
 // QUERY_MIGRATION
 // assert.eq( 4, explain.nscannedObjectsAllPlans );

@@ -1955,24 +1955,41 @@ namespace {
                                     "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
     }
 
-#if 0 // SERVER-12196
-    TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdx) {
+    // SERVER-12196
+    TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder1) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
         addIndex(BSON("a" << 1 << "b" << 1));
         addIndex(BSON("b" << 1));
         runQuery(fromjson("{a:1, b:1}"));
 
-        ASSERT_EQUALS(getNumSolutions(), 2U);
-        // We don't want to assign the 'b' predicate as a compound *and* assign it to the 'b' index.
+        assertNumSolutions(3U);
 
-        // As for what solutions we produce, it's not wrong to intersect both indices but we
-        // currently prefer to make full use of the compound.
         assertSolutionExists("{fetch: {filter: null, node: "
                                  "{ixscan: {filter: null, pattern: {a:1, b:1}}}}}");
         assertSolutionExists("{fetch: {filter: {a:1}, node: "
                                  "{ixscan: {filter: null, pattern: {b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes: ["
+                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}},"
+                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
     }
-#endif
+
+    // SERVER-12196
+    TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{a:1, b:1}"));
+
+        assertNumSolutions(3U);
+
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes: ["
+                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}},"
+                                 "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    }
 
     TEST_F(QueryPlannerTest, IntersectBasicMultikey) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;

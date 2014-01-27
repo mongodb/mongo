@@ -221,7 +221,12 @@ namespace mongo {
         }
         else if (MatchExpression::AND == node->matchType()) {
             typedef unordered_map<IndexID, vector<MatchExpression*> > IndexToPredMap;
-            // map from idx id to children that have a pred over it.
+            // Map from idx id to children that have a pred over it.
+            // XXX: The index intersection logic could be simplified if we could
+            // iterate over these maps in a known order. Currently when iterating
+            // over these maps we have to impose an ordering on each individual
+            // pair of indices in order to make sure that the enumeration results
+            // are order-independent. See SERVER-12196.
             IndexToPredMap idxToFirst;
             IndexToPredMap idxToNotFirst;
 
@@ -326,26 +331,54 @@ namespace mongo {
             }
 
             if (_ixisect) {
-                // Hardcoded "look at all power sets of size 2" search.
+                // Hardcoded "look at all members of the power set of size 2" search,
+                // a.k.a. "consider all pairs of indices".
+                //
+                // For each unordered pair of indices do the following:
+                //   0. Impose an ordering (idx1, idx2) using the key patterns.
+                //   (*See note below.)
+                //   1. Assign predicates which prefix idx1 to idx1.
+                //   2. Add assigned indices to a set of indices---the "already
+                //   assigned set".
+                //   3. Assign predicates which prefix idx2 to idx2, as long as they
+                //   been assigned to idx1 already. Add newly assigned indices to
+                //   the "already assigned set".
+                //   4. Try to assign predicates to idx1 by compounding.
+                //   5. Add any predicates assigned to idx1 by compounding to the
+                //   "already assigned set",
+                //   6. Try to assign predicates to idx2 by compounding.
+                //
+                // *NOTE on ordering. Suppose we have two indices A and B, and a
+                // predicate P1 which is over the prefix of both indices A and B.
+                // If we order the indices (A, B) then P1 will get assigned to A,
+                // but if we order the indices (B, A) then P1 will get assigned to
+                // B. In order to make sure that we get the same result for the unordered
+                // pair {A, B} we have to begin by imposing an ordering. As a more concrete
+                // example, if we have indices {x: 1, y: 1} and {x: 1, z: 1} with predicate
+                // {x: 3}, we want to make sure that {x: 3} gets assigned to the same index
+                // irrespective of ordering.
                 for (IndexToPredMap::iterator firstIt = idxToFirst.begin();
                      firstIt != idxToFirst.end(); ++firstIt) {
 
-                    const IndexEntry& firstIndex = (*_indices)[firstIt->first];
+                    const IndexEntry& oneIndex = (*_indices)[firstIt->first];
 
-                    // Create the assignment for firstIt.
-                    OneIndexAssignment firstAssign;
-                    firstAssign.index = firstIt->first;
-                    firstAssign.preds = firstIt->second;
+                    // 'oneAssign' is used to assign indices and subnodes or to
+                    // make assignments for the first index when it's multikey.
+                    // It is NOT used in the inner loop that considers pairs of
+                    // indices.
+                    OneIndexAssignment oneAssign;
+                    oneAssign.index = firstIt->first;
+                    oneAssign.preds = firstIt->second;
                     // Since everything in assign.preds prefixes the index, they all go
                     // at position '0' in the index, the first position.
-                    firstAssign.positions.resize(firstAssign.preds.size(), 0);
+                    oneAssign.positions.resize(oneAssign.preds.size(), 0);
 
                     // We create a scan per predicate so if we have >1 predicate we'll already
                     // have at least 2 scans (one predicate per scan as the planner can't
                     // intersect bounds when the index is multikey), so we stop here.
-                    if (firstIndex.multikey && firstAssign.preds.size() > 1) {
+                    if (oneIndex.multikey && oneAssign.preds.size() > 1) {
                         AndEnumerableState state;
-                        state.assignments.push_back(firstAssign);
+                        state.assignments.push_back(oneAssign);
                         andAssignment->choices.push_back(state);
                         continue;
                     }
@@ -353,30 +386,9 @@ namespace mongo {
                     // Output (subnode, firstAssign) pairs.
                     for (size_t i = 0; i < subnodes.size(); ++i) {
                         AndEnumerableState indexAndSubnode;
-                        indexAndSubnode.assignments.push_back(firstAssign);
+                        indexAndSubnode.assignments.push_back(oneAssign);
                         indexAndSubnode.subnodesToIndex.push_back(subnodes[i]);
                         andAssignment->choices.push_back(indexAndSubnode);
-                    }
-
-                    // We keep track of what preds were compounded and we DO NOT let them become
-                    // additional index assignments.  Example: what if firstAssign is the index (x,
-                    // y) and we're considering index y?  We don't want to assign 'y' to anything we
-                    // compounded with.
-                    set<MatchExpression*> predsAssigned;
-
-                    // We compound on firstAssign, if applicable.
-                    IndexToPredMap::iterator firstIndexCompound =
-                        idxToNotFirst.find(firstAssign.index);
-
-                    // Can't compound with multikey indices.
-                    if (!firstIndex.multikey && firstIndexCompound != idxToNotFirst.end()) {
-                        // Assigns MatchExpressions to compound idx.
-                        compound(firstIndexCompound->second, firstIndex, &firstAssign);
-                    }
-
-                    // Exclude all predicates in firstAssign from future assignments.
-                    for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
-                        predsAssigned.insert(firstAssign.preds[i]);
                     }
 
                     // Start looking at all other indices to find one that we want to bundle
@@ -384,23 +396,69 @@ namespace mongo {
                     IndexToPredMap::iterator secondIt = firstIt;
                     secondIt++;
                     for (; secondIt != idxToFirst.end(); secondIt++) {
+                        const IndexEntry& firstIndex = (*_indices)[secondIt->first];
                         const IndexEntry& secondIndex = (*_indices)[secondIt->first];
 
                         // If the other index we're considering is multikey with >1 pred, we don't
-                        // want to have it as an additional assignment.  Eventually, firstIt will be
+                        // want to have it as an additional assignment.  Eventually, it1 will be
                         // equal to the current value of secondIt and we'll assign every pred for
                         // this mapping to the index.
                         if (secondIndex.multikey && secondIt->second.size() > 1) {
                             continue;
                         }
 
+                        //
+                        // Step #0:
+                        // Impose an ordering (idx1, idx2) using the key patterns.
+                        //
+                        IndexToPredMap::iterator it1, it2;
+                        int ordering = firstIndex.keyPattern.woCompare(secondIndex.keyPattern);
+                        it1 = (ordering > 0) ? firstIt : secondIt;
+                        it2 = (ordering > 0) ? secondIt : firstIt;
+                        const IndexEntry& ie1 = (*_indices)[it1->first];
+                        const IndexEntry& ie2 = (*_indices)[it2->first];
+
+                        //
+                        // Step #1:
+                        // Assign predicates which prefix firstIndex to firstAssign.
+                        //
+                        OneIndexAssignment firstAssign;
+                        firstAssign.index = it1->first;
+                        firstAssign.preds = it1->second;
+                        // Since everything in assign.preds prefixes the index, they all go
+                        // at position '0' in the index, the first position.
+                        firstAssign.positions.resize(firstAssign.preds.size(), 0);
+
+                        // We keep track of what preds are assigned to indices either because they
+                        // prefix the index or have been assigned through compounding. We make sure
+                        // that these predicates DO NOT become additional index assignments.
+                        // Example: what if firstAssign is the index (x, y) and we're trying to
+                        // compound? We want to make sure not to compound if the predicate is
+                        // already assigned to index y.
+                        set<MatchExpression*> predsAssigned;
+
+                        //
+                        // Step #2:
+                        // Add indices assigned in 'firstAssign' to 'predsAssigned'.
+                        //
+                        for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
+                            predsAssigned.insert(firstAssign.preds[i]);
+                        }
+
+                        //
+                        // Step #3:
+                        // Assign predicates which prefix secondIndex to secondAssign and
+                        // have not already been assigned to firstAssign. Any newly
+                        // assigned predicates are added to 'predsAssigned'.
+                        //
                         OneIndexAssignment secondAssign;
-                        secondAssign.index = secondIt->first;
-                        const vector<MatchExpression*>& preds = secondIt->second;
+                        secondAssign.index = it2->first;
+                        const vector<MatchExpression*>& preds = it2->second;
                         for (size_t i = 0; i < preds.size(); ++i) {
                             if (predsAssigned.end() == predsAssigned.find(preds[i])) {
                                 secondAssign.preds.push_back(preds[i]);
                                 secondAssign.positions.push_back(0);
+                                predsAssigned.insert(preds[i]);
                             }
                         }
 
@@ -408,10 +466,48 @@ namespace mongo {
                         // firstAssign.
                         if (0 == secondAssign.preds.size()) { continue; }
 
+                        //
+                        // Step #4:
+                        // Compound on firstAssign, if applicable.
+                        //
+                        IndexToPredMap::iterator firstIndexCompound =
+                            idxToNotFirst.find(firstAssign.index);
+
+                        // Can't compound with multikey indices.
+                        if (!ie1.multikey && firstIndexCompound != idxToNotFirst.end()) {
+                            // We must remove any elements of 'predsAssigned' from consideration.
+                            vector<MatchExpression*> tryCompound;
+                            const vector<MatchExpression*>& couldCompound
+                                = firstIndexCompound->second;
+                            for (size_t i = 0; i < couldCompound.size(); ++i) {
+                                if (predsAssigned.end() == predsAssigned.find(couldCompound[i])) {
+                                    tryCompound.push_back(couldCompound[i]);
+                                }
+                            }
+                            if (tryCompound.size()) {
+                                compound(tryCompound, ie1, &firstAssign);
+                            }
+                        }
+
+                        //
+                        // Step #5:
+                        // Make sure predicates assigned by compounding in step #4 do not get
+                        // assigned again.
+                        //
+                        for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
+                            if (predsAssigned.end() == predsAssigned.find(firstAssign.preds[i])) {
+                                predsAssigned.insert(firstAssign.preds[i]);
+                            }
+                        }
+
+                        //
+                        // Step #6:
+                        // Compound on firstAssign, if applicable.
+                        //
                         IndexToPredMap::iterator secondIndexCompound =
                             idxToNotFirst.find(secondAssign.index);
 
-                        if (!secondIndex.multikey && secondIndexCompound != idxToNotFirst.end()) {
+                        if (!ie2.multikey && secondIndexCompound != idxToNotFirst.end()) {
                             // We must remove any elements of 'predsAssigned' from consideration.
                             vector<MatchExpression*> tryCompound;
                             const vector<MatchExpression*>& couldCompound
@@ -422,10 +518,12 @@ namespace mongo {
                                 }
                             }
                             if (tryCompound.size()) {
-                                compound(tryCompound, secondIndex, &secondAssign);
+                                compound(tryCompound, ie2, &secondAssign);
                             }
                         }
 
+                        // We're done with this particular pair of indices; output
+                        // the resulting assignments.
                         AndEnumerableState state;
                         state.assignments.push_back(firstAssign);
                         state.assignments.push_back(secondAssign);
