@@ -174,15 +174,15 @@ namespace mutablebson {
          */
         bool hasChildren() const;
 
-        /** Returns either this Element's left sibling, or a non-ok Element if no left sibling
-         *  exists.
+        /** Returns either this Element's sibling 'distance' elements to the left, or a non-ok
+         *  Element if no such left sibling exists.
          */
-        Element leftSibling() const;
+        Element leftSibling(size_t distance = 1) const;
 
-        /** Returns either this Element's right sibling, or a non-ok Element if no right
-         *  sibling exists.
+        /** Returns either this Element's sibling 'distance' Elements to the right, or a non-ok
+         *  Element if no such right sibling exists.
          */
-        Element rightSibling() const;
+        Element rightSibling(size_t distance = 1) const;
 
         /** Returns this Element's parent, or a non-ok Element if this Element has no parent
          *  (is a root).
@@ -190,17 +190,38 @@ namespace mutablebson {
         Element parent() const;
 
         /** Returns the nth child, if any, of this Element. If no such element exists, a non-ok
-         *  Element is returned. This is not a constant time operation. This is purely
-         *  syntactic sugar for calling getNthChild from algorithm.h
+         *  Element is returned. This is not a constant time operation. This method is also
+         *  available as operator[] taking a size_t for convenience.
          */
-        Element operator[](size_t n) const;
+        Element findNthChild(size_t n) const;
+        inline Element operator[](size_t n) const;
 
         /** Returns the first child, if any, of this Element named 'name'. If no such Element
          *  exists, a non-ok Element is returned. This is not a constant time operation. This
-         *  is purely syntactic sugar for calling findFirstChildNamed from algorithm.h.
+         *  method is also available as operator[] taking a StringData for convenience.
          */
-        Element operator[](const StringData& name) const;
+        Element findFirstChildNamed(const StringData& name) const;
+        inline Element operator[](const StringData& name) const;
 
+        /** Returns the first element found named 'name', starting the search at the current
+         *  Element, and walking right. If no such Element exists, a non-ok Element is
+         *  returned. This is not a constant time operation. This implementation is used in the
+         *  specialized implementation of findElement<ElementType, FieldNameEquals>.
+         */
+        Element findElementNamed(const StringData& name) const;
+
+        //
+        // Counting API.
+        //
+
+        /** Returns the number of valid siblings to the left of this Element. */
+        size_t countSiblingsLeft() const;
+
+        /** Returns the number of valid siblings to the right of this Element. */
+        size_t countSiblingsRight() const;
+
+        /** Return the number of children of this Element. */
+        size_t countChildren() const;
 
         //
         // Value access API.

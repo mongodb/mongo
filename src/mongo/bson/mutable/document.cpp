@@ -1320,26 +1320,28 @@ namespace mutablebson {
         return impl.resolveLeftChild(_repIdx) != kInvalidRepIdx;
     }
 
-    Element Element::leftSibling() const {
+    Element Element::leftSibling(size_t distance) const {
         verify(ok());
-
         const Document::Impl& impl = getDocument().getImpl();
-        const Element::RepIdx leftSibling = impl.getElementRep(_repIdx).sibling.left;
-        // If we have a left sibling, we are assured that it has already been expanded.
-        dassert(leftSibling != kOpaqueRepIdx);
-        return Element(_doc, leftSibling);
+        Element::RepIdx current = _repIdx;
+        while ((current != kInvalidRepIdx) && (distance-- != 0)) {
+            // We are (currently) never left opaque, so don't need to resolve.
+            current = impl.getElementRep(current).sibling.left;
+        }
+        return Element(_doc, current);
     }
 
-    Element Element::rightSibling() const {
+    Element Element::rightSibling(size_t distance) const {
         verify(ok());
 
         // Capturing Document::Impl by non-const ref exploits the constness loophole
         // created by our Impl so that we can let rightSibling be lazily evaluated, even for a
         // const Element.
         Document::Impl& impl = _doc->getImpl();
-        const Element::RepIdx rightSiblingIdx = impl.resolveRightSibling(_repIdx);
-        dassert(rightSiblingIdx != kOpaqueRepIdx);
-        return Element(_doc, rightSiblingIdx);
+        Element::RepIdx current = _repIdx;
+        while ((current != kInvalidRepIdx) && (distance-- != 0))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
     }
 
     Element Element::parent() const {
@@ -1348,6 +1350,80 @@ namespace mutablebson {
         const Element::RepIdx parentIdx = impl.getElementRep(_repIdx).parent;
         dassert(parentIdx != kOpaqueRepIdx);
         return Element(_doc, parentIdx);
+    }
+
+    Element Element::findNthChild(size_t n) const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        current = impl.resolveLeftChild(current);
+        while ((current != kInvalidRepIdx) && (n-- != 0))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
+    }
+
+    Element Element::findFirstChildNamed(const StringData& name) const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        current = impl.resolveLeftChild(current);
+        // TODO: Could DRY this loop with the identical logic in findElementNamed.
+        while ((current != kInvalidRepIdx) &&
+               (impl.getFieldName(impl.getElementRep(current)) != name))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
+    }
+
+    Element Element::findElementNamed(const StringData& name) const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        while ((current != kInvalidRepIdx) &&
+               (impl.getFieldName(impl.getElementRep(current)) != name))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
+    }
+
+    size_t Element::countSiblingsLeft() const {
+        verify(ok());
+        const Document::Impl& impl = getDocument().getImpl();
+        Element::RepIdx current = _repIdx;
+        size_t result = 0;
+        while (true) {
+            // We are (currently) never left opaque, so don't need to resolve.
+            current = impl.getElementRep(current).sibling.left;
+            if (current == kInvalidRepIdx)
+                break;
+            ++result;
+        }
+        return result;
+    }
+
+    size_t Element::countSiblingsRight() const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        size_t result = 0;
+        while (true) {
+            current = impl.resolveRightSibling(current);
+            if (current == kInvalidRepIdx)
+                break;
+            ++result;
+        }
+        return result;
+    }
+
+    size_t Element::countChildren() const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        current = impl.resolveLeftChild(current);
+        size_t result = 0;
+        while (current != kInvalidRepIdx) {
+            ++result;
+            current = impl.resolveRightSibling(current);
+        }
+        return result;
     }
 
     bool Element::hasValue() const {
