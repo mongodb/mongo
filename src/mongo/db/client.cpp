@@ -362,7 +362,7 @@ namespace mongo {
     void Client::Context::_finishInit() {
         dassert( Lock::isLocked() );
         int writeLocked = Lock::somethingWriteLocked();
-        if ( writeLocked && FileAllocator::get()->hasFailed() ) {
+        if ( writeLocked && FileAllocator::get()->hasFailed(_ns) ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
         

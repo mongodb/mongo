@@ -84,13 +84,20 @@ namespace mongo {
     }
 
 
+    string  getDbName(const string &filename){
+            int pos = filename.find_last_of("/\\");
+            int dot = filename.find_last_of(".");
+            verify(dot>pos);
+            return filename.substr(pos+1, dot-pos-1);
+    }
     void FileAllocator::start() {
         boost::thread t( boost::bind( &FileAllocator::run , this ) );
     }
 
     void FileAllocator::requestAllocation( const string &name, long &size ) {
         scoped_lock lk( _pendingMutex );
-        if ( _failed )
+        string db = getDbName(name);
+        if ( _failed[db] )
             return;
         long oldSize = prevSize( name );
         if ( oldSize != -1 ) {
@@ -110,7 +117,8 @@ namespace mongo {
             if ( !inProgress( name ) )
                 return;
         }
-        checkFailure();
+        string db = getDbName(name);
+        checkFailure(db);
         _pendingSize[ name ] = size;
         if ( _pending.size() == 0 )
             _pending.push_back( name );
@@ -122,18 +130,25 @@ namespace mongo {
         }
         _pendingUpdated.notify_all();
         while( inProgress( name ) ) {
-            checkFailure();
+            checkFailure(db); 
             _pendingUpdated.wait( lk.boost() );
         }
 
     }
 
     void FileAllocator::waitUntilFinished() const {
-        if ( _failed )
-            return;
         scoped_lock lk( _pendingMutex );
-        while( _pending.size() != 0 )
+        map<string, bool>::const_iterator it;
+        unsigned int fail=0;
+        for(it=_failed.begin(); it!=_failed.end();++it){
+            if(it->second)
+                fail++;
+        }
+        while( _pending.size() != 0 ) {
+            if(_pending.size()<=fail)
+                break;
             _pendingUpdated.wait( lk.boost() );
+        }
     }
 
     // TODO: pull this out to per-OS files once they exist
@@ -216,14 +231,19 @@ namespace mongo {
         }
     }
 
-    bool FileAllocator::hasFailed() const {
-        return _failed;
+    bool FileAllocator::hasFailed(const string &database) const {
+        map<string,bool>::const_iterator it = _failed.find(database);
+        if(it!=_failed.end())
+                return it->second;
+        return false;
+
     }
 
-    void FileAllocator::checkFailure() {
-        if (_failed) {
-            // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack tracke
-            msgassertedNoTrace( 12520, "new file allocation failure" );
+    void FileAllocator::checkFailure(string &database) {
+        map<string, bool>::const_iterator it = _failed.find(database);
+        if(it!=_failed.end()){
+            if(it->second)
+                msgassertedNoTrace( 12520, "new file allocation failure" );
         }
     }
 
@@ -337,7 +357,8 @@ namespace mongo {
                           << endl;
 
                     // no longer in a failed state. allow new writers.
-                    fa->_failed = false;
+                    string db = getDbName(name);
+                    fa->_failed[db] = false;
                 }
                 catch ( const std::exception& e ) {
                     log() << "error: failed to allocate new file: " << name
@@ -353,10 +374,15 @@ namespace mongo {
                         log() << "error removing files: " << e.what() << endl;
                     }
                     scoped_lock lk( fa->_pendingMutex );
-                    fa->_failed = true;
+                    string db = getDbName(name);
+                    fa->_failed[db] = true;
+                    // change it the last
+                    fa->_pending.remove(name);
+                    fa->_pending.push_back( name ); 
                     // not erasing from pending
                     fa->_pendingUpdated.notify_all();
-                    
+                    // when sleep, we should release the lock so that others still can send file request 
+                    lk.boost().unlock();
                     
                     sleepsecs(10);
                     continue;
