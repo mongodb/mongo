@@ -1357,3 +1357,106 @@ DBCollection.prototype.getQueryOptions = function() {
     if (this.getSlaveOk()) options |= 4;
     return options;
 }
+
+/**
+ * Returns a PlanCache for the collection.
+ */
+DBCollection.prototype.getPlanCache = function() {
+    return new PlanCache( this );
+}
+
+// plan cache commands
+
+/**
+ * PlanCache
+ * Holds a reference to the collection.
+ * Proxy for planCache* commands.
+ */
+if ( ( typeof  PlanCache ) == "undefined" ){
+    PlanCache = function( collection ){
+        this._collection = collection;
+    }
+}
+
+/**
+ * Name of PlanCache.
+ * Same as collection.
+ */
+PlanCache.prototype.getName = function(){
+    return this._collection.getName();
+}
+
+/**
+ * Displays help for a PlanCache object.
+ */
+PlanCache.prototype.help = function () {
+    var shortName = this.getName();
+    print("DBCollection help");
+    print("\tdb." + shortName + ".getPlanCache().help() - show PlanCache help");
+    print("\tdb." + shortName + ".getPlanCache().listQueryShapes() - " +
+          "displays all query shapes in a collection");
+    print("\tdb." + shortName + ".getPlanCache().clear() - " +
+          "drops all cached queries in a collection");
+    print("\tdb." + shortName + ".getPlanCache().clearPlansByQuery(query[, projection, sort]) - " +
+          "drops query shape from plan cache");
+    print("\tdb." + shortName + ".getPlanCache().getPlansByQuery(query[, projection, sort]) - " +
+          "displays the cached plans for a query shape");
+    return __magicNoPrint;
+}
+
+/**
+ * Internal function to parse query shape.
+ */
+PlanCache.prototype._parseQueryShape = function(query, projection, sort) {
+    if (query == undefined) {
+        throw new Error("required parameter query missing");
+    }
+    var shape = {
+        query: query,
+        projection: projection == undefined ? {} : projection,
+        sort: sort == undefined ? {} : sort,
+    };
+    return shape;
+}
+
+/**
+ * Internal function to run command.
+ */
+PlanCache.prototype._runCommandThrowOnError = function(cmd, params) {
+    var res = this._collection.runCommand(cmd, params);
+    if (!res.ok) {
+        throw new Error(res.errmsg);
+    }
+    return res;
+}
+
+/**
+ * Lists query shapes in a collection.
+ */
+PlanCache.prototype.listQueryShapes = function() {
+    return this._runCommandThrowOnError("planCacheListQueryShapes", {}).shapes;
+}
+
+/**
+ * Clears plan cache in a collection.
+ */
+PlanCache.prototype.clear = function() {
+    this._runCommandThrowOnError("planCacheClear", {});
+    return;
+}
+
+/**
+ * List plans for a query shape.
+ */
+PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
+    return this._runCommandThrowOnError("planCacheListPlans",
+                                        this._parseQueryShape(query, projection, sort)).plans;
+}
+
+/**
+ * Drop query shape from the plan cache.
+ */
+PlanCache.prototype.clearPlansByQuery = function(query, projection, sort) {
+    this._runCommandThrowOnError("planCacheDrop", this._parseQueryShape(query, projection, sort));
+    return;
+}
