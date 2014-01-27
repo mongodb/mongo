@@ -1,4 +1,3 @@
-
 Building MongoDB
 ================
 
@@ -69,10 +68,13 @@ Then build as usual with `scons`:
 OS X
 --------------
 
-Try [Homebrew](http://mxcl.github.com/homebrew/):
+Using [Homebrew](http://mxcl.github.com/homebrew/):
 
     $ brew install mongodb
 
+Using [MacPorts](http://www.macports.org):
+
+    § sudo port install mongodb
 
 FREEBSD
 --------------
