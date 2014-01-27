@@ -660,12 +660,11 @@ namespace mongo {
             }
             virtual const string& ns() {
                 invariant( false );
-                
+                return _ns;
             }
             virtual void invalidate(const DiskLoc& dl, InvalidationType type);
-            virtual const Collection* collection() { 
-                invariant( false );
-                return NULL;
+            virtual const Collection* collection() {
+                return _collection;
             }
             virtual Status getInfo(TypeExplain** explain, PlanInfo** planInfo) const {
                 return Status( ErrorCodes::InternalError, "no" );
