@@ -47,4 +47,8 @@ master.getDB( 'db' ).c.save( big );
 
 // Restart old master
 replTest.restart( 0 );
+assert.soon(function () {
+                res = conns[0].getDB("admin").runCommand({ replSetGetStatus: 1 });
+                return res.myState == 2;
+            }, "original master failed to become secondary in under a minute", 60*1000);
 replTest.awaitReplication();
