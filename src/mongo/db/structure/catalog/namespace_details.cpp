@@ -33,18 +33,18 @@
 #include <algorithm>
 #include <list>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/json.h"
-#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/structure/catalog/hashtab.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/hashtab.h"
 #include "mongo/util/startup_test.h"
 
 

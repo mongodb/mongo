@@ -76,7 +76,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
-#include "mongo/util/hashtab.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/db/stats/timer_stats.h"

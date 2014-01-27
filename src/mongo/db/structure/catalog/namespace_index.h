@@ -34,8 +34,8 @@
 #include <string>
 
 #include "mongo/db/diskloc.h"
+#include "mongo/db/structure/catalog/hashtab.h"
 #include "mongo/db/structure/catalog/namespace.h"
-#include "mongo/util/hashtab.h"
 
 namespace mongo {
 
