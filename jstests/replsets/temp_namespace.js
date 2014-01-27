@@ -44,10 +44,17 @@ assert.eq(secondDB.system.namespaces.count({name: /keep\d$/}) , 4);
 
 // restart secondary and reconnect
 replTest.restart(secondId, {},  /*wait=*/true);
-try {
-    secondDB.system.namespaces.count(); // trigger a reconnect if needed
-} catch (e) {
-}
+
+// wait for the secondary to achieve secondary status
+assert.soon(function () {
+                try {
+                    res = second.getDB("admin").runCommand({ replSetGetStatus: 1 });
+                    return res.myState == 2;
+                }
+                catch (e) {
+                    return false;
+                }
+            }, "took more than a minute for the secondary to become secondary again", 60*1000);
 
 // make sure restarting secondary didn't drop collections
 assert.eq(secondDB.system.namespaces.count({name: /temp\d$/}) , 2); // collections
