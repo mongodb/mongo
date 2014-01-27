@@ -257,9 +257,7 @@ add_option( "pch" , "use precompiled headers to speed up the build (experimental
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
 
 # debugging/profiling help
-if os.sys.platform.startswith("linux") and (os.uname()[-1] == 'x86_64'):
-    defaultAllocator = 'tcmalloc'
-elif (os.sys.platform == "darwin") and (os.uname()[-1] == 'x86_64'):
+if os.sys.platform.startswith("linux") or (os.sys.platform == "darwin"):
     defaultAllocator = 'tcmalloc'
 else:
     defaultAllocator = 'system'
