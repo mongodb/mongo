@@ -118,9 +118,9 @@ latency_op(CONFIG *cfg,
 	for (i = 0, thread = cfg->workers;
 	    thread != NULL && i < cfg->workers_cnt; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
-		tmp = track->ops;
-		ops += tmp - track->last_ops;
-		track->last_ops = tmp;
+		tmp = track->latency_ops;
+		ops += tmp - track->last_latency_ops;
+		track->last_latency_ops = tmp;
 		tmp = track->latency;
 		latency += tmp - track->last_latency;
 		track->last_latency = tmp;

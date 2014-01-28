@@ -367,6 +367,7 @@ op_err:			lprintf(cfg, ret, 0,
 				lprintf(cfg, ret, 0, "Get time call failed");
 				goto err;
 			}
+			++trk->latency_ops;
 			nsecs = (uint64_t)(stop.tv_nsec - start.tv_nsec);
 			nsecs += sec_to_ns(
 			    (uint64_t)(stop.tv_sec - start.tv_sec));

@@ -125,9 +125,10 @@ typedef struct {
 	 * the last_XXX fields.
 	 */
 	uint64_t ops;			/* Total operations */
+	uint64_t latency_ops;		/* Total ops sampled for latency */
 	uint64_t latency;		/* Total latency */
 
-	uint64_t last_ops;		/* Last read by monitor thread */
+	uint64_t last_latency_ops;	/* Last read by monitor thread */
 	uint64_t last_latency;
 
 	/*
