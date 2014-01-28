@@ -103,7 +103,7 @@ namespace mongo {
         boost::scoped_ptr<PlanCache> _planCache;
 
         // Query settings.
-        // Includes admin hints.
+        // Includes index filters.
         boost::scoped_ptr<QuerySettings> _querySettings;
 
         void computeIndexKeys();

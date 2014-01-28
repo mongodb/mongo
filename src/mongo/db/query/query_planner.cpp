@@ -433,11 +433,11 @@ namespace mongo {
         vector<IndexEntry> relevantIndices;
 
         // Hints require us to only consider the hinted index.
-        // If admin hints in the query settings were used to override
+        // If index filters in the query settings were used to override
         // the allowed indices for planning, we should not use the hinted index
         // requested in the query.
         BSONObj hintIndex;
-        if (!params.adminHintApplied) {
+        if (!params.indexFiltersApplied) {
             hintIndex = query.getParsed().getHint();
         }
 

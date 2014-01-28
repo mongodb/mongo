@@ -84,7 +84,7 @@ namespace mongo {
     };
 
     /**
-     * Holds the admin hints in a collection.
+     * Holds the index filters in a collection.
      */
     class QuerySettings {
     private:

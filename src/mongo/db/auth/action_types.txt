@@ -70,7 +70,7 @@
 "logRotate",
 "moveChunk",
 "netstat",
-"planCacheHint", # view/update admin hints
+"planCacheIndexFilter", # view/update index filters
 "planCacheRead", # view contents of plan cache
 "planCacheWrite", # clear cache, drop cache entry, pin/unpin/shun plans
 "reIndex",

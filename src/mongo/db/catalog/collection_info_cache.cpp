@@ -54,7 +54,7 @@ namespace mongo {
         clearQueryCache();
         _keysComputed = false;
         // query settings is not affected by info cache reset.
-        // admin hints should persist throughout life of collection
+        // index filters should persist throughout life of collection
     }
 
     void CollectionInfoCache::computeIndexKeys() {

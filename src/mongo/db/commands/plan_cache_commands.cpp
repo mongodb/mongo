@@ -386,7 +386,7 @@ namespace mongo {
             }
             feedbackBob.doneFast();
 
-            planBob.append("hint", scd->adminHintApplied);
+            planBob.append("filterSet", scd->indexFilterApplied);
         }
         plansBuilder.doneFast();
 

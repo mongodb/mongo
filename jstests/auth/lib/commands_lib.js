@@ -1555,8 +1555,8 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "planCacheHint",
-            command: {planCacheClearHints: "x"},
+            testname: "planCacheIndexFilter",
+            command: {planCacheClearFilters: "x"},
             skipSharded: true,
             setup: function (db) { db.x.save( {} ); },
             teardown: function (db) { db.x.drop(); },
@@ -1565,14 +1565,20 @@ var authCommandsLib = {
                     runOnDb: firstDbName,
                     roles: roles_dbAdmin,
                     privileges: [
-                        { resource: {db: firstDbName, collection: "x"}, actions: ["planCacheHint"] }
+                        {
+                            resource: {db: firstDbName, collection: "x"},
+                            actions: ["planCacheIndexFilter"]
+                        }
                     ],
                 },
                 {
                     runOnDb: secondDbName,
                     roles: roles_dbAdminAny,
                     privileges: [
-                        { resource: {db: secondDbName, collection: "x"}, actions: ["planCacheHint"] }
+                        {
+                            resource: {db: secondDbName, collection: "x"},
+                            actions: ["planCacheIndexFilter"]
+                        }
                     ],
                 },
             ]

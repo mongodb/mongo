@@ -36,7 +36,7 @@
 namespace mongo {
 
     struct QueryPlannerParams {
-        QueryPlannerParams() : options(DEFAULT), adminHintApplied(false) { }
+        QueryPlannerParams() : options(DEFAULT), indexFiltersApplied(false) { }
 
         enum Options {
             // You probably want to set this.
@@ -85,8 +85,8 @@ namespace mongo {
         // forcing a fetch.
         BSONObj shardKey;
 
-        // Were admin hints applied to indices?
-        bool adminHintApplied;
+        // Were index filters applied to indices?
+        bool indexFiltersApplied;
     };
 
 }  // namespace mongo

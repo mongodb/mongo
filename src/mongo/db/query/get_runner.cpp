@@ -169,16 +169,16 @@ namespace mongo {
                                                        desc->infoObj()));
         }
 
-        // If query supports admin hint, filter params.indices by indexes in query settings.
+        // If query supports index filters, filter params.indices by indices in query settings.
         QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
         AllowedIndices* allowedIndicesRaw;
 
-        // Filter index catalog if admin hint is specified for query.
+        // Filter index catalog if index filters are specified for query.
         // Also, signal to planner that application hint should be ignored.
         if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
             boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
             filterAllowedIndexEntries(*allowedIndices, &plannerParams.indices);
-            plannerParams.adminHintApplied = true;
+            plannerParams.indexFiltersApplied = true;
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -345,7 +345,7 @@ namespace mongo {
                 WorkingSet* ws;
                 PlanStage* root;
                 if (solutions[i]->cacheData.get()) {
-                    solutions[i]->cacheData->adminHintApplied = plannerParams.adminHintApplied;
+                    solutions[i]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
                 }
                 verify(StageBuilder::build(*solutions[i], &root, &ws));
                 // Takes ownership of all arguments.

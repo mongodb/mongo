@@ -243,7 +243,7 @@ namespace mongo {
         }
         other->solnType = this->solnType;
         other->wholeIXSolnDir = this->wholeIXSolnDir;
-        other->adminHintApplied = this->adminHintApplied;
+        other->indexFilterApplied = this->indexFilterApplied;
         return other;
     }
 

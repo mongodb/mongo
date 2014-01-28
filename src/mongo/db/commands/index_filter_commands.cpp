@@ -36,7 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/hint_commands.h"
+#include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/catalog/collection.h"
 
@@ -109,12 +109,12 @@ namespace {
     // available to the client.
     //
 
-    MONGO_INITIALIZER_WITH_PREREQUISITES(SetupHintCommands, MONGO_NO_PREREQUISITES)(
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, MONGO_NO_PREREQUISITES)(
             InitializerContext* context) {
 
-        new ListHints();
-        new ClearHints();
-        new SetHint();
+        new ListFilters();
+        new ClearFilters();
+        new SetFilter();
 
         return Status::OK();
     }
@@ -128,15 +128,15 @@ namespace mongo {
     using std::vector;
     using boost::scoped_ptr;
 
-    HintCommand::HintCommand(const string& name, const string& helpText)
+    IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpText)
         : Command(name),
           helpText(helpText) { }
 
-    bool HintCommand::run(const string& dbname, BSONObj& cmdObj, int options,
+    bool IndexFilterCommand::run(const string& dbname, BSONObj& cmdObj, int options,
                            string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string ns = parseNs(dbname, cmdObj);
 
-        Status status = runHintCommand(ns, cmdObj, &result);
+        Status status = runIndexFilterCommand(ns, cmdObj, &result);
 
         if (!status.isOK()) {
             addStatus(status, result);
@@ -146,34 +146,34 @@ namespace mongo {
         return true;
     }
 
-    Command::LockType HintCommand::locktype() const {
+    Command::LockType IndexFilterCommand::locktype() const {
         return NONE;
     }
 
-    bool HintCommand::slaveOk() const {
+    bool IndexFilterCommand::slaveOk() const {
         return false;
     }
 
-    void HintCommand::help(stringstream& ss) const {
+    void IndexFilterCommand::help(stringstream& ss) const {
         ss << helpText;
     }
 
-    Status HintCommand::checkAuthForCommand(ClientBasic* client, const std::string& dbname,
+    Status IndexFilterCommand::checkAuthForCommand(ClientBasic* client, const std::string& dbname,
                                             const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = client->getAuthorizationSession();
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheHint)) {
+        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheIndexFilter)) {
             return Status::OK();
         }
 
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
-    ListHints::ListHints() : HintCommand("planCacheListHints",
-        "Displays admin hints for all query shapes in a collection.") { }
+    ListFilters::ListFilters() : IndexFilterCommand("planCacheListFilters",
+        "Displays index filters for all query shapes in a collection.") { }
 
-    Status ListHints::runHintCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status ListFilters::runIndexFilterCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
@@ -186,7 +186,7 @@ namespace mongo {
     }
 
     // static
-    Status ListHints::list(const QuerySettings& querySettings, BSONObjBuilder* bob) {
+    Status ListFilters::list(const QuerySettings& querySettings, BSONObjBuilder* bob) {
         invariant(bob);
 
         // Format of BSON result:
@@ -200,7 +200,7 @@ namespace mongo {
         //             indexes: [<index1>, <index2>, <index3>, ...]
         //         }
         //  }
-        BSONArrayBuilder hintsBuilder(bob->subarrayStart("hints"));
+        BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
         OwnedPointerVector<AllowedIndexEntry> entries;
         entries.mutableVector() = querySettings.getAllAllowedIndices();
         for (vector<AllowedIndexEntry*>::const_iterator i = entries.begin();
@@ -224,11 +224,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    ClearHints::ClearHints() : HintCommand("planCacheClearHints",
-        "Clears all admin hints for a single query shape or, "
-        "if the query shape is omitted, for the entire collection.") { }
+    ClearFilters::ClearFilters() : IndexFilterCommand("planCacheClearFilters",
+        "Clears index filter for a single query shape or, "
+        "if the query shape is omitted, all filters for the collection.") { }
 
-    Status ClearHints::runHintCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status ClearFilters::runIndexFilterCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
@@ -246,11 +246,11 @@ namespace mongo {
     }
 
     // static
-    Status ClearHints::clear(QuerySettings* querySettings, PlanCache* planCache,
+    Status ClearFilters::clear(QuerySettings* querySettings, PlanCache* planCache,
                              const std::string& ns, const BSONObj& cmdObj) {
         invariant(querySettings);
 
-        // According to the specification, the planCacheClearHints command runs in two modes:
+        // According to the specification, the planCacheClearFilters command runs in two modes:
         // - clear all hints; or
         // - clear hints for single query shape when a query shape is described in the
         //   command arguments.
@@ -286,9 +286,9 @@ namespace mongo {
 
         // Remove corresponding entries from plan cache.
         // Admin hints affect the planning process directly. If there were
-        // plans generated as a result of applying admin hints, these need to be
+        // plans generated as a result of applying index filter, these need to be
         // invalidated. This allows the planner to re-populate the plan cache with
-        // non-admin hinted solutions next time the query is run.
+        // non-filtered indexed solutions next time the query is run.
         // Resolve plan cache key from (query, sort, projection) in query settings entry.
         // Concurrency note: There's no harm in removing plan cache entries one at at time.
         // Only way that PlanCache::remove() can fail is when the query shape has been removed from
@@ -313,10 +313,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    SetHint::SetHint() : HintCommand("planCacheSetHint",
-        "Sets admin hints for a query shape. Overrides existing hints.") { }
+    SetFilter::SetFilter() : IndexFilterCommand("planCacheSetFilter",
+        "Sets index filter for a query shape. Overrides existing filter.") { }
 
-    Status SetHint::runHintCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status SetFilter::runIndexFilterCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
@@ -334,7 +334,7 @@ namespace mongo {
     }
 
     // static
-    Status SetHint::set(QuerySettings* querySettings, PlanCache* planCache,
+    Status SetFilter::set(QuerySettings* querySettings, PlanCache* planCache,
                         const string& ns, const BSONObj& cmdObj) {
         // indexes - required
         BSONElement indexesElt = cmdObj.getField("indexes");

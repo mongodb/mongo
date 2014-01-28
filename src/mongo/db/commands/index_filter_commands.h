@@ -35,23 +35,23 @@
 namespace mongo {
 
     /**
-     * DB commands for admin hints.
-     * Admin hint commands work on a different data structure in the collection
+     * DB commands for index filters.
+     * Index filter commands work on a different data structure in the collection
      * info cache from the plan cache.
-     * The user still thinks of admin hint commands as part of the plan cache functionality
+     * The user still thinks of index filter commands as part of the plan cache functionality
      * so the command name prefix is still "planCache".
      *
-     * These are in a header to facilitate unit testing. See hint_commands_test.cpp.
+     * These are in a header to facilitate unit testing. See index_filter_commands_test.cpp.
      */
 
     /**
-     * HintCommand
-     * Defines common attributes for all admin hint related commands
+     * IndexFilterCommand
+     * Defines common attributes for all index filter related commands
      * such as slaveOk and locktype.
      */
-    class HintCommand : public Command {
+    class IndexFilterCommand : public Command {
     public:
-        HintCommand(const std::string& name, const std::string& helpText);
+        IndexFilterCommand(const std::string& name, const std::string& helpText);
 
         /**
          * Entry point from command subsystem.
@@ -78,59 +78,59 @@ namespace mongo {
         virtual void help(std::stringstream& ss) const;
 
         /**
-         * One action type defined for hint commands:
-         * - adminHintReadWrite
+         * One action type defined for index filter commands:
+         * - planCacheIndexFilter
          */
         virtual Status checkAuthForCommand(ClientBasic* client, const std::string& dbname,
                                            const BSONObj& cmdObj);
 
         /**
-         * Subset of command arguments used by hint commands
+         * Subset of command arguments used by index filter commands
          * Override to provide command functionality.
          * Should contain just enough logic to invoke run*Command() function
-         * in admin_hint.h
+         * in query_settings.h
          */
-        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj,
-                                      BSONObjBuilder* bob) = 0;
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj,
+                                             BSONObjBuilder* bob) = 0;
 
     private:
         std::string helpText;
     };
 
     /**
-     * ListHints
+     * ListFilters
      *
-     * { planCacheListHints: <collection> }
+     * { planCacheListFilters: <collection> }
      *
      */
-    class ListHints : public HintCommand {
+    class ListFilters : public IndexFilterCommand {
     public:
-        ListHints();
+        ListFilters();
 
-        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
-         * Looks up admin hints from collection's query settings.
-         * Inserts hints into BSON builder.
+         * Looks up index filters from collection's query settings.
+         * Inserts index filters into BSON builder.
          */
         static Status list(const QuerySettings& querySettings, BSONObjBuilder* bob);
     };
 
     /**
-     * ClearHints
+     * ClearFilters
      *
-     * { planCacheClearHints: <collection>, query: <query>, sort: <sort>, projection: <projection> }
+     * { planCacheClearFilters: <collection>, query: <query>, sort: <sort>, projection: <projection> }
      *
      */
-    class ClearHints : public HintCommand {
+    class ClearFilters : public IndexFilterCommand {
     public:
-        ClearHints();
+        ClearFilters();
 
-        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
-         * If query shape is provided, clears hints for a query.
-         * Otherwise, clears collection's query settings.
+         * If query shape is provided, clears index filter for a query.
+         * Otherwise, clears collection's filters.
          * Namespace argument ns is ignored if we are clearing the entire cache.
          * Removes corresponding entries from plan cache.
          */
@@ -139,10 +139,10 @@ namespace mongo {
     };
 
     /**
-     * SetHint
+     * SetFilter
      *
      * {
-     *     planCacheSetHint: <collection>,
+     *     planCacheSetFilter: <collection>,
      *     query: <query>,
      *     sort: <sort>,
      *     projection: <projection>,
@@ -150,14 +150,14 @@ namespace mongo {
      * }
      *
      */
-    class SetHint : public HintCommand {
+    class SetFilter : public IndexFilterCommand {
     public:
-        SetHint();
+        SetFilter();
 
-        virtual Status runHintCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
-         * Sets admin hints for a query shape.
+         * Sets index filter for a query shape.
          * Removes entry for query shape from plan cache.
          */
         static Status set(QuerySettings* querySettings, PlanCache* planCache, const std::string& ns,

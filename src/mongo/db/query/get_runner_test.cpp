@@ -114,7 +114,7 @@ namespace {
          ASSERT_EQUALS(indexEntries.size(), numExpected);
      }
 
-    // Use of admin hint to select compound index over single key index.
+    // Use of index filters to select compound index over single key index.
     TEST(GetRunnerTest, GetAllowedIndices) {
         const char* hintKeyPatterns[] = {"{a: 1, b: 1}", NULL};
         const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
@@ -122,7 +122,7 @@ namespace {
         testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns,  expectedFilteredKeyPatterns);
     }
 
-    // Settings admin hints which refer to non-existent indexes
+    // Setting index filter referring to non-existent indexes
     // will effectively disregard the index catalog and
     // result in the planner generating a collection scan.
     TEST(GetRunnerTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {

@@ -43,15 +43,15 @@ namespace mongo {
     using std::vector;
 
     /**
-     * Base class for mongos hint commands.
-     * Cluster hint commands don't do much more than
+     * Base class for mongos index filter commands.
+     * Cluster index filter commands don't do much more than
      * forwarding the commands to all shards and combining the results.
      */
-    class ClusterHintCmd : public Command {
-    MONGO_DISALLOW_COPYING(ClusterHintCmd);
+    class ClusterIndexFilterCmd : public Command {
+    MONGO_DISALLOW_COPYING(ClusterIndexFilterCmd);
     public:
 
-        virtual ~ClusterHintCmd() {
+        virtual ~ClusterIndexFilterCmd() {
         }
 
         bool logTheOp() {
@@ -76,7 +76,8 @@ namespace mongo {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
     
-            if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheHint)) {
+            if (authzSession->isAuthorizedForActionsOnResource(pattern,
+                                                               ActionType::planCacheIndexFilter)) {
                 return Status::OK();
             }
     
@@ -97,7 +98,7 @@ namespace mongo {
          * Instantiates a command that can be invoked by "name", which will be described by
          * "helpText", and will require privilege "actionType" to run.
          */
-        ClusterHintCmd( const std::string& name, const std::string& helpText) :
+        ClusterIndexFilterCmd( const std::string& name, const std::string& helpText) :
             Command( name ), _helpText( helpText ) {
         }
 
@@ -107,10 +108,10 @@ namespace mongo {
     };
 
     //
-    // Cluster hint command implementation(s) below
+    // Cluster index filter command implementation(s) below
     //
 
-    bool ClusterHintCmd::run( const std::string& dbName,
+    bool ClusterIndexFilterCmd::run( const std::string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                std::string& errMsg,
@@ -120,7 +121,7 @@ namespace mongo {
         NamespaceString nss(fullns);
 
         // Dispatch command to all the shards.
-        // Targeted shard commands are generally data-dependent but hint
+        // Targeted shard commands are generally data-dependent but index filter
         // commands are tied to query shape (data has no effect on query shape).
         vector<Strategy::CommandResult> results;
         STRATEGY->commandOp(dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
@@ -149,26 +150,26 @@ namespace mongo {
     }
 
     //
-    // Register hint commands at startup
+    // Register index filter commands at startup
     //
 
     namespace {
 
-        MONGO_INITIALIZER(RegisterHintCommands)(InitializerContext* context) {
+        MONGO_INITIALIZER(RegisterIndexFilterCommands)(InitializerContext* context) {
             // Leaked intentionally: a Command registers itself when constructed.
 
-            new ClusterHintCmd(
-                "planCacheListHints",
-                "Displays admin hints for all query shapes in a collection." );
+            new ClusterIndexFilterCmd(
+                "planCacheListFilters",
+                "Displays index filters for all query shapes in a collection." );
 
-            new ClusterHintCmd(
-                "planCacheClearHints",
-                "Clears all admin hints for a single query shape or, "
-                "if the query shape is omitted, for the entire collection." );
+            new ClusterIndexFilterCmd(
+                "planCacheClearFilters",
+                "Clears index filter for a single query shape or, "
+                "if the query shape is omitted, all filters for the collection." );
 
-            new ClusterHintCmd(
-                "planCacheSetHint",
-                "Sets admin hints for a query shape. Overrides existing hints." );
+            new ClusterIndexFilterCmd(
+                "planCacheSetFilter",
+                "Sets index filter for a query shape. Overrides existing index filter." );
 
             return Status::OK();
         }

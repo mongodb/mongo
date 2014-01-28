@@ -134,7 +134,7 @@ namespace mongo {
             tree(NULL),
             solnType(USE_INDEX_TAGS_SOLN),
             wholeIXSolnDir(1),
-            adminHintApplied(false) {
+            indexFilterApplied(false) {
         }
 
         // Make a deep copy.
@@ -168,8 +168,8 @@ namespace mongo {
         // for WHOLE_IXSCAN_SOLN.
         int wholeIXSolnDir;
 
-        // True if admin hints were applied.
-        bool adminHintApplied;
+        // True if index filter was applied.
+        bool indexFilterApplied;
     };
 
     class PlanCacheEntry;
@@ -387,7 +387,7 @@ namespace mongo {
          * Returns a vector of all cache entries.
          * Caller owns the result vector and is responsible for cleaning up
          * the cache entry copies.
-         * Used by planCacheListQueryShapes and hint_commands_test.cpp.
+         * Used by planCacheListQueryShapes and index_filter_commands_test.cpp.
          */
         std::vector<PlanCacheEntry*> getAllEntries() const;
 
