@@ -105,7 +105,7 @@ set yrange [1:]\n''' % {
             '\', graph 1 fc rgb "gray" back\n')
     of.write('''
 set output '%(NAME)s.latency1.png'
-plot "monitor" using 1:($%(COL_AVG)d / 1000) title "Average Latency", "monitor" using 1:($%(COL_MIN)d / 1000) title "Minimum Latency", "monitor" using 1:($%(COL_MAX)d / 1000) title "Maximum Latency"\n''' % {
+plot "monitor" using 1:($%(COL_AVG)d) title "Average Latency", "monitor" using 1:($%(COL_MIN)d) title "Minimum Latency", "monitor" using 1:($%(COL_MAX)d) title "Maximum Latency"\n''' % {
     'NAME' : name,
     'COL_AVG' : col_avg,
     'COL_MIN' : col_min,

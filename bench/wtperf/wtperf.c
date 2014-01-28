@@ -150,18 +150,18 @@ randomize_value(CONFIG *cfg, char *value_buf)
 }
 
 /*
- * track_aggregated_update --
+ * track_operation --
  *	Update an operation's tracking structure with new latency information.
  */
 static inline void
-track_operation(TRACK *trk, uint64_t nsecs)
+track_operation(TRACK *trk, uint64_t usecs)
 {
 	uint64_t v;
 
-					/* average nanoseconds per call */
-	v = (uint64_t)nsecs;
+					/* average microseconds per call */
+	v = (uint64_t)usecs;
 
-	trk->latency += nsecs;		/* track total latency */
+	trk->latency += usecs;		/* track total latency */
 
 	if (v > trk->max_latency)	/* track max/min latency */
 		trk->max_latency = (uint32_t)v;
@@ -172,20 +172,20 @@ track_operation(TRACK *trk, uint64_t nsecs)
 	 * Update a latency bucket.
 	 * First buckets: usecs from 100us to 1000us at 100us each.
 	 */
-	if (v < us_to_ns(1000))
-		++trk->us[ns_to_us(v)];
+	if (v < 1000)
+		++trk->us[v];
 
 	/*
 	 * Second buckets: millseconds from 1ms to 1000ms, at 1ms each.
 	 */
-	else if (v < ms_to_ns(1000))
-		++trk->ms[ns_to_ms(v)];
+	else if (v < ms_to_us(1000))
+		++trk->ms[us_to_ms(v)];
 
 	/*
 	 * Third buckets are seconds from 1s to 100s, at 1s each.
 	 */
-	else if (v < sec_to_ns(100))
-		++trk->sec[ns_to_sec(v)];
+	else if (v < sec_to_us(100))
+		++trk->sec[us_to_sec(v)];
 
 	/* >100 seconds, accumulate in the biggest bucket. */
 	else
@@ -371,7 +371,7 @@ op_err:			lprintf(cfg, ret, 0,
 			nsecs = (uint64_t)(stop.tv_nsec - start.tv_nsec);
 			nsecs += sec_to_ns(
 			    (uint64_t)(stop.tv_sec - start.tv_sec));
-			track_operation(trk, nsecs);
+			track_operation(trk, nsecs/1000);
 		}
 		++trk->ops;		/* increment operation counts */
 
@@ -637,6 +637,8 @@ monitor(void *arg)
 		lprintf(cfg, errno, 0, "%s", path);
 		goto err;
 	}
+	/* Set line buffering for monitor file. */
+	(void)setvbuf(fp, NULL, _IOLBF, 0);
 #ifdef __WRITE_A_HEADER
 	fprintf(fp,
 	    "#time,"
