@@ -811,7 +811,7 @@ namespace mongo {
                 // If there was no new data in capped collection, let's slow down on burning the CPU
                 // by doing a sleep(1) for about >~1 second. Finally, let's move to 2ms wait in between
                 // loops after that until we reach the limit of 4 seconds in the code above
-                else sleepmillis( pass < 400 ? 0 : pass < 2000 ? 1 : 2);                    
+                else sleepmillis( pass < 400 ? 0 : pass < 2000 ? 1 : 2 );                    
                 
                 // note: the 1100 is because of the waitForDifferent above
                 // should eventually clean this up a bit
