@@ -491,6 +491,8 @@ config_print(CONFIG *cfg)
 	printf("\tHome: %s\n", cfg->home);
 	printf("\tTable name: %s\n", cfg->table_name);
 	printf("\tConnection configuration: %s\n", cfg->conn_config);
+	if (cfg->sess_config != NULL)
+		printf("\tSession configuration: %s\n", cfg->sess_config);
 
 	printf("\t%s table: %s\n",
 	    cfg->create ? "Creating new" : "Using existing",

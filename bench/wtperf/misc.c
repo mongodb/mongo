@@ -54,7 +54,7 @@ setup_log_file(CONFIG *cfg)
 		return (enomem(cfg));
 
 	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
-	cfg->logf = fopen(fname, "w");
+	cfg->logf = fopen(fname, "a");
 	free(fname);
 
 	if (cfg->logf == NULL) {
