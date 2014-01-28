@@ -98,7 +98,7 @@ namespace mongo {
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         BSONObjBuilder bExtra;
         stringstream verstr;
-        OSVERSIONINFOEX osvi;   // os version 
+        OSVERSIONINFOEX osvi;   // os version
         MEMORYSTATUSEX mse;     // memory stats
         SYSTEM_INFO ntsysinfo;  //system stats
 
@@ -146,6 +146,15 @@ namespace mongo {
                             osName += "Windows 7";
                         else
                             osName += "Windows Server 2008 R2";
+
+                        // Windows 6.1 is either Windows 7 or Windows 2008 R2. There is no SP2 for
+                        // either of these two operating systems, but the check will hold if one
+                        // were released. This code assumes that SP2 will include fix for 
+                        // http://support.microsoft.com/kb/2731284.
+                        //
+                        if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
+                            fileZeroNeeded = true;
+                        }
                         break;
                     case 0:
                         if ( osvi.wProductType == VER_NT_WORKSTATION )
