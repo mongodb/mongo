@@ -809,7 +809,7 @@ namespace mongo {
                     sleepmillis(20);
                 // Let's go really fast the first 400 passes (arbitrary number), yield to thread with no sleeping.
                 // If there was no new data in capped collection, let's slow down on burning the CPU
-                // by doing a sleep(1) for about >~1 second. Finally, let's move to 2ms wait in between
+                // by doing a sleep(1) for about >~2 second. Finally, let's move to 2ms wait in between
                 // loops after that until we reach the limit of 4 seconds in the code above
                 else sleepmillis( pass < 400 ? 0 : pass < 2000 ? 1 : 2 );                    
                 
