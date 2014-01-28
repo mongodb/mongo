@@ -93,31 +93,13 @@ namespace mongo {
         PlanStageStats* getStats();
 
     private:
-        // A helper class used for sorting results by score.
-        struct ScoredLocation {
-            DiskLoc loc;
-            double score;
-
-            ScoredLocation() : loc(DiskLoc()), score(1.0) {}
-            ScoredLocation(const DiskLoc& d, double s) : loc(d), score(s) {}
-            ~ScoredLocation() {}
-
-            // Use descending order (highest-scored documents should appear first).
-            bool operator<(const ScoredLocation& rhs) const {
-                if (score != rhs.score) {
-                    return score > rhs.score;
-                }
-                return loc < rhs.loc;
-            }
-        };
-
         // Helper for buffering results array.  Returns NEED_TIME (if any results were produced),
         // IS_EOF, or FAILURE.
         StageState fillOutResults();
 
-        // Helper to update _scores with a new-found (term, score) pair for this document.  Also
-        // rejects documents that don't match this stage's filter.
-        void filterAndScore(BSONObj key, DiskLoc loc);
+        // Helper to update aggregate score with a new-found (term, score) pair for this document.
+        // Also rejects documents that don't match this stage's filter.
+        void filterAndScore(BSONObj key, DiskLoc loc, double* documentAggregateScore);
 
         // Parameters of this text stage.
         TextStageParams _params;
@@ -138,12 +120,12 @@ namespace mongo {
         // State bit for work().  True if results have been buffered.
         bool _filledOutResults;
 
-        // Map: diskloc -> aggregate score for doc.
-        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
-        ScoreMap _scores;
+        // WSIDs in result.
+        std::vector<WorkingSetID> _results;
 
-        // Score-ordered result set of documents (as DiskLoc's).
-        std::vector<ScoredLocation> _results;
+        // We want to look up data in the working set by DiskLoc quickly upon invalidation.
+        typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;
+        DataMap _wsidByDiskLoc;
 
         // The next result to return from work().
         size_t _curResult;

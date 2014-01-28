@@ -27,6 +27,8 @@
  */
 
 #include "mongo/db/exec/text.h"
+
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -69,18 +71,19 @@ namespace mongo {
         }
 
         // Having cached all our results, return them one at a time.
-
-        // Fill out a WSM.
-        WorkingSetID id = _ws->allocate();
-        WorkingSetMember* member = _ws->get(id);
-        member->loc = _results[_curResult].loc;
-        member->obj = member->loc.obj();
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-        member->addComputed(new TextScoreComputedData(_results[_curResult].score));
+        WorkingSetID id = _results[_curResult];
 
         // Advance to next result.
         ++_curResult;
         *out = id;
+
+        // If we're returning something, take it out of our DL -> WSID map so that future
+        // calls to invalidate don't cause us to take action for a DL we're done with.
+        WorkingSetMember* member = _ws->get(*out);
+        if (member->hasLoc()) {
+            _wsidByDiskLoc.erase(member->loc);
+        }
+
         return PlanStage::ADVANCED;
     }
 
@@ -96,12 +99,28 @@ namespace mongo {
 
     void TextStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        // TODO: This is much slower than it should be.
-        for (size_t i = 0; i < _results.size(); ++i) {
-            if (dl == _results[i].loc) {
-                _results.erase(_results.begin() + i);
-                return;
-            }
+
+        // Invalidation does not affect the number of results added in fillOutResults().
+        // All it affects is whether the WSM returned to the caller has a DiskLoc.
+
+        // _results contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
+        // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still
+        // be at the same spot in the WorkingSet.  As such, we don't need to modify _results.
+        DataMap::iterator it = _wsidByDiskLoc.find(dl);
+
+        // If we're holding on to data that's got the DiskLoc we're invalidating...
+        if (_wsidByDiskLoc.end() != it) {
+            // Grab the WSM that we're converting from LOC_AND_UNOWNED to OWNED_OBJ.
+            WorkingSetMember* member = _ws->get(it->second);
+            verify(member->loc == dl);
+            verify(member->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
+
+            member->loc.Null();
+            member->obj = member->obj.getOwned();
+            member->state = WorkingSetMember::OWNED_OBJ;
+
+            // Remove the DiskLoc from our set of active DLs.
+            _wsidByDiskLoc.erase(it);
         }
     }
 
@@ -127,7 +146,7 @@ namespace mongo {
         }
 
         // Get all the index scans for each term in our query.
-        vector<IndexScan*> scanners;
+        OwnedPointerVector<PlanStage> scanners;
         for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
             const string& term = _params.query.getTerms()[i];
             IndexScanParams params;
@@ -139,8 +158,12 @@ namespace mongo {
             params.descriptor = idxMatches[0];
             params.direction = -1;
             IndexScan* ixscan = new IndexScan(params, _ws, NULL);
-            scanners.push_back(ixscan);
+            scanners.mutableVector().push_back(ixscan);
         }
+
+        // Map: diskloc -> aggregate score for doc.
+        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
+        ScoreMap scores;
 
         // For each index scan, read all results and store scores.
         size_t currentIndexScanner = 0;
@@ -149,12 +172,12 @@ namespace mongo {
             DiskLoc loc;
 
             WorkingSetID id;
-            PlanStage::StageState state = scanners[currentIndexScanner]->work(&id);
+            PlanStage::StageState state = scanners.vector()[currentIndexScanner]->work(&id);
 
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* wsm = _ws->get(id);
                 IndexKeyDatum& keyDatum = wsm->keyData.back();
-                filterAndScore(keyDatum.keyData, wsm->loc);
+                filterAndScore(keyDatum.keyData, wsm->loc, &scores[wsm->loc]);
                 _ws->free(id);
             }
             else if (PlanStage::IS_EOF == state) {
@@ -171,15 +194,12 @@ namespace mongo {
             else {
                 verify(PlanStage::FAILURE == state);
                 warning() << "error from index scan during text stage: invalid FAILURE state";
-                for (size_t i=0; i<scanners.size(); ++i) { delete scanners[i]; }
                 return PlanStage::FAILURE;
             }
         }
 
-        for (size_t i=0; i<scanners.size(); ++i) { delete scanners[i]; }
-
         // Filter for phrases and negative terms, score and truncate.
-        for (ScoreMap::iterator i = _scores.begin(); i != _scores.end(); ++i) {
+        for (ScoreMap::iterator i = scores.begin(); i != scores.end(); ++i) {
             DiskLoc loc = i->first;
             double score = i->second;
 
@@ -195,7 +215,19 @@ namespace mongo {
                 }
             }
 
-            _results.push_back(ScoredLocation(loc, score));
+            // Add results to working set as LOC_AND_UNOWNED_OBJ initially.
+            // On invalidation, we copy the object and change the state to
+            // OWNED_OBJ.
+            // Fill out a WSM.
+            WorkingSetID id = _ws->allocate();
+            WorkingSetMember* member = _ws->get(id);
+            member->loc = loc;
+            member->obj = member->loc.obj();
+            member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+            member->addComputed(new TextScoreComputedData(score));
+
+            _results.push_back(id);
+            _wsidByDiskLoc[member->loc] = id;
         }
 
         _filledOutResults = true;
@@ -255,7 +287,9 @@ namespace mongo {
         bool* _fetched;
     };
 
-    void TextStage::filterAndScore(BSONObj key, DiskLoc loc) {
+    void TextStage::filterAndScore(BSONObj key, DiskLoc loc, double* documentAggregateScore) {
+        invariant(documentAggregateScore);
+
         ++_specificStats.keysExamined;
 
         // Locate score within possibly compound key: {prefix,term,score,suffix}.
@@ -268,15 +302,14 @@ namespace mongo {
 
         BSONElement scoreElement = keyIt.next();
         double documentTermScore = scoreElement.number();
-        double& documentAggregateScore = _scores[loc];
         
         // Handle filtering.
-        if (documentAggregateScore < 0) {
+        if (*documentAggregateScore < 0) {
             // We have already rejected this document.
             return;
         }
 
-        if (documentAggregateScore == 0) {
+        if (*documentAggregateScore == 0) {
             if (_filter) {
                 // We have not seen this document before and need to apply a filter.
                 bool fetched = false;
@@ -287,7 +320,7 @@ namespace mongo {
                     if (fetched) {
                         ++_specificStats.fetches;
                     }
-                    documentAggregateScore = -1;
+                    *documentAggregateScore = -1;
                     return;
                 }
             }
@@ -298,7 +331,7 @@ namespace mongo {
         }
 
         // Aggregate relevance score, term keys.
-        documentAggregateScore += documentTermScore;
+        *documentAggregateScore += documentTermScore;
     }
 
 }  // namespace mongo
