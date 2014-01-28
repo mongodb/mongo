@@ -124,13 +124,13 @@ namespace mongo {
             Collection* collection = NULL;
 
             while( i.moreInCurrentBatch() ) {
-                if ( n % 128 == 127 /*yield some*/ ) {
+                if ( numSeen % 128 == 127 /*yield some*/ ) {
                     collection = NULL;
                     time_t now = time(0);
-                    if( now - lastLog >= 60 ) { 
+                    if( now - lastLog >= 60 ) {
                         // report progress
                         if( lastLog )
-                            log() << "clone " << to_collection << ' ' << n << endl;
+                            log() << "clone " << to_collection << ' ' << numSeen << endl;
                         lastLog = now;
                     }
                     mayInterrupt( _mayBeInterrupted );
@@ -161,7 +161,7 @@ namespace mongo {
                     continue;
                 }
 
-                ++n;
+                ++numSeen;
 
                 BSONObj js = tmp;
                 if ( isindex ) {
@@ -185,7 +185,7 @@ namespace mongo {
                 getDur().commitIfNeeded();
 
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
-                    log() << n << " objects cloned so far from collection " << from_collection << endl;
+                    log() << numSeen << " objects cloned so far from collection " << from_collection;
                     saveLast = time( 0 );
                 }
             }
@@ -194,7 +194,7 @@ namespace mongo {
         time_t lastLog;
         Client::Context& context;
 
-        int n;
+        int64_t numSeen;
         bool isindex;
         const char *from_collection;
         const char *to_collection;
@@ -217,7 +217,7 @@ namespace mongo {
         LOG(2) << "\t\tcloning collection " << from_collection << " to " << to_collection << " on " << _conn->getServerAddress() << " with filter " << query.toString() << endl;
 
         Fun f( ctx );
-        f.n = 0;
+        f.numSeen = 0;
         f.isindex = isindex;
         f.from_collection = from_collection;
         f.to_collection = to_collection;
