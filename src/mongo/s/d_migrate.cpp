@@ -399,6 +399,7 @@ namespace mongo {
                 return false;
             }
 
+            invariant( _dummyRunner.get() == NULL );
             _dummyRunner.reset( new DummyRunner( _ns, collection ) );
 
             IndexDescriptor *idx =
