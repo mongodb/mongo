@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
@@ -41,22 +42,23 @@ namespace mongo {
 
         using namespace mongoutils;
 
-        Status FTSQuery::parse(const string& query, const string& language) {
+        Status FTSQuery::parse(const string& query, const StringData& language) {
             _search = query;
-            Status status = _language.init( language );
-            if ( !status.isOK() ) {
-                return status;
+            StatusWithFTSLanguage swl = FTSLanguage::make( language, TEXT_INDEX_VERSION_2 );
+            if ( !swl.getStatus().isOK() ) {
+                return swl.getStatus();
             }
+            _language = swl.getValue();
 
-            const StopWords* stopWords = StopWords::getStopWords( _language );
-            Stemmer stemmer( _language );
+            const StopWords* stopWords = StopWords::getStopWords( *_language );
+            Stemmer stemmer( *_language );
 
             bool inNegation = false;
             bool inPhrase = false;
 
             unsigned quoteOffset = 0;
 
-            Tokenizer i( _language, query );
+            Tokenizer i( *_language, query );
             while ( i.more() ) {
                 Token t = i.next();
 

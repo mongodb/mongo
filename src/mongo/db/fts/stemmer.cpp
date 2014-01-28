@@ -32,12 +32,13 @@
 #include <string>
 
 #include "mongo/db/fts/stemmer.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     namespace fts {
 
-        Stemmer::Stemmer( const FTSLanguage language ) {
+        Stemmer::Stemmer( const FTSLanguage& language ) {
             _stemmer = NULL;
             if ( language.str() != "none" )
                 _stemmer = sb_stemmer_new(language.str().c_str(), "UTF_8");

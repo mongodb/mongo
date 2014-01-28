@@ -160,6 +160,9 @@ namespace mongo {
         }
 
         TEST( FTSSpec, FixTextIndexVersion1 ) {
+            assertFixSuccess("{key: {a: 'text'}, textIndexVersion: 1.0}}");
+            assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberInt(1)}}");
+            assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberLong(1)}}");
             assertFixSuccess("{key: {a: 'text'}, textIndexVersion: 2.0}}");
             assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberInt(2)}}");
             assertFixSuccess("{key: {a: 'text'}, textIndexVersion: NumberLong(2)}}");
@@ -178,7 +181,7 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "title" << "cat sat run" ),
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                spec.defaultLanguage(),
                                 "",
                                 false,
                                 &m );
@@ -197,7 +200,7 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "title" << "cat sat run" << "text" << "cat book" ),
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                spec.defaultLanguage(),
                                 "",
                                 false,
                                 &m );
@@ -220,7 +223,7 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "a" << BSON( "b" << "term" ) ),
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                spec.defaultLanguage(),
                                 "",
                                 false,
                                 &m );
@@ -236,7 +239,7 @@ namespace mongo {
 
             TermFrequencyMap m;
             spec.scoreDocument( BSON( "title" << "cat sat sat run run run" ),
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
+                                spec.defaultLanguage(),
                                 "",
                                 false,
                                 &m );
@@ -308,11 +311,7 @@ namespace mongo {
             // The following document matches {"a.b": {$type: 2}}, so "term" should be indexed.
             BSONObj obj = fromjson("{a: [{b: ['term']}]}"); // indirectly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -323,11 +322,7 @@ namespace mongo {
             // The wildcard spec implies a full recursive traversal, so "term" should be indexed.
             BSONObj obj = fromjson("{a: {b: [['term']]}}"); // directly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -339,11 +334,7 @@ namespace mongo {
             // indexed.
             BSONObj obj = fromjson("{a: {b: [['term']]}}"); // directly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &m );
             ASSERT_EQUALS( 0U, m.size() );
         }
 
@@ -362,11 +353,7 @@ namespace mongo {
                 "   }"
                 " }" );
 
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &tfm );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
 
             set<string> hits;
             hits.insert("walk");
@@ -397,11 +384,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &tfm );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -432,11 +415,7 @@ namespace mongo {
                 "  } ]"
                 "}" );
 
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &tfm );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -469,11 +448,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &tfm );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -506,11 +481,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &tfm );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -545,11 +516,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj,
-                                FTSLanguage::makeFTSLanguage( "english" ).getValue(),
-                                "",
-                                false,
-                                &tfm );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -564,6 +531,52 @@ namespace mongo {
 
         }
 
+        /** Test differences across textIndexVersion values in handling of nested arrays. */
+        TEST( FTSSpec, TextIndexLegacyNestedArrays ) {
+            BSONObj obj = fromjson( "{a: [{b: ['hello']}]}" );
+
+            // textIndexVersion=1 FTSSpec objects do not index nested arrays.
+            {
+                BSONObj indexSpec = fromjson( "{key: {'a.b': 'text'}, textIndexVersion: 1}" ); 
+                FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
+                TermFrequencyMap tfm;
+                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                ASSERT_EQUALS( tfm.size(), 0U );
+            }
+
+            // textIndexVersion=2 FTSSpec objects do index nested arrays.
+            {
+                BSONObj indexSpec = fromjson( "{key: {'a.b': 'text'}, textIndexVersion: 2}" ); 
+                FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
+                TermFrequencyMap tfm;
+                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                ASSERT_EQUALS( tfm.size(), 1U );
+            }
+        }
+
+        /** Test differences across textIndexVersion values in handling of language annotations. */
+        TEST( FTSSpec, TextIndexLegacyLanguageRecognition) {
+            BSONObj obj = fromjson( "{a: 'the', language: 'EN'}" );
+
+            // textIndexVersion=1 FTSSpec objects treat two-letter language annotations as "none"
+            // for purposes of stopword processing.
+            {
+                BSONObj indexSpec = fromjson( "{key: {'a': 'text'}, textIndexVersion: 1}" ); 
+                FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
+                TermFrequencyMap tfm;
+                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                ASSERT_EQUALS( tfm.size(), 1U ); // "the" not recognized as stopword
+            }
+
+            // textIndexVersion=2 FTSSpec objects recognize two-letter codes.
+            {
+                BSONObj indexSpec = fromjson( "{key: {'a': 'text'}, textIndexVersion: 2}" ); 
+                FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
+                TermFrequencyMap tfm;
+                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                ASSERT_EQUALS( tfm.size(), 0U ); // "the" recognized as stopword
+            }
+        }
 
     }
 }

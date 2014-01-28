@@ -46,23 +46,33 @@ namespace mongo {
     namespace fts {
 
         extern const double MAX_WEIGHT;
+        extern const double MAX_WORD_WEIGHT;
 
         typedef std::map<string,double> Weights; // TODO cool map
 
         typedef unordered_map<string,double> TermFrequencyMap;
 
+        struct ScoreHelperStruct {
+            ScoreHelperStruct()
+                : freq(0), count(0), exp(0){
+            }
+            double freq;
+            double count;
+            double exp;
+        };
+        typedef unordered_map<string,ScoreHelperStruct> ScoreHelperMap;
 
         class FTSSpec {
 
             struct Tools {
-                Tools( const FTSLanguage _language,
+                Tools( const FTSLanguage& _language,
                        const Stemmer* _stemmer,
                        const StopWords* _stopwords )
                     : language( _language )
                     , stemmer( _stemmer )
                     , stopwords( _stopwords ) {}
 
-                const FTSLanguage language;
+                const FTSLanguage& language;
                 const Stemmer* stemmer;
                 const StopWords* stopwords;
             };
@@ -71,7 +81,7 @@ namespace mongo {
             FTSSpec( const BSONObj& indexInfo );
 
             bool wildcard() const { return _wildcard; }
-            const FTSLanguage defaultLanguage() const { return _defaultLanguage; }
+            const FTSLanguage& defaultLanguage() const { return *_defaultLanguage; }
             const string& languageOverrideField() const { return _languageOverrideField; }
 
             size_t numExtraBefore() const { return _extraBefore.size(); }
@@ -89,7 +99,7 @@ namespace mongo {
              * - "term_freqs": out-parameter to store results
              */
             void scoreDocument( const BSONObj& obj,
-                                const FTSLanguage parentLanguage,
+                                const FTSLanguage& parentLanguage,
                                 const string& parentPath,
                                 bool isArray,
                                 TermFrequencyMap* term_freqs ) const;
@@ -102,20 +112,56 @@ namespace mongo {
             const Weights& weights() const { return _weights; }
 
             static BSONObj fixSpec( const BSONObj& spec );
+
         private:
+            //
+            // Helper methods.  Invoked for TEXT_INDEX_VERSION_2 spec objects only.
+            //
+
             /**
              * Get the language override for the given BSON doc.  If no language override is
              * specified, returns currentLanguage.
              */
-            const FTSLanguage getLanguageToUse( const BSONObj& userDoc,
-                                                const FTSLanguage currentLanguage ) const;
+            const FTSLanguage& _getLanguageToUseV2( const BSONObj& userDoc,
+                                                    const FTSLanguage& currentLanguage ) const;
 
-            void _scoreString( const Tools& tools,
-                               const StringData& raw,
-                               TermFrequencyMap* term_freqs,
-                               double weight ) const;
+            /**
+             * Calculate the term scores for 'raw' and update 'term_freqs' with the result.  Parses
+             * 'raw' using 'tools', and weights term scores based on 'weight'.
+             */
+            void _scoreStringV2( const Tools& tools,
+                                 const StringData& raw,
+                                 TermFrequencyMap* term_freqs,
+                                 double weight ) const;
 
-            FTSLanguage _defaultLanguage;
+            //
+            // Deprecated helper methods.  Invoked for TEXT_INDEX_VERSION_1 spec objects only.
+            //
+
+            void _scoreStringV1( const Tools& tools,
+                                 const StringData& raw,
+                                 TermFrequencyMap* docScores,
+                                 double weight ) const;
+
+            bool _weightV1( const StringData& field, double* out ) const;
+
+            void _scoreRecurseV1( const Tools& tools,
+                                  const BSONObj& obj,
+                                  TermFrequencyMap* term_freqs ) const;
+
+            void _scoreDocumentV1( const BSONObj& obj, TermFrequencyMap* term_freqs ) const;
+
+            const FTSLanguage& _getLanguageToUseV1( const BSONObj& userDoc ) const;
+
+            static BSONObj _fixSpecV1( const BSONObj& spec );
+
+            //
+            // Instance variables.
+            //
+
+            TextIndexVersion _textIndexVersion;
+
+            const FTSLanguage* _defaultLanguage;
             string _languageOverrideField;
             bool _wildcard;
 

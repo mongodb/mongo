@@ -30,8 +30,9 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_spec.h"
+
+#include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
@@ -61,14 +62,37 @@ namespace mongo {
         }
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
+            // indexInfo is a text index spec.  Text index specs pass through fixSpec() before
+            // being saved to the system.indexes collection.  fixSpec() enforces a schema, such that
+            // required fields must exist and be of the correct type (e.g. weights,
+            // textIndexVersion).
             massert( 16739, "found invalid spec for text index",
                      indexInfo["weights"].isABSONObj() );
+            BSONElement textIndexVersionElt = indexInfo["textIndexVersion"];
+            massert( 17367,
+                     "found invalid spec for text index, expected number for textIndexVersion",
+                     textIndexVersionElt.isNumber() );
 
-            Status status = _defaultLanguage.init( indexInfo["default_language"].String() );
-            verify( status.isOK() );
+            // We currently support TEXT_INDEX_VERSION_1 (deprecated) and TEXT_INDEX_VERSION_2.
+            // Reject all other values.
+            massert( 17364,
+                     str::stream() << "attempt to use unsupported textIndexVersion " <<
+                         textIndexVersionElt.numberInt() << "; versions supported: " <<
+                         TEXT_INDEX_VERSION_2 << ", " << TEXT_INDEX_VERSION_1,
+                     textIndexVersionElt.numberInt() == TEXT_INDEX_VERSION_2 ||
+                         textIndexVersionElt.numberInt() == TEXT_INDEX_VERSION_1 );
+
+            _textIndexVersion = ( textIndexVersionElt.numberInt() == TEXT_INDEX_VERSION_2 ) ?
+                                TEXT_INDEX_VERSION_2 : TEXT_INDEX_VERSION_1;
+
+            // Initialize _defaultLanguage.  Note that the FTSLanguage constructor requires
+            // textIndexVersion, since language parsing is version-specific.
+            StatusWithFTSLanguage swl =
+                FTSLanguage::make( indexInfo["default_language"].String(), _textIndexVersion );
+            verify( swl.getStatus().isOK() ); // should not fail, since validated by fixSpec().
+            _defaultLanguage = swl.getValue();
 
             _languageOverrideField = indexInfo["language_override"].valuestrsafe();
-            verify( validateOverride( _languageOverrideField ) );
 
             _wildcard = false;
 
@@ -116,8 +140,8 @@ namespace mongo {
             }
         }
 
-        const FTSLanguage FTSSpec::getLanguageToUse( const BSONObj& userDoc,
-                                                     const FTSLanguage currentLanguage ) const {
+        const FTSLanguage& FTSSpec::_getLanguageToUseV2( const BSONObj& userDoc,
+                                                         const FTSLanguage& currentLanguage ) const {
             BSONElement e = userDoc[_languageOverrideField];
             if ( e.eoo() ) {
                 return currentLanguage;
@@ -125,11 +149,11 @@ namespace mongo {
             uassert( 17261,
                      "found language override field in document with non-string type",
                      e.type() == mongo::String );
-            StatusWithFTSLanguage swl = FTSLanguage::makeFTSLanguage( e.String() );
+            StatusWithFTSLanguage swl = FTSLanguage::make( e.String(), TEXT_INDEX_VERSION_2 );
             uassert( 17262,
                      "language override unsupported: " + e.String(),
                      swl.getStatus().isOK() );
-            return swl.getValue();
+            return *swl.getValue();
         }
 
 
@@ -147,11 +171,18 @@ namespace mongo {
         }
 
         void FTSSpec::scoreDocument( const BSONObj& obj,
-                                     const FTSLanguage parentLanguage,
+                                     const FTSLanguage& parentLanguage,
                                      const string& parentPath,
                                      bool isArray,
                                      TermFrequencyMap* term_freqs ) const {
-            const FTSLanguage language = getLanguageToUse( obj, parentLanguage );
+
+            if ( _textIndexVersion == TEXT_INDEX_VERSION_1 ) {
+                dassert( parentPath == "" );
+                dassert( !isArray );
+                return _scoreDocumentV1( obj, term_freqs );
+            }
+
+            const FTSLanguage& language = _getLanguageToUseV2( obj, parentLanguage );
             Stemmer stemmer( language );
             Tools tools( language, &stemmer, StopWords::getStopWords( language ) );
 
@@ -209,7 +240,7 @@ namespace mongo {
                 case String:
                     // Only index strings on exact match or wildcard.
                     if ( exactMatch || wildcard() ) {
-                        _scoreString( tools, elem.valuestr(), term_freqs, weight );
+                        _scoreStringV2( tools, elem.valuestr(), term_freqs, weight );
                     }
                     break;
                 case Object:
@@ -233,22 +264,10 @@ namespace mongo {
             }
         }
 
-        namespace {
-            struct ScoreHelperStruct {
-                ScoreHelperStruct()
-                    : freq(0), count(0), exp(0){
-                }
-                double freq;
-                double count;
-                double exp;
-            };
-            typedef unordered_map<string,ScoreHelperStruct> ScoreHelperMap;
-        }
-
-        void FTSSpec::_scoreString( const Tools& tools,
-                                    const StringData& raw,
-                                    TermFrequencyMap* docScores,
-                                    double weight ) const {
+        void FTSSpec::_scoreStringV2( const Tools& tools,
+                                      const StringData& raw,
+                                      TermFrequencyMap* docScores,
+                                      double weight ) const {
 
             ScoreHelperMap terms;
 
@@ -335,6 +354,10 @@ namespace mongo {
         }
 
         BSONObj FTSSpec::fixSpec( const BSONObj& spec ) {
+            if ( spec["textIndexVersion"].numberInt() == TEXT_INDEX_VERSION_1 ) {
+                return _fixSpecV1( spec );
+            }
+
             map<string,int> m;
 
             BSONObj keyPattern;
@@ -477,7 +500,8 @@ namespace mongo {
             }
             uassert( 17264,
                      "default_language is not valid",
-                     FTSLanguage::makeFTSLanguage( default_language ).getStatus().isOK() );
+                     FTSLanguage::make( default_language,
+                                        TEXT_INDEX_VERSION_2 ).getStatus().isOK() );
 
             BSONElement language_override_elt = spec["language_override"];
             string language_override( language_override_elt.str() );
@@ -492,7 +516,7 @@ namespace mongo {
             }
 
             int version = -1;
-            int textIndexVersion = 2;
+            int textIndexVersion = TEXT_INDEX_VERSION_2;
 
             BSONObjBuilder b;
             BSONObjIterator i( spec );
@@ -523,7 +547,7 @@ namespace mongo {
                     textIndexVersion = e.numberInt();
                     uassert( 16730,
                              str::stream() << "bad textIndexVersion: " << textIndexVersion,
-                             textIndexVersion == 2 );
+                             textIndexVersion == TEXT_INDEX_VERSION_2 );
                 }
                 else {
                     b.append( e );

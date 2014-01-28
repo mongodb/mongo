@@ -50,7 +50,7 @@ namespace mongo {
         class FTSQuery {
 
         public:
-            Status parse(const string& query, const string& language);
+            Status parse(const string& query, const StringData& language);
 
             const vector<string>& getTerms() const { return _terms; }
             const unordered_set<string>& getNegatedTerms() const { return _negatedTerms; }
@@ -69,7 +69,7 @@ namespace mongo {
             }
 
             string getSearch() const { return _search; }
-            const FTSLanguage getLanguage() const { return _language; }
+            const FTSLanguage& getLanguage() const { return *_language; }
 
             string toString() const;
 
@@ -77,7 +77,7 @@ namespace mongo {
 
         protected:
             string _search;
-            FTSLanguage _language;
+            const FTSLanguage* _language;
             vector<string> _terms;
             unordered_set<string> _negatedTerms;
             vector<string> _phrases;

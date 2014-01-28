@@ -61,7 +61,7 @@ namespace mongo {
         class Tokenizer {
         public:
 
-            Tokenizer( const FTSLanguage language, const StringData& str );
+            Tokenizer( const FTSLanguage& language, const StringData& str );
 
             bool more() const;
             Token next();

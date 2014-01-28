@@ -30,6 +30,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/fts/fts_language.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -52,7 +53,9 @@ namespace mongo {
                                                   "$language needs a String" );
             }
             language = languageElt.String();
-            if ( !fts::FTSLanguage::makeFTSLanguage( language ).getStatus().isOK() ) {
+            Status status =
+                fts::FTSLanguage::make( language, fts::TEXT_INDEX_VERSION_2 ).getStatus();
+            if ( !status.isOK() ) {
                 return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                   "$language specifies unsupported language" );
             }

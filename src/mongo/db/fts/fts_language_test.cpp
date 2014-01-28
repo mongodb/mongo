@@ -30,76 +30,107 @@
 
 #include "mongo/pch.h"
 #include "mongo/db/fts/fts_language.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     namespace fts {
 
-        // Positive tests for FTSLanguage::init() and FTSLanguage::str().
+        // Positive tests for FTSLanguage::make() with TEXT_INDEX_VERSION_2.
 
-        TEST( FTSLanguage, ExactLanguage ) {
-            FTSLanguage lang;
-            Status s = lang.init( "spanish" );
-            ASSERT( s.isOK() );
-            ASSERT_EQUALS( lang.str(), "spanish" );
+        TEST( FTSLanguageV2, ExactLanguage ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "spanish", TEXT_INDEX_VERSION_2 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "spanish" );
         }
 
-        TEST( FTSLanguage, ExactCode ) {
-            FTSLanguage lang;
-            Status s = lang.init( "es" );
-            ASSERT( s.isOK() );
-            ASSERT_EQUALS( lang.str(), "spanish" );
+        TEST( FTSLanguageV2, ExactCode ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "es", TEXT_INDEX_VERSION_2 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "spanish" );
         }
 
-        TEST( FTSLanguage, UpperCaseLanguage ) {
-            FTSLanguage lang;
-            Status s = lang.init( "SPANISH" );
-            ASSERT( s.isOK() );
-            ASSERT_EQUALS( lang.str(), "spanish" );
+        TEST( FTSLanguageV2, UpperCaseLanguage ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "SPANISH", TEXT_INDEX_VERSION_2 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "spanish" );
         }
 
-        TEST( FTSLanguage, UpperCaseCode ) {
-            FTSLanguage lang;
-            Status s = lang.init( "ES" );
-            ASSERT( s.isOK() );
-            ASSERT_EQUALS( lang.str(), "spanish" );
+        TEST( FTSLanguageV2, UpperCaseCode ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "ES", TEXT_INDEX_VERSION_2 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "spanish" );
         }
         
-        TEST( FTSLanguage, NoneLanguage ) {
-            FTSLanguage lang;
-            Status s = lang.init( "none" );
-            ASSERT( s.isOK() );
-            ASSERT_EQUALS( lang.str(), "none" );
-        }
-
-        // Negative tests for FTSLanguage::init() and FTSLanguage::str().
-
-        TEST( FTSLanguage, Unknown ) {
-            FTSLanguage lang;
-            Status s = lang.init( "spanglish" );
-            ASSERT( !s.isOK() );
-        }
-
-        TEST( FTSLanguage, Empty ) {
-            FTSLanguage lang;
-            Status s = lang.init( "" );
-            ASSERT( !s.isOK() );
-        }
-
-        // Positive tests for FTSLanguage::makeFTSLanguage().
-
-        TEST( FTSLanguage, MakeFTSLanguage1 ) {
-            StatusWithFTSLanguage swl = FTSLanguage::makeFTSLanguage( "english" );
+        TEST( FTSLanguageV2, NoneLanguage ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "none", TEXT_INDEX_VERSION_2 );
             ASSERT( swl.getStatus().isOK() );
-            ASSERT_EQUALS( swl.getValue().str(), "english" );
+            ASSERT_EQUALS( swl.getValue()->str(), "none" );
         }
 
-        // Negative tests for FTSLanguage::makeFTSLanguage().
+        // Negative tests for FTSLanguage::make() with TEXT_INDEX_VERSION_2.
 
-        TEST( FTSLanguage, MakeFTSLanguage2 ) {
-            StatusWithFTSLanguage swl = FTSLanguage::makeFTSLanguage( "onglish" );
+        TEST( FTSLanguageV2, Unknown ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "spanglish", TEXT_INDEX_VERSION_2 );
             ASSERT( !swl.getStatus().isOK() );
+        }
+
+        TEST( FTSLanguageV2, Empty ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "", TEXT_INDEX_VERSION_2 );
+            ASSERT( !swl.getStatus().isOK() );
+        }
+
+        // Positive tests for FTSLanguage::make() with TEXT_INDEX_VERSION_1.
+
+        TEST( FTSLanguageV1, ExactLanguage ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "spanish", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "spanish" );
+        }
+
+        TEST( FTSLanguageV1, DeprecatedLanguage ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "porter", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "porter" );
+        }
+
+        TEST( FTSLanguageV1, StemmerOnlyLanguage1 ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "en", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "en" );
+        }
+
+        TEST( FTSLanguageV1, StemmerOnlyLanguage2 ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "eng", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "eng" );
+        }
+
+        TEST( FTSLanguageV1, NoneLanguage ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "none", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "none" );
+        }
+
+        // Negative tests for FTSLanguage::make() with TEXT_INDEX_VERSION_1.
+
+        TEST( FTSLanguageV1, CaseSensitive ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "SPANISH", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "none" );
+        }
+
+        TEST( FTSLanguageV1, Unknown ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "asdf", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "none" );
+        }
+
+        TEST( FTSLanguageV1, Empty ) {
+            StatusWithFTSLanguage swl = FTSLanguage::make( "", TEXT_INDEX_VERSION_1 );
+            ASSERT( swl.getStatus().isOK() );
+            ASSERT_EQUALS( swl.getValue()->str(), "none" );
         }
 
     }

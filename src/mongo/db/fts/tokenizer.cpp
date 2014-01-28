@@ -31,15 +31,16 @@
 #include <string>
 
 #include "mongo/db/fts/tokenizer.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
 
     namespace fts {
 
-        Tokenizer::Tokenizer( const FTSLanguage language, const StringData& str )
+        Tokenizer::Tokenizer( const FTSLanguage& language, const StringData& str )
             : _pos(0), _raw( str ) {
-            _english = language.str() == "english";
+            _english = ( language.str() == "english" );
             _skipWhitespace();
             _previousWhiteSpace = true;
         }

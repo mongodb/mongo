@@ -373,7 +373,8 @@ namespace mongo {
 
                 params.spec = fam->getSpec();
 
-                if (!params.query.parse(search, fam->getSpec().defaultLanguage().str()).isOK()) {
+                if (!params.query.parse(search,
+                                        fam->getSpec().defaultLanguage().str().c_str()).isOK()) {
                     return NULL;
                 }
 
