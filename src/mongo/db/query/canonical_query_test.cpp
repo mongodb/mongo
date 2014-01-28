@@ -50,6 +50,14 @@ namespace {
     }
 
     TEST(CanonicalQueryTest, IsValidText) {
+        // Passes in default values for LiteParsedQuery.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), false, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
         auto_ptr<MatchExpression> me;
         StatusWithMatchExpression swme(Status::OK());
 
@@ -57,7 +65,7 @@ namespace {
         swme = parseNormalize("{$text: {$search: 's'}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Valid: TEXT inside OR.
         swme = parseNormalize(
@@ -68,19 +76,19 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Valid: TEXT outside NOR.
         swme = parseNormalize("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: TEXT inside NOR.
         swme = parseNormalize("{$nor: [{$text: {$search: 's'}}, {a: 1}]}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: TEXT inside NOR.
         swme = parseNormalize(
@@ -94,7 +102,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: >1 TEXT.
         swme = parseNormalize(
@@ -105,7 +113,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: >1 TEXT.
         swme = parseNormalize(
@@ -122,10 +130,18 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
     }
 
     TEST(CanonicalQueryTest, IsValidGeo) {
+        // Passes in default values for LiteParsedQuery.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), false, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
         auto_ptr<MatchExpression> me;
         StatusWithMatchExpression swme(Status::OK());
 
@@ -133,7 +149,7 @@ namespace {
         swme = parseNormalize("{a: {$near: [0, 0]}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Valid: GEO_NEAR inside nested AND.
         swme = parseNormalize(
@@ -147,7 +163,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: >1 GEO_NEAR.
         swme = parseNormalize(
@@ -158,7 +174,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: >1 GEO_NEAR.
         swme = parseNormalize(
@@ -169,7 +185,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: >1 GEO_NEAR.
         swme = parseNormalize(
@@ -186,7 +202,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: GEO_NEAR inside NOR.
         swme = parseNormalize(
@@ -197,7 +213,7 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: GEO_NEAR inside OR.
         swme = parseNormalize(
@@ -208,10 +224,18 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
     }
 
     TEST(CanonicalQueryTest, IsValidTextAndGeo) {
+        // Passes in default values for LiteParsedQuery.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), false, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
         auto_ptr<MatchExpression> me;
         StatusWithMatchExpression swme(Status::OK());
 
@@ -219,13 +243,13 @@ namespace {
         swme = parseNormalize("{$text: {$search: 's'}, a: {$near: [0, 0]}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: TEXT and GEO_NEAR.
         swme = parseNormalize("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
 
         // Invalid: TEXT and GEO_NEAR.
         swme = parseNormalize(
@@ -237,7 +261,87 @@ namespace {
         );
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get()));
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+    }
+
+    TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
+        // Passes in default values for LiteParsedQuery except for sort order.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        BSONObj sort = fromjson("{$natural: 1}");
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        sort, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), false, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: TEXT and {$natural: 1} sort order.
+        swme = parseNormalize("{$text: {$search: 's'}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+    }
+
+    TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
+        // Passes in default values for LiteParsedQuery except for sort order.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        BSONObj sort = fromjson("{$natural: -1}");
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        sort, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), false, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: TEXT and {$natural: -1} sort order.
+        swme = parseNormalize("{$text: {$search: 's'}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+    }
+
+    TEST(CanonicalQueryTest, IsValidTextAndHint) {
+        // Passes in default values for LiteParsedQuery except for hint.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        BSONObj hint = fromjson("{a: 1}");
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), hint, fromjson("{}"),
+                                        fromjson("{}"), false, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: TEXT and {$natural: -1} sort order.
+        swme = parseNormalize("{$text: {$search: 's'}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+    }
+
+    TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
+        // Passes in default values for LiteParsedQuery except for snapshot.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        bool snapshot = true;
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), snapshot, &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: TEXT and snapshot.
+        swme = parseNormalize("{$text: {$search: 's'}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
     }
 
     /**

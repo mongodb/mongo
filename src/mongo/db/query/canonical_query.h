@@ -98,8 +98,16 @@ namespace mongo {
         // Debugging
         string toString() const;
 
-        // TODO: Move this to query_validator.cpp
-        static Status isValid(MatchExpression* root);
+        /**
+         * Validates match expression, checking for certain
+         * combinations of operators in match expression and
+         * query options in LiteParsedQuery.
+         * Since 'root' is derived from 'filter' in LiteParsedQuery,
+         * 'filter' is not validated.
+         *
+         * TODO: Move this to query_validator.cpp
+         */
+        static Status isValid(MatchExpression* root, const LiteParsedQuery& parsed);
 
         /**
          * Returns the normalized version of the subtree rooted at 'root'.

@@ -402,7 +402,7 @@ namespace mongo {
     }
 
     // static
-    Status CanonicalQuery::isValid(MatchExpression* root) {
+    Status CanonicalQuery::isValid(MatchExpression* root, const LiteParsedQuery& parsed) {
         // Analysis below should be done after squashing the tree to make it clearer.
 
         // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
@@ -448,6 +448,29 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "text and geoNear not allowed in same query");
         }
 
+        // TEXT and {$natural: ...} sort order cannot both be in the query.
+        if (numText > 0) {
+            const BSONObj& sortObj = parsed.getSort();
+            BSONObjIterator it(sortObj);
+            while (it.more()) {
+                BSONElement elt = it.next();
+                if (mongoutils::str::equals("$natural", elt.fieldName())) {
+                    return Status(ErrorCodes::BadValue,
+                                  "text expression not allowed with $natural sort order");
+                }
+            }
+        }
+
+        // TEXT and hint cannot both be in the query.
+        if (numText > 0 && !parsed.getHint().isEmpty()) {
+            return Status(ErrorCodes::BadValue, "text and hint not allowed in same query");
+        }
+
+        // TEXT and snapshot cannot both be in the query.
+        if (numText > 0 && parsed.isSnapshot()) {
+            return Status(ErrorCodes::BadValue, "text and snapshot not allowed in same query");
+        }
+
         return Status::OK();
     }
 
@@ -462,7 +485,7 @@ namespace mongo {
         MatchExpression* root = swme.getValue();
         root = normalizeTree(root);
         sortTree(root);
-        Status validStatus = isValid(root);
+        Status validStatus = isValid(root, *_pq);
         if (!validStatus.isOK()) {
             return validStatus;
         }
