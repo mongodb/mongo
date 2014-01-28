@@ -1408,7 +1408,7 @@ start_threads(CONFIG *cfg,
 		if (cfg->random_value) {
 			end = cfg->value_sz / sizeof(uint32_t);
 			for (j = 0; j < end; j+= sizeof(uint32_t))
-				thread->value_buf[j] = __wt_random();
+				thread->value_buf[j] = (char)__wt_random();
 		} else
 			memset(thread->value_buf, 'a', cfg->value_sz - 1);
 
