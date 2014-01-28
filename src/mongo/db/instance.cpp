@@ -811,10 +811,13 @@ namespace mongo {
                 pass++;
                 if (debug)
                     sleepmillis(20);
-                else
-                    sleepmillis(2);
+                // Let's go really fast the first 400 passes (arbitrary number), yield to thread with no sleeping.
+                // If there was no new data in capped collection, let's slow down on burning the CPU
+                // by doing a sleep(1) for about >~1 second. Finally, let's move to 2ms wait in between
+                // loops after that until we reach the limit of 4 seconds in the code above
+                else sleepmillis( pass < 400 ? 0 : pass < 1000 ? 1 : 2);                    
                 
-                // note: the 1100 is beacuse of the waitForDifferent above
+                // note: the 1100 is because of the waitForDifferent above
                 // should eventually clean this up a bit
                 curop.setExpectedLatencyMs( 1100 + timer->millis() );
                 
