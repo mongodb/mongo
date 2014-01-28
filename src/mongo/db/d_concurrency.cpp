@@ -309,7 +309,10 @@ namespace mongo {
         long long acquisitionTime = _timer.micros();
         _timer.reset();
         _stat = stat;
+
+        // increment the operation level statistics
         cc().curop()->lockStat().recordAcquireTimeMicros( _type , acquisitionTime );
+
         return acquisitionTime;
     }
 
@@ -336,11 +339,9 @@ namespace mongo {
     
     void Lock::ScopedLock::relock() {
         _pbws_lk.relock();
-        _relock();
         resetTime();
+        _relock();
     }
-
-
 
     Lock::TempRelease::TempRelease() : cant( Lock::nested() )
     {

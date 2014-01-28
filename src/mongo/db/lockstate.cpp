@@ -252,8 +252,10 @@ namespace mongo {
     Acquiring::~Acquiring() {
         _ls._lockPending = false;
         LockStat* stat = _ls.getRelevantLockStat();
-        if ( stat && _lock )
+        if ( stat && _lock ) {
+            // increment the global stats for this counter
             stat->recordAcquireTimeMicros( _ls.threadState(), _lock->acquireFinished( stat ) );
+        }
     }
     
     AcquiringParallelWriter::AcquiringParallelWriter( LockState& ls )
