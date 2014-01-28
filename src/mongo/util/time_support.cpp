@@ -222,9 +222,26 @@ namespace mongo {
     void sleepsecs(int s) {
         Sleep(s*1000);
     }
+
+    extern "C" unsigned int __stdcall timeBeginPeriod( unsigned int ms );
+    extern "C" unsigned int __stdcall timeEndPeriod( unsigned int ms );
+    // Notice bellow the arbitrary nature of 50ms set as the "minimum" timer resolution
+    // There seems to be no complete agreement on that *is* the default timer resolution in Windows.
+    // To be on the "safe side" let's use 50ms
+    #define BELLOW_WINDOWS_MIN_RESOLUTION(s)(s > 0 && s < 50)
+    
     void sleepmillis(long long s) {
         fassert(16228, s <= 0xffffffff );
+        // When our waiting period falls bellow Windows min resolution, let's set resolution
+        // to 1 ms. Note that this change may effect all kernel scheduler thread operations.
+        // Apparently this changes the Windows kernel "quantum" length
+        // see http://msdn.microsoft.com/en-us/library/windows/desktop/dd757624(v=vs.85).aspx
+        // Applications such as Google Chrome seem to do this during the life of Chrome, that's why
+        // running apps which do this "accelerate" certain mongo operations that depending on proper
+        // Sleep() resolution on Windows
+        if(BELLOW_WINDOWS_MIN_RESOLUTION(s)) timeBeginPeriod(1);
         Sleep((DWORD) s);
+        if(BELLOW_WINDOWS_MIN_RESOLUTION(s)) timeEndPeriod(1);
     }
     void sleepmicros(long long s) {
         if ( s <= 0 )
