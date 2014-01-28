@@ -492,7 +492,4 @@ namespace mongo {
         return true;
     }
 
-    bool ProcessInfo::isDataFileZeroingNeeded() {
-        return false;
-    }
 }
