@@ -29,6 +29,9 @@ namespace mongo {
     class Message;
 
     static const char kUpsertedFieldName[] = "upserted";
+    static const char kGLEStatsFieldName[] = "$gleStats";
+    static const char kGLEStatsLastOpTimeFieldName[] = "lastOpTime";
+    static const char kGLEStatsElectionIdFieldName[] = "electionId";
 
     struct LastError {
         int code;

@@ -534,9 +534,9 @@ namespace {
 
         HostOpTimeMap hostOpTimes;
         hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = 
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
         hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] =
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
@@ -559,9 +559,9 @@ namespace {
 
         HostOpTimeMap hostOpTimes;
         hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = 
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
         hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] =
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );
@@ -585,9 +585,9 @@ namespace {
 
         HostOpTimeMap hostOpTimes;
         hostOpTimes[ConnectionString::mock( HostAndPort( "shardA:1000" ) )] =
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
         hostOpTimes[ConnectionString::mock( HostAndPort( "shardB:1000" ) )] = 
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, err: 'norepl'}" ) );
@@ -616,9 +616,9 @@ namespace {
 
         HostOpTimeMap hostOpTimes;
         hostOpTimes[ConnectionString::mock(HostAndPort("shardA:1000"))] = 
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
         hostOpTimes[ConnectionString::mock(HostAndPort("shardB:1000"))] =
-            std::make_pair(OpTime(), OID());
+            HostOpTime(OpTime(), OID());
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'something'}" ) );

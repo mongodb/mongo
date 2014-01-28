@@ -439,8 +439,9 @@ namespace mongo {
             ++it ) {
 
             const ConnectionString& shardEndpoint = it->first;
-            const OpTime& opTime = it->second.first;
-            const OID& electionId = it->second.second;
+            const HostOpTime hot = it->second;
+            const OpTime& opTime = hot.opTime;
+            const OID& electionId = hot.electionId;
 
             LOG( 3 ) << "enforcing write concern " << options << " on " << shardEndpoint.toString()
                      << " at opTime " << opTime.toStringPretty() << " with electionID "

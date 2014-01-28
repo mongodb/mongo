@@ -104,7 +104,14 @@ namespace mongo {
         }
     };
 
-    typedef std::map<ConnectionString, std::pair<OpTime, OID>, ConnectionStringComp> HostOpTimeMap;
+    struct HostOpTime {
+        HostOpTime(OpTime ot, OID e) : opTime(ot), electionId(e) {};
+        HostOpTime() {};
+        OpTime opTime;
+        OID electionId;
+    };
+
+    typedef std::map<ConnectionString, HostOpTime, ConnectionStringComp> HostOpTimeMap;
 
     class BatchWriteExecStats {
     public:

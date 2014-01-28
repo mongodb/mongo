@@ -81,6 +81,7 @@ namespace mongo {
         /**
          * Notes that this client wrote to these particular hosts with write commands.
          */
+        void addHostOpTime(ConnectionString connstr, HostOpTime stat);
         void addHostOpTimes( const HostOpTimeMap& hostOpTimes );
 
         /**

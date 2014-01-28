@@ -70,10 +70,14 @@ namespace mongo {
         _sinceLastGetError.insert( shardHost );
     }
 
+    void ClientInfo::addHostOpTime(ConnectionString connStr, HostOpTime stat) {
+        _cur->hostOpTimes[connStr] = stat;
+    }
+
     void ClientInfo::addHostOpTimes( const HostOpTimeMap& hostOpTimes ) {
         for ( HostOpTimeMap::const_iterator it = hostOpTimes.begin();
             it != hostOpTimes.end(); ++it ) {
-            _cur->hostOpTimes[it->first] = it->second;
+            addHostOpTime(it->first, it->second);
         }
     }
 

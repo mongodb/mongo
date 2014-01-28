@@ -342,7 +342,7 @@ namespace mongo {
     void BatchWriteExecStats::noteWriteAt(const ConnectionString& host,
                                           OpTime opTime,
                                           const OID& electionId) {
-        _writeOpTimes[host] = std::make_pair(opTime, electionId);
+        _writeOpTimes[host] = HostOpTime(opTime, electionId);
     }
 
     const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {

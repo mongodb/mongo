@@ -1370,9 +1370,9 @@ namespace mongo {
 
     namespace {
         void appendGLEHelperData(BSONObjBuilder& bob, const OpTime& opTime, const OID& oid) {
-            BSONObjBuilder subobj(bob.subobjStart("$gleHelpers"));
-            subobj.appendTimestamp("lastOptime", opTime.asDate());
-            subobj.appendOID("electionId", const_cast<OID*>(&oid));
+            BSONObjBuilder subobj(bob.subobjStart(kGLEStatsFieldName));
+            subobj.appendTimestamp(kGLEStatsLastOpTimeFieldName, opTime.asDate());
+            subobj.appendOID(kGLEStatsElectionIdFieldName, const_cast<OID*>(&oid));
             subobj.done();
         }
     }
@@ -1536,7 +1536,7 @@ namespace mongo {
         if (theReplSet) {
             // Detect mongos connections by looking for setShardVersion to have been run previously
             // on this connection.
-            if (!shardingState.needCollectionMetadata(dbname)) {
+            if (shardingState.needCollectionMetadata(dbname)) {
                 appendGLEHelperData(result, client.getLastOp(), theReplSet->getElectionId());
             }
         }
