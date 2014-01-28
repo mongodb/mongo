@@ -43,10 +43,28 @@ namespace mongo {
     class RecordStore {
     public:
         RecordStore( const StringData& ns );
+        virtual ~RecordStore();
 
-        void init( NamespaceDetails* details,
-                   ExtentManager* em,
-                   bool isSystemIndexes );
+        virtual Record* recordFor( const DiskLoc& loc ) const = 0;
+
+        virtual void deleteRecord( const DiskLoc& dl ) = 0;
+
+        virtual StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax ) = 0;
+
+        virtual StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax ) = 0;
+
+    protected:
+        std::string _ns;
+    };
+
+    class RecordStoreV1Base : public RecordStore {
+    public:
+        RecordStoreV1Base( const StringData& ns,
+                           NamespaceDetails* details,
+                           ExtentManager* em,
+                           bool isSystemIndexes );
+
+        virtual ~RecordStoreV1Base();
 
         Record* recordFor( const DiskLoc& loc ) const;
 
@@ -57,13 +75,41 @@ namespace mongo {
         StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax );
 
     protected:
-        StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+        virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;
 
-    private:
-        std::string _ns;
         NamespaceDetails* _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
     };
+
+    // used by index and original collections
+    class SimpleRecordStoreV1 : public RecordStoreV1Base {
+    public:
+        SimpleRecordStoreV1( const StringData& ns,
+                             NamespaceDetails* details,
+                             ExtentManager* em,
+                             bool isSystemIndexes );
+
+        virtual ~SimpleRecordStoreV1();
+
+    protected:
+        virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+
+    };
+
+    class CappedRecordStoreV1 : public RecordStoreV1Base {
+    public:
+        CappedRecordStoreV1( const StringData& ns,
+                             NamespaceDetails* details,
+                             ExtentManager* em,
+                             bool isSystemIndexes );
+
+        virtual ~CappedRecordStoreV1();
+
+    protected:
+        virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+
+    };
+
 
 }

@@ -127,8 +127,10 @@ namespace mongo {
                  str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
                  indexMetadata );
 
-        auto_ptr<RecordStore> recordStore( new RecordStore( descriptor->indexNamespace() ) );
-        recordStore->init( indexMetadata, _collection->getExtentManager(), false );
+        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( descriptor->indexNamespace(),
+                                                                    indexMetadata,
+                                                                    _collection->getExtentManager(),
+                                                                    false ) );
 
         auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection,
                                                                   descriptorCleanup.release(),

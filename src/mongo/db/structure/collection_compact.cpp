@@ -146,9 +146,9 @@ namespace mongo {
                         }
 
                         CompactDocWriter writer( objOld, lenWPadding );
-                        StatusWith<DiskLoc> status = _recordStore.insertRecord( &writer, 0 );
+                        StatusWith<DiskLoc> status = _recordStore->insertRecord( &writer, 0 );
                         uassertStatusOK( status.getStatus() );
-                        datasize += _recordStore.recordFor( status.getValue() )->netLength();
+                        datasize += _recordStore->recordFor( status.getValue() )->netLength();
 
                         InsertDeleteOptions options;
                         options.logIfError = false;

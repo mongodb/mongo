@@ -73,15 +73,24 @@ namespace mongo {
                             NamespaceDetails* details,
                             Database* database )
         : _ns( fullNS ),
-          _recordStore( _ns.ns() ),
           _infoCache( this ),
           _indexCatalog( this, details ),
           _cursorCache( fullNS ) {
         _details = details;
         _database = database;
-        _recordStore.init( _details,
-                           &database->getExtentManager(),
-                           _ns.coll() == "system.indexes" );
+
+        if ( details->isCapped() ) {
+            _recordStore.reset( new CappedRecordStoreV1( _ns.ns(),
+                                                         details,
+                                                         &database->getExtentManager(),
+                                                         _ns.coll() == "system.indexes" ) );
+        }
+        else {
+            _recordStore.reset( new SimpleRecordStoreV1( _ns.ns(),
+                                                         details,
+                                                         &database->getExtentManager(),
+                                                         _ns.coll() == "system.indexes" ) );
+        }
         _magic = 1357924;
         _indexCatalog.init();
     }
@@ -150,7 +159,7 @@ namespace mongo {
     StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
         verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
 
-        StatusWith<DiskLoc> loc = _recordStore.insertRecord( doc,
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( doc,
                                                              enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
             return loc;
@@ -188,7 +197,7 @@ namespace mongo {
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
 
-        StatusWith<DiskLoc> loc = _recordStore.insertRecord( docToInsert.objdata(),
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( docToInsert.objdata(),
                                                              docToInsert.objsize(),
                                                             enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
@@ -209,7 +218,7 @@ namespace mongo {
 
             // indexRecord takes care of rolling back indexes
             // so we just have to delete the main storage
-            _recordStore.deleteRecord( loc.getValue() );
+            _recordStore->deleteRecord( loc.getValue() );
             return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
         }
 
@@ -238,7 +247,7 @@ namespace mongo {
 
         _indexCatalog.unindexRecord( doc, loc, noWarn);
 
-        _recordStore.deleteRecord( loc );
+        _recordStore->deleteRecord( loc );
 
         _infoCache.notifyOfWriteOp();
     }
@@ -321,7 +330,7 @@ namespace mongo {
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location
                 // remember its already unindexed
-                _recordStore.deleteRecord( oldLocation );
+                _recordStore->deleteRecord( oldLocation );
             }
             else {
                 // new doc insert failed, so lets re-index the old document and location

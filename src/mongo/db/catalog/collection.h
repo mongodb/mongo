@@ -226,7 +226,7 @@ namespace mongo {
         NamespaceString _ns;
         NamespaceDetails* _details;
         Database* _database;
-        RecordStore _recordStore;
+        scoped_ptr<RecordStore> _recordStore;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
 
