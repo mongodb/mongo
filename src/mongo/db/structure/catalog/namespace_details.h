@@ -157,12 +157,6 @@ namespace mongo {
         Extra* allocExtra(const char *ns, int nindexessofar);
         void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 
-        /* dump info on this namespace.  for debugging. */
-        void dump(const Namespace& k);
-
-        /* dump info on all extents for this namespace.  for debugging. */
-        void dumpExtents();
-
     public:
         const DiskLoc& capExtent() const { return _capExtent; }
         const DiskLoc capFirstNewRecord() const { return _capFirstNewRecord; }
@@ -223,7 +217,6 @@ namespace mongo {
 
         DiskLoc& cappedListOfAllDeletedRecords() { return _deletedList[0]; }
         DiskLoc& cappedLastDelRecLastExtent()    { return _deletedList[1]; }
-        void cappedDumpDelInfo();
         bool capLooped() const { return _isCapped && _capFirstNewRecord.isValid();  }
         bool inCapExtent( const DiskLoc &dl ) const;
         void cappedCheckMigrate();
@@ -387,7 +380,7 @@ namespace mongo {
 
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
-        void dumpDeleted(set<DiskLoc> *extents = 0);
+
         // Start from firstExtent by default.
         DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
         // Start from lastExtent by default.

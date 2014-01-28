@@ -90,32 +90,6 @@ namespace mongo {
         memset(_reserved, 0, sizeof(_reserved));
     }
 
-#if defined(_DEBUG)
-    void NamespaceDetails::dump(const Namespace& k) {
-        if (!storageGlobalParams.dur)
-            cout << "ns offsets which follow will not display correctly with --journal disabled" << endl;
-
-        size_t ofs = 1; // 1 is sentinel that the find call below failed
-        privateViews.find(this, /*out*/ofs);
-
-        cout << "ns" << hex << setw(8) << ofs << ' ';
-        cout << k.toString() << '\n';
-
-        if( k.isExtra() ) {
-            cout << "ns\t extra" << endl;
-            return;
-        }
-
-        cout << "ns         " << _firstExtent.toString() << ' ' << _lastExtent.toString() << " nidx:" << _nIndexes << '\n';
-        cout << "ns         " << _stats.datasize << ' ' << _stats.nrecords << ' ' << _nIndexes << '\n';
-        cout << "ns         " << isCapped() << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << _dataFileVersion << '\n';
-        cout << "ns         " << _multiKeyIndexBits << ' ' << _indexBuildsInProgress << '\n';
-        cout << "ns         " << (int)_reserved[0] << ' ' << (int)_reserved[59];
-        cout << endl;
-    }
-#endif
-
-
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
@@ -327,24 +301,6 @@ namespace mongo {
         }
 
         return bestmatch;
-    }
-
-    void NamespaceDetails::dumpDeleted(set<DiskLoc> *extents) {
-        for ( int i = 0; i < Buckets; i++ ) {
-            DiskLoc dl = _deletedList[i];
-            while ( !dl.isNull() ) {
-                DeletedRecord *r = dl.drec();
-                DiskLoc extLoc(dl.a(), r->extentOfs());
-                if ( extents == 0 || extents->count(extLoc) <= 0 ) {
-                    out() << "  bucket " << i << endl;
-                    out() << "   " << dl.toString() << " ext:" << extLoc.toString();
-                    if ( extents && extents->count(extLoc) <= 0 )
-                        out() << '?';
-                    out() << " len:" << r->lengthWithHeaders() << endl;
-                }
-                dl = r->nextDeleted();
-            }
-        }
     }
 
     DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {

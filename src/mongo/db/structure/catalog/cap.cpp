@@ -304,25 +304,6 @@ namespace mongo {
         return loc;
     }
 
-    void NamespaceDetails::dumpExtents() {
-        cout << "dumpExtents:" << endl;
-        for ( DiskLoc i = _firstExtent; !i.isNull(); i = i.ext()->xnext ) {
-            Extent *e = i.ext();
-            stringstream ss;
-            e->dump(ss);
-            cout << ss.str() << endl;
-        }
-    }
-
-    void NamespaceDetails::cappedDumpDelInfo() {
-        cout << "dl[0]: " << _deletedList[0].toString() << endl;
-        for( DiskLoc z = _deletedList[0]; !z.isNull(); z = z.drec()->nextDeleted() ) {
-            cout << "  drec:" << z.toString() << " dreclen:" << hex << z.drec()->lengthWithHeaders() <<
-                 " ext:" << z.drec()->myExtent(z)->myLoc.toString() << endl;
-        }
-        cout << "dl[1]: " << _deletedList[1].toString() << endl;
-    }
-
     void NamespaceDetails::cappedTruncateLastDelUpdate() {
         if ( _capExtent == _firstExtent ) {
             // Only one extent of the collection is in use, so there
