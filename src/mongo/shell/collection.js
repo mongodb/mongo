@@ -460,7 +460,8 @@ DBCollection.prototype.ensureIndex = function( keys , options ){
     var result = this.createIndex(keys, options);
 
     if (result != null) {
-        if (result.errmsg != null) return result.errmsg;
+        if (!result.ok) return result;
+        // Preserve old behavior of returning undefined on success.
         return;
     }
 
