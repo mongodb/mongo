@@ -31,12 +31,12 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/fts/fts_iterator.h"
 #include "mongo/platform/strcasestr.h"
 
 namespace mongo {
 
     namespace fts {
-
 
         FTSMatcher::FTSMatcher( const FTSQuery& query, const FTSSpec& spec )
             : _query( query ),
@@ -53,67 +53,19 @@ namespace mongo {
             // flagged for exclusion, i.e. "hello -world" we want to remove all
             // results that include "world"
 
-            if ( _query.getNegatedTerms().size() == 0 )
+            if ( _query.getNegatedTerms().size() == 0 ) {
                 return false;
-
-            if ( _spec.wildcard() ) {
-                return _hasNegativeTerm_recurse(obj);
             }
 
-            /* otherwise look at fields where weights are defined */
-            for ( Weights::const_iterator i = _spec.weights().begin();
-                  i != _spec.weights().end();
-                  i++ ) {
-                const char * leftOverName = i->first.c_str();
-                BSONElement e = obj.getFieldDottedOrArray(leftOverName);
+            FTSElementIterator it( _spec, obj);
 
-                if ( e.type() == Array ) {
-                    BSONObjIterator j( e.Obj() );
-                    while ( j.more() ) {
-                        BSONElement x = j.next();
-                        if ( leftOverName[0] && x.isABSONObj() )
-                            x = x.Obj().getFieldDotted( leftOverName );
-                        if ( x.type() == String )
-                            if ( _hasNegativeTerm_string( x.String() ) )
-                                return true;
-                    }
-                }
-                else if ( e.type() == String ) {
-                    if ( _hasNegativeTerm_string( e.String() ) )
-                        return true;
+            while ( it.more() ) {
+                FTSIteratorValue val = it.next();
+                if (_hasNegativeTerm_string( val._text )) {
+                    return true;
                 }
             }
-            return false;
-        }
 
-        bool FTSMatcher::_hasNegativeTerm_recurse(const BSONObj& obj ) const {
-            BSONObjIterator j( obj );
-            while ( j.more() ) {
-                BSONElement x = j.next();
-
-                if ( _spec.languageOverrideField() == x.fieldName())
-                    continue;
-
-                if (x.type() == String) {
-                    if ( _hasNegativeTerm_string( x.String() ) )
-                        return true;
-                }
-                else if ( x.isABSONObj() ) {
-                    BSONObjIterator k( x.Obj() );
-                    while ( k.more() ) {
-                        // check if k.next() is a obj/array or not
-                        BSONElement y = k.next();
-                        if ( y.type() == String ) {
-                            if ( _hasNegativeTerm_string( y.String() ) )
-                                return true;
-                        }
-                        else if ( y.isABSONObj() ) {
-                            if ( _hasNegativeTerm_recurse( y.Obj() ) )
-                                return true;
-                        }
-                    }
-                }
-            }
             return false;
         }
 
@@ -135,7 +87,6 @@ namespace mongo {
             return false;
         }
 
-
         bool FTSMatcher::phrasesMatch( const BSONObj& obj ) const {
             for (unsigned i = 0; i < _query.getPhr().size(); i++ ) {
                 if ( !phraseMatch( _query.getPhr()[i], obj ) ) {
@@ -152,89 +103,23 @@ namespace mongo {
             return true;
         }
 
-
         /**
          * Checks if phrase is exactly matched in obj, returns true if so, false otherwise
          * @param phrase, the string to be matched
          * @param obj, document in the collection to match against
          */
         bool FTSMatcher::phraseMatch( const string& phrase, const BSONObj& obj ) const {
+            FTSElementIterator it( _spec, obj);
 
-            if ( _spec.wildcard() ) {
-                // case where everything is indexed (all fields)
-                return _phraseRecurse( phrase, obj );
-            }
-
-            for ( Weights::const_iterator i = _spec.weights().begin();
-                  i != _spec.weights().end();
-                  ++i ) {
-
-                //  figure out what the indexed field is.. ie. is it "field" or "field.subfield" etc.
-                const char * leftOverName = i->first.c_str();
-                BSONElement e = obj.getFieldDottedOrArray(leftOverName);
-
-                if ( e.type() == Array ) {
-                    BSONObjIterator j( e.Obj() );
-                    while ( j.more() ) {
-                        BSONElement x = j.next();
-
-                        if ( leftOverName[0] && x.isABSONObj() )
-                            x = x.Obj().getFieldDotted( leftOverName );
-
-                        if ( x.type() == String )
-                            if ( _phraseMatches( phrase, x.String() ) )
-                                return true;
-                    }
-                }
-                else if ( e.type() == String ) {
-                    if ( _phraseMatches( phrase, e.String() ) )
-                        return true;
-                }
-            }
-            return false;
-        }
-
-
-        /*
-         * Recurses over all fields in the obj to match against phrase
-         * @param phrase, string to be matched
-         * @param obj, object to matched against
-         */
-        bool FTSMatcher::_phraseRecurse( const string& phrase, const BSONObj& obj ) const {
-            BSONObjIterator j( obj );
-            while ( j.more() ) {
-                BSONElement x = j.next();
-
-                if ( _spec.languageOverrideField() == x.fieldName() )
-                    continue;
-
-                if ( x.type() == String ) {
-                    if ( _phraseMatches( phrase, x.String() ) )
-                        return true;
-                } 
-                else if ( x.isABSONObj() ) {
-                    BSONObjIterator k( x.Obj() );
-
-                    while ( k.more() ) {
-
-                        BSONElement y = k.next();
-
-                        if ( y.type() == mongo::String ) {
-                            if ( _phraseMatches( phrase, y.String() ) )
-                                return true;
-                        }
-                        else if ( y.isABSONObj() ) {
-                            if ( _phraseRecurse( phrase, y.Obj() ) )
-                                return true;
-                        }
-                    }
-
+            while ( it.more() ) {
+                FTSIteratorValue val = it.next();
+                if (_phraseMatches( phrase, val._text )) {
+                    return true;
                 }
             }
 
             return false;
         }
-
 
         /*
          * Looks for phrase in a raw string
@@ -244,7 +129,5 @@ namespace mongo {
         bool FTSMatcher::_phraseMatches( const string& phrase, const string& haystack ) const {
             return strcasestr( haystack.c_str(), phrase.c_str() ) > 0;
         }
-
-
     }
 }

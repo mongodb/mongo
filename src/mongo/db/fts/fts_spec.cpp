@@ -1,5 +1,4 @@
 // fts_spec.cpp
-
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
@@ -31,6 +30,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/field_ref.h"
+#include "mongo/db/fts/fts_iterator.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -116,8 +116,9 @@ namespace mongo {
             }
         }
 
-        const FTSLanguage FTSSpec::getLanguageToUse( const BSONObj& userDoc,
-                                                     const FTSLanguage currentLanguage ) const {
+        FTSLanguage FTSSpec::getLanguageToUse( const BSONObj& userDoc,
+                                               const FTSLanguage currentLanguage ) const {
+
             BSONElement e = userDoc[_languageOverrideField];
             if ( e.eoo() ) {
                 return currentLanguage;
@@ -132,102 +133,15 @@ namespace mongo {
             return swl.getValue();
         }
 
+        void FTSSpec::scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const {
 
+            FTSElementIterator it( *this, obj );
 
-        namespace {
-            /**
-             * Check for exact match or path prefix match.
-             */
-            inline bool _matchPrefix( const string& dottedName, const string& weight ) {
-                if ( weight == dottedName ) {
-                    return true;
-                }
-                return str::startsWith( weight, dottedName + '.' );
-            }
-        }
-
-        void FTSSpec::scoreDocument( const BSONObj& obj,
-                                     const FTSLanguage parentLanguage,
-                                     const string& parentPath,
-                                     bool isArray,
-                                     TermFrequencyMap* term_freqs ) const {
-            const FTSLanguage language = getLanguageToUse( obj, parentLanguage );
-            Stemmer stemmer( language );
-            Tools tools( language, &stemmer, StopWords::getStopWords( language ) );
-
-            // Perform a depth-first traversal of obj, skipping fields not touched by this spec.
-            BSONObjIterator j( obj );
-            while ( j.more() ) {
-
-                BSONElement elem = j.next();
-                string fieldName = elem.fieldName();
-
-                // Skip "language" specifier fields if wildcard.
-                if ( wildcard() && languageOverrideField() == fieldName ) {
-                    continue;
-                }
-
-                // Compose the dotted name of the current field:
-                // 1. parent path empty (top level): use the current field name
-                // 2. parent path non-empty and obj is an array: use the parent path
-                // 3. parent path non-empty and obj is a sub-doc: append field name to parent path
-                string dottedName = ( parentPath.empty() ? fieldName
-                                          : isArray ? parentPath
-                                          : parentPath + '.' + fieldName );
-
-                // Find lower bound of dottedName in _weights.  lower_bound leaves us at the first
-                // weight that could possibly match or be a prefix of dottedName.  And if this
-                // element fails to match, then no subsequent weight can match, since the weights
-                // are lexicographically ordered.
-                Weights::const_iterator i = _weights.lower_bound( dottedName );
-
-                // possibleWeightMatch is set if the weight map contains either a match or some item
-                // lexicographically larger than fieldName.  This boolean acts as a guard on
-                // dereferences of iterator 'i'.
-                bool possibleWeightMatch = ( i != _weights.end() );
-
-                // Optimize away two cases, when not wildcard:
-                // 1. lower_bound seeks to end(): no prefix match possible
-                // 2. lower_bound seeks to a name which is not a prefix
-                if ( !wildcard() ) {
-                    if ( !possibleWeightMatch ) {
-                        continue;
-                    }
-                    else if ( !_matchPrefix( dottedName, i->first ) ) {
-                        continue;
-                    }
-                }
-
-                // Is the current field an exact match on a weight?
-                bool exactMatch = ( possibleWeightMatch && i->first == dottedName );
-
-                double weight = ( possibleWeightMatch ? i->second : DEFAULT_WEIGHT );
-
-                switch ( elem.type() ) {
-                case String:
-                    // Only index strings on exact match or wildcard.
-                    if ( exactMatch || wildcard() ) {
-                        _scoreString( tools, elem.valuestr(), term_freqs, weight );
-                    }
-                    break;
-                case Object:
-                    // Only descend into a sub-document on proper prefix or wildcard.  Note that
-                    // !exactMatch is a sufficient test for proper prefix match, because of
-                    // matchPrefix() continue block above.
-                    if ( !exactMatch || wildcard() ) {
-                        scoreDocument( elem.Obj(), language, dottedName, false, term_freqs );
-                    }
-                    break;
-                case Array:
-                    // Only descend into arrays from non-array parents or on wildcard.
-                    if ( !isArray || wildcard() ) {
-                        scoreDocument( elem.Obj(), language, dottedName, true, term_freqs );
-                    }
-                    break;
-                default:
-                    // Skip over all other BSON types.
-                    break;
-                }
+            while ( it.more() ) {
+                FTSIteratorValue val = it.next();
+                Stemmer stemmer( val._language );
+                Tools tools( val._language, &stemmer, StopWords::getStopWords( val._language ) );
+                _scoreString( tools, val._text, term_freqs, val._weight );
             }
         }
 
@@ -260,19 +174,21 @@ namespace mongo {
 
                 string term = t.data.toString();
                 makeLower( &term );
-                if ( tools.stopwords->isStopWord( term ) )
+                if ( tools.stopwords->isStopWord( term ) ) {
                     continue;
+                }
                 term = tools.stemmer->stem( term );
 
                 ScoreHelperStruct& data = terms[term];
 
-                if ( data.exp )
+                if ( data.exp ) {
                     data.exp *= 2;
-                else
+                }
+                else {
                     data.exp = 1;
+                }
                 data.count += 1;
                 data.freq += ( 1 / data.exp );
-
                 numTokens++;
             }
 
@@ -528,20 +444,21 @@ namespace mongo {
                 }
             }
 
-            if ( !weights.isEmpty() )
+            if ( !weights.isEmpty() ) {
                 b.append( "weights", weights );
-            if ( !default_language.empty() )
+            }
+            if ( !default_language.empty() ) {
                 b.append( "default_language", default_language);
-            if ( !language_override.empty() )
+            }
+            if ( !language_override.empty() ) {
                 b.append( "language_override", language_override);
-
-            if ( version >= 0 )
+            }
+            if ( version >= 0 ) {
                 b.append( "v", version );
-
+            }
             b.append( "textIndexVersion", textIndexVersion );
 
             return b.obj();
-
         }
 
     }

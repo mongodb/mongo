@@ -2,7 +2,7 @@
 
 Import("env")
 
-stop_word_lanages = [
+stop_word_languages = [
     'danish',
     'dutch',
     'english',
@@ -21,7 +21,7 @@ stop_word_lanages = [
 ]
 
 env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
-             [ "generate_stop_words.py"] + [ 'stop_words_%s.txt' % x for x in stop_word_lanages ],
+             [ "generate_stop_words.py"] + [ 'stop_words_%s.txt' % x for x in stop_word_languages ],
              "$PYTHON $SOURCES $TARGETS" )
 
 env.Library('base', [
@@ -31,6 +31,7 @@ env.Library('base', [
         'fts_spec.cpp',
         'fts_language.cpp',
         'fts_util.cpp',
+        'fts_iterator.cpp',
         'stemmer.cpp',
         'stop_words.cpp',
         'stop_words_list.cpp',
@@ -78,6 +79,9 @@ env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_iterator_test", "fts_iterator_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_util_test", "fts_util_test.cpp",
