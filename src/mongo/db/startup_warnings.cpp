@@ -87,7 +87,16 @@ namespace mongo {
             warned = true;
         }
 
-        if (boost::filesystem::exists("/sys/devices/system/node/node1")){
+        bool hasMultipleNumaNodes = false;
+        try {
+            hasMultipleNumaNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
+        } catch(boost::filesystem::filesystem_error& e) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: Cannot detect if NUMA interleaving is enabled. "
+                  << "Failed to probe \"" << e.path1().string() << "\": " << e.code().message()
+                  << startupWarningsLog;
+        }
+        if (hasMultipleNumaNodes) {
             // We are on a box with a NUMA enabled kernel and more than 1 numa node (they start at
             // node0)
             // Now we look at the first line of /proc/self/numa_maps
