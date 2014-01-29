@@ -8,7 +8,6 @@
  * nodes along this chain.
  */
 
-if (!_isWindows()) {
 function myprint( x ) {
     print( "tags output: " + x );
 }
@@ -202,5 +201,3 @@ assert.eq(result.err, "timeout");
 
 replTest.stopSet();
 myprint("\n\ntags.js SUCCESS\n\n");
-
-}

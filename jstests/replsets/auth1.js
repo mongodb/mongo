@@ -42,8 +42,6 @@ print("make sure user is written before shutting down");
 m.getDB("test").getLastError();
 stopMongod(port[0]);
 
-if ( !_isWindows() ) {  // SERVER-5024
-
 print("start up rs");
 var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
 print("restart 0 with keyFile");
@@ -218,4 +216,3 @@ assert.soon(function() {
         }
         return true;
     });
-    } // !isWindows

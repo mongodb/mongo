@@ -1,5 +1,3 @@
-if (!_isWindows()) {
-
 var testInsert = function() {
     master.getDB("foo").bar.insert({x:1});
     var result = master.getDB("foo").runCommand({getLastError:1, w:"majority", wtimeout:timeout});
@@ -123,4 +121,3 @@ assert.contains(config.members[1], result);
 assert.contains(config.members[2], result);
 
 replTest.stopSet();
-}
