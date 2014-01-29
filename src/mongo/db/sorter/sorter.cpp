@@ -448,11 +448,17 @@ namespace mongo {
                 if (_data.empty())
                     return;
 
-                if (!_opts.extSortAllowed)
+                if (!_opts.extSortAllowed) {
+                    // XXX This error message is only correct for aggregation, but it is also the
+                    // only way this code could be hit at the moment. If the Sorter is used
+                    // elsewhere where extSortAllowed could possibly be false, this message will
+                    // need to be revisited.
                     uasserted(16819, str::stream()
                         << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
-                        << " bytes, but did not opt-in to external sorting. Aborting operation."
+                        << " bytes, but did not opt in to external sorting. Aborting operation."
+                        << " Pass allowDiskUse:true to opt in."
                         );
+                }
 
                 sort();
 
@@ -713,11 +719,17 @@ namespace mongo {
                 if (_data.empty())
                     return;
 
-                if (!_opts.extSortAllowed)
+                if (!_opts.extSortAllowed) {
+                    // XXX This error message is only correct for aggregation, but it is also the
+                    // only way this code could be hit at the moment. If the Sorter is used
+                    // elsewhere where extSortAllowed could possibly be false, this message will
+                    // need to be revisited.
                     uasserted(16820, str::stream()
                         << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
-                        << " bytes, but did not opt-in to external sorting. Aborting operation."
+                        << " bytes, but did not opt in to external sorting. Aborting operation."
+                        << " Pass allowDiskUse:true to opt in."
                         );
+                }
 
                 sort();
                 updateCutoff();

@@ -278,7 +278,7 @@ namespace {
         virtual void help(stringstream &help) const {
             help << "{ pipeline: [ { $operator: {...}}, ... ]"
                  << ", explain: <bool>"
-                 << ", allowDiskUsage: <bool>"
+                 << ", allowDiskUse: <bool>"
                  << ", cursor: {batchSize: <number>}"
                  << " }"
                  << endl

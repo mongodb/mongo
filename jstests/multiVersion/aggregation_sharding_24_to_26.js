@@ -28,7 +28,7 @@ function testVersions(versions) {
             // these only run in the "normal" sharded case
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$out: "ts1_out"}]}));
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$limit: 10}],
-                                                               allowDiskUsage:true}));
+                                                               allowDiskUse:true}));
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$limit: 10}],
                                                                cursor: {}}));
         }

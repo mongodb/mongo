@@ -147,9 +147,9 @@ namespace mongo {
                 continue;
             }
 
-            if (str::equals(pFieldName, "allowDiskUsage")) {
+            if (str::equals(pFieldName, "allowDiskUse")) {
                 uassert(16949,
-                        str::stream() << "allowDiskUsage must be a bool, not a "
+                        str::stream() << "allowDiskUse must be a bool, not a "
                                       << typeName(cmdElement.type()),
                         cmdElement.type() == Bool);
                 pCtx->extSortAllowed = cmdElement.Bool();
@@ -468,7 +468,7 @@ namespace mongo {
         }
 
         if (pCtx->extSortAllowed) {
-            serialized.setField("allowDiskUsage", Value(true));
+            serialized.setField("allowDiskUse", Value(true));
         }
 
         return serialized.freeze();

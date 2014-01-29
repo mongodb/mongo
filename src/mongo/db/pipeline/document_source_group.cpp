@@ -362,7 +362,8 @@ namespace mongo {
         // This loop consumes all input from pSource and buckets it based on pIdExpression.
         while (boost::optional<Document> input = pSource->getNext()) {
             if (memoryUsageBytes > _maxMemoryUsageBytes) {
-                uassert(16945, "Exceeded memory limit for $group, but didn't allow external sort",
+                uassert(16945, "Exceeded memory limit for $group, but didn't allow external sort."
+                               " Pass allowDiskUse:true to opt in.",
                         _extSortAllowed);
                 sortedFiles.push_back(spill());
                 memoryUsageBytes = 0;
