@@ -52,7 +52,6 @@ namespace mongo {
              *         so all full phrases and no negated
              */
             bool phrasesMatch( const BSONObj& obj ) const;
-
             bool phraseMatch( const string& phrase, const BSONObj& obj ) const;
 
             bool matchesNonTerm( const BSONObj& obj ) const {
@@ -60,19 +59,19 @@ namespace mongo {
             }
 
         private:
-            bool _hasNegativeTerm_recurse(const BSONObj& obj ) const;
-
             /**
              * @return true if raw has a negated term
              */
             bool _hasNegativeTerm_string( const string& raw ) const;
 
-            bool _phraseRecurse( const string& phrase, const BSONObj& obj ) const;
-            bool _phraseMatches( const string& phrase, const string& haystack ) const;
+            /**
+             * @return true if raw has a phrase
+             */
+            bool _phraseMatches( const string& phrase, const string& raw ) const;
 
             FTSQuery _query;
-            FTSSpec _spec;
-            Stemmer _stemmer;
+            FTSSpec  _spec;
+            Stemmer  _stemmer;
         };
 
     }

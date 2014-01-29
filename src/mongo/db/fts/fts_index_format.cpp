@@ -79,7 +79,7 @@ namespace mongo {
 
 
             TermFrequencyMap term_freqs;
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &term_freqs );
+            spec.scoreDocument( obj, &term_freqs );
 
             // create index keys from raw scores
             // only 1 per string
@@ -92,9 +92,7 @@ namespace mongo {
             long long keyBSONSize = 0;
             const int MaxKeyBSONSizeMB = 4;
 
-            for ( TermFrequencyMap::const_iterator i = term_freqs.begin();
-                  i != term_freqs.end();
-                  ++i ) {
+            for ( TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i ) {
 
                 const string& term = i->first;
                 double weight = i->second;
@@ -108,17 +106,18 @@ namespace mongo {
                     extraSize;
 
                 BSONObjBuilder b(guess); // builds a BSON object with guess length.
-                for ( unsigned k = 0; k < extrasBefore.size(); k++ )
+                for ( unsigned k = 0; k < extrasBefore.size(); k++ ) {
                     b.appendAs( extrasBefore[k], "" );
+                }
                 _appendIndexKey( b, weight, term );
-                for ( unsigned k = 0; k < extrasAfter.size(); k++ )
+                for ( unsigned k = 0; k < extrasAfter.size(); k++ ) {
                     b.appendAs( extrasAfter[k], "" );
+                }
                 BSONObj res = b.obj();
 
                 verify( guess >= res.objsize() );
 
                 keys->insert( res );
-
                 keyBSONSize += res.objsize();
 
                 uassert( 16733,
@@ -136,8 +135,9 @@ namespace mongo {
             BSONObjBuilder b;
 
             BSONObjIterator i( indexPrefix );
-            while ( i.more() )
+            while ( i.more() ) {
                 b.appendAs( i.next(), "" );
+            }
 
             _appendIndexKey( b, weight, term );
             return b.obj();

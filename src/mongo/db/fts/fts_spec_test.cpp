@@ -180,11 +180,7 @@ namespace mongo {
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             TermFrequencyMap m;
-            spec.scoreDocument( BSON( "title" << "cat sat run" ),
-                                spec.defaultLanguage(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( BSON( "title" << "cat sat run" ), &m );
             ASSERT_EQUALS( 3U, m.size() );
             ASSERT_EQUALS( m["cat"], m["sat"] );
             ASSERT_EQUALS( m["cat"], m["run"] );
@@ -199,11 +195,7 @@ namespace mongo {
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             TermFrequencyMap m;
-            spec.scoreDocument( BSON( "title" << "cat sat run" << "text" << "cat book" ),
-                                spec.defaultLanguage(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( BSON( "title" << "cat sat run" << "text" << "cat book" ), &m );
 
             ASSERT_EQUALS( 4U, m.size() );
             ASSERT_EQUALS( m["sat"], m["run"] );
@@ -222,11 +214,7 @@ namespace mongo {
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             TermFrequencyMap m;
-            spec.scoreDocument( BSON( "a" << BSON( "b" << "term" ) ),
-                                spec.defaultLanguage(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( BSON( "a" << BSON( "b" << "term" ) ), &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -238,11 +226,7 @@ namespace mongo {
             FTSSpec spec( FTSSpec::fixSpec( user ) );
 
             TermFrequencyMap m;
-            spec.scoreDocument( BSON( "title" << "cat sat sat run run run" ),
-                                spec.defaultLanguage(),
-                                "",
-                                false,
-                                &m );
+            spec.scoreDocument( BSON( "title" << "cat sat sat run run run" ), &m );
             ASSERT_EQUALS( 3U, m.size() );
             ASSERT( m["cat"] > 0 );
             ASSERT( m["sat"] > m["cat"] );
@@ -311,7 +295,7 @@ namespace mongo {
             // The following document matches {"a.b": {$type: 2}}, so "term" should be indexed.
             BSONObj obj = fromjson("{a: [{b: ['term']}]}"); // indirectly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &m );
+            spec.scoreDocument( obj, &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -322,7 +306,7 @@ namespace mongo {
             // The wildcard spec implies a full recursive traversal, so "term" should be indexed.
             BSONObj obj = fromjson("{a: {b: [['term']]}}"); // directly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &m );
+            spec.scoreDocument( obj, &m );
             ASSERT_EQUALS( 1U, m.size() );
         }
 
@@ -334,7 +318,7 @@ namespace mongo {
             // indexed.
             BSONObj obj = fromjson("{a: {b: [['term']]}}"); // directly nested arrays
             TermFrequencyMap m;
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &m );
+            spec.scoreDocument( obj, &m );
             ASSERT_EQUALS( 0U, m.size() );
         }
 
@@ -353,7 +337,7 @@ namespace mongo {
                 "   }"
                 " }" );
 
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+            spec.scoreDocument( obj, &tfm );
 
             set<string> hits;
             hits.insert("walk");
@@ -384,7 +368,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+            spec.scoreDocument( obj, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -415,7 +399,7 @@ namespace mongo {
                 "  } ]"
                 "}" );
 
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+            spec.scoreDocument( obj, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -448,7 +432,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+            spec.scoreDocument( obj, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -481,7 +465,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+            spec.scoreDocument( obj, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -516,7 +500,7 @@ namespace mongo {
                 "  }"
                 "}" );
 
-            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+            spec.scoreDocument( obj, &tfm );
 
             set<string> hits;
             hits.insert("foredrag");
@@ -540,7 +524,7 @@ namespace mongo {
                 BSONObj indexSpec = fromjson( "{key: {'a.b': 'text'}, textIndexVersion: 1}" ); 
                 FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
                 TermFrequencyMap tfm;
-                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                spec.scoreDocument( obj, &tfm );
                 ASSERT_EQUALS( tfm.size(), 0U );
             }
 
@@ -549,7 +533,7 @@ namespace mongo {
                 BSONObj indexSpec = fromjson( "{key: {'a.b': 'text'}, textIndexVersion: 2}" ); 
                 FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
                 TermFrequencyMap tfm;
-                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                spec.scoreDocument( obj, &tfm );
                 ASSERT_EQUALS( tfm.size(), 1U );
             }
         }
@@ -564,7 +548,7 @@ namespace mongo {
                 BSONObj indexSpec = fromjson( "{key: {'a': 'text'}, textIndexVersion: 1}" ); 
                 FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
                 TermFrequencyMap tfm;
-                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                spec.scoreDocument( obj, &tfm );
                 ASSERT_EQUALS( tfm.size(), 1U ); // "the" not recognized as stopword
             }
 
@@ -573,7 +557,7 @@ namespace mongo {
                 BSONObj indexSpec = fromjson( "{key: {'a': 'text'}, textIndexVersion: 2}" ); 
                 FTSSpec spec( FTSSpec::fixSpec( indexSpec ) );
                 TermFrequencyMap tfm;
-                spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &tfm );
+                spec.scoreDocument( obj, &tfm );
                 ASSERT_EQUALS( tfm.size(), 0U ); // "the" recognized as stopword
             }
         }

@@ -47,9 +47,9 @@ namespace mongo {
 
         extern const double MAX_WEIGHT;
         extern const double MAX_WORD_WEIGHT;
+        extern const double DEFAULT_WEIGHT;
 
         typedef std::map<string,double> Weights; // TODO cool map
-
         typedef unordered_map<string,double> TermFrequencyMap;
 
         struct ScoreHelperStruct {
@@ -92,17 +92,10 @@ namespace mongo {
 
             /**
              * Calculates term/score pairs for a BSONObj as applied to this spec.
-             * - "obj": the BSONObj to traverse; can be a subdocument or array
-             * - "parentLanguage": nearest enclosing document "language" spec for obj
-             * - "parentPath": obj's dotted path in containing document
-             * - "isArray": true if obj is an array
-             * - "term_freqs": out-parameter to store results
+             * @arg obj  document to traverse; can be a subdocument or array
+             * @arg term_freqs  output parameter to store (term,score) results
              */
-            void scoreDocument( const BSONObj& obj,
-                                const FTSLanguage& parentLanguage,
-                                const string& parentPath,
-                                bool isArray,
-                                TermFrequencyMap* term_freqs ) const;
+            void scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const;
 
             /**
              * given a query, pulls out the pieces (in order) that go in the index first
@@ -110,20 +103,12 @@ namespace mongo {
             Status getIndexPrefix( const BSONObj& filter, BSONObj* out ) const;
 
             const Weights& weights() const { return _weights; }
-
             static BSONObj fixSpec( const BSONObj& spec );
 
         private:
             //
             // Helper methods.  Invoked for TEXT_INDEX_VERSION_2 spec objects only.
             //
-
-            /**
-             * Get the language override for the given BSON doc.  If no language override is
-             * specified, returns currentLanguage.
-             */
-            const FTSLanguage& _getLanguageToUseV2( const BSONObj& userDoc,
-                                                    const FTSLanguage& currentLanguage ) const;
 
             /**
              * Calculate the term scores for 'raw' and update 'term_freqs' with the result.  Parses
@@ -134,6 +119,15 @@ namespace mongo {
                                  TermFrequencyMap* term_freqs,
                                  double weight ) const;
 
+        public:
+            /**
+             * Get the language override for the given BSON doc.  If no language override is
+             * specified, returns currentLanguage.
+             */
+            const FTSLanguage* _getLanguageToUseV2( const BSONObj& userDoc,
+                                                    const FTSLanguage* currentLanguage ) const;
+
+        private:
             //
             // Deprecated helper methods.  Invoked for TEXT_INDEX_VERSION_1 spec objects only.
             //
@@ -165,12 +159,13 @@ namespace mongo {
             string _languageOverrideField;
             bool _wildcard;
 
-            // _weights stores a mapping between the fields and the value as a double
-            // basically, how much should an occurence of (query term) in (field) be worth
+            // mapping : fieldname -> weight
             Weights _weights;
 
-            // other fields to index
+            // Prefix compound key - used to partition search index
             std::vector<string> _extraBefore;
+
+            // Suffix compound key - used for covering index behavior
             std::vector<string> _extraAfter;
         };
 
