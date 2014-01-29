@@ -33,8 +33,10 @@
 #include <algorithm>
 #include <list>
 
+#include "mongo/base/counter.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_legacy.h"
@@ -49,6 +51,19 @@
 
 
 namespace mongo {
+
+    static Counter64 freelistAllocs;
+    static Counter64 freelistBucketExhausted;
+    static Counter64 freelistIterations;
+
+    static ServerStatusMetricField<Counter64> dFreelist1( "storage.freelist.search.requests",
+                                                          &freelistAllocs );
+
+    static ServerStatusMetricField<Counter64> dFreelist2( "storage.freelist.search.bucketExhausted",
+                                                          &freelistBucketExhausted );
+
+    static ServerStatusMetricField<Counter64> dFreelist3( "storage.freelist.search.scanned",
+                                                          &freelistIterations );
 
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
@@ -229,6 +244,7 @@ namespace mongo {
        returned item is out of the deleted list upon return
     */
     DiskLoc NamespaceDetails::__stdAlloc(int len, bool peekOnly) {
+        freelistAllocs.increment();
         DiskLoc *prev;
         DiskLoc *bestprev = 0;
         DiskLoc bestmatch;
@@ -256,9 +272,16 @@ namespace mongo {
                 // move to next bucket.  if we were doing "extra", just break
                 if ( bestmatchlen < 0x7fffffff )
                     break;
+
+                if ( chain > 0 ) {
+                    // if we looked at things in the right bucket, but they were not suitable
+                    freelistBucketExhausted.increment();
+                }
+
                 b++;
                 if ( b > MaxBucket ) {
                     // out of space. alloc a new extent.
+                    freelistIterations.increment( 1 + chain );
                     return DiskLoc();
                 }
                 cur = _deletedList[b];
@@ -280,6 +303,7 @@ namespace mongo {
             if ( ++chain > 30 && b < MaxBucket ) {
                 // too slow, force move to next bucket to grab a big chunk
                 //b++;
+                freelistIterations.increment( chain );
                 chain = 0;
                 cur.Null();
             }
@@ -303,6 +327,7 @@ namespace mongo {
             verify(bmr->extentOfs() < bestmatch.getOfs());
         }
 
+        freelistIterations.increment( 1 + chain );
         return bestmatch;
     }
 
