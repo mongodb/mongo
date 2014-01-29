@@ -26,29 +26,31 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import csv, os
+import csv, os, sys
 from subprocess import call
 # Python script to read wtperf monitor output and create a performance
 # graph.
 
 TIMEFMT = "%b %d %H:%M:%S"
 
-# Read the monitor file and figure out when a checkpoint was running.
-in_ckpt = 'N'
-ckptlist=[]
-with open('monitor', 'r') as csvfile:
-    reader = csv.reader(csvfile)
-    for row in reader:
-        if row[4] != in_ckpt:
-            ckptlist.append(row[0])
-            in_ckpt = row[4]
-if in_ckpt == 'Y':
-    ckptlist.append(row[0])
+def process_monitor(fname, ckptlist):
+    # Read the monitor file and figure out when a checkpoint was running.
+    in_ckpt = 'N'
 
+    ckptlist=[]
+    with open(fname, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            if row[4] != in_ckpt:
+                ckptlist.append(row[0])
+                in_ckpt = row[4]
+    if in_ckpt == 'Y':
+        ckptlist.append(row[0])
 
-# Graph time vs. read, insert and update operations per second.
-of = open("gnuplot.cmd", "w")
-of.write('''
+    # Graph time vs. read, insert and update operations per second.
+    gcmd = "gnuplot.mon.cmd"
+    of = open(gcmd, "w")
+    of.write('''
 set autoscale
 set datafile sep ','
 set grid
@@ -60,26 +62,27 @@ set format x "%(TIMEFMT)s"
 set xlabel "Time"
 set xtics rotate by -45
 set xdata time
-set ylabel "Operations per second (hundreds)"
+set ylabel "Operations per second (thousands)"
 set yrange [0:]\n''' % {
     'TIMEFMT' : TIMEFMT
-    })
-it = iter(ckptlist)
-for start, stop in zip(it, it):
-    of.write('set object rectangle from first \'' + start +\
-        '\', graph 0 ' + ' to first \'' + stop +\
-        '\', graph 1 fc rgb "gray" back\n')
-of.write('''
-set output 'monitor.png'
-plot "monitor" using 1:($2/100) title "Reads", "monitor" using 1:($3/100) title "Updates", "monitor" using 1:($4/100) title "Inserts"\n''')
-of.close()
-call(["gnuplot", "gnuplot.cmd"])
-os.remove("gnuplot.cmd")
-
+        })
+    it = iter(ckptlist)
+    for start, stop in zip(it, it):
+        of.write('set object rectangle from first \'' + start +\
+            '\', graph 0 ' + ' to first \'' + stop +\
+            '\', graph 1 fc rgb "gray" back\n') 
+    of.write('set output "' + fname + '.png"\n')
+    of.write('plot "' + fname + '" using 1:($2/1000) title "Reads", "' +\
+        fname + '" using 1:($3/1000) title "Inserts", "' +\
+        fname + '" using 1:($4/1000) title "Updates"\n')
+    of.close()
+    call(["gnuplot", gcmd])
+    os.remove(gcmd)
 
 # Graph time vs. average, minimium, maximum latency for an operation.
-def plot_latency_operation(name, col_avg, col_min, col_max):
-    of = open("gnuplot.cmd", "w")
+def plot_latency_operation(name, fname, sfx, ckptlist, col_avg, col_min, col_max):
+    gcmd = "gnuplot." + name + ".l1.cmd"
+    of = open(gcmd, "w")
     of.write('''
 set autoscale
 set datafile sep ','
@@ -103,48 +106,49 @@ set yrange [1:]\n''' % {
         of.write('set object rectangle from first \'' + start +\
             '\', graph 0 ' + ' to first \'' + stop +\
             '\', graph 1 fc rgb "gray" back\n')
-    of.write('''
-set output '%(NAME)s.latency1.png'
-plot "monitor" using 1:($%(COL_AVG)d) title "Average Latency", "monitor" using 1:($%(COL_MIN)d) title "Minimum Latency", "monitor" using 1:($%(COL_MAX)d) title "Maximum Latency"\n''' % {
-    'NAME' : name,
-    'COL_AVG' : col_avg,
-    'COL_MIN' : col_min,
-    'COL_MAX' : col_max
-    })
+    ofname = name + sfx + '.latency1.png'
+    of.write('set output "' + ofname + '"\n')
+    of.write('plot "' + fname + '" using 1:($' + repr(col_avg) +\
+        ') title "Average Latency", "' + fname +'" using 1:($' +\
+        repr(col_min) + ') title "Minimum Latency", "' +\
+        fname + '" using 1:($' + repr(col_max) + ') title "Maximum Latency"\n')
     of.close()
-    call(["gnuplot", "gnuplot.cmd"])
-    os.remove("gnuplot.cmd")
+    call(["gnuplot", gcmd])
+    os.remove(gcmd)
 
 
 # Graph latency vs. % operations
-def plot_latency_percent(name):
-    of = open("gnuplot.cmd", "w")
+def plot_latency_percent(name, sfx, ckptlist):
+    gcmd = "gnuplot." + name + ".l2.cmd"
+    of = open(gcmd, "w")
     of.write('''
 set autoscale
 set datafile sep ','
 set grid
 set style data points
-set terminal png nocrop size 800,600
-set title "%(NAME)s: latency distribution"
+set terminal png nocrop size 800,600\n''')
+    of.write('set title "' + name + ': latency distribution"\n')
+    of.write('''
 set xlabel "Latency (us)"
 set xrange [1:]
 set xtics rotate by -45
 set logscale x
 set ylabel "%% operations"
-set yrange [0:]
-set output '%(NAME)s.latency2.png'
-plot "latency.%(NAME)s" using (($2 * 100)/$4) title "%(NAME)s"\n''' % {
-        'NAME' : name
-        })
+set yrange [0:]\n''')
+    ofname = name + sfx + '.latency2.png'
+    of.write('set output "' + ofname + '"\n')
+    of.write('plot "latency.' + name + sfx +\
+        '" using (($2 * 100)/$4) title "' + name + '"\n')
     of.close()
-    call(["gnuplot", "gnuplot.cmd"])
-    os.remove("gnuplot.cmd")
+    call(["gnuplot", gcmd])
+    os.remove(gcmd)
 
 
 # Graph latency vs. % operations (cumulative)
-def plot_latency_cumulative_percent(name):
+def plot_latency_cumulative_percent(name, sfx, ckptlist):
     # Latency plot: cumulative operations vs. latency
-    of = open("gnuplot.cmd", "w")
+    gcmd = "gnuplot." + name + ".l3.cmd"
+    of = open(gcmd, "w")
     of.write('''
 set autoscale
 set datafile sep ','
@@ -157,19 +161,48 @@ set xrange [1:]
 set xtics rotate by -45
 set logscale x
 set ylabel "%% operations"
-set yrange [0:]
-set output '%(NAME)s.latency3.png'
-plot "latency.%(NAME)s" using 1:(($3 * 100)/$4) title "%(NAME)s"\n''' % {
+set yrange [0:]\n''' % {
         'NAME' : name
         })
+    ofname = name + sfx + '.latency3.png'
+    of.write('set output "' + ofname + '"\n')
+    of.write('plot "latency.' + name + sfx + \
+        '" using 1:(($3 * 100)/$4) title "' + name + '"\n')
     of.close()
-    call(["gnuplot", "gnuplot.cmd"])
-    os.remove("gnuplot.cmd")
+    call(["gnuplot", gcmd])
+    os.remove(gcmd)
 
+def process_file(fname):
+    ckptlist=[]
+    process_monitor(fname, ckptlist)
+    
+    # This assumes the monitor file has the string "monitor"
+    # and any other (optional) characters in the filename are a suffix.
+    sfx=fname.replace('monitor','')
 
-column = 6              # average, minimum, maximum start in column 6
-for op in ['read', 'insert', 'update']:
-    plot_latency_operation(op, column, column + 1, column + 2)
-    column = column + 3
-    plot_latency_percent(op)
-    plot_latency_cumulative_percent(op)
+    column = 6              # average, minimum, maximum start in column 6
+
+    # NOTE: The operations below must be in this exact order to match
+    # the operation latency output in the monitor file.
+    for op in ['read', 'insert', 'update']:
+        plot_latency_operation(
+            op, fname, sfx, ckptlist, column, column + 1, column + 2)
+        column = column + 3
+        plot_latency_percent(op, sfx, ckptlist)
+        plot_latency_cumulative_percent(op, sfx, ckptlist)
+
+def main():
+    # This program takes a list of monitor files generated by
+    # wtperf.  If no args are given, it looks for a single file
+    # named 'monitor'.
+    numargs = len(sys.argv)
+    if numargs < 2:
+        process_file('monitor')
+    else:
+        d = 1
+        while d < numargs:
+            process_file(sys.argv[d])
+            d += 1
+
+if __name__ == '__main__':
+    main()
