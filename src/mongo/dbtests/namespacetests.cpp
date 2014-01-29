@@ -1416,7 +1416,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( NULL, ns(), 300 );
 
                 // The length of the allocated record is quantized.
                 ASSERT_EQUALS( 320, actualLocation.rec()->lengthWithHeaders() );
@@ -1430,7 +1430,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                DiskLoc loc = nsd()->alloc( ns(), 300 );
+                DiskLoc loc = nsd()->alloc( collection(), ns(), 300 );
                 ASSERT_EQUALS( 300, loc.rec()->lengthWithHeaders() );
             }
             virtual string spec() const { return "{capped:true,size:2048}"; }
@@ -1452,7 +1452,7 @@ namespace NamespaceTests {
                 NamespaceDetails* indexNsd = nsdetails( indexNamespace );
 
                 // Check that no quantization is performed.
-                DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 300 );
+                DiskLoc actualLocation = indexNsd->alloc( NULL, indexNamespace.c_str(), 300 );
                 ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
             }
         };
@@ -1470,7 +1470,7 @@ namespace NamespaceTests {
                 NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
 
                 // Check that multiple of 4 quantization is performed.
-                DiskLoc actualLocation = indexNsd->alloc( indexNamespace.c_str(), 298 );
+                DiskLoc actualLocation = indexNsd->alloc( NULL, indexNamespace.c_str(), 298 );
                 ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
             }
         };
@@ -1481,7 +1481,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 cookDeletedList( 310 );
-                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( NULL, ns(), 300 );
                 ASSERT_EQUALS( 310, actualLocation.rec()->lengthWithHeaders() );
 
                 // No deleted records remain after alloc returns the non quantized record.
@@ -1496,7 +1496,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 cookDeletedList( 300 );
-                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( NULL, ns(), 300 );
                 ASSERT_EQUALS( 300, actualLocation.rec()->lengthWithHeaders() );
                 ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
             }
@@ -1512,7 +1512,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 cookDeletedList( 343 );
-                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( NULL, ns(), 300 );
                 ASSERT_EQUALS( 343, actualLocation.rec()->lengthWithHeaders() );
                 ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
             }
@@ -1528,7 +1528,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 cookDeletedList( 344 );
-                DiskLoc actualLocation = nsd()->alloc( ns(), 300 );
+                DiskLoc actualLocation = nsd()->alloc( NULL, ns(), 300 );
 
                 // The returned record is quantized from 300 to 320.
                 ASSERT_EQUALS( 320, actualLocation.rec()->lengthWithHeaders() );
@@ -1548,7 +1548,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 cookDeletedList( 344 );
-                DiskLoc actualLocation = nsd()->alloc( ns(), 319 );
+                DiskLoc actualLocation = nsd()->alloc( NULL, ns(), 319 );
 
                 // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
                 // deleted record, the entire deleted record is returned because
@@ -1566,7 +1566,7 @@ namespace NamespaceTests {
                 create();
                 cookDeletedList( 299 );
 
-                ASSERT( nsd()->alloc( ns(), 300 ).isNull() );
+                ASSERT( nsd()->alloc( NULL, ns(), 300 ).isNull() );
             }
             virtual string spec() const { return ""; }
         };
