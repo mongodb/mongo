@@ -46,27 +46,31 @@ namespace mongo {
 
     namespace dur {
 
+        ThreadLocalIntents::ThreadLocalIntents() { 
+            intents.reserve(N); 
+        }
+
         ThreadLocalIntents::~ThreadLocalIntents() {
             fassert( 16731, intents.size() == 0 );
         }
 
         void ThreadLocalIntents::push(const WriteIntent& x) {
-            if( !commitJob._hasWritten )
-                commitJob._hasWritten = true;
-
+            intents.push_back( x );
+#if( CHECK_SPOOLING )
+            nSpooled++;
+#endif
             if( intents.size() == N ) {
                 if ( !condense() ) {
                     unspool();
                 }
             }
-
-            intents.push_back( x );
-#if( CHECK_SPOOLING )
-            nSpooled++;
-#endif
         }
+
+        // we are in groupCommitMutex when this is called
         void ThreadLocalIntents::_unspool() {
             dassert( intents.size() );
+
+            commitJob._hasWritten = true;
 
             for( unsigned j = 0; j < intents.size(); j++ ) {
                 commitJob.note(intents[j].start(), intents[j].length());

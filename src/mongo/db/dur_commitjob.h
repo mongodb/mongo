@@ -123,7 +123,7 @@ namespace mongo {
             bool condense();
             void _unspool();
         public:
-            ThreadLocalIntents() : intents(N) { intents.clear(); }
+            ThreadLocalIntents();
             ~ThreadLocalIntents();
             void unspool();
             void push(const WriteIntent& i);
