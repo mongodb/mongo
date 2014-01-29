@@ -42,6 +42,8 @@
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
+
+    class Collection;
     class IndexCatalogEntry;
     class Database;
     class IndexCatalog;
@@ -168,7 +170,7 @@ namespace mongo {
         Extent *theCapExtent() const { return _capExtent.ext(); }
         void advanceCapExtent( const StringData& ns );
         DiskLoc __capAlloc(int len);
-        DiskLoc cappedAlloc(const StringData& ns, int len);
+        DiskLoc cappedAlloc(Collection* collection, const StringData& ns, int len);
         DiskLoc &cappedFirstDeletedInCurExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
 
@@ -376,7 +378,7 @@ namespace mongo {
             @param lenToAlloc is WITH header
             @return null diskloc if no room - allocate a new extent then
         */
-        DiskLoc alloc(const StringData& ns, int lenToAlloc);
+        DiskLoc alloc(Collection* collection, const StringData& ns, int lenToAlloc);
 
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
@@ -406,7 +408,7 @@ namespace mongo {
          */
         void swapIndex( int a, int b );
 
-        DiskLoc _alloc(const StringData& ns, int len);
+        DiskLoc _alloc(Collection* collection, const StringData& ns, int len);
         void maybeComplain( const StringData& ns, int len ) const;
         DiskLoc __stdAlloc(int len, bool willBeAt);
         void compact(); // combine adjacent deleted records

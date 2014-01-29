@@ -337,7 +337,7 @@ namespace mongo {
 
         collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god );
 
-        loc = d->alloc(ns, lenWHdr);
+        loc = d->alloc(NULL, ns, lenWHdr);
         if ( !loc.isNull() ) {
             // got on first try
             return loc;
@@ -351,7 +351,7 @@ namespace mongo {
             log() << "try #" << z << endl;
             collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god);
 
-            loc = d->alloc(ns, lenWHdr);
+            loc = d->alloc(NULL, ns, lenWHdr);
             if ( ! loc.isNull() )
                 break;
         }
@@ -364,7 +364,8 @@ namespace mongo {
       * XXX-ERH
       */
     DiskLoc allocateSpaceForANewRecord(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
-        DiskLoc loc = d->alloc(ns, lenWHdr);
+        invariant( !d->isCapped() );
+        DiskLoc loc = d->alloc(NULL, ns, lenWHdr);
         if ( loc.isNull() ) {
             loc = outOfSpace(ns, d, lenWHdr, god);
         }

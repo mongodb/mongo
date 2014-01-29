@@ -182,7 +182,7 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( int lengthWithHeaders, int quotaMax ) {
-        DiskLoc loc = _details->alloc( _ns, lengthWithHeaders );
+        DiskLoc loc = _details->alloc( NULL, _ns, lengthWithHeaders );
         if ( !loc.isNull() )
             return StatusWith<DiskLoc>( loc );
 
@@ -193,7 +193,7 @@ namespace mongo {
                                                                    _details->lastExtentSize()),
                                              quotaMax );
 
-        loc = _details->alloc( _ns, lengthWithHeaders );
+        loc = _details->alloc( NULL, _ns, lengthWithHeaders );
         if ( !loc.isNull() ) {
             // got on first try
             return StatusWith<DiskLoc>( loc );
@@ -211,7 +211,7 @@ namespace mongo {
                                                                        _details->lastExtentSize()),
                                                  quotaMax );
 
-            loc = _details->alloc( _ns, lengthWithHeaders);
+            loc = _details->alloc( NULL, _ns, lengthWithHeaders);
             if ( ! loc.isNull() )
                 return StatusWith<DiskLoc>( loc );
         }
@@ -221,18 +221,20 @@ namespace mongo {
 
     // -------------------------------
 
-    CappedRecordStoreV1::CappedRecordStoreV1( const StringData& ns,
+    CappedRecordStoreV1::CappedRecordStoreV1( Collection* collection,
+                                              const StringData& ns,
                                               NamespaceDetails* details,
                                               ExtentManager* em,
                                               bool isSystemIndexes )
-        : RecordStoreV1Base( ns, details, em, isSystemIndexes ) {
+        : RecordStoreV1Base( ns, details, em, isSystemIndexes ),
+          _collection( collection ) {
     }
 
     CappedRecordStoreV1::~CappedRecordStoreV1() {
     }
 
     StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord( int lengthWithHeaders, int quotaMax ) {
-        DiskLoc loc = _details->alloc( _ns, lengthWithHeaders );
+        DiskLoc loc = _details->alloc( _collection, _ns, lengthWithHeaders );
         if ( !loc.isNull() )
             return StatusWith<DiskLoc>( loc );
 

@@ -41,6 +41,7 @@ namespace mongo {
     class Record;
 
     class RecordStore {
+        MONGO_DISALLOW_COPYING(RecordStore);
     public:
         RecordStore( const StringData& ns );
         virtual ~RecordStore();
@@ -99,7 +100,8 @@ namespace mongo {
 
     class CappedRecordStoreV1 : public RecordStoreV1Base {
     public:
-        CappedRecordStoreV1( const StringData& ns,
+        CappedRecordStoreV1( Collection* collection,
+                             const StringData& ns,
                              NamespaceDetails* details,
                              ExtentManager* em,
                              bool isSystemIndexes );
@@ -108,6 +110,8 @@ namespace mongo {
 
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+
+        Collection* _collection;
 
     };
 

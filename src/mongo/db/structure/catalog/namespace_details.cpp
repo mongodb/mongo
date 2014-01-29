@@ -162,13 +162,16 @@ namespace mongo {
         @param lenToAlloc is WITH header
         @return null diskloc if no room - allocate a new extent then
     */
-    DiskLoc NamespaceDetails::alloc(const StringData& ns, int lenToAlloc) {
+    DiskLoc NamespaceDetails::alloc(Collection* collection, const StringData& ns, int lenToAlloc) {
+        // if we are capped, collection must be non-NULL
+        invariant( !isCapped() || collection );
+
         {
             // align very slightly.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         }
 
-        DiskLoc loc = _alloc(ns, lenToAlloc);
+        DiskLoc loc = _alloc(collection, ns, lenToAlloc);
         if ( loc.isNull() )
             return loc;
 
@@ -340,11 +343,11 @@ namespace mongo {
     }
 
     /* alloc with capped table handling. */
-    DiskLoc NamespaceDetails::_alloc(const StringData& ns, int len) {
+    DiskLoc NamespaceDetails::_alloc(Collection* collection, const StringData& ns, int len) {
         if ( ! isCapped() )
             return __stdAlloc(len, false);
 
-        return cappedAlloc(ns,len);
+        return cappedAlloc(collection, ns,len);
     }
 
     NamespaceDetails::Extra* NamespaceDetails::allocExtra(const char *ns, int nindexessofar) {

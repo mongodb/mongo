@@ -80,7 +80,8 @@ namespace mongo {
         _database = database;
 
         if ( details->isCapped() ) {
-            _recordStore.reset( new CappedRecordStoreV1( _ns.ns(),
+            _recordStore.reset( new CappedRecordStoreV1( this,
+                                                         _ns.ns(),
                                                          details,
                                                          &database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
