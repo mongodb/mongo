@@ -97,6 +97,7 @@ files.forEach(function(x) {
 
     // These aren't supposed to get run under sharding:
     var notForShardingPattern = new RegExp('[\\/\\\\](' +
+        'create_indexes|' +
         'dbadmin|' +
         'error1|' +
         'fsync|' +
