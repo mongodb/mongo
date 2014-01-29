@@ -100,53 +100,6 @@
                 DiskId="1" KeyPath="yes" />
         </Component>
       <?endif ?>
-      <Directory Id="Driver" Name="Driver">
-        <Component Id="c_mongoclientlib" Guid="B0AF30BE-924F-47C7-A2B9-AE22E0BFCEC1">
-          <File Id="f_mongoclientlib" Name="mongoclient.lib" Source="$(var.ClientSource)\mongoclient.lib"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_mongoclientdll" Guid="0B202F31-C173-4D59-A31E-1DD87C16EDC6">
-          <File Id="f_mongoclientdll" Name="mongoclient.dll" Source="$(var.ClientSource)\mongoclient.dll"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_mongoclientpdb" Guid="C1AA694E-FC9B-4540-8C73-638BDC2CD7A5">
-          <File Id="f_mongoclientpdb" Name="mongoclient.pdb" Source="$(var.ClientSource)\mongoclient.pdb"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_mongoclientexp" Guid="E95F4011-1E88-4A53-807F-F43175864EAF">
-          <File Id="f_mongoclientexp" Name="mongoclient.exp" Source="$(var.ClientSource)\mongoclient.exp"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <?if $(var.Edition) = Enterprise ?>
-          <Component Id="c_driversasl" Guid="E51F24ED-3464-4B01-B825-C9F1219181A0">
-            <File Id="f_driversasl" Name="libsasl.dll" Source="$(var.SaslSource)\libsasl.dll"
-                  DiskId="1" KeyPath="yes" />
-          </Component>
-          <Component Id="c_driversaslPdb" Guid="1D6BF915-8E12-47FA-A582-64BF9D77EBC5">
-            <File Id="f_driversaslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
-                  DiskId="1" KeyPath="yes" />
-          </Component>
-          <Component Id="c_driverssleay" Guid="B2C36398-A79C-4ADE-BA72-7E3DF85B2D28">
-            <File Id="f_driverssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
-                  DiskId="1" KeyPath="yes" />
-          </Component>
-          <Component Id="c_driverlibeay" Guid="B7E3243C-25F4-4358-A420-2BFFA0BAABED">
-            <File Id="f_driverlibeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
-                  DiskId="1" KeyPath="yes" />
-          </Component>
-          <Component Id="c_driversnmp" Guid="57DB53E1-C7B1-4E9C-816E-A7C920DCF393">
-            <File Id="f_driverssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
-                  DiskId="1" KeyPath="yes" />
-          </Component>
-          <Component Id="c_driversnmpPdb" Guid="CACC153D-8167-4C9D-B47B-764F254A6BDF">
-            <File Id="f_driversnmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
-                  DiskId="1" KeyPath="yes" />
-          </Component>
-        <?endif ?>
-        <Directory Id="Include" Name="include">
-          <Directory Id="Header" Name="mongo" />
-        </Directory>
-      </Directory>
     </DirectoryRef>
 
     <!--
@@ -171,14 +124,6 @@
         <ComponentRef Id="c_snmpConfSubagent" />
         <ComponentRef Id="c_snmpMib" />
       </ComponentGroup>
-    <ComponentGroup Id="cg_DriverEnterprise">
-      <ComponentRef Id="c_driversasl" />
-      <ComponentRef Id="c_driversaslPdb" />
-      <ComponentRef Id="c_driverssleay" />
-      <ComponentRef Id="c_driverlibeay" />
-      <ComponentRef Id="c_driversnmp" />
-      <ComponentRef Id="c_driversnmpPdb" />
-    </ComponentGroup>
     <?endif ?>
   </Fragment>
 </Wix>
