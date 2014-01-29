@@ -563,6 +563,8 @@ namespace mongo {
             return;
         }
 
+        // note you can infer how many throws weren't allowed by subtracting:
+        //   accessesNotInMemory - pageFaultExceptionsThrown
         recordStats.pageFaultExceptionsThrown.fetchAndAdd(1);
         if ( db )
             db->recordStats().pageFaultExceptionsThrown.fetchAndAdd(1);
