@@ -234,9 +234,9 @@ namespace mongo {
                 return NULL;
             }
 
-            StringData language = ("" == node->_language
-                                   ? fam->getSpec().defaultLanguage().str().c_str()
-                                   : node->_language);
+            const std::string& language = ("" == node->_language
+                                           ? fam->getSpec().defaultLanguage().str()
+                                           : node->_language);
 
             FTSQuery ftsq;
             Status parseStatus = ftsq.parse(node->_query, language);
