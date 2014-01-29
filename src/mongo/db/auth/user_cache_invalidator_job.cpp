@@ -41,9 +41,10 @@ namespace {
 
         virtual Status validate( const int& potentialNewValue )
         {
-            if (potentialNewValue < 30) {
+            if (potentialNewValue < 30 || potentialNewValue > 86400) {
                 return Status(ErrorCodes::BadValue,
-                              "userCacheInvalidationIntervalSecs must be at least 30");
+                              "userCacheInvalidationIntervalSecs must be between 30 " 
+                              "and 86400 (24 hours)");
             }
             return Status::OK();
         }

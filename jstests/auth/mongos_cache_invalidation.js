@@ -11,7 +11,14 @@ var st = new ShardingTest({ shards: 2,
                                      {}],
                             keyFile: 'jstests/libs/key1' });
 
-var res = st.s1.getDB('admin').runCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1});
+var res = st.s1.getDB('admin').runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 29});
+assert.commandFailed(res, "Setting the invalidation interval to an disallowed value should fail");
+
+res = st.s1.getDB('admin').runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 100000});
+assert.commandFailed(res, "Setting the invalidation interval to an disallowed value should fail");
+
+res = st.s1.getDB('admin').runCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1});
+
 assert.eq(30, res.userCacheInvalidationIntervalSecs);
 st.s0.getDB('test').foo.insert({a:1}); // initial data
 
