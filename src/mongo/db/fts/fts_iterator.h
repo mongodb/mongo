@@ -89,16 +89,6 @@ namespace mongo {
         class FTSElementIterator {
         public:
             /**
-             *  Iterator interface: returns false iff there are no further text-indexable fields.
-             */
-            bool more();
-
-            /**
-             *  Iterator interface: advances to the next text-indexable field.
-             */
-            FTSIteratorValue next();
-
-            /**
              *  Iterator constructor 
              *
              *  Note: Caller must ensure that the constructed FTSElementIterator
@@ -108,6 +98,16 @@ namespace mongo {
              *  @arg obj   document that the iterator will traverse
              */
             FTSElementIterator( const FTSSpec& spec, const BSONObj& obj);
+
+            /**
+             *  Iterator interface: returns false iff there are no further text-indexable fields.
+             */
+            bool more();
+
+            /**
+             *  Iterator interface: advances to the next text-indexable field.
+             */
+            FTSIteratorValue next();
 
             /**
              *  Iterator frame needed for iterative implementation of
