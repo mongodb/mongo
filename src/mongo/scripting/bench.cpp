@@ -344,8 +344,9 @@ namespace mongo {
 
                 int delay = e["delay"].eoo() ? 0 : e["delay"].Int();
 
-                // Let's default to writeCmd == true.
-                bool useWriteCmd = e["writeCmd"].eoo() ? true : e["writeCmd"].Bool();
+                // Let's default to writeCmd == false.
+                bool useWriteCmd = e["writeCmd"].eoo() ? false : 
+                    e["writeCmd"].Bool();
 
                 BSONObj context = e["context"].eoo() ? BSONObj() : e["context"].Obj();
 
