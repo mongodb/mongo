@@ -38,7 +38,7 @@ def process_monitor(fname, ckptlist, opdict):
     in_ckpt = 'N'
 
     ckptlist=[]
-    # Monitor output format current is:
+    # Monitor output format currently is:
     # time,read,insert,update,ckpt,...latencies...
     ops = ('read', 'insert', 'update')
     csvcol = (1, 2, 3)
@@ -83,7 +83,8 @@ set yrange [0:]\n''' % {
     of.write('set output "' + fname + '.png"\n')
     of.write('plot "' + fname + '" using 1:($2/1000) title "Reads", "' +\
         fname + '" using 1:($3/1000) title "Inserts", "' +\
-        fname + '" using 1:($4/1000) title "Updates"\n')
+        fname + '" using 1:($4/1000) title "Updates", "' +\
+        fname + '" using 1:(($2+$3+$4)/1000) title "Total", "\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
