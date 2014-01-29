@@ -73,36 +73,42 @@ class MultiVersionDownloader :
         urls.sort()
         full_version = urls[-1][0]
         url = urls[-1][1]
+        extract_dir = url.split("/")[-1][:-4]
 
-        temp_dir = tempfile.mkdtemp()
-        temp_file = tempfile.mktemp(suffix=".tgz")
-
-        data = urllib2.urlopen(url)
-
-        print "Downloading data for version %s (%s)..." % (version, full_version)
-
-        with open(temp_file, 'wb') as f:
-            f.write(data.read())
-            print "Uncompressing data for version %s (%s)..." % (version, full_version)
-
-        # Can't use cool with syntax b/c of python 2.6
-        tf = tarfile.open(temp_file, 'r:gz')
-
-        try:
-            tf.extractall(path=temp_dir)
-        except:
+        # only download if we don't already have the directory
+        already_downloaded = os.path.isdir(os.path.join( self.install_dir, extract_dir))
+        if already_downloaded:
+            print "Skipping download for version %s (%s) since the dest already exists '%s'" \
+                % (version, full_version, extract_dir)
+        else:
+            temp_dir = tempfile.mkdtemp()
+            temp_file = tempfile.mktemp(suffix=".tgz")
+    
+            data = urllib2.urlopen(url)
+    
+            print "Downloading data for version %s (%s)..." % (version, full_version)
+    
+            with open(temp_file, 'wb') as f:
+                f.write(data.read())
+                print "Uncompressing data for version %s (%s)..." % (version, full_version)
+    
+            # Can't use cool with syntax b/c of python 2.6
+            tf = tarfile.open(temp_file, 'r:gz')
+    
+            try:
+                tf.extractall(path=temp_dir)
+            except:
+                tf.close()
+                raise
+    
             tf.close()
-            raise
-
-        tf.close()
-
-        extract_dir = os.listdir(temp_dir)[0]
-        temp_install_dir = os.path.join(temp_dir, extract_dir)
-
-        shutil.move(temp_install_dir, self.install_dir)
-
-        shutil.rmtree(temp_dir)
-        os.remove(temp_file)
+    
+            temp_install_dir = os.path.join(temp_dir, extract_dir)
+    
+            shutil.move(temp_install_dir, self.install_dir)
+    
+            shutil.rmtree(temp_dir)
+            os.remove(temp_file)
 
         self.symlink_version(version, os.path.abspath(os.path.join(self.install_dir, extract_dir)))
 
@@ -120,20 +126,32 @@ class MultiVersionDownloader :
 
             link_name = "%s-%s" % (executable, version)
 
-            os.symlink(os.path.join(installed_dir, "bin", executable),\
-                       os.path.join(self.link_dir, link_name))
+            try:
+                os.symlink(os.path.join(installed_dir, "bin", executable),\
+                           os.path.join(self.link_dir, link_name))
+            except OSError as exc:
+                if exc.errno == errno.EEXIST:
+                    pass
+                else: raise
 
 
 CL_HELP_MESSAGE = \
 """
-Downloads and installs particular mongodb versions into an install directory and symlinks the binaries with versions to
-another directory.
+Downloads and installs particular mongodb versions (each binary is renamed to include its version) 
+into an install directory and symlinks the binaries with versions to another directory.
 
 Usage: setup_multiversion_mongodb.py INSTALL_DIR LINK_DIR PLATFORM_AND_ARCH VERSION1 [VERSION2 VERSION3 ...]
 
 Ex: setup_multiversion_mongodb.py ./install ./link "Linux/x86_64" "2.0.6" "2.0.3-rc0" "2.0" "2.2" "2.3"
+Ex: setup_multiversion_mongodb.py ./install ./link "OSX/x86_64" "2.4" "2.2"
 
-If "rc" is included in the version name, we'll use the exact rc, otherwise we'll pull the highest non-rc
+After running the script you will have a directory structure like this:
+./install/[mongodb-osx-x86_64-2.4.9, mongodb-osx-x86_64-2.2.7]
+./link/[mongod-2.4.9, mongod-2.2.7, mongo-2.4.9...]
+
+You should then add ./link/ to your path so multi-version tests will work.
+
+Note: If "rc" is included in the version name, we'll use the exact rc, otherwise we'll pull the highest non-rc
 version compatible with the version specified.
 """
 
