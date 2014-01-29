@@ -80,6 +80,8 @@ namespace mongo {
             _size++;
         }
 
+        authindex::configureSystemIndexes(dbname);
+
         return db;
     }
 
