@@ -93,12 +93,4 @@ namespace mongo {
         return BSONObj( r->data() );
     }
 
-    DiskLoc allocateSpaceForANewRecord(const char* ns,
-                                       NamespaceDetails* d,
-                                       int32_t lenWHdr,
-                                       bool god);
-
-    void addRecordToRecListInExtent(Record* r, DiskLoc loc);
-
-
 } // namespace mongo

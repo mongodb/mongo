@@ -79,7 +79,7 @@ namespace mongo {
         r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
         doc->writeDocument( r->data() );
 
-        addRecordToRecListInExtent(r, loc.getValue()); // XXX move code here from pdfile
+        _addRecordToRecListInExtent(r, loc.getValue());
 
         _details->incrementStats( r->netLength(), 1 );
 
@@ -102,7 +102,7 @@ namespace mongo {
         r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
         memcpy( r->data(), data, len );
 
-        addRecordToRecListInExtent(r, loc.getValue()); // XXX move code here from pdfile
+        _addRecordToRecListInExtent(r, loc.getValue());
 
         _details->incrementStats( r->netLength(), 1 );
 
@@ -167,6 +167,23 @@ namespace mongo {
             }
         }
 
+    }
+
+    void RecordStoreV1Base::_addRecordToRecListInExtent(Record *r, DiskLoc loc) {
+        dassert( loc.rec() == r );
+        Extent *e = r->myExtent(loc);
+        if ( e->lastRecord.isNull() ) {
+            Extent::FL *fl = getDur().writing(e->fl());
+            fl->firstRecord = fl->lastRecord = loc;
+            r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
+        }
+        else {
+            Record *oldlast = e->lastRecord.rec();
+            r->prevOfs() = e->lastRecord.getOfs();
+            r->nextOfs() = DiskLoc::NullOfs;
+            getDur().writingInt(oldlast->nextOfs()) = loc.getOfs();
+            getDur().writingDiskLoc(e->lastRecord) = loc;
+        }
     }
 
     // -------------------------------

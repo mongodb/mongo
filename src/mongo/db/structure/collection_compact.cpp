@@ -263,13 +263,9 @@ namespace mongo {
         d->setLastExtentSize( 0 );
 
         // before dropping indexes, at least make sure we can allocate one extent!
-        if ( allocateSpaceForANewRecord( _ns.ns().c_str(),
-                                         d,
-                                         Record::HeaderSize+1,
-                                         false).isNull() ) {
-            return StatusWith<CompactStats>( ErrorCodes::InternalError,
-                                             "compact error no space available to allocate" );
-        }
+        // this will allocate an extent and add to free list
+        // if it cannot, it will throw an exception
+        increaseStorageSize( _details->lastExtentSize(), true );
 
         // note that the drop indexes call also invalidates all clientcursors for the namespace,
         // which is important and wanted here

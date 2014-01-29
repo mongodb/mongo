@@ -78,6 +78,11 @@ namespace mongo {
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;
 
+        /** add a record to the end of the linked list chain within this extent.
+            require: you must have already declared write intent for the record header.
+        */
+        void _addRecordToRecListInExtent(Record* r, DiskLoc loc);
+
         NamespaceDetails* _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
