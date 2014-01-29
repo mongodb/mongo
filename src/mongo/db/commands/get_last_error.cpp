@@ -178,6 +178,10 @@ namespace mongo {
                 return true;
             }
 
+            // No error occurred, so we won't duplicate these fields with write concern errors
+            dassert( result.asTempObj()["err"].eoo() );
+            dassert( result.asTempObj()["code"].eoo() );
+
             OpTime wOpTime;
             if ( cmdObj["wOpTime"].type() == Timestamp ) {
                 // Get the wOpTime from the command if it exists
@@ -202,11 +206,6 @@ namespace mongo {
                 result.append( "code", status.code() );
                 return true;
             }
-
-            // Always need an err field appended
-            dassert( wcResult.err.empty() );
-            if ( !errorOccurred )
-                result.appendNull( "err" );
 
             return appendCommandStatus( result, status );
         }

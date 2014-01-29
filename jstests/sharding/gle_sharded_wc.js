@@ -1,5 +1,6 @@
 //
-// Tests whether sharded GLE fails sanely and correctly reports failures.
+// Tests of sharded GLE enforcing write concern against operations in a cluster
+// Basic sharded GLE operation is tested elsewhere.
 //
 
 // Options for a cluster with two replica set shards, the first with two nodes the second with one
@@ -30,36 +31,10 @@ assert.commandWorked( admin.runCommand({ moveChunk : coll.toString(),
 
 st.printShardingStatus();
 
-// Don't use write commands
-coll.getMongo().useWriteCommands = function(){ return false; };
-
-var gle = null;
-
-//
-// Successful insert
-coll.remove({});
-coll.insert({ _id : -1 });
-printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
-assert(gle.ok);
-assert(!gle.err);
-assert.eq(coll.count(), 1);
-
-//
-// Successful upserts
-coll.remove({});
-coll.update({ _id : -1 }, { _id : -1 }, true);
-coll.update({ _id : 1 }, { _id : 1 }, true);
-printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
-assert(gle.ok);
-assert(!gle.err);
-assert.eq(gle.n, 1);
-assert.eq(gle.upserted, 1);
-assert.eq(coll.count(), 2);
-
 //
 // No journal insert, GLE fails
 coll.remove({});
-coll.insert({ _id : -1 });
+coll.insert({ _id : 1 });
 printjson(gle = coll.getDB().runCommand({ getLastError : 1, j : true }));
 assert(!gle.ok);
 assert(gle.errmsg);
@@ -88,18 +63,6 @@ assert(!gle.errmsg);
 assert.eq(coll.count(), 1);
 
 //
-// Error on two-hosts during remove
-coll.remove({});
-coll.remove({ $invalid : 'remove' });
-printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
-assert(gle.ok);
-assert(gle.err);
-assert(gle.code);
-assert(!gle.errmsg);
-assert(gle.shards);
-assert.eq(coll.count(), 0);
-
-//
 // Successful remove on two hosts, write concern timeout on one
 coll.remove({});
 st.rs0.awaitReplication(); // To ensure the first shard won't timeout
@@ -114,7 +77,7 @@ assert.eq(coll.count(), 0);
 // Successful remove on two hosts, write concern timeout on both
 // We don't aggregate two timeouts together
 coll.remove({});
-st.rs0.awaitReplication(); // To ensure the first shard won't timeout
+st.rs0.awaitReplication();
 printjson(gle = coll.getDB().runCommand({ getLastError : 1, w : 3, wtimeout : 5 * 1000 }));
 assert(!gle.ok);
 assert(gle.errmsg);
@@ -125,7 +88,7 @@ assert(gle.errs);
 assert.eq(coll.count(), 0);
 
 //
-// First replica set DOWN
+// First replica set with no primary
 //
 
 //
@@ -143,7 +106,7 @@ assert(gle.errmsg);
 assert.eq(coll.count({ _id : 1 }), 1);
 
 //
-// Failed insert on two hosts, first host down
+// Failed insert on two hosts, first replica set with no primary
 // NOTE: This is DIFFERENT from 2.4, since we don't need to contact a host we didn't get
 // successful writes from.
 coll.remove({ _id : 1 });

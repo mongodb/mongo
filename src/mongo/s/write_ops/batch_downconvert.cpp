@@ -347,7 +347,7 @@ namespace mongo {
             else {
                 // Suppress non-write concern err as null, but we need to report null err if ok
                 if ( gleResponse["ok"].trueValue() )
-                    builder.appendNull( err );
+                    builder.appendNull( errField.fieldName() );
             }
         }
 
