@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
 
 namespace mongo {
@@ -37,6 +38,7 @@ namespace mongo {
     class Collection;
     class DocWriter;
     class ExtentManager;
+    class MAdvise;
     class NamespaceDetails;
     class Record;
 
@@ -117,6 +119,8 @@ namespace mongo {
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
         Collection* _collection;
+
+        OwnedPointerVector<MAdvise> _extentAdvice;
 
     };
 

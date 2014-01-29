@@ -245,6 +245,16 @@ namespace mongo {
                                               bool isSystemIndexes )
         : RecordStoreV1Base( ns, details, em, isSystemIndexes ),
           _collection( collection ) {
+
+        DiskLoc extentLoc = details->firstExtent();
+        while ( !extentLoc.isNull() ) {
+            Extent* extent = em->getExtent( extentLoc );
+            extentLoc = extent->xnext;
+            MAdvise* m( new MAdvise( reinterpret_cast<void*>( extent ),
+                                     extent->length,
+                                     MAdvise::Sequential ) );
+            _extentAdvice.mutableVector().push_back( m );
+        }
     }
 
     CappedRecordStoreV1::~CappedRecordStoreV1() {

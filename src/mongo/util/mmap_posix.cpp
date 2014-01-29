@@ -29,6 +29,7 @@
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/startup_test.h"
 
 using namespace mongoutils;
 
@@ -74,29 +75,63 @@ namespace mongo {
 #define MAP_NORESERVE (0)
 #endif
 
+    namespace {
+        void* _pageAlign( void* p ) {
+            return (void*)((int64_t)p & ~(g_minOSPageSizeBytes-1));
+        }
+
+        class PageAlignTest : public StartupTest {
+        public:
+            void run() {
+                {
+                    int64_t x = g_minOSPageSizeBytes + 123;
+                    void* y = _pageAlign( reinterpret_cast<void*>( x ) );
+                    invariant( g_minOSPageSizeBytes == reinterpret_cast<size_t>(y) );
+                }
+                {
+                    int64_t a = static_cast<uint64_t>( numeric_limits<int>::max() );
+                    a = a / g_minOSPageSizeBytes;
+                    a = a * g_minOSPageSizeBytes;
+                    // a should now be page aligned
+
+                    // b is not page aligned
+                    int64_t b = a + 123;
+
+                    void* y = _pageAlign( reinterpret_cast<void*>( b ) );
+                    invariant( a == reinterpret_cast<int64_t>(y) );
+                }
+
+            }
+        } pageAlignTest;
+    }
+
 #if defined(__sunos__)
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 #else
     MAdvise::MAdvise(void *p, unsigned len, Advice a) {
-        
-        _p = (void*)((long)p & ~(g_minOSPageSizeBytes-1));
-        
-        _len = len +((unsigned long long)p-(unsigned long long)_p);
-        
+
+        _p = _pageAlign( p );
+
+        _len = len + static_cast<unsigned>( reinterpret_cast<size_t>(p) -
+                                            reinterpret_cast<size_t>(_p)  );
+
         int advice = 0;
         switch ( a ) {
-        case Sequential: advice = MADV_SEQUENTIAL; break;
-        case Random: advice = MADV_RANDOM; break;
-        default: verify(0);
+        case Sequential:
+            advice = MADV_SEQUENTIAL;
+            break;
+        case Random:
+            advice = MADV_RANDOM;
+            break;
         }
-        
+
         if ( madvise(_p,_len,advice ) ) {
-            error() << "madvise failed: " << errnoWithDescription() << endl;
+            error() << "madvise failed: " << errnoWithDescription();
         }
-        
+
     }
-    MAdvise::~MAdvise() { 
+    MAdvise::~MAdvise() {
         madvise(_p,_len,MADV_NORMAL);
     }
 #endif

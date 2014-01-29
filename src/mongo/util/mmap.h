@@ -36,12 +36,14 @@ namespace mongo {
     void dataSyncFailedHandler();
 
     class MAdvise {
-        void *_p;
-        unsigned _len;
+        MONGO_DISALLOW_COPYING(MAdvise);
     public:
         enum Advice { Sequential=1 , Random=2 };
         MAdvise(void *p, unsigned len, Advice a);
         ~MAdvise(); // destructor resets the range to MADV_NORMAL
+    private:
+        void *_p;
+        unsigned _len;
     };
 
     // lock order: lock dbMutex before this if you lock both
