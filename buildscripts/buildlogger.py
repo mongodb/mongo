@@ -251,7 +251,7 @@ def run_and_echo(command):
     return proc.returncode
 
 class LogAppender(object):
-    def __init__(self, callback, args, send_after_lines=2000, send_after_seconds=2):
+    def __init__(self, callback, args, send_after_lines=2000, send_after_seconds=10):
         self.callback = callback
         self.callback_args = args
 
