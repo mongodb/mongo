@@ -516,14 +516,6 @@ namespace {
                 Privilege(ResourcePattern::forExactNamespace(
                                   AuthorizationManager::versionCollectionNamespace),
                           ActionType::find));
-
-        // For BRS
-        ActionSet backupCollectionActions;
-        backupCollectionActions << ActionType::insert << ActionType::update;
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.mms.backup")),
-                          backupCollectionActions));
     }
 
     void addRestorePrivileges(PrivilegeVector* privileges) {
