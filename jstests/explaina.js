@@ -43,10 +43,3 @@ assert.eq( 333, plan( explain1, "BtreeCursor a_1" ).n );
 assert.eq( 1000, plan( explain1, "BtreeCursor a_1" ).nscanned );
 assert.eq( 666, plan( explain2, "BtreeCursor a_1" ).n );
 assert.eq( 2000, plan( explain2, "BtreeCursor a_1" ).nscanned );
-
-// Check that results only examined after the a:1 plan is selected will not affect plan explain
-// output for other plans.
-// QUERY_MIGRATION: The explain outputs don't need to be and often are not identical, especially in
-// the presence of a fetch.
-//assert.eq( plan( explain1, "BtreeCursor b_1" ), plan( explain2, "BtreeCursor b_1" ) );
-//assert.eq( plan( explain1, "BasicCursor" ), plan( explain2, "BasicCursor" ) );

@@ -60,8 +60,5 @@ noMemoryException( {_id:1}, {b:null} );
 
 // With an unindexed plan on b:1 recorded for a query, the query should be
 // retried when the unindexed plan exhausts its memory limit.
-//
-// QUERY_MIGRATION: the _id index actually performs the best in this case...
-// assert.eq( 'BtreeCursor b_1', t.find( {b:0} ).sort( {_id:1} ).explain().cursor ); // Record b:1 plan
 noMemoryException( {_id:1}, {b:null} );
 t.drop();

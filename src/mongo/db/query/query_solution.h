@@ -165,8 +165,8 @@ namespace mongo {
 
         string ns;
 
-        // XXX temporary: if it has a sort stage the sort wasn't provided by an index,
-        // so we use that index (if it exists) to provide a sort.
+        // If the solution has a sort stage, the sort wasn't provided by an index, so we might want
+        // to scan an index to provide that sort in a non-blocking fashion.
         bool hasSortStage;
 
         // Owned here. Used by the plan cache.

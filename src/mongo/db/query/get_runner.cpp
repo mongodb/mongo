@@ -251,7 +251,7 @@ namespace mongo {
             Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
                                                         &qs, &backupQs);
 
-            // XXX: SERVER-12438. Unfortunately we have to defer to the backup solution
+            // See SERVER-12438. Unfortunately we have to defer to the backup solution
             // if both a batch size is set and a sort is requested.
             //
             // TODO: it would be really nice to delete this block in the future.
@@ -366,7 +366,7 @@ namespace mongo {
             return Status::OK();
         }
         else {
-            // XXX: SERVER-12438. In an ideal world we should not arbitrarily prefer certain
+            // See SERVER-12438. In an ideal world we should not arbitrarily prefer certain
             // solutions over others. But unfortunately for historical reasons we are forced
             // to prefer a solution where the index provides the sort, if the batch size
             // is set and a sort is requested. Read SERVER-12438 for details, if you dare.

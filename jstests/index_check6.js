@@ -32,12 +32,8 @@ for ( var a=1; a<10; a++ ){
 }
 
 function doQuery( count, query, sort, index ) {
-    // QUERY_MIGRATION: our nscanned is slightly off but our bounds are fine...
-    //printjson(t.find( query ).hint( index ).sort( sort ).explain());
     var nscanned = t.find( query ).hint( index ).sort( sort ).explain().nscanned;
-    //print("count is " + count + " nscanned is " + nscanned);
     assert(Math.abs(count - nscanned) <= 2);
-    //assert.eq( count, t.find( query ).hint( index ).sort( sort ).explain().nscanned );
 }
 
 function doTest( sort, index ) {

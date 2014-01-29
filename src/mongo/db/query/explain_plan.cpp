@@ -101,7 +101,7 @@ namespace mongo {
 
         res->setNScanned(nScanned);
         // XXX: this isn't exactly "correct" -- for ixscans we have to find out if it's part of a
-        // subtree rooted at a fetch, etc. etc.  XXX: do we want to just add the # of advances of a
+        // subtree rooted at a fetch, etc. etc.  do we want to just add the # of advances of a
         // fetch node minus the number of alreadyHasObj for those nodes?
         res->setNScannedObjects(nScannedObjects);
 
@@ -221,6 +221,7 @@ namespace mongo {
             res->setNScanned(csStats->docsTested);
             res->setNScannedObjects(csStats->docsTested);
             res->setIndexOnly(false);
+            res->setIsMultiKey(false);
         }
         else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
             // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
@@ -295,7 +296,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    // XXX: where does this really live?  stage_types.h?
+    // TODO: where does this really live?  stage_types.h?
     string stageTypeString(StageType type) {
         switch (type) {
         case STAGE_AND_HASH:

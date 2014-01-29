@@ -69,8 +69,8 @@ namespace mongo {
      *
      * END NOTE FROM GREG
      *
-     * Preconditions: Child must be fetched.  TODO XXX: when covering analysis is in just build doc
-     * and check that against shard key.
+     * Preconditions: Child must be fetched.  TODO: when covering analysis is in just build doc
+     * and check that against shard key.  See SERVER-5022.
      */
     class ShardFilterStage : public PlanStage {
     public:

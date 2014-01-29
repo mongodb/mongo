@@ -42,10 +42,8 @@ function checkFields( matches, sort, limit ) {
     checkField( explain, "millis" );
     checkField( explain, "nYields" );
     checkField( explain, "nChunkSkips", 0 );
-    // QUERY MIGRATION
-    // index related fields do not appear in non-indexed plan
-    // checkField( explain, "isMultiKey", false );
-    // checkField( explain, "indexOnly", false );
+    checkField( explain, "isMultiKey", false );
+    checkField( explain, "indexOnly", false );
     checkField( explain, "server" );
     checkField( explain, "allPlans" );
     explain.allPlans.forEach( function( x ) { checkPlanFields( x, matches, matches ); } );
@@ -63,8 +61,6 @@ checkFields( 1, true );
 
 t.save( {} );
 checkFields( 1, false, 1 );
-// QUERY_MIGRATION: why is n=2 when limit is 1?
-//checkFields( 2, true, 1 );
 
 // Check basic fields with multiple clauses.
 t.save( { _id:0 } );

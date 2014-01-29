@@ -46,10 +46,9 @@ assertHintedExplain( { n:1, nscanned:1, nscannedObjects:0 },
 assertHintedExplain( { n:1, nscanned:1, nscannedObjects:1 },
                      t.find( { a:1, b:null } )._addSpecial( "$returnKey", true ) );
 
-// QUERY MIGRATION
 // Skip a result.
-//assertHintedExplain( { n:0, nscanned:1, nscannedObjects:0 },
-//                     t.find( { a:1 } ).skip( 1 ) );
+assertHintedExplain( { n:0, nscanned:1, nscannedObjects:1 },
+                     t.find( { a:1 } ).skip( 1 ) );
 
 // Cursor sorted covered index query.
 assertHintedExplain( { n:1, nscanned:1, nscannedObjects:0, scanAndOrder:false },
@@ -78,8 +77,6 @@ t.drop();
 t.ensureIndex( { a:1 } );
 t.save( { a:[ 1, 2 ] } );
 
-// QUERY_MIGRATION: the old system would scan dup keys, the new system ranks the collscan plan
-// better.
 assertHintedExplain( { n:1, scanAndOrder:false },
                      t.find( { a:{ $gt:0 } }, { _id:0, a:1 } ) );
 assertHintedExplain( { n:1, scanAndOrder:true },
@@ -91,20 +88,17 @@ t.ensureIndex( { a:1, b:1 } );
 t.ensureIndex( { b:1, a:1 } );
 t.save( { a:1, b:1 } );
 
-// QUERY MIGRATION
 // Document matched by three query plans.
-// assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1,
-//                         nscannedObjectsAllPlans:2 /* Result is not loaded if a dup. */ },
-//                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ) );
+assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1 },
+                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ) );
 
 // Document matched by three query plans, with sorting.
-//assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:2 },
-//                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).sort( { c:1 } ) );
+assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1 },
+                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).sort( { c:1 } ) );
 
-// QUERY MIGRATION
 // Document matched by three query plans, with a skip.
-// assertUnhintedExplain( { n:0, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:1 },
-//                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).skip( 1 ) );
+assertUnhintedExplain( { n:0, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:1 },
+                      t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).skip( 1 ) );
 
 // Hybrid ordered and unordered plans.
 
@@ -147,12 +141,8 @@ assertUnhintedExplain( { cursor:'BtreeCursor b_1', n:1, nscanned:1, nscannedObje
                        t.find( { b:1 }, { _id:0, b:1 } ).sort( { a:1 } ) );
 
 // Unordered plan chosen, with a skip.
-// QUERY_MIGRATION: all plans are equally unproductive here, so it's hard to say what happens.
-assertUnhintedExplain( { // cursor:'BtreeCursor b_1',
-                         n:0,
-                         // nscanned:1, nscannedObjects:1,
-                         // nscannedObjectsAllPlans:2, scanAndOrder:true
-                        },
+// Note that all plans are equally unproductive here, so we can't test which one is picked reliably.
+assertUnhintedExplain( { n:0 },
                        t.find( { b:1 }, { _id:0, b:1 } ).sort( { a:1 } ).skip( 1 ) );
 
 // Unordered plan chosen, $returnKey specified.
@@ -179,8 +169,7 @@ for( i = 30; i < 150; ++i ) {
     t.save( { a:i, b:i } );
 }
 
-// QUERY_MIGRATION: this is fully covered for us, not fully covered in old system.
-explain = assertUnhintedExplain( { n:150}, // nscannedObjects:150, nscannedObjectsAllPlans:150 },
+explain = assertUnhintedExplain( { n:150},
                                  t.find( { $or:[ { a:{ $gte:-1, $lte:200 },
                                                    b:{ $gte:0, $lte:201 } },
                                                  { a:{ $gte:0, $lte:201 },
@@ -189,6 +178,3 @@ explain = assertUnhintedExplain( { n:150}, // nscannedObjects:150, nscannedObjec
 printjson(explain);
 // Check nscannedObjects for each clause.
 assert.eq( 0, explain.clauses[ 0 ].nscannedObjects );
-//assert.eq( 0, explain.clauses[ 0 ].nscannedObjectsAllPlans );
-// assert.eq( 150, explain.clauses[ 1 ].nscannedObjects );
-//assert.eq( 150, explain.clauses[ 1 ].nscannedObjectsAllPlans );

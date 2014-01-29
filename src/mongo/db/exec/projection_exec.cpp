@@ -189,7 +189,6 @@ namespace mongo {
             _include = include;
         }
         else {
-            // XXX document
             _include = !include;
 
             const size_t dot = field.find('.');

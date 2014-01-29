@@ -22,9 +22,8 @@ assert.eq( 1, t.count( { loc : { $within : { $center : [[30, 30], 40] } } } ) );
 assert.eq( 1, t.count( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : true } } } ) );
 assert.eq( 1, t.count( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } } } ) );
 
-// For $within / $uniqueDocs, limit seems to apply to docs, not locs.
-// QUERY_MIGRATION: Limit should mean limit.
-// assert.eq( 2, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } } } ).limit(1).itcount() );
+// For $within / $uniqueDocs, limit applies to docs.
+assert.eq( 1, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } } } ).limit(1).itcount() );
 
 // Now check a circle only containing one of the locs.
 assert.eq( 1, t.count( { loc : { $within : { $center : [[30, 30], 10] } } } ) );
@@ -62,8 +61,6 @@ assert.contains( results[0].loc, objLocs );
 // Check locs returned in includeLocs mode, where locs are arrays.
 t.remove();
 arrLocs = [[20,30],[40,50]];
-// QUERY_MIGRATION THESE ARE NOT POINTS
-//arrLocs = [[20,30,['loc1','loca']],[40,50,['loc2','locb']]];
 t.save( {loc:arrLocs} );
 results = db.runCommand( { geoNear : collName , near : [50,50], num : 10, uniqueDocs : false, includeLocs : true } ).results;
 // The original loc arrays are returned as objects.
@@ -71,27 +68,6 @@ expectedLocs = arrLocs
 
 assert.contains( results[0].loc, expectedLocs );
 
-/*
-// QUERY_MIGRATION SEE ABOVE
-// Check matching an additional indexed field inside loc.
-t.drop();
-t.ensureIndex( {loc:'2d','loc.z':1} );
-t.save( {loc:objLocs} );
-assert.eq( 1, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : true } }, 'loc.z':'loc2' } ).itcount() );
-assert.eq( 2, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } }, 'loc.z':'loc2' } ).itcount() );
-assert.eq( 1, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : true } }, 'loc.z':'loc1' } ).itcount() );
-assert.eq( 2, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } }, 'loc.z':'loc1' } ).itcount() );
-
-// Check matching an additional indexed field inside loc array.
-t.drop();
-t.ensureIndex( {loc:'2d','loc.1.2':1} );
-t.save( {loc:arrLocs} );
-//assert.eq( 1, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : true } }, 'loc.1.2':'loc2' } ).itcount() );
-//assert.eq( 2, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } }, 'loc.1.2':'loc2' } ).itcount() );
-//assert.eq( 1, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : true } }, 'loc.1.2':'locb' } ).itcount() );
-//assert.eq( 2, t.find( { loc : { $within : { $center : [[30, 30], 40], $uniqueDocs : false } }, 'loc.1.2':'locb' } ).itcount() );
-
-*/
 // Test a large number of locations in the array.
 t.drop();
 arr = [];

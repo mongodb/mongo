@@ -76,7 +76,8 @@ assert.eq( 'BtreeCursor a_1', e.cursor );
 assert.eq( [[1,1]], e.indexBounds.a );
 
 function checkBounds( query ) {
-    var e = t.find( query ).explain();
+    var e = t.find( query ).explain(true);
+    printjson(e);
     assert.eq( 1, e.n );
 }
 

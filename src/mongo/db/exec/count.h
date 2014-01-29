@@ -105,7 +105,6 @@ namespace mongo {
         // Could our index have duplicates?  If so, we use _returned to dedup.
         unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
 
-        // XXX: take ptr to soln?
         CountParams _params;
 
         bool _hitEnd;

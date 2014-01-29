@@ -60,9 +60,8 @@ namespace mongo {
           _killed(false) { }
 
     CachedPlanRunner::~CachedPlanRunner() {
-        // The runner may produce all necessary results without
-        // hitting EOF. In this case, we still want to update
-        // the cache with feedback.
+        // The runner may produce all necessary results without hitting EOF.  In this case, we still
+        // want to update the cache with feedback.
         if (!_updatedCache) {
             updateCache();
         }
@@ -180,18 +179,16 @@ namespace mongo {
         }
 
         Database* db = cc().database();
-        // XXX: We need to check for NULL because this is called upon
-        // destruction of the CachedPlanRunner. In some cases, the db
-        // or collection could be dropped without kill() being called
-        // on the runner (for example, timeout of a ClientCursor holding
-        // the runner).
+
+        // We need to check db and collection for NULL because updateCache() is called upon destruction of
+        // the CachedPlanRunner. In some cases, the db or collection could be dropped without kill()
+        // being called on the runner (for example, timeout of a ClientCursor holding the runner).
         if (NULL == db) { return; }
         Collection* collection = db->getCollection(_canonicalQuery->ns());
         if (NULL == collection) { return; }
         PlanCache* cache = collection->infoCache()->getPlanCache();
 
         std::auto_ptr<PlanCacheEntryFeedback> feedback(new PlanCacheEntryFeedback());
-        // XXX: what else can we provide here?
         feedback->stats.reset(_exec->getStats());
         feedback->score = PlanRanker::scoreTree(feedback->stats.get());
 

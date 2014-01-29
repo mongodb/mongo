@@ -66,13 +66,7 @@ namespace mongo {
         }
         else if (STAGE_IXSCAN == root->getType()) {
             const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
-            //
-            // XXX XXX
-            // Given that this grabs data from the catalog, we must do this inside of a lock.
-            // We should change this to take a (ns, index key pattern) pair so that the params
-            // don't involve any on-disk data, just descriptions thereof.
-            // XXX XXX
-            //
+
             Database* db = cc().database();
             Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
             if (NULL == collection) {

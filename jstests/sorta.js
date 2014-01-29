@@ -3,9 +3,6 @@
 t = db.jstests_sorta;
 t.drop();
 
-// QUERY_MIGRATION: sorting on 'a' but expecting order by _id...not guaranteed that sorting by 'a'
-// gives sorted by _id.
-
 // Enable _allow_dot to try and bypass v8 field name checking.
 t.insert( {_id:0,a:MinKey}, true );
 t.save( {_id:3,a:null} );

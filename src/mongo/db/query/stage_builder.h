@@ -40,7 +40,8 @@ namespace mongo {
     class StageBuilder {
     public:
         /**
-         * Turns 'solution' into an executable tree of PlanStage(s).
+         * Turns 'solution' into an executable tree of PlanStage(s).  This function accesses cc()
+         * and catalog information and as such the caller must have a lock.
          *
          * Returns true if the PlanStage tree was built successfully.  The root of the tree is in
          * *rootOut and the WorkingSet that the tree uses is in *wsOut.

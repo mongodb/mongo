@@ -76,7 +76,7 @@ namespace mongo {
             return Runner::RUNNER_EOF;
         }
 
-        // XXX: This may not be valid always.  See SERVER-12397.
+        // This may not be valid always.  See SERVER-12397.
         const BtreeBasedAccessMethod* accessMethod =
             static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
 

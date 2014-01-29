@@ -57,11 +57,12 @@ namespace mongo {
     public:
         /**
          * Takes ownership of all arguments.
-         * XXX: what args should this really take?  probably a cachekey as well?
          */
         CachedPlanRunner(const Collection* collection,
-                         CanonicalQuery* canonicalQuery, QuerySolution* solution,
-                         PlanStage* root, WorkingSet* ws);
+                         CanonicalQuery* canonicalQuery,
+                         QuerySolution* solution,
+                         PlanStage* root,
+                         WorkingSet* ws);
 
         virtual ~CachedPlanRunner();
 

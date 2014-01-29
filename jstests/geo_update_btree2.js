@@ -61,11 +61,10 @@ for( var i = 0; i < updateIds.length; i++ )
 
 status( "Counting final points..." )
 
-// QUERY_MIGRATION: it's not defined whether or not we return documents that are modified during a
-// query.  We shouldn't crash, but it's not defined how many results we get back.  This test is
-// modifying every doc not returned by the query, and since we currently handle the invalidation
-// by removing them, we won't return them.  But we shouldn't crash.
-//
+// It's not defined whether or not we return documents that are modified during a query.  We
+// shouldn't crash, but it's not defined how many results we get back.  This test is modifying every
+// doc not returned by the query, and since we currently handle the invalidation by removing them,
+// we won't return them.  But we shouldn't crash.
 // assert.eq( ( numPoints - 2 ) / 2, query.itcount() )
 query.itcount();
 

@@ -60,12 +60,15 @@ namespace mongo {
          */
         bool yieldAndCheckIfOK(Runner* runner, Record* record = NULL) {
             invariant(runner);
-            invariant(runner->collection()); // XXX: should this just return true?
+            invariant(runner->collection());
 
             int micros = ClientCursor::suggestYieldMicros();
 
             // If micros is not positive, no point in yielding, nobody waiting.
-            // XXX: Do we want to yield anyway if record is not NULL?
+            //
+            // TODO: Do we want to yield anyway if record is not NULL?
+            //
+            // TODO: Track how many times we actually yield, how many times micros is <0, etc.
             if (micros <= 0) { return true; }
 
             // If micros > 0, we should yield.
@@ -99,13 +102,10 @@ namespace mongo {
             // we want to page in the record in the lock even if nobody is waiting for the lock?
             if (micros > 0 || (NULL != rec)) {
                 staticYield(micros, rec);
-                // XXX: when do we really want to reset this?
-                //
-                // Currently we reset it when we actually yield.  As such we'll keep on trying
-                // to yield once the tracker has elapsed.
-                //
-                // If we reset it even if we don't yield, we'll wait until the time interval
-                // elapses again to try yielding.
+                // TODO:  When do we really want to reset this?  Currently we reset it when we
+                // actually yield.  As such we'll keep on trying to yield once the tracker has
+                // elapsed.  If we reset it even if we don't yield, we'll wait until the time
+                // interval elapses again to try yielding.
                 _elapsedTracker.resetLastTime();
             }
         }

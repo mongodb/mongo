@@ -37,5 +37,4 @@ assert( res.cursor.indexOf( "BtreeC" ) == 0 , "D2" );
 assert.eq( 2 , t.find( { a : { $elemMatch : { x : { $gt : 2 } } } } ).count() , "D3" );
 
 assert.eq( 2 , t.find( { a : { $ne:2, $elemMatch : { x : { $gt : 2 } } } } ).count() , "E1" );
-// QUERY_MIGRATION negation
-// assert( t.find( { a : { $ne:2, $elemMatch : { x : { $gt : 2 } } } } ).explain().cursor.indexOf( "BtreeC" ) == 0 , "E2" );
+assert( t.find( { a : { $ne:2, $elemMatch : { x : { $gt : 2 } } } } ).explain().cursor.indexOf( "BtreeC" ) == 0 , "E2" );
