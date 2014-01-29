@@ -51,10 +51,11 @@ namespace mongo {
     PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
-        if (isEOF()) { return PlanStage::IS_EOF; }
         WorkingSetID id;
         StageState status = _child->work(&id);
 
+        // Note that we don't do the normal if isEOF() return EOF thing here.  Our child might be a
+        // tailable cursor and isEOF() would be true even if it had more data...
         if (PlanStage::ADVANCED == status) {
             WorkingSetMember* member = _ws->get(id);
             Status projStatus = _exec->transform(member);
