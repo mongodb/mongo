@@ -44,9 +44,13 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(enableIndexIntersection, bool, true);
 
     static bool canUseIDHack(const CanonicalQuery& query) {
         return !query.getParsed().isExplain()
@@ -281,7 +285,10 @@ namespace mongo {
             }
         }
 
-        plannerParams.options |= QueryPlannerParams::INDEX_INTERSECTION;
+        if (enableIndexIntersection) {
+            plannerParams.options |= QueryPlannerParams::INDEX_INTERSECTION;
+        }
+
         plannerParams.options |= QueryPlannerParams::KEEP_MUTATIONS;
 
         vector<QuerySolution*> solutions;
