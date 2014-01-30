@@ -32,7 +32,7 @@ env.Library('base', [
         'fts_spec_legacy.cpp',
         'fts_language.cpp',
         'fts_util.cpp',
-        'fts_iterator.cpp',
+        'fts_element_iterator.cpp',
         'stemmer.cpp',
         'stop_words.cpp',
         'stop_words_list.cpp',
@@ -82,7 +82,7 @@ env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
 env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_iterator_test", "fts_iterator_test.cpp",
+env.CppUnitTest( "fts_element_iterator_test", "fts_element_iterator_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_util_test", "fts_util_test.cpp",

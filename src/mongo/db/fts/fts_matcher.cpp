@@ -31,7 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/fts/fts_matcher.h"
-#include "mongo/db/fts/fts_iterator.h"
+#include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/platform/strcasestr.h"
 
 namespace mongo {

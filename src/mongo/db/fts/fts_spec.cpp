@@ -32,7 +32,7 @@
 #include "mongo/db/fts/fts_spec.h"
 
 #include "mongo/db/field_ref.h"
-#include "mongo/db/fts/fts_iterator.h"
+#include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"

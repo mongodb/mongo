@@ -1,4 +1,4 @@
-// fts_iterator.cpp
+// fts_element_iterator.cpp
 /**
 *    Copyright (C) 2014 MongoDB Inc.
 *
@@ -27,7 +27,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/fts/fts_iterator.h"
+#include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"

@@ -1,4 +1,4 @@
-// fts_iterator_test.cpp
+// fts_element_iterator_test.cpp
 /**
 *    Copyright (C) 2014 MongoDB Inc.
 *
@@ -29,7 +29,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/fts/fts_iterator.h"
+#include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 

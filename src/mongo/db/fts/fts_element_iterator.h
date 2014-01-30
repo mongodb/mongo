@@ -1,4 +1,4 @@
-// fts_iterator.h
+// fts_element_iterator.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
