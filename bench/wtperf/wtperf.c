@@ -368,10 +368,7 @@ op_err:			lprintf(cfg, ret, 0,
 				goto err;
 			}
 			++trk->latency_ops;
-			usecs = ns_to_us(
-			    (uint64_t)(stop.tv_nsec - start.tv_nsec));
-			usecs += sec_to_us(
-			    (uint64_t)(stop.tv_sec - start.tv_sec));
+			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
 			track_operation(trk, usecs);
 		}
 		++trk->ops;		/* increment operation counts */
