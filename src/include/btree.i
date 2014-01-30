@@ -592,22 +592,6 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-		/*
-		 * Before the first attempt at forced eviction, try splitting
-		 * the page in memory.
-		 */
-		if (page->type == WT_PAGE_ROW_LEAF &&
-		    !F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) &&
-		    __wt_eviction_force_check(session, page)) {
-			if ((ret = __wt_split_page_inmem(session, page)) == 0) {
-				WT_STAT_FAST_CONN_INCR(
-				    session, cache_inmem_split);
-				WT_STAT_FAST_DATA_INCR(
-				    session, cache_inmem_split);
-				return (0);
-			} else if (ret == EBUSY)
-				ret = 0;
-		}
 		WT_TRET(__wt_evict_page(session, page));
 		if (ret == 0)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);

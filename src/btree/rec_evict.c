@@ -441,6 +441,24 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
+		/*
+		 * If the page is larger than the maximum allowed, attempt to
+		 * split the page in memory before evicting it.  The in-memory
+		 * split checks for left and right splits, and prevents the
+		 * tree deepening unnecessarily.
+		 *
+		 * Note, we won't be here if recursively descending a tree of
+		 * pages: dirty row-store leaf pages can't be merged into their
+		 * parents, which means if top wasn't true in this test, we'd
+		 * have returned busy before attempting reconciliation.
+		 */
+		if (page->type == WT_PAGE_ROW_LEAF &&
+		    !F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) &&
+		    __wt_eviction_force_check(session, page)) {
+			*inmem_split = 1;
+			return (0);
+		}
+
 		ret = __wt_rec_write(session, page,
 		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_QUIT);
 
@@ -449,24 +467,6 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		 * might have changed it.
 		 */
 		mod = page->modify;
-
-		/*
-		 * If reconciliation failed due to active modifications and
-		 * the page is a lot larger than the maximum allowed, it is
-		 * likely that we are having trouble reconciling it due to
-		 * contention, attempt to split the page in memory.
-		 *
-		 * Note, we won't be here if recursively descending a tree of
-		 * pages: dirty row-store leaf pages can't be merged into their
-		 * parents, which means if top wasn't true in this test, we'd
-		 * have returned busy before attempting reconciliation.
-		 */
-		if (ret == EBUSY &&
-		    page->type == WT_PAGE_ROW_LEAF &&
-		    __wt_eviction_force_check(session, page)) {
-			*inmem_split = 1;
-			return (0);
-		}
 		if (ret == EBUSY) {
 			/* Give up if there are unwritten changes */
 			WT_VERBOSE_RET(session, evict,
