@@ -983,6 +983,17 @@ namespace mongo {
             return _runCommandHook;
         }
 
+        /** 
+         * Similar to above, but for running a function on a command response after a command
+         * has been run.
+         */
+        typedef boost::function<void(const BSONObj&, const std::string&)> PostRunCommandHookFunc;
+        virtual void setPostRunCommandHook(PostRunCommandHookFunc func);
+        PostRunCommandHookFunc getPostRunCommandHook() const {
+            return _postRunCommandHook;
+        }
+
+
     protected:
         /** if the result of a command is ok*/
         bool isOk(const BSONObj&);
@@ -1023,9 +1034,11 @@ namespace mongo {
                        BSONObj *info);
 
         /**
-         * This function will be executed by the driver on runCommand calls.
+         * These functions will be executed by the driver on runCommand calls.
          */
         RunCommandHookFunc _runCommandHook;
+        PostRunCommandHookFunc _postRunCommandHook;
+
 
     private:
         enum QueryOptions _cachedAvailableOptions;

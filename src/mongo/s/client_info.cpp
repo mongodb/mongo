@@ -157,4 +157,30 @@ namespace mongo {
 
     boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 
+
+    // Look for $gleStats in a command response, and fill in ClientInfo with the data,
+    // if found.
+    // This data will be used by subsequent GLE calls, to ensure we look for the correct
+    // write on the correct PRIMARY.
+    void saveGLEStats(const BSONObj& result, const std::string& hostString) {
+        if (!ClientInfo::exists()) {
+            return;
+        }
+        if (result[kGLEStatsFieldName].type() != Object) {
+            return;
+        }
+        std::string errmsg;
+        ConnectionString shardConn = ConnectionString::parse(hostString, errmsg);
+
+        BSONElement subobj = result[kGLEStatsFieldName];
+        OpTime lastOpTime = subobj[kGLEStatsLastOpTimeFieldName]._opTime();
+        OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
+        ClientInfo* clientInfo = ClientInfo::get( NULL );
+        LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 
+               << " electionId:" << electionId;
+
+        clientInfo->addHostOpTime(shardConn, HostOpTime(lastOpTime, electionId));
+    }
+
+
 } // namespace mongo

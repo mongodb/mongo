@@ -754,4 +754,8 @@ namespace mongo {
         return true;
     }
 
+    void saveGLEStats(const BSONObj& result, const std::string& conn) {
+        // This can be called in mongod, which is unfortunate.  To fix this,
+        // we can redesign how connection pooling works on mongod for sharded operations.
+    }
 }

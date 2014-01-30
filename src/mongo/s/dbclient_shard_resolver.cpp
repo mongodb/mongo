@@ -57,14 +57,20 @@ namespace mongo {
             return Status( ErrorCodes::ShardNotFound,
                            string("unknown shard name ") + shardName );
         }
+        return findMaster(shard.getConnString(), shardHost);
+    }
 
-        ConnectionString rawShardHost = ConnectionString::parse( shard.getConnString(), errMsg );
+    Status DBClientShardResolver::findMaster( const std::string connString,
+                                              ConnectionString* resolvedHost ) {
+        std::string errMsg;
+
+        ConnectionString rawHost = ConnectionString::parse( connString, errMsg );
         dassert( errMsg == "" );
-        dassert( rawShardHost.type() == ConnectionString::SET
-                 || rawShardHost.type() == ConnectionString::MASTER );
+        dassert( rawHost.type() == ConnectionString::SET
+                 || rawHost.type() == ConnectionString::MASTER );
 
-        if ( rawShardHost.type() == ConnectionString::MASTER ) {
-            *shardHost = rawShardHost;
+        if ( rawHost.type() == ConnectionString::MASTER ) {
+            *resolvedHost = rawHost;
             return Status::OK();
         }
 
@@ -73,17 +79,17 @@ namespace mongo {
         //
 
         // Does not reload the monitor if it doesn't currently exist
-        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get( rawShardHost.getSetName(),
+        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get( rawHost.getSetName(),
                                                                    false );
         if ( !replMonitor ) {
             return Status( ErrorCodes::ReplicaSetNotFound,
-                           string("unknown replica set ") + rawShardHost.getSetName() );
+                           string("unknown replica set ") + rawHost.getSetName() );
         }
 
         try {
             // This can throw when we don't find a master!
             HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
-            *shardHost = ConnectionString::parse( masterHostAndPort.toString( true ), errMsg );
+            *resolvedHost = ConnectionString::parse( masterHostAndPort.toString( true ), errMsg );
             dassert( errMsg == "" );
             return Status::OK();
         }

@@ -486,6 +486,11 @@ namespace mongo {
                     uasserted( 17363, errMsg );
                 }
             }
+
+            // For every DBClient created by mongos, add a hook that will capture the response from
+            // commands, so that we can target the correct node when subsequent getLastError calls
+            // are made by mongos.
+            conn->setPostRunCommandHook(boost::bind(&saveGLEStats, _1, _2));
         }
 
         // For every DBClient created by mongos, add a hook that will append impersonated users
