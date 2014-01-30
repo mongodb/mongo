@@ -38,6 +38,7 @@ NUMA
 NoSQL
 README
 RepMgr
+Roelofs
 Rrx
 Seward's
 SiS
@@ -359,3 +360,4 @@ writelocks
 wrlock
 xa
 yieldcpu
+zlib

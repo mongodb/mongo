@@ -542,6 +542,13 @@ session_ops(WT_SESSION *session)
 	    "block_compressor=snappy,key_format=S,value_format=S");
 	/*! [Create a snappy compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/*! [Create a zlib compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=zlib,key_format=S,value_format=S");
+	/*! [Create a zlib compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 #endif
 
 	/*! [Configure checksums to uncompressed] */
@@ -969,6 +976,14 @@ main(void)
 	    "create,"
 	    "extensions=[/usr/local/lib/libwiredtiger_snappy.so]", &conn);
 	/*! [Configure snappy extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zlib extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_zlib.so]", &conn);
+	/*! [Configure zlib extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 

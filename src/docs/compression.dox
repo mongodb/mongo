@@ -3,6 +3,35 @@
 This section explains how to configure WiredTiger's builtin support for
 the snappy and bzip2 compression engines.
 
+@section compression_zlib Using zlib compression
+
+To use the builtin support for Greg Roelofs' and Mark Adler's
+<a href="http://www.zlib.net/">zlib</a>
+compression, first check that zlib is installed in include and library
+directories searched by the compiler.  Once zlib is installed, you can
+enable zlib using the \c --enable-zlib option to configure.
+
+If zlib is installed in a location not normally searched by the compiler
+toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS to
+indicate these locations.  For example, with the zlib includes and
+libraries installed in \c /usr/local/include and \c /usr/local/lib, you
+would run configure with the following additional arguments:
+
+@code
+--enable-zlib CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+When opening the WiredTiger database, load the zlib shared library as
+an extension.  For example, with the WiredTiger library installed in
+\c /usr/local/lib, you would use the following extension:
+
+@snippet ex_all.c Configure zlib extension
+
+Finally, when creating the WiredTiger object, set \c block_compressor
+to \c zlib:
+
+@snippet ex_all.c Create a zlib compressed table
+
 @section compression_snappy Using snappy compression
 
 To use the builtin support for
