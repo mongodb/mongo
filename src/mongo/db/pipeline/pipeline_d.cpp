@@ -215,9 +215,7 @@ namespace {
         }
 
         // Now wrap the Runner in ClientCursor
-        auto_ptr<ClientCursor> cursor(new ClientCursor(collection,
-                                                       runner.release(),
-                                                       QueryOption_NoCursorTimeout));
+        auto_ptr<ClientCursor> cursor(new ClientCursor(collection, runner.release()));
         verify(cursor->getRunner());
         CursorId cursorId = cursor->cursorid();
 
