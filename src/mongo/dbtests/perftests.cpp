@@ -1071,8 +1071,14 @@ namespace PerfTests {
     class InsertBig : public B {
         BSONObj x;
         virtual int howLongMillis() {
-            if( sizeof(void*) == 4 )
-                return 1000;  // could exceed mmapping if run too long, as this function adds a lot fasta
+            if (sizeof(void*) == 4) {
+                // See SERVER-12556 - Running this test for some time causes occasional failures
+                // on Windows 32-bit, because the virtual address space is used up and remapping 
+                // starts to fail. Value of zero means that only one iteration of the test
+                // will run.
+                //
+                return 0;
+            }
             return 5000;
         }
     public:
