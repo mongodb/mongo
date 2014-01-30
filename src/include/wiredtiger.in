@@ -855,7 +855,9 @@ struct __wt_session {
 	 * value can be created.  Must be larger than chunk_size., an integer
 	 * between 100MB and 10TB; default \c 5GB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
-	 * in-memory chunk of an LSM tree., an integer between 512K and 500MB;
+	 * in-memory chunk of an LSM tree.  This limit is soft - it is possible
+	 * for chunks to be temporarily larger than this value.  This overrides
+	 * the \c memory_page_max setting., an integer between 512K and 500MB;
 	 * default \c 10MB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the
 	 * maximum number of chunks to include in a merge operation., an integer
@@ -872,7 +874,8 @@ struct __wt_session {
 	 * memory before being reconciled to disk.  The specified size will be
 	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>. This
 	 * limit is soft - it is possible for pages to be temporarily larger
-	 * than this value., an integer between 512B and 10TB; default \c 5MB.}
+	 * than this value.  This setting is ignored for LSM trees\, see \c
+	 * chunk_size., an integer between 512B and 10TB; default \c 5MB.}
 	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\,
 	 * in bytes.  If non-zero\, schedule writes for dirty blocks belonging
 	 * to this object in the system buffer cache after that many bytes from
