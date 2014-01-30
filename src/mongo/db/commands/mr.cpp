@@ -977,22 +977,24 @@ namespace mongo {
                 }
 
                 runner->saveState();
-                auto_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
+
+                // can't be a smart pointer since it needs throw annotation on destructor
+                dbtempreleasecond* yield = new dbtempreleasecond();
 
                 try {
                     // reduce a finalize array
                     finalReduce( all );
                 }
                 catch (...) {
-                    yield.reset();
+                    delete yield; // if throws, replaces current exception rather than terminating.
                     throw;
                 }
+                delete yield;
 
                 all.clear();
                 prev = o;
                 all.push_back( o );
 
-                yield.reset();
                 if (!runner->restoreState()) {
                     break;
                 }
