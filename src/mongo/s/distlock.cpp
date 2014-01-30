@@ -169,11 +169,6 @@ namespace mongo {
                         continue;
                     }
 
-                    // create index so remove is fast even with a lot of servers
-                    if ( loops++ == 0 ) {
-                        conn->ensureIndex( LockpingsType::ConfigNS, BSON( LockpingsType::ping() << 1 ) );
-                    }
-
                     LOG( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime
                             << " by distributed lock pinger '" << pingId
                             << "', sleeping for " << sleepTime << "ms" << endl;
