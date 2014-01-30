@@ -62,8 +62,13 @@ namespace mongo {
 
         void gotShardName( const string& name );
         bool setShardName( const string& name ); // Same as above, does not throw
-
         string getShardName() { scoped_lock lk(_mutex); return _shardName; }
+
+        // Helpers for SetShardVersion which report the host name sent to this shard when the shard
+        // name does not match.  Do not use in other places.
+        // TODO: Remove once SSV is deprecated
+        void gotShardNameAndHost( const string& name, const string& host );
+        bool setShardNameAndHost( const string& name, const string& host );
 
         /** Reverts back to a state where this mongod is not sharded. */
         void resetShardingState(); 
