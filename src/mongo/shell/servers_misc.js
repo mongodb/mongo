@@ -216,9 +216,6 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
     } else {
         var conn = startMongod.apply(null, o);
         if (jsTestOptions().keyFile || jsTestOptions().auth || jsTestOptions().useX509) {
-            if (master) {
-                jsTest.addAuth(conn);
-            }
             jsTest.authenticate(conn);
         }
         return conn;

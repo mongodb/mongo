@@ -431,37 +431,7 @@ jsTest.randomize = function( seed ) {
     print( "Random seed for test : " + seed ) 
 }
 
-/**
-* Adds a user to the admin DB on the given connection. This is only used for running the test suite
-* with authentication enabled.
-*/
-jsTest.addAuth = function(conn) {
-    // Get a connection over localhost so that the first user can be added.
-    var localconn = conn;
-    if ( localconn.host.indexOf('localhost') != 0 ) {
-        print( 'Getting locahost connection instead of ' + conn + ' to add first admin user' );
-        var hosts = conn.host.split(',');
-        for ( var i = 0; i < hosts.length; i++ ) {
-            hosts[i] = 'localhost:' + hosts[i].split(':')[1];
-        }
-        localconn = new Mongo(hosts.join(','));
-    }
-    print ("Adding admin user on connection: " + localconn);
-    try {
-        localconn._skipAuth = true; // Make sure we don't try to authenticate the conn while adding the user
-        return localconn.getDB('admin').createUser({user: jsTestOptions().adminUser,
-                                                    pwd: jsTestOptions().adminPassword,
-                                                    roles: ["__system"]},
-                                                   {w: 'majority', wtimeout: 60000});
-    } finally {
-        localconn._skipAuth = false;
-    }
-}
-
 jsTest.authenticate = function(conn) {
-    if (conn._skipAuth) { // To prevent us from trying to authenticate while in the process of adding user.
-        return true;
-    }
     if (!jsTest.options().auth && !jsTest.options().keyFile && !jsTest.options().useX509) {
         conn.authenticated = true;
         return true;
@@ -472,13 +442,12 @@ jsTest.authenticate = function(conn) {
             // Set authenticated to stop an infinite recursion from getDB calling
             // back into authenticate.
             conn.authenticated = true;
-            print ("Authenticating to admin database as " +
-                   jsTestOptions().adminUser + " with mechanism " +
+            print ("Authenticating as internal " + jsTestOptions().authUser + " user with mechanism " +
                    DB.prototype._defaultAuthenticationMechanism +
                    " on connection: " + conn);
             conn.authenticated = conn.getDB('admin').auth({
-                user: jsTestOptions().adminUser,
-                pwd: jsTestOptions().adminPassword
+                user: jsTestOptions().authUser,
+                pwd: jsTestOptions().authPassword,
             });
             return conn.authenticated;
         }, "Authenticating connection: " + conn, 5000, 1000);

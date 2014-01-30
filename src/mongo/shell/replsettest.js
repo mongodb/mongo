@@ -454,7 +454,6 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     if ((jsTestOptions().keyFile || jsTestOptions().useX509) && 
           cmdKey == 'replSetInitiate') {
         master = this.getMaster();
-        jsTest.addAuth(master);
         jsTest.authenticateNodes(this.nodes);
     }
 }

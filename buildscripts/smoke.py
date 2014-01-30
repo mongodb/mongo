@@ -167,17 +167,6 @@ class mongod(object):
         print >> sys.stderr, "timeout starting mongod"
         return False
 
-    def setup_admin_user(self, port=mongod_port):
-        try:
-            Connection( "localhost" , int(port), ssl=use_ssl ).admin.command("createUser", "admin",
-                                                                pwd="password",
-                                                                roles=["__system"])
-        except OperationFailure, e:
-            if e.message == 'need to login':
-                pass # SERVER-4225
-            else:
-                raise e
-
     def start(self):
         global mongod_port
         global mongod
@@ -218,11 +207,13 @@ class mongod(object):
         if self.kwargs.get('no_preallocj'):
             argv += ['--nopreallocj']
         if self.kwargs.get('auth'):
-            argv += ['--auth']
+            argv += ['--auth', '--setParameter', 'enableLocalhostAuthBypass=false']
             authMechanism = self.kwargs.get('authMechanism', 'MONGODB-CR')
             if authMechanism != 'MONGODB-CR':
                 argv += ['--setParameter', 'authenticationMechanisms=' + authMechanism]
             self.auth = True
+        if self.kwargs.get('keyFile'):
+            argv += ['--keyFile', self.kwargs.get('keyFile')]
         if self.kwargs.get('use_ssl') or self.kwargs.get('use_x509'):
             argv += ['--sslMode', "requireSSL",
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
@@ -236,9 +227,6 @@ class mongod(object):
 
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
-
-        if self.auth:
-            self.setup_admin_user(self.port)
 
         if self.slave:
             local = Connection(port=self.port, slave_okay=True).local
@@ -481,14 +469,6 @@ def runTest(test, result):
     else:
         raise Bug("fell off in extension case: %s" % path)
 
-    if keyFile:
-        f = open(keyFile, 'r')
-        keyFileData = re.sub(r'\s', '', f.read()) # Remove all whitespace
-        f.close()
-        os.chmod(keyFile, stat.S_IRUSR | stat.S_IWUSR)
-    else:
-        keyFileData = None
-
     mongo_test_filename = os.path.basename(path)
     if 'sharedclient' in path:
         mongo_test_filename += "-sharedclient"
@@ -615,6 +595,7 @@ def run_tests(tests):
                         no_preallocj=no_preallocj,
                         auth=auth,
                         authMechanism=authMechanism,
+                        keyFile=keyFile,
                         use_ssl=use_ssl,
                         use_x509=use_x509).__enter__()
     else:
@@ -632,6 +613,7 @@ def run_tests(tests):
                            no_preallocj=no_preallocj,
                            auth=auth,
                            authMechanism=authMechanism,
+                           keyFile=keyFile,
                            use_ssl=use_ssl,
                            use_x509=use_x509).__enter__()
             primary = Connection(port=master.port, slave_okay=True);
@@ -690,6 +672,7 @@ def run_tests(tests):
                                             no_preallocj=no_preallocj,
                                             auth=auth,
                                             authMechanism=authMechanism,
+                                            keyFile=keyFile,
                                             use_ssl=use_ssl,
                                             use_x509=use_x509).__enter__()
 
@@ -915,7 +898,7 @@ def add_exe(e):
 
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
     global use_ssl, use_x509
     global file_of_commands_mode
     global report_file, use_write_commands
@@ -964,6 +947,14 @@ def set_globals(options, tests):
         # if only --auth was given to smoke.py, load the
         # default keyFile from jstests/libs/authTestsKey
         keyFile = os.path.join(mongo_repo, 'jstests', 'libs', 'authTestsKey')
+
+    if keyFile:
+        f = open(keyFile, 'r')
+        keyFileData = re.sub(r'\s', '', f.read()) # Remove all whitespace
+        f.close()
+        os.chmod(keyFile, stat.S_IRUSR | stat.S_IWUSR)
+    else:
+        keyFileData = None
 
     # if smoke.py is running a list of commands read from a
     # file (or stdin) rather than running a suite of js tests

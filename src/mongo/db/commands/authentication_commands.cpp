@@ -144,7 +144,17 @@ namespace mongo {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
         redactForLogging(&cmdToLog);
         log() << " authenticate db: " << dbname << " " << cmdToLog << endl;
+
         UserName user(cmdObj.getStringField("user"), dbname);
+        if (Command::testCommandsEnabled &&
+                user.getDB() == "admin" &&
+                user.getUser() == internalSecurity.user->getName().getUser()) {
+            // Allows authenticating as the internal user against the admin database.  This is to
+            // support the auth passthrough test framework on mongos (since you can't use the local
+            // database on a mongos, so you can't auth as the internal user without this).
+            user = internalSecurity.user->getName();
+        }
+
         std::string mechanism = cmdObj.getStringField("mechanism");
         if (mechanism.empty()) {
             mechanism = "MONGODB-CR";

@@ -767,9 +767,6 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
 
     if (jsTestOptions().auth || jsTestOptions().keyFile || jsTestOptions().useX509) {
-        if (!this.shardsvr && !options.replSet && !options.hasOwnProperty("slave") && !restart) {
-            jsTest.addAuth(conn);
-        }
         jsTest.authenticate(conn);
     }
     return conn;
@@ -823,6 +820,9 @@ function appendSetParameterArgs(argArray) {
                                     ['--setParameter',
                                      "authenticationMechanisms=" + jsTest.options().authMechanism]);
             }
+        }
+        if (jsTest.options().auth) {
+            argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
 
         // mongos only options
@@ -933,8 +933,8 @@ runMongoProgram = function() {
     if ( jsTestOptions().auth ) {
         args = args.slice(1);
         args.unshift( progName,
-                      '-u', jsTestOptions().adminUser,
-                      '-p', jsTestOptions().adminPassword,
+                      '-u', jsTestOptions().authUser,
+                      '-p', jsTestOptions().authPassword,
                       '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
@@ -959,8 +959,8 @@ startMongoProgramNoConnect = function() {
     if ( jsTestOptions().auth ) {
         args = args.slice(1);
         args.unshift(progName,
-                     '-u', jsTestOptions().adminUser,
-                     '-p', jsTestOptions().adminPassword,
+                     '-u', jsTestOptions().authUser,
+                     '-p', jsTestOptions().authPassword,
                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }
