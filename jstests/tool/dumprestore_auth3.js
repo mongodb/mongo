@@ -72,6 +72,12 @@ function runTest(shutdownServer) {
     db.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
     db.createRole({role: 'role', roles: [], privileges:[]});
     db.system.users.insert({user:'dbuser', pwd: 'pwd', roles: ['readWrite']});
+    assert.gleSuccess(db);
+
+    assert.eq(1, db.bar.findOne().a);
+    assert.eq(1, db.getUsers().length, "didn't create user");
+    assert.eq(1, db.getRoles().length, "didn't create role");
+    assert.eq(1, db.system.users.count(), "didn't create legacy system.users collection");
 
 
     jsTestLog("Dump foo database *with* user data");
