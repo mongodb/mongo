@@ -292,9 +292,6 @@ function startParallelShell( jsCode, port ){
     var x;
 
     var args = ["mongo"];
-    if (port) {
-        args.push("--port", port);
-    }
 
     if (typeof(db) == "object") {
         jsCode = "db = db.getSiblingDB('" + db.getName() + "');" + jsCode;
@@ -307,7 +304,15 @@ function startParallelShell( jsCode, port ){
     args.push("--eval", jsCode);
 
     if (typeof db == "object") {
-        args.push(db.getMongo().host);
+        var hostAndPort = db.getMongo().host.split(':');
+        var host = hostAndPort[0];
+        args.push("--host", host);
+        if (!port && hostAndPort.length >= 2) {
+            var port = hostAndPort[1];
+        }
+        if (port) {
+            args.push("--port", port);
+        }
     }
 
     if( jsTestOptions().useSSL ) {
