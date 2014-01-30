@@ -220,7 +220,7 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t next_val, nsecs;
+	uint64_t next_val, usecs;
 	int measure_latency, ret;
 	uint8_t *op, *op_end;
 	char *value_buf, *key_buf, *value;
@@ -368,10 +368,11 @@ op_err:			lprintf(cfg, ret, 0,
 				goto err;
 			}
 			++trk->latency_ops;
-			nsecs = (uint64_t)(stop.tv_nsec - start.tv_nsec);
-			nsecs += sec_to_ns(
+			usecs = ns_to_us(
+			    (uint64_t)(stop.tv_nsec - start.tv_nsec));
+			usecs += sec_to_us(
 			    (uint64_t)(stop.tv_sec - start.tv_sec));
-			track_operation(trk, nsecs/1000);
+			track_operation(trk, usecs);
 		}
 		++trk->ops;		/* increment operation counts */
 
