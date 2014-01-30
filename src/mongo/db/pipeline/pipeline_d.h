@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 namespace mongo {
+    class Collection;
     class DocumentSourceCursor;
     struct ExpressionContext;
     class Pipeline;
@@ -60,12 +61,16 @@ namespace mongo {
          *
          * The cursor is added to the front of the pipeline's sources.
          *
+         * Must have a ReadContext before entering.
+         *
          * @param pPipeline the logical "this" for this operation
          * @param pExpCtx the expression context for this pipeline
+         * @param collection the input collection. NULL if doesn't exist.
          */
         static void prepareCursorSource(
             const intrusive_ptr<Pipeline> &pPipeline,
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx,
+            Collection* collection);
 
     private:
         PipelineD(); // does not exist:  prevent instantiation

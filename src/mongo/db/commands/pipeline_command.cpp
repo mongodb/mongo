@@ -166,28 +166,16 @@ namespace {
     }
 
     static void handleCursorCommand(const string& ns,
-                                    intrusive_ptr<Pipeline>& pPipeline,
-                                    BSONObj& cmdObj,
+                                    ClientCursorPin* pin,
+                                    PipelineRunner* runner,
+                                    const BSONObj& cmdObj,
                                     BSONObjBuilder& result) {
 
-        scoped_ptr<ClientCursorPin> pin;
-        string cursorNs = ns;
-
-        {
-            // Set up cursor
-            Client::ReadContext ctx(ns);
-            Collection* collection = ctx.ctx().db()->getCollection( ns );
-            if ( collection ) {
-                ClientCursor* cc = new ClientCursor(collection,
-                                                    new PipelineRunner(pPipeline));
-                // enable special locking and ns deletion behavior
-                cc->isAggCursor = true;
-
-                pin.reset( new ClientCursorPin( collection, cc->cursorid() ) );
-
-                // we need this after cursor may have been deleted
-                cursorNs = cc->ns();
-            }
+        ClientCursor* cursor = pin ? pin->c() : NULL;
+        if (pin) {
+            invariant(cursor);
+            invariant(cursor->getRunner() == runner);
+            invariant(cursor->isAggCursor);
         }
 
         BSONElement batchSizeElem = cmdObj.getFieldDotted("cursor.batchSize");
@@ -195,74 +183,56 @@ namespace {
                                     ? batchSizeElem.numberLong()
                                     : 101; // same as query
 
-        ClientCursor* cursor = NULL;
-        PipelineRunner* runner = NULL;
-        if ( pin ) {
-            cursor = pin->c();
-            massert(16958,
-                    "Cursor shouldn't have been deleted",
-                    cursor);
-            verify(cursor->isAggCursor);
+        // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
+        BSONArrayBuilder resultsArray;
+        const int byteLimit = MaxBytesToReturnToClientAtOnce;
+        BSONObj next;
+        for (int objCount = 0; objCount < batchSize; objCount++) {
+            // The initial getNext() on a PipelineRunner may be very expensive so we don't
+            // do it when batchSize is 0 since that indicates a desire for a fast return.
+            if (runner->getNext(&next, NULL) != Runner::RUNNER_ADVANCED) {
+                if (pin) pin->deleteUnderlying();
+                // make it an obvious error to use cursor or runner after this point
+                cursor = NULL;
+                runner = NULL;
+                break;
+            }
 
-            runner = dynamic_cast<PipelineRunner*>(cursor->getRunner());
-            verify(runner);
+            if (resultsArray.len() + next.objsize() > byteLimit) {
+                // too big. next will be the first doc in the second batch
+                runner->pushBack(next);
+                break;
+            }
+
+            resultsArray.append(next);
         }
 
-        try {
-
-            // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
-            BSONArrayBuilder resultsArray;
-            const int byteLimit = MaxBytesToReturnToClientAtOnce;
-            BSONObj next;
-            if ( runner ) {
-                for (int objCount = 0; objCount < batchSize; objCount++) {
-                    // The initial getNext() on a PipelineRunner may be very expensive so we don't
-                    // do it when batchSize is 0 since that indicates a desire for a fast return.
-                    if (runner->getNext(&next, NULL) != Runner::RUNNER_ADVANCED) {
-                        pin->deleteUnderlying();
-                        cursor = NULL; // make it an obvious error to use cursor after this point
-                        break;
-                    }
-
-                    if (resultsArray.len() + next.objsize() > byteLimit) {
-                        // too big. next will be the first doc in the second batch
-                        runner->pushBack(next);
-                        break;
-                    }
-
-                    resultsArray.append(next);
-                }
-            }
-            else {
-                // this is to ensure that side-effects such as $out occur,
-                // and that an empty output set is the correct result of this pipeline
-                invariant( pPipeline.get() );
-                invariant( pPipeline->output() );
-                invariant( !pPipeline->output()->getNext() );
-            }
-
-            if (cursor) {
-                // If a time limit was set on the pipeline, remaining time is "rolled over" to the
-                // cursor (for use by future getmore ops).
-                cursor->setLeftoverMaxTimeMicros( cc().curop()->getRemainingMaxTimeMicros() );
-            }
-
-            BSONObjBuilder cursorObj(result.subobjStart("cursor"));
-            if ( cursor )
-                cursorObj.append("id", cursor->cursorid() );
-            else
-                cursorObj.append("id", 0LL );
-            cursorObj.append("ns", cursorNs);
-            cursorObj.append("firstBatch", resultsArray.arr());
-            cursorObj.done();
+        // NOTE: runner->isEOF() can have side effects such as writing by $out. However, it should
+        // be relatively quick since if there was no pin then the input is empty. Also, this
+        // violates the contract for batchSize==0. Sharding requires a cursor to be returned in that
+        // case. This is ok for now however, since you can't have a sharded collection that doesn't
+        // exist.
+        const bool canReturnMoreBatches = pin;
+        if (!canReturnMoreBatches && runner && !runner->isEOF()) {
+            // msgasserting since this shouldn't be possible to trigger from today's aggregation
+            // language. The wording assumes that the only reason pin would be null is if the
+            // collection doesn't exist.
+            msgasserted(17391, str::stream()
+                << "Aggregation has more results than fit in initial batch, but can't "
+                << "create cursor since collection " << ns << " doesn't exist");
         }
-        catch (...) {
-            // Clean up cursor on way out of scope.
-            if ( pin ) {
-                pin->deleteUnderlying();
-            }
-            throw;
+
+        if (cursor) {
+            // If a time limit was set on the pipeline, remaining time is "rolled over" to the
+            // cursor (for use by future getmore ops).
+            cursor->setLeftoverMaxTimeMicros( cc().curop()->getRemainingMaxTimeMicros() );
         }
+
+        BSONObjBuilder cursorObj(result.subobjStart("cursor"));
+        cursorObj.append("id", cursor ? cursor->cursorid() : 0LL);
+        cursorObj.append("ns", ns);
+        cursorObj.append("firstBatch", resultsArray.arr());
+        cursorObj.done();
     }
 
 
@@ -321,22 +291,52 @@ namespace {
             }
 #endif
 
-            // This does the mongod-specific stuff like creating a cursor
-            PipelineD::prepareCursorSource(pPipeline, pCtx);
+            scoped_ptr<ClientCursorPin> pin;
+            PipelineRunner* runner = NULL;
+            auto_ptr<PipelineRunner> runnerHolder;
+            {
+                // This will throw if the sharding version for this connection is out of date. The
+                // lock must be held continuously from now until we have we created both the output
+                // ClientCursor and the input Runner. This ensures that both are using the same
+                // sharding version that we synchronize on here. This is also why we always need to
+                // create a ClientCursor even when we aren't outputting to a cursor. See the comment
+                // on ShardFilterStage for more details.
+                Client::ReadContext ctx(ns);
 
-            pPipeline->stitch();
+                Collection* collection = ctx.ctx().db()->getCollection(ns);
 
-            if (pPipeline->isExplain()) {
-                result << "stages" << Value(pPipeline->writeExplainOps());
-                return true; // don't do any actual execution
+                // This does mongod-specific stuff like creating the input Runner if needed
+                PipelineD::prepareCursorSource(pPipeline, pCtx, collection);
+                pPipeline->stitch();
+
+                runnerHolder.reset(new PipelineRunner(pPipeline));
+                runner = runnerHolder.get();
+
+                if (collection) {
+                    ClientCursor* cursor = new ClientCursor(collection, runnerHolder.release());
+                    cursor->isAggCursor = true; // enable special locking behavior
+                    pin.reset(new ClientCursorPin(collection, cursor->cursorid()));
+                    // Don't add any code between here and the start of the try block.
+                }
             }
 
-            if (isCursorCommand(cmdObj)) {
-                handleCursorCommand(ns, pPipeline, cmdObj, result);
+            try {
+                if (pPipeline->isExplain()) {
+                    result << "stages" << Value(pPipeline->writeExplainOps());
+                }
+                else if (isCursorCommand(cmdObj)) {
+                    handleCursorCommand(ns, pin.get(), runner, cmdObj, result);
+                }
+                else {
+                    pPipeline->run(result);
+                }
             }
-            else {
-                pPipeline->run(result);
+            catch (...) {
+                // Clean up cursor on way out of scope.
+                if (pin) pin->deleteUnderlying();
+                throw;
             }
+            // Any code that needs the cursor pinned must be inside the try block, above.
 
             return true;
         }

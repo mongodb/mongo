@@ -63,9 +63,12 @@ namespace {
     };
 }
 
-    void PipelineD::prepareCursorSource(
-        const intrusive_ptr<Pipeline> &pPipeline,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+    void PipelineD::prepareCursorSource(const intrusive_ptr<Pipeline>& pPipeline,
+                                        const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                        Collection* collection) {
+        // get the full "namespace" name
+        const string& fullName = pExpCtx->ns.ns();
+        Lock::assertAtLeastReadLocked(fullName);
 
         // We will be modifying the source vector as we go
         Pipeline::SourceContainer& sources = pPipeline->sources;
@@ -125,9 +128,6 @@ namespace {
             }
         }
 
-        // get the full "namespace" name
-        const string& fullName = pExpCtx->ns.ns();
-
         // for debugging purposes, show what the query and sort are
         DEV {
             (log() << "\n---- query BSON\n" <<
@@ -138,11 +138,9 @@ namespace {
              fullName << "\n----\n");
         }
 
-        // Create the necessary context to use a Runner, including taking a namespace read lock.
-        // Note: this may throw if the sharding version for this connection is out of date.
-        Client::ReadContext context(fullName);
-        Collection* collection = context.ctx().db()->getCollection(fullName);
-        if ( !collection ) {
+        if (!collection) {
+            // Collection doesn't exist. Create a source that will return no results to simulate an
+            // empty collection.
             intrusive_ptr<DocumentSource> source(DocumentSourceBsonArray::create(BSONObj(),
                                                                                  pExpCtx));
             while (!sources.empty() && source->coalesce(sources.front())) {
