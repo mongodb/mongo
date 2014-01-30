@@ -1201,7 +1201,13 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: adminDbName,
-                    roles: roles_monitoring,
+                    roles: { backup: 1,
+                             restore: 1,
+                             clusterMonitor: 1,
+                             clusterAdmin: 1,
+                             root: 1,
+                             __system: 1
+                           },
                     privileges: [
                         { resource: {cluster: true}, actions: ["getParameter"] }
                     ]
