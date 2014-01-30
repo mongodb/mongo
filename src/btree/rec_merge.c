@@ -307,6 +307,10 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
+	/* Pages cannot grow larger than 2**32, but that should never happen. */
+	if (visit_state.refcnt > UINT32_MAX)
+		return (ENOMEM);
+
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
 	 * or if there are "enough" keys, we split into two equal internal
