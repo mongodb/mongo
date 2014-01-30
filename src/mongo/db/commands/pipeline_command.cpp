@@ -28,6 +28,7 @@
 
 #include "mongo/pch.h"
 
+#include <boost/smart_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -57,9 +59,10 @@ namespace {
      */
     class PipelineRunner : public Runner {
     public:
-        PipelineRunner(intrusive_ptr<Pipeline> pipeline)
+        PipelineRunner(intrusive_ptr<Pipeline> pipeline, const boost::shared_ptr<Runner>& child)
             : _pipeline(pipeline)
             , _includeMetaData(_pipeline->getContext()->inShard) // send metadata to merger
+            , _childRunner(child)
         {}
 
         virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
@@ -101,12 +104,20 @@ namespace {
                           "PipelineCursor doesn't implement getExplainPlan");
         }
 
+        // propagate to child runner if still in use
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type) {
+            if (boost::shared_ptr<Runner> runner = _childRunner.lock()) {
+                runner->invalidate(dl, type);
+            }
+        }
+        virtual void kill() {
+            if (boost::shared_ptr<Runner> runner = _childRunner.lock()) {
+                runner->kill();
+            }
+        }
+
         // These are all no-ops for PipelineRunners
         virtual void setYieldPolicy(YieldPolicy policy) {}
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type) {}
-        virtual void kill() {
-            _pipeline->output()->kill();
-        }
         virtual void saveState() {}
         virtual bool restoreState() { return true; }
         virtual const Collection* collection() { return NULL; }
@@ -136,6 +147,7 @@ namespace {
         const intrusive_ptr<Pipeline> _pipeline;
         vector<BSONObj> _stash;
         const bool _includeMetaData;
+        boost::weak_ptr<Runner> _childRunner;
     };
 }
 
@@ -291,8 +303,8 @@ namespace {
             }
 #endif
 
-            scoped_ptr<ClientCursorPin> pin;
             PipelineRunner* runner = NULL;
+            scoped_ptr<ClientCursorPin> pin; // either this OR the runnerHolder will be non-null
             auto_ptr<PipelineRunner> runnerHolder;
             {
                 // This will throw if the sharding version for this connection is out of date. The
@@ -305,12 +317,20 @@ namespace {
 
                 Collection* collection = ctx.ctx().db()->getCollection(ns);
 
-                // This does mongod-specific stuff like creating the input Runner if needed
-                PipelineD::prepareCursorSource(pPipeline, pCtx, collection);
+                // This does mongod-specific stuff like creating the input Runner and adding to the
+                // front of the pipeline if needed.
+                boost::shared_ptr<Runner> input = PipelineD::prepareCursorSource(pPipeline, pCtx);
                 pPipeline->stitch();
 
-                runnerHolder.reset(new PipelineRunner(pPipeline));
+                runnerHolder.reset(new PipelineRunner(pPipeline, input));
                 runner = runnerHolder.get();
+
+                if (!collection && input) {
+                    // If we don't have a collection, we won't be able to register any Runners, so
+                    // make sure that the input Runner (likely an EOFRunner) doesn't need to be
+                    // registered.
+                    invariant(!input->collection());
+                }
 
                 if (collection) {
                     ClientCursor* cursor = new ClientCursor(collection, runnerHolder.release());

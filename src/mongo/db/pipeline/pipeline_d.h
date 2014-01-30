@@ -28,13 +28,14 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
     class Collection;
     class DocumentSourceCursor;
     struct ExpressionContext;
     class Pipeline;
+    class Runner;
 
     /*
       PipelineD is an extension of the Pipeline class, but with additional
@@ -63,14 +64,15 @@ namespace mongo {
          *
          * Must have a ReadContext before entering.
          *
+         * If the returned Runner is non-null, you are responsible for ensuring
+         * it receives appropriate invalidate and kill messages.
+         *
          * @param pPipeline the logical "this" for this operation
          * @param pExpCtx the expression context for this pipeline
-         * @param collection the input collection. NULL if doesn't exist.
          */
-        static void prepareCursorSource(
+        static boost::shared_ptr<Runner> prepareCursorSource(
             const intrusive_ptr<Pipeline> &pPipeline,
-            const intrusive_ptr<ExpressionContext> &pExpCtx,
-            Collection* collection);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
     private:
         PipelineD(); // does not exist:  prevent instantiation

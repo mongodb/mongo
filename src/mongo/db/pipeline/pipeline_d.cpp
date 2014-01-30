@@ -63,9 +63,9 @@ namespace {
     };
 }
 
-    void PipelineD::prepareCursorSource(const intrusive_ptr<Pipeline>& pPipeline,
-                                        const intrusive_ptr<ExpressionContext>& pExpCtx,
-                                        Collection* collection) {
+    boost::shared_ptr<Runner> PipelineD::prepareCursorSource(
+            const intrusive_ptr<Pipeline>& pPipeline,
+            const intrusive_ptr<ExpressionContext>& pExpCtx) {
         // get the full "namespace" name
         const string& fullName = pExpCtx->ns.ns();
         Lock::assertAtLeastReadLocked(fullName);
@@ -90,7 +90,7 @@ namespace {
                 // on secondaries, this is needed.
                 ShardedConnectionInfo::addHook();
             }
-            return; // don't need a cursor
+            return boost::shared_ptr<Runner>(); // don't need a cursor
         }
 
 
@@ -128,28 +128,6 @@ namespace {
             }
         }
 
-        // for debugging purposes, show what the query and sort are
-        DEV {
-            (log() << "\n---- query BSON\n" <<
-             queryObj.jsonString(Strict, 1) << "\n----\n");
-            (log() << "\n---- sort BSON\n" <<
-             sortObj.jsonString(Strict, 1) << "\n----\n");
-            (log() << "\n---- fullName\n" <<
-             fullName << "\n----\n");
-        }
-
-        if (!collection) {
-            // Collection doesn't exist. Create a source that will return no results to simulate an
-            // empty collection.
-            intrusive_ptr<DocumentSource> source(DocumentSourceBsonArray::create(BSONObj(),
-                                                                                 pExpCtx));
-            while (!sources.empty() && source->coalesce(sources.front())) {
-                sources.pop_front();
-            }
-            pPipeline->addInitialSource( source );
-            return;
-        }
-
         // Create the Runner.
         //
         // If we try to create a Runner that includes both the match and the
@@ -173,7 +151,7 @@ namespace {
                                    | QueryPlannerParams::INCLUDE_SHARD_FILTER
                                    | QueryPlannerParams::NO_BLOCKING_SORT
                                    ;
-        auto_ptr<Runner> runner;
+        boost::shared_ptr<Runner> runner;
         bool sortInRunner = false;
         if (sortStage) {
             CanonicalQuery* cq;
@@ -212,19 +190,14 @@ namespace {
             runner.reset(rawRunner);
         }
 
-        // Now wrap the Runner in ClientCursor
-        auto_ptr<ClientCursor> cursor(new ClientCursor(collection, runner.release()));
-        verify(cursor->getRunner());
-        CursorId cursorId = cursor->cursorid();
 
-        // Prepare the cursor for data to change under it when we unlock
-        cursor->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
-        cursor->getRunner()->saveState();
-        cursor.release(); // it is now owned by the client cursor manager
+        // DocumentSourceCursor expects a yielding Runner that has had its state saved.
+        runner->setYieldPolicy(Runner::YIELD_AUTO);
+        runner->saveState();
 
-        /* wrap the cursor with a DocumentSource and return that */
-        intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create( fullName, cursorId, pExpCtx ) );
+        // Put the Runner into a DocumentSourceCursor and add it to the front of the pipeline.
+        intrusive_ptr<DocumentSourceCursor> pSource =
+            DocumentSourceCursor::create(fullName, runner, pExpCtx);
 
         // Note the query, sort, and projection for explain.
         pSource->setQuery(queryObj);
@@ -238,6 +211,8 @@ namespace {
         }
 
         pPipeline->addInitialSource(pSource);
+
+        return runner;
     }
 
 } // namespace mongo

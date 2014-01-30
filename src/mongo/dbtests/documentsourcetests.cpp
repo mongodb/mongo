@@ -160,54 +160,45 @@ namespace DocumentSourceTests {
             { _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp"; }
         protected:
             void createSource() {
+                // clean up first if this was called before
+                _source.reset();
+                _registration.reset();
+                _runner.reset();
+
                 Client::WriteContext ctx (ns);
-                Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns );
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
-                Runner* runner;
-                uassertStatusOK(getRunner(cq, &runner));
-                auto_ptr<ClientCursor> cc(new ClientCursor(collection,
-                                                           runner,
-                                                           QueryOption_NoCursorTimeout));
-                verify(cc->getRunner());
-                cc->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
-                CursorId cursorId = cc->cursorid();
-                runner->saveState();
-                cc.release(); // it is now owned by the client cursor manager
-                _source = DocumentSourceCursor::create(ns, cursorId, _ctx);
+                Runner* runnerBare;
+                uassertStatusOK(getRunner(cq, &runnerBare));
+
+                _runner.reset(runnerBare);
+                _runner->setYieldPolicy(Runner::YIELD_AUTO);
+                _runner->saveState();
+                _registration.reset(new ScopedRunnerRegistration(_runner.get()));
+
+                _source = DocumentSourceCursor::create(ns, _runner, _ctx);
             }
             intrusive_ptr<ExpressionContext> ctx() { return _ctx; }
             DocumentSourceCursor* source() { return _source.get(); }
         private:
+            // It is important that these are ordered to ensure correct destruction order.
+            boost::shared_ptr<Runner> _runner;
+            boost::scoped_ptr<ScopedRunnerRegistration> _registration;
             intrusive_ptr<ExpressionContext> _ctx;
             intrusive_ptr<DocumentSourceCursor> _source;
         };
 
         /** Create a DocumentSourceCursor. */
-        class Create : public Base {
+        class Empty : public Base {
         public:
             void run() {
                 createSource();
                 // The DocumentSourceCursor doesn't hold a read lock.
                 ASSERT( !Lock::isReadLocked() );
-                // The DocumentSourceCursor holds a ClientCursor.
-                assertNumClientCursors( 1 );
                 // The collection is empty, so the source produces no results.
                 ASSERT( !source()->getNext() );
                 // Exhausting the source releases the read lock.
                 ASSERT( !Lock::isReadLocked() );
-                // The ClientCursor is also cleaned up.
-                assertNumClientCursors( 0 );
-            }
-        private:
-            void assertNumClientCursors( unsigned int expected ) {
-                Client::ReadContext ctx( ns );
-                Collection* collection = ctx.ctx().db()->getCollection( ns );
-                if ( !collection ) {
-                    ASSERT( 0 == expected );
-                    return;
-                }
-                ASSERT_EQUALS( expected, collection->cursorCache()->numCursors() );
             }
         };
 
@@ -1936,7 +1927,7 @@ namespace DocumentSourceTests {
         void setupTests() {
             add<DocumentSourceClass::Deps>();
 
-            add<DocumentSourceCursor::Create>();
+            add<DocumentSourceCursor::Empty>();
             add<DocumentSourceCursor::Iterate>();
             add<DocumentSourceCursor::Dispose>();
             add<DocumentSourceCursor::IterateDispose>();
