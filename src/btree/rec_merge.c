@@ -307,17 +307,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
-#if 0
-	/*
-	 * Don't allow split merges to generate arbitrarily large pages.
-	 * Ideally we would choose a size based on the internal_page_max
-	 * setting for the btree, but we don't have the correct btree handle
-	 * available.
-	 */
-	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
-		return (EBUSY);
-#endif
-
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
 	 * or if there are "enough" keys, we split into two equal internal
