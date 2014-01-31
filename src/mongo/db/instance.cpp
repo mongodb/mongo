@@ -614,7 +614,7 @@ namespace mongo {
         // the only question is whether this update is against the 'config' database, in
         // which case we want to disable checks, since config db docs can have field names
         // containing a dot (".").
-        options.modOptions = ( NamespaceString( ns ).isConfigDB() ) ?
+        options.modOptions = ns.isConfigDB() ?
             ModifierInterface::Options::unchecked() :
             ModifierInterface::Options::normal();
 
@@ -625,14 +625,13 @@ namespace mongo {
             uasserted( 17009, status.reason() );
         }
 
-        const NamespaceString requestNs(ns);
         const bool isSimpleIdQuery = CanonicalQuery::isSimpleIdQuery(query);
         CanonicalQuery* cqRaw;
         if (isSimpleIdQuery) {
             cqRaw = NULL;
         }
         else {
-            status = CanonicalQuery::canonicalize(requestNs, query, &cqRaw);
+            status = CanonicalQuery::canonicalize(ns.ns(), query, &cqRaw);
             if (status == ErrorCodes::NoClientContext) {
                 cqRaw = NULL;
             }
@@ -658,7 +657,7 @@ namespace mongo {
         Client::Context ctx( ns );
 
         if (!isSimpleIdQuery && !cq.get()) {
-            status = CanonicalQuery::canonicalize(requestNs, query, &cqRaw);
+            status = CanonicalQuery::canonicalize(ns.ns(), query, &cqRaw);
             if (!status.isOK()) {
                 uasserted(17350,
                           "could not canonicalize query " + query.toString() + "; " +
@@ -667,14 +666,14 @@ namespace mongo {
             cq.reset(cqRaw);
         }
 
-        UpdateRequest request(requestNs);
+        UpdateRequest request(ns);
 
         request.setUpsert(upsert);
         request.setMulti(multi);
         request.setQuery(query);
         request.setUpdates(toupdate);
         request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
-        UpdateLifecycleImpl updateLifecycle(broadcast, requestNs);
+        UpdateLifecycleImpl updateLifecycle(broadcast, ns);
         request.setLifecycle(&updateLifecycle);
         UpdateResult res = update(request, &op.debug(), &driver, cq.release());
 
