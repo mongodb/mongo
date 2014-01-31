@@ -4,9 +4,7 @@
  * Cache-wide Commands
  * - planCacheListQueryShapes
  * - planCacheClear
- *
- * Query-specific Commands
- * - planCacheDrop
+ *       Removes plans for one or all query shapes.
  * - planCacheListPlans
  */ 
 
@@ -55,16 +53,16 @@ assert.eq({query: queryA1, sort: sortA1, projection: projectionA1}, shapes[0],
 
 
 //
-// Tests for planCacheDrop
+// Tests for planCacheClear (one query shape)
 //
 
 // Invalid key should be an error.
-assert.commandFailed(t.runCommand('planCacheDrop', {query: {unknownfield: 1}}));
+assert.commandFailed(t.runCommand('planCacheClear', {query: {unknownfield: 1}}));
 
 // Run a new query shape and drop it from the cache
 assert.eq(0, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
 assert.eq(2, getShapes().length, 'unexpected cache size after running 2nd query');
-assert.commandWorked(t.runCommand('planCacheDrop', {query: {a: 1, b: 1}}));
+assert.commandWorked(t.runCommand('planCacheClear', {query: {a: 1, b: 1}}));
 assert.eq(1, getShapes().length, 'unexpected cache size after dropping 2nd query from cache');
 
 

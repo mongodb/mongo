@@ -1457,6 +1457,6 @@ PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
  * Drop query shape from the plan cache.
  */
 PlanCache.prototype.clearPlansByQuery = function(query, projection, sort) {
-    this._runCommandThrowOnError("planCacheDrop", this._parseQueryShape(query, projection, sort));
+    this._runCommandThrowOnError("planCacheClear", this._parseQueryShape(query, projection, sort));
     return;
 }

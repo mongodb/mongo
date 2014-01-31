@@ -120,7 +120,12 @@ namespace mongo {
     /**
      * planCacheClear
      *
-     * { planCacheClear: <collection> }
+     * {
+     *     planCacheClear: <collection>,
+     *     query: <query>,
+     *     sort: <sort>,
+     *     projection: <projection>
+     * }
      *
      */
     class PlanCacheClear : public PlanCacheCommand {
@@ -130,32 +135,20 @@ namespace mongo {
 
         /**
          * Clears collection's plan cache.
+         * If query shape is provided, clears plans for that single query shape only.
          */
-        static Status clear(const std::string& ns, PlanCache* planCache);
-    };
-
-    /**
-     * planCacheDrop
-     *
-     * { planCacheDrop: <collection>, key: <key> } }
-     *
-     */
-    class PlanCacheDrop : public PlanCacheCommand {
-    public:
-        PlanCacheDrop();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
-                                           BSONObjBuilder* bob);
-
-        /**
-         * Drops using a cache key.
-         */
-        static Status drop(PlanCache* planCache,const std::string& ns,  const BSONObj& cmdObj);
+        static Status clear(PlanCache* planCache, const std::string& ns, const BSONObj& cmdObj);
     };
 
     /**
      * planCacheListPlans
      *
-     * { planCacheListPlans: <collection>, key: <key> } }
+     * {
+     *     planCacheListPlans: <collection>,
+     *     query: <query>,
+     *     sort: <sort>,
+     *     projection: <projection>
+     * }
      *
      */
     class PlanCacheListPlans : public PlanCacheCommand {

@@ -166,12 +166,7 @@ namespace mongo {
 
             new ClusterPlanCacheCmd(
                 "planCacheClear",
-                "Drops all cached queries in a collection.",
-                ActionType::planCacheWrite );
-
-            new ClusterPlanCacheCmd(
-                "planCacheDrop",
-                "Drops query shape from plan cache.",
+                "Drops one or all cached queries in a collection.",
                 ActionType::planCacheWrite );
 
             new ClusterPlanCacheCmd(

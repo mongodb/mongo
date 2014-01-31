@@ -144,7 +144,7 @@ namespace {
      * Tests for planCacheClear
      */
 
-    TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
+    TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
         // Create a canonical query
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
@@ -160,7 +160,7 @@ namespace {
         ASSERT_EQUALS(getShapes(planCache).size(), 1U);
 
         // Clear cache and confirm number of keys afterwards.
-        ASSERT_OK(PlanCacheClear::clear(ns, &planCache));
+        ASSERT_OK(PlanCacheClear::clear(&planCache, ns, BSONObj()));
         ASSERT_EQUALS(getShapes(planCache).size(), 0U);
     }
 
@@ -207,24 +207,30 @@ namespace {
     }
 
     /**
-     * Tests for planCacheDrop
+     * Tests for planCacheClear (single query shape)
      */
 
-    TEST(PlanCacheCommandsTest, planCacheDropInvalidParameter) {
+    TEST(PlanCacheCommandsTest, planCacheClearInvalidParameter) {
         PlanCache planCache;
-        // Missing query field is not ok.
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, BSONObj()));
-        // Query field type must be PlanCacheKey.
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, fromjson("{query: 12345}")));
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, fromjson("{query: /keyisnotregex/}")));
+        // Query field type must be BSON object.
+        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns, fromjson("{query: 12345}")));
+        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns, fromjson("{query: /keyisnotregex/}")));
+        // Query must pass canonicalization.
+        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns,
+                                            fromjson("{query: {a: {$no_such_op: 1}}}")));
+        // Sort present without query is an error.
+        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns, fromjson("{sort: {a: 1}}")));
+        // Projection present without query is an error.
+        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns,
+                                            fromjson("{projection: {_id: 0, a: 1}}")));
     }
 
-    TEST(PlanCacheCommandsTest, planCacheDropUnknownKey) {
+    TEST(PlanCacheCommandsTest, planCacheClearUnknownKey) {
         PlanCache planCache;
-        ASSERT_NOT_OK(PlanCacheDrop::drop(&planCache, ns, fromjson("{query: {a: 1}}")));
+        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns, fromjson("{query: {a: 1}}")));
     }
 
-    TEST(PlanCacheCommandsTest, planCacheDropOneKey) {
+    TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
         // Create 2 canonical queries.
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
@@ -253,7 +259,7 @@ namespace {
 
         // Drop {b: 1} from cache. Make sure {a: 1} is still in cache afterwards.
         BSONObjBuilder bob;
-        ASSERT_OK(PlanCacheDrop::drop(&planCache, ns, BSON("query" << cqB->getQueryObj())));
+        ASSERT_OK(PlanCacheClear::clear(&planCache, ns, BSON("query" << cqB->getQueryObj())));
         vector<BSONObj> shapesAfter = getShapes(planCache);
         ASSERT_EQUALS(shapesAfter.size(), 1U);
         ASSERT_EQUALS(shapesAfter[0], shapeA);
