@@ -764,7 +764,9 @@ elif windows:
     # docs say don't use /FD from command line (minimal rebuild)
     # /Gy function level linking (implicit when using /Z7)
     # /Z7 debug info goes into each individual .obj file -- no .pdb created 
-    env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
+    
+    # JSB: no debug info
+    # env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
 
     # /DEBUG will tell the linker to create a .pdb file
     # which WinDbg and Visual Studio will use to resolve
@@ -772,7 +774,9 @@ elif windows:
     # Note that this means we can't do parallel links in the build.
     #
     # Please also note that this has nothing to do with _DEBUG or optimization.
-    env.Append( LINKFLAGS=["/DEBUG"] )
+    
+    # JSB: node debug info
+    # env.Append( LINKFLAGS=["/DEBUG"] )
 
     # /MD:  use the multithreaded, DLL version of the run-time library (MSVCRT.lib/MSVCR###.DLL)
     # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
