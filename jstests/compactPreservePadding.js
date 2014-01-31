@@ -1,5 +1,6 @@
 // test preservePadding
 
+var db = db.getSiblingDB('compactPreservePadding');
 var collName = "compactPreservePadding";
 var t = db.getCollection(collName);
 t.drop();

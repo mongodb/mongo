@@ -1,5 +1,6 @@
 // compact.js
 
+var db = db.getSiblingDB('compact');
 t = db.compacttest;
 t.drop();
 t.insert({ x: 3 });
