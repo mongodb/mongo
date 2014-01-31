@@ -53,12 +53,21 @@ namespace mongo {
         return ++_lastReturned;
     }
 
-    void NotifyAll::waitFor(When e) {
+    void NotifyAll::waitFor( When e ) {
         scoped_lock lock( _mutex );
         ++_nWaiting;
         while( _lastDone < e ) {
             _condition.wait( lock.boost() );
         }
+    }
+
+    bool NotifyAll::timedWaitFor( When e, int millis ) {
+        scoped_lock lock( _mutex );
+        ++_nWaiting;
+        while( _lastDone < e ) {
+            if( ! _condition.timed_wait( lock.boost(), boost::posix_time::milliseconds( millis ) ) ) break;
+        }
+        return _lastDone >= e;
     }
 
     void NotifyAll::awaitBeyondNow() { 
@@ -68,6 +77,16 @@ namespace mongo {
         while( _lastDone <= e ) {
             _condition.wait( lock.boost() );
         }
+    }
+
+    bool NotifyAll::timedAwaitBeyondNow( int millis ) {
+        scoped_lock lock( _mutex );
+        ++_nWaiting;
+        When e = ++_lastReturned;
+        while( _lastDone <= e ) {
+            if( ! _condition.timed_wait( lock.boost(), boost::posix_time::milliseconds( millis ) ) ) break;
+        }
+        return _lastDone > e;
     }
 
     void NotifyAll::notifyAll(When e) {

@@ -63,10 +63,20 @@ namespace mongo {
         /** awaits the next notifyAll() call by another thread. notifications that precede this
             call are ignored -- we are looking for a fresh event.
         */
-        void waitFor(When);
+        void waitFor( When );
+
+        /** like waitFor() but add timeout support
+            returns true if was signaled 
+        */
+        bool timedWaitFor( When, int millis );        
 
         /** a bit faster than waitFor( now() ) */
         void awaitBeyondNow();
+
+        /** like awaitBeyondNow() but with timeout of millis 
+            returns true if was signaled
+        */
+        bool timedAwaitBeyondNow( int millis );
 
         /** may be called multiple times. notifies all waiters */
         void notifyAll(When);
