@@ -123,11 +123,11 @@ public:
 
         ProgressMeter m(conn(true).count(coll.c_str(), BSONObj(), QueryOption_SlaveOk));
         m.setName("Collection File Writing Progress");
-        m.setUnits("objects");
+        m.setUnits("documents");
 
         doCollection(coll, q, f, &m);
 
-        toolInfoLog() << "\t\t " << m.done() << " objects" << std::endl;
+        toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
     }
 
     void writeMetadataFile( const string coll, boost::filesystem::path outputFile, 
@@ -354,7 +354,7 @@ public:
         // init with double the docs count because we make two passes 
         ProgressMeter m( nsd->numRecords() * 2 );
         m.setName("Repair Progress");
-        m.setUnits("objects");
+        m.setUnits("documents");
 
         Writer w( f , &m );
 
@@ -384,7 +384,7 @@ public:
             toolError() << "ERROR: backwards extent pass failed:" << e.toString() << std::endl;
         }
 
-        toolInfoLog() << "\t\t " << m.done() << " objects" << std::endl;
+        toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
     }
     
     int _repair( string dbname ) {
@@ -517,7 +517,7 @@ public:
                 string key = *i;
                 
                 if ( ! dbs[key].isABSONObj() ) {
-                    toolError() << "database field not an object key: " << key << " value: "
+                    toolError() << "database field not an document key: " << key << " value: "
                               << dbs[key] << std::endl;
                     return -3;
                 }
