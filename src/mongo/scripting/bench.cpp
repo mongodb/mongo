@@ -494,14 +494,14 @@ namespace mongo {
                                     nsToCollectionSubstring(ns));
                                 BSONArrayBuilder docBuilder(
                                     builder.subarrayStart("updates"));
-                                docBuilder.append(BSON("q" << query <<
+                                docBuilder.append(BSON("q" << fixQuery(query, bsonTemplateEvaluator) <<
                                                        "u" << update <<
                                                        "multi" << multi <<
                                                        "upsert" << upsert));
                                 docBuilder.done();
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
-                                    builder.obj(), result);
+                                    builder.done(), result);
                             }
                             else {
                                 conn->update(ns, fixQuery(query,
@@ -597,8 +597,9 @@ namespace mongo {
                                 BSONArrayBuilder docBuilder(
                                     builder.subarrayStart("deletes"));
                                 int limit = (multi == true) ? 0 : 1;
-                                docBuilder.append(BSON("q" << query <<
-                                                       "limit" << limit));
+                                docBuilder.append(
+                                        BSON("q" << fixQuery(query, bsonTemplateEvaluator) <<
+                                             "limit" << limit));
                                 docBuilder.done();
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
