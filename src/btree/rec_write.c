@@ -1616,10 +1616,11 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * We can't compress the first 64B of the block (it must be
 		 * written without compression), and a possible split point
 		 * may appear in that 64B; keep it simple, ignore the first
-		 * 1KB of data, anybody splitting a smaller than 1KB piece
-		 * (as calculated before compression), is doing us wrong.
+		 * allocation size of data, anybody splitting a smaller than
+		 * that (as calculated before compression), is doing it wrong.
 		 */
-		if ((len = WT_PTRDIFF(cell, dsk)) > 1024)
+		len = WT_PTRDIFF(cell, dsk);
+		if (len > btree->allocsize - WT_BLOCK_COMPRESS_SKIP)
 			r->raw_offsets[++slots] =
 			    WT_STORE_SIZE(len - WT_BLOCK_COMPRESS_SKIP);
 
@@ -1705,7 +1706,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		len = WT_PTRDIFF(r->first_free, (uint8_t *)dsk +
 		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP);
 		dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
-		(void)memcpy(dsk_start, (uint8_t *)r->first_free - len, len);
+		(void)memmove(dsk_start, (uint8_t *)r->first_free - len, len);
 
 		r->entries -= r->raw_entries[result_slots - 1];
 		r->first_free = dsk_start + len;
@@ -1726,7 +1727,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		}
 
 		bnd->already_compressed = 1;
-	} else if (final) {
+	} else if (final || result_len != 0) {
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
 too_small:	/*

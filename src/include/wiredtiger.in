@@ -2136,14 +2136,19 @@ struct __wt_compressor {
 	 * set \c result_slotsp to the number of byte strings encoded and
 	 * \c result_lenp to the bytes needed for the encoded representation.
 	 *
-	 * WiredTiger repeatedly calls the callback function until all rows on
-	 * the page have been encoded.  There is no requirement the callback
-	 * encode any or all of the byte strings passed by WiredTiger.  If the
-	 * callback does not encode any of the byte strings, the callback must
-	 * set \c result_slotsp to 0.  In this case, WiredTiger will accumulate
-	 * more rows and repeat the call; if there are no more rows to
-	 * accumulate, WiredTiger writes the remaining rows without further
-	 * calls to the callback.
+	 * There is no requirement the callback encode any or all of the byte
+	 * strings passed by WiredTiger.  If the callback does not encode any
+	 * of the byte strings and should be retried with more, the callback
+	 * must set \c result_slotsp and \c result_lenp to 0.  In this case,
+	 * WiredTiger will accumulate more rows and repeat the call.
+	 *
+	 * If no rows could be compressed into the provided destination buffer,
+	 * \c compress_raw should set \c result_slotsp to zero and \c
+	 * result_lenp to a non-zero value.
+	 *
+	 * If there are no more rows to accumulate or the callback indicates
+	 * that it cannot be retried, WiredTiger writes the remaining rows
+	 * using \c WT_COMPRESSOR::compress.
 	 *
 	 * On entry, \c final is zero if there are more rows to be written as
 	 * part of this page (if there will be additional data provided to the
