@@ -31,6 +31,7 @@
 #pragma once
 
 #include <string>
+#include <list>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_cursor_cache.h"
@@ -41,6 +42,9 @@
 #include "mongo/db/structure/record_store.h"
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/platform/cstdint.h"
+#include "boost/asio/detail/event.hpp"
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/concurrency/synchronization.h"
 
 namespace mongo {
 
@@ -203,6 +207,12 @@ namespace mongo {
             return static_cast<int>( dataSize() / n );
         }
 
+        void subscribeToChange(NotifyAll* sig);
+        void unsubcribeToChange(NotifyAll* sig);
+        /* For now triggerChangeSubscribersNotification() used only to awake waiters on capped collection
+           cursor while waiting */
+        void triggerChangeSubscribersNotification();
+
     private:
         /**
          * same semantics as insertDocument, but doesn't do:
@@ -220,6 +230,7 @@ namespace mongo {
 
         ExtentManager* getExtentManager();
         const ExtentManager* getExtentManager() const;
+        void checkInitChangeSubscribers();
 
         int _magic;
 
@@ -234,6 +245,8 @@ namespace mongo {
         // use it keep state.  This seems valid as const correctness of Collection
         // should be about the data.
         mutable CollectionCursorCache _cursorCache;
+        RWLock _changeSubscribersLock;
+        list<NotifyAll*>* _changeSubscribers;
 
         friend class Database;
         friend class FlatIterator;

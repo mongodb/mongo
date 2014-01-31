@@ -75,7 +75,8 @@ namespace mongo {
         : _ns( fullNS ),
           _infoCache( this ),
           _indexCatalog( this, details ),
-          _cursorCache( fullNS ) {
+          _cursorCache( fullNS ),
+          _changeSubscribersLock( "collection_subscribers_lock" ){
         _details = details;
         _database = database;
 
@@ -94,11 +95,47 @@ namespace mongo {
         }
         _magic = 1357924;
         _indexCatalog.init();
+        _changeSubscribers = 0;
     }
 
     Collection::~Collection() {
         verify( ok() );
         _magic = 0;
+        if( _changeSubscribers != 0) {
+            delete _changeSubscribers;
+        }
+    }
+
+    void Collection::checkInitChangeSubscribers()
+    {
+        if( _changeSubscribers == 0 ) {
+            _changeSubscribers = new list<NotifyAll*>;
+        }
+    }
+
+    void Collection::subscribeToChange( NotifyAll* evt ) {    
+        _changeSubscribersLock.lock();
+        checkInitChangeSubscribers();
+        _changeSubscribers->push_back( evt );
+        _changeSubscribersLock.unlock();
+    }
+
+    void Collection::unsubcribeToChange( NotifyAll* evt ) {
+        _changeSubscribersLock.lock();
+        checkInitChangeSubscribers();
+        _changeSubscribers->remove( evt );
+        _changeSubscribersLock.unlock();
+    }
+
+    void Collection::triggerChangeSubscribersNotification(){
+        if( _changeSubscribers == 0 ) return; 
+        _changeSubscribersLock.lock_shared();
+        list<NotifyAll*>::iterator sigIterator;
+        for( sigIterator = _changeSubscribers->begin(); sigIterator != _changeSubscribers->end(); sigIterator++) {            
+            NotifyAll* sig = *sigIterator;
+            sig->notifyAll( sig->now() );
+        }
+        _changeSubscribersLock.unlock_shared();
     }
 
     bool Collection::requiresIdIndex() const {
@@ -221,6 +258,11 @@ namespace mongo {
             // so we just have to delete the main storage
             _recordStore->deleteRecord( loc.getValue() );
             return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
+        }
+
+        /* Let's trigger event notifier only for capped collections */
+        if( _details->isCapped() ) {
+            triggerChangeSubscribersNotification();
         }
 
         return loc;
