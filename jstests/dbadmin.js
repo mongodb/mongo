@@ -1,5 +1,19 @@
 load('jstests/aggregation/extras/utils.js');
 
+// Check that smallArray is entirely contained by largeArray
+// returns false if a member of smallArray is not in largeArray
+function arrayIsSubset(smallArray, largeArray) {
+
+    for(var i = 0; i < smallArray.length; i++) {
+        if(!Array.contains(largeArray, smallArray[i])) {
+            print("Could not find " + smallArray[i] + " in largeArray");
+            return false;
+        }
+    }
+
+    return true;
+}
+
 t = db.dbadmin;
 t.save( { x : 1 } );
 
@@ -78,7 +92,7 @@ var isMaster = db._adminCommand( "ismaster" );
 var expectedKeys = ["version", "gitVersion", "OpenSSLVersion", "sysInfo", "loaderFlags", "compilerFlags", "allocator", "versionArray", "javascriptEngine", "bits", "debug", "maxBsonObjectSize"];
 var keys = Object.keySet(latestStartUpLog.buildinfo);
 // Disabled to check
-assert(arrayEq(expectedKeys, keys, verbose), "buildinfo keys failed! \n expected:\t" + expectedKeys + "\n actual:\t" + keys);
+assert(arrayIsSubset(expectedKeys, keys), "buildinfo keys failed! \n expected:\t" + expectedKeys + "\n actual:\t" + keys);
 assert.eq(buildinfo, latestStartUpLog.buildinfo, "buildinfo doesn't match that from buildinfo command");
 
 // Test version and version Array
