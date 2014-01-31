@@ -84,7 +84,7 @@ set yrange [0:]\n''' % {
     of.write('plot "' + fname + '" using 1:($2/1000) title "Reads", "' +\
         fname + '" using 1:($3/1000) title "Inserts", "' +\
         fname + '" using 1:($4/1000) title "Updates", "' +\
-        fname + '" using 1:(($2+$3+$4)/1000) title "Total", "\n')
+        fname + '" using 1:(($2+$3+$4)/1000) title "Total"\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
@@ -128,7 +128,7 @@ set yrange [1:]\n''' % {
 
 
 # Graph latency vs. % operations
-def plot_latency_percent(name, sfx, ckptlist):
+def plot_latency_percent(name, dirname, sfx, ckptlist):
     gcmd = "gnuplot." + name + ".l2.cmd"
     of = open(gcmd, "w")
     of.write('''
@@ -147,7 +147,7 @@ set ylabel "%% operations"
 set yrange [0:]\n''')
     ofname = name + sfx + '.latency2.png'
     of.write('set output "' + ofname + '"\n')
-    of.write('plot "latency.' + name + sfx +\
+    of.write('plot "' + os.path.join(dirname, 'latency.' + name) + sfx +\
         '" using (($2 * 100)/$4) title "' + name + '"\n')
     of.close()
     call(["gnuplot", gcmd])
@@ -155,7 +155,7 @@ set yrange [0:]\n''')
 
 
 # Graph latency vs. % operations (cumulative)
-def plot_latency_cumulative_percent(name, sfx, ckptlist):
+def plot_latency_cumulative_percent(name, dirname, sfx, ckptlist):
     # Latency plot: cumulative operations vs. latency
     gcmd = "gnuplot." + name + ".l3.cmd"
     of = open(gcmd, "w")
@@ -176,7 +176,7 @@ set yrange [0:]\n''' % {
         })
     ofname = name + sfx + '.latency3.png'
     of.write('set output "' + ofname + '"\n')
-    of.write('plot "latency.' + name + sfx + \
+    of.write('plot "' + os.path.join(dirname, 'latency.' + name) + sfx +\
         '" using 1:(($3 * 100)/$4) title "' + name + '"\n')
     of.close()
     call(["gnuplot", gcmd])
@@ -191,15 +191,16 @@ def process_file(fname):
     
     # This assumes the monitor file has the string "monitor"
     # and any other (optional) characters in the filename are a suffix.
-    sfx=fname.replace('monitor','')
+    sfx = os.path.basename(fname).replace('monitor','')
+    dirname = os.path.dirname(fname)
 
     column = 6              # average, minimum, maximum start in column 6
     for k, v in opdict.items():
         if v != 0:
             plot_latency_operation(
                 k, fname, sfx, ckptlist, column, column + 1, column + 2)
-            plot_latency_percent(k, sfx, ckptlist)
-            plot_latency_cumulative_percent(k, sfx, ckptlist)
+            plot_latency_percent(k, dirname, sfx, ckptlist)
+            plot_latency_cumulative_percent(k, dirname, sfx, ckptlist)
         else:
             print fname + ': no ' + k + ' operations found.  Skip.'
         column = column + 3
