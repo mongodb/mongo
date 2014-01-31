@@ -827,7 +827,7 @@ namespace mongo {
                         scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
                         collection = ctx->ctx().db()->getCollection(ns);
                         // TODO: Add unique assertion number here????
-                        uassert( 17356, "collection dropped between getMore calls", collection );
+                        uassert( 17383, "collection dropped between processGetMore calls", collection );
                         collection->subscribeToChange( waitNotification ); 
                         /* After creating the notification and subscripting we will do one more loop before waiting
                            because of concurrency, a new item *may* have been inserted in the collection while we were
