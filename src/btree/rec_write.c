@@ -1702,6 +1702,9 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * There may be a remnant in the working buffer that didn't get
 		 * compressed; copy it down to the start of the working buffer
 		 * and update the starting record number, free space and so on.
+		 * !!!
+		 * Note use of memmove, the source and destination buffers can
+		 * overlap.
 		 */
 		len = WT_PTRDIFF(r->first_free, (uint8_t *)dsk +
 		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP);
