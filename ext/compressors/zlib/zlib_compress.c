@@ -161,7 +161,9 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
 	zs.avail_out = (uint32_t)dst_len - 1;
-	if ((ret = deflate(&zs, Z_FINISH)) == Z_STREAM_END) {
+	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	if (ret == Z_STREAM_END) {
 		*compression_failed = 0;
 		*result_lenp = zs.total_out;
 	} else
@@ -183,15 +185,14 @@ zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 {
 	uint32_t base, indx, limit;
 
-	indx = 0;
+	indx = 1;
 
 	/* Figure out which slot we got to: binary search */
 	if (target >= offsets[slots])
 		indx = slots;
-	else if (target >= offsets[1])
-		for (base = 1, limit = slots - 1; limit != 0; limit >>= 1) {
+	else if (target > offsets[1])
+		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-
 			if (target < offsets[indx])
 				continue;
 			base = indx + 1;
@@ -241,9 +242,10 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.next_out = dst;
 	/*
 	 * Experimentally derived, reserve this many bytes for zlib to finish
-	 * up a buffer.
+	 * up a buffer.  If this isn't sufficient, we don't fail but we will be
+	 * inefficient.
 	 */
-#define	WT_ZLIB_RESERVED	6
+#define	WT_ZLIB_RESERVED	12
 	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
 	last_zs = zs;
 
@@ -252,49 +254,62 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * input.  Continue until there is no input small enough or the
 	 * compression fails to fit.
 	 */
-	for (;;) {
+	while (zs.avail_out > 0) {
 		/* Find the slot we will try to compress up to. */
 		if ((curr_slot = zlib_find_slot(
-		    zs.total_in + zs.avail_out, offsets, slots)) == last_slot)
+		    zs.total_in + zs.avail_out, offsets, slots)) <= last_slot)
 			break;
 
 		zs.avail_in = offsets[curr_slot] - offsets[last_slot];
 		/* Save the stream state in case the chosen data doesn't fit. */
 		last_zs = zs;
 
-		if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
-			return (
-			    zlib_error(compressor, session, "deflate", ret));
+		while (zs.avail_in > 0 && zs.avail_out > 0)
+			if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
+				return (zlib_error(
+				    compressor, session, "deflate", ret));
 
-		if (zs.avail_out == 0 && zs.avail_in > 0) {
-			/* Roll back the last operation: it didn't complete */
+		/* Roll back the if the last deflate didn't complete. */
+		if (zs.avail_in > 0) {
 			zs = last_zs;
 			break;
-		}
-
-		last_slot = curr_slot;
+		} else
+			last_slot = curr_slot;
 	}
 
 	zs.avail_out += WT_ZLIB_RESERVED;
-	if ((ret = deflate(&zs, Z_FINISH)) != Z_STREAM_END)
+	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	/*
+	 * If the end marker didn't fit, report that we got no work done.  WT
+	 * will compress the (possibly large) page image using ordinary
+	 * compression instead.
+	 */
+	if (ret == Z_BUF_ERROR)
+		last_slot = 0;
+	else if (ret != Z_STREAM_END)
 		return (
-		    zlib_error(compressor, session, "deflate", ret));
+		    zlib_error(compressor, session, "deflate end block", ret));
+
+	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
+		return (
+		    zlib_error(compressor, session, "deflateEnd", ret));
 
 	if (last_slot > 0) {
 		*result_slotsp = last_slot;
 		*result_lenp = zs.total_out;
+	} else {
+		/* We didn't manage to compress anything: don't retry. */
+		*result_slotsp = 0;
+		*result_lenp = 1;
 	}
-
-	if ((ret = deflateEnd(&zs)) != Z_OK)
-		return (
-		    zlib_error(compressor, session, "deflateEnd", ret));
 
 #if 0
 	fprintf(stderr,
 	    "zlib_compress_raw (%s): page_max %" PRIuMAX ", slots %" PRIu32
 	    ", take %" PRIu32 ": %" PRIu32 " -> %" PRIuMAX "\n",
 	    final ? "final" : "not final", (uintmax_t)page_max,
-	    slots, last_slot, offset[last_slot], (uintmax_t)*result_lenp);
+	    slots, last_slot, offsets[last_slot], (uintmax_t)*result_lenp);
 #endif
 	return (0);
 }
@@ -324,7 +339,9 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
 	zs.avail_out = (uint32_t)dst_len;
-	if ((ret = inflate(&zs, Z_FINISH)) == Z_STREAM_END) {
+	while ((ret = inflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	if (ret == Z_STREAM_END) {
 		*result_lenp = zs.total_out;
 		ret = Z_OK;
 	}
