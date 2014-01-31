@@ -6,6 +6,7 @@ awaitCompact = function() {
     print("waiting for compact to acquire lock");
     assert.soon(function() {
         var curop = compactingSlave.getDB('compact').currentOp();
+        printjson(curop);
         for (index in curop.inprog) {
             entry = curop.inprog[index];
             if (entry.query.hasOwnProperty("compact") && entry.query.compact === "foo"
