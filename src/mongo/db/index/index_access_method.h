@@ -32,7 +32,6 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_details.h"
 
 namespace mongo {
 
@@ -109,7 +108,17 @@ namespace mongo {
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
          * failure. If the latter, '*out' contains NULL.  See index_cursor.h for IndexCursor usage.
          */
-        virtual Status newCursor(IndexCursor **out) = 0;
+        virtual Status newCursor(IndexCursor **out) const = 0;
+
+        // ------ index level operations ------
+
+
+        /**
+         * initializes this index
+         * only called once for the lifetime of the index
+         * if called multiple times, is an error
+         */
+        virtual Status initializeAsEmpty() = 0;
 
         /**
          * Try to page-in the pages that contain the keys generated from 'obj'.
@@ -131,12 +140,35 @@ namespace mongo {
         virtual Status validate(int64_t* numKeys) = 0;
 
         //
-        // Bulk operations support (TODO)
+        // Bulk operations support
         //
 
-        // virtual Status insertBulk(BulkDocs arg) = 0;
+        /**
+         * Starts a bulk operation.
+         * You work on the returned IndexAccessMethod and then call commitBulk.
+         * This can return NULL, meaning bulk mode is not available.
+         *
+         * Long term, you'll eventually be able to mix/match bulk, not bulk,
+         * have as many as you want, etc..
+         *
+         * For now (1/8/14) you can only do bulk when the index is empty
+         * it will fail if you try other times.
+         */
+        virtual IndexAccessMethod* initiateBulk() = 0;
 
-        // virtual Status removeBulk(BulkDocs arg) = 0;
+        /**
+         * Call this when you are ready to finish your bulk work.
+         * Pass in the IndexAccessMethod gotten from initiateBulk.
+         * After this method is called, the bulk index access method is invalid
+         * and should not be used.
+         * @param bulk - something created from initiateBulk
+         * @param mayInterrupt - is this commit interruptable (will cancel)
+         * @param dups - if NULL, error out on dups if not allowed
+         *               if not NULL, put the bad DiskLocs there
+         */
+        virtual Status commitBulk( IndexAccessMethod* bulk,
+                                   bool mayInterrupt,
+                                   std::set<DiskLoc>* dups ) = 0;
     };
 
     /**

@@ -29,18 +29,20 @@
 #include "mongo/db/index/haystack_access_method.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/haystack_access_method_internal.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/internal_plans.h"
 
 namespace mongo {
 
     static const string GEOSEARCHNAME = "geoHaystack";
 
-    HaystackAccessMethod::HaystackAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         BSONElement e = descriptor->getInfoElement("bucketSize");
         uassert(16777, "need bucketSize", e.isNumber());
@@ -135,10 +137,6 @@ namespace mongo {
         keys->insert(buf.obj());
     }
 
-    Status HaystackAccessMethod::newCursor(IndexCursor** out) {
-        return Status(ErrorCodes::IllegalOperation, "Unimplemented seek called on Haystack");
-    }
-
     void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
                                              const BSONObj& search, BSONObjBuilder* result,
                                              unsigned limit) {
@@ -180,22 +178,20 @@ namespace mongo {
                 unordered_set<DiskLoc, DiskLoc::Hasher> thisPass;
 
 
-                scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsdetails(_descriptor->parentNS()),
-                                                                 _descriptor->getOnDisk(),
-                                                                 key,
-                                                                 key,
-                                                                 true,
-                                                                 1));
-                while (cursor->ok() && !hopper.limitReached()) {
+                scoped_ptr<Runner> runner(InternalPlanner::indexScan(_btreeState->collection(),
+                                                                     _descriptor, key, key, true));
+                Runner::RunnerState state;
+                DiskLoc loc;
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+                    if (hopper.limitReached()) { break; }
                     pair<unordered_set<DiskLoc, DiskLoc::Hasher>::iterator, bool> p
-                        = thisPass.insert(cursor->currLoc());
+                        = thisPass.insert(loc);
                     // If a new element was inserted (haven't seen the DiskLoc before), p.second
                     // is true.
                     if (p.second) {
-                        hopper.consider(cursor->currLoc());
+                        hopper.consider(loc);
                         btreeMatches++;
                     }
-                    cursor->advance();
                 }
             }
         }

@@ -28,6 +28,7 @@
 
 #include "mongo/db/exec/2dcommon.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/geo/geoquery.h"
 
 #pragma once
 
@@ -51,7 +52,7 @@ namespace mongo {
 
         virtual void prepareToYield();
         virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual PlanStageStats* getStats();
     private:

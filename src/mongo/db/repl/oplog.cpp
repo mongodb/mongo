@@ -41,6 +41,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
@@ -53,8 +54,9 @@
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
 #include "mongo/util/startup_test.h"
@@ -62,15 +64,23 @@
 namespace mongo {
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
-    static NamespaceDetails *localOplogMainDetails = 0;
-    static Database *localDB = 0;
-    static NamespaceDetails *rsOplogDetails = 0;
-    void oplogCheckCloseDatabase( Database * db ) {
+    static Database* localDB = NULL;
+    static Collection* localOplogMainCollection = 0;
+    static Collection* localOplogRSCollection = 0;
+
+    void oplogCheckCloseDatabase( Database* db ) {
         verify( Lock::isW() );
-        localDB = 0;
-        localOplogMainDetails = 0;
-        rsOplogDetails = 0;
+        localDB = NULL;
+        localOplogMainCollection = NULL;
+        localOplogRSCollection = NULL;
         resetSlaveCache();
+    }
+
+    // so we can fail the same way
+    void checkOplogInsert( StatusWith<DiskLoc> result ) {
+        massert( 17322,
+                 str::stream() << "write to oplog failed: " << result.getStatus().toString(),
+                 result.isOK() );
     }
 
     static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
@@ -87,20 +97,18 @@ namespace mongo {
         long long h = op["h"].numberLong();
 
         {
-            const char *logns = rsoplog;
-            if ( rsOplogDetails == 0 ) {
-                Client::Context ctx(logns, storageGlobalParams.dbpath);
+            if ( localOplogRSCollection == 0 ) {
+                Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
                 localDB = ctx.db();
                 verify( localDB );
-                rsOplogDetails = nsdetails(logns);
-                massert(13389, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
+                localOplogRSCollection = localDB->getCollection( rsoplog );
+                massert(13389,
+                        "local.oplog.rs missing. did you drop it? if so restart server",
+                        localOplogRSCollection);
             }
-            Client::Context ctx(logns , localDB);
-            {
-                int len = op.objsize();
-                Record *r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
-                memcpy(getDur().writingPtr(r->data(), len), op.objdata(), len);
-            }
+            Client::Context ctx(rsoplog, localDB);
+            checkOplogInsert( localOplogRSCollection->insertDocument( op, false ) );
+
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
                      */
@@ -127,35 +135,46 @@ namespace mongo {
         OpTime::setLast( ts );
     }
 
-    /** given a BSON object, create a new one at dst which is the existing (partial) object
-        with a new object element appended at the end with fieldname "o".
+    /**
+     * This allows us to stream the oplog entry directly into data region
+     * main goal is to avoid copying the o portion
+     * which can be very large
+     * TODO: can have this build the entire doc
+     */
+    class OplogDocWriter : public DocWriter {
+    public:
+        OplogDocWriter( const BSONObj& frame, const BSONObj& oField )
+            : _frame( frame ), _oField( oField ) {
+        }
 
-        @param partial already build object with everything except the o member.  e.g. something like:
-               { ts:..., ns:..., os2:... }
-        @param o a bson object to be added with fieldname "o"
-        @dst   where to put the newly built combined object.  e.g. ends up as something like:
-               { ts:..., ns:..., os2:..., o:... }
-    */
-    void append_O_Obj(char *dst, const BSONObj& partial, const BSONObj& o) {
-        const int size1 = partial.objsize() - 1;  // less the EOO char
-        const int oOfs = size1+3;                 // 3 = byte BSONOBJTYPE + byte 'o' + byte \0
+        ~OplogDocWriter(){}
 
-        void *p = getDur().writingPtr(dst, oOfs+o.objsize()+1);
+        void writeDocument( char* start ) const {
+            char* buf = start;
 
-        memcpy(p, partial.objdata(), size1);
+            memcpy( buf, _frame.objdata(), _frame.objsize() - 1 ); // don't copy final EOO
 
-        // adjust overall bson object size for the o: field
-        *(static_cast<unsigned*>(p)) += o.objsize() + 1/*fieldtype byte*/ + 2/*"o" fieldname*/;
+            reinterpret_cast<int*>( buf )[0] = documentSize();
 
-        char *b = static_cast<char *>(p);
-        b += size1;
-        *b++ = (char) Object;
-        *b++ = 'o'; // { o : ... }
-        *b++ = 0;   // null terminate "o" fieldname
-        memcpy(b, o.objdata(), o.objsize());
-        b += o.objsize();
-        *b = EOO;
-    }
+            buf += ( _frame.objsize() - 1 );
+            buf[0] = (char)Object;
+            buf[1] = 'o';
+            buf[2] = 0;
+            memcpy( buf+3, _oField.objdata(), _oField.objsize() );
+            buf += 3 + _oField.objsize();
+            buf[0] = EOO;
+
+            verify( static_cast<size_t>( ( buf + 1 ) - start ) == documentSize() ); // DEV?
+        }
+
+        size_t documentSize() const {
+            return _frame.objsize() + _oField.objsize() + 1 /* type */ + 2 /* "o" */;
+        }
+
+    private:
+        BSONObj _frame;
+        BSONObj _oField;
+    };
 
     /* we write to local.oplog.rs:
          { ts : ..., h: ..., v: ..., op: ..., etc }
@@ -222,46 +241,41 @@ namespace mongo {
         if ( o2 )
             b.append("o2", *o2);
         BSONObj partial = b.done();
-        int posz = partial.objsize();
-        int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
-        Record *r;
-        DEV verify( logNS == 0 );
-        {
-            const char *logns = rsoplog;
-            if ( rsOplogDetails == 0 ) {
-                Client::Context ctx(logns, storageGlobalParams.dbpath);
-                localDB = ctx.db();
-                verify( localDB );
-                rsOplogDetails = nsdetails(logns);
-                massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
-            }
-            Client::Context ctx(logns , localDB);
-            r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
-            /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
-                     this code (or code in now() maybe) should be improved.
-                     */
-            if( theReplSet ) {
-                if( !(theReplSet->lastOpTimeWritten<ts) ) {
-                    log() << "replication oplog stream went back in time. previous timestamp: "
-                          << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
-                          << ". attempting to sync directly from primary." << endl;
-                    std::string errmsg;
-                    BSONObjBuilder result;
-                    if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
-                                                   errmsg, result)) {
-                        log() << "Can't sync from primary: " << errmsg << endl;
-                    }
-                }
-                theReplSet->lastOpTimeWritten = ts;
-                theReplSet->lastH = hashNew;
-                ctx.getClient()->setLastOp( ts );
-            }
+        DEV verify( logNS == 0 ); // check this was never a master/slave master
+
+        if ( localOplogRSCollection == 0 ) {
+            Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
+            localDB = ctx.db();
+            verify( localDB );
+            localOplogRSCollection = localDB->getCollection( rsoplog );
+            massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", localOplogRSCollection);
         }
 
-        append_O_Obj(r->data(), partial, obj);
+        Client::Context ctx(rsoplog, localDB);
+        OplogDocWriter writer( partial, obj );
+        checkOplogInsert( localOplogRSCollection->insertDocument( &writer, false ) );
 
-        LOG( 6 ) << "logOp:" << BSONObj::make(r) << endl;
+        /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
+           this code (or code in now() maybe) should be improved.
+        */
+        if( theReplSet ) {
+            if( !(theReplSet->lastOpTimeWritten<ts) ) {
+                log() << "replication oplog stream went back in time. previous timestamp: "
+                      << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
+                      << ". attempting to sync directly from primary." << endl;
+                std::string errmsg;
+                BSONObjBuilder result;
+                if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+                                               errmsg, result)) {
+                    log() << "Can't sync from primary: " << errmsg << endl;
+                }
+            }
+            theReplSet->lastOpTimeWritten = ts;
+            theReplSet->lastH = hashNew;
+            ctx.getClient()->setLastOp( ts );
+        }
+
     }
 
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
@@ -297,35 +311,24 @@ namespace mongo {
             b.append("o2", *o2);
         BSONObj partial = b.done(); // partial is everything except the o:... part.
 
-        int po_sz = partial.objsize();
-        int len = po_sz + obj.objsize() + 1 + 2 /*o:*/;
-
-        Record *r;
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
-            if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx(logNS, storageGlobalParams.dbpath);
-                localDB = ctx.db();
-                verify( localDB );
-                localOplogMainDetails = nsdetails(logNS);
-                verify( localOplogMainDetails );
-            }
-            Client::Context ctx(logNS , localDB);
-            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
-        }
-        else {
-            Client::Context ctx(logNS, storageGlobalParams.dbpath);
-            verify( nsdetails( logNS ) );
-            // first we allocate the space, then we fill it below.
-            r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
-        append_O_Obj(r->data(), partial, obj);
+        if ( localOplogMainCollection == 0 ) {
+            Client::Context ctx(logNS, storageGlobalParams.dbpath);
+            localDB = ctx.db();
+            verify( localDB );
+            localOplogMainCollection = localDB->getCollection(logNS);
+            verify( localOplogMainCollection );
+        }
+
+        Client::Context ctx(logNS , localDB);
+        OplogDocWriter writer( partial, obj );
+        checkOplogInsert( localOplogMainCollection->insertDocument( &writer, false ) );
 
         context.getClient()->setLastOp( ts );
-
-        LOG( 6 ) << "logging op:" << BSONObj::make(r) << endl;
-    } 
+    }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;
     void newReplUp() {
@@ -369,6 +372,11 @@ namespace mongo {
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
         logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
         getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
+
+        if ( strstr( ns, ".system.js" ) ) {
+            Scope::storedFuncMod(); // this is terrible
+        }
+
     }
 
     void createOplog() {
@@ -486,7 +494,7 @@ namespace mongo {
         Lock::assertWriteLocked(ns);
 
         Collection* collection = cc().database()->getCollection( ns );
-        NamespaceDetails *nsd = collection == NULL ? NULL : collection->details();
+        IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types
         const char *opType = fieldOp.valuestrsafe();
@@ -495,16 +503,17 @@ namespace mongo {
             opCounters->gotInsert();
 
             const char *p = strchr(ns, '.');
-            if ( p && strcmp(p, ".system.indexes") == 0 ) {
+            if ( p && nsToCollectionSubstring( p ) == "system.indexes" ) {
                 if (o["background"].trueValue()) {
-                    IndexBuilder* builder = new IndexBuilder(ns, o);
+                    IndexBuilder* builder = new IndexBuilder(o);
                     // This spawns a new thread and returns immediately.
                     builder->go();
                 }
                 else {
-                    IndexBuilder builder(ns, o);
-                    // Finish the foreground build before returning
-                    builder.build();
+                    Client::Context* ctx = cc().getContext();
+                    verify( ctx );
+                    IndexBuilder builder(o);
+                    uassertStatusOK( builder.build( *ctx ) );
                 }
             }
             else {
@@ -516,7 +525,7 @@ namespace mongo {
                     Timer t;
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(o);
                     request.setUpdates(o);
@@ -534,8 +543,8 @@ namespace mongo {
                 else {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
-                    RARELY if ( nsd && !nsd->isCapped() ) {
-                        collection->getIndexCatalog()->ensureHaveIdIndex();
+                    RARELY if ( indexCatalog && !collection->isCapped() ) {
+                        indexCatalog->ensureHaveIdIndex();
                     }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
@@ -545,7 +554,7 @@ namespace mongo {
                     b.append(_id);
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(b.done());
                     request.setUpdates(o);
@@ -563,8 +572,8 @@ namespace mongo {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( nsd && !nsd->isCapped() ) {
-                collection->getIndexCatalog()->ensureHaveIdIndex();
+            RARELY if ( indexCatalog && !collection->isCapped() ) {
+                indexCatalog->ensureHaveIdIndex();
             }
 
             OpDebug debug;
@@ -572,7 +581,7 @@ namespace mongo {
             const bool upsert = valueB || convertUpdateToUpsert;
 
             const NamespaceString requestNs(ns);
-            UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
+            UpdateRequest request(requestNs);
 
             request.setQuery(updateCriteria);
             request.setUpdates(o);
@@ -596,10 +605,10 @@ namespace mongo {
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
                     else {
-                        if (nsd == NULL ||
-                            (nsd->findIdIndex() >= 0 && Helpers::findById(nsd, updateCriteria).isNull()) ||
+                        if (collection == NULL ||
+                            (indexCatalog->haveIdIndex() && Helpers::findById(collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (nsd->findIdIndex() < 0 && Helpers::findOne(ns, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex() && Helpers::findOne(ns, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }

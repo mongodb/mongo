@@ -40,6 +40,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/time_support.h"
 
 
 // make sure our assumptions are valid
@@ -78,11 +79,11 @@ namespace mongo {
             s << '"' << escape( string(valuestr(), valuestrsize()-1) ) << '"';
             break;
         case NumberLong:
-            if (format == JS) {
+            if (format == TenGen) {
                 s << "NumberLong(" << _numberLong() << ")";
             }
             else {
-                s << _numberLong();
+                s << "{ \"$numberLong\" : \"" << _numberLong() << "\" }";
             }
             break;
         case NumberInt:
@@ -96,6 +97,9 @@ namespace mongo {
                 s.precision( 16 );
                 s << number();
             }
+            // This is not valid JSON, but according to RFC-4627, "Numeric values that cannot be
+            // represented as sequences of digits (such as Infinity and NaN) are not permitted." so
+            // we are accepting the fact that if we have such values we cannot output valid JSON.
             else if ( mongo::isNaN(number()) ) {
                 s << "NaN";
             }
@@ -205,22 +209,35 @@ namespace mongo {
             break;
         }
         case mongo::Date:
-            if ( format == Strict )
-                s << "{ \"$date\" : ";
-            else
-                s << "Date( ";
-            if( pretty ) {
+            if (format == Strict) {
                 Date_t d = date();
-                if( d == 0 ) s << '0';
-                else
-                    s << '"' << date().toString() << '"';
-            }
-            else
-                s << date().asInt64();
-            if ( format == Strict )
+                s << "{ \"$date\" : ";
+                if (static_cast<long long>(d.millis) < 0) {
+                    s << "{ \"$numberLong\" : \"" << static_cast<long long>(d.millis) << "\" }";
+                }
+                else {
+                    s << "\"" << dateToISOStringLocal(date()) << "\"";
+                }
                 s << " }";
-            else
+            }
+            else {
+                s << "Date( ";
+                if (pretty) {
+                    Date_t d = date();
+                    if (static_cast<long long>(d.millis) < 0) {
+                        // FIXME: This is not parseable by the shell, since it may not fit in a
+                        // float
+                        s << d.millis;
+                    }
+                    else {
+                        s << "\"" << dateToISOStringLocal(date()) << "\"";
+                    }
+                }
+                else {
+                    s << date().asInt64();
+                }
                 s << " )";
+            }
             break;
         case RegEx:
             if ( format == Strict ) {
@@ -246,14 +263,14 @@ namespace mongo {
         case CodeWScope: {
             BSONObj scope = codeWScopeObject();
             if ( ! scope.isEmpty() ) {
-                s << "{ \"$code\" : " << _asCode() << " , "
-                  << " \"$scope\" : " << scope.jsonString() << " }";
+                s << "{ \"$code\" : \"" << escape(_asCode()) << "\" , "
+                  << "\"$scope\" : " << scope.jsonString() << " }";
                 break;
             }
         }
 
         case Code:
-            s << _asCode();
+            s << "\"" << escape(_asCode()) << "\"";
             break;
 
         case Timestamp:
@@ -1266,7 +1283,7 @@ namespace mongo {
         case Date:
             appendDate( fieldName , numeric_limits<long long>::max() ); return;
         case Timestamp: // TODO integrate with Date SERVER-3304
-            appendTimestamp( fieldName , numeric_limits<unsigned long long>::max() ); return;
+            append( fieldName , OpTime::max() ); return;
         case Undefined: // shared with EOO
             appendUndefined( fieldName ); return;
 

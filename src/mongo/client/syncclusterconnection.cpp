@@ -131,7 +131,9 @@ namespace mongo {
 
         for ( size_t i = 0; i<_conns.size(); i++ ) {
             BSONObj res = _lastErrors[i];
-            if ( res["ok"].trueValue() && (res["fsyncFiles"].numberInt() > 0 || res.hasElement("waited")))
+            if ( res["ok"].trueValue() && (res["fsyncFiles"].numberInt() > 0 ||
+                                           res.hasElement("waited") ||
+                                           res["syncMillis"].numberInt() >= 0 ) )
                 continue;
             ok = false;
             err << _conns[i]->toString() << ": " << res << " " << errors[i];
@@ -159,6 +161,7 @@ namespace mongo {
     void SyncClusterConnection::_connect( const std::string& host ) {
         log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
+        c->setRunCommandHook(_runCommandHook);
         c->setSoTimeout( _socketTimeout );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
@@ -423,7 +426,18 @@ namespace mongo {
 
     string SyncClusterConnection::_toString() const {
         stringstream ss;
-        ss << "SyncClusterConnection [" << _address << "]";
+        ss << "SyncClusterConnection ";
+        ss << " [";
+        for ( size_t i = 0; i < _conns.size(); i++ ) {
+            if ( i != 0 ) ss << ",";
+            if ( _conns[i] ) {
+                ss << _conns[i]->toString();
+            }
+            else {
+                ss << "(no conn)";
+            }
+        }
+        ss << "]";
         return ss.str();
     }
 
@@ -511,4 +525,13 @@ namespace mongo {
             if( _conns[i] ) _conns[i]->setSoTimeout( socketTimeout );
     }
 
+    void SyncClusterConnection::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+        // Set the hooks in both our sub-connections and in ourselves.
+        for (size_t i = 0; i < _conns.size(); ++i) {
+            if (_conns[i]) { 
+                _conns[i]->setRunCommandHook(func);
+            }
+        }
+        _runCommandHook = func;
+    }
 }

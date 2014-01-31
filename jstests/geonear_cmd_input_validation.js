@@ -86,7 +86,7 @@ indexTypes.forEach(function(indexType) {
 
                 // Bad values for limit / num.
                 ['num', 'limit'].forEach(function(limitOptionName) {
-                    badNumbers.forEach(function(badLimit) {
+                    [-1, 'foo'].forEach(function(badLimit) {
 
                         var msg = (
                             "geoNear with spherical=" + spherical + " and "

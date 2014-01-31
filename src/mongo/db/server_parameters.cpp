@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/parse_number.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {

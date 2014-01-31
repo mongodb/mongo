@@ -3,39 +3,25 @@
 t = db.jstests_orf;
 t.drop();
 
-a = [];
+var a = [];
+var expectBounds = [];
 for( var i = 0; i < 200; ++i ) {
     a.push( {_id:i} );
+    expectBounds.push([i, i]);
 }
 a.forEach( function( x ) { t.save( x ); } );
 
-explain = t.find( {$or:a} ).explain( true );
-// printjson( explain );
-assert.eq( 200, explain.n );
-
-// QUERY MIGRATION
-// The new query systems collapses this $or into a single collection scan
-//
-// clauses = explain.clauses;
-// for( i = 0; i < clauses.length; ++i ) {
-//     c = clauses[ i ];
-//     assert.eq( 'BtreeCursor _id_', c.cursor );
-//     assert.eq( false, c.isMultiKey );
-//     assert.eq( 1, c.n, 'n' );
-//     assert.eq( 1, c.nscannedObjects, 'nscannedObjects' );
-//     assert.eq( 1, c.nscanned, 'nscanned' );
-//     assert.eq( false, c.scanAndOrder );
-//     assert.eq( false, c.indexOnly );
-//     assert.eq( {_id:[[i,i]]}, c.indexBounds );
-//     allPlans = c.allPlans;
-//     assert.eq( 1, allPlans.length );
-//     plan = allPlans[ 0 ];
-//     assert.eq( 'BtreeCursor _id_', plan.cursor );
-//     assert.eq( 1, plan.n, 'n' );
-//     assert.eq( 1, plan.nscannedObjects, 'nscannedObjects' );
-//     assert.eq( 1, plan.nscanned, 'nscanned' );
-//     assert.eq( {_id:[[i,i]]}, plan.indexBounds );
-// }
-// assert.eq( 200, clauses.length );
+// This $or query is answered as an index scan over
+// a series of _id index point intervals.
+explain = t.find( {$or:a} ).hint( {_id: 1} ).explain( true );
+printjson( explain );
+assert.eq( 'BtreeCursor _id_', explain.cursor, 'cursor' );
+assert.eq( expectBounds, explain.indexBounds['_id'], 'indexBounds' );
+assert.eq( 200, explain.n, 'n' );
+assert.eq( 200, explain.nscanned, 'nscanned' );
+assert.eq( 200, explain.nscannedObjects, 'nscannedObjects' );
+assert.eq( false, explain.isMultiKey, 'isMultiKey' );
+assert.eq( false, explain.scanAndOrder, 'scanAndOrder' );
+assert.eq( false, explain.indexOnly, 'indexOnly' );
 
 assert.eq( 200, t.count( {$or:a} ) );

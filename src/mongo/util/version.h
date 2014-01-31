@@ -31,8 +31,7 @@
 
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
     struct BSONArray;
@@ -44,29 +43,16 @@ namespace mongo {
 
     // Convert a version string into a numeric array
     BSONArray toVersionArray(const char* version);
-    
+
     // Checks whether another version is the same major version as us
     bool isSameMajorVersion(const char* version);
-
-    void appendBuildInfo(BSONObjBuilder& result);
 
     const char * gitVersion();
     const char * compiledJSEngine();
     const char * allocator();
     const char * loaderFlags();
     const char * compilerFlags();
-
-    void printGitVersion();
-
-    const std::string openSSLVersion(const std::string &prefix = "", const std::string &suffix = "");
-    void printOpenSSLVersion();
-
     std::string sysInfo();
-    void printSysInfo();
-    void printTargetMinOS();
-    void printAllocator();
-
-    void show_warnings();
 
 }  // namespace mongo
 

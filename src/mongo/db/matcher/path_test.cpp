@@ -136,6 +136,55 @@ namespace mongo {
         ASSERT( !cursor.more() );
     }
 
+    TEST( Path, NestedPartialMatchScalar ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b" ).isOK() );
+
+        BSONObj doc = BSON( "a" << 4 );
+
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( cursor.more() );
+        BSONElementIterator::Context e = cursor.next();
+        ASSERT( e.element().eoo() );
+        ASSERT( e.arrayOffset().eoo() );
+        ASSERT( !e.outerArray() );
+
+        ASSERT( !cursor.more() );
+    }
+
+    // When the path (partially or in its entirety) refers to an array,
+    // the iteration logic does not return an EOO.
+    // what we want ideally.
+    TEST( Path, NestedPartialMatchArray ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b" ).isOK() );
+
+        BSONObj doc = BSON( "a" << BSON_ARRAY( 4 ) );
+
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( !cursor.more() );
+    }
+
+    // Note that this describes existing behavior and not necessarily
+    TEST( Path, NestedEmptyArray ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b" ).isOK() );
+
+        BSONObj doc = BSON( "a" << BSON( "b" << BSONArray() ) );
+
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( cursor.more() );
+        BSONElementIterator::Context e = cursor.next();
+        ASSERT_EQUALS( Array, e.element().type() );
+        ASSERT_EQUALS( 0, e.element().Obj().nFields() );
+        ASSERT( e.outerArray() );
+
+        ASSERT( !cursor.more() );
+    }
+
     TEST( Path, NestedNoLeaf1 ) {
         ElementPath p;
         ASSERT( p.init( "a.b" ).isOK() );
@@ -216,10 +265,12 @@ namespace mongo {
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( 4, e.element().numberInt() );
+        ASSERT( !e.outerArray() );
 
         ASSERT( cursor.more() );
         e = cursor.next();
         ASSERT_EQUALS( BSON( "1" << 4 ), e.element().Obj() );
+        ASSERT( e.outerArray() );
 
         ASSERT( !cursor.more() );
     }

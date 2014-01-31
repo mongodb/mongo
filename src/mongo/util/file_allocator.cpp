@@ -24,8 +24,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#if defined(__freebsd__) || defined(__openbsd__)
-#   include <sys/stat.h>
+#if defined(__freebsd__)
+#   include <sys/param.h>
+#   include <sys/mount.h>
 #endif
 
 #if defined(__linux__)
@@ -40,6 +41,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -137,19 +139,28 @@ namespace mongo {
 
     // TODO: pull this out to per-OS files once they exist
     static bool useSparseFiles(int fd) {
+
+#if defined(__linux__) || defined(__freebsd__)
+        struct statfs fs_stats;
+        int ret = fstatfs(fd, &fs_stats);
+        uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
+#endif
+
 #if defined(__linux__)
 // these are from <linux/magic.h> but that isn't available on all systems
 # define NFS_SUPER_MAGIC 0x6969
 
-        struct statfs fs_stats;
-        int ret = fstatfs(fd, &fs_stats);
-        uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
-
         return (fs_stats.f_type == NFS_SUPER_MAGIC);
 
-#elif defined(__freebsd__) || defined(__sunos__)
+#elif defined(__freebsd__)
+
+        return (str::equals(fs_stats.f_fstypename, "zfs") ||
+            str::equals(fs_stats.f_fstypename, "nfs") ||
+            str::equals(fs_stats.f_fstypename, "oldnfs"));
+
+#elif defined(__sunos__)
         // assume using ZFS which is copy-on-write so no benefit to zero-filling
-        // TODO: check which fs we are using like we do on linux
+        // TODO: check which fs we are using like we do elsewhere
         return true;
 #else
         return false;
@@ -187,6 +198,15 @@ namespace mongo {
                      size - 1 == lseek(fd, size - 1, SEEK_SET) );
             uassert( 10442 ,  str::stream() << "Unable to allocate new file of size " << size << ' ' << errnoWithDescription(),
                      1 == write(fd, "", 1) );
+
+            // File expansion is completed here. Do not do the zeroing out on OS-es where there
+            // is no risk of triggering allocation-related bugs such as
+            // http://support.microsoft.com/kb/2731284.
+            //
+            if (!ProcessInfo::isDataFileZeroingNeeded()) {
+                return;
+            }
+
             lseek(fd, 0, SEEK_SET);
 
             const long z = 256 * 1024;
@@ -270,7 +290,7 @@ namespace mongo {
             }
             while( 1 ) {
                 string name;
-                long size;
+                long size = 0;
                 {
                     scoped_lock lk( fa->_pendingMutex );
                     if ( fa->_pending.size() == 0 )

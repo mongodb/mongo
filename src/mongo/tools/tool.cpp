@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 // Tool.cpp
@@ -29,9 +41,10 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/json.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
@@ -300,21 +313,23 @@ namespace mongo {
             verify( amt == (size_t)( size - 4 ) );
 
             BSONObj o( buf );
-            if (bsonToolGlobalParams.objcheck && !o.valid()) {
-                toolError() << "INVALID OBJECT - going to try and print out " << std::endl;
-                toolError() << "size: " << size << std::endl;
-                BSONObjIterator i(o);
-                while ( i.more() ) {
-                    BSONElement e = i.next();
+            if (bsonToolGlobalParams.objcheck) {
+                const Status status = validateBSON(buf, size);
+                if (!status.isOK()) {
+                    toolError() << "INVALID OBJECT - going to try and print out " << std::endl;
+                    toolError() << "size: " << size << std::endl;
+                    toolError() << "error: " << status.reason() << std::endl;
+
+                    StringBuilder sb;
                     try {
-                        e.validate();
+                        o.toString(sb); // using StringBuilder version to get as much as possible
+                    } catch (...) {
+                        toolError() << "object up to error: " << sb.str() << endl;
+                        throw;
                     }
-                    catch ( ... ) {
-                        toolError() << "\t\t NEXT ONE IS INVALID" << std::endl;
-                    }
-                    toolError() << "\t name : " << e.fieldName() << " " << typeName(e.type())
-                                << std::endl;
-                    toolError() << "\t " << e << std::endl;
+                    toolError() << "complete object: " << sb.str() << endl;
+
+                    // NOTE: continuing with object even though we know it is invalid.
                 }
             }
 
@@ -349,6 +364,7 @@ namespace mongo {
 // and makes them available through the argv() and envp() members.  This enables toolMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
+    setWindowsUnhandledExceptionFilter();
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
     auto_ptr<Tool> instance = (*Tool::createInstance)();
     int exitCode = instance->main(argc, wcl.argv(), wcl.envp());

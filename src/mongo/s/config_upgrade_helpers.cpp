@@ -31,7 +31,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/timer.h"
 
@@ -199,139 +201,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status copyFrozenCollection(const ConnectionString& configLoc,
-                                const string& fromNS,
-                                const string& toNS)
-    {
-        scoped_ptr<ScopedDbConnection> connPtr;
-        auto_ptr<DBClientCursor> cursor;
-
-        // Create new collection
-        bool resultOk;
-        BSONObj createResult;
-
-        try {
-            connPtr.reset(new ScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-
-            resultOk = conn->createCollection(toNS, 0, false, 0, &createResult);
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not create new collection");
-        }
-
-        if (!resultOk) {
-            return Status(ErrorCodes::UnknownError,
-                          stream() << DBClientWithCommands::getLastErrorString(createResult)
-                                   << causedBy(createResult.toString()));
-        }
-
-        NamespaceString fromNSS(fromNS);
-        NamespaceString toNSS(toNS);
-
-        // Copy indexes over
-        try {
-            ScopedDbConnection& conn = *connPtr;
-
-            verify(fromNSS.isValid());
-
-            // TODO: EnsureIndex at some point, if it becomes easier?
-            string indexesNS = fromNSS.db().toString() + ".system.indexes";
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(indexesNS,
-                                                                      BSON("ns" << fromNS))));
-
-            while (cursor->more()) {
-
-                BSONObj next = cursor->nextSafe();
-
-                BSONObjBuilder newIndexDesc;
-                newIndexDesc.append("ns", toNS);
-                newIndexDesc.appendElementsUnique(next);
-
-                conn->insert(toNSS.db().toString() + ".system.indexes", newIndexDesc.done());
-                _checkGLE(conn);
-            }
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not create indexes in new collection");
-        }
-
-        //
-        // Copy data over in batches. A batch size here is way smaller than the maximum size of
-        // a bsonobj. We want to copy efficiently but we don't need to maximize the object size
-        // here.
-        //
-
-        Timer t;
-        int64_t docCount = 0;
-        const int32_t maxBatchSize = BSONObjMaxUserSize / 16;
-        try {
-            log() << "About to copy " << fromNS << " to " << toNS << endl;
-
-            // Lower the query's batchSize so that we incur in getMore()'s more frequently.
-            // The rationale here is that, if for some reason the config server is extremely
-            // slow, we wouldn't time this cursor out.
-            ScopedDbConnection& conn = *connPtr;
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(fromNS,
-                                                                      BSONObj(),
-                                                                      0 /* nToReturn */,
-                                                                      0 /* nToSkip */,
-                                                                      NULL /* fieldsToReturn */,
-                                                                      0 /* queryOptions */,
-                                                                      1024 /* batchSize */)));
-
-            vector<BSONObj> insertBatch;
-            int32_t insertSize = 0;
-            while (cursor->more()) {
-
-                BSONObj next = cursor->nextSafe().getOwned();
-                ++docCount;
-
-                insertBatch.push_back(next);
-                insertSize += next.objsize();
-
-                if (insertSize > maxBatchSize ) {
-                    conn->insert(toNS, insertBatch);
-                    _checkGLE(conn);
-                    insertBatch.clear();
-                    insertSize = 0;
-                }
-
-                if (t.seconds() >= 10) {
-                    t.reset();
-                    log() << "Copied " << docCount << " documents so far from "
-                          << fromNS << " to " << toNS << endl;
-                }
-            }
-
-            if (!insertBatch.empty()) {
-                conn->insert(toNS, insertBatch);
-                _checkGLE(conn);
-            }
-
-            log() << "Finished copying " << docCount << " documents from "
-                  << fromNS << " to " << toNS << endl;
-
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not copy data into new collection");
-        }
-
-        connPtr->done();
-
-        // Verify indices haven't changed
-        Status indexStatus = checkIdsTheSame(configLoc,
-                                             fromNSS.db().toString() + ".system.indexes",
-                                             toNSS.db().toString() + ".system.indexes");
-
-        if (!indexStatus.isOK()) {
-            return indexStatus;
-        }
-
-        // Verify data hasn't changed
-        return checkHashesTheSame(configLoc, fromNS, toNS);
-    }
-
     Status overwriteCollection(const ConnectionString& configLoc,
                                const string& fromNS,
                                const string& overwriteNS)
@@ -414,43 +283,47 @@ namespace mongo {
         setUpgradeIdObj << VersionType::upgradeId(upgradeID);
         setUpgradeIdObj << VersionType::upgradeState(BSONObj());
 
-        try {
-            ScopedDbConnection conn(configServer, 30);
-            conn->update(VersionType::ConfigNS,
-                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                         BSON("$set" << setUpgradeIdObj.done()));
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not initialize version info for upgrade");
-        }
+        Status result = clusterUpdate(VersionType::ConfigNS,
+                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                BSON("$set" << setUpgradeIdObj.done()),
+                false, // upsert
+                false, // multi
+                WriteConcernOptions::AllConfigs,
+                NULL);
 
-        return Status::OK();
+        if ( !result.isOK() ) {
+            return Status( result.code(),
+                           str::stream() << "could not initialize version info"
+                                         << "for upgrade: " << result.reason() );
+        }
+        return result;
     }
 
     Status enterConfigUpgradeCriticalSection(const string& configServer, int currentVersion) {
         BSONObjBuilder setUpgradeStateObj;
         setUpgradeStateObj.append(VersionType::upgradeState(), BSON(inCriticalSectionField(true)));
 
-        try {
-            ScopedDbConnection conn(configServer, 30);
-            conn->update(VersionType::ConfigNS,
-                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                         BSON("$set" << setUpgradeStateObj.done()));
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
-
-            // No cleanup message here since we're not sure if we wrote or not, and
-            // not dangerous either way except to prevent further updates (at which point
-            // the message is printed)
-            return e.toStatus("could not update version info to enter critical update section");
-        }
+        Status result = clusterUpdate(VersionType::ConfigNS,
+                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                BSON("$set" << setUpgradeStateObj.done()),
+                false, // upsert
+                false, // multi
+                WriteConcernOptions::AllConfigs,
+                NULL);
 
         log() << "entered critical section for config upgrade" << endl;
-        return Status::OK();
+
+        // No cleanup message here since we're not sure if we wrote or not, and
+        // not dangerous either way except to prevent further updates (at which point
+        // the message is printed)
+
+        if ( !result.isOK() ) {
+            return Status( result.code(), str::stream() << "could not update version info"
+                                                        << "to enter critical update section: "
+                                                        << result.reason() );
+        }
+
+        return result;
     }
 
 
@@ -471,20 +344,21 @@ namespace mongo {
         unsetObj.append(VersionType::upgradeId(), 1);
         unsetObj.append(VersionType::upgradeState(), 1);
 
-        try {
-            ScopedDbConnection conn(configServer, 30);
-            conn->update(VersionType::ConfigNS,
-                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                         BSON("$set" << setObj.done() << "$unset" << unsetObj.done()));
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
-            return e.toStatus("could not write new version info and "
-                              "exit critical upgrade section");
+        Status result = clusterUpdate(VersionType::ConfigNS,
+                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
+                false, // upsert
+                false, // multi,
+                WriteConcernOptions::AllConfigs,
+                NULL);
+
+        if ( !result.isOK() ) {
+            return Status( result.code(), str::stream() << "could not write new version info "
+                                                        << " and exit critical upgrade section: "
+                                                        << result.reason() );
         }
 
-        return Status::OK();
+        return result;
     }
 
 }

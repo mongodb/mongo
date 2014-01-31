@@ -20,7 +20,7 @@
 #include <cstdlib>
 
 #include "mongo/base/initializer.h"
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/util/background.h"
 
 namespace mongo {

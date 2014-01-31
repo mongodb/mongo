@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 /**
@@ -21,7 +33,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/cursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/mock_stage.h"
@@ -29,6 +41,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_registry.h"
@@ -44,10 +58,14 @@ namespace QueryStageFetch {
             _client.dropCollection(ns());
         }
 
-        void getLocs(set<DiskLoc>* out) {
-            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok(); c->advance()) {
-                out->insert(c->currLoc());
+        void getLocs(set<DiskLoc>* out, Collection* coll) {
+            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+                                                       CollectionScanParams::FORWARD);
+            while (!it->isEOF()) {
+                DiskLoc nextLoc = it->getNext();
+                out->insert(nextLoc);
             }
+            delete it;
         }
 
         void insert(const BSONObj& obj) {
@@ -73,12 +91,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -139,12 +162,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -199,12 +227,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -238,20 +271,17 @@ namespace QueryStageFetch {
             WorkingSetMember* member = ws.get(id);
 
             // Invalidate the DL.
-            fetchStage->invalidate(member->loc);
+            fetchStage->invalidate(member->loc, INVALIDATION_DELETION);
 
-            bool fetchReturnsInvalidated = false;
-            if (fetchReturnsInvalidated) {
-                // Next call to work() should give us the OWNED obj as it was invalidated mid-page-in.
-                state = fetchStage->work(&id);
-                ASSERT_EQUALS(PlanStage::ADVANCED, state);
-                ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->state);
+            // Next call to work() should give us the OWNED obj as it was invalidated mid-page-in.
+            state = fetchStage->work(&id);
+            ASSERT_EQUALS(PlanStage::ADVANCED, state);
+            ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->state);
 
-                // We should be able to get data from the obj now.
-                BSONElement elt;
-                ASSERT_TRUE(member->getFieldDotted("foo", &elt));
-                ASSERT_EQUALS(elt.numberInt(), 5);
-            }
+            // We should be able to get data from the obj now.
+            BSONElement elt;
+            ASSERT_TRUE(member->getFieldDotted("foo", &elt));
+            ASSERT_EQUALS(elt.numberInt(), 5);
 
             // Mock stage is EOF so fetch should be too.
             ASSERT_TRUE(fetchStage->isEOF());
@@ -269,12 +299,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
@@ -328,12 +363,17 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             WorkingSet ws;
 
             // Add an object to the DB.
             insert(BSON("foo" << 5));
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.

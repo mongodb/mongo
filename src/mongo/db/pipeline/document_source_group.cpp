@@ -153,7 +153,7 @@ namespace mongo {
         return Value(DOC(getSourceName() << insides.freeze()));
     }
 
-    DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(set<string>& deps) const {
+    DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
         // add the _id
         pIdExpression->addDependencies(deps);
 
@@ -163,7 +163,7 @@ namespace mongo {
             vpExpression[i]->addDependencies(deps);
         }
 
-        return EXHAUSTIVE;
+        return EXHAUSTIVE_ALL;
     }
 
     intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
@@ -362,7 +362,8 @@ namespace mongo {
         // This loop consumes all input from pSource and buckets it based on pIdExpression.
         while (boost::optional<Document> input = pSource->getNext()) {
             if (memoryUsageBytes > _maxMemoryUsageBytes) {
-                uassert(16945, "Exceeded memory limit for $group, but didn't allow external sort",
+                uassert(16945, "Exceeded memory limit for $group, but didn't allow external sort."
+                               " Pass allowDiskUse:true to opt in.",
                         _extSortAllowed);
                 sortedFiles.push_back(spill());
                 memoryUsageBytes = 0;

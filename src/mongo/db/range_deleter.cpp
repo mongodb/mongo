@@ -397,6 +397,8 @@ namespace mongo {
     }
 
     void RangeDeleter::doWork() {
+        _env->initThread();
+
         while (!inShutdown() && !stopRequested()) {
             string errMsg;
 

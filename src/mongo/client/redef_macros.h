@@ -36,6 +36,9 @@
 #pragma push_macro("verify")
 #undef verify
 #define verify MONGO_verify
+#pragma push_macro("invariant")
+#undef invariant
+#define invariant MONGO_invariant
 #pragma push_macro("dassert")
 #undef dassert
 #define dassert MONGO_dassert

@@ -92,4 +92,4 @@ def removeIfPresent(lst, item):
 for to_remove in ['-Werror', "-Wsign-compare","-Wall"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
-env.StaticLibrary('tcmalloc_minimal', files, SYSLIBDEPS=my_SYSLIBDEPS)
+env.Library('tcmalloc_minimal', files, SYSLIBDEPS=my_SYSLIBDEPS)

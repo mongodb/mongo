@@ -15,9 +15,23 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
+
+#include <limits>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/instance.h"
@@ -758,6 +772,26 @@ namespace JSTests {
             ASSERT( s->exec( "f = {f:a.a.top}", "foo", false, true, false ) );
             out = s->getObject( "f" );
             ASSERT( Undefined == out.firstElement().type() );
+        }
+    };
+
+    class InvalidTimestamp {
+    public:
+        void run() {
+            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            s->localConnect( "blah" );
+
+            // Timestamp 't' component cannot exceed max for int32_t.
+            // Use appendTimestamp(field, Date) to bypass OpTime construction.
+            BSONObj in;
+            {
+                BSONObjBuilder b;
+                b.appendTimestamp( "a", std::numeric_limits<unsigned long long>::max() );
+                in = b.obj();
+            }
+            s->setObject( "a" , in );
+
+            ASSERT_FALSE( s->exec( "x = tojson( a ); " ,"foo" , false , true , false ) );
         }
     };
 
@@ -1606,6 +1640,22 @@ namespace JSTests {
             }
         };
 
+        class TimestampMax : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendMaxForType( "a", mongo::Timestamp );
+                BSONObj o = b.obj();
+                return o;
+            }
+            virtual string json() const {
+                OpTime opTime = OpTime::max();
+                stringstream ss;
+                ss << "{ \"a\" : Timestamp( " << opTime.getSecs() << ", " << opTime.getInc()
+                   << " ) }";
+                return ss.str();
+            }
+        };
+
         class Regex : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -2027,6 +2077,7 @@ namespace JSTests {
             add< TypeConservation >();
             add< NumberLong >();
             add< NumberLong2 >();
+            add< InvalidTimestamp >();
             add< RenameTest >();
 
             add< WeirdObjects >();
@@ -2083,6 +2134,7 @@ namespace JSTests {
             add< RoundTripTests::DateNonzero >();
             add< RoundTripTests::DateNegative >();
             add< RoundTripTests::Timestamp >();
+            add< RoundTripTests::TimestampMax >();
             add< RoundTripTests::Regex >();
             add< RoundTripTests::RegexWithQuotes >();
             add< RoundTripTests::UnquotedFieldName >();

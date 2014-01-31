@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/db/ops/modifier_compare.h"
@@ -43,9 +55,6 @@ namespace mongo {
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element elemFound;
-
-        // The replacement string passed in via prepare
-        std::string pathReplacementString;
     };
 
     ModifierCompare::ModifierCompare(ModifierCompare::ModifierCompareMode mode)
@@ -56,7 +65,8 @@ namespace mongo {
     ModifierCompare::~ModifierCompare() {
     }
 
-    Status ModifierCompare::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierCompare::init(const BSONElement& modExpr, const Options& opts,
+                                 bool* positional) {
 
         _updatePath.parse(modExpr.fieldName());
         Status status = fieldchecker::isUpdatable(_updatePath);
@@ -67,8 +77,13 @@ namespace mongo {
         // If a $-positional operator was used, get the index in which it occurred
         // and ensure only one occurrence.
         size_t foundCount;
-        fieldchecker::isPositional(_updatePath, &_pathReplacementPosition, &foundCount);
-        if (_pathReplacementPosition && foundCount > 1) {
+        bool foundDollar = fieldchecker::isPositional(
+            _updatePath, &_pathReplacementPosition, &foundCount);
+
+        if (positional)
+            *positional = foundDollar;
+
+        if (foundDollar && foundCount > 1) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Too many positional (i.e. '$') elements found in path '"
                                         << _updatePath.dottedField() << "'");
@@ -93,8 +108,7 @@ namespace mongo {
                                                "needed from the query. Unexpanded update: "
                                             << _updatePath.dottedField());
             }
-            _preparedState->pathReplacementString = matchedField.toString();
-            _updatePath.setPart(_pathReplacementPosition, _preparedState->pathReplacementString);
+            _updatePath.setPart(_pathReplacementPosition, matchedField);
         }
 
         // Locate the field name in 'root'. Note that we may not have all the parts in the path

@@ -46,6 +46,14 @@ namespace mongo {
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
                                                                        ComparisonMatchExpression* cmp,
                                                                        const BSONElement& e ) {
+        // Non-equality comparison match expressions cannot have
+        // a regular expression as the argument (e.g. {a: {$gt: /b/}} is illegal).
+        if (MatchExpression::EQ != cmp->matchType() && RegEx == e.type()) {
+            std::stringstream ss;
+            ss << "Can't have RegEx as arg to predicate over field '" << name << "'.";
+            return StatusWithMatchExpression(Status(ErrorCodes::BadValue, ss.str()));
+        }
+
         std::auto_ptr<ComparisonMatchExpression> temp( cmp );
 
         Status s = temp->init( name, e );
@@ -84,6 +92,12 @@ namespace mongo {
         case BSONObj::GTE:
             return _parseComparison( name, new GTEMatchExpression(), e );
         case BSONObj::NE: {
+            if (RegEx == e.type()) {
+                // Just because $ne can be rewritten as the negation of an
+                // equality does not mean that $ne of a regex is allowed. See SERVER-1705.
+                return StatusWithMatchExpression(Status(ErrorCodes::BadValue,
+                                                        "Can't have regex as arg to $ne."));
+            }
             StatusWithMatchExpression s = _parseComparison( name, new EqualityMatchExpression(), e );
             if ( !s.isOK() )
                 return s;
@@ -135,7 +149,14 @@ namespace mongo {
                 size = 0;
             }
             else if ( e.type() == NumberInt || e.type() == NumberLong ) {
-                size = e.numberInt();
+                if (e.numberLong() < 0) {
+                    // SERVER-11952. Setting 'size' to -1 means that no documents
+                    // should match this $size expression.
+                    size = -1;
+                }
+                else {
+                    size = e.numberInt();
+                }
             }
             else if ( e.type() == NumberDouble ) {
                 if ( e.numberInt() == e.numberDouble() ) {
@@ -400,13 +421,64 @@ namespace mongo {
         if ( name[0] != '$' )
             return false;
 
-        if ( mongoutils::str::equals( "$ref", name ) )
+        if ( _isDBRefDocument( o ) ) {
             return false;
+        }
 
         return true;
     }
 
+    /**
+     * DBRef fields are ordered
+     * Required fields: $ref and $id (in that order)
+     * Optional field: $db
+     * Field names are checked but not field types.
+     */
+    bool MatchExpressionParser::_isDBRefDocument( const BSONObj& obj ) {
+        BSONObjIterator i( obj );
+        BSONElement element;
+        const char* fieldName;
 
+        // $ref
+        if ( !i.more() ) {
+            return false;
+        }
+        element = i.next();
+        fieldName = element.fieldName();
+        if ( !mongoutils::str::equals( "$ref", fieldName ) ) {
+            return false;
+        }
+
+        // $id
+        if ( !i.more() ) {
+            return false;
+        }
+        element = i.next();
+        fieldName = element.fieldName();
+        if ( !mongoutils::str::equals( "$id", fieldName ) ) {
+            return false;
+        }
+
+        // $db
+        if ( !i.more() ) {
+            // $db is optional
+            return true;
+        }
+        element = i.next();
+        fieldName = element.fieldName();
+        if ( !mongoutils::str::equals( "$db", fieldName ) ) {
+            return false;
+        }
+
+        // Additional fields encountered beyond $db
+        // should invalidate the DBRef
+        if ( !i.more() ) {
+            return true;
+        }
+
+        // Document has more than 3 fields - invalid DBRef
+        return false;
+    }
 
     StatusWithMatchExpression MatchExpressionParser::_parseMOD( const char* name,
                                                       const BSONElement& e ) {
@@ -500,6 +572,11 @@ namespace mongo {
         while ( i.more() ) {
             BSONElement e = i.next();
 
+            // allow DBRefs but reject all fields with names starting wiht $
+            if ( _isExpressionDocument( e ) ) {
+                return Status( ErrorCodes::BadValue, "cannot nest $ under $in" );
+            }
+
             if ( e.type() == RegEx ) {
                 std::auto_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
                 Status s = r->init( "", e );
@@ -542,6 +619,28 @@ namespace mongo {
                 temp->add( theAnd.getChild( i ) );
             }
             theAnd.clearAndRelease();
+
+            return StatusWithMatchExpression( temp.release() );
+        }
+
+        // DBRef value case
+        // A DBRef document under a $elemMatch should be treated as a value case
+        // with an implied $eq.
+
+        if ( _isDBRefDocument( obj ) ) {
+
+            std::auto_ptr<EqualityMatchExpression> eq( new EqualityMatchExpression() );
+            Status s = eq->init( "", e );
+            if ( !s.isOK() ) {
+                return StatusWithMatchExpression( s );
+            }
+
+            std::auto_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
+            s = temp->init( name );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+
+            temp->add( eq.release() );
 
             return StatusWithMatchExpression( temp.release() );
         }

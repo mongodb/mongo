@@ -18,7 +18,6 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/memconcept.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
@@ -72,7 +71,7 @@ namespace mongo {
     }
 
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex(new mutex("flushMutex")) {
+        : _flushMutex(new mutex("flushMutex")), _uniqueId(0) {
         fd = 0;
         maphandle = 0;
         len = 0;
@@ -82,7 +81,6 @@ namespace mongo {
     void MemoryMappedFile::close() {
         LockMongoFilesShared::assertExclusivelyLocked();
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
-            memconcept::invalidate(*i);
             clearWritableBits(*i);
             UnmapViewOfFile(*i);
         }
@@ -111,13 +109,13 @@ namespace mongo {
         if ( 0 == readOnlyMapAddress ) {
             DWORD dosError = GetLastError();
             log() << "MapViewOfFileEx for " << filename()
+                    << " at address " << thisAddress
                     << " failed with error " << errnoWithDescription( dosError )
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createReadOnlyMap"
                     << endl;
             fassertFailed( 16165 );
         }
-        memconcept::is( readOnlyMapAddress, memconcept::concept::other, filename() );
         views.push_back( readOnlyMapAddress );
         return readOnlyMapAddress;
     }
@@ -202,6 +200,7 @@ namespace mongo {
             if ( view == 0 ) {
                 DWORD dosError = GetLastError();
                 log() << "MapViewOfFileEx for " << filename
+                        << " at address " << thisAddress
                         << " failed with " << errnoWithDescription( dosError )
                         << " (file size is " << length << ")"
                         << " in MemoryMappedFile::map"
@@ -211,7 +210,6 @@ namespace mongo {
             }
         }
         views.push_back(view);
-        memconcept::is(view, memconcept::concept::memorymappedfile, this->filename(), (unsigned) length);
         len = length;
         return view;
     }
@@ -290,7 +288,6 @@ namespace mongo {
         }
         clearWritableBits( privateMapAddress );
         views.push_back( privateMapAddress );
-        memconcept::is( privateMapAddress, memconcept::concept::memorymappedfile, filename() );
         return privateMapAddress;
     }
 
@@ -332,16 +329,23 @@ namespace mongo {
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
-        WindowsFlushable( void * view,
+        WindowsFlushable( MemoryMappedFile* theFile,
+                          void * view,
                           HANDLE fd,
                           const std::string& filename,
                           boost::shared_ptr<mutex> flushMutex )
-            : _view(view) , _fd(fd) , _filename(filename) , _flushMutex(flushMutex)
+            : _theFile(theFile), _view(view), _fd(fd), _filename(filename), _flushMutex(flushMutex)
         {}
 
         void flush() {
             if (!_view || !_fd)
                 return;
+
+            LockMongoFilesShared mmfilesLock;
+            if ( MongoFile::getAllFiles().count( _theFile ) == 0 ) {
+                // this was deleted while we were unlocked
+                return;
+            }
 
             SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
             scoped_lock lk(*_flushMutex);
@@ -382,10 +386,13 @@ namespace mongo {
             success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
-                out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
+                out() << "FlushFileBuffers failed: " << errnoWithDescription( err )
+                      << " file: " << _filename << endl;
+                dataSyncFailedHandler();
             }
         }
 
+        MemoryMappedFile* _theFile; // this may be deleted while we are running
         void * _view;
         HANDLE _fd;
         string _filename;
@@ -395,13 +402,13 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f( viewForFlushing() , fd , filename() , _flushMutex);
+            WindowsFlushable f( this, viewForFlushing() , fd , filename() , _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable( viewForFlushing() , fd , filename() , _flushMutex );
+        return new WindowsFlushable( this, viewForFlushing() , fd , filename() , _flushMutex );
     }
 
 }

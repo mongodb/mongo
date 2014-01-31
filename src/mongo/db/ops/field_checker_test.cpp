@@ -30,24 +30,20 @@ namespace {
     using mongo::Status;
 
     TEST(IsUpdatable, Basics) {
-        FieldRef fieldRef;
-        fieldRef.parse("x");
+        FieldRef fieldRef("x");
         ASSERT_OK(isUpdatable(fieldRef));
     }
 
     TEST(IsUpdatable, DottedFields) {
-        FieldRef fieldRef;
-        fieldRef.parse("x.y.z");
+        FieldRef fieldRef("x.y.z");
         ASSERT_OK(isUpdatable(fieldRef));
     }
 
     TEST(IsUpdatable, EmptyFields) {
-        FieldRef fieldRef;
-        fieldRef.parse("");
+        FieldRef fieldRef("");
         ASSERT_NOT_OK(isUpdatable(fieldRef));
 
-        FieldRef fieldRefDot;
-        fieldRefDot.parse(".");
+        FieldRef fieldRefDot(".");
         ASSERT_NOT_OK(isUpdatable(fieldRefDot));
 
         /* TODO: Re-enable after review
@@ -57,12 +53,10 @@ namespace {
 
 */
 
-        FieldRef fieldRefADot;
-        fieldRefADot.parse("a.");
+        FieldRef fieldRefADot("a.");
         ASSERT_NOT_OK(isUpdatable(fieldRefADot));
 
-        FieldRef fieldRefDotB;
-        fieldRefDotB.parse(".b");
+        FieldRef fieldRefDotB(".b");
         ASSERT_NOT_OK(isUpdatable(fieldRefDotB));
 
         FieldRef fieldRefEmptyMiddle;
@@ -72,8 +66,7 @@ namespace {
 
     // Positional checks
     TEST(isPositional, EntireArrayItem) {
-        FieldRef fieldRefPositional;
-        fieldRefPositional.parse("a.$");
+        FieldRef fieldRefPositional("a.$");
         size_t pos;
         size_t count;
         ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
@@ -82,8 +75,7 @@ namespace {
     }
 
     TEST(isPositional, ArraySubObject) {
-        FieldRef fieldRefPositional;
-        fieldRefPositional.parse("a.$.b");
+        FieldRef fieldRefPositional("a.$.b");
         size_t pos;
         size_t count;
         ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
@@ -92,8 +84,7 @@ namespace {
     }
 
     TEST(isPositional, MultiplePositional) {
-        FieldRef fieldRefPositional;
-        fieldRefPositional.parse("a.$.b.$.c");
+        FieldRef fieldRefPositional("a.$.b.$.c");
         size_t pos;
         size_t count;
         ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));

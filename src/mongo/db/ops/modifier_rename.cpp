@@ -75,7 +75,8 @@ namespace mongo {
     ModifierRename::~ModifierRename() {
     }
 
-    Status ModifierRename::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierRename::init(const BSONElement& modExpr, const Options& opts,
+                                bool* positional) {
 
         if (modExpr.type() != String) {
             return Status(ErrorCodes::BadValue,
@@ -123,6 +124,9 @@ namespace mongo {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The destination field for $rename may not be dynamic: "
                                         << _toFieldRef.dottedField());
+
+        if (positional)
+            *positional = false;
 
         return Status::OK();
     }
@@ -300,13 +304,7 @@ namespace mongo {
             // dotted field, if it was applied over a dotted field. The rationale is that the
             // secondary may be in a different state than the primary and thus make different
             // decisions about creating the intermediate path in _fieldRef or not.
-            mutablebson::Element unsetEntry = doc.makeElementBool(unsetPath, true);
-            if (!unsetEntry.ok()) {
-                return Status(ErrorCodes::InternalError, "cannot create details for $rename mod");
-            }
-
-            // Now, we attach the Element under the {$unset: ...} section.
-            status = logBuilder->addToUnsets(unsetEntry);
+            status = logBuilder->addToUnsets(unsetPath);
         }
 
         return status;

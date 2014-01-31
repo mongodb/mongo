@@ -38,7 +38,9 @@ namespace mongo {
 
     class MatchableDocument {
     public:
-        virtual ~MatchableDocument();
+        // Inlining to allow subclasses to see that this is a no-op and avoid a function call.
+        // Speeds up query execution measurably.
+        virtual ~MatchableDocument() {}
 
         virtual BSONObj toBSON() const = 0;
 

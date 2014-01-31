@@ -32,6 +32,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_entry.h"
 
 namespace mongo {
 
@@ -40,6 +41,17 @@ namespace mongo {
      */
     class IndexBoundsBuilder {
     public:
+        enum BoundsTightness {
+            // Index bounds are exact.
+            EXACT,
+
+            // Index bounds are inexact, and a fetch is required.
+            INEXACT_FETCH,
+
+            // Index bounds are inexact, but no fetch is required
+            INEXACT_COVERED
+        };
+
         /**
          * Populate the provided O.I.L. with one interval goes from MinKey to MaxKey (or vice-versa
          * depending on the index direction).
@@ -47,30 +59,39 @@ namespace mongo {
         static void allValuesForField(const BSONElement& elt, OrderedIntervalList* out);
 
         /**
-         * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr'
-         * is concerned with is indexed according to the keypattern element 'elt'.
+         * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr' is
+         * concerned with is indexed according to the keypattern element 'elt' from index 'index'.
          *
          * If 'expr' is elemMatch, the index tag is affixed to a child.
          *
          * The expression must be a predicate over one field.  That is, expr->isLeaf() or
          * expr->isArray() must be true, and expr->isLogical() must be false.  
          */
-        static void translate(const MatchExpression* expr, const BSONElement& elt,
-                              OrderedIntervalList* oilOut, bool* exactOut);
+        static void translate(const MatchExpression* expr,
+                              const BSONElement& elt,
+                              const IndexEntry& index,
+                              OrderedIntervalList* oilOut,
+                              BoundsTightness* tightnessOut);
 
         /**
          * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
          * with the bounds in oilOut, which is an in/out parameter.
          */
-        static void translateAndIntersect(const MatchExpression* expr, const BSONElement& elt,
-                                          OrderedIntervalList* oilOut, bool* exactOut);
+        static void translateAndIntersect(const MatchExpression* expr,
+                                          const BSONElement& elt,
+                                          const IndexEntry& index,
+                                          OrderedIntervalList* oilOut,
+                                          BoundsTightness* tightnessOut);
 
         /**
          * Creates bounds for 'expr' (indexed according to 'elt').  Unions those bounds
          * with the bounds in oilOut, which is an in/out parameter.
          */
-        static void translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
-                                      OrderedIntervalList* oilOut, bool* exactOut);
+        static void translateAndUnion(const MatchExpression* expr,
+                                      const BSONElement& elt,
+                                      const IndexEntry& index,
+                                      OrderedIntervalList* oilOut,
+                                      BoundsTightness* tightnessOut);
 
         /**
          * Make a range interval from the provided object.
@@ -79,10 +100,14 @@ namespace mongo {
          * The two inclusive flags indicate whether or not the start/end fields are included in the
          * interval (closed interval if included, open if not).
          */
-        static Interval makeRangeInterval(const BSONObj& obj, bool startInclusive,
+        static Interval makeRangeInterval(const BSONObj& obj,
+                                          bool startInclusive,
                                           bool endInclusive);
-        static Interval makeRangeInterval(const string& start, const string& end,
-                                          bool startInclusive, bool endInclusive);
+
+        static Interval makeRangeInterval(const string& start,
+                                          const string& end,
+                                          bool startInclusive,
+                                          bool endInclusive);
 
         /**
          * Make a point interval from the provided object.
@@ -111,18 +136,40 @@ namespace mongo {
          *
          *  used to optimize queries in some simple regex cases that start with '^'
          */
-        static string simpleRegex(const char* regex, const char* flags, bool* exact);
+        static string simpleRegex(const char* regex,
+                                  const char* flags,
+                                  BoundsTightness* tightnessOut);
 
+        /**
+         * Returns an Interval from minKey to maxKey
+         */
         static Interval allValues();
 
-        static void translateRegex(const RegexMatchExpression* rme, OrderedIntervalList* oil,
-                                   bool* exact);
+        static void translateRegex(const RegexMatchExpression* rme,
+                                   OrderedIntervalList* oil,
+                                   BoundsTightness* tightnessOut);
 
-        static void translateEquality(const BSONElement& data, bool isHashed,
-                                      OrderedIntervalList* oil, bool* exact);
+        static void translateEquality(const BSONElement& data,
+                                      bool isHashed,
+                                      OrderedIntervalList* oil,
+                                      BoundsTightness* tightnessOut);
 
         static void unionize(OrderedIntervalList* oilOut);
-        static void intersectize(const OrderedIntervalList& arg, OrderedIntervalList* oilOut);
+        static void intersectize(const OrderedIntervalList& arg,
+                                 OrderedIntervalList* oilOut);
+
+        /**
+         * Fills out 'bounds' with the bounds for an index scan over all values of the
+         * index described by 'keyPattern' in the default forward direction.
+         */
+        static void allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds);
+
+        /**
+         * Assumes each OIL in 'bounds' is increasing.
+         *
+         * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
+         */
+        static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
     };
 
 }  // namespace mongo

@@ -13,7 +13,6 @@ test = new SyncCCTest("sync6", {logpath: bitbucket, logappend: ""});
 var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {}); //{ logpath : bitbucket } )//{verbose : ""} )
 // { logpath : MongoRunner.dataDir + "/syncCommander/mongod.log" } );
 
-if ( !_isWindows() ) { //SERVER-7411
 // Up the log level for this test
 commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 0 } );
 
@@ -77,7 +76,6 @@ for ( var i = 4; i < 5; i++ ) {
 	printjson( command );
 	assert( result.ok, "Skewed threads did not increment correctly." );
 
-}
 }
 }
 

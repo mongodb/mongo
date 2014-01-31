@@ -47,7 +47,6 @@ namespace mongo {
             : doc(doc)
             , idxFound(0)
             , elemFound(doc.end())
-            , boundDollar("")
             , noOp(false) {
         }
 
@@ -59,9 +58,6 @@ namespace mongo {
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element elemFound;
-
-        // Value to bind to a $-positional field, if one is provided.
-        std::string boundDollar;
 
         // Value to be applied.
         SafeNum newValue;
@@ -80,7 +76,8 @@ namespace mongo {
     ModifierBit::~ModifierBit() {
     }
 
-    Status ModifierBit::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierBit::init(const BSONElement& modExpr, const Options& opts,
+                             bool* positional) {
 
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
@@ -93,6 +90,10 @@ namespace mongo {
         // and ensure only one occurrence.
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+
+        if (positional)
+            *positional = foundDollar;
+
         if (foundDollar && foundCount > 1) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Too many positional (i.e. '$') elements found in path '"
@@ -101,7 +102,7 @@ namespace mongo {
 
         if (modExpr.type() != mongo::Object)
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "The $bit modifier is not compatible with "
+                          str::stream() << "The $bit modifier is not compatible with a "
                                         << typeName(modExpr.type())
                                         << ". You must pass in an embedded document: "
                                            "{$bit: {field: {and/or/xor: #}}");
@@ -112,14 +113,6 @@ namespace mongo {
             BSONElement curOp = opsIterator.next();
 
             const StringData payloadFieldName = curOp.fieldName();
-
-            if ((curOp.type() != mongo::NumberInt) &&
-                (curOp.type() != mongo::NumberLong))
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream() << "The $bit modifier field must be an Integer(32/64 bit); a '"
-                                  << typeName(curOp.type())
-                                  << "' is not supported here: " << curOp);
 
             SafeNumOp op = NULL;
 
@@ -137,8 +130,16 @@ namespace mongo {
                     ErrorCodes::BadValue,
                     str::stream() << "The $bit modifier only supports 'and', 'or', and 'xor', not '"
                                   << payloadFieldName
-                                  << "' which is an unknown operator: " << curOp);
+                                  << "' which is an unknown operator: {" << curOp << "}");
             }
+
+            if ((curOp.type() != mongo::NumberInt) &&
+                (curOp.type() != mongo::NumberLong))
+                return Status(
+                    ErrorCodes::BadValue,
+                    str::stream() << "The $bit modifier field must be an Integer(32/64 bit); a '"
+                                  << typeName(curOp.type())
+                                  << "' is not supported here: {" << curOp << "}");
 
             const OpEntry entry = {SafeNum(curOp), op};
             _ops.push_back(entry);
@@ -163,8 +164,7 @@ namespace mongo {
                                                 "needed from the query. Unexpanded update: "
                                             << _fieldRef.dottedField());
             }
-            _preparedState->boundDollar = matchedField.toString();
-            _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
+            _fieldRef.setPart(_posDollar, matchedField);
         }
 
         // Locate the field name in 'root'.

@@ -33,10 +33,12 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 
@@ -193,6 +195,16 @@ namespace mongo {
                     log() << "replSet " << o.toString() << rsLog;
                     throw rsfatal();
                 }
+                else if( cmdname == "collMod" ) {
+                    if ( o.nFields() == 2 &&
+                         o["usePowerOf2Sizes"].type() == Bool ) {
+                        log() << "replSet not rolling back change of usePowerOf2Sizes: " << o;
+                    }
+                    else {
+                        log() << "replSet error cannot rollback a collMod command: " << o;
+                        throw rsfatal();
+                    }
+                }
                 else {
                     log() << "replSet error can't rollback this command yet: " << o.toString() << rsLog;
                     log() << "replSet cmdname=" << cmdname << rsLog;
@@ -215,11 +227,16 @@ namespace mongo {
     static void syncRollbackFindCommonPoint(DBClientConnection *them, HowToFixUp& h) {
         verify( Lock::isLocked() );
         Client::Context c(rsoplog);
-        NamespaceDetails *nsd = nsdetails(rsoplog);
-        verify(nsd);
-        ReverseCappedCursor u(nsd);
-        if( !u.ok() )
+
+        boost::scoped_ptr<Runner> runner(
+            InternalPlanner::collectionScan(rsoplog, InternalPlanner::BACKWARD));
+
+        BSONObj ourObj;
+        DiskLoc ourLoc;
+
+        if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
             throw rsfatal("our oplog empty or unreadable");
+        }
 
         const Query q = Query().sort(reverseNaturalObj);
         const bo fields = BSON( "ts" << 1 << "h" << 1 );
@@ -231,7 +248,6 @@ namespace mongo {
 
         if( t.get() == 0 || !t->more() ) throw rsfatal("remote oplog empty or unreadable");
 
-        BSONObj ourObj = u.current();
         OpTime ourTime = ourObj["ts"]._opTime();
         BSONObj theirObj = t->nextSafe();
         OpTime theirTime = theirObj["ts"]._opTime();
@@ -260,7 +276,7 @@ namespace mongo {
                     log() << "replSet rollback found matching events at " << ourTime.toStringPretty() << rsLog;
                     log() << "replSet rollback findcommonpoint scanned : " << scanned << rsLog;
                     h.commonPoint = ourTime;
-                    h.commonPointOurDiskloc = u.currLoc();
+                    h.commonPointOurDiskloc = ourLoc;
                     return;
                 }
 
@@ -276,15 +292,13 @@ namespace mongo {
                 theirObj = t->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
-                u.advance();
-                if( !u.ok() ) {
+                if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog" << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
                     log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
                     throw rsfatal("RS101 reached beginning of local oplog [1]");
                 }
-                ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
             }
             else if( theirTime > ourTime ) {
@@ -301,15 +315,13 @@ namespace mongo {
             else {
                 // theirTime < ourTime
                 refetch(h, ourObj);
-                u.advance();
-                if( !u.ok() ) {
+                if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog" << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: " << scanned << rsLog;
                     log() << "replSet   theirTime: " << theirTime.toStringLong() << rsLog;
                     log() << "replSet   ourTime:   " << ourTime.toStringLong() << rsLog;
                     throw rsfatal("RS101 reached beginning of local oplog [2]");
                 }
-                ourObj = u.current();
                 ourTime = ourObj["ts"]._opTime();
             }
         }
@@ -453,8 +465,10 @@ namespace mongo {
 
         sethbmsg("rollback 4.7");
         Client::Context c(rsoplog);
-        NamespaceDetails *oplogDetails = nsdetails(rsoplog);
-        uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
+        Collection* oplogCollection = c.db()->getCollection( rsoplog );
+        uassert(13423,
+                str::stream() << "replSet error in rollback can't find " << rsoplog,
+                oplogCollection);
 
         map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
 
@@ -493,9 +507,9 @@ namespace mongo {
                     /* TODO1.6 : can't delete from a capped collection.  need to handle that here. */
                     deletes++;
 
-                    NamespaceDetails *nsd = nsdetails(d.ns);
-                    if( nsd ) {
-                        if( nsd->isCapped() ) {
+                    Collection* collection = c.db()->getCollection(d.ns);
+                    if( collection ) {
+                        if( collection->isCapped() ) {
                             /* can't delete from a capped collection - so we truncate instead. if this item must go,
                             so must all successors!!! */
                             try {
@@ -505,6 +519,7 @@ namespace mongo {
                                 DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
                                 if( Listener::getElapsedTimeMillis() - start > 200 )
                                     log() << "replSet warning roll back slow no _id index for " << d.ns << " perhaps?" << rsLog;
+                                NamespaceDetails* nsd = collection->details();
                                 //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
                                 if( !loc.isNull() ) {
                                     try {
@@ -535,7 +550,7 @@ namespace mongo {
                             }
                         }
                         // did we just empty the collection?  if so let's check if it even exists on the source.
-                        if( nsd->numRecords() == 0 ) {
+                        if( collection->numRecords() == 0 ) {
                             try {
                                 string sys = cc().database()->name() + ".system.namespaces";
                                 bo o = them->findOne(sys, QUERY("name"<<d.ns));
@@ -590,7 +605,7 @@ namespace mongo {
         // clean up oplog
         LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
-        oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+        oplogCollection->details()->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 
         Status status = getGlobalAuthorizationManager()->initialize();
         if (!status.isOK()) {

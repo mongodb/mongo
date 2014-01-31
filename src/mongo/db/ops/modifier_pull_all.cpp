@@ -47,7 +47,6 @@ namespace mongo {
             : doc(*targetDoc)
             , pathFoundIndex(0)
             , pathFoundElement(doc.end())
-            , pathPositionalPart(std::string())
             , applyCalled(false)
             , elementsToRemove() {
         }
@@ -60,9 +59,6 @@ namespace mongo {
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element pathFoundElement;
-
-        // Value to bind to a $-positional field, if one is provided.
-        std::string pathPositionalPart;
 
         bool applyCalled;
 
@@ -91,7 +87,8 @@ namespace mongo {
     ModifierPullAll::~ModifierPullAll() {
     }
 
-    Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts,
+                                 bool* positional) {
 
         //
         // field name analysis
@@ -111,6 +108,10 @@ namespace mongo {
         bool foundDollar = fieldchecker::isPositional(_fieldRef,
                                                       &_positionalPathIndex,
                                                       &foundCount);
+
+        if (positional)
+            *positional = foundDollar;
+
         if (foundDollar && foundCount > 1) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Too many positional (i.e. '$') elements found in path '"
@@ -147,8 +148,7 @@ namespace mongo {
                                                 "needed from the query. Unexpanded update: "
                                             << _fieldRef.dottedField());
             }
-            _preparedState->pathPositionalPart = matchedField.toString();
-            _fieldRef.setPart(_positionalPathIndex, _preparedState->pathPositionalPart);
+            _fieldRef.setPart(_positionalPathIndex, matchedField);
         }
 
         // Locate the field name in 'root'. Note that if we don't have the full path in the
@@ -225,25 +225,23 @@ namespace mongo {
     Status ModifierPullAll::log(LogBuilder* logBuilder) const {
         // log document
         mutablebson::Document& doc = logBuilder->getDocument();
-
         const bool pathExists = _preparedState->pathFoundElement.ok() &&
             (_preparedState->pathFoundIndex == (_fieldRef.numParts() - 1));
 
+        if (!pathExists)
+            return logBuilder->addToUnsets(_fieldRef.dottedField());
+
         // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = pathExists ?
-            doc.makeElementWithNewFieldName(
-                _fieldRef.dottedField(),
-                _preparedState->pathFoundElement):
-            doc.makeElementBool(_fieldRef.dottedField(), true);
+        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
+                                                            _fieldRef.dottedField(),
+                                                            _preparedState->pathFoundElement);
 
         if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create details");
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not append entry to $pullAll oplog entry: "
+                                        << "set '" << _fieldRef.dottedField() << "' -> "
+                                        << _preparedState->pathFoundElement.toString() );
         }
-
-        // Now, we attach the {<fieldname>: <value>} Element under the {$op: ...} one.
-        return pathExists ?
-            logBuilder->addToSets(logElement) :
-            logBuilder->addToUnsets(logElement);
+        return logBuilder->addToSets(logElement);
     }
-
 } // namespace mongo

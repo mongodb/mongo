@@ -40,17 +40,17 @@
 
 namespace mongo {
 
-    SingleSolutionRunner::SingleSolutionRunner(CanonicalQuery* canonicalQuery,
+    SingleSolutionRunner::SingleSolutionRunner(const Collection* collection,
+                                               CanonicalQuery* canonicalQuery,
                                                QuerySolution* soln,
                                                PlanStage* root,
                                                WorkingSet* ws)
-        : _canonicalQuery(canonicalQuery),
+        : _collection( collection ),
+          _canonicalQuery(canonicalQuery),
           _solution(soln),
-          _exec(new PlanExecutor(ws, root)) {
-    }
+          _exec(new PlanExecutor(ws, root)) { }
 
-    SingleSolutionRunner::~SingleSolutionRunner() {
-    }
+    SingleSolutionRunner::~SingleSolutionRunner() { }
 
     Runner::RunnerState SingleSolutionRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         return _exec->getNext(objOut, dlOut);
@@ -76,8 +76,8 @@ namespace mongo {
         _exec->setYieldPolicy(policy);
     }
 
-    void SingleSolutionRunner::invalidate(const DiskLoc& dl) {
-        _exec->invalidate(dl);
+    void SingleSolutionRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
+        _exec->invalidate(dl, type);
     }
 
     const std::string& SingleSolutionRunner::ns() {
@@ -86,29 +86,40 @@ namespace mongo {
 
     void SingleSolutionRunner::kill() {
         _exec->kill();
+        _collection = NULL;
     }
 
-    Status SingleSolutionRunner::getExplainPlan(TypeExplain** explain) const {
-        dassert(_exec.get());
+    Status SingleSolutionRunner::getInfo(TypeExplain** explain,
+                                         PlanInfo** planInfo) const {
+        if (NULL != explain) {
+            verify(_exec.get());
 
-        scoped_ptr<PlanStageStats> stats(_exec->getStats());
-        if (NULL == stats.get()) {
-            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
-        }
+            scoped_ptr<PlanStageStats> stats(_exec->getStats());
+            if (NULL == stats.get()) {
+                return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+            }
 
-        Status status = explainPlan(*stats, explain, true /* full details */);
-        if (!status.isOK()) {
-            return status;
-        }
+            Status status = explainPlan(*stats, explain, true /* full details */);
+            if (!status.isOK()) {
+                return status;
+            }
 
-        // Fill in explain fields that are accounted by on the runner level.
-        TypeExplain* chosenPlan = NULL;
-        explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (chosenPlan) {
-            (*explain)->addToAllPlans(chosenPlan);
+            // Fill in explain fields that are accounted by on the runner level.
+            TypeExplain* chosenPlan = NULL;
+            explainPlan(*stats, &chosenPlan, false /* no full details */);
+            if (chosenPlan) {
+                (*explain)->addToAllPlans(chosenPlan);
+            }
+            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
+            (*explain)->setNScannedAllPlans((*explain)->getNScanned());
         }
-        (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
-        (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+        else if (NULL != planInfo) {
+            if (NULL == _solution.get()) {
+                return Status(ErrorCodes::InternalError,
+                              "no solution available for plan info");
+            }
+            getPlanInfo(*_solution, planInfo);
+        }
 
         return Status::OK();
     }

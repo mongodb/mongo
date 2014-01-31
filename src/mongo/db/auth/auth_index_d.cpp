@@ -34,8 +34,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_details.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

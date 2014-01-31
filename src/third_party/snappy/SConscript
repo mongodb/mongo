@@ -6,4 +6,4 @@ if not windows:
     env = env.Clone()
     env.Append(CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function'])
 
-env.StaticLibrary('snappy', ['snappy.cc', 'snappy-sinksource.cc'])
+env.Library('snappy', ['snappy.cc', 'snappy-sinksource.cc'])

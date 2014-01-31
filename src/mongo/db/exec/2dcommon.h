@@ -28,7 +28,6 @@
 
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/geo/core.h"
-#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/pdfile.h"
@@ -132,8 +131,8 @@ namespace twod_exec {
         // Returns the min and max keys which bound a particular location.
         // The only time these may be equal is when we actually equal the location
         // itself, otherwise our expanding algorithm will fail.
-        static bool initial(IndexDescriptor* descriptor, const TwoDIndexingParams& params,
-                             BtreeLocation& min, BtreeLocation& max, GeoHash start);
+        static bool initial(const IndexDescriptor* descriptor, const TwoDIndexingParams& params,
+                            BtreeLocation& min, BtreeLocation& max, GeoHash start);
     };
 
     //
@@ -142,8 +141,7 @@ namespace twod_exec {
 
     class GeoAccumulator {
     public:
-        GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter, bool uniqueDocs,
-                       bool needDistance);
+        GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter);
 
         virtual ~GeoAccumulator();
 
@@ -172,9 +170,6 @@ namespace twod_exec {
         long long _objectsLoaded;
         long long _pointsLoaded;
         long long _found;
-
-        bool _uniqueDocs;
-        bool _needDistance;
     };
 
     class GeoBrowse : public GeoAccumulator {
@@ -190,8 +185,7 @@ namespace twod_exec {
             DONE
         } _state;
 
-        GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter,
-                  bool uniqueDocs = true, bool needDistance = false);
+        GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter);
 
         virtual bool ok();
         virtual bool advance();
@@ -238,7 +232,10 @@ namespace twod_exec {
 
         void notePrefix() { _expPrefixes.push_back(_prefix); }
 
-        void invalidate(const DiskLoc& dl);
+        /**
+         * Returns true if the result was actually invalidated, false otherwise.
+         */
+        bool invalidate(const DiskLoc& dl);
 
         string _type;
         list<GeoPoint> _stack;
@@ -269,7 +266,7 @@ namespace twod_exec {
 
         shared_ptr<GeoHash> _expPrefix;
         mutable vector<GeoHash> _expPrefixes;
-        IndexDescriptor* _descriptor;
+        const IndexDescriptor* _descriptor;
         shared_ptr<GeoHashConverter> _converter;
         TwoDIndexingParams _params;
     };

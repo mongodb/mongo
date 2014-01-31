@@ -47,6 +47,7 @@ namespace mongo {
     class PlanStage;
     struct QuerySolution;
     class TypeExplain;
+    struct PlanInfo;
     class WorkingSet;
 
     /**
@@ -57,7 +58,7 @@ namespace mongo {
         /**
          * Takes ownership of query.
          */
-        MultiPlanRunner(CanonicalQuery* query);
+        MultiPlanRunner(const Collection* collection, CanonicalQuery* query);
         virtual ~MultiPlanRunner();
 
         /**
@@ -85,7 +86,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual bool restoreState();
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
@@ -93,14 +94,17 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
+
         /**
-         * Returns OK, allocating and filling in '*explain' with details of the "winner"
-         * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
-         * the error.
+         * Returns OK, allocating and filling in '*explain' and '*planInfo' with details of
+         * the "winner" plan. Caller takes ownership of '*explain' and '*planInfo'. Otherwise,
+         * return a status describing the error.
          *
          * TOOD: fill in the explain of all candidate plans
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
         /**
@@ -109,6 +113,8 @@ namespace mongo {
         bool workAllPlans();
         void allPlansSaveState();
         void allPlansRestoreState();
+
+        const Collection* _collection;
 
         // Were we killed by an invalidate?
         bool _killed;

@@ -21,7 +21,8 @@
 
 namespace mongo {
 
-    unsigned long long Timer::_countsPerSecond;
+    // default value of 1 so that during startup initialization if referenced no division by zero
+    unsigned long long Timer::_countsPerSecond = 1;
 
     namespace {
 

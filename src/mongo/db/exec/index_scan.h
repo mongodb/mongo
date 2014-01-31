@@ -45,27 +45,35 @@ namespace mongo {
     class WorkingSet;
 
     struct IndexScanParams {
-        IndexScanParams() : descriptor(NULL), direction(1), limit(0),
-                            forceBtreeAccessMethod(false), doNotDedup(false) { }
+        IndexScanParams() : descriptor(NULL),
+                            direction(1),
+                            doNotDedup(false),
+                            maxScan(0),
+                            addKeyMetadata(false) { }
 
-        IndexDescriptor* descriptor;
+        const IndexDescriptor* descriptor;
 
         IndexBounds bounds;
 
         int direction;
 
-        // This only matters for 2d indices and will be ignored by every other index.
-        int limit;
-
-        // Special indices internally open an IndexCursor over themselves but as a straight Btree.
-        bool forceBtreeAccessMethod;
-
         bool doNotDedup;
+
+        // How many keys will we look at?
+        size_t maxScan;
+
+        // Do we want to add the key as metadata?
+        bool addKeyMetadata;
     };
 
     /**
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
      * filter.  Internally dedups on DiskLoc.
+     *
+     * XXX: we probably should split this into 2 stages: one btree-only "fast" ixscan and one
+     *      that strictly talks through the index API.  Need to figure out what we really want
+     *      to ship down through that API predicate-wise though, currently is a BSONObj but that's
+     *      not going to be enough. See SERVER-12397 for tracking.
      *
      * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
      */
@@ -80,11 +88,16 @@ namespace mongo {
         virtual bool isEOF();
         virtual void prepareToYield();
         virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual PlanStageStats* getStats();
 
     private:
+        /**
+         * Initialize the underlying IndexCursor
+         */
+        void initIndexCursor();
+
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
 
@@ -92,9 +105,9 @@ namespace mongo {
         WorkingSet* _workingSet;
 
         // Index access.
-        IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
+        const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
         scoped_ptr<IndexCursor> _indexCursor;
-        IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
+        const IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
 
         // Have we hit the end of the index scan?
         bool _hitEnd;

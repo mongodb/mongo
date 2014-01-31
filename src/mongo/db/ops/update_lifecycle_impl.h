@@ -31,7 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update_lifecycle.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 
@@ -48,11 +48,16 @@ namespace mongo {
          */
         UpdateLifecycleImpl(bool ignoreVersion, const NamespaceString& nsString);
 
-        virtual const bool canContinue() const;
-        virtual const void getIndexKeys(IndexPathSet* returnedIndexPathSet) const;
+        virtual void setCollection(Collection* collection);
+
+        virtual bool canContinue() const;
+
+        virtual const IndexPathSet* getIndexKeys() const;
+
         virtual const std::vector<FieldRef*>* getImmutableFields() const;
 
     private:
+        Collection* _collection;
         const NamespaceString& _nsString;
         ChunkVersion _shardVersion;
     };

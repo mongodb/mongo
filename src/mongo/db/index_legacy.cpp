@@ -29,13 +29,11 @@
 #include "mongo/db/index_legacy.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/fts/fts_enabled.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
@@ -43,14 +41,7 @@ namespace mongo {
     BSONObj IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
         string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
 
-        if (IndexNames::TEXT == pluginName || IndexNames::TEXT_INTERNAL == pluginName) {
-            StringData desc = cc().desc();
-            if (desc.find("conn") == 0) {
-                // this is to make sure we only complain for users
-                // if you do get a text index created an a primary
-                // want it to index on the secondary as well
-                massert(16811, "text search not enabled", fts::isTextSearchEnabled() );
-            }
+        if (IndexNames::TEXT == pluginName) {
             return fts::FTSSpec::fixSpec(obj);
         }
 
@@ -90,7 +81,7 @@ namespace mongo {
     void IndexLegacy::postBuildHook(Collection* collection, const BSONObj& keyPattern) {
         // If it's an FTS index, we want to set the power of 2 flag.
         string pluginName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
-        if (IndexNames::TEXT == pluginName || IndexNames::TEXT_INTERNAL == pluginName) {
+        if (IndexNames::TEXT == pluginName) {
             NamespaceDetails* nsd = collection->details();
             if (nsd->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes)) {
                 nsd->syncUserFlags(collection->ns().ns());

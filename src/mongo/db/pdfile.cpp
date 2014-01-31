@@ -51,7 +51,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
-#include "mongo/db/btree.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands/server_status.h"
@@ -61,53 +61,27 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/extsort.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/memconcept.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
-#include "mongo/util/hashtab.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
-
-    //The oplog entries inserted
-    static TimerStats oplogInsertStats;
-    static ServerStatusMetricField<TimerStats> displayInsertedOplogEntries(
-                                                    "repl.oplog.insert",
-                                                    &oplogInsertStats );
-    static Counter64 oplogInsertBytesStats;
-    static ServerStatusMetricField<Counter64> displayInsertedOplogEntryBytes(
-                                                    "repl.oplog.insertBytes",
-                                                    &oplogInsertBytesStats );
-
-    bool isValidNS( const StringData& ns ) {
-        // TODO: should check for invalid characters
-
-        size_t idx = ns.find( '.' );
-        if ( idx == string::npos )
-            return false;
-
-        if ( idx == ns.size() - 1 )
-            return false;
-
-        return true;
-    }
 
     // TODO SERVER-4328
     bool inDBRepair = false;
@@ -125,7 +99,6 @@ namespace mongo {
     const char FREELIST_NS[] = ".$freelist";
     string pidfilepath;
 
-    DataFileMgr theDataFileMgr;
     DatabaseHolder _dbHolder;
     int MAGIC = 0x1000;
 
@@ -303,10 +276,6 @@ namespace mongo {
         if ( mx > 0 )
             d->setMaxCappedDocs( mx );
 
-        if ( options["flags"].numberInt() ) {
-            d->replaceUserFlags( options["flags"].numberInt() );
-        }
-
         return true;
     }
 
@@ -319,6 +288,7 @@ namespace mongo {
         massert(10356 ,
                 str::stream() << "invalid ns: " << ns,
                 NamespaceString::validCollectionComponent(ns));
+
         bool ok = _userCreateNS(ns, options, err, deferIdIndex);
         if ( logForReplication && ok ) {
             if ( options.getField( "create" ).eoo() ) {
@@ -333,519 +303,7 @@ namespace mongo {
         return ok;
     }
 
-    /*---------------------------------------------------------------------*/
-
-    DataFileMgr::DataFileMgr(){}
-
-    shared_ptr<Cursor> DataFileMgr::findAll(const StringData& ns, const DiskLoc &startLoc) {
-        Database* db = cc().database();
-        Collection* collection = db->getCollection( ns );
-        if ( !collection )
-            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
-        NamespaceDetails* d = collection->details();
-        DiskLoc loc = d->firstExtent();
-        if ( loc.isNull() )
-            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
-        Extent *e = getExtent(loc);
-
-        DEBUGGING {
-            out() << "listing extents for " << ns << endl;
-            DiskLoc tmp = loc;
-            set<DiskLoc> extents;
-
-            while ( 1 ) {
-                Extent *f = db->getExtentManager().getExtent(tmp);
-                out() << "extent: " << tmp.toString() << endl;
-                extents.insert(tmp);
-                tmp = f->xnext;
-                if ( tmp.isNull() )
-                    break;
-                f = db->getExtentManager().getNextExtent( f );
-            }
-
-            out() << endl;
-            d->dumpDeleted(&extents);
-        }
-
-        if ( d->isCapped() )
-            return shared_ptr<Cursor>( ForwardCappedCursor::make( d , startLoc ) );
-
-        if ( !startLoc.isNull() )
-            return shared_ptr<Cursor>(new BasicCursor( startLoc ));
-
-        while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
-            /* todo: if extent is empty, free it for reuse elsewhere.
-               that is a bit complicated have to clean up the freelists.
-            */
-            RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead. ns:" << ns << endl;
-            // find a nonempty extent
-            // it might be nice to free the whole extent here!  but have to clean up free recs then.
-            e = db->getExtentManager().getNextExtent( e );
-        }
-        return shared_ptr<Cursor>(new BasicCursor( e->firstRecord ));
-    }
-
-    /* get a table scan cursor, but can be forward or reverse direction.
-       order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
-    */
-    shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
-        BSONElement el = order.getField("$natural"); // e.g., { $natural : -1 }
-
-        if ( el.number() >= 0 )
-            return DataFileMgr::findAll(ns, startLoc);
-
-        // "reverse natural order"
-        Database* db = cc().database();
-        Collection* collection = db->getCollection( ns );
-        if ( !collection )
-            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
-
-        NamespaceDetails* d = collection->details();
-
-        if ( !d->isCapped() ) {
-            if ( !startLoc.isNull() )
-                return shared_ptr<Cursor>(new ReverseCursor( startLoc ));
-            Extent *e = d->lastExtent().ext();
-            while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
-                OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
-                e = db->getExtentManager().getPrevExtent(e);
-            }
-            return shared_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
-        }
-        else {
-            return shared_ptr<Cursor>( new ReverseCappedCursor( d, startLoc ) );
-        }
-    }
-
-    /* deletes a record, just the pdfile portion -- no index cleanup, no cursor cleanup, etc.
-       caller must check if capped
-    */
-    void DataFileMgr::_deleteRecord(NamespaceDetails *d, const StringData& ns, Record *todelete, const DiskLoc& dl) {
-        /* remove ourself from the record next/prev chain */
-        {
-            if ( todelete->prevOfs() != DiskLoc::NullOfs )
-                getDur().writingInt( todelete->getPrev(dl).rec()->nextOfs() ) = todelete->nextOfs();
-            if ( todelete->nextOfs() != DiskLoc::NullOfs )
-                getDur().writingInt( todelete->getNext(dl).rec()->prevOfs() ) = todelete->prevOfs();
-        }
-
-        /* remove ourself from extent pointers */
-        {
-            Extent *e = getDur().writing( todelete->myExtent(dl) );
-            if ( e->firstRecord == dl ) {
-                if ( todelete->nextOfs() == DiskLoc::NullOfs )
-                    e->firstRecord.Null();
-                else
-                    e->firstRecord.set(dl.a(), todelete->nextOfs() );
-            }
-            if ( e->lastRecord == dl ) {
-                if ( todelete->prevOfs() == DiskLoc::NullOfs )
-                    e->lastRecord.Null();
-                else
-                    e->lastRecord.set(dl.a(), todelete->prevOfs() );
-            }
-        }
-
-        /* add to the free list */
-        {
-            d->incrementStats( -1 * todelete->netLength(), -1 );
-
-            if ( nsToCollectionSubstring(ns) == "system.indexes") {
-                /* temp: if in system.indexes, don't reuse, and zero out: we want to be
-                   careful until validated more, as IndexDetails has pointers
-                   to this disk location.  so an incorrectly done remove would cause
-                   a lot of problems.
-                */
-                memset(getDur().writingPtr(todelete, todelete->lengthWithHeaders() ), 0, todelete->lengthWithHeaders() );
-            }
-            else {
-                DEV {
-                    unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
-                    *getDur().writing(p) = 0;
-                    //DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
-                }
-                d->addDeletedRec((DeletedRecord*)todelete, dl);
-            }
-        }
-    }
-
-    void DataFileMgr::deleteRecord(NamespaceDetails* d, const StringData& ns, Record *todelete,
-                                   const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
-        dassert( todelete == dl.rec() );
-
-        if ( d->isCapped() && !cappedOK ) {
-            out() << "failing remove on a capped ns " << ns << endl;
-            uassert( 10089 ,  "can't remove from a capped collection" , 0 );
-            return;
-        }
-
-        BSONObj obj = BSONObj::make( todelete );
-
-        Collection* collection = cc().database()->getCollection( ns );
-        verify( collection );
-
-        BSONObj toDelete;
-        collection->deleteDocument( dl, cappedOK, noWarn, doLog ? &toDelete : NULL );
-
-        if ( ! toDelete.isEmpty() ) {
-            // TODO: this is crazy, need to fix logOp
-            const char* raw = ns.rawData();
-            if ( strlen(raw) == ns.size() ) {
-                logOp( "d", raw, toDelete );
-            }
-            else {
-                string temp = ns.toString();
-                logOp( "d", temp.c_str(), toDelete );
-            }
-        }
-    }
-
-#pragma pack(1)
-    struct IDToInsert {
-        char type;
-        char id[4];
-        OID oid;
-
-        IDToInsert() {
-            type = 0;
-        }
-
-        bool needed() const { return type > 0; }
-
-        void init() {
-            type = static_cast<char>(jstOID);
-            strcpy( id, "_id" );
-            oid.init();
-            verify( size() == 17 );
-        }
-
-        int size() const { return sizeof( IDToInsert ); }
-
-        const char* rawdata() const { return reinterpret_cast<const char*>( this ); }
-    };
-#pragma pack()
-
-    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god, bool fromMigrate ) {
-        BSONObj tmp = o;
-        insertWithObjMod( ns, tmp, false, god );
-        logOp( "i", ns, tmp, 0, 0, fromMigrate );
-    }
-
-    /** @param o the object to insert. can be modified to add _id and thus be an in/out param
-     */
-    DiskLoc DataFileMgr::insertWithObjMod(const char* ns, BSONObj& o, bool mayInterrupt, bool god) {
-        bool addedID = false;
-        DiskLoc loc = insert( ns, o.objdata(), o.objsize(), mayInterrupt, god, true, &addedID );
-        if( addedID && !loc.isNull() )
-            o = BSONObj::make( loc.rec() );
-        return loc;
-    }
-
-    /** add a record to the end of the linked list chain within this extent. 
-        require: you must have already declared write intent for the record header.        
-    */
-    void addRecordToRecListInExtent(Record *r, DiskLoc loc) {
-        dassert( loc.rec() == r );
-        Extent *e = r->myExtent(loc);
-        if ( e->lastRecord.isNull() ) {
-            Extent::FL *fl = getDur().writing(e->fl());
-            fl->firstRecord = fl->lastRecord = loc;
-            r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
-        }
-        else {
-            Record *oldlast = e->lastRecord.rec();
-            r->prevOfs() = e->lastRecord.getOfs();
-            r->nextOfs() = DiskLoc::NullOfs;
-            getDur().writingInt(oldlast->nextOfs()) = loc.getOfs();
-            getDur().writingDiskLoc(e->lastRecord) = loc;
-        }
-    }
-
-    NOINLINE_DECL DiskLoc outOfSpace(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
-        DiskLoc loc;
-        if ( d->isCapped() ) {
-            // size capped doesn't grow
-            return loc;
-        }
-
-        LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
-
-        Collection* collection = cc().database()->getCollection( ns );
-        verify( collection );
-
-        collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god );
-
-        loc = d->alloc(ns, lenWHdr);
-        if ( !loc.isNull() ) {
-            // got on first try
-            return loc;
-        }
-
-        log() << "warning: alloc() failed after allocating new extent. "
-              << "lenWHdr: " << lenWHdr << " last extent size:"
-              << d->lastExtentSize() << "; trying again" << endl;
-
-        for ( int z = 0; z < 10 && lenWHdr > d->lastExtentSize(); z++ ) {
-            log() << "try #" << z << endl;
-            collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god);
-
-            loc = d->alloc(ns, lenWHdr);
-            if ( ! loc.isNull() )
-                break;
-        }
-
-        return loc;
-    }
-
-    /** used by insert and also compact
-      * @return null loc if out of space 
-      */
-    DiskLoc allocateSpaceForANewRecord(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
-        DiskLoc loc = d->alloc(ns, lenWHdr);
-        if ( loc.isNull() ) {
-            loc = outOfSpace(ns, d, lenWHdr, god);
-        }
-        return loc;
-    }
-
-    bool NOINLINE_DECL insert_checkSys(const char *sys, const char *ns, bool& wouldAddIndex, const void *obuf, bool god) {
-        uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
-        if ( strstr(ns, ".system.") ) {
-            // later:check for dba-type permissions here if have that at some point separate
-            if (nsToCollectionSubstring(ns) == "system.indexes")
-                wouldAddIndex = true;
-            else if ( legalClientSystemNS( ns , true ) ) {
-                if ( obuf &&
-                        StringData(ns) == StringData(".system.users", StringData::LiteralTag()) ) {
-                    BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                    V2UserDocumentParser parser;
-                    uassertStatusOK(parser.checkValidUserDocument(t));
-                }
-            }
-            else if ( !god ) {
-                uasserted(16459, str::stream() << "attempt to insert in system namespace '"
-                                               << ns << "'");
-            }
-        }
-        return true;
-    }
-
-    DiskLoc DataFileMgr::insert(const char* ns,
-                                const void* obuf,
-                                int32_t len,
-                                bool mayInterrupt,
-                                bool god,
-                                bool mayAddIndex,
-                                bool* addedID) {
-
-        Database* database = cc().database();
-
-        bool wouldAddIndex = false;
-        massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
-        uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
-        {
-            const char *sys = strstr(ns, "system.");
-            if ( sys ) {
-
-                if ( !insert_checkSys(sys, ns, wouldAddIndex, obuf, god) )
-                    return DiskLoc();
-
-                if ( mayAddIndex && wouldAddIndex ) {
-                    // TODO: this should be handled above this function
-                    BSONObj spec( static_cast<const char*>( obuf ) );
-                    string collectionToIndex = spec.getStringField( "ns" );
-                    uassert(10096, "invalid ns to index", collectionToIndex.find( '.' ) != string::npos);
-                    massert(10097,
-                            str::stream() << "trying to create index on wrong db "
-                            << " db: " << database->name() << " collection: " << collectionToIndex,
-                            database->ownsNS( collectionToIndex ) );
-
-                    Collection* collection = database->getCollection( collectionToIndex );
-                    if ( !collection ) {
-                        collection = database->createCollection( collectionToIndex, false, NULL, true );
-                        verify( collection );
-                        if ( !god )
-                            ensureIdIndexForNewNs( collection );
-                    }
-
-                    Status status = collection->getIndexCatalog()->createIndex( spec, mayInterrupt );
-                    if ( status.code() == ErrorCodes::IndexAlreadyExists )
-                        return DiskLoc();
-                    uassertStatusOK( status );
-                    return DiskLoc();
-                }
-            }
-        }
-
-        Collection* collection = database->getCollection( ns );
-        if ( collection == NULL ) {
-            collection = database->createCollection( ns, false, NULL, false );
-
-            int ies = Extent::initialSize(len);
-            if( str::contains(ns, '$') &&
-                len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 &&
-                len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) {
-                // probably an index.  so we pick a value here for the first extent instead of using
-                // initialExtentSize() which is more for user collections.
-                // TODO: we could look at the # of records in the parent collection to be smarter here.
-                ies = (32+4) * 1024;
-            }
-            collection->increaseStorageSize( ies, false);
-            if ( !god )
-                ensureIdIndexForNewNs( collection );
-        }
-
-        NamespaceDetails* d = collection->details();
-
-        IDToInsert idToInsert; // only initialized if needed
-
-        if( !god ) {
-            /* Check if we have an _id field. If we don't, we'll add it.
-               Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
-            */
-            BSONObj io((const char *) obuf);
-            BSONElement idField = io.getField( "_id" );
-            uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
-            // we don't add _id for capped collections in local as they don't have an _id index
-            if( idField.eoo() &&
-                !wouldAddIndex &&
-                nsToDatabase( ns ) != "local" &&
-                d->haveIdIndex() ) {
-
-                if( addedID )
-                    *addedID = true;
-
-                idToInsert.init();
-                len += idToInsert.size();
-            }
-
-            BSONElementManipulator::lookForTimestamps( io );
-        }
-
-        int lenWHdr = d->getRecordAllocationSize( len + Record::HeaderSize );
-        fassert( 16440, lenWHdr >= ( len + Record::HeaderSize ) );
-
-        // If the collection is capped, check if the new object will violate a unique index
-        // constraint before allocating space.
-        if ( d->isCapped() && !god) {
-            BSONObj temp = BSONObj( reinterpret_cast<const char *>( obuf ) );
-            Status ret = collection->getIndexCatalog()->checkNoIndexConflicts( temp );
-            uassert(12582, "duplicate key insert for unique index of capped collection", ret.isOK() );
-        }
-
-        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
-
-        if ( loc.isNull() ) {
-            string errmsg = str::stream() << "insert: couldn't alloc space for object ns:" << ns
-                                          << " capped:" << d->isCapped();
-            log() << errmsg;
-            uasserted( 17248, errmsg );
-        }
-
-        Record *r = loc.rec();
-        {
-            verify( r->lengthWithHeaders() >= lenWHdr );
-            r = (Record*) getDur().writingPtr(r, lenWHdr);
-            if( idToInsert.needed() ) {
-                /* a little effort was made here to avoid a double copy when we add an ID */
-                int originalSize = *((int*) obuf);
-                ((int&)*r->data()) = originalSize + idToInsert.size();
-                memcpy(r->data()+4, idToInsert.rawdata(), idToInsert.size());
-                memcpy(r->data()+4+idToInsert.size(), ((char*)obuf)+4, originalSize-4);
-            }
-            else {
-                if( obuf ) // obuf can be null from internal callers
-                    memcpy(r->data(), obuf, len);
-            }
-        }
-
-        addRecordToRecListInExtent(r, loc);
-
-        d->incrementStats( r->netLength(), 1 );
-
-        // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
-        if ( !god )
-            collection->infoCache()->notifyOfWriteOp();
-
-        /* add this record to our indexes */
-        if ( d->getTotalIndexCount() > 0 ) {
-            try {
-                BSONObj obj(r->data());
-                collection->getIndexCatalog()->indexRecord(obj, loc);
-            }
-            catch( AssertionException& e ) {
-                // should be a dup key error on _id index
-                if( d->isCapped() ) {
-                    massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
-                    string s = e.toString();
-                    s += " : on addIndex/capped - collection and its index will not match";
-                    setLastError(0, s.c_str());
-                    error() << s << endl;
-                }
-                else {
-                    // normal case -- we can roll back
-                    _deleteRecord(d, ns, r, loc);
-                    throw;
-                }
-            }
-        }
-
-        d->paddingFits();
-
-        return loc;
-    }
-
-    /* special version of insert for transaction logging -- streamlined a bit.
-       assumes ns is capped and no indexes
-    */
-    Record* DataFileMgr::fast_oplog_insert(NamespaceDetails *d, const char *ns, int len) {
-        verify( d );
-        RARELY verify( d == nsdetails(ns) );
-        DEV verify( d == nsdetails(ns) );
-
-        massert( 16509,
-                 str::stream()
-                 << "fast_oplog_insert requires a capped collection "
-                 << " but " << ns << " is not capped",
-                 d->isCapped() );
-
-        //record timing on oplog inserts
-        boost::optional<TimerHolder> insertTimer;
-        //skip non-oplog collections
-        if (NamespaceString::oplog(ns)) {
-            insertTimer = boost::in_place(&oplogInsertStats);
-            oplogInsertBytesStats.increment(len); //record len of inserted records for oplog
-        }
-
-        int lenWHdr = len + Record::HeaderSize;
-        DiskLoc loc = d->alloc(ns, lenWHdr);
-        verify( !loc.isNull() );
-
-        Record *r = loc.rec();
-        verify( r->lengthWithHeaders() >= lenWHdr );
-
-        Extent *e = r->myExtent(loc);
-        if ( e->lastRecord.isNull() ) {
-            Extent::FL *fl = getDur().writing( e->fl() );
-            fl->firstRecord = fl->lastRecord = loc;
-
-            Record::NP *np = getDur().writing(r->np());
-            np->nextOfs = np->prevOfs = DiskLoc::NullOfs;
-        }
-        else {
-            Record *oldlast = e->lastRecord.rec();
-            Record::NP *np = getDur().writing(r->np());
-            np->prevOfs = e->lastRecord.getOfs();
-            np->nextOfs = DiskLoc::NullOfs;
-            getDur().writingInt( oldlast->nextOfs() ) = loc.getOfs();
-            e->lastRecord.writing() = loc;
-        }
-
-        d->incrementStats( r->netLength(), 1 );
-        return r;
-    }
-
-} // namespace mongo
+}
 
 #include "clientcursor.h"
 
@@ -1034,11 +492,17 @@ namespace mongo {
             Client::Context ctx( dbName, reservedPathString );
             verify( ctx.justCreated() );
 
-            res = Cloner::cloneFrom(localhost.c_str(), errmsg, dbName,
-                                    /*logForReplication=*/false, /*slaveOk*/false,
-                                    /*replauth*/false, /*snapshot*/false, /*mayYield*/false,
-                                    /*mayBeInterrupted*/true);
- 
+
+            CloneOptions cloneOptions;
+            cloneOptions.fromDB = dbName;
+            cloneOptions.logForRepl = false;
+            cloneOptions.slaveOk = false;
+            cloneOptions.useReplAuth = false;
+            cloneOptions.snapshot = false;
+            cloneOptions.mayYield = false;
+            cloneOptions.mayBeInterrupted = true;
+            res = Cloner::cloneFrom(ctx, localhost, cloneOptions, errmsg );
+
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 

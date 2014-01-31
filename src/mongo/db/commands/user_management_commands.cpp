@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/commands/user_management_commands.h"
+
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <string>
@@ -59,14 +63,6 @@
 namespace mongo {
 
     namespace str = mongoutils::str;
-
-    static void addStatus(const Status& status, BSONObjBuilder& builder) {
-        builder.append("ok", status.isOK() ? 1.0: 0.0);
-        if (!status.isOK())
-            builder.append("code", status.code());
-        if (!status.reason().empty())
-            builder.append("errmsg", status.reason());
-    }
 
     static void redactPasswordData(mutablebson::Element parent) {
         namespace mmb = mutablebson;
@@ -224,7 +220,7 @@ namespace mongo {
             }
             std::vector<RoleName> indirectRoles;
             status = auth::parseRoleNamesFromBSONArray(
-                    BSONArray(roleToAddDoc["indirectRoles"].Obj()),
+                    BSONArray(roleToAddDoc["inheritedRoles"].Obj()),
                     role.getDB(),
                     &indirectRoles);
             if (!status.isOK()) {
@@ -288,7 +284,7 @@ namespace mongo {
             return Status(
                     ErrorCodes::AuthSchemaIncompatible,
                     str::stream() << "The usersInfo and rolesInfo commands require auth data to "
-                    "have schema  version " << AuthorizationManager::schemaVersion26Final <<
+                    "have schema version " << AuthorizationManager::schemaVersion26Final <<
                     " or " << AuthorizationManager::schemaVersion26Upgrade <<
                     " but found " << foundSchemaVersion);
         }
@@ -352,40 +348,39 @@ namespace mongo {
                                                                   dbname,
                                                                   &args);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (args.userName.getDB() == "local") {
-                addStatus(Status(ErrorCodes::BadValue, "Cannot create users in the local database"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue, "Cannot create users in the local database"));
             }
 
             if (!args.hasHashedPassword && args.userName.getDB() != "$external") {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "Must provide a 'pwd' field for all user documents, except those"
-                                         " with '$external' as the user's source db"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Must provide a 'pwd' field for all user documents, except those"
+                               " with '$external' as the user's source db"));
             }
 
             if (!args.hasRoles) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "\"createUser\" command requires a \"roles\" array"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "\"createUser\" command requires a \"roles\" array"));
             }
 
 #ifdef MONGO_SSL
             if (args.userName.getDB() == "$external" &&
                 getSSLManager() && 
                 getSSLManager()->getServerSubjectName() == args.userName.getUser()) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "Cannot create an x.509 user with the same "
-                                 "subjectname as the server"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Cannot create an x.509 user with the same "
+                               "subjectname as the server"));
             }
 #endif
  
@@ -412,22 +407,20 @@ namespace mongo {
             V2UserDocumentParser parser;
             status = parser.checkValidUserDocument(userObj);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Create user")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Role existence has to be checked after acquiring the update lock
@@ -435,8 +428,7 @@ namespace mongo {
                 BSONObj ignored;
                 status = authzManager->getRoleDescription(args.roles[i], false, &ignored);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
             }
 
@@ -448,11 +440,7 @@ namespace mongo {
             status = authzManager->insertPrivilegeDocument(dbname,
                                                            userObj,
                                                            args.writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-            return true;
+            return appendCommandStatus(result, status);
         }
 
         virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -544,15 +532,14 @@ namespace mongo {
                                                                   dbname,
                                                                   &args);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (!args.hasHashedPassword && !args.hasCustomData && !args.hasRoles) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "Must specify at least one field to update in updateUser"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Must specify at least one field to update in updateUser"));
             }
 
             BSONObjBuilder updateSetBuilder;
@@ -569,15 +556,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Update user")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
 
@@ -587,8 +573,7 @@ namespace mongo {
                     BSONObj ignored;
                     status = authzManager->getRoleDescription(args.roles[i], false, &ignored);
                     if (!status.isOK()) {
-                        addStatus(status, result);
-                        return false;
+                        return appendCommandStatus(result, status);
                     }
                 }
             }
@@ -604,12 +589,7 @@ namespace mongo {
                                                            args.writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(args.userName);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            return true;
+            return appendCommandStatus(result, status);
         }
 
         virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -671,15 +651,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Drop user")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
 
@@ -690,8 +669,7 @@ namespace mongo {
                                                            &userName,
                                                            &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             int numUpdated;
@@ -706,16 +684,15 @@ namespace mongo {
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (numUpdated == 0) {
-                addStatus(Status(ErrorCodes::UserNotFound,
-                                 str::stream() << "User '" << userName.getFullName() <<
-                                         "' not found"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::UserNotFound,
+                               str::stream() << "User '" << userName.getFullName() <<
+                               "' not found"));
             }
 
             return true;
@@ -766,15 +743,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Drop all users from database")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             BSONObj writeConcern;
@@ -782,8 +758,7 @@ namespace mongo {
                                                                            dbname,
                                                                            &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             int numRemoved;
@@ -797,8 +772,7 @@ namespace mongo {
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUsersFromDB(dbname);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             result.append("n", numRemoved);
@@ -857,15 +831,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Grant roles to user")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             std::string userNameString;
@@ -878,16 +851,14 @@ namespace mongo {
                                                                    &roles,
                                                                    &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             UserName userName(userNameString, dbname);
             unordered_set<RoleName> userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
@@ -895,8 +866,7 @@ namespace mongo {
                 BSONObj roleDoc;
                 status = authzManager->getRoleDescription(roleName, false, &roleDoc);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
 
                 userRoles.insert(roleName);
@@ -910,12 +880,7 @@ namespace mongo {
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(userName);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            return true;
+            return appendCommandStatus(result, status);
         }
 
     } cmdGrantRolesToUser;
@@ -970,15 +935,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Revoke roles from user")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             std::string userNameString;
@@ -991,16 +955,14 @@ namespace mongo {
                                                                    &roles,
                                                                    &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             UserName userName(userNameString, dbname);
             unordered_set<RoleName> userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
@@ -1008,8 +970,7 @@ namespace mongo {
                 BSONObj roleDoc;
                 status = authzManager->getRoleDescription(roleName, false, &roleDoc);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
 
                 userRoles.erase(roleName);
@@ -1023,12 +984,7 @@ namespace mongo {
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(userName);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            return true;
+            return appendCommandStatus(result, status);
         }
 
     } cmdRevokeRolesFromUser;
@@ -1098,22 +1054,20 @@ namespace mongo {
             auth::UsersInfoArgs args;
             Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             status = requireAuthSchemaVersion26UpgradeOrFinal(getGlobalAuthorizationManager());
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (args.allForDB && args.showPrivileges) {
-                addStatus(Status(ErrorCodes::IllegalOperation,
-                                 "Can only get privilege details on exact-match usersInfo "
-                                 "queries."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::IllegalOperation,
+                               "Can only get privilege details on exact-match usersInfo "
+                               "queries."));
             }
 
             BSONArrayBuilder usersArrayBuilder;
@@ -1127,8 +1081,7 @@ namespace mongo {
                         continue;
                     }
                     if (!status.isOK()) {
-                        addStatus(status, result);
-                        return false;
+                        return appendCommandStatus(result, status);
                     }
                     if (!args.showCredentials) {
                         // getUserDescription always includes credentials, need to strip it out
@@ -1161,6 +1114,11 @@ namespace mongo {
                 }
 
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+                int authzVersion = authzManager->getAuthorizationVersion();
+                NamespaceString usersNamespace =
+                        authzVersion== AuthorizationManager::schemaVersion26Final ?
+                                AuthorizationManager::usersCollectionNamespace :
+                                AuthorizationManager::usersAltCollectionNamespace;
                 BSONObjBuilder projection;
                 if (!args.showCredentials) {
                     projection.append("credentials", 0);
@@ -1169,7 +1127,7 @@ namespace mongo {
                         &BSONArrayBuilder::append<BSONObj>;
                 const boost::function<void(const BSONObj&)> function =
                         boost::bind(appendBSONObj, &usersArrayBuilder, _1);
-                authzManager->queryAuthzDocument(AuthorizationManager::usersCollectionNamespace,
+                authzManager->queryAuthzDocument(usersNamespace,
                                                  queryBuilder.done(),
                                                  projection.done(),
                                                  function);
@@ -1242,35 +1200,40 @@ namespace mongo {
                                                                   dbname,
                                                                   &args);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
+            }
+
+            if (args.roleName.getRole().empty()) {
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue, "Role name must be non-empty"));
             }
 
             if (args.roleName.getDB() == "local") {
-                addStatus(Status(ErrorCodes::BadValue, "Cannot create roles in the local database"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue, "Cannot create roles in the local database"));
             }
 
             if (args.roleName.getDB() == "$external") {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "Cannot create roles in the $external database"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Cannot create roles in the $external database"));
             }
 
             if (!args.hasRoles) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "\"createRole\" command requires a \"roles\" array"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "\"createRole\" command requires a \"roles\" array"));
             }
 
             if (!args.hasPrivileges) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "\"createRole\" command requires a \"privileges\" array"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "\"createRole\" command requires a \"privileges\" array"));
             }
 
             BSONObjBuilder roleObjBuilder;
@@ -1285,8 +1248,7 @@ namespace mongo {
             BSONArray privileges;
             status = privilegeVectorToBSONArray(args.privileges, &privileges);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
             roleObjBuilder.append("privileges", privileges);
 
@@ -1295,28 +1257,25 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Create role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Role existence has to be checked after acquiring the update lock
             status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             status = checkOkayToGrantPrivilegesToRole(args.roleName, args.privileges);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             audit::logCreateRole(ClientBasic::getCurrent(),
@@ -1325,11 +1284,7 @@ namespace mongo {
                                  args.privileges);
 
             status = authzManager->insertRoleDocument(roleObjBuilder.done(), args.writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-            return true;
+            return appendCommandStatus(result, status);
         }
 
     } cmdCreateRole;
@@ -1397,15 +1352,14 @@ namespace mongo {
                                                                   dbname,
                                                                   &args);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (!args.hasPrivileges && !args.hasRoles) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "Must specify at least one field to update in updateRole"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Must specify at least one field to update in updateRole"));
             }
 
             BSONObjBuilder updateSetBuilder;
@@ -1414,8 +1368,7 @@ namespace mongo {
                 BSONArray privileges;
                 status = privilegeVectorToBSONArray(args.privileges, &privileges);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
                 updateSetBuilder.append("privileges", privileges);
             }
@@ -1427,38 +1380,34 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Update role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Role existence has to be checked after acquiring the update lock
             BSONObj ignored;
             status = authzManager->getRoleDescription(args.roleName, false, &ignored);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (args.hasRoles) {
                 status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
             }
 
             if (args.hasPrivileges) {
                 status = checkOkayToGrantPrivilegesToRole(args.roleName, args.privileges);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
             }
 
@@ -1470,12 +1419,9 @@ namespace mongo {
             status = authzManager->updateRoleDocument(args.roleName,
                                                       BSON("$set" << updateSetBuilder.done()),
                                                       args.writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            return true;
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
+            return appendCommandStatus(result, status);
         }
     } cmdUpdateRole;
 
@@ -1530,15 +1476,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Grant privileges to role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             RoleName roleName;
@@ -1552,29 +1497,26 @@ namespace mongo {
                     &privilegesToAdd,
                     &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (RoleGraph::isBuiltinRole(roleName)) {
-                addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                 str::stream() << roleName.getFullName() <<
-                                         " is a built-in role and cannot be modified."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::InvalidRoleModification,
+                               str::stream() << roleName.getFullName() <<
+                               " is a built-in role and cannot be modified."));
             }
 
             status = checkOkayToGrantPrivilegesToRole(roleName, privilegesToAdd);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(roleName, true, &roleDoc);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             PrivilegeVector privileges;
@@ -1582,8 +1524,7 @@ namespace mongo {
                                                           &privileges);
 
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             for (PrivilegeVector::iterator it = privilegesToAdd.begin();
@@ -1596,19 +1537,16 @@ namespace mongo {
             mutablebson::Element setElement = updateObj.makeElementObject("$set");
             status = updateObj.root().pushBack(setElement);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
             mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
             status = setElement.pushBack(privilegesElement);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
             status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             BSONObjBuilder updateBSONBuilder;
@@ -1622,12 +1560,9 @@ namespace mongo {
                     roleName,
                     updateBSONBuilder.done(),
                     writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            return true;
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
+            return appendCommandStatus(result, status);
         }
 
     } cmdGrantPrivilegesToRole;
@@ -1683,15 +1618,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Revoke privileges from role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             RoleName roleName;
@@ -1705,31 +1639,28 @@ namespace mongo {
                     &privilegesToRemove,
                     &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (RoleGraph::isBuiltinRole(roleName)) {
-                addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                 str::stream() << roleName.getFullName() <<
-                                         " is a built-in role and cannot be modified."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::InvalidRoleModification,
+                               str::stream() << roleName.getFullName() <<
+                               " is a built-in role and cannot be modified."));
             }
 
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(roleName, true, &roleDoc);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             PrivilegeVector privileges;
             status = auth::parseAndValidatePrivilegeArray(BSONArray(roleDoc["privileges"].Obj()),
                                                           &privileges);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             for (PrivilegeVector::iterator itToRm = privilegesToRemove.begin();
@@ -1751,19 +1682,16 @@ namespace mongo {
             mutablebson::Element setElement = updateObj.makeElementObject("$set");
             status = updateObj.root().pushBack(setElement);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
             mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
             status = setElement.pushBack(privilegesElement);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
             status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             audit::logRevokePrivilegesFromRole(ClientBasic::getCurrent(),
@@ -1776,12 +1704,9 @@ namespace mongo {
                     roleName,
                     updateBSONBuilder.done(),
                     writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            return true;
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
+            return appendCommandStatus(result, status);
         }
 
     } cmdRevokePrivilegesFromRole;
@@ -1844,46 +1769,42 @@ namespace mongo {
                     &rolesToAdd,
                     &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             RoleName roleName(roleNameString, dbname);
             if (RoleGraph::isBuiltinRole(roleName)) {
-                addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                 str::stream() << roleName.getFullName() <<
-                                         " is a built-in role and cannot be modified."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::InvalidRoleModification,
+                               str::stream() << roleName.getFullName() <<
+                               " is a built-in role and cannot be modified."));
             }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Grant roles to role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Role existence has to be checked after acquiring the update lock
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(roleName, false, &roleDoc);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Check for cycles
             status = checkOkayToGrantRolesToRole(roleName, rolesToAdd, authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Add new roles to existing roles
@@ -1892,8 +1813,7 @@ namespace mongo {
                                                        roleName.getDB(),
                                                        &directRoles);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
             for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
                 const RoleName& roleToAdd = *it;
@@ -1909,11 +1829,9 @@ namespace mongo {
                     roleName,
                     BSON("$set" << BSON("roles" << rolesVectorToBSONArray(directRoles))),
                     writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-            return true;
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
+            return appendCommandStatus(result, status);
         }
 
     } cmdGrantRolesToRole;
@@ -1968,15 +1886,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Revoke roles from role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             std::string roleNameString;
@@ -1989,24 +1906,22 @@ namespace mongo {
                                                                    &rolesToRemove,
                                                                    &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             RoleName roleName(roleNameString, dbname);
             if (RoleGraph::isBuiltinRole(roleName)) {
-                addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                 str::stream() << roleName.getFullName() <<
-                                         " is a built-in role and cannot be modified."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::InvalidRoleModification,
+                               str::stream() << roleName.getFullName() <<
+                               " is a built-in role and cannot be modified."));
             }
 
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(roleName, false, &roleDoc);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             std::vector<RoleName> roles;
@@ -2014,8 +1929,7 @@ namespace mongo {
                                                        roleName.getDB(),
                                                        &roles);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             for (vector<RoleName>::const_iterator it = rolesToRemove.begin();
@@ -2034,11 +1948,9 @@ namespace mongo {
                     roleName,
                     BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))),
                     writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-            return true;
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
+            return appendCommandStatus(result, status);
         }
 
     } cmdRevokeRolesFromRole;
@@ -2099,15 +2011,14 @@ namespace mongo {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Drop role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             Status status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             RoleName roleName;
@@ -2117,23 +2028,21 @@ namespace mongo {
                                                 &roleName,
                                                 &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             if (RoleGraph::isBuiltinRole(roleName)) {
-                addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                 str::stream() << roleName.getFullName() <<
-                                         " is a built-in role and cannot be modified."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::InvalidRoleModification,
+                               str::stream() << roleName.getFullName() <<
+                               " is a built-in role and cannot be modified."));
             }
 
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(roleName, false, &roleDoc);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Remove this role from all users
@@ -2154,14 +2063,16 @@ namespace mongo {
                     true,
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
             if (!status.isOK()) {
                 ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
                         ErrorCodes::UserModificationFailed : status.code();
-                addStatus(Status(code,
-                                 str::stream() << "Failed to remove role " << roleName.getFullName()
-                                         << " from all users: " << status.reason()),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(code,
+                               str::stream() << "Failed to remove role " << roleName.getFullName()
+                               << " from all users: " << status.reason()));
             }
 
             // Remove this role from all other roles
@@ -2181,15 +2092,17 @@ namespace mongo {
                     true,
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
             if (!status.isOK()) {
                 ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
                         ErrorCodes::RoleModificationFailed : status.code();
-                addStatus(Status(code,
-                                 str::stream() << "Removed role " << roleName.getFullName() <<
-                                         " from all users but failed to remove from all roles: " <<
-                                         status.reason()),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(code,
+                               str::stream() << "Removed role " << roleName.getFullName() <<
+                               " from all users but failed to remove from all roles: " <<
+                               status.reason()));
             }
 
             audit::logDropRole(ClientBasic::getCurrent(),
@@ -2200,22 +2113,24 @@ namespace mongo {
                          AuthorizationManager::ROLE_SOURCE_FIELD_NAME << roleName.getDB()),
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
             if (!status.isOK()) {
-                addStatus(Status(status.code(),
-                                 str::stream() << "Removed role " << roleName.getFullName() <<
-                                         " from all users and roles but failed to actually delete"
-                                         " the role itself: " <<  status.reason()),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(status.code(),
+                               str::stream() << "Removed role " << roleName.getFullName() <<
+                               " from all users and roles but failed to actually delete"
+                               " the role itself: " <<  status.reason()));
             }
 
             dassert(numUpdated == 0 || numUpdated == 1);
             if (numUpdated == 0) {
-                addStatus(Status(ErrorCodes::RoleNotFound,
-                                 str::stream() << "Role '" << roleName.getFullName() <<
-                                         "' not found"),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::RoleNotFound,
+                               str::stream() << "Role '" << roleName.getFullName() <<
+                               "' not found"));
             }
 
             return true;
@@ -2272,22 +2187,20 @@ namespace mongo {
                                                                     dbname,
                                                                     &writeConcern);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Drop roles from database")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
             status = requireAuthSchemaVersion26Final(authzManager);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             // Remove these roles from all users
@@ -2302,14 +2215,16 @@ namespace mongo {
                     true,
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
             if (!status.isOK()) {
                 ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
                         ErrorCodes::UserModificationFailed : status.code();
-                addStatus(Status(code,
-                                 str::stream() << "Failed to remove roles from \"" << dbname
-                                         << "\" db from all users: " << status.reason()),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(code,
+                               str::stream() << "Failed to remove roles from \"" << dbname
+                               << "\" db from all users: " << status.reason()));
             }
 
             // Remove these roles from all other roles
@@ -2325,14 +2240,16 @@ namespace mongo {
                     true,
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
             if (!status.isOK()) {
                 ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
                         ErrorCodes::RoleModificationFailed : status.code();
-                addStatus(Status(code,
-                                 str::stream() << "Failed to remove roles from \"" << dbname
-                                         << "\" db from all roles: " << status.reason()),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(code,
+                               str::stream() << "Failed to remove roles from \"" << dbname
+                               << "\" db from all roles: " << status.reason()));
             }
 
             audit::logDropAllRolesFromDatabase(ClientBasic::getCurrent(), dbname);
@@ -2341,13 +2258,15 @@ namespace mongo {
                     BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname),
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserCache();
             if (!status.isOK()) {
-                addStatus(Status(status.code(),
-                                 str::stream() << "Removed roles from \"" << dbname << "\" db "
-                                         " from all users and roles but failed to actually delete"
-                                         " those roles themselves: " <<  status.reason()),
-                          result);
-                return false;
+                return appendCommandStatus(
+                        result,
+                        Status(status.code(),
+                               str::stream() << "Removed roles from \"" << dbname << "\" db "
+                               " from all users and roles but failed to actually delete"
+                               " those roles themselves: " <<  status.reason()));
             }
 
             result.append("n", numUpdated);
@@ -2424,14 +2343,12 @@ namespace mongo {
             auth::RolesInfoArgs args;
             Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             status = requireAuthSchemaVersion26UpgradeOrFinal(getGlobalAuthorizationManager());
             if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+                return appendCommandStatus(result, status);
             }
 
             BSONArrayBuilder rolesArrayBuilder;
@@ -2440,8 +2357,7 @@ namespace mongo {
                 status = getGlobalAuthorizationManager()->getRoleDescriptionsForDB(
                         dbname, args.showPrivileges, args.showBuiltinRoles, &rolesDocs);
                 if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
 
                 for (size_t i = 0; i < rolesDocs.size(); ++i) {
@@ -2456,8 +2372,7 @@ namespace mongo {
                         continue;
                     }
                     if (!status.isOK()) {
-                        addStatus(status, result);
-                        return false;
+                        return appendCommandStatus(result, status);
                     }
                     rolesArrayBuilder.append(roleDetails);
                 }
@@ -2514,65 +2429,27 @@ namespace mongo {
 
     } cmdInvalidateUserCache;
 
-    class CmdAuthSchemaUpgradeStep : public Command {
-    public:
-        CmdAuthSchemaUpgradeStep() : Command("authSchemaUpgradeStep") {}
+    CmdAuthSchemaUpgrade::CmdAuthSchemaUpgrade() : Command("authSchemaUpgrade") {}
+    CmdAuthSchemaUpgrade::~CmdAuthSchemaUpgrade() {}
 
-        virtual bool slaveOk() const { return false; }
-        virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+    bool CmdAuthSchemaUpgrade::slaveOk() const { return false; }
+    bool CmdAuthSchemaUpgrade::adminOnly() const { return true; }
+    Command::LockType CmdAuthSchemaUpgrade::locktype() const { return NONE; }
 
-        virtual void help(stringstream& ss) const {
-            ss << "Performs the next step in the process of upgrading the auth schema.";
+    void CmdAuthSchemaUpgrade::help(stringstream& ss) const {
+        ss << "Upgrades the auth data storage schema";
+    }
+
+    Status CmdAuthSchemaUpgrade::checkAuthForCommand(ClientBasic* client,
+                                                         const std::string& dbname,
+                                                         const BSONObj& cmdObj) {
+
+        AuthorizationSession* authzSession = client->getAuthorizationSession();
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
+            return Status(ErrorCodes::Unauthorized,
+                          "Not authorized to run authSchemaUpgrade command.");
         }
-
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-
-            AuthorizationSession* authzSession = client->getAuthorizationSession();
-            if (!authzSession->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
-                return Status(ErrorCodes::Unauthorized,
-                              "Not authorized to run authSchemaUpgradeStep command.");
-            }
-            return Status::OK();
-        }
-
-        virtual bool run(
-                const string& dbname,
-                BSONObj& cmdObj,
-                int options,
-                string& errmsg,
-                BSONObjBuilder& result,
-                bool fromRepl) {
-
-            BSONObj writeConcern;
-            Status status = auth::parseAuthSchemaUpgradeStepCommand(cmdObj, dbname, &writeConcern);
-            if (!status.isOK()) {
-                appendCommandStatus(result, status);
-                return false;
-            }
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("auth schema upgrade")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
-            }
-
-            bool done;
-            status = authzManager->upgradeSchemaStep(writeConcern, &done);
-            if (!status.isOK()) {
-                appendCommandStatus(result, status);
-                return false;
-            }
-
-            result.append("done", done);
-            return true;
-        }
-
-    } cmdAuthSchemaUpgradeStep;
+        return Status::OK();
+    }
 }

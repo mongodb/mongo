@@ -1,7 +1,4 @@
 // server-3253 Unsharded support for $out
-load('jstests/aggregation/extras/utils.js'); // assertErrorCode
-load("jstests/libs/fts.js"); // used for testing text index
-
 load('jstests/aggregation/extras/utils.js');
 
 var input = db.server3253_in;

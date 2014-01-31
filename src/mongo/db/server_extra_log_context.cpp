@@ -53,8 +53,8 @@ namespace {
         if (!clientBasic->hasAuthorizationSession())
             return;
 
-        UserSet::NameIterator users =
-                clientBasic->getAuthorizationSession()->getAuthenticatedUserNames();
+        UserNameIterator users =
+            clientBasic->getAuthorizationSession()->getAuthenticatedUserNames();
 
         if (!users.more())
             return;

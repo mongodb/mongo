@@ -12,17 +12,18 @@ t.drop();
 db.createCollection( coll );
 
 
-// Verify the new collection has userFlags set to 0
-assert.eq( t.stats().userFlags , 0 , "fresh collection doesn't have userFlags = 0 ");
+// Verify the new collection has userFlags set to 1
+printjson(t.stats());
+assert.eq( t.stats().userFlags , 1 , "fresh collection doesn't have userFlags = 1 ");
 
-// Modify the collection with the usePowerOf2Sizes flag. Verify userFlags now = 1.
-var res = db.runCommand( { "collMod" : coll,  "usePowerOf2Sizes" : true } );
+// Modify the collection with the usePowerOf2Sizes flag. Verify userFlags now = 0.
+var res = db.runCommand( { "collMod" : coll,  "usePowerOf2Sizes" : false } );
 debug( res );
 assert.eq( res.ok , 1 , "collMod failed" );
-assert.eq( t.stats().userFlags , 1 , "modified collection should have userFlags = 1 ");
+assert.eq( t.stats().userFlags , 0 , "modified collection should have userFlags = 0 ");
 var nso = db.system.namespaces.findOne( { name : t.getFullName() } );
 debug( nso );
-assert.eq( 1, nso.options.flags, "options didn't sync to system.namespaces: " + tojson( nso ) );
+assert.eq( 0, nso.options.flags, "options didn't sync to system.namespaces: " + tojson( nso ) );
 
 // Try to modify it with some unrecognized value
 var res = db.runCommand( { "collMod" : coll,  "unrecognized" : true } );
@@ -71,11 +72,11 @@ assert.eq( 0, res.ok, "shouldn't be able to modify faulty index spec" );
 t.dropIndex( {a : 1 } );
 t.ensureIndex( {a : 1} , { "expireAfterSeconds": 50 } )
 var res = db.runCommand( { "collMod" : coll ,
-                           "usePowerOf2Sizes" : false,
+                           "usePowerOf2Sizes" : true,
                            "index" : { "keyPattern" : {a : 1} , "expireAfterSeconds" : 100 } } );
 debug( res );
 assert.eq( 1, res.ok, "should be able to modify both userFlags and expireAfterSeconds" );
-assert.eq( t.stats().userFlags , 0 , "userflags should be 0 now");
+assert.eq( t.stats().userFlags , 1 , "userflags should be 1 now");
 assert.eq( 1, db.system.indexes.count( { key : {a:1}, expireAfterSeconds : 100 } ),
            "TTL index should be 100 now" );
 

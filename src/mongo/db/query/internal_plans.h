@@ -28,11 +28,12 @@
 
 #pragma once
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/query/eof_runner.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/internal_runner.h"
 
 namespace mongo {
@@ -61,11 +62,11 @@ namespace mongo {
         /**
          * Return a collection scan.  Caller owns pointer.
          */
-        static Runner* collectionScan(const StringData& ns,
+        static Runner* collectionScan(const StringData& ns, // TODO: make this a Collection*
                                       const Direction direction = FORWARD,
                                       const DiskLoc startLoc = DiskLoc()) {
-            NamespaceDetails* nsd = nsdetails(ns);
-            if (NULL == nsd) { return new EOFRunner(NULL, ns.toString()); }
+            Collection* collection = cc().database()->getCollection(ns);
+            if (NULL == collection) { return new EOFRunner(NULL, ns.toString()); }
 
             CollectionScanParams params;
             params.ns = ns.toString();
@@ -80,19 +81,19 @@ namespace mongo {
 
             WorkingSet* ws = new WorkingSet();
             CollectionScan* cs = new CollectionScan(params, ws, NULL);
-            return new InternalRunner(ns.toString(), cs, ws);
+            return new InternalRunner(collection, cs, ws);
         }
 
         /**
          * Return an index scan.  Caller owns returned pointer.
          */
-        static Runner* indexScan(IndexDescriptor* descriptor,
+        static Runner* indexScan(const Collection* collection,
+                                 const IndexDescriptor* descriptor,
                                  const BSONObj& startKey, const BSONObj& endKey,
                                  bool endKeyInclusive, Direction direction = FORWARD,
                                  int options = 0) {
-            verify(descriptor);
-
-            const NamespaceString& ns = descriptor->getIndexedCollection()->ns();
+            invariant(collection);
+            invariant(descriptor);
 
             IndexScanParams params;
             params.descriptor = descriptor;
@@ -101,18 +102,15 @@ namespace mongo {
             params.bounds.startKey = startKey;
             params.bounds.endKey = endKey;
             params.bounds.endKeyInclusive = endKeyInclusive;
-            // This always as 'true' as this is the new btreecursor.  Even if the underlying index
-            // is 'special' (ie, expression) we treat it like a Btree.
-            params.forceBtreeAccessMethod = true;
 
             WorkingSet* ws = new WorkingSet();
             IndexScan* ix = new IndexScan(params, ws, NULL);
 
             if (IXSCAN_FETCH & options) {
-                return new InternalRunner(ns.toString(), new FetchStage(ws, ix, NULL), ws);
+                return new InternalRunner(collection, new FetchStage(ws, ix, NULL), ws);
             }
             else {
-                return new InternalRunner(ns.toString(), ix, ws);
+                return new InternalRunner(collection, ix, ws);
             }
         }
     };

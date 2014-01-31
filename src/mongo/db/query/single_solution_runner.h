@@ -52,8 +52,9 @@ namespace mongo {
     class SingleSolutionRunner : public Runner {
     public:
 
-        /** Takes ownership of all the arguments. */
-        SingleSolutionRunner(CanonicalQuery* canonicalQuery, QuerySolution* soln,
+        /** Takes ownership of all the arguments except collection */
+        SingleSolutionRunner(const Collection* collection,
+                             CanonicalQuery* canonicalQuery, QuerySolution* soln,
                              PlanStage* root, WorkingSet* ws);
 
         virtual ~SingleSolutionRunner();
@@ -68,20 +69,24 @@ namespace mongo {
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual const std::string& ns();
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
         /**
-         * Returns OK, allocating and filling in '*explain' with the details of the plan used
-         * by this runner. Caller takes ownership of '*explain'. Otherwise, return a status
-         * describing the error.
+         * Returns OK, allocating and filling in '*explain' and '*staticInfo' with the details
+         * of the plan used by this runner. Caller takes ownership of '*explain' and
+         * '*staticInfo'. Otherwise, return a status describing the error.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
+        const Collection* _collection;
+
         boost::scoped_ptr<CanonicalQuery> _canonicalQuery;
         boost::scoped_ptr<QuerySolution> _solution;
         boost::scoped_ptr<PlanExecutor> _exec;

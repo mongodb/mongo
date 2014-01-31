@@ -33,7 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/hasher.h"  // For HashSeed.
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/btree_access_method_internal.h"
+#include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -45,10 +45,8 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HashAccessMethod(IndexDescriptor* descriptor);
+        HashAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~HashAccessMethod() { }
-
-        virtual Status newCursor(IndexCursor** out);
 
         // This is a NO-OP.
         virtual Status setOptions(const CursorOptions& options) {

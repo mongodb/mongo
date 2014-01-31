@@ -199,7 +199,7 @@ namespace audit {
     void logAddShard(ClientBasic* client,
                      const StringData& name,
                      const std::string& servers,
-                     long long maxsize) MONGO_AUDIT_STUB
+                     long long maxSize) MONGO_AUDIT_STUB
 
     void logRemoveShard(ClientBasic* client,
                         const StringData& shardname) MONGO_AUDIT_STUB
@@ -208,6 +208,15 @@ namespace audit {
                             const StringData& ns,
                             const BSONObj& keyPattern,
                             bool unique) MONGO_AUDIT_STUB
+
+    void appendImpersonatedUsers(BSONObjBuilder* cmd) MONGO_AUDIT_STUB
+
+    void parseAndRemoveImpersonatedUserField(BSONObj cmdObj, 
+                                             AuthorizationSession* authSession,
+                                             std::vector<UserName>* parsedUserNames,
+                                             bool* fieldIsPresent)
+                                             MONGO_AUDIT_STUB
+
 }  // namespace audit
 }  // namespace mongo
 

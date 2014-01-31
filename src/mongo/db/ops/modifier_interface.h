@@ -76,6 +76,13 @@ namespace mongo {
          *
          * If 'modExpr' is invalid, returns an error status with a reason description.
          *
+         * The optional bool out parameter 'positional', if provided, will be set to 'true' if
+         * the mod requires matched field details to be provided when calling 'prepare'. The
+         * field is optional since this is a hint to the caller about what work is needed to
+         * correctly invoke 'prepare'. It is always legal to provide any match details
+         * unconditionally. The value set in 'positional' if any, is only meaningful if 'init'
+         * returns an OK status.
+         *
          * Note:
          *
          *   + An operator may assume the modExpr passed here will be unchanged throughout all
@@ -83,7 +90,8 @@ namespace mongo {
          *     time of this mod. Therefore, taking references to elements inside modExpr is
          *     valid.
          */
-        virtual Status init(const BSONElement& modExpr, const Options& opts) = 0;
+        virtual Status init(const BSONElement& modExpr, const Options& opts,
+                            bool* positional = NULL) = 0;
 
         /**
          * Returns OK if it would be correct to apply this mod over the document 'root' (e.g, if
@@ -100,6 +108,9 @@ namespace mongo {
          *
          * If the mod cannot be applied over 'root', returns an error status with a reason
          * description.
+         *
+         * Note that you must provide a meaningful 'matchedField' here, unless 'init' set
+         * 'positional' to 'false', in which case you may pass an empty StringData object.
          */
         struct ExecInfo;
         virtual Status prepare(mutablebson::Element root,

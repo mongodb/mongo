@@ -33,10 +33,10 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/dbhelpers.h"
 
 namespace mongo {
 
+    extern const BSONObj reverseNaturalObj; // { $natural : -1 }
     /**
      * Authenticates conn using the server's cluster-membership credentials.
      *

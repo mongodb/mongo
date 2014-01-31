@@ -30,8 +30,6 @@
 
 #include <deque>
 
-#include "mongo/pch.h"
-
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
@@ -39,14 +37,10 @@
 namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
-    class BSONArrayBuilder;
     class Command;
+    struct DepsTracker;
     class DocumentSource;
-    class DocumentSourceProject;
-    class Expression;
     struct ExpressionContext;
-    class ExpressionNary;
-    struct OpDesc; // local private struct
     class Privilege;
 
     /** mongodb "commands" (sent via db.$cmd.findOne(...))
@@ -122,7 +116,7 @@ namespace mongo {
         void addInitialSource(intrusive_ptr<DocumentSource> source);
 
         /// The source that represents the output. Returns a non-owning pointer.
-        DocumentSource* output() { return sources.back().get(); }
+        DocumentSource* output() { invariant( !sources.empty() ); return sources.back().get(); }
 
         /// Returns true if this pipeline only uses features that work in mongos.
         bool canRunInMongos() const;
@@ -132,6 +126,14 @@ namespace mongo {
          * explain flag true (for DocumentSource::serializeToArray()).
          */
         vector<Value> writeExplainOps() const;
+        
+        /**
+         * Returns the dependencies needed by this pipeline.
+         *
+         * initialQuery is used as a fallback for metadata dependency detection. The assumption is
+         * that any metadata produced by the query is needed unless we can prove it isn't.
+         */
+        DepsTracker getDependencies(const BSONObj& initialQuery) const;
 
         /**
           The aggregation command name.

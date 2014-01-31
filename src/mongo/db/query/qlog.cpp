@@ -34,13 +34,6 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(verboseQueryLogging, bool, false);
 
-    class nullstream : public std::ostream {
-    public:
-        nullstream() : std::ios(0), std::ostream(0) { }
-    };
-
-    static nullstream theNullStream;
-
     bool qlogOff() {
         bool old = verboseQueryLogging;
         verboseQueryLogging = false;
@@ -53,14 +46,4 @@ namespace mongo {
         return old;
     }
 
-    std::ostream& QLOG() {
-        if (verboseQueryLogging) {
-            return std::cout;
-        }
-        else {
-            return theNullStream;
-        }
-    }
-
 }  // namespace mongo
-

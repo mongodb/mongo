@@ -94,11 +94,18 @@ namespace mongo {
         if ( _shardName.size() == 0 ) {
             // TODO SERVER-2299 remotely verify the name is sound w.r.t IPs
             _shardName = name;
+
+            string clientAddr = cc().clientAddress(true);
+            log() << "remote client " << clientAddr << " initialized this host as shard " << name;
             return true;
         }
 
         if ( _shardName == name )
             return true;
+
+        string clientAddr = cc().clientAddress(true);
+        warning() << "remote client " << clientAddr << " tried to initialize this host as shard "
+                  << name << ", but shard name was previously initialized as " << _shardName;
 
         return false;
     }
@@ -107,11 +114,12 @@ namespace mongo {
         if ( setShardName( name ) )
             return;
 
+        string clientAddr = cc().clientAddress(true);
         stringstream ss;
-        ss << "gotShardName different than what i had before "
-           << " before [" << _shardName << "] "
-           << " got [" << name << "] "
-           ;
+
+        // Same error as above, to match for reporting
+        ss << "remote client " << clientAddr << " tried to initialize this host as shard " << name
+           << ", but shard name was previously initialized as " << _shardName;
         msgasserted( 13298 , ss.str() );
     }
 
@@ -788,7 +796,7 @@ namespace mongo {
         UnsetShardingCommand() : MongodShardCommand("unsetSharding") {}
 
         virtual void help( stringstream& help ) const {
-            help << " example: { unsetSharding : 1 } ";
+            help << "internal";
         }
 
         virtual LockType locktype() const { return NONE; }
@@ -799,7 +807,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::unsetSharding);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
@@ -815,7 +823,7 @@ namespace mongo {
         SetShardVersion() : MongodShardCommand("setShardVersion") {}
 
         virtual void help( stringstream& help ) const {
-            help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
+            help << "internal";
         }
 
         virtual bool slaveOk() const { return true; }
@@ -825,7 +833,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::setShardVersion);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
@@ -916,7 +924,6 @@ namespace mongo {
                 shardingState.gotShardName( cmdObj["shard"].String() );
             }
             
-
             // Handle initial shard connection
             if( cmdObj["version"].eoo() && cmdObj["init"].trueValue() ){
 

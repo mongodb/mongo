@@ -30,9 +30,9 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/projection_exec.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/lite_projection.h"
 
 namespace mongo {
 
@@ -41,12 +41,10 @@ namespace mongo {
      */
     class ProjectionStage : public PlanStage {
     public:
-        ProjectionStage(LiteProjection* proj,
-                        bool covered,
+        ProjectionStage(BSONObj projObj,
                         const MatchExpression* fullExpression,
                         WorkingSet* ws,
-                        PlanStage* child,
-                        const MatchExpression* filter);
+                        PlanStage* child);
 
         virtual ~ProjectionStage();
 
@@ -55,27 +53,19 @@ namespace mongo {
 
         virtual void prepareToYield();
         virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         PlanStageStats* getStats();
 
     private:
-        // Not owned by us.
-        LiteProjection* _proj;
-        bool _covered;
+        scoped_ptr<ProjectionExec> _exec;
 
         // _ws is not owned by us.
         WorkingSet* _ws;
         scoped_ptr<PlanStage> _child;
 
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
-
         // Stats
         CommonStats _commonStats;
-
-        // Not owned here.  Used when we have a positional projection.
-        const MatchExpression* _fullExpression;
     };
 
 }  // namespace mongo

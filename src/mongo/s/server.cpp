@@ -38,6 +38,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -76,7 +77,9 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
+#include "mongo/util/signal_win32.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
@@ -110,6 +113,16 @@ namespace mongo {
         return false;
     }
 
+    static BSONObj buildErrReply( const DBException& ex ) {
+        BSONObjBuilder errB;
+        errB.append( "$err", ex.what() );
+        errB.append( "code", ex.getCode() );
+        if ( !ex._shard.empty() ) {
+            errB.append( "shard", ex._shard );
+        }
+        return errB.obj();
+    }
+
     class ShardedMessageHandler : public MessageHandler {
     public:
         virtual ~ShardedMessageHandler() {}
@@ -130,42 +143,43 @@ namespace mongo {
                 r.process();
 
                 // Release connections after non-write op 
-                if ( ShardConnection::releaseConnectionsAfterResponse && r.expectResponse() ) {
+                if ( r.expectResponse() ) {
                     LOG(2) << "release thread local connections back to pool" << endl;
                     ShardConnection::releaseMyConnections();
                 }
             }
-            catch ( AssertionException & e ) {
-                LOG( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;
+            catch ( const AssertionException& ex ) {
 
-                le->raiseError( e.getCode() , e.what() );
-
-                m.header()->id = r.id();
-
-                if ( r.expectResponse() ) {
-                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
-                    replyToQuery( ResultFlag_ErrSet, p , m , err );
-                }
-            }
-            catch ( DBException& e ) {
-                // note that e.toString() is more detailed on a SocketException than 
-                // e.what().  we should think about what is the right level of detail both 
-                // for logging and return code.
-                log() << "DBException in process: " << e.what() << endl;
-
-                le->raiseError( e.getCode() , e.what() );
-
-                m.header()->id = r.id();
+                LOG( ex.isUserAssertion() ? 1 : 0 ) << "Assertion failed"
+                    << " while processing " << opToString( m.operation() ) << " op"
+                    << " for " << r.getns() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
-                    BSONObjBuilder b;
-                    b.append("$err",e.what()).append("code",e.getCode());
-                    if( !e._shard.empty() ) {
-                        b.append("shard",e._shard);
-                    }
-                    replyToQuery( ResultFlag_ErrSet, p , m , b.obj() );
+                    m.header()->id = r.id();
+                    replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
+                }
+                else {
+                    le->raiseError( ex.getCode() , ex.what() );
                 }
             }
+            catch ( const DBException& ex ) {
+
+                log() << "Exception thrown"
+                    << " while processing " << opToString( m.operation() ) << " op"
+                    << " for " << r.getns() << causedBy( ex ) << endl;
+
+                if ( r.expectResponse() ) {
+                    m.header()->id = r.id();
+                    replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
+                }
+                else {
+                    le->raiseError( ex.getCode() , ex.what() );
+                }
+            }
+
+            // Clear out the last error for GLE unless it's been explicitly disabled
+            if ( r.expectResponse() && !le->disabled )
+                le->reset();
         }
 
         virtual void disconnected( AbstractMessagingPort* p ) {
@@ -210,6 +224,42 @@ namespace mongo {
         verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( signalProcessingThread );
     }
+#else
+
+    void eventProcessingThread() {
+        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
+
+        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
+        if (event == NULL) {
+            warning() << "eventProcessingThread CreateEvent failed: "
+                << errnoWithDescription();
+            return;
+        }
+
+        ON_BLOCK_EXIT(CloseHandle, event);
+
+        int returnCode = WaitForSingleObject(event, INFINITE);
+        if (returnCode != WAIT_OBJECT_0) {
+            if (returnCode == WAIT_FAILED) {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription();
+                return;
+            }
+            else {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription(returnCode);
+                return;
+            }
+        }
+
+        Client::initThread("eventTerminate");
+        log() << "shutdown event signaled, will terminate after current cmd ends";
+        exitCleanly(EXIT_CLEAN);
+    }
+
+    void startSignalProcessingThread() {
+        boost::thread it(eventProcessingThread);
+    }
 #endif  // not _WIN32
 
     void setupSignalHandlers() {
@@ -218,6 +268,9 @@ namespace mongo {
 
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
+#if defined(SIGXCPU)
+        signal(SIGXCPU, sighandler);
+#endif
 
 #if defined(SIGQUIT)
         signal( SIGQUIT , printStackAndExit );
@@ -235,8 +288,9 @@ namespace mongo {
 #ifndef _WIN32
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGUSR1 );
-        startSignalProcessingThread();
 #endif
+
+        startSignalProcessingThread();
 
         setWindowsUnhandledExceptionFilter();
         set_new_handler( my_new_handler );
@@ -286,7 +340,8 @@ static bool runMongosServer( bool doUpgrade ) {
     // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
     DBClientConnection::setLazyKillCursor( false );
 
-    ReplicaSetMonitor::setConfigChangeHook( boost::bind( &ConfigServer::replicaSetChange , &configServer , _1 ) );
+    ReplicaSetMonitor::setConfigChangeHook(
+        boost::bind(&ConfigServer::replicaSetChange, &configServer, _1 , _2));
 
     if (!configServer.init(mongosGlobalParams.configdbs)) {
         log() << "couldn't resolve config db address" << endl;
@@ -446,7 +501,12 @@ int mongoSMain(int argc, char* argv[], char** envp) {
 
     mongosCommand = argv[0];
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    Status status = mongo::runGlobalInitializers(argc, argv, envp);
+    if (!status.isOK()) {
+        severe() << "Failed global initialization: " << status;
+        ::_exit(EXIT_FAILURE);
+    }
+
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);
     try {

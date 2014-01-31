@@ -6,6 +6,9 @@ assert( res.maxBsonObjectSize &&
 assert( res.maxMessageSizeBytes &&
         isNumber(res.maxMessageSizeBytes) &&
         res.maxBsonObjectSize > 0, "maxMessageSizeBytes possibly missing:" + tojson(res));
+assert( res.maxWriteBatchSize &&
+        isNumber(res.maxWriteBatchSize) &&
+        res.maxWriteBatchSize > 0, "maxWriteBatchSize possibly missing:" + tojson(res));
 assert(res.ismaster, "ismaster missing or false:" + tojson(res));
 assert(res.localTime, "localTime possibly missing:" + tojson(res));
 var unwantedFields = ["setName", "setVersion", "secondary", "hosts", "passives", "arbiters",

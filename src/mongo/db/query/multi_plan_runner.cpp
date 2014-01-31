@@ -28,21 +28,28 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
+#include <memory>
+#include "mongo/db/client.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 
-    MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _killed(false),
+    MultiPlanRunner::MultiPlanRunner(const Collection* collection, CanonicalQuery* query)
+        : _collection(collection),
+          _killed(false),
           _failure(false),
           _failureCount(0),
           _policy(Runner::YIELD_MANUAL),
@@ -127,11 +134,11 @@ namespace mongo {
         }
     }
 
-    void MultiPlanRunner::invalidate(const DiskLoc& dl) {
+    void MultiPlanRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (_failure || _killed) { return; }
 
         if (NULL != _bestPlan) {
-            _bestPlan->invalidate(dl);
+            _bestPlan->invalidate(dl, type);
             for (list<WorkingSetID>::iterator it = _alreadyProduced.begin();
                  it != _alreadyProduced.end();) {
                 WorkingSetMember* member = _bestPlan->getWorkingSet()->get(*it);
@@ -148,7 +155,7 @@ namespace mongo {
                 }
             }
             if (NULL != _backupPlan) {
-                _backupPlan->invalidate(dl);
+                _backupPlan->invalidate(dl, type);
                 for (list<WorkingSetID>::iterator it = _backupAlreadyProduced.begin();
                         it != _backupAlreadyProduced.end();) {
                     WorkingSetMember* member = _backupPlan->getWorkingSet()->get(*it);
@@ -168,7 +175,7 @@ namespace mongo {
         }
         else {
             for (size_t i = 0; i < _candidates.size(); ++i) {
-                _candidates[i].root->invalidate(dl);
+                _candidates[i].root->invalidate(dl, type);
                 for (list<WorkingSetID>::iterator it = _candidates[i].results.begin();
                      it != _candidates[i].results.end();) {
                     WorkingSetMember* member = _candidates[i].ws->get(*it);
@@ -202,6 +209,7 @@ namespace mongo {
 
     void MultiPlanRunner::kill() {
         _killed = true;
+        _collection = NULL;
         if (NULL != _bestPlan) { _bestPlan->kill(); }
     }
 
@@ -218,17 +226,21 @@ namespace mongo {
             }
         }
 
-        if (!_alreadyProduced.empty()) {
+        // Look for an already produced result that provides the data the caller wants.
+        while (!_alreadyProduced.empty()) {
             WorkingSetID id = _alreadyProduced.front();
             _alreadyProduced.pop_front();
 
             WorkingSetMember* member = _bestPlan->getWorkingSet()->get(id);
+
             // Note that this copies code from PlanExecutor.
             if (NULL != objOut) {
                 if (WorkingSetMember::LOC_AND_IDX == member->state) {
                     if (1 != member->keyData.size()) {
                         _bestPlan->getWorkingSet()->free(id);
-                        return Runner::RUNNER_ERROR;
+                        // If the caller needs the key data and the WSM doesn't have it, drop the
+                        // result and carry on.
+                        continue;
                     }
                     *objOut = member->keyData[0].keyData;
                 }
@@ -236,9 +248,10 @@ namespace mongo {
                     *objOut = member->obj;
                 }
                 else {
-                    // TODO: Checking the WSM for covered fields goes here.
+                    // If the caller needs an object and the WSM doesn't have it, drop and
+                    // try the next result.
                     _bestPlan->getWorkingSet()->free(id);
-                    return Runner::RUNNER_ERROR;
+                    continue;
                 }
             }
 
@@ -247,10 +260,14 @@ namespace mongo {
                     *dlOut = member->loc;
                 }
                 else {
+                    // If the caller needs a DiskLoc and the WSM doesn't have it, drop and carry on.
                     _bestPlan->getWorkingSet()->free(id);
-                    return Runner::RUNNER_ERROR;
+                    continue;
                 }
             }
+
+            // If we're here, the caller has all the data needed and we've set the out
+            // parameters.  Remove the result from the WorkingSet.
             _bestPlan->getWorkingSet()->free(id);
             return Runner::RUNNER_ADVANCED;
         }
@@ -259,6 +276,20 @@ namespace mongo {
 
         if (Runner::RUNNER_ERROR == state && (NULL != _backupSolution)) {
             QLOG() << "Best plan errored out switching to backup\n";
+            // Uncache the bad solution if we fall back
+            // on the backup solution.
+            //
+            // XXX: Instead of uncaching we should find a way for the
+            // cached plan runner to fall back on a different solution
+            // if the best solution fails. Alternatively we could try to
+            // defer cache insertion to be after the first produced result.
+            Database* db = cc().database();
+            verify(NULL != db);
+            Collection* collection = db->getCollection(_query->ns());
+            verify(NULL != collection);
+            PlanCache* cache = collection->infoCache()->getPlanCache();
+            cache->remove(*_query);
+
             _bestPlan.reset(_backupPlan);
             _backupPlan = NULL;
             _bestSolution.reset(_backupSolution);
@@ -291,7 +322,14 @@ namespace mongo {
 
         if (_failure || _killed) { return false; }
 
-        size_t bestChild = PlanRanker::pickBestPlan(_candidates, NULL);
+        // After picking best plan, ranking will own plan stats from
+        // candidate solutions (winner and losers).
+        std::auto_ptr<PlanRankingDecision> ranking(new PlanRankingDecision);
+        size_t bestChild = PlanRanker::pickBestPlan(_candidates, ranking.get());
+
+        // Copy candidate order. We will need this to sort candidate stats for explain
+        // after transferring ownership of 'ranking' to plan cache.
+        std::vector<size_t> candidateOrder = ranking->candidateOrder;
 
         // Run the best plan.  Store it.
         _bestPlan.reset(new PlanExecutor(_candidates[bestChild].ws,
@@ -318,14 +356,50 @@ namespace mongo {
             }
         }
 
-        // TODO:
         // Store the choice we just made in the cache.
-        // QueryPlanCache* cache = PlanCache::get(somenamespace);
-        // cache->add(_query, *_candidates[bestChild]->solution, decision->bestPlanStats);
-        // delete decision;
+        if (PlanCache::shouldCacheQuery(*_query)) {
+            Database* db = cc().database();
+            verify(NULL != db);
+            Collection* collection = db->getCollection(_query->ns());
+            verify(NULL != collection);
+            PlanCache* cache = collection->infoCache()->getPlanCache();
+            // Create list of candidate solutions for the cache with
+            // the best solution at the front.
+            std::vector<QuerySolution*> solutions;
+
+            // Generate solutions and ranking decisions sorted by score.
+            for (size_t orderingIndex = 0;
+                 orderingIndex < candidateOrder.size(); ++orderingIndex) {
+                // index into candidates/ranking
+                size_t i = candidateOrder[orderingIndex];
+                solutions.push_back(_candidates[i].solution);
+            }
+
+            // Check solution cache data. Do not add to cache if
+            // we have any invalid SolutionCacheData data.
+            // XXX: One known example is 2D queries
+            bool validSolutions = true;
+            for (size_t i = 0; i < solutions.size(); ++i) {
+                if (NULL == solutions[i]->cacheData.get()) {
+                    QLOG() << "Not caching query because this solution has no cache data: "
+                           << solutions[i]->toString();
+                    validSolutions = false;
+                    break;
+                }
+            }
+
+            if (validSolutions) {
+                cache->add(*_query, solutions, ranking.release());
+            }
+        }
 
         // Clear out the candidate plans, leaving only stats as we're all done w/them.
-        for (size_t i = 0; i < _candidates.size(); ++i) {
+        // Traverse candidate plans in order or score
+        for (size_t orderingIndex = 0;
+             orderingIndex < candidateOrder.size(); ++orderingIndex) {
+            // index into candidates/ranking
+            size_t i = candidateOrder[orderingIndex];
+
             if (i == bestChild) { continue; }
             if (i == backupChild) { continue; }
 
@@ -442,64 +516,74 @@ namespace mongo {
         }
     }
 
-    Status MultiPlanRunner::getExplainPlan(TypeExplain** explain) const {
-        if (NULL == _bestPlan.get()) {
-            return Status(ErrorCodes::InternalError, "No plan available to provide stats");
-        }
-
-        //
-        // Explain for the winner plan
-        //
-
-        scoped_ptr<PlanStageStats> stats(_bestPlan->getStats());
-        if (NULL == stats.get()) {
-            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
-        }
-
-        Status status = explainPlan(*stats, explain, true /* full details */);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // TODO Hook the cached plan if there was one.
-        // (*explain)->setOldPlan(???);
-
-        //
-        // Alternative plans' explains
-        //
-        // We get information about all the plans considered and hook them up the the main
-        // explain structure. If we fail to get any of them, we still return the main explain.
-        // Make sure we initialize the "*AllPlans" fields with the plan that was chose.
-        //
-
-        TypeExplain* chosenPlan = NULL;
-        status = explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        (*explain)->addToAllPlans(chosenPlan); // ownership xfer
-
-        uint64_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
-        uint64_t nScannedAllPlans = chosenPlan->getNScanned();
-        for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
-             it != _candidateStats.end();
-             ++it) {
-
-            TypeExplain* candidateExplain;
-            status = explainPlan(**it, &candidateExplain, false /* no full details */);
-            if (status != Status::OK()) {
-                continue;
+    Status MultiPlanRunner::getInfo(TypeExplain** explain,
+                                    PlanInfo** planInfo) const {
+        if (NULL != explain) {
+            if (NULL == _bestPlan.get()) {
+                return Status(ErrorCodes::InternalError, "No plan available to provide stats");
             }
 
-            (*explain)->addToAllPlans(candidateExplain); // ownership xfer
+            //
+            // Explain for the winner plan
+            //
 
-            nScannedObjectsAllPlans += candidateExplain->getNScannedObjects();
-            nScannedAllPlans += candidateExplain->getNScanned();
+            scoped_ptr<PlanStageStats> stats(_bestPlan->getStats());
+            if (NULL == stats.get()) {
+                return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+            }
+
+            Status status = explainPlan(*stats, explain, true /* full details */);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // TODO Hook the cached plan if there was one.
+            // (*explain)->setOldPlan(???);
+
+            //
+            // Alternative plans' explains
+            //
+            // We get information about all the plans considered and hook them up the the main
+            // explain structure. If we fail to get any of them, we still return the main explain.
+            // Make sure we initialize the "*AllPlans" fields with the plan that was chose.
+            //
+
+            TypeExplain* chosenPlan = NULL;
+            status = explainPlan(*stats, &chosenPlan, false /* no full details */);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            (*explain)->addToAllPlans(chosenPlan); // ownership xfer
+
+            size_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
+            size_t nScannedAllPlans = chosenPlan->getNScanned();
+            for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
+                 it != _candidateStats.end();
+                 ++it) {
+
+                TypeExplain* candidateExplain = NULL;
+                status = explainPlan(**it, &candidateExplain, false /* no full details */);
+                if (status != Status::OK()) {
+                    continue;
+                }
+
+                (*explain)->addToAllPlans(candidateExplain); // ownership xfer
+
+                nScannedObjectsAllPlans += candidateExplain->getNScannedObjects();
+                nScannedAllPlans += candidateExplain->getNScanned();
+            }
+
+            (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
+            (*explain)->setNScannedAllPlans(nScannedAllPlans);
         }
-
-        (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
-        (*explain)->setNScannedAllPlans(nScannedAllPlans);
+        else if (NULL != planInfo) {
+            if (NULL == _bestSolution.get()) {
+                return Status(ErrorCodes::InternalError,
+                              "no best solution available for plan info");
+            }
+            getPlanInfo(*_bestSolution, planInfo);
+        }
 
         return Status::OK();
     }

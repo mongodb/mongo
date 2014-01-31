@@ -51,7 +51,8 @@ namespace {
     const std::string ADMIN_DBNAME = "admin";
 }  // namespace
 
-    AuthorizationSession::AuthorizationSession(AuthzSessionExternalState* externalState) {
+    AuthorizationSession::AuthorizationSession(AuthzSessionExternalState* externalState) 
+        : _impersonationFlag(false) {
         _externalState.reset(externalState);
     }
 
@@ -78,6 +79,9 @@ namespace {
             return status;
         }
 
+        // If there are any users in the impersonate list, clear them.
+        clearImpersonatedUserNames();
+
         // Calling add() on the UserSet may return a user that was replaced because it was from the
         // same database.
         User* replacedUser = _authenticatedUsers.add(user);
@@ -97,19 +101,20 @@ namespace {
     }
 
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
+        clearImpersonatedUserNames();
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);
         if (removedUser) {
             getAuthorizationManager().releaseUser(removedUser);
         }
     }
 
-    UserSet::NameIterator AuthorizationSession::getAuthenticatedUserNames() {
+    UserNameIterator AuthorizationSession::getAuthenticatedUserNames() {
         return _authenticatedUsers.getNames();
     }
 
     std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
         std::string ret;
-        for (UserSet::NameIterator nameIter = getAuthenticatedUserNames();
+        for (UserNameIterator nameIter = getAuthenticatedUserNames();
                 nameIter.more();
                 nameIter.next()) {
             ret += '\0'; // Using a NUL byte which isn't valid in usernames to separate them.
@@ -348,7 +353,8 @@ namespace {
         }
         ResourcePattern resourceSearchList[resourceSearchListCapacity];
         const int resourceSearchListLength =
-                buildResourceSearchList(ResourcePattern::forClusterResource(), resourceSearchList);
+                buildResourceSearchList(ResourcePattern::forDatabaseName(userName.getDB()),
+                                        resourceSearchList);
 
         ActionSet actions;
         for (int i = 0; i < resourceSearchListLength; ++i) {
@@ -364,7 +370,8 @@ namespace {
         }
         ResourcePattern resourceSearchList[resourceSearchListCapacity];
         const int resourceSearchListLength =
-                buildResourceSearchList(ResourcePattern::forClusterResource(), resourceSearchList);
+                buildResourceSearchList(ResourcePattern::forDatabaseName(userName.getDB()),
+                                        resourceSearchList);
 
         ActionSet actions;
         for (int i = 0; i < resourceSearchListLength; ++i) {
@@ -471,6 +478,25 @@ namespace {
         }
 
         return false;
+    }
+
+    void AuthorizationSession::setImpersonatedUserNames(const std::vector<UserName>& names) {
+        _impersonatedUserNames = names;
+        _impersonationFlag = true;
+    }
+
+    // Clear the vector of impersonated UserNames.
+    void AuthorizationSession::clearImpersonatedUserNames() {
+        _impersonatedUserNames.clear();
+        _impersonationFlag = false;
+    }
+
+    UserNameIterator AuthorizationSession::getImpersonatedUserNames() const {
+         return makeUserNameIteratorForContainer(_impersonatedUserNames);
+    }
+
+    bool AuthorizationSession::isImpersonating() const {
+        return _impersonationFlag;
     }
 
 } // namespace mongo

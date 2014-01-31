@@ -26,6 +26,7 @@ try {
     
     db.setProfilingLevel(2);
     
+    db.createCollection(t.getName(), {usePowerOf2Sizes: false});
     t.insert( { x : 1 } );
     t.findOne( { x : 1 } );
     t.find( { x : 1 } ).count();

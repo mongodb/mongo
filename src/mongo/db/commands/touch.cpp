@@ -43,10 +43,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/curop-inl.h"
-#include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 

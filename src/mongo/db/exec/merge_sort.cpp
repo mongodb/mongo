@@ -174,17 +174,17 @@ namespace mongo {
         }
     }
 
-    void MergeSortStage::invalidate(const DiskLoc& dl) {
+    void MergeSortStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl);
+            _children[i]->invalidate(dl, type);
         }
 
         // Go through our data and see if we're holding on to the invalidated loc.
         for (list<StageWithValue>::iterator valueIt = _mergingData.begin(); valueIt != _mergingData.end(); valueIt++) {
             WorkingSetMember* member = _ws->get(valueIt->id);
             if (member->hasLoc() && (dl == member->loc)) {
-                // Force a fetch and flag.
+                // Force a fetch and flag.  We could possibly merge this result back in later.
                 WorkingSetCommon::fetchAndInvalidateLoc(member);
                 _ws->flagForReview(valueIt->id);
                 ++_specificStats.forcedFetches;

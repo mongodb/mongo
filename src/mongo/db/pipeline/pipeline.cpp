@@ -147,9 +147,9 @@ namespace mongo {
                 continue;
             }
 
-            if (str::equals(pFieldName, "allowDiskUsage")) {
+            if (str::equals(pFieldName, "allowDiskUse")) {
                 uassert(16949,
-                        str::stream() << "allowDiskUsage must be a bool, not a "
+                        str::stream() << "allowDiskUse must be a bool, not a "
                                       << typeName(cmdElement.type()),
                         cmdElement.type() == Bool);
                 pCtx->extSortAllowed = cmdElement.Bool();
@@ -200,6 +200,8 @@ namespace mongo {
             verify(stage);
             sources.push_back(stage);
 
+            // TODO find a good general way to check stages that must be first syntactically
+
             if (dynamic_cast<DocumentSourceOut*>(stage.get())) {
                 uassert(16991, "$out can only be the final stage in the pipeline",
                         iStep == nSteps - 1);
@@ -218,10 +220,14 @@ namespace mongo {
     }
 
     void Pipeline::Optimizations::Local::moveMatchBeforeSort(Pipeline* pipeline) {
+        // TODO Keep moving matches across multiple sorts as moveLimitBeforeSkip does below.
+        // TODO Check sort for limit. Not an issue currently due to order optimizations are applied,
+        // but should be fixed.
         SourceContainer& sources = pipeline->sources;
         for (size_t srcn = sources.size(), srci = 1; srci < srcn; ++srci) {
             intrusive_ptr<DocumentSource> &pSource = sources[srci];
-            if (dynamic_cast<DocumentSourceMatch *>(pSource.get())) {
+            DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch *>(pSource.get());
+            if (match && !match->isTextQuery()) {
                 intrusive_ptr<DocumentSource> &pPrevious = sources[srci - 1];
                 if (dynamic_cast<DocumentSourceSort *>(pPrevious.get())) {
                     /* swap this item with the previous */
@@ -352,6 +358,8 @@ namespace mongo {
         // The order in which optimizations are applied can have significant impact on the
         // efficiency of the final pipeline. Be Careful!
         Optimizations::Sharded::findSplitPoint(shardPipeline.get(), this);
+        Optimizations::Sharded::moveFinalUnwindFromShardsToMerger(shardPipeline.get(), this);
+        Optimizations::Sharded::limitFieldsSentFromShardsToMerger(shardPipeline.get(), this);
 
         return shardPipeline;
     }
@@ -380,6 +388,51 @@ namespace mongo {
                 break;
             }
         }
+    }
+
+    void Pipeline::Optimizations::Sharded::moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe,
+                                                                             Pipeline* mergePipe) {
+        while (!shardPipe->sources.empty()
+                && dynamic_cast<DocumentSourceUnwind*>(shardPipe->sources.back().get())) {
+            mergePipe->sources.push_front(shardPipe->sources.back());
+            shardPipe->sources.pop_back();
+        }
+    }
+
+    void Pipeline::Optimizations::Sharded::limitFieldsSentFromShardsToMerger(Pipeline* shardPipe,
+                                                                             Pipeline* mergePipe) {
+        DepsTracker mergeDeps = mergePipe->getDependencies(shardPipe->getInitialQuery());
+        if (mergeDeps.needWholeDocument)
+            return; // the merge needs all fields, so nothing we can do.
+
+        // Empty project is "special" so if no fields are needed, we just ask for _id instead.
+        if (mergeDeps.fields.empty())
+            mergeDeps.fields.insert("_id");
+
+        // Remove metadata from dependencies since it automatically flows through projection and we
+        // don't want to project it in to the document.
+        mergeDeps.needTextScore = false;
+
+        // HEURISTIC: only apply optimization if none of the shard stages have an exhaustive list of
+        // field dependencies. While this may not be 100% ideal in all cases, it is simple and
+        // avoids the worst cases by ensuring that:
+        // 1) Optimization IS applied when the shards wouldn't have known their exhaustive list of
+        //    dependencies. This situation can happen when a $sort is before the first $project or
+        //    $group. Without the optimization, the shards would have to reify and transmit full
+        //    objects even though only a subset of fields are needed.
+        // 2) Optimization IS NOT applied immediately following a $project or $group since it would
+        //    add an unnecessary project (and therefore a deep-copy).
+        for (size_t i = 0; i < shardPipe->sources.size(); i++) {
+            DepsTracker dt; // ignored
+            if (shardPipe->sources[i]->getDependencies(&dt) & DocumentSource::EXHAUSTIVE_FIELDS)
+                return;
+        }
+
+        // if we get here, add the project.
+        shardPipe->sources.push_back(
+            DocumentSourceProject::createFromBson(
+                BSON("$project" << mergeDeps.toProjection()).firstElement(),
+                shardPipe->pCtx));
     }
 
     BSONObj Pipeline::getInitialQuery() const {
@@ -415,7 +468,7 @@ namespace mongo {
         }
 
         if (pCtx->extSortAllowed) {
-            serialized.setField("allowDiskUsage", Value(true));
+            serialized.setField("allowDiskUse", Value(true));
         }
 
         return serialized.freeze();
@@ -486,4 +539,43 @@ namespace mongo {
         return true;
     }
 
+    DepsTracker Pipeline::getDependencies(const BSONObj& initialQuery) const {
+        DepsTracker deps;
+        bool knowAllFields = false;
+        bool knowAllMeta = false;
+        for (size_t i=0; i < sources.size() && !(knowAllFields && knowAllMeta); i++) {
+            DepsTracker localDeps;
+            DocumentSource::GetDepsReturn status = sources[i]->getDependencies(&localDeps);
+
+            if (status == DocumentSource::NOT_SUPPORTED) {
+                // Assume this stage needs everything. We may still know something about our
+                // dependencies if an earlier stage returned either EXHAUSTIVE_FIELDS or
+                // EXHAUSTIVE_META.
+                break;
+            }
+
+            if (!knowAllFields) {
+                deps.fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+                if (localDeps.needWholeDocument)
+                    deps.needWholeDocument = true;
+                knowAllFields = status & DocumentSource::EXHAUSTIVE_FIELDS;
+            }
+
+            if (!knowAllMeta) {
+                if (localDeps.needTextScore)
+                    deps.needTextScore = true;
+
+                knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
+            }
+        }
+
+        if (!knowAllFields)
+            deps.needWholeDocument = true; // don't know all fields we need
+
+        // If doing a text query, assume we need the score if we can't prove we don't.
+        if (!knowAllMeta && DocumentSourceMatch::isTextQuery(initialQuery))
+            deps.needTextScore = true;
+
+        return deps;
+    }
 } // namespace mongo

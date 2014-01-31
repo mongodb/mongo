@@ -98,7 +98,7 @@ namespace mongo {
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         BSONObjBuilder bExtra;
         stringstream verstr;
-        OSVERSIONINFOEX osvi;   // os version 
+        OSVERSIONINFOEX osvi;   // os version
         MEMORYSTATUSEX mse;     // memory stats
         SYSTEM_INFO ntsysinfo;  //system stats
 
@@ -129,17 +129,32 @@ namespace mongo {
             switch ( osvi.dwMajorVersion ) {
             case 6:
                 switch ( osvi.dwMinorVersion ) {
+                    case 3:
+                        if ( osvi.wProductType == VER_NT_WORKSTATION )
+                            osName += "Windows 8.1";
+                        else
+                            osName += "Windows Server 2012 R2";
+                        break;
                     case 2:
                         if ( osvi.wProductType == VER_NT_WORKSTATION )
                             osName += "Windows 8";
                         else
-                            osName += "Windows Server 8";
+                            osName += "Windows Server 2012";
                         break;
                     case 1:
                         if ( osvi.wProductType == VER_NT_WORKSTATION )
                             osName += "Windows 7";
                         else
                             osName += "Windows Server 2008 R2";
+
+                        // Windows 6.1 is either Windows 7 or Windows 2008 R2. There is no SP2 for
+                        // either of these two operating systems, but the check will hold if one
+                        // were released. This code assumes that SP2 will include fix for 
+                        // http://support.microsoft.com/kb/2731284.
+                        //
+                        if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
+                            fileZeroNeeded = true;
+                        }
                         break;
                     case 0:
                         if ( osvi.wProductType == VER_NT_WORKSTATION )
@@ -196,7 +211,54 @@ namespace mongo {
     }
 
     bool ProcessInfo::checkNumaEnabled() {
-        return false;
+        typedef BOOL(WINAPI *LPFN_GLPI)(
+            PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
+            PDWORD);
+
+        DWORD returnLength = 0;
+        DWORD numaNodeCount = 0;
+        scoped_array<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> buffer;
+
+        LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(GetProcAddress(
+            GetModuleHandleW(L"kernel32"),
+            "GetLogicalProcessorInformation")));
+        if (glpi == NULL) {
+            return false;
+        }
+
+        DWORD returnCode = 0;
+        do {
+            returnCode = glpi(buffer.get(), &returnLength);
+
+            if (returnCode == FALSE) {
+                if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+                    buffer.reset(reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION>(
+                        new BYTE[returnLength]));
+                }
+                else {
+                    DWORD gle = GetLastError();
+                    warning() << "GetLogicalProcessorInformation failed with "
+                        << errnoWithDescription(gle);
+                    return false;
+                }
+            }
+        } while (returnCode == FALSE);
+
+        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer.get();
+
+        unsigned int byteOffset = 0;
+        while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
+            if (ptr->Relationship == RelationNumaNode) {
+                // Non-NUMA systems report a single record of this type.
+                numaNodeCount++;
+            }
+
+            byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+            ptr++;
+        }
+
+        // For non-NUMA machines, the count is 1
+        return numaNodeCount > 1;
     }
 
     bool ProcessInfo::blockCheckSupported() {

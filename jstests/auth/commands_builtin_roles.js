@@ -23,6 +23,8 @@ var roles = [
     {key: "clusterMonitor", role: "clusterMonitor", dbname: adminDbName},
     {key: "hostManager", role: "hostManager", dbname: adminDbName},
     {key: "clusterManager", role: "clusterManager", dbname: adminDbName},
+    {key: "backup", role: "backup", dbname: adminDbName},
+    {key: "restore", role: "restore", dbname: adminDbName},
     {key: "root", role: "root", dbname: adminDbName},
     {key: "__system", role: "__system", dbname: adminDbName}
 ];
@@ -47,7 +49,7 @@ function testProperAuthorization(conn, t, testcase, r) {
     assert(r.db.auth("user|" + r.role, "password"));
     var res = runOnDb.runCommand(t.command);
 
-    if (testcase.rolesAllowed[r.role]) {
+    if (testcase.roles[r.role]) {
         if (res.ok == 0 && res.code == authErrCode) {
             out = "expected authorization success" +
                   " but received " + tojson(res) + 
@@ -84,6 +86,9 @@ function runOneTest(conn, t) {
 
     for (var i = 0; i < t.testcases.length; i++) {
         var testcase = t.testcases[i];
+        if (!("roles" in testcase)) {
+            continue;
+        }
         for (var j = 0; j < roles.length; j++) {
             var msg = testProperAuthorization(conn, t, testcase, roles[j]);
             if (msg) {
@@ -122,7 +127,7 @@ function checkForNonExistentRoles() {
         var test = tests[i];
         for (var j = 0; j < test.testcases.length; j++) {
             var testcase = test.testcases[j];
-            for (role in testcase.rolesAllowed) {
+            for (role in testcase.roles) {
                 var roleExists = false;
                 for (var k = 0; k < roles.length; k++) {
                     if (roles[k].role === role) {

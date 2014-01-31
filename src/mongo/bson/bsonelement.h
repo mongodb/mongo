@@ -23,6 +23,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/client/export_macros.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/float_utils.h"
 
@@ -58,7 +59,7 @@ namespace mongo {
         value()
         type()
     */
-    class BSONElement {
+    class MONGO_CLIENT_API BSONElement {
     public:
         /** These functions, which start with a capital letter, throw a MsgAssertionException if the
             element is not of the required type. Example:
@@ -78,8 +79,8 @@ namespace mongo {
         void OK()                   const { chk(ok()); }     // throw MsgAssertionException if element DNE
 
         /** @return the embedded object associated with this field.
-            Note the returned object is a reference to within the parent bson object. If that 
-            object is out of scope, this pointer will no longer be valid. Call getOwned() on the 
+            Note the returned object is a reference to within the parent bson object. If that
+            object is out of scope, this pointer will no longer be valid. Call getOwned() on the
             returned BSONObj if you need your own copy.
             throws UserException if the element is not of type object.
         */
@@ -236,7 +237,7 @@ namespace mongo {
         }
 
         /** Size (length) of a string element.
-            You must assure of type String first.  
+            You must assure of type String first.
             @return string size including terminating null
         */
         int valuestrsize() const {
@@ -375,9 +376,6 @@ namespace mongo {
         /** Constructs an empty element */
         BSONElement();
 
-        /** Check that data is internally consistent. */
-        void validate() const;
-
         /** True if this element may contain subobjects. */
         bool mayEncapsulate() const {
             switch ( type() ) {
@@ -407,6 +405,10 @@ namespace mongo {
         }
         unsigned int timestampInc() const {
             return ((unsigned int*)(value() ))[0];
+        }
+
+        unsigned long long timestampValue() const {
+            return reinterpret_cast<const unsigned long long*>( value() )[0];
         }
 
         const char * dbrefNS() const {
@@ -453,6 +455,19 @@ namespace mongo {
                 fieldNameSize_ = 0;
                 totalSize = 1;
             }
+        }
+
+        struct FieldNameSizeTag {}; // For disambiguation with ctor taking 'maxLen' above.
+
+        /** Construct a BSONElement where you already know the length of the name. The value
+         *  passed here includes the null terminator. The data pointed to by 'd' must not
+         *  represent an EOO. You may pass -1 to indicate that you don't actually know the
+         *  size.
+         */
+        BSONElement(const char* d, int fieldNameSize, FieldNameSizeTag)
+            : data(d)
+            , fieldNameSize_(fieldNameSize) // internal size includes null terminator
+            , totalSize(-1) {
         }
 
         std::string _asCode() const;

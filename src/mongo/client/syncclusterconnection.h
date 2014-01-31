@@ -22,6 +22,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace mongo {
      * The class checks if a command is read or write style, and sends to a single
      * node if a read lock command and to all in two phases with a write style command.
      */
-    class SyncClusterConnection : public DBClientBase {
+    class MONGO_CLIENT_API SyncClusterConnection : public DBClientBase {
     public:
 
         using DBClientBase::query;
@@ -93,7 +94,7 @@ namespace mongo {
         virtual string getServerAddress() const { return _address; }
         virtual bool isFailed() const { return false; }
         virtual bool isStillConnected();
-        virtual string toString() { return _toString(); }
+        virtual string toString() const { return _toString(); }
 
         virtual BSONObj getLastErrorDetailed(const std::string& db,
                                              bool fsync=false,
@@ -111,6 +112,8 @@ namespace mongo {
 
 
         virtual bool lazySupported() const { return false; }
+
+        virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
 
     protected:
         virtual void _auth(const BSONObj& params);
@@ -136,7 +139,7 @@ namespace mongo {
         double _socketTimeout;
     };
 
-    class UpdateNotTheSame : public UserException {
+    class MONGO_CLIENT_API UpdateNotTheSame : public UserException {
     public:
         UpdateNotTheSame( int code , const string& msg , const vector<string>& addrs , const vector<BSONObj>& lastErrors )
             : UserException( code , msg ) , _addrs( addrs ) , _lastErrors( lastErrors ) {

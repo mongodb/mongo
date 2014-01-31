@@ -4,8 +4,6 @@ t = db.stages_text;
 t.drop();
 t.save({x: "az b x"})
 
-// Sets any params needed to make a text index.
-load("jstests/libs/fts.js");
 t.ensureIndex({x: "text"})
 
 // We expect to retrieve 'b'

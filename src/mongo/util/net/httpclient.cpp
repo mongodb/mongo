@@ -140,7 +140,7 @@ namespace mongo {
                 if ( result )
                     sb << buf;
             }
-        } catch (const SocketException& se) {}
+        } catch (const SocketException&) {}
 
 
         if ( result ) {

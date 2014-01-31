@@ -14,21 +14,38 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/interrupt_status_mongod.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace DocumentSourceTests {
 
     static const char* const ns = "unittests.documentsourcetests";
+    static const BSONObj metaTextScore = BSON("$meta" << "textScore");
     static DBDirectClient client;
 
     BSONObj toBson( const intrusive_ptr<DocumentSource>& source ) {
@@ -61,38 +78,72 @@ namespace DocumentSourceTests {
             void run() {
                 {
                     const char* array[] = {"a", "b"}; // basic
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "b" << 1 << "_id" << 0));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
                 }
                 {
                     const char* array[] = {"a", "ab"}; // prefixed but not subfield
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "ab" << 1 << "_id" << 0));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "ab" << 1 << "_id" << 0));
                 }
                 {
                     const char* array[] = {"a", "b", "a.b"}; // a.b included by a
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "b" << 1 << "_id" << 0));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
                 }
                 {
                     const char* array[] = {"a", "_id"}; // _id now included
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
                 }
                 {
                     const char* array[] = {"a", "_id.a"}; // still include whole _id (SERVER-7502)
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
                 }
                 {
                     const char* array[] = {"a", "_id", "_id.a"}; // handle both _id and subfield
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
                 }
                 {
                     const char* array[] = {"a", "_id", "_id_a"}; // _id prefixed but non-subfield
-                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
-                    ASSERT_EQUALS(proj, BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    ASSERT_EQUALS(deps.toProjection(), BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+                }
+                {
+                    const char* array[] = {"a"}; // fields ignored with needWholeDocument
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    deps.needWholeDocument = true;
+                    ASSERT_EQUALS(deps.toProjection(), BSONObj());
+                }
+                {
+                    const char* array[] = {"a"}; // needTextScore with needWholeDocument
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    deps.needWholeDocument = true;
+                    deps.needTextScore = true;
+                    ASSERT_EQUALS(
+                        deps.toProjection(),
+                        BSON(Document::metaFieldTextScore << metaTextScore));
+                }
+                {
+                    const char* array[] = {"a"}; // needTextScore without needWholeDocument
+                    DepsTracker deps;
+                    deps.fields = arrayToSet(array);
+                    deps.needTextScore = true;
+                    ASSERT_EQUALS(deps.toProjection(),
+                                  BSON(Document::metaFieldTextScore << metaTextScore
+                                    << "a" << 1
+                                    << "_id" << 0));
                 }
             }
         };
@@ -109,12 +160,19 @@ namespace DocumentSourceTests {
             { _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp"; }
         protected:
             void createSource() {
-                Client::ReadContext ctx (ns);
-                boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
-                ClientCursorHolder cc(
-                        new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
+                Client::WriteContext ctx (ns);
+                Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns );
+                CanonicalQuery* cq;
+                uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
+                Runner* runner;
+                uassertStatusOK(getRunner(cq, &runner));
+                auto_ptr<ClientCursor> cc(new ClientCursor(collection,
+                                                           runner,
+                                                           QueryOption_NoCursorTimeout));
+                verify(cc->getRunner());
+                cc->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
                 CursorId cursorId = cc->cursorid();
-                cc->c()->prepareToYield();
+                runner->saveState();
                 cc.release(); // it is now owned by the client cursor manager
                 _source = DocumentSourceCursor::create(ns, cursorId, _ctx);
             }
@@ -143,9 +201,13 @@ namespace DocumentSourceTests {
             }
         private:
             void assertNumClientCursors( unsigned int expected ) {
-                set<CursorId> nsCursors;
-                ClientCursor::find( ns, nsCursors );
-                ASSERT_EQUALS( expected, nsCursors.size() );
+                Client::ReadContext ctx( ns );
+                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                if ( !collection ) {
+                    ASSERT( 0 == expected );
+                    return;
+                }
+                ASSERT_EQUALS( expected, collection->cursorCache()->numCursors() );
             }
         };
 
@@ -278,7 +340,7 @@ namespace DocumentSourceTests {
                 // Iterate through all results.
                 while( source()->getNext() );
                 // The lock was yielded during iteration.
-                ASSERT( 0 < cc().curop()->numYields() );
+                ASSERT_GREATER_THAN(cc().curop()->numYields(), 0);
             }
         private:
             // An active writer is required to trigger yielding.
@@ -391,9 +453,11 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createLimit( 1 );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::SEE_NEXT, limit()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 0U, dependencies.size() );
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT, limit()->getDependencies(&dependencies) );
+                ASSERT_EQUALS( 0U, dependencies.fields.size() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -838,16 +902,18 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createGroup( fromjson( "{_id:'$x',a:{$sum:'$y.z'},b:{$avg:{$add:['$u','$v']}}}" ) );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE,
-                               group()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 4U, dependencies.size() );
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE_ALL,
+                               group()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 4U, dependencies.fields.size() );
                 // Dependency from _id expression.
-                ASSERT_EQUALS( 1U, dependencies.count( "x" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "x" ) );
                 // Dependencies from accumulator expressions.
-                ASSERT_EQUALS( 1U, dependencies.count( "y.z" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "u" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "v" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "y.z" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "u" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "v" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -1010,20 +1076,23 @@ namespace DocumentSourceTests {
         class Dependencies : public Base {
         public:
             void run() {
-                createProject( fromjson( "{a:true,x:'$b',y:{$and:['$c','$d']}}" ) );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE,
-                               project()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 5U, dependencies.size() );
+                createProject(fromjson(
+                    "{a:true,x:'$b',y:{$and:['$c','$d']}, z: {$meta:'textScore'}}"));
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE_FIELDS,
+                               project()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 5U, dependencies.fields.size() );
                 // Implicit _id dependency.
-                ASSERT_EQUALS( 1U, dependencies.count( "_id" ) );                
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "_id" ) );
                 // Inclusion dependency.
-                ASSERT_EQUALS( 1U, dependencies.count( "a" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a" ) );
                 // Field path expression dependency.
-                ASSERT_EQUALS( 1U, dependencies.count( "b" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "b" ) );
                 // Nested expression dependencies.
-                ASSERT_EQUALS( 1U, dependencies.count( "c" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "d" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "c" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "d" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( true, dependencies.needTextScore );
             }
         };
         
@@ -1351,11 +1420,13 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createSort( BSON( "a" << 1 << "b.c" << -1 ) );
-                set<string> dependencies;
-                ASSERT_EQUALS( DocumentSource::SEE_NEXT, sort()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 2U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a" ) );
-                ASSERT_EQUALS( 1U, dependencies.count( "b.c" ) );
+                DepsTracker dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT, sort()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 2U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a" ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "b.c" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
         
@@ -1612,11 +1683,13 @@ namespace DocumentSourceTests {
         public:
             void run() {
                 createUnwind( "$x.y.z" );
-                set<string> dependencies;
+                DepsTracker dependencies;
                 ASSERT_EQUALS( DocumentSource::SEE_NEXT,
-                               unwind()->getDependencies( dependencies ) );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "x.y.z" ) );
+                               unwind()->getDependencies( &dependencies ) );
+                ASSERT_EQUALS( 1U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "x.y.z" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 

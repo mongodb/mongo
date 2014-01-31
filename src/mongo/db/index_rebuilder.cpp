@@ -34,7 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -64,21 +64,14 @@ namespace mongo {
                 Database* db = cc().database();
                 db->namespaceIndex().getNamespaces(collNames, /* onlyCollections */ true);
             }
-            {
-                boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
-                ReplSet::rss.indexRebuildDone = true;
-                ReplSet::rss.cond.notify_all();
-            }
             checkNS(collNames);
         }
         catch (const DBException&) {
             warning() << "index rebuilding did not complete" << endl;
-            {
-                boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
-                ReplSet::rss.indexRebuildDone = true;
-                ReplSet::rss.cond.notify_all();
-            }
         }
+        boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
+        ReplSet::rss.indexRebuildDone = true;
+        ReplSet::rss.cond.notify_all();
         LOG(1) << "checking complete" << endl;
     }
 
@@ -88,59 +81,61 @@ namespace mongo {
                 it != nsToCheck.end();
                 ++it) {
 
+            string ns = *it;
+
+            LOG(3) << "IndexRebuilder::checkNS: " << ns;
+
             // This write lock is held throughout the index building process
             // for this namespace.
-            Client::WriteContext ctx(*it);
-            Collection* collection = ctx.ctx().db()->getCollection( *it );
+            Client::WriteContext ctx(ns);
+            Collection* collection = ctx.ctx().db()->getCollection( ns );
             if ( collection == NULL )
                 continue;
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-            if ( indexCatalog->numIndexesInProgress() == 0 ) {
+            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
+                warning() << ns << " had ilegal indexes, removing";
+                indexCatalog->dropAllIndexes( true );
                 continue;
             }
 
-            log() << "found interrupted index build(s) on " << *it << endl;
+            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes();
+
+            // The indexes have now been removed from system.indexes, so the only record is
+            // in-memory. If there is a journal commit between now and when insert() rewrites
+            // the entry and the db crashes before the new system.indexes entry is journalled,
+            // the index will be lost forever.  Thus, we're assuming no journaling will happen
+            // between now and the entry being re-written.
+
+            if ( indexesToBuild.size() == 0 ) {
+                continue;
+            }
+
+            log() << "found " << indexesToBuild.size()
+                  << " interrupted index build(s) on " << ns;
 
             if (firstTime) {
                 log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
                 firstTime = false;
             }
 
-            // If the indexBuildRetry flag isn't set, just clear the inProg flag
             if (!serverGlobalParams.indexBuildRetry) {
-                // If we crash between unsetting the inProg flag and cleaning up the index, the
-                // index space will be lost.
-                Status s = indexCatalog->blowAwayInProgressIndexEntries();
-                if ( !s.isOK() ) {
-                    log() << "failed to blowAwayInProgressIndexEntries: " << s;
-                    fassertFailed( 17201 );
-                }
+                log() << "  not rebuilding interrupted indexes";
                 continue;
             }
 
-            // We go from right to left building these indexes, so that indexBuildInProgress-- has
-            // the correct effect of "popping" an index off the list.
-            while ( indexCatalog->numIndexesInProgress() > 0 ) {
-                // First, clean up the in progress index build.  Save the system.indexes entry so that we
-                // can add it again afterwards.
-                BSONObj indexObj = indexCatalog->prepOneUnfinishedIndex();
+            // TODO: these can/should/must be done in parallel
+            for ( size_t i = 0; i < indexesToBuild.size(); i++ ) {
+                BSONObj indexObj = indexesToBuild[i];
 
-                // The index has now been removed from system.indexes, so the only record of it is
-                // in-memory. If there is a journal commit between now and when insert() rewrites
-                // the entry and the db crashes before the new system.indexes entry is journalled,
-                // the index will be lost forever.  Thus, we're assuming no journaling will happen
-                // between now and the entry being re-written.
+                log() << "going to rebuild: " << indexObj;
 
-                try {
-                    // TODO
-                    const std::string ns = collection->ns().getSystemIndexesCollection();
-                    theDataFileMgr.insert(ns.c_str(), indexObj.objdata(), indexObj.objsize(), false, true);
+                Status status = indexCatalog->createIndex( indexObj, false );
+                if ( !status.isOK() ) {
+                    log() << "building index failed: " << status.toString() << " index: " << indexObj;
                 }
-                catch (const DBException& e) {
-                    log() << "building index failed: " << e.what() << " (" << e.getCode() << ")";
-                }
+
             }
         }
     }

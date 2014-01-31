@@ -28,10 +28,11 @@
 
 #include "mongo/db/query/internal_runner.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_executor.h"
@@ -39,14 +40,16 @@
 
 namespace mongo {
 
-    /** Takes ownership of all arguments. */
-    InternalRunner::InternalRunner(const std::string& ns, PlanStage* root, WorkingSet* ws)
-        : _ns(ns), _exec(new PlanExecutor(ws, root)), _policy(Runner::YIELD_MANUAL) {
+    InternalRunner::InternalRunner(const Collection* collection, PlanStage* root, WorkingSet* ws)
+        : _collection(collection),
+          _exec(new PlanExecutor(ws, root)),
+          _policy(Runner::YIELD_MANUAL) {
+        invariant( collection );
     }
 
     InternalRunner::~InternalRunner() {
-        if (Runner::YIELD_AUTO == _policy) {
-            ClientCursor::deregisterRunner(this);
+        if (Runner::YIELD_AUTO == _policy && _collection) {
+            _collection->cursorCache()->deregisterRunner(this);
         }
     }
 
@@ -67,24 +70,26 @@ namespace mongo {
     }
 
     const std::string& InternalRunner::ns() {
-        return _ns;
+        return _collection->ns().ns();
     }
 
-    void InternalRunner::invalidate(const DiskLoc& dl) {
-        _exec->invalidate(dl);
+    void InternalRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
+        _exec->invalidate(dl, type);
     }
 
     void InternalRunner::setYieldPolicy(Runner::YieldPolicy policy) {
         // No-op.
         if (_policy == policy) { return; }
 
+        invariant( _collection );
+
         if (Runner::YIELD_AUTO == policy) {
             // Going from manual to auto.
-            ClientCursor::registerRunner(this);
+            _collection->cursorCache()->registerRunner(this);
         }
         else {
             // Going from auto to manual.
-            ClientCursor::deregisterRunner(this);
+            _collection->cursorCache()->deregisterRunner(this);
         }
 
         _policy = policy;
@@ -93,29 +98,37 @@ namespace mongo {
 
     void InternalRunner::kill() {
         _exec->kill();
+        _collection = NULL;
     }
 
-    Status InternalRunner::getExplainPlan(TypeExplain** explain) const {
-        dassert(_exec.get());
+    Status InternalRunner::getInfo(TypeExplain** explain,
+                                   PlanInfo** planInfo) const {
+        if (NULL != explain) {
+            verify(_exec.get());
 
-        scoped_ptr<PlanStageStats> stats(_exec->getStats());
-        if (NULL == stats.get()) {
-            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
-        }
+            scoped_ptr<PlanStageStats> stats(_exec->getStats());
+            if (NULL == stats.get()) {
+                return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+            }
 
-        Status status = explainPlan(*stats, explain, true /* full details */);
-        if (!status.isOK()) {
-            return status;
-        }
+            Status status = explainPlan(*stats, explain, true /* full details */);
+            if (!status.isOK()) {
+                return status;
+            }
 
-        // Fill in explain fields that are accounted by on the runner level.
-        TypeExplain* chosenPlan = NULL;
-        explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (chosenPlan) {
-            (*explain)->addToAllPlans(chosenPlan);
+            // Fill in explain fields that are accounted by on the runner level.
+            TypeExplain* chosenPlan = NULL;
+            explainPlan(*stats, &chosenPlan, false /* no full details */);
+            if (chosenPlan) {
+                (*explain)->addToAllPlans(chosenPlan);
+            }
+            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
+            (*explain)->setNScannedAllPlans((*explain)->getNScanned());
         }
-        (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
-        (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+        else if (NULL != planInfo) {
+            *planInfo = new PlanInfo();
+            (*planInfo)->planSummary = "INTERNAL";
+        }
 
         return Status::OK();
     }

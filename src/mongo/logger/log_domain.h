@@ -77,10 +77,11 @@ namespace logger {
         /**
          * Receives an event for logging, calling append(event) on all attached appenders.
          *
-         * TODO(schwerin): Should we return failed statuses somehow?  vector<AppenderHandle, Status>
-         * for failed appends, e.g.?
+         * If any appender fails, the behavior is determined by the abortOnFailure flag:
+         * *If abortOnFailure is set, ::abort() is immediately called.
+         * *If abortOnFailure is not set, the error is returned and no further appenders are called.
          */
-        void append(const Event& event);
+        Status append(const Event& event);
 
         /**
          * Predicate that answers the question, "Should I, the caller, append to you, the log
@@ -98,6 +99,15 @@ namespace logger {
          */
         void setMinimumLoggedSeverity(LogSeverity severity) { _minimumLoggedSeverity = severity; }
 
+        /**
+         * Gets the state of the abortOnFailure flag.
+         */
+        bool getAbortOnFailure() const { return _abortOnFailure; }
+
+        /**
+         * Sets the state of the abortOnFailure flag.
+         */
+        void setAbortOnFailure(bool abortOnFailure) { _abortOnFailure = abortOnFailure; }
 
         //
         // Configuration methods.  Must be synchronized with each other and calls to "append" by the
@@ -127,6 +137,7 @@ namespace logger {
 
         LogSeverity _minimumLoggedSeverity;
         AppenderVector _appenders;
+        bool _abortOnFailure;
     };
 
 }  // namespace logger

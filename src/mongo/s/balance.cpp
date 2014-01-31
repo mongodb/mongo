@@ -31,11 +31,13 @@
 #include "mongo/s/balance.h"
 
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/shard.h"
@@ -135,19 +137,17 @@ namespace mongo {
         return movedCount;
     }
 
-    void Balancer::_ping( DBClientBase& conn, bool waiting ) {
-        WriteConcern w = conn.getWriteConcern();
-        conn.setWriteConcern( W_NONE );
-
-        conn.update( MongosType::ConfigNS ,
-                     BSON( MongosType::name(_myid) ) ,
-                     BSON( "$set" << BSON( MongosType::ping(jsTime()) <<
-                                           MongosType::up((int)(time(0)-_started)) <<
-                                           MongosType::waiting(waiting) <<
-                                           MongosType::mongoVersion(versionString) ) ) ,
-                     true );
-
-        conn.setWriteConcern( w);
+    void Balancer::_ping( bool waiting ) {
+        clusterUpdate( MongosType::ConfigNS,
+                       BSON( MongosType::name( _myid )),
+                       BSON( "$set" << BSON( MongosType::ping(jsTime()) <<
+                                             MongosType::up(static_cast<int>(time(0)-_started)) <<
+                                             MongosType::waiting(waiting) <<
+                                             MongosType::mongoVersion(versionString) )),
+                       true, // upsert
+                       false, // multi
+                       WriteConcernOptions::Unacknowledged,
+                       NULL );
     }
 
     bool Balancer::_checkOIDs() {
@@ -297,9 +297,16 @@ namespace mongo {
             DistributionStatus status( shardInfo, shardToChunksMap );
 
             // load tags
-            conn.ensureIndex(TagsType::ConfigNS,
-                             BSON(TagsType::ns() << 1 << TagsType::min() << 1),
-                             true);
+            Status result = clusterCreateIndex(TagsType::ConfigNS,
+                                               BSON(TagsType::ns() << 1 << TagsType::min() << 1),
+                                               true, // unique
+                                               WriteConcernOptions::AllConfigs,
+                                               NULL);
+
+            if ( !result.isOK() ) {
+                warning() << "could not create index tags_1_min_1: " << result.reason() << endl;
+                continue;
+            }
 
             cursor = conn.query(TagsType::ConfigNS,
                                 QUERY(TagsType::ns(ns)).sort(TagsType::min()));
@@ -432,7 +439,7 @@ namespace mongo {
                 ScopedDbConnection conn(config.toString(), 30);
 
                 // ping has to be first so we keep things in the config server in sync
-                _ping( conn.conn() );
+                _ping();
 
                 // use fresh shard state
                 Shard::reloadShardInfo();
@@ -446,7 +453,7 @@ namespace mongo {
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 
                     // Ping again so scripts can determine if we're active without waiting
-                    _ping( conn.conn(), true );
+                    _ping( true );
 
                     conn.done();
 
@@ -465,7 +472,7 @@ namespace mongo {
                         LOG(1) << "skipping balancing round because another balancer is active" << endl;
 
                         // Ping again so scripts can determine if we're active without waiting
-                        _ping( conn.conn(), true );
+                        _ping( true );
 
                         conn.done();
                         
@@ -511,7 +518,7 @@ namespace mongo {
                 }
 
                 // Ping again so scripts can determine if we're active without waiting
-                _ping( conn.conn(), true );
+                _ping( true );
                 
                 conn.done();
 

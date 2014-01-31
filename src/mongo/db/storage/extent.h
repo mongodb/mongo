@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
 
@@ -85,6 +85,10 @@ namespace mongo {
             int x = dl.getOfs() - myLoc.getOfs();
             verify( x > 0 );
             return (Record *) (((char *) this) + x);
+        }
+
+        DeletedRecord* getDeletedRecord(const DiskLoc& dl ) {
+            return reinterpret_cast<DeletedRecord*>( getRecord( dl ) );
         }
 
         static int maxSize();

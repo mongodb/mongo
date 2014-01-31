@@ -201,9 +201,6 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
 
         if (failureMsg) throw failureMsg;
     }
-
-    // Can't be routed to secondary, succeeds by ignoring mode and tags
-    testDB.runCommand({ create: 'quux' });
 };
 
 var testAllModes = function(conn, hostList, isMongos) {

@@ -59,6 +59,7 @@ namespace mongo {
         ASSERT( !NamespaceString::validDBName( "foo.bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo\\bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo\"bar" ) );
+        ASSERT( !NamespaceString::validDBName( StringData( "a\0b", StringData::LiteralTag() ) ) );
 #ifdef _WIN32
         ASSERT( !NamespaceString::validDBName( "foo*bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo<bar" ) );
@@ -88,6 +89,8 @@ namespace mongo {
         ASSERT( !NamespaceString::validCollectionName( "$a" ) );
         ASSERT( !NamespaceString::validCollectionName( "a$b" ) );
         ASSERT( !NamespaceString::validCollectionName( "" ) );
+        ASSERT( !NamespaceString::validCollectionName(
+                    StringData( "a\0b", StringData::LiteralTag() ) ) );
     }
 
     TEST( NamespaceStringTest, DBHash ) {
@@ -139,7 +142,7 @@ namespace mongo {
     }
 
     TEST( NamespaceStringTest, nsToDatabase2 ) {
-        char buf[128];
+        char buf[MaxDatabaseNameLen];
 
         nsToDatabase( "foo.bar", buf );
         ASSERT_EQUALS( 'f', buf[0] );

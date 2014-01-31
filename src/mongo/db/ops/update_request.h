@@ -31,7 +31,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query_plan_selection_policy.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -43,11 +42,8 @@ namespace mongo {
 
     class UpdateRequest {
     public:
-        inline UpdateRequest(
-            const NamespaceString& nsString,
-            const QueryPlanSelectionPolicy& policy = QueryPlanSelectionPolicy::any() )
+        inline UpdateRequest(const NamespaceString& nsString)
             : _nsString(nsString)
-            , _queryPlanPolicy(policy)
             , _god(false)
             , _upsert(false)
             , _multi(false)
@@ -58,10 +54,6 @@ namespace mongo {
 
         const NamespaceString& getNamespaceString() const {
             return _nsString;
-        }
-
-        const QueryPlanSelectionPolicy& getQueryPlanSelectionPolicy() const {
-            return _queryPlanPolicy;
         }
 
         inline void setQuery(const BSONObj& query) {
@@ -131,11 +123,11 @@ namespace mongo {
             return _fromReplication;
         }
 
-        inline void setLifecycle(const UpdateLifecycle* value) {
+        inline void setLifecycle(UpdateLifecycle* value) {
             _lifecycle = value;
         }
 
-        inline const UpdateLifecycle* getLifecycle() const {
+        inline UpdateLifecycle* getLifecycle() const {
             return _lifecycle;
         }
 
@@ -153,7 +145,6 @@ namespace mongo {
     private:
 
         const NamespaceString& _nsString;
-        const QueryPlanSelectionPolicy& _queryPlanPolicy;
 
         // Contains the query that selects documents to update.
         BSONObj _query;
@@ -183,7 +174,7 @@ namespace mongo {
         bool _fromReplication;
 
         // The lifecycle data, and events used during the update request.
-        const UpdateLifecycle* _lifecycle;
+        UpdateLifecycle* _lifecycle;
     };
 
 } // namespace mongo

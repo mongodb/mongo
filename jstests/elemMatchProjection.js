@@ -260,8 +260,6 @@ t.update({ group: 10, 'y.c':1, 'x.a': 3 }, { $set:{'x.$':100} }, false, true );
 assert.eq( 100,
            t.find( { group:10, 'y.c':1 , x:100 }, { 'x.$':1 } ).toArray()[0].x[0],
            "right single element match after update" );
-
-// the following test asserts that the array element match behavior is consistently wrong
-assert.eq( { a: 1, b: 2 },
+assert.eq( 100,
           t.find( { group:10 , x:100 , 'y.c':1 }, { 'x.$':1 } ).toArray()[0].x[0],
           "right single element match after update" );

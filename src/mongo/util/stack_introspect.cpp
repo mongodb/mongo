@@ -94,6 +94,16 @@ namespace mongo {
                 return EXEMPT;
             }
 
+            if ( name.find( "_debugCheck" ) != string::npos ) {
+                // use this for generic debugging paths
+                return EXEMPT;
+            }
+
+            if ( name.find( "_catalog" ) != string::npos ) {
+                // internal catalog methods are exempt
+                return EXEMPT;
+            }
+
             // For sharding dbtests - page fault exceptions cause sporadic errors unrelated to tests
             if ( name.find( "ScopedDistributedLock" ) != string::npos ) {
                 return EXEMPT;
@@ -102,6 +112,7 @@ namespace mongo {
             if ( name.find( "CollectionInfo" ) != string::npos ) {
                 return EXEMPT;
             }
+
             // End sharding dbtest exemptions
 
             return method == clazz ? YES : NO;

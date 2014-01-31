@@ -48,14 +48,6 @@ namespace mutablebson {
         return right.remove();
     }
 
-    Element Element::operator[](size_t n) const {
-        return getNthChild(*this, n);
-    }
-
-    Element Element::operator[](const StringData& name) const {
-        return findFirstChildNamed(*this, name);
-    }
-
     Status Element::appendDouble(const StringData& fieldName, double value) {
         return pushBack(getDocument().makeElementDouble(fieldName, value));
     }

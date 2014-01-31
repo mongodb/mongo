@@ -53,7 +53,7 @@ namespace fieldchecker {
                 return Status(ErrorCodes::EmptyFieldName,
                               mongoutils::str::stream() << "The update path '"
                               << field.dottedField()
-                              << "' contains an empty field, which is not allowed.");
+                              << "' contains an empty field name, which is not allowed.");
             }
         }
 

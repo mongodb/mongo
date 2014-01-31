@@ -171,6 +171,15 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase( const_iterator it ) {
+        dassert(it._position >= 0);
+        dassert(it._area == &_area);
+
+        _area._entries[it._position].used = false;
+        _area._entries[it._position].data.second = V();
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
     inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
         unsigned capacity = _area._capacity;
         for ( int numGrowTries = 0; numGrowTries < 5; numGrowTries++ ) {

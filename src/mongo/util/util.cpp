@@ -34,11 +34,9 @@ namespace mongo {
         verify( len < 1000000 );
         const unsigned char *p = (const unsigned char *) data;
         stringstream ss;
-        for( unsigned i = 0; i < 4 && i < len; i++ ) {
-            ss << std::hex << setw(2) << setfill('0');
-            unsigned n = p[i];
-            ss << n;
-            ss << ' ';
+        ss << std::hex << setw(2) << setfill('0');
+        for( unsigned i = 0; i < len; i++ ) {
+            ss << static_cast<unsigned>(p[i]) << ' ';
         }
         string s = ss.str();
         return s;

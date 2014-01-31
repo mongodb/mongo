@@ -7,7 +7,7 @@ env = env.Clone()
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 env.Append(CCFLAGS=['-Isrc/third_party/gflags-2.0/src'])
 
-env.StaticLibrary(
+env.Library(
     "coding",
     [ 
 	"coder.cc",

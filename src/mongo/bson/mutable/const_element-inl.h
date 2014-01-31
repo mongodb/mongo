@@ -33,24 +33,48 @@ namespace mutablebson {
         return _basis.hasChildren();
     }
 
-    inline ConstElement ConstElement::leftSibling() const {
-        return _basis.leftSibling();
+    inline ConstElement ConstElement::leftSibling(size_t distance) const {
+        return _basis.leftSibling(distance);
     }
 
-    inline ConstElement ConstElement::rightSibling() const {
-        return _basis.rightSibling();
+    inline ConstElement ConstElement::rightSibling(size_t distance) const {
+        return _basis.rightSibling(distance);
     }
 
     inline ConstElement ConstElement::parent() const {
         return _basis.parent();
     }
 
+    inline ConstElement ConstElement::findNthChild(size_t n) const {
+        return _basis.findNthChild(n);
+    }
+
     inline ConstElement ConstElement::operator[](size_t n) const {
         return _basis[n];
     }
 
+    inline ConstElement ConstElement::findFirstChildNamed(const StringData& name) const {
+        return _basis.findFirstChildNamed(name);
+    }
+
     inline ConstElement ConstElement::operator[](const StringData& name) const {
         return _basis[name];
+    }
+
+    inline ConstElement ConstElement::findElementNamed(const StringData& name) const {
+        return _basis.findElementNamed(name);
+    }
+
+    inline size_t ConstElement::countSiblingsLeft() const {
+        return _basis.countSiblingsLeft();
+    }
+
+    inline size_t ConstElement::countSiblingsRight() const {
+        return _basis.countSiblingsRight();
+    }
+
+    inline size_t ConstElement::countChildren() const {
+        return _basis.countChildren();
     }
 
     inline bool ConstElement::hasValue() const {

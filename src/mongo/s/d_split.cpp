@@ -36,7 +36,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
@@ -52,6 +52,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/timer.h"
 
@@ -143,7 +144,7 @@ namespace mongo {
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
             }
 
-            auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max,
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx, min, max,
                                                                false, InternalPlanner::FORWARD));
 
             runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -283,7 +284,7 @@ namespace mongo {
                     return false;
                 }
 
-                NamespaceDetails* d = collection->details();
+                const NamespaceDetails* d = collection->details();
 
                 IndexDescriptor *idx =
                     collection->getIndexCatalog()->findIndexByPrefix( keyPattern,
@@ -375,7 +376,7 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max,
+                auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx, min, max,
                     false, InternalPlanner::FORWARD));
 
                 BSONObj currKey;
@@ -434,7 +435,7 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
 
-                    runner.reset(InternalPlanner::indexScan(idx, min, max,
+                    runner.reset(InternalPlanner::indexScan(collection, idx, min, max,
                                                             false, InternalPlanner::FORWARD));
 
                     runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -860,7 +861,8 @@ namespace mongo {
                     BSONObj newmin = Helpers::toKeyFormat( kp.extendRangeBound( chunk.min, false) );
                     BSONObj newmax = Helpers::toKeyFormat( kp.extendRangeBound( chunk.max, false) );
 
-                    auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, newmin, newmax, false));
+                    auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx,
+                                                                       newmin, newmax, false));
 
                     // check if exactly one document found
                     if (Runner::RUNNER_ADVANCED == runner->getNext(NULL, NULL)) {

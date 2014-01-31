@@ -51,7 +51,7 @@ namespace mongo {
         const int32_t _hitsBetweenMarks;
         const int32_t _msBetweenMarks;
 
-        uint64_t _pings;
+        int32_t _pings;
 
         int64_t _last;
     };

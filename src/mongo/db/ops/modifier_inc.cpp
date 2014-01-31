@@ -47,7 +47,6 @@ namespace mongo {
             : doc(doc)
             , idxFound(0)
             , elemFound(doc.end())
-            , boundDollar("")
             , newValue()
             , noOp(false) {
         }
@@ -60,9 +59,6 @@ namespace mongo {
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mutablebson::Element elemFound;
-
-        // Value to bind to a $-positional field, if one is provided.
-        std::string boundDollar;
 
         // Value to be applied
         SafeNum newValue;
@@ -82,7 +78,8 @@ namespace mongo {
     ModifierInc::~ModifierInc() {
     }
 
-    Status ModifierInc::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierInc::init(const BSONElement& modExpr, const Options& opts,
+                             bool* positional) {
 
         //
         // field name analysis
@@ -99,6 +96,10 @@ namespace mongo {
         // and ensure only one occurrence.
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+
+        if (positional)
+            *positional = foundDollar;
+
         if (foundDollar && foundCount > 1) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Too many positional (i.e. '$') elements found in path '"
@@ -113,8 +114,8 @@ namespace mongo {
             // TODO: Context for mod error messages would be helpful
             // include mod code, etc.
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Cannot increment with non-numeric argument: "
-                                        << modExpr);
+                          str::stream() << "Cannot increment with non-numeric argument: {"
+                                        << modExpr << "}");
         }
 
         _val = modExpr;
@@ -137,8 +138,7 @@ namespace mongo {
                                                "needed from the query. Unexpanded update: "
                                             << _fieldRef.dottedField());
             }
-            _preparedState->boundDollar = matchedField.toString();
-            _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
+            _fieldRef.setPart(_posDollar, matchedField);
         }
 
         // Locate the field name in 'root'. Note that we may not have all the parts in the path
@@ -189,13 +189,15 @@ namespace mongo {
         // If the value being $inc'ed is the same as the one already in the doc, than this is a
         // noOp.
         if (!_preparedState->elemFound.isNumeric()) {
-            mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+            mb::Element idElem = mb::findFirstChildNamed(root, "_id");
             return Status(
                 ErrorCodes::BadValue,
-                str::stream() << "Cannot apply $inc to a value of non-numeric type."
+                str::stream() << "Cannot apply "
+                              << (_mode == MODE_INC ? "$inc" : "$mul")
+                              << " to a value of non-numeric type. {"
                               << idElem.toString()
-                              << " has the field " <<  _preparedState->elemFound.getFieldName()
-                              << " of non-numeric type "
+                              << "} has the field '" <<  _preparedState->elemFound.getFieldName()
+                              << "' of non-numeric type "
                               << typeName(_preparedState->elemFound.getType()));
         }
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
@@ -208,9 +210,11 @@ namespace mongo {
 
         // If the result of the addition is invalid, we must return an error.
         if (!_preparedState->newValue.isValid()) {
+            mb::Element idElem = mb::findFirstChildNamed(root, "_id");
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Failed to apply $inc operations to current value: "
-                                        << currentValue.debugString());
+                          str::stream() << "Failed to apply $inc operations to current value ("
+                                        << currentValue.debugString() << ") for document {"
+                                        << idElem.toString() << "}");
         }
 
         // If the values are identical (same type, same value), then this is a no-op.

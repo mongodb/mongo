@@ -31,7 +31,7 @@ t.drop();
 t.insert({k:3});
 t.insert({k:[2,3]});
 t.insert({k:[4,3]});
-t.insert({k:[4,3]}); 
+t.insert({k:[4,3]});
 
 t.ensureIndex({k:1}, {unique:true, dropDups:true, background:true});
 
@@ -62,13 +62,13 @@ t.insert({k:[4,3]});
 assert( t.count() == 3 ) ;
 
 // Trigger an error, so we can test n of getPrevError() later.
-assert.throws( function() { t.find( {$where:'aaa'} ).itcount(); } );
-assert( db.getLastError() );
+t.update({ x : 1 }, { $invalid : true });
+assert.neq(null, db.getLastError());
 checkNprev( 1 );
 
 t.ensureIndex({k:1}, {unique:true, dropDups:true});
 // Check error flag was not set SERVER-2054.
-assert( !db.getLastError() );
+assert.eq(null, db.getLastError() );
 // Check that offset of previous error is correct.
 checkNprev( 2 );
 
@@ -92,7 +92,7 @@ assert( t.count() == 3 ) ;
 // Now try with a background index op.
 
 // Trigger an error, so we can test n of getPrevError() later.
-assert.throws( function() { t.find( {$where:'aaa'} ).itcount(); } );
+t.update({ x : 1 }, { $invalid : true });
 assert( db.getLastError() );
 checkNprev( 1 );
 

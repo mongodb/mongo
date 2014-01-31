@@ -58,6 +58,7 @@ namespace mongo {
         /* create the result document */
         const size_t sizeHint = pEO->getSizeHint();
         MutableDocument out (sizeHint);
+        out.copyMetaDataFrom(*input);
 
         /*
           Use the ExpressionObject to create the base result.
@@ -126,23 +127,23 @@ namespace mongo {
         pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
 
         BSONObj projectObj = elem.Obj();
-        pProject->_raw = projectObj.getOwned(); // probably not necessary, but better to be safe
+        pProject->_raw = projectObj.getOwned();
 
 #if defined(_DEBUG)
         if (exprObj->isSimple()) {
-            set<string> deps;
+            DepsTracker deps;
             vector<string> path;
-            exprObj->addDependencies(deps, &path);
-            pProject->_simpleProjection.init(depsToProjection(deps));
+            exprObj->addDependencies(&deps, &path);
+            pProject->_simpleProjection.init(deps.toProjection());
         }
 #endif
 
         return pProject;
     }
 
-    DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(set<string>& deps) const {
+    DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker* deps) const {
         vector<string> path; // empty == top-level
         pEO->addDependencies(deps, &path);
-        return EXHAUSTIVE;
+        return EXHAUSTIVE_FIELDS;
     }
 }

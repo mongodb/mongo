@@ -26,12 +26,9 @@
 *    it in the license file.
 */
 
-#include "mongo/db/btree.h"
-#include "mongo/db/btreecursor.h"
+#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/hash_access_method.h"
-#include "mongo/db/index/hash_index_cursor.h"
-#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
@@ -40,8 +37,10 @@ namespace mongo {
         return BSONElementHasher::hash64(e, seed);
     }
 
-    HashAccessMethod::HashAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         const string HASHED_INDEX_TYPE_IDENTIFIER = "hashed";
 
@@ -77,11 +76,6 @@ namespace mongo {
         massert(16765, "error: no hashed index field",
                 firstElt.str().compare(HASHED_INDEX_TYPE_IDENTIFIER) == 0);
         _hashedField = firstElt.fieldName();
-    }
-
-    Status HashAccessMethod::newCursor(IndexCursor** out) {
-        *out = new HashIndexCursor(_hashedField, _seed, _hashVersion, _descriptor);
-        return Status::OK();
     }
 
     void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {

@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#pragma once
+
 #include <string>
 #include <vector>
 
@@ -180,11 +182,14 @@ namespace auth {
                                                 BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "authSchemaUpgradeStep" command and
-     * parses out the write concern.
+     * Takes a command object describing an invocation of the "authSchemaUpgrade" command and
+     * parses out the write concern, maximum steps to take and whether or not shard servers should
+     * also be upgraded, in the sharded deployment case.
      */
     Status parseAuthSchemaUpgradeStepCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
+                                             int* maxSteps,
+                                             bool* shouldUpgradeShards,
                                              BSONObj* parsedWriteConcern);
     /**
      * Parses the privileges described in "privileges" into a vector of Privilege objects.
@@ -194,13 +199,22 @@ namespace auth {
                                           PrivilegeVector* parsedPrivileges);
 
     /**
-     * Takes a BSONArray of name,source pair documents, parses that array and returns (via the
+     * Takes a BSONArray of name,db pair documents, parses that array and returns (via the
      * output param parsedRoleNames) a list of the role names in the input array.
      * Performs syntactic validation of "rolesArray", only.
      */
     Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
                                        const StringData& dbname,
                                        std::vector<RoleName>* parsedRoleNames);
+
+    /**
+     * Takes a BSONArray of name,db pair documents, parses that array and returns (via the
+     * output param parsedUserNames) a list of the usernames in the input array.
+     * Performs syntactic validation of "usersArray", only.
+     */
+    Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
+                                       const StringData& dbname,
+                                       std::vector<UserName>* parsedUserNames);
 
 } // namespace auth
 } // namespace mongo

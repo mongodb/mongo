@@ -73,7 +73,7 @@ namespace mongo {
             Timer timer;
 
             vector<Strategy::CommandResult> results;
-            SHARDED->commandOp( dbName, cmdObj, cmdOptions, ns, filter, &results );
+            STRATEGY->commandOp( dbName, cmdObj, cmdOptions, ns, filter, &results );
 
             vector<Scored> all;
             long long nscanned = 0;

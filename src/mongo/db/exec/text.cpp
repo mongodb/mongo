@@ -27,6 +27,8 @@
  */
 
 #include "mongo/db/exec/text.h"
+
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -35,13 +37,17 @@
 
 namespace mongo {
 
-    TextStage::TextStage(const TextStageParams& params, WorkingSet* ws,
+    TextStage::TextStage(const TextStageParams& params,
+                         WorkingSet* ws,
                          const MatchExpression* filter)
-        : _params(params), _ftsMatcher(params.query, params.spec), _ws(ws), _filter(filter),
-          _filledOutResults(false), _curResult(0) { }
+        : _params(params),
+          _ftsMatcher(params.query, params.spec),
+          _ws(ws),
+          _filter(filter),
+          _filledOutResults(false),
+          _curResult(0) { }
 
-    TextStage::~TextStage() {
-    }
+    TextStage::~TextStage() { }
 
     bool TextStage::isEOF() {
         // If we haven't filled out our results yet we can't be EOF.
@@ -65,20 +71,19 @@ namespace mongo {
         }
 
         // Having cached all our results, return them one at a time.
-
-        // Fill out a WSM.
-        WorkingSetID id = _ws->allocate();
-        WorkingSetMember* member = _ws->get(id);
-        member->loc = _results[_curResult].loc;
-        member->obj = member->loc.obj();
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-        // TODO: Planner can tell us whether or not to do this depending on whether or not we have a
-        // $textScore projection.
-        member->addComputed(new TextScoreComputedData(_results[_curResult].score));
+        WorkingSetID id = _results[_curResult];
 
         // Advance to next result.
         ++_curResult;
         *out = id;
+
+        // If we're returning something, take it out of our DL -> WSID map so that future
+        // calls to invalidate don't cause us to take action for a DL we're done with.
+        WorkingSetMember* member = _ws->get(*out);
+        if (member->hasLoc()) {
+            _wsidByDiskLoc.erase(member->loc);
+        }
+
         return PlanStage::ADVANCED;
     }
 
@@ -92,20 +97,38 @@ namespace mongo {
         // TODO: When we incrementally read results, tell our sub-runners to unyield.
     }
 
-    void TextStage::invalidate(const DiskLoc& dl) {
+    void TextStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        // TODO: This is much slower than it should be.
-        for (size_t i = 0; i < _results.size(); ++i) {
-            if (dl == _results[i].loc) {
-                _results.erase(_results.begin() + i);
-                return;
-            }
+
+        // Invalidation does not affect the number of results added in fillOutResults().
+        // All it affects is whether the WSM returned to the caller has a DiskLoc.
+
+        // _results contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
+        // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still
+        // be at the same spot in the WorkingSet.  As such, we don't need to modify _results.
+        DataMap::iterator it = _wsidByDiskLoc.find(dl);
+
+        // If we're holding on to data that's got the DiskLoc we're invalidating...
+        if (_wsidByDiskLoc.end() != it) {
+            // Grab the WSM that we're converting from LOC_AND_UNOWNED to OWNED_OBJ.
+            WorkingSetMember* member = _ws->get(it->second);
+            verify(member->loc == dl);
+            verify(member->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
+
+            member->loc.Null();
+            member->obj = member->obj.getOwned();
+            member->state = WorkingSetMember::OWNED_OBJ;
+
+            // Remove the DiskLoc from our set of active DLs.
+            _wsidByDiskLoc.erase(it);
         }
     }
 
     PlanStageStats* TextStage::getStats() {
         _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_TEXT);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
+        ret->specific.reset(new TextStats(_specificStats));
+        return ret.release();
     }
 
     PlanStage::StageState TextStage::fillOutResults() {
@@ -115,15 +138,15 @@ namespace mongo {
             warning() << "TextStage params namespace error";
             return PlanStage::FAILURE;
         }
-        vector<int> idxMatches;
-        collection->details()->findIndexByType("text", idxMatches);
+        vector<IndexDescriptor*> idxMatches;
+        collection->getIndexCatalog()->findIndexByType("text", idxMatches);
         if (1 != idxMatches.size()) {
             warning() << "Expected exactly one text index";
             return PlanStage::FAILURE;
         }
 
         // Get all the index scans for each term in our query.
-        vector<IndexScan*> scanners;
+        OwnedPointerVector<PlanStage> scanners;
         for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
             const string& term = _params.query.getTerms()[i];
             IndexScanParams params;
@@ -132,12 +155,15 @@ namespace mongo {
             params.bounds.endKey = FTSIndexFormat::getIndexKey(0, term, _params.indexPrefix);
             params.bounds.endKeyInclusive = true;
             params.bounds.isSimpleRange = true;
-            params.descriptor = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
-            params.forceBtreeAccessMethod = true;
+            params.descriptor = idxMatches[0];
             params.direction = -1;
             IndexScan* ixscan = new IndexScan(params, _ws, NULL);
-            scanners.push_back(ixscan);
+            scanners.mutableVector().push_back(ixscan);
         }
+
+        // Map: diskloc -> aggregate score for doc.
+        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
+        ScoreMap scores;
 
         // For each index scan, read all results and store scores.
         size_t currentIndexScanner = 0;
@@ -146,12 +172,12 @@ namespace mongo {
             DiskLoc loc;
 
             WorkingSetID id;
-            PlanStage::StageState state = scanners[currentIndexScanner]->work(&id);
+            PlanStage::StageState state = scanners.vector()[currentIndexScanner]->work(&id);
 
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* wsm = _ws->get(id);
                 IndexKeyDatum& keyDatum = wsm->keyData.back();
-                filterAndScore(keyDatum.keyData, wsm->loc);
+                filterAndScore(keyDatum.keyData, wsm->loc, &scores[wsm->loc]);
                 _ws->free(id);
             }
             else if (PlanStage::IS_EOF == state) {
@@ -168,15 +194,12 @@ namespace mongo {
             else {
                 verify(PlanStage::FAILURE == state);
                 warning() << "error from index scan during text stage: invalid FAILURE state";
-                for (size_t i=0; i<scanners.size(); ++i) { delete scanners[i]; }
                 return PlanStage::FAILURE;
             }
         }
 
-        for (size_t i=0; i<scanners.size(); ++i) { delete scanners[i]; }
-
         // Filter for phrases and negative terms, score and truncate.
-        for (ScoreMap::iterator i = _scores.begin(); i != _scores.end(); ++i) {
+        for (ScoreMap::iterator i = scores.begin(); i != scores.end(); ++i) {
             DiskLoc loc = i->first;
             double score = i->second;
 
@@ -187,19 +210,24 @@ namespace mongo {
 
             // Filter for phrases and negated terms
             if (_params.query.hasNonTermPieces()) {
-                Record* rec_p = loc.rec();
-                if (!_ftsMatcher.matchesNonTerm(BSONObj::make(rec_p))) {
+                if (!_ftsMatcher.matchesNonTerm(loc.obj())) {
                     continue;
                 }
             }
-            _results.push_back(ScoredLocation(loc, score));
-        }
 
-        // Sort results by score (not always in correct order, especially w.r.t. multiterm).
-        sort(_results.begin(), _results.end());
+            // Add results to working set as LOC_AND_UNOWNED_OBJ initially.
+            // On invalidation, we copy the object and change the state to
+            // OWNED_OBJ.
+            // Fill out a WSM.
+            WorkingSetID id = _ws->allocate();
+            WorkingSetMember* member = _ws->get(id);
+            member->loc = loc;
+            member->obj = member->loc.obj();
+            member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+            member->addComputed(new TextScoreComputedData(score));
 
-        if (_results.size() > _params.limit) {
-            _results.resize(_params.limit);
+            _results.push_back(id);
+            _wsidByDiskLoc[member->loc] = id;
         }
 
         _filledOutResults = true;
@@ -210,7 +238,60 @@ namespace mongo {
         return PlanStage::NEED_TIME;
     }
 
-    void TextStage::filterAndScore(BSONObj key, DiskLoc loc) {
+    class TextMatchableDocument : public MatchableDocument {
+    public:
+        TextMatchableDocument(const BSONObj& keyPattern, const BSONObj& key, DiskLoc loc, bool *fetched)
+            : _keyPattern(keyPattern),
+              _key(key),
+              _loc(loc),
+              _fetched(fetched) { }
+
+        BSONObj toBSON() const {
+            *_fetched = true;
+            return _loc.obj();
+        }
+
+        virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+            BSONObjIterator keyPatternIt(_keyPattern);
+            BSONObjIterator keyDataIt(_key);
+
+            // Look in the key.
+            while (keyPatternIt.more()) {
+                BSONElement keyPatternElt = keyPatternIt.next();
+                verify(keyDataIt.more());
+                BSONElement keyDataElt = keyDataIt.next();
+
+                if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                    if (Array == keyDataElt.type()) {
+                        return new SimpleArrayElementIterator(keyDataElt, true);
+                    }
+                    else {
+                        return new SingleElementElementIterator(keyDataElt);
+                    }
+                }
+            }
+
+            // All else fails, fetch.
+            *_fetched = true;
+            return new BSONElementIterator(path, _loc.obj());
+        }
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            delete iterator;
+        }
+
+    private:
+        BSONObj _keyPattern;
+        BSONObj _key;
+        DiskLoc _loc;
+        bool* _fetched;
+    };
+
+    void TextStage::filterAndScore(BSONObj key, DiskLoc loc, double* documentAggregateScore) {
+        invariant(documentAggregateScore);
+
+        ++_specificStats.keysExamined;
+
         // Locate score within possibly compound key: {prefix,term,score,suffix}.
         BSONObjIterator keyIt(key);
         for (unsigned i = 0; i < _params.spec.numExtraBefore(); i++) {
@@ -221,27 +302,36 @@ namespace mongo {
 
         BSONElement scoreElement = keyIt.next();
         double documentTermScore = scoreElement.number();
-        double& documentAggregateScore = _scores[loc];
         
         // Handle filtering.
-        if (documentAggregateScore < 0) {
+        if (*documentAggregateScore < 0) {
             // We have already rejected this document.
             return;
         }
-        if (documentAggregateScore == 0 && _filter) {
-            // We have not seen this document before and need to apply a filter.
-            Record* rec_p = loc.rec();
-            BSONObj doc = BSONObj::make(rec_p);
 
-            // TODO: Covered index matching logic here.
-            if (!_filter->matchesBSON(doc)) {
-                documentAggregateScore = -1;
-                return;
+        if (*documentAggregateScore == 0) {
+            if (_filter) {
+                // We have not seen this document before and need to apply a filter.
+                bool fetched = false;
+                TextMatchableDocument tdoc(_params.index->keyPattern(), key, loc, &fetched);
+
+                if (!_filter->matches(&tdoc)) {
+                    // We had to fetch but we're not going to return it.
+                    if (fetched) {
+                        ++_specificStats.fetches;
+                    }
+                    *documentAggregateScore = -1;
+                    return;
+                }
+            }
+            else {
+                // If we're here, we're going to return the doc, and we do a fetch later.
+                ++_specificStats.fetches;
             }
         }
 
         // Aggregate relevance score, term keys.
-        documentAggregateScore += documentTermScore;
+        *documentAggregateScore += documentTermScore;
     }
 
 }  // namespace mongo

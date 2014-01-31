@@ -8,6 +8,17 @@ chatty = function(s){
         print( s );
 }
 
+function reconnect(db) {
+    assert.soon(function() {
+                    try {
+                        db.runCommand({ping:1});
+                        return true;
+                    } catch (x) {
+                        return false;
+                    }
+                });
+};
+
 // Please consider using bsonWoCompare instead of this as much as possible.
 friendlyEqual = function( a , b ){
     if ( a == b )
@@ -229,13 +240,12 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/opcounters.js",
                                    "jstests/currentop.js", // SERVER-8673, plus rwlock yielding issues
                                    "jstests/set_param1.js", // changes global state
-                                   "jstests/geo_update_btree2.js" // SERVER-11132 test disables table scans
+                                   "jstests/geo_update_btree2.js", // SERVER-11132 test disables table scans
                                   ] );
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js",
                                "jstests/auth1.js",
-                               "jstests/auth_copydb2.js",
                                "jstests/connection_status.js",
                                "jstests/validate_user_documents.js"
 //                              ,"jstests/fsync2.js" // SERVER-4243
@@ -439,10 +449,10 @@ jsTest.addAuth = function(conn) {
     print ("Adding admin user on connection: " + localconn);
     try {
         localconn._skipAuth = true; // Make sure we don't try to authenticate the conn while adding the user
-        return localconn.getDB('admin').addUser({user: jsTestOptions().adminUser,
-                                                 pwd: jsTestOptions().adminPassword,
-                                                 roles: ["__system"]},
-                                                'majority', 60000);
+        return localconn.getDB('admin').createUser({user: jsTestOptions().adminUser,
+                                                    pwd: jsTestOptions().adminPassword,
+                                                    roles: ["__system"]},
+                                                   {w: 'majority', wtimeout: 60000});
     } finally {
         localconn._skipAuth = false;
     }
@@ -865,7 +875,12 @@ shellHelper.show = function (what) {
     }
 
     if (what == "users") {
-        db.system.users.find().forEach(printjson);
+        db.getUsers().forEach(printjson);
+        return "";
+    }
+
+    if (what == "roles") {
+        db.getRoles({showBuiltinRoles: true}).forEach(printjson);
         return "";
     }
 

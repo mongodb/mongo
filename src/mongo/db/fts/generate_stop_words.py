@@ -10,13 +10,13 @@ def generate( header, source, language_files ):
     out = open( header, "wb" )
     out.write( """
 #pragma once
-#include <map>
 #include <set>
 #include <string>
+#include "mongo/util/string_map.h"
 namespace mongo {
 namespace fts {
 
-  void loadStopWordMap( std::map< std::string, std::set< std::string > >* m );
+  void loadStopWordMap( StringMap< std::set< std::string > >* m );
 }
 }
 """ )
@@ -30,7 +30,7 @@ namespace fts {
 namespace mongo {
 namespace fts {
 
-  void loadStopWordMap( std::map< std::string, std::set< std::string > >* m ) {
+  void loadStopWordMap( StringMap< std::set< std::string > >* m ) {
 
 """ )
 

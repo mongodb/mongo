@@ -47,7 +47,6 @@ namespace mongo {
             : doc(doc)
             , idxFound(0)
             , elemFound(doc.end())
-            , boundDollar("")
             , elementsToRemove()
             , noOp(false) {
         }
@@ -60,9 +59,6 @@ namespace mongo {
 
         // Element corresponding to _fieldRef[0.._idxFound].
         mb::Element elemFound;
-
-        // Value to bind to a $-positional field, if one is provided.
-        std::string boundDollar;
 
         // Values to be removed.
         std::vector<mb::Element> elementsToRemove;
@@ -85,7 +81,8 @@ namespace mongo {
     ModifierPull::~ModifierPull() {
     }
 
-    Status ModifierPull::init(const BSONElement& modExpr, const Options& opts) {
+    Status ModifierPull::init(const BSONElement& modExpr, const Options& opts,
+                              bool* positional) {
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
         Status status = fieldchecker::isUpdatable(_fieldRef);
@@ -97,6 +94,10 @@ namespace mongo {
         // and ensure only one occurrence.
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
+
+        if (positional)
+            *positional = foundDollar;
+
         if (foundDollar && foundCount > 1) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Too many positional (i.e. '$') elements found in path '"
@@ -144,10 +145,12 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
-            _preparedState->boundDollar = matchedField.toString();
-            _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
+            _fieldRef.setPart(_posDollar, matchedField);
         }
 
         // Locate the field name in 'root'.
@@ -227,13 +230,7 @@ namespace mongo {
 
             // If we didn't find the element that we wanted to pull from, we log an unset for
             // that element.
-
-            mb::Element logElement = doc.makeElementInt(_fieldRef.dottedField(), 1);
-            if (!logElement.ok())
-                return Status(ErrorCodes::InternalError,
-                              "cannot create log entry for $pull mod");
-
-            return logBuilder->addToUnsets(logElement);
+            return logBuilder->addToUnsets(_fieldRef.dottedField());
 
         } else {
 

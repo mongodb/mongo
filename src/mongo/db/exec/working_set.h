@@ -28,25 +28,34 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
+
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
-    struct WorkingSetMember;
+    class WorkingSetMember;
 
-    typedef long WorkingSetID;
+    typedef size_t WorkingSetID;
 
     /**
      * All data in use by a query.  Data is passed through the stage tree by referencing the ID of
      * an element of the working set.  Stages can add elements to the working set, delete elements
      * from the working set, or mutate elements in the working set.
+     *
+     * Concurrency Notes:
+     * flagForReview() can only be called with a write lock covering the collection this WorkingSet
+     * is for. All other methods should only be called by the thread owning this WorkingSet while
+     * holding the read lock covering the collection.
      */
     class WorkingSet {
+        MONGO_DISALLOW_COPYING(WorkingSet);
     public:
-        static const WorkingSetID INVALID_ID;
+        static const WorkingSetID INVALID_ID = WorkingSetID(-1);
 
         WorkingSet();
         ~WorkingSet();
@@ -57,12 +66,18 @@ namespace mongo {
         WorkingSetID allocate();
 
         /**
-         * Get the i-th mutable query result.
+         * Get the i-th mutable query result. The pointer will be valid for this id until freed.
+         * Do not delete the returned pointer as the WorkingSet retains ownership. Call free() to
+         * release it.
          */
-        WorkingSetMember* get(const WorkingSetID& i);
+        WorkingSetMember* get(const WorkingSetID& i) {
+            dassert(i < _data.size()); // ID has been allocated.
+            dassert(_data[i].nextFreeOrSelf == i); // ID currently in use.
+            return _data[i].member;
+        }
 
         /**
-         * Unallocate the i-th query result and release its resouces.
+         * Deallocate the i-th query result and release its resources.
          */
         void free(const WorkingSetID& i);
 
@@ -77,25 +92,37 @@ namespace mongo {
         void flagForReview(const WorkingSetID& i);
 
         /**
-         * Return a set of all WSIDs passed to flagForReview.
-         */
-        const unordered_set<WorkingSetID>& getFlagged() const;
-
-        /**
          * Return true if the provided ID is flagged.
          */
         bool isFlagged(WorkingSetID id) const;
 
+        /**
+         * Return the set of all WSIDs passed to flagForReview.
+         */
+        const unordered_set<WorkingSetID>& getFlagged() const;
+
     private:
-        typedef unordered_map<WorkingSetID, WorkingSetMember*> DataMap;
+        struct MemberHolder {
+            MemberHolder();
+            ~MemberHolder();
 
-        DataMap _data;
+            // Free list link if freed. Points to self if in use.
+            WorkingSetID nextFreeOrSelf;
 
-        // The WorkingSetID returned by the next call to allocate().  Should refer to the next valid
-        // ID.  IDs allocated contiguously.  Should never point at an in-use ID.  
-        WorkingSetID _nextId;
+            // Owning pointer
+            WorkingSetMember* member;
+        };
 
-        // All WSIDs invalidated during evaluation of a predicate (AND).
+        // All WorkingSetIDs are indexes into this, except for INVALID_ID.
+        // Elements are added to _freeList rather than removed when freed.
+        vector<MemberHolder> _data;
+
+        // Index into _data, forming a linked-list using MemberHolder::nextFreeOrSelf as the next
+        // link. INVALID_ID is the list terminator since 0 is a valid index.
+        // If _freeList == INVALID_ID, the free list is empty and all elements in _data are in use.
+        WorkingSetID _freeList;
+
+        // An insert-only set of WorkingSetIDs that have been flagged for review.
         unordered_set<WorkingSetID> _flagged;
     };
 
@@ -119,14 +146,28 @@ namespace mongo {
      * What types of computed data can we have?
      */
     enum WorkingSetComputedDataType {
+        // What's the score of the document retrieved from a $text query?
         WSM_COMPUTED_TEXT_SCORE = 0,
+
+        // What's the distance from a geoNear query point to the document?
         WSM_COMPUTED_GEO_DISTANCE = 1,
+
+        // The index key used to retrieve the document, for $returnKey query option.
+        WSM_INDEX_KEY = 2,
+
+        // What point (of several possible points) was used to compute the distance to the document
+        // via geoNear?
+        WSM_GEO_NEAR_POINT = 3,
+
+        // Must be last.
+        WSM_COMPUTED_NUM_TYPES,
     };
 
     /**
      * Data that is a computed function of a WSM.
      */
     class WorkingSetComputedData {
+        MONGO_DISALLOW_COPYING(WorkingSetComputedData);
     public:
         WorkingSetComputedData(const WorkingSetComputedDataType type) : _type(type) { }
         virtual ~WorkingSetComputedData() { }
@@ -148,9 +189,16 @@ namespace mongo {
      *
      * A WorkingSetMember may have any of the data above.
      */
-    struct WorkingSetMember {
+    class WorkingSetMember {
+        MONGO_DISALLOW_COPYING(WorkingSetMember);
+    public:
         WorkingSetMember();
         ~WorkingSetMember();
+
+        /**
+         * Reset to an "empty" state.
+         */
+        void clear();
 
         enum MemberState {
             // Initial state.
@@ -201,7 +249,7 @@ namespace mongo {
         bool getFieldDotted(const string& field, BSONElement* out) const;
 
     private:
-        unordered_map<size_t, WorkingSetComputedData*> _computed;
+        boost::scoped_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
     };
 
 }  // namespace mongo

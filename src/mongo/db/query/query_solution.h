@@ -33,7 +33,7 @@
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/lite_projection.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
@@ -67,7 +67,7 @@ namespace mongo {
          *
          * TODO: Consider outputting into a BSONObj or builder thereof.
          */
-        virtual void appendToString(stringstream* ss, int indent) const = 0;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const = 0;
 
         //
         // Computed properties
@@ -128,19 +128,21 @@ namespace mongo {
         // These are owned here.
         vector<QuerySolutionNode*> children;
 
+        // If a stage has a non-NULL filter all values outputted from that stage must pass that
+        // filter.
         scoped_ptr<MatchExpression> filter;
 
     protected:
         /**
          * Formatting helper used by toString().
          */
-        static void addIndent(stringstream* ss, int level);
+        static void addIndent(mongoutils::str::stream* ss, int level);
 
         /**
          * Every solution node has properties and this adds the debug info for the
          * properties.
          */
-        void addCommon(stringstream* ss, int indent) const;
+        void addCommon(mongoutils::str::stream* ss, int indent) const;
 
     private:
         MONGO_DISALLOW_COPYING(QuerySolutionNode);
@@ -167,6 +169,9 @@ namespace mongo {
         // so we use that index (if it exists) to provide a sort.
         bool hasSortStage;
 
+        // Owned here. Used by the plan cache.
+        boost::scoped_ptr<SolutionCacheData> cacheData;
+
         /**
          * Output a human-readable string representing the plan.
          */
@@ -175,30 +180,30 @@ namespace mongo {
                 return "empty query solution";
             }
 
-            stringstream ss;
+            mongoutils::str::stream ss;
             root->appendToString(&ss, 0);
-            return ss.str();
+            return ss;
         }
     private:
         MONGO_DISALLOW_COPYING(QuerySolution);
     };
 
     struct TextNode : public QuerySolutionNode {
-        TextNode() : _numWanted(100) { }
+        TextNode() { }
         virtual ~TextNode() { }
 
         virtual StageType getType() const { return STAGE_TEXT; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
-        bool fetched() const { return false; }
-        bool hasField(const string& field) const { return false; }
+        // text's return is LOC_AND_UNOWNED_OBJ so it's fetched and has all fields.
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sort; }
 
         BSONObjSet _sort;
 
-        uint32_t _numWanted;
         BSONObj  _indexKeyPattern;
         std::string _query;
         std::string _language;
@@ -210,7 +215,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_COLLSCAN; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
@@ -226,6 +231,9 @@ namespace mongo {
         bool tailable;
 
         int direction;
+
+        // maxScan option to .find() limits how many docs we look at.
+        int maxScan;
     };
 
     struct AndHashNode : public QuerySolutionNode {
@@ -234,12 +242,12 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_AND_HASH; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return false; }
-        const BSONObjSet& getSort() const { return _sort; }
+        const BSONObjSet& getSort() const { return children.back()->getSort(); }
 
         BSONObjSet _sort;
     };
@@ -250,7 +258,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_AND_SORTED; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
         bool hasField(const string& field) const;
@@ -266,7 +274,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_OR; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
         bool hasField(const string& field) const;
@@ -288,7 +296,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_SORT_MERGE; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
         bool hasField(const string& field) const;
@@ -316,7 +324,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_FETCH; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
@@ -334,7 +342,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_IXSCAN; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return false; }
         bool hasField(const string& field) const;
@@ -346,10 +354,13 @@ namespace mongo {
         BSONObj indexKeyPattern;
         bool indexIsMultiKey;
 
-        // Only set for 2d.
-        int limit;
-
         int direction;
+
+        // maxScan option to .find() limits how many docs we look at.
+        int maxScan;
+
+        // If there's a 'returnKey' projection we add key metadata.
+        bool addKeyMetadata;
 
         // BIG NOTE:
         // If you use simple bounds, we'll use whatever index access method the keypattern implies.
@@ -359,12 +370,12 @@ namespace mongo {
     };
 
     struct ProjectionNode : public QuerySolutionNode {
-        ProjectionNode() : liteProjection(NULL) { }
+        ProjectionNode() { }
         virtual ~ProjectionNode() { }
 
         virtual StageType getType() const { return STAGE_PROJECTION; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         /**
          * This node changes the type to OWNED_OBJ.  There's no fetching possible after this.
@@ -394,21 +405,22 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        // Points into the CanonicalQuery, not owned here.
-        LiteProjection* liteProjection;
-
         // The full query tree.  Needed when we have positional operators.
         // Owned in the CanonicalQuery, not here.
         MatchExpression* fullExpression;
+
+        // Given that we don't yet have a MatchExpression analogue for the expression language, we
+        // use a BSONObj.
+        BSONObj projection;
     };
 
     struct SortNode : public QuerySolutionNode {
-        SortNode() : hasBounds(false) { }
+        SortNode() : limit(0) { }
         virtual ~SortNode() { }
 
         virtual StageType getType() const { return STAGE_SORT; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
         bool hasField(const string& field) const { return children[0]->hasField(field); }
@@ -428,10 +440,10 @@ namespace mongo {
 
         BSONObj pattern;
 
-        bool hasBounds;
+        BSONObj query;
 
-        // XXX
-        IndexBounds bounds;
+        // Sum of both limit and skip count in the parsed query.
+        int limit;
     };
 
     struct LimitNode : public QuerySolutionNode {
@@ -440,7 +452,7 @@ namespace mongo {
 
         virtual StageType getType() const { return STAGE_LIMIT; }
 
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
         bool hasField(const string& field) const { return children[0]->hasField(field); }
@@ -455,7 +467,7 @@ namespace mongo {
         virtual ~SkipNode() { }
 
         virtual StageType getType() const { return STAGE_SKIP; }
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
         bool hasField(const string& field) const { return children[0]->hasField(field); }
@@ -476,7 +488,7 @@ namespace mongo {
         virtual ~Geo2DNode() { }
 
         virtual StageType getType() const { return STAGE_GEO_2D; }
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return false; }
         bool hasField(const string& field) const;
@@ -490,11 +502,11 @@ namespace mongo {
 
     // This is a standalone stage.
     struct GeoNear2DNode : public QuerySolutionNode {
-        GeoNear2DNode() : numWanted(100) { }
+        GeoNear2DNode() : numWanted(100), addPointMeta(false), addDistMeta(false) { }
         virtual ~GeoNear2DNode() { }
 
         virtual StageType getType() const { return STAGE_GEO_NEAR_2D; }
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
@@ -505,15 +517,17 @@ namespace mongo {
         NearQuery nq;
         int numWanted;
         BSONObj indexKeyPattern;
+        bool addPointMeta;
+        bool addDistMeta;
     };
 
     // This is actually its own standalone stage.
     struct GeoNear2DSphereNode : public QuerySolutionNode {
-        GeoNear2DSphereNode() { }
+        GeoNear2DSphereNode() : addPointMeta(false), addDistMeta(false) { }
         virtual ~GeoNear2DSphereNode() { }
 
         virtual StageType getType() const { return STAGE_GEO_NEAR_2DSPHERE; }
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
@@ -526,6 +540,8 @@ namespace mongo {
         IndexBounds baseBounds;
 
         BSONObj indexKeyPattern;
+        bool addPointMeta;
+        bool addDistMeta;
     };
 
     //
@@ -543,12 +559,89 @@ namespace mongo {
         virtual ~ShardingFilterNode() { }
 
         virtual StageType getType() const { return STAGE_SHARDING_FILTER; }
-        virtual void appendToString(stringstream* ss, int indent) const;
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
         bool hasField(const string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
+    };
+
+    /**
+     * If documents mutate or are deleted during a query, we can (in some cases) fetch them
+     * and still return them.  This stage merges documents that have been mutated or deleted
+     * into the query result stream.
+     */
+    struct KeepMutationsNode : public QuerySolutionNode {
+        KeepMutationsNode() { }
+        virtual ~KeepMutationsNode() { }
+
+        virtual StageType getType() const { return STAGE_KEEP_MUTATIONS; }
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+        // Any flagged results are OWNED_OBJ and therefore we're covered if our child is.
+        bool fetched() const { return children[0]->fetched(); }
+
+        // Any flagged results are OWNED_OBJ and as such they'll have any field we need.
+        bool hasField(const string& field) const { return children[0]->hasField(field); }
+
+        bool sortedByDiskLoc() const { return false; }
+        const BSONObjSet& getSort() const { return sorts; }
+
+        // Since we merge in flagged results we have no sort order.
+        BSONObjSet sorts;
+    };
+
+    /**
+     * Distinct queries only want one value for a given field.  We run an index scan but
+     * *always* skip over the current key to the next key.
+     */
+    struct DistinctNode : public QuerySolutionNode {
+        DistinctNode() { }
+        virtual ~DistinctNode() { }
+
+        virtual StageType getType() const { return STAGE_DISTINCT; }
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+        // This stage is created "on top" of normal planning and as such the properties
+        // below don't really matter.
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return !indexKeyPattern[field].eoo(); }
+        bool sortedByDiskLoc() const { return false; }
+        const BSONObjSet& getSort() const { return sorts; }
+        BSONObjSet sorts;
+
+        BSONObj indexKeyPattern;
+        int direction;
+        IndexBounds bounds;
+        // We are distinct-ing over the 'fieldNo'-th field of 'indexKeyPattern'.
+        int fieldNo;
+    };
+
+    /**
+     * Some count queries reduce to counting how many keys are between two entries in a
+     * Btree.
+     */
+    struct CountNode : public QuerySolutionNode {
+        CountNode() { }
+        virtual ~CountNode() { }
+
+        virtual StageType getType() const { return STAGE_COUNT; }
+        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
+        bool sortedByDiskLoc() const { return false; }
+        const BSONObjSet& getSort() const { return sorts; }
+        BSONObjSet sorts;
+
+        BSONObj indexKeyPattern;
+
+        BSONObj startKey;
+        bool startKeyInclusive;
+
+        BSONObj endKey;
+        bool endKeyInclusive;
     };
 
 }  // namespace mongo

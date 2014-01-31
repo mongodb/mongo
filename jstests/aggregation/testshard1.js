@@ -206,7 +206,7 @@ assert.eq(db.ts1.find().sort({_id:1}).toArray(),
           outCollection.find().sort({_id:1}).toArray());
 
 // Make sure we error out if $out collection is sharded
-assertErrorCode(db.outCollection, [{$out: db.ts1.getName()}], 17017);
+assertErrorCode(outCollection, [{$out: db.ts1.getName()}], 17017);
 
 db.literal.save({dollar:false});
 
@@ -227,6 +227,11 @@ for (var shardName in res.shards) {
     assert("host" in res.shards[shardName]);
     assert("stages" in res.shards[shardName]);
 }
+
+// Call sub-tests designed to work sharded and unsharded.
+// They check for this variable to know to shard their collections.
+RUNNING_IN_SHARDED_AGG_TEST = true; // global
+load("jstests/aggregation/bugs/server11675.js"); // text support
 
 // shut everything down
 shardedAggTest.stop();

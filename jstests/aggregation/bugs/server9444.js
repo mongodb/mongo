@@ -20,18 +20,18 @@ function test(pipeline, outOfMemoryCode) {
     assert.commandFailed(res);
     assert.eq(res.code, outOfMemoryCode);
 
-    // ensure allowDiskUsage: false does what it says
-    var res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUsage: false});
+    // ensure allowDiskUse: false does what it says
+    var res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUse: false});
     assert.commandFailed(res);
     assert.eq(res.code, outOfMemoryCode);
 
-    // allowDiskUsage only supports bool. In particular, numbers aren't allowed.
-    var res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUsage: 1});
+    // allowDiskUse only supports bool. In particular, numbers aren't allowed.
+    var res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUse: 1});
     assert.commandFailed(res);
     assert.eq(res.code, 16949);
 
-    // ensure we work when allowingDiskUsage === true
-    var res = t.aggregate(pipeline, {allowDiskUsage: true});
+    // ensure we work when allowDiskUse === true
+    var res = t.aggregate(pipeline, {allowDiskUse: true});
     assert.eq(res.itcount(), t.count()); // all tests output one doc per input doc
 }
 

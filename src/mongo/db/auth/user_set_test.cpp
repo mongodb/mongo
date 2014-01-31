@@ -75,7 +75,7 @@ namespace {
         ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
         ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
 
-        UserSet::NameIterator iter = set.getNames();
+        UserNameIterator iter = set.getNames();
         ASSERT_TRUE(iter.more());
         ASSERT_EQUALS(iter.next(), UserName("Bob", "test2"));
         ASSERT_FALSE(iter.more());
@@ -83,7 +83,7 @@ namespace {
 
     TEST(UserSetTest, IterateNames) {
         UserSet pset;
-        UserSet::NameIterator iter = pset.getNames();
+        UserNameIterator iter = pset.getNames();
         ASSERT(!iter.more());
 
         ASSERT_NULL(pset.add(new User(UserName("bob", "test"))));

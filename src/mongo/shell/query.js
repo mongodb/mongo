@@ -169,6 +169,9 @@ DBQuery.prototype.count = function( applySkipLimit ) {
             if ( this._query.$maxTimeMS ) {
                 cmd.$maxTimeMS = this._query.$maxTimeMS;
             }
+            if ( this._query.$hint ) {
+                cmd.hint = this._query.$hint;
+            }
         }
         else {
             cmd.query = this._query;
@@ -305,6 +308,7 @@ DBQuery.prototype.explain = function (verbose) {
 
         delete obj.allPlans;
         delete obj.oldPlan;
+        delete obj.stats;
 
         if (typeof(obj.length) == 'number'){
             for (var i=0; i < obj.length; i++){

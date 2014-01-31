@@ -44,19 +44,25 @@ namespace mutablebson {
     }
 
     /** A predicate for findElement that matches on the field name of Elements. */
-    class FieldNameEquals {
-    public:
+    struct FieldNameEquals {
         // The lifetime of this object must be a subset of the lifetime of 'fieldName'.
         explicit FieldNameEquals(const StringData& fieldName)
-            : _fieldName(fieldName) {}
+            : fieldName(fieldName) {}
 
         bool operator()(const ConstElement& element) const {
-            return (_fieldName == element.getFieldName());
+            return (fieldName == element.getFieldName());
         }
 
-    private:
-        const StringData& _fieldName;
+        const StringData& fieldName;
     };
+
+    /** An overload of findElement that delegates to the special implementation
+     *  Element::findElementNamed to reduce traffic across the Element API.
+     */
+    template<typename ElementType>
+    inline ElementType findElement(ElementType first, FieldNameEquals predicate) {
+        return first.ok() ? first.findElementNamed(predicate.fieldName) : first;
+    }
 
     /** A convenience wrapper around findElement<ElementType, FieldNameEquals>. */
     template<typename ElementType>
@@ -64,12 +70,28 @@ namespace mutablebson {
         return findElement(first, FieldNameEquals(fieldName));
     }
 
+    /** Finds the first child under 'parent' that matches the given predicate. If no such child
+     *  Element is found, the returned Element's 'ok' method will return false.
+     */
+    template<typename ElementType, typename Predicate>
+    inline ElementType findFirstChild(ElementType parent, Predicate predicate) {
+        return findElement(parent.leftchild(), predicate);
+    }
+
+    /** An overload of findFirstChild that delegates to the special implementation
+     *  Element::findFirstChildNamed to reduce traffic across the Element API.
+     */
+    template<typename ElementType>
+    inline ElementType findFirstChild(ElementType parent, FieldNameEquals predicate) {
+        return parent.ok() ? parent.findFirstChildNamed(predicate.fieldName) : parent;
+    }
+
     /** Finds the first child under 'parent' that matches the given field name. If no such child
      *  Element is found, the returned Element's 'ok' method will return false.
      */
     template<typename ElementType>
     inline ElementType findFirstChildNamed(ElementType parent, const StringData& fieldName) {
-        return findElementNamed(parent.leftChild(), fieldName);
+        return findFirstChild(parent, FieldNameEquals(fieldName));
     }
 
     /** A less-than ordering for Elements that compares based on the Element field names. */
@@ -190,20 +212,22 @@ namespace mutablebson {
         const bool _considerFieldName;
     };
 
+    // NOTE: Originally, these truly were algorithms, in that they executed the loop over a
+    // generic ElementType. However, these operations were later made intrinsic to
+    // Element/Document for performance reasons. These functions hare here for backward
+    // compatibility, and just delegate to the appropriate Element or ConstElement method of
+    // the same name.
+
     /** Return the element that is 'n' Elements to the left in the sibling chain of 'element'. */
     template<typename ElementType>
     ElementType getNthLeftSibling(ElementType element, std::size_t n) {
-        while (element.ok() && (n-- != 0))
-            element = element.leftSibling();
-        return element;
+        return element.leftSibling(n);
     }
 
     /** Return the element that is 'n' Elements to the right in the sibling chain of 'element'. */
     template<typename ElementType>
     ElementType getNthRightSibling(ElementType element, std::size_t n) {
-        while (element.ok() && (n-- != 0))
-            element = element.rightSibling();
-        return element;
+        return element.rightSibling(n);
     }
 
     /** Move 'n' Elements left or right in the sibling chain of 'element' */
@@ -217,38 +241,25 @@ namespace mutablebson {
     /** Get the child that is 'n' Elements to the right of 'element's left child. */
     template<typename ElementType>
     ElementType getNthChild(ElementType element, std::size_t n) {
-        return getNthRightSibling(element.leftChild(), n);
+        return element.findNthChild(n);
     }
 
     /** Returns the number of valid siblings to the left of 'element'. */
     template<typename ElementType>
     std::size_t countSiblingsLeft(ElementType element) {
-        std::size_t result = 0;
-        element = element.leftSibling();
-        while (element.ok()) {
-            element = element.leftSibling();
-            ++result;
-        }
-        return result;
+        return element.countSiblingsLeft();
     }
 
     /** Returns the number of valid siblings to the right of 'element'. */
     template<typename ElementType>
     std::size_t countSiblingsRight(ElementType element) {
-        std::size_t result = 0;
-        element = element.rightSibling();
-        while (element.ok()) {
-            element = element.rightSibling();
-            ++result;
-        }
-        return result;
+        return element.countSiblingsRight();
     }
 
     /** Return the number of children of 'element'. */
     template<typename ElementType>
     std::size_t countChildren(ElementType element) {
-        element = element.leftChild();
-        return element.ok() ? (1 + countSiblingsRight(element)) : 0;
+        return element.countChildren();
     }
 
 } // namespace mutablebson

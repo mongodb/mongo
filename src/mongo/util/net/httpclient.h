@@ -17,16 +17,17 @@
 
 #pragma once
 
+#include "mongo/client/export_macros.h"
 #include "mongo/pch.h"
 
 namespace mongo {
 
-    class HttpClient : boost::noncopyable {
+    class MONGO_CLIENT_API HttpClient : boost::noncopyable {
     public:
 
         typedef map<string,string> Headers;
 
-        class Result {
+        class MONGO_CLIENT_API Result {
         public:
             Result() {}
 

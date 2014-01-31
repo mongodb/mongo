@@ -32,6 +32,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -46,15 +47,21 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
+#include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/writeback_listener.h"
+#include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
@@ -665,13 +672,15 @@ namespace mongo {
                 //    receiving shard whenever a migrate occurs.
                 else {
                     // call ensureIndex with cache=false, see SERVER-1691
-                    bool ensureSuccess = conn->ensureIndex( ns ,
-                                                            proposedKey ,
-                                                            careAboutUnique ,
-                                                            "" ,
-                                                            false );
-                    if ( ! ensureSuccess ) {
-                        errmsg = "ensureIndex failed to create index on primary shard";
+                    Status result = clusterCreateIndex( ns,
+                                                        proposedKey,
+                                                        careAboutUnique,
+                                                        WriteConcernOptions::Default,
+                                                        NULL );
+
+                    if ( !result.isOK() ) {
+                        errmsg = str::stream() << "ensureIndex failed to create index on "
+                                               << "primary shard: " << result.reason();
                         conn.done();
                         return false;
                     }
@@ -742,7 +751,7 @@ namespace mongo {
                 result << "collectionsharded" << ns;
 
                 // only initially move chunks when using a hashed shard key
-                if (isHashedShardKey) {
+                if (isHashedShardKey && isEmpty) {
 
                     // Reload the new config info.  If we created more than one initial chunk, then
                     // we need to move them around to balance.
@@ -1118,6 +1127,9 @@ namespace mongo {
                                       res)) {
                     errmsg = "move failed";
                     result.append( "cause" , res );
+                    if ( !res["code"].eoo() ) {
+                        result.append( res["code"] );
+                    }
                     return false;
                 }
 
@@ -1295,11 +1307,19 @@ namespace mongo {
 
                     log() << "going to start draining shard: " << s.getName() << endl;
                     BSONObj newStatus = BSON( "$set" << BSON( ShardType::draining(true) ) );
-                    conn->update( ShardType::ConfigNS , searchDoc , newStatus, false /* do no upsert */);
 
-                    errmsg = conn->getLastError();
-                    if ( errmsg.size() ) {
-                        log() << "error starting remove shard: " << s.getName() << " err: " << errmsg << endl;
+                    Status status = clusterUpdate( ShardType::ConfigNS,
+                                                   searchDoc,
+                                                   newStatus,
+                                                   false /* do no upsert */,
+                                                   false /* multi */,
+                                                   WriteConcernOptions::AllConfigs,
+                                                   NULL );
+
+                    if ( !status.isOK() ) {
+                        errmsg = status.reason();
+                        log() << "error starting remove shard: " << s.getName()
+                              << " err: " << errmsg << endl;
                         return false;
                     }
 
@@ -1308,10 +1328,15 @@ namespace mongo {
                     PRINT(primaryLocalDoc);
                     if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
                         log() << "This shard is listed as primary of local db. Removing entry." << endl;
-                        conn->remove(DatabaseType::ConfigNS, BSON(DatabaseType::name("local")));
-                        errmsg = conn->getLastError();
-                        if ( errmsg.size() ) {
-                            log() << "error removing local db: " << errmsg << endl;
+                        Status status = clusterDelete( DatabaseType::ConfigNS,
+                                                       BSON(DatabaseType::name("local")),
+                                                       0 /* limit */,
+                                                       WriteConcernOptions::AllConfigs,
+                                                       NULL );
+
+                        if ( !status.isOK() ) {
+                            log() << "error removing local db: "
+                                  << status.reason() << endl;
                             return false;
                         }
                     }
@@ -1340,11 +1365,16 @@ namespace mongo {
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
                     audit::logRemoveShard(ClientBasic::getCurrent(), s.getName());
-                    conn->remove( ShardType::ConfigNS , searchDoc );
+                    Status status = clusterDelete( ShardType::ConfigNS,
+                                                   searchDoc,
+                                                   0, // limit
+                                                   WriteConcernOptions::AllConfigs,
+                                                   NULL );
 
-                    errmsg = conn->getLastError();
-                    if ( errmsg.size() ) {
-                        log() << "error concluding remove shard: " << s.getName() << " err: " << errmsg << endl;
+                    if ( !status.isOK() ) {
+                        errmsg = status.reason();
+                        log() << "error concluding remove shard: " << s.getName()
+                              << " err: " << errmsg << endl;
                         return false;
                     }
 
@@ -1426,6 +1456,8 @@ namespace mongo {
                 result.append("msg", "isdbgrid");
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
                 result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
+                result.appendNumber("maxWriteBatchSize",
+                                    BatchedCommandRequest::kMaxWriteBatchSize);
                 result.appendDate("localTime", jsTime());
 
                 // Mongos tries to keep exactly the same version range of the server it is
@@ -1493,21 +1525,126 @@ namespace mongo {
                                                std::vector<Privilege>* out) {} // No auth required
             CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
 
-            virtual bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run( const string& dbName,
+                              BSONObj& cmdObj,
+                              int,
+                              string& errmsg,
+                              BSONObjBuilder& result,
+                              bool ) {
+
+                //
+                // Mongos GLE - finicky.
+                //
+                // To emulate mongod, we first append any write errors we had, then try to append
+                // write concern error if there was no write error.  We need to contact the previous
+                // shards regardless to maintain 2.4 behavior.
+                //
+                // If there are any unexpected or connectivity errors when calling GLE, fail the
+                // command.
+                //
+                // Finally, report the write concern errors IF we don't already have an error.
+                // If we only get one write concern error back, report that, otherwise report an
+                // aggregated error.
+                //
+                // TODO: Do we need to contact the prev shards regardless - do we care that much
+                // about 2.4 behavior?
+                //
+
                 LastError *le = lastError.disableForCommand();
                 verify( le );
-                {
-                    if ( Strategy::useClusterWriteCommands ||
-                         ( le->msg.size() && le->nPrev == 1 ) ) {
-                        le->appendSelf( result );
-                        return true;
+
+                // Write commands always have the error stored in the mongos last error
+                bool errorOccurred = false;
+                if ( le->nPrev == 1 ) {
+                    errorOccurred = le->appendSelf( result, false );
+                }
+
+                // For compatibility with 2.4 sharded GLE, we always enforce the write concern
+                // across all shards.
+
+                DBClientMultiCommand dispatcher;
+                vector<LegacyWCResponse> wcResponses;
+                Status status = enforceLegacyWriteConcern( &dispatcher,
+                                                           dbName,
+                                                           cmdObj,
+                                                           ClientInfo::get()->getPrevHostOpTimes(),
+                                                           &wcResponses );
+
+                // Don't forget about our last hosts, reset the client info
+                ClientInfo::get()->disableForCommand();
+
+                // We're now done contacting all remote servers, just report results
+
+                if ( !status.isOK() ) {
+                    // Return immediately if we failed to contact a shard, unexpected GLE issue
+                    // Can't return code, since it may have been set above (2.4 compatibility)
+                    result.append( "errmsg", status.reason() );
+                    return false;
+                }
+
+                // Go through all the write concern responses and find errors
+                BSONArrayBuilder shards;
+                BSONObjBuilder shardRawGLE;
+                BSONArrayBuilder errors;
+                BSONArrayBuilder errorRawGLE;
+
+                int numWCErrors = 0;
+                const LegacyWCResponse* lastErrResponse = NULL;
+
+                for ( vector<LegacyWCResponse>::const_iterator it = wcResponses.begin();
+                    it != wcResponses.end(); ++it ) {
+
+                    const LegacyWCResponse& wcResponse = *it;
+
+                    shards.append( wcResponse.shardHost );
+                    shardRawGLE.append( wcResponse.shardHost, wcResponse.gleResponse );
+
+                    if ( !wcResponse.errToReport.empty() ) {
+                        numWCErrors++;
+                        lastErrResponse = &wcResponse;
+                        errors.append( wcResponse.errToReport );
+                        errorRawGLE.append( wcResponse.gleResponse );
                     }
                 }
-                ClientInfo * client = ClientInfo::get();
-                bool res = client->getLastError( dbName, cmdObj , result, errmsg );
-                client->disableForCommand();
-                return res;
+
+                // Always report what we found to match 2.4 behavior and for debugging
+                if ( wcResponses.size() == 1u ) {
+                    result.append( "singleShard", wcResponses.front().shardHost );
+                }
+                else {
+                    result.append( "shards", shards.arr() );
+                    result.append( "shardRawGLE", shardRawGLE.obj() );
+                }
+
+                // Suppress write concern errors if a write error occurred, to match mongod behavior
+                if ( errorOccurred || numWCErrors == 0 ) {
+                    // Still need to return err
+                    if ( !errorOccurred ) result.appendNull( "err" );
+                    return true;
+                }
+
+                if ( numWCErrors == 1 ) {
+
+                    // Return the single write concern error we found, err should be set or not
+                    // from gle response
+                    result.appendElements( lastErrResponse->gleResponse );
+                    return lastErrResponse->gleResponse["ok"].trueValue();
+                }
+                else {
+
+                    // Return a generic combined WC error message
+                    result.append( "errs", errors.arr() );
+                    result.append( "errObjects", errorRawGLE.arr() );
+
+                    // Need to always return err
+                    result.appendNull( "err" );
+
+                    return appendCommandStatus( result,
+                        Status( ErrorCodes::WriteConcernFailed,
+                                "multiple write concern errors occurred" ) );
+                }
             }
+
         } cmdGetLastError;
 
     }
@@ -1529,7 +1666,7 @@ namespace mongo {
                 le->reset();
 
             ClientInfo * client = ClientInfo::get();
-            set<string> * shards = client->getPrev();
+            set<string> * shards = client->getPrevShardHosts();
 
             for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ) {
                 string theShard = *i;

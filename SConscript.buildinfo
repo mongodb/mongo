@@ -59,7 +59,9 @@ def generate_buildinfo(env, target, source, **kw):
     finally:
         out.close()
 
-env.Command(buildinfo_filename, Value(buildinfo_template), generate_buildinfo)
+env.Command(buildinfo_filename,
+            Value(buildinfo_template),
+            Action(generate_buildinfo, "Generating $TARGET"))
 env.AlwaysBuild(buildinfo_filename)
 env.Install('$BUILD_DIR/mongo', buildinfo_filename)
 env.Install('$BUILD_DIR/client_build/mongo', buildinfo_filename)

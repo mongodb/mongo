@@ -135,22 +135,18 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void FetchStage::invalidate(const DiskLoc& dl) {
+    void FetchStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
 
         // If we're holding on to an object that we're waiting for the runner to page in...
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+            // And we haven't already invalidated it...
             WorkingSetMember* member = _ws->get(_idBeingPagedIn);
-            // If we're paging something in it must have a DiskLoc.
-            verify(member->hasLoc());
-            // The DiskLoc is about to perish so we force a fetch of the data.
-            if (member->loc == dl) {
-                // TODO: Do we ever want a third state, _idBeingPagedIn is a valid WSID but doesn't
-                // have a DiskLoc?
-                _ws->free(_idBeingPagedIn);
-                _idBeingPagedIn = WorkingSet::INVALID_ID;
+            if (member->hasLoc() && (member->loc == dl)) {
+                // Just fetch it now and kill the DiskLoc.
+                WorkingSetCommon::fetchAndInvalidateLoc(member);
             }
         }
     }

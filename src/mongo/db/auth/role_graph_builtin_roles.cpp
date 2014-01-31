@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/db/auth/role_graph.h"
@@ -66,9 +78,6 @@ namespace {
     // and that the "dbAdminAnyDatabase" role may perform on normal resources of any database.
     ActionSet dbAdminRoleActions;
 
-    /// Actions that the "dbOwner" role may perform on normal resources of a specific database.
-    ActionSet dbOwnerRoleActions;
-
     /// Actions that the "clusterMonitor" role may perform on the cluster resource.
     ActionSet clusterMonitorRoleClusterActions;
 
@@ -105,7 +114,8 @@ namespace {
             << ActionType::dbHash
             << ActionType::dbStats
             << ActionType::find
-            << ActionType::killCursors;
+            << ActionType::killCursors
+            << ActionType::planCacheRead;
 
         // Read-write role
         readWriteRoleActions += readRoleActions;
@@ -130,7 +140,6 @@ namespace {
             << ActionType::dropUser
             << ActionType::dropRole
             << ActionType::grantRole
-            << ActionType::invalidateUserCache // hostManager gets this also
             << ActionType::revokeRole
             << ActionType::viewUser
             << ActionType::viewRole;
@@ -138,7 +147,6 @@ namespace {
 
         // DB admin role
         dbAdminRoleActions
-            << ActionType::clean
             << ActionType::collMod
             << ActionType::collStats // clusterMonitor gets this also
             << ActionType::compact
@@ -151,6 +159,9 @@ namespace {
             << ActionType::createIndex
             << ActionType::indexStats
             << ActionType::enableProfiler
+            << ActionType::planCacheIndexFilter
+            << ActionType::planCacheRead
+            << ActionType::planCacheWrite
             << ActionType::reIndex
             << ActionType::renameCollectionSameDB // read_write gets this also
             << ActionType::repairDatabase
@@ -171,7 +182,6 @@ namespace {
             << ActionType::replSetGetStatus // clusterManager gets this also
             << ActionType::serverStatus
             << ActionType::top
-            << ActionType::writeBacksQueued
             << ActionType::cursorInfo
             << ActionType::inprog
             << ActionType::shardingState;
@@ -196,7 +206,7 @@ namespace {
             << ActionType::diagLogging
             << ActionType::flushRouterConfig // clusterManager gets this also
             << ActionType::fsync
-            << ActionType::invalidateUserCache // userAdmin gets this also
+            << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
             << ActionType::killop
             << ActionType::resync; // clusterManager gets this also
 
@@ -208,6 +218,7 @@ namespace {
 
         // clusterManager role actions that target the cluster resource
         clusterManagerRoleClusterActions
+            << ActionType::appendOplogNote // backup gets this also
             << ActionType::applicationMessage // hostManager gets this also
             << ActionType::replSetConfigure
             << ActionType::replSetGetStatus // clusterMonitor gets this also
@@ -224,11 +235,6 @@ namespace {
             << ActionType::moveChunk
             << ActionType::enableSharding
             << ActionType::splitVector;
-
-        // Database-owner role database actions.
-        dbOwnerRoleActions += readWriteRoleActions;
-        dbOwnerRoleActions += dbAdminRoleActions;
-        dbOwnerRoleActions += userAdminRoleActions;
 
         return Status::OK();
     }
@@ -292,13 +298,9 @@ namespace {
     }
 
     void addDbOwnerPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
-
         addReadWriteDbPrivileges(privileges, dbName);
         addDbAdminDbPrivileges(privileges, dbName);
         addUserAdminDbPrivileges(privileges, dbName);
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forDatabaseName(dbName), dbOwnerRoleActions));
     }
 
 
@@ -343,6 +345,9 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"),
@@ -408,6 +413,11 @@ namespace {
         addReadOnlyDbPrivileges(privileges, "config");
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  NamespaceString("local.system.replset")),
+                          ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
                 Privilege(ResourcePattern::forCollectionName("system.profile"), ActionType::find));
     }
 
@@ -460,9 +470,12 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
 
+        ActionSet clusterActions;
+        clusterActions << ActionType::getParameter // To check authSchemaVersion
+                       << ActionType::listDatabases
+                       << ActionType::appendOplogNote; // For BRS
         Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
+                privileges, Privilege(ResourcePattern::forClusterResource(), clusterActions));
 
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
@@ -504,14 +517,6 @@ namespace {
                 Privilege(ResourcePattern::forExactNamespace(
                                   AuthorizationManager::versionCollectionNamespace),
                           ActionType::find));
-
-        // For BRS
-        ActionSet backupCollectionActions;
-        backupCollectionActions << ActionType::insert << ActionType::update;
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.mms.backup")),
-                          backupCollectionActions));
     }
 
     void addRestorePrivileges(PrivilegeVector* privileges) {
@@ -565,6 +570,11 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.namespaces"),
                           ActionType::find));
+
+        // Need to be able to run getParameter to check authSchemaVersion
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges, Privilege(ResourcePattern::forClusterResource(),
+                                      ActionType::getParameter));
     }
 
     void addRootRolePrivileges(PrivilegeVector* privileges) {
@@ -572,9 +582,6 @@ namespace {
         addUserAdminAnyDbPrivileges(privileges);
         addDbAdminAnyDbPrivileges(privileges);
         addReadWriteAnyDbPrivileges(privileges);
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forAnyNormalResource(), dbOwnerRoleActions));
     }
 
     void addInternalRolePrivileges(PrivilegeVector* privileges) {

@@ -35,18 +35,19 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/s2_index_cursor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-    static int configValueWithDefault(IndexDescriptor *desc, const string& name, int def) {
+    static int configValueWithDefault(const IndexDescriptor *desc, const string& name, int def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberInt(); }
         return def;
     }
 
-    S2AccessMethod::S2AccessMethod(IndexDescriptor *descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         // Set up basic params.
         _params.maxKeysPerInsert = 200;
@@ -84,11 +85,6 @@ namespace mongo {
                 geoFields >= 1);
     }
 
-    Status S2AccessMethod::newCursor(IndexCursor** out) {
-        *out = new S2IndexCursor(_params, _descriptor);
-        return Status::OK();
-    }
-
     void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
         BSONObjSet keysToAdd;
         // We output keys in the same order as the fields we index.
@@ -101,9 +97,6 @@ namespace mongo {
             BSONElementSet fieldElements;
             // false means Don't expand the last array, duh.
             obj.getFieldsDotted(e.fieldName(), fieldElements, false);
-
-            // If we're sparse and we're missing any field, bail out.
-            if (_descriptor->isSparse() && fieldElements.empty()) { return; }
 
             BSONObjSet keysForThisField;
             if (IndexNames::GEO_2DSPHERE == e.valuestr()) {

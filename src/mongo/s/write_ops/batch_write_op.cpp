@@ -32,8 +32,31 @@
 
 namespace mongo {
 
+    /**
+     * Returns a new write concern that has the copy of every field from the original
+     * document but with a w set to 1. This is intended for upgrading { w: 0 } write
+     * concern to { w: 1 }.
+     */
+    static BSONObj upgradeWriteConcern ( const BSONObj& origWriteConcern ) {
+        BSONObjIterator iter( origWriteConcern );
+        BSONObjBuilder newWriteConcern;
+
+        while ( iter.more() ) {
+            BSONElement elem( iter.next() );
+
+            if ( strncmp( elem.fieldName(), "w", 2 ) == 0 ) {
+                newWriteConcern.append( "w", 1 );
+            }
+            else {
+                newWriteConcern.append( elem );
+            }
+        }
+
+        return newWriteConcern.obj();
+    }
+
     BatchWriteStats::BatchWriteStats() :
-        numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numDeleted( 0 ) {
+        numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numModified( 0 ), numDeleted( 0 ) {
     }
 
     BatchWriteOp::BatchWriteOp() :
@@ -54,7 +77,7 @@ namespace mongo {
         _clientRequest = clientRequest;
     }
 
-    static void buildTargetError( const Status& errStatus, BatchedErrorDetail* details ) {
+    static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
         details->setErrCode( errStatus.code() );
         details->setErrMessage( errStatus.reason() );
     }
@@ -89,8 +112,23 @@ namespace mongo {
         typedef std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp> TargetedBatchMap;
     }
 
+    // Helper function to cancel all the write ops of targeted batch.
+    static void cancelBatch( const TargetedWriteBatch& targetedBatch,
+                             WriteOp* writeOps,
+                             const WriteErrorDetail& why ) {
+        const vector<TargetedWrite*>& writes = targetedBatch.getWrites();
+
+        for ( vector<TargetedWrite*>::const_iterator writeIt = writes.begin();
+            writeIt != writes.end(); ++writeIt ) {
+
+            TargetedWrite* write = *writeIt;
+            // NOTE: We may repeatedly cancel a write op here, but that's fast.
+            writeOps[write->writeOpRef.first].cancelWrites( &why );
+        }
+    }
+
     // Helper function to cancel all the write ops of targeted batches in a map
-    static void cancelBatches( const BatchedErrorDetail& why,
+    static void cancelBatches( const WriteErrorDetail& why,
                                WriteOp* writeOps,
                                TargetedBatchMap* batchMap ) {
 
@@ -157,7 +195,7 @@ namespace mongo {
                 // current batches.
                 //
 
-                BatchedErrorDetail targetError;
+                WriteErrorDetail targetError;
                 buildTargetError( targetStatus, &targetError );
 
                 if ( recordTargetErrors ) {
@@ -217,8 +255,6 @@ namespace mongo {
                                           BatchedCommandRequest* request ) const {
 
         request->setNS( _clientRequest->getNS() );
-        request->setShardName( targetedBatch.getEndpoint().shardName );
-        request->setShardVersion( targetedBatch.getEndpoint().shardVersion );
 
         const vector<TargetedWrite*>& targetedWrites = targetedBatch.getWrites();
 
@@ -257,13 +293,26 @@ namespace mongo {
         }
 
         if ( _clientRequest->isWriteConcernSet() ) {
-            request->setWriteConcern( _clientRequest->getWriteConcern() );
+            if ( _clientRequest->isVerboseWC() ) {
+                request->setWriteConcern( _clientRequest->getWriteConcern() );
+            }
+            else {
+                // Mongos needs to send to the shard with w > 0 so it will be able to
+                // see the writeErrors.
+                request->setWriteConcern( upgradeWriteConcern(
+                        _clientRequest->getWriteConcern() ));
+            }
         }
 
         if ( !request->isOrderedSet() ) {
             request->setOrdered( _clientRequest->getOrdered() );
         }
-        request->setSession( 0 );
+
+        auto_ptr<BatchedRequestMetadata> requestMetadata( new BatchedRequestMetadata() );
+        requestMetadata->setShardName( targetedBatch.getEndpoint().shardName );
+        requestMetadata->setShardVersion( targetedBatch.getEndpoint().shardVersion );
+        requestMetadata->setSession( 0 );
+        request->setMetadata( requestMetadata.release() );
     }
 
     //
@@ -271,52 +320,38 @@ namespace mongo {
     //
 
     namespace {
-        struct BatchedErrorDetailComp {
-            bool operator()( const BatchedErrorDetail* errorA,
-                             const BatchedErrorDetail* errorB ) const {
+        struct WriteErrorDetailComp {
+            bool operator()( const WriteErrorDetail* errorA,
+                             const WriteErrorDetail* errorB ) const {
                 return errorA->getIndex() < errorB->getIndex();
             }
         };
     }
 
     static void cloneBatchErrorTo( const BatchedCommandResponse& batchResp,
-                                   BatchedErrorDetail* details ) {
+                                   WriteErrorDetail* details ) {
         details->setErrCode( batchResp.getErrCode() );
-        if ( batchResp.isErrInfoSet() ) details->setErrInfo( batchResp.getErrInfo() );
         details->setErrMessage( batchResp.getErrMessage() );
     }
 
-    static void cloneBatchErrorFrom( const BatchedErrorDetail& details,
+    static void cloneBatchErrorFrom( const WriteErrorDetail& details,
                                      BatchedCommandResponse* response ) {
         response->setErrCode( details.getErrCode() );
-        if ( details.isErrInfoSet() ) response->setErrInfo( details.getErrInfo() );
         response->setErrMessage( details.getErrMessage() );
-    }
-
-    static bool isWCErrCode( int errCode ) {
-        return errCode == ErrorCodes::WriteConcernFailed;
     }
 
     // Given *either* a batch error or an array of per-item errors, copies errors we're interested
     // in into a TrackedErrorMap
     static void trackErrors( const ShardEndpoint& endpoint,
-                             const BatchedErrorDetail* batchError,
-                             const vector<BatchedErrorDetail*> itemErrors,
+                             const vector<WriteErrorDetail*> itemErrors,
                              TrackedErrors* trackedErrors ) {
-        if ( batchError ) {
-            if ( trackedErrors->isTracking( batchError->getErrCode() ) ) {
-                trackedErrors->addError( new ShardError( endpoint, *batchError ) );
-            }
-        }
-        else {
-            for ( vector<BatchedErrorDetail*>::const_iterator it = itemErrors.begin();
-                it != itemErrors.end(); ++it ) {
+        for ( vector<WriteErrorDetail*>::const_iterator it = itemErrors.begin();
+            it != itemErrors.end(); ++it ) {
 
-                const BatchedErrorDetail* error = *it;
+            const WriteErrorDetail* error = *it;
 
-                if ( trackedErrors->isTracking( error->getErrCode() ) ) {
-                    trackedErrors->addError( new ShardError( endpoint, *error ) );
-                }
+            if ( trackedErrors->isTracking( error->getErrCode() ) ) {
+                trackedErrors->addError( new ShardError( endpoint, *error ) );
             }
         }
     }
@@ -333,10 +368,8 @@ namespace mongo {
             if( response.isUpsertDetailsSet() ) {
                 numUpserted = response.sizeUpsertDetails();
             }
-            else if( response.isSingleUpsertedSet() ) {
-                numUpserted = 1;
-            }
             stats->numUpdated += ( response.getN() - numUpserted );
+            stats->numModified += response.getNModified();
             stats->numUpserted += numUpserted;
         }
         else {
@@ -349,57 +382,54 @@ namespace mongo {
                                           const BatchedCommandResponse& response,
                                           TrackedErrors* trackedErrors ) {
 
+        // Increment stats for this batch
+        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
+
+        // Stop tracking targeted batch
+        _targeted.erase( &targetedBatch );
+
         //
         // Organize errors based on error code.
         // We may have *either* a batch error or errors per-item.
         // (Write Concern errors are stored and handled later.)
         //
 
-        vector<BatchedErrorDetail*> itemErrors;
-        scoped_ptr<BatchedErrorDetail> batchError;
-
         if ( !response.getOk() ) {
-
-            int errCode = response.getErrCode();
-            bool isWCError = isWCErrCode( errCode );
-
-            // Special handling for write concern errors, save for later
-            if ( isWCError ) {
-                BatchedErrorDetail error;
-                cloneBatchErrorTo( response, &error );
-                ShardError* wcError = new ShardError( targetedBatch.getEndpoint(), error );
-                _wcErrors.mutableVector().push_back( wcError );
-            }
-
-            // Handle batch and per-item errors
-            if ( response.isErrDetailsSet() ) {
-
-                // Per-item errors were set
-                itemErrors.insert( itemErrors.begin(),
-                                   response.getErrDetails().begin(),
-                                   response.getErrDetails().end() );
-
-                // Sort per-item errors by index
-                std::sort( itemErrors.begin(), itemErrors.end(), BatchedErrorDetailComp() );
-            }
-            else if ( !isWCError ) {
-
-                // Per-item errors were not set and this error is not a WC error
-                // => this is a full-batch error
-                batchError.reset( new BatchedErrorDetail );
-                cloneBatchErrorTo( response, batchError.get() );
-            }
+            WriteErrorDetail batchError;
+            cloneBatchErrorTo( response, &batchError );
+            _batchError.reset( new ShardError( targetedBatch.getEndpoint(),
+                                                      batchError ));
+            cancelBatch( targetedBatch, _writeOps, batchError );
+            return;
         }
 
-        // We can't have both a batch error and per-item errors
-        dassert( !( batchError && !itemErrors.empty() ) );
+        // Special handling for write concern errors, save for later
+        if ( response.isWriteConcernErrorSet() ) {
+            auto_ptr<ShardWCError> wcError( new ShardWCError( targetedBatch.getEndpoint(),
+                                                              *response.getWriteConcernError() ));
+            _wcErrors.mutableVector().push_back( wcError.release() );
+        }
+
+        vector<WriteErrorDetail*> itemErrors;
+
+        // Handle batch and per-item errors
+        if ( response.isErrDetailsSet() ) {
+
+            // Per-item errors were set
+            itemErrors.insert( itemErrors.begin(),
+                               response.getErrDetails().begin(),
+                               response.getErrDetails().end() );
+
+            // Sort per-item errors by index
+            std::sort( itemErrors.begin(), itemErrors.end(), WriteErrorDetailComp() );
+        }
 
         //
         // Go through all pending responses of the op and sorted remote reponses, populate errors
         // This will either set all errors to the batch error or apply per-item errors as-needed
         //
 
-        vector<BatchedErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
+        vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
         int index = 0;
         for ( vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
             it != targetedBatch.getWrites().end(); ++it, ++index ) {
@@ -410,13 +440,9 @@ namespace mongo {
             dassert( writeOp.getWriteState() == WriteOpState_Pending );
 
             // See if we have an error for the write
-            BatchedErrorDetail* writeError = NULL;
+            WriteErrorDetail* writeError = NULL;
 
-            if ( batchError ) {
-                // Default to batch error, if it exists
-                writeError = batchError.get();
-            }
-            else if ( itemErrorIt != itemErrors.end() && ( *itemErrorIt )->getIndex() == index ) {
+            if ( itemErrorIt != itemErrors.end() && ( *itemErrorIt )->getIndex() == index ) {
                 // We have an per-item error for this write op's index
                 writeError = *itemErrorIt;
                 ++itemErrorIt;
@@ -433,21 +459,11 @@ namespace mongo {
 
         // Track errors we care about, whether batch or individual errors
         if ( NULL != trackedErrors ) {
-            trackErrors( targetedBatch.getEndpoint(), batchError.get(), itemErrors, trackedErrors );
+            trackErrors( targetedBatch.getEndpoint(), itemErrors, trackedErrors );
         }
 
         // Track upserted ids if we need to
-        if ( response.isSingleUpsertedSet() ) {
-
-            // Work backward from the child batch item index to the batch item index
-            int batchIndex = targetedBatch.getWrites()[0]->writeOpRef.first;
-
-            BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
-            upsertedId->setIndex( batchIndex );
-            upsertedId->setUpsertedID( response.getSingleUpserted() );
-            _upsertedIds.mutableVector().push_back( upsertedId );
-        }
-        else if ( response.isUpsertDetailsSet() ) {
+        if ( response.isUpsertDetailsSet() ) {
 
             const vector<BatchedUpsertDetail*>& upsertedIds = response.getUpsertDetails();
             for ( vector<BatchedUpsertDetail*>::const_iterator it = upsertedIds.begin();
@@ -467,16 +483,10 @@ namespace mongo {
                 _upsertedIds.mutableVector().push_back( upsertedId );
             }
         }
-
-        // Increment stats for this batch
-        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
-
-        // Stop tracking targeted batch
-        _targeted.erase( &targetedBatch );
     }
 
     void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
-                                       const BatchedErrorDetail& error ) {
+                                       const WriteErrorDetail& error ) {
         BatchedCommandResponse response;
         response.setOk( false );
         response.setN( 0 );
@@ -485,7 +495,13 @@ namespace mongo {
         noteBatchResponse( targetedBatch, response, NULL );
     }
 
+    void BatchWriteOp::setBatchError( const WriteErrorDetail& error ) {
+        _batchError.reset( new ShardError( ShardEndpoint(), error ) );
+    }
+
     bool BatchWriteOp::isFinished() {
+        if ( _batchError.get() ) return true;
+
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         bool orderedOps = _clientRequest->getOrdered();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
@@ -501,63 +517,34 @@ namespace mongo {
     // Aggregation functions for building the final response errors
     //
 
-    // Aggregate all errors for batch operations together into a single error
-    static void combineOpErrors( const vector<WriteOp*>& errOps, BatchedErrorDetail* error ) {
-
-        // Special case, pass through details of single error for better usability
-        if ( errOps.size() == 1 ) {
-            errOps.front()->getOpError().cloneTo( error );
-            return;
-        }
-
-        error->setErrCode( ErrorCodes::MultipleErrorsOccurred );
-
-        // Generate the multi-item error message below
-        stringstream msg;
-        msg << "multiple errors in batch : ";
-
-        // TODO: Coalesce adjacent errors if possible
-        for ( vector<WriteOp*>::const_iterator it = errOps.begin(); it != errOps.end(); ++it ) {
-            const WriteOp& errOp = **it;
-            if ( it != errOps.begin() ) msg << " :: and :: ";
-            msg << errOp.getOpError().getErrMessage();
-        }
-
-        error->setErrMessage( msg.str() );
-    }
-
-    // Aggregate all WC errors for the whole batch into a single error
-    static void combineWCErrors( const vector<ShardError*>& wcResponses,
-                                 BatchedErrorDetail* error ) {
-
-        // Special case, pass through details of single error for better usability
-        if ( wcResponses.size() == 1 ) {
-            wcResponses.front()->error.cloneTo( error );
-            return;
-        }
-
-        error->setErrCode( ErrorCodes::WriteConcernFailed );
-
-        // Generate the multi-error message below
-        stringstream msg;
-        msg << "multiple errors reported : ";
-
-        BSONArrayBuilder errB;
-        for ( vector<ShardError*>::const_iterator it = wcResponses.begin(); it != wcResponses.end();
-            ++it ) {
-            const ShardError* wcError = *it;
-            if ( it != wcResponses.begin() ) msg << " :: and :: ";
-            msg << wcError->error.getErrMessage();
-            errB.append( wcError->error.getErrInfo() );
-        }
-
-        error->setErrInfo( BSON( "info" << errB.arr() ) );
-        error->setErrMessage( msg.str() );
-    }
-
     void BatchWriteOp::buildClientResponse( BatchedCommandResponse* batchResp ) {
 
         dassert( isFinished() );
+
+        if ( _batchError.get() ) {
+
+            batchResp->setOk( false );
+            batchResp->setErrCode( _batchError->error.getErrCode() );
+
+            stringstream msg;
+            msg << _batchError->error.getErrMessage();
+            if ( !_batchError->endpoint.shardName.empty() ) {
+                msg << " at " << _batchError->endpoint.shardName;
+            }
+
+            batchResp->setErrMessage( msg.str() );
+            dassert( batchResp->isValid( NULL ) );
+            return;
+        }
+
+        // Result is OK
+        batchResp->setOk( true );
+
+        // For non-verbose, it's all we need.
+        if ( !_clientRequest->isVerboseWC() ) {
+            dassert( batchResp->isValid( NULL ) );
+            return;
+        }
 
         //
         // Find all the errors in the batch
@@ -576,36 +563,47 @@ namespace mongo {
         }
 
         //
-        // Build the top-level batch error
-        // This will be either the write concern error, the special "multiple item errors" error,
-        // or a promoted single-item error.  Top-level parsing/targeting errors handled elsewhere.
+        // Build the per-item errors.
         //
 
-        if ( !_wcErrors.empty() ) {
-            BatchedErrorDetail comboWCError;
-            combineWCErrors( _wcErrors.vector(), &comboWCError );
-            cloneBatchErrorFrom( comboWCError, batchResp );
-        }
-        else if ( !errOps.empty() ) {
-            BatchedErrorDetail comboBatchError;
-            combineOpErrors( errOps, &comboBatchError );
-            cloneBatchErrorFrom( comboBatchError, batchResp );
-
-            // Suppress further error details if only one error
-            if ( _clientRequest->sizeWriteOps() == 1u ) errOps.clear();
-        }
-
-        //
-        // Build the per-item errors, if needed
-        //
-
-        if ( !errOps.empty() && _clientRequest->isVerboseWC() ) {
+        if ( !errOps.empty() ) {
             for ( vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it ) {
                 WriteOp& writeOp = **it;
-                BatchedErrorDetail* error = new BatchedErrorDetail();
+                WriteErrorDetail* error = new WriteErrorDetail();
                 writeOp.getOpError().cloneTo( error );
                 batchResp->addToErrDetails( error );
             }
+        }
+
+        // Only return a write concern error if everything succeeded (unordered or ordered)
+        // OR if something succeeded and we're unordered
+        bool reportWCError = errOps.empty()
+                             || ( !_clientRequest->getOrdered()
+                                  && errOps.size() < _clientRequest->sizeWriteOps() );
+        if ( !_wcErrors.empty() && reportWCError ) {
+
+            WCErrorDetail* error = new WCErrorDetail;
+
+            // Generate the multi-error message below
+            stringstream msg;
+            if ( _wcErrors.size() > 1 ) {
+                msg << "multiple errors reported : ";
+                error->setErrCode( ErrorCodes::WriteConcernFailed );
+            }
+            else {
+                error->setErrCode( ( *_wcErrors.begin() )->error.getErrCode() );
+            }
+
+            for ( vector<ShardWCError*>::const_iterator it = _wcErrors.begin();
+                it != _wcErrors.end(); ++it ) {
+                const ShardWCError* wcError = *it;
+                if ( it != _wcErrors.begin() )
+                    msg << " :: and :: ";
+                msg << wcError->error.getErrMessage() << " at " << wcError->endpoint.shardName;
+            }
+
+            error->setErrMessage( msg.str() );
+            batchResp->setWriteConcernError( error );
         }
 
         //
@@ -613,20 +611,16 @@ namespace mongo {
         //
 
         if ( _upsertedIds.size() != 0 ) {
-            if ( _clientRequest->sizeWriteOps() == 1u ) {
-                batchResp->setSingleUpserted( _upsertedIds.vector().front()->getUpsertedID() );
-            }
-            else if( _clientRequest->isVerboseWC() ) {
-                batchResp->setUpsertDetails( _upsertedIds.vector() );
-            }
+            batchResp->setUpsertDetails( _upsertedIds.vector() );
         }
 
         // Stats
         int nValue = _stats->numInserted + _stats->numUpserted + _stats->numUpdated
                      + _stats->numDeleted;
         batchResp->setN( nValue );
+        if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update )
+            batchResp->setNModified( _stats->numModified );
 
-        batchResp->setOk( !batchResp->isErrCodeSet() );
         dassert( batchResp->isValid( NULL ) );
     }
 
@@ -645,6 +639,24 @@ namespace mongo {
             ::operator delete[]( _writeOps );
             _writeOps = NULL;
         }
+    }
+
+    int BatchWriteOp::numWriteOps() const {
+        return static_cast<int>( _clientRequest->sizeWriteOps() );
+    }
+
+    int BatchWriteOp::numWriteOpsIn( WriteOpState opState ) const {
+
+        // TODO: This could be faster, if we tracked this info explicitly
+        size_t numWriteOps = _clientRequest->sizeWriteOps();
+        int count = 0;
+        for ( size_t i = 0; i < numWriteOps; ++i ) {
+            WriteOp& writeOp = _writeOps[i];
+            if ( writeOp.getWriteState() == opState )
+                ++count;
+        }
+
+        return count;
     }
 
     void TrackedErrors::startTracking( int errCode ) {

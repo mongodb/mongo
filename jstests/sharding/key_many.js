@@ -98,14 +98,8 @@ for ( var i=0; i<types.length; i++ ){
     s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
     s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
 
-    //Sometimes the TO-side shard isn't immediately ready, this
-    //causes problems on slow hosts.
-    //Remove when SERVER-10232 is fixed
-
-    assert.soon( function() {
-        var cmdRes = s.admin.runCommand( { movechunk : longName , find : makeObjectDotted( curT.values[2] ) , to : secondary.getMongo().name, _waitForDelete : true } );
-        return cmdRes.ok;
-    }, 'movechunk ' + longName, 60000, 1000);
+    s.admin.runCommand({ movechunk: longName, find: makeObjectDotted( curT.values[2] ),
+                         to: secondary.getMongo().name, _waitForDelete : true });
 
     s.printChunks();
     

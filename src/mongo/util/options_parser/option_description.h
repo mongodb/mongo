@@ -30,6 +30,7 @@ namespace optionenvironment {
      */
     enum OptionType {
         StringVector,     // po::value< std::vector<std::string> >
+        StringMap,        // po::value< std::vector<std::string> > (but in "key=value" format)
         Bool,             // po::value<bool>
         Double,           // po::value<double>
         Int,              // po::value<int>
@@ -161,6 +162,28 @@ namespace optionenvironment {
          * Specifies the range allowed for this option.  Only allowed for options with numeric type.
          */
         OptionDescription& validRange(long min, long max);
+
+        /**
+         * Specifies that this option is incompatible with another option.  The string provided must
+         * be the dottedName, which is the name used to access the option in the result Environment.
+         *
+         * TODO: Find a way to check that that option actually exists in our section somewhere.
+         */
+        OptionDescription& incompatibleWith(const std::string& otherDottedName);
+
+        /**
+         * Specifies that this option is requires another option to be specified.  The string
+         * provided must be the dottedName, which is the name used to access the option in the
+         * result Environment.
+         */
+        OptionDescription& requires(const std::string& otherDottedName);
+
+        /**
+         * Specifies that this option is required to match the given format, specified as a regular
+         * expression.  The displayFormat argument is what gets printed to the user in the case
+         * where this constraint is not satisfied.  This is only allowed on String options.
+         */
+        OptionDescription& format(const std::string& regexFormat, const std::string& displayFormat);
 
         /**
          * Adds a constraint for this option.  During parsing, this Constraint will be added to the

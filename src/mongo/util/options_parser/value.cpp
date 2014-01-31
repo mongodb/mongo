@@ -24,7 +24,7 @@ namespace optionenvironment {
 
     // Value access functions
 
-    Status Value::get(std::vector<std::string>* val) const {
+    Status Value::get(StringVector_t* val) const {
         if (_type != StringVector) {
             StringBuilder sb;
             sb << "Attempting to get Value as type: StringVector, but Value is of type: "
@@ -32,6 +32,16 @@ namespace optionenvironment {
             return Status(ErrorCodes::TypeMismatch, sb.str());
         }
         *val = _stringVectorVal;
+        return Status::OK();
+    }
+    Status Value::get(StringMap_t* val) const {
+        if (_type != StringMap) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: StringMap, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
+        }
+        *val = _stringMapVal;
         return Status::OK();
     }
     Status Value::get(bool* val) const {
@@ -118,6 +128,7 @@ namespace optionenvironment {
     std::string Value::typeToString() const {
         switch (_type) {
             case StringVector: return "StringVector";
+            case StringMap: return "StringMap";
             case Bool: return "Bool";
             case Double: return "Double";
             case Int: return "Int";
@@ -132,12 +143,13 @@ namespace optionenvironment {
     bool Value::isEmpty() const {
         return _type == None;
     }
-    bool Value::equal(Value& otherVal) const {
+    bool Value::equal(const Value& otherVal) const {
         if (_type != otherVal._type) {
             return false;
         }
         switch (_type) {
             case StringVector: return _stringVectorVal == otherVal._stringVectorVal;
+            case StringMap: return _stringMapVal == otherVal._stringMapVal;
             case Bool: return _boolVal == otherVal._boolVal;
             case Double: return _doubleVal == otherVal._doubleVal;
             case Int: return _intVal == otherVal._intVal;
@@ -149,6 +161,8 @@ namespace optionenvironment {
             default: return false; /* Undefined */
         }
     }
+
+    // Dump the value as a string.  This function is used only for debugging purposes.
     std::string Value::toString() const {
         StringBuilder sb;
         switch (_type) {
@@ -156,13 +170,30 @@ namespace optionenvironment {
                 if (!_stringVectorVal.empty())
                 {
                     // Convert all but the last element to avoid a trailing ","
-                    for(std::vector<std::string>::const_iterator iterator = _stringVectorVal.begin();
-                        iterator != _stringVectorVal.end() - 1; iterator++) {
-                        sb << *iterator;
+                    for (StringVector_t::const_iterator iterator = _stringVectorVal.begin();
+                         iterator != _stringVectorVal.end() - 1; iterator++) {
+                        sb << *iterator << ",";
                     }
 
                     // Now add the last element with no delimiter
                     sb << _stringVectorVal.back();
+                }
+                break;
+            case StringMap:
+                if (!_stringMapVal.empty())
+                {
+                    // Convert all but the last element to avoid a trailing ","
+                    if (_stringMapVal.begin() != _stringMapVal.end()) {
+                        StringMap_t::const_iterator iterator;
+                        StringMap_t::const_iterator it_last;
+                        for (iterator = _stringMapVal.begin(), it_last = --_stringMapVal.end();
+                             iterator != it_last; ++iterator) {
+                            sb << iterator->first << ":" << iterator->second << ",";
+                        }
+                    }
+
+                    // Now add the last element with no delimiter
+                    sb << _stringMapVal.end()->first << ":" << _stringMapVal.end()->second;
                 }
                 break;
             case Bool: sb << _boolVal; break;
@@ -179,7 +210,8 @@ namespace optionenvironment {
     }
     const std::type_info& Value::type() const {
         switch (_type) {
-            case StringVector: return typeid(std::vector<std::string>);
+            case StringVector: return typeid(StringVector_t);
+            case StringMap: return typeid(StringMap_t);
             case Bool: return typeid(bool);
             case Double: return typeid(double);
             case Int: return typeid(int);

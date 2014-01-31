@@ -1,5 +1,3 @@
-load( "jstests/libs/fts.js" );
-
 t = db.text_blogwild;
 t.drop();
 

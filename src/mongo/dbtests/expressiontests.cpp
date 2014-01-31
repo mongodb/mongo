@@ -14,6 +14,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -509,10 +521,12 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> nested = ExpressionFieldPath::create( "a.b" );
                 intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create( nested );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a.b" ) );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
+                ASSERT_EQUALS( 1U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a.b" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -912,9 +926,11 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> expression =
                         ExpressionConstant::create( Value( 5 ) );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 0U, dependencies.size() );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
+                ASSERT_EQUALS( 0U, dependencies.fields.size() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -978,10 +994,12 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a.b" ) );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
+                ASSERT_EQUALS( 1U, dependencies.fields.size() );
+                ASSERT_EQUALS( 1U, dependencies.fields.count( "a.b" ) );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }
         };
 
@@ -1270,14 +1288,17 @@ namespace ExpressionTests {
         private:
             void assertDependencies( const BSONArray& expectedDependencies,
                                      const intrusive_ptr<Expression>& expression ) {
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies );
                 BSONArrayBuilder dependenciesBson;
-                for( set<string>::const_iterator i = dependencies.begin(); i != dependencies.end();
-                     ++i ) {
+                for( set<string>::const_iterator i = dependencies.fields.begin();
+                        i != dependencies.fields.end();
+                        ++i ) {
                     dependenciesBson << *i;
                 }
                 ASSERT_EQUALS( expectedDependencies, dependenciesBson.arr() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }                
         };
 
@@ -1438,15 +1459,18 @@ namespace ExpressionTests {
             void assertDependencies( const BSONArray& expectedDependencies,
                                      const intrusive_ptr<ExpressionObject>& expression,
                                      bool includePath = true ) const {
-                set<string> dependencies;
                 vector<string> path;
-                expression->addDependencies( dependencies, includePath ? &path : 0 );
+                DepsTracker dependencies;
+                expression->addDependencies( &dependencies, includePath ? &path : 0 );
                 BSONArrayBuilder bab;
-                for( set<string>::const_iterator i = dependencies.begin(); i != dependencies.end();
-                    ++i ) {
+                for( set<string>::const_iterator i = dependencies.fields.begin();
+                        i != dependencies.fields.end();
+                        ++i ) {
                     bab << *i;
                 }
                 ASSERT_EQUALS( expectedDependencies, bab.arr() );
+                ASSERT_EQUALS( false, dependencies.needWholeDocument );
+                ASSERT_EQUALS( false, dependencies.needTextScore );
             }            
         };
 
@@ -2086,9 +2110,9 @@ namespace ExpressionTests {
                 intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
                 expression->includePath( "a" );
                 assertDependencies( BSON_ARRAY( "_id" << "a" ), expression, true );
-                set<string> unused;
+                DepsTracker unused;
                 // 'path' must be provided for inclusion expressions.
-                ASSERT_THROWS( expression->addDependencies( unused ), UserException );
+                ASSERT_THROWS( expression->addDependencies( &unused ), UserException );
             }
         };
 

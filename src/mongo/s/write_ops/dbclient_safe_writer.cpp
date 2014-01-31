@@ -33,9 +33,10 @@
 
 namespace mongo {
 
-    void DBClientSafeWriter::safeWrite( DBClientBase* conn,
-                                        const BatchItemRef& itemRef,
-                                        LastError* error ) {
+    Status DBClientSafeWriter::safeWrite( DBClientBase* conn,
+                                          const BatchItemRef& itemRef,
+                                          const BSONObj& writeConcern,
+                                          BSONObj* gleResponse ) {
 
         const BatchedCommandRequest* request = itemRef.getRequest();
 
@@ -74,24 +75,41 @@ namespace mongo {
                               deleteDoc->getLimit() == 1 /*just one*/);
             }
 
-            // Default GLE Options
-            const bool fsync = false;
-            const bool j = false;
-            const int w = 1;
-            const int wtimeout = 0;
+            BSONObjBuilder gleCmdB;
+            gleCmdB.append( "getLastError", true );
+            gleCmdB.appendElements( writeConcern );
 
-            BSONObj result = conn->getLastErrorDetailed( NamespaceString( request->getNS() ).db()
-                                                             .toString(),
-                                                         fsync,
-                                                         j,
-                                                         w,
-                                                         wtimeout );
-
-            SafeWriter::fillLastError( result, error );
+            conn->runCommand( nsToDatabase( request->getNS() ),
+                              gleCmdB.obj(),
+                              *gleResponse );
         }
         catch ( const DBException& ex ) {
-            error->raiseError( ex.getCode(), ex.toString().c_str() );
+            return ex.toStatus();
         }
+
+        return Status::OK();
+    }
+
+    Status DBClientSafeWriter::enforceWriteConcern( DBClientBase* conn,
+                                                    const StringData& dbName,
+                                                    const BSONObj& writeConcern,
+                                                    BSONObj* gleResponse ) {
+
+        try {
+            BSONObj resetResponse; // ignored, always ok
+            conn->runCommand( dbName.toString(), BSON( "resetError" << 1 ), resetResponse );
+
+            BSONObjBuilder gleCmdB;
+            gleCmdB.append( "getLastError", true );
+            gleCmdB.appendElements( writeConcern );
+
+            conn->runCommand( dbName.toString(), gleCmdB.obj(), *gleResponse );
+        }
+        catch ( const DBException& ex ) {
+            return ex.toStatus();
+        }
+
+        return Status::OK();
     }
 
 }

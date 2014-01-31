@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 
 #include "mongo/db/curop.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/dur_commitjob.h"
@@ -171,7 +171,8 @@ namespace mongo {
 
                     case JEntry::OpCode_DbContext: {
                         _lastDbName = (const char*) _entries->pos();
-                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLen, _entries->remaining());
+                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLenWithNUL,
+                                                        _entries->remaining());
                         const unsigned len = strnlen(_lastDbName, limit);
                         massert(13533, "problem processing journal file during recovery", _lastDbName[len] == '\0');
                         _entries->skip(len+1); // skip '\0' too

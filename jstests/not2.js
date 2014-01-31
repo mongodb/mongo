@@ -14,9 +14,10 @@ check = function( query, expected, size ) {
 fail = function( query ) {
     try {
         t.find( query ).itcount();
+        assert( false, tojson( query ) );
     } catch ( e ) {
+        // expected
     }
-    assert( db.getLastError(), tojson( query ) );
 }
 
 doTest = function() {

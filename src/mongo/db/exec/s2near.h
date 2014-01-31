@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
@@ -41,6 +42,16 @@
 #include "third_party/s2/s2regionintersection.h"
 
 namespace mongo {
+
+    struct S2NearParams {
+        string ns;
+        BSONObj indexKeyPattern;
+        NearQuery nearQuery;
+        IndexBounds baseBounds;
+        MatchExpression* filter;
+        bool addPointMeta;
+        bool addDistMeta;
+    };
 
     /**
      * Executes a geoNear search.  Is a leaf node.  Output type is LOC_AND_UNOWNED_OBJ.
@@ -51,9 +62,7 @@ namespace mongo {
          * Takes: index to scan over, MatchExpression with near point, other MatchExpressions for
          * covered data,
          */
-        S2NearStage(const string& ns, const BSONObj& indexKeyPattern,
-                    const NearQuery& nearQuery, const IndexBounds& baseBounds,
-                    MatchExpression* filter, WorkingSet* ws);
+        S2NearStage(const S2NearParams& params, WorkingSet* ws);
 
         virtual ~S2NearStage();
 
@@ -62,35 +71,27 @@ namespace mongo {
 
         void prepareToYield();
         void recoverFromYield();
-        void invalidate(const DiskLoc& dl);
+        void invalidate(const DiskLoc& dl, InvalidationType type);
 
         PlanStageStats* getStats();
 
     private:
+        void init();
         StageState addResultToQueue(WorkingSetID* out);
         void nextAnnulus();
 
         bool _worked;
 
+        S2NearParams _params;
+
         WorkingSet* _ws;
-
-        string _ns;
-
-        BSONObj _indexKeyPattern;
 
         // This is the "array index" of the key field that is the near field.  We use this to do
         // cheap is-this-doc-in-the-annulus testing.  We also need to know where to stuff the index
         // bounds for the various annuluses/annuli.
         int _nearFieldIndex;
 
-        NearQuery _nearQuery;
-
-        IndexBounds _baseBounds;
-
         scoped_ptr<PlanStage> _child;
-
-        // We don't check this ourselves; we let the sub-fetch deal w/it.
-        MatchExpression* _filter;
 
         // The S2 machinery that represents the search annulus.  We keep this around after bounds
         // generation to check for intersection.
@@ -128,12 +129,21 @@ namespace mongo {
         double _innerRadius;
         double _outerRadius;
 
+        // True if we are looking at last annulus
+        bool _outerRadiusInclusive;
+
         // When we search the next annulus, what to adjust our radius by?  Grows when we search an
         // annulus and find no results.
         double _radiusIncrement;
 
         // Did we encounter an unrecoverable error?
         bool _failed;
+
+        // Have we init()'d yet?
+        bool _initted;
+
+        // What index are we searching over?
+        IndexDescriptor* _descriptor;
 
         CommonStats _commonStats;
     };

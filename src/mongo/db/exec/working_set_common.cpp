@@ -42,9 +42,26 @@ namespace mongo {
 
         // Do the fetch, invalidate the DL.
         member->obj = member->loc.obj().getOwned();
+
         member->state = WorkingSetMember::OWNED_OBJ;
         member->loc = DiskLoc();
         return true;
+    }
+
+    // static
+    void WorkingSetCommon::initFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
+        dest->loc = src.loc;
+        dest->obj = src.obj;
+        dest->keyData = src.keyData;
+        dest->state = src.state;
+
+        // Merge computed data.
+        typedef WorkingSetComputedDataType WSCD;
+        for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
+            if (src.hasComputed(i)) {
+                dest->addComputed(src.getComputed(i)->clone());
+            }
+        }
     }
 
 }  // namespace mongo

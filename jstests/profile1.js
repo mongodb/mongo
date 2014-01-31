@@ -13,11 +13,13 @@ print("profile1.js BEGIN");
 // special db so that it can be run in parallel tests
 var stddb = db;
 var db = db.getSisterDB("profile1");
+var username = "jstests_profile1_user";
+
+db.dropUser(username)
 db.dropDatabase();
 
 try {
 
-    username = "jstests_profile1_user";
     db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
     db.auth( username, "password" );
 
@@ -41,17 +43,27 @@ try {
     assert(!db.getLastError(), "Z");
     assert.eq(0, db.runCommand({profile: -1}).was, "A");
     
-    db.createCollection("system.profile", {capped: true, size: 10000});
+    // Create 32MB profile (capped) collection
+    db.system.profile.drop();
+    db.createCollection("system.profile", {capped: true, size: 32 * 1024 * 1024});
     db.runCommand({profile: 2});
     assert.eq(2, db.runCommand({profile: -1}).was, "B");
     assert.eq(1, db.system.profile.stats().capped, "C");
     var capped_size = db.system.profile.storageSize();
-    assert.gt(capped_size, 9999, "D");
-    assert.lt(capped_size, 20000, "E");
+    assert.gt(capped_size, 31 * 1024 * 1024, "D");
+    assert.lt(capped_size, 65 * 1024 * 1024, "E");
     
     db.foo.findOne()
+
+    var profileItems = profileCursor().toArray();
     
-    assert.eq( 4 , profileCursor().count() , "E2" );
+    // create a msg for later if there is a failure.
+    var msg = "";
+    profileItems.forEach(function(d) {msg += "profile doc: " + d.ns + " " + d.op + " " + tojson(d.query ? d.query : d.command)});    
+    msg += tojson(db.system.profile.stats());
+
+    // If these nunmbers don't match, it is possible the collection has rolled over (set to 32MB above in the hope this doesn't happen)
+    assert.eq( 4 , profileItems.length , "E2 -- " + msg  );
     
     /* Make sure we can't drop if profiling is still on */
     assert.throws( function(z){ db.getCollection("system.profile").drop(); } )
@@ -75,7 +87,7 @@ try {
     assert.eq(2, db.runCommand({profile: -1}).was, "I");
     assert.eq(1, db.system.profile.stats().capped, "J");
     var auto_size = db.system.profile.storageSize();
-    assert.gt(auto_size, capped_size, "K");
+    assert.lt(auto_size, capped_size, "K");
     
 
     db.eval("sleep(1)") // pre-load system.js

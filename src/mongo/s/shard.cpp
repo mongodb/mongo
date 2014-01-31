@@ -36,8 +36,9 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -53,6 +54,23 @@
 
 namespace mongo {
 
+    static bool initWireVersion( DBClientBase* conn, std::string* errMsg ) {
+        BSONObj response;
+        if ( !conn->runCommand( "admin", BSON("isMaster" << 1), response )) {
+            *errMsg = str::stream() << "Failed to determine wire version "
+                                    << "for internal connection: " << response;
+            return false;
+        }
+
+        if ( response.hasField("minWireVersion") && response.hasField("maxWireVersion") ) {
+            int minWireVersion = response["minWireVersion"].numberInt();
+            int maxWireVersion = response["maxWireVersion"].numberInt();
+            conn->setWireVersions( minWireVersion, maxWireVersion );
+        }
+
+        return true;
+    }
+
     class StaticShardInfo {
     public:
         StaticShardInfo() : _mutex("StaticShardInfo"), _rsMutex("RSNameMap") { }
@@ -63,9 +81,16 @@ namespace mongo {
                 ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
                 auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS , Query());
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
+
+                int numShards = 0;
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
+                    ++numShards;
                 }
+
+                LOG( 1 ) << "found " << numShards << " shards listed on config server(s): "
+                         << conn.get()->toString() << endl;
+
                 conn.done();
             }
 
@@ -339,7 +364,7 @@ namespace mongo {
                 return false;
             }
 
-            return rs->contains( node );
+            return rs->contains(HostAndPort(node));
         }
 
         return false;
@@ -438,19 +463,35 @@ namespace mongo {
                      result );
         }
 
-        if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {
+        if ( _shardedConnections ) {
+            if ( versionManager.isVersionableCB( conn )) {
+                // We must initialize sharding on all connections, so that we get exceptions
+                // if sharding is enabled on the collection.
+                BSONObj result;
+                bool ok = versionManager.initShardVersionCB( conn, result );
 
-            // We must initialize sharding on all connections, so that we get exceptions if sharding is enabled on
-            // the collection.
-            BSONObj result;
-            bool ok = versionManager.initShardVersionCB( conn, result );
-
-            // assert that we actually successfully setup sharding
-            uassert( 15907, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
-                        ( result["errmsg"].type() == String ? causedBy( result["errmsg"].String() ) :
-                                                              causedBy( (string)"unknown failure : " + result.toString() ) ), ok );
-
+                // assert that we actually successfully setup sharding
+                uassert( 15907,
+                         str::stream() << "could not initialize sharding on connection "
+                             << conn->toString() << ( result["errmsg"].type() == String ?
+                                  causedBy( result["errmsg"].String() ) :
+                                  causedBy( (string)"unknown failure : " + result.toString() ) ),
+                         ok );
+            }
+            else {
+                // Initialize the wire protocol version of the connection to find out if we
+                // can send write commands to this connection.
+                string errMsg;
+                if ( !initWireVersion( conn, &errMsg )) {
+                    uasserted( 17363, errMsg );
+                }
+            }
         }
+
+        // For every DBClient created by mongos, add a hook that will append impersonated users
+        // to the end of every runCommand.  mongod uses this information to produce auditing
+        // records attributed to the proper authenticated user(s).
+        conn->setRunCommandHook(boost::bind(&audit::appendImpersonatedUsers, _1));
     }
 
     void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {

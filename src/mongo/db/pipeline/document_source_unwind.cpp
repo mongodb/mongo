@@ -143,8 +143,8 @@ namespace mongo {
         return Value(DOC(getSourceName() << _unwindPath->getPath(true)));
     }
 
-    DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(set<string>& deps) const {
-        deps.insert(_unwindPath->getPath(false));
+    DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
+        deps->fields.insert(_unwindPath->getPath(false));
         return SEE_NEXT;
     }
 

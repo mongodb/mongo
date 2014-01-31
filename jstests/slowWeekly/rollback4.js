@@ -47,4 +47,5 @@ master.getDB( 'db' ).c.save( big );
 
 // Restart old master
 replTest.restart( 0 );
-replTest.awaitReplication();
+// Wait five minutes to ensure there is enough time for rollback
+replTest.awaitReplication(5*60*1000);

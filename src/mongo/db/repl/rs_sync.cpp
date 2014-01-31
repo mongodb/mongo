@@ -35,6 +35,7 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
@@ -624,13 +625,6 @@ namespace replset {
         bool golive = false;
 
         lock rsLock( this );
-        Lock::GlobalWrite writeLock;
-
-        // make sure we're not primary, secondary, rollback, or fatal already
-        if (box.getState().primary() || box.getState().secondary() ||
-            box.getState().fatal()) {
-            return false;
-        }
 
         if (_maintenanceMode > 0) {
             // we're not actually going live
@@ -639,6 +633,14 @@ namespace replset {
 
         // if we're blocking sync, don't change state
         if (_blockSync) {
+            return false;
+        }
+
+        Lock::GlobalWrite writeLock;
+
+        // make sure we're not primary, secondary, rollback, or fatal already
+        if (box.getState().primary() || box.getState().secondary() ||
+            box.getState().fatal()) {
             return false;
         }
 

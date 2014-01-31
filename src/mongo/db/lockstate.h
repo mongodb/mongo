@@ -123,16 +123,24 @@ namespace mongo {
         friend class AcquiringParallelWriter;
     };
 
-    class WrapperForRWLock : boost::noncopyable { 
-        SimpleRWLock r;
+    class WrapperForRWLock : boost::noncopyable {
+        SimpleRWLock rw;
+        SimpleMutex m;
+        bool sharedLatching;
     public:
-        string name() const { return r.name; }
+        string name() const { return rw.name; }
         LockStat stats;
-        WrapperForRWLock(const StringData& name) : r(name) { }
-        void lock()          { r.lock(); }
-        void lock_shared()   { r.lock_shared(); }
-        void unlock()        { r.unlock(); }
-        void unlock_shared() { r.unlock_shared(); }
+        WrapperForRWLock(const StringData& name)
+            : rw(name), m(name) {
+            // For the local datbase, all operations are short,
+            // either writing one entry, or doing a tail.
+            // In tests, use a SimpleMutex is much faster for the local db.
+            sharedLatching = name != "local";
+        }
+        void lock()          { if ( sharedLatching ) { rw.lock(); } else { m.lock(); } }
+        void lock_shared()   { if ( sharedLatching ) { rw.lock_shared(); } else { m.lock(); } }
+        void unlock()        { if ( sharedLatching ) { rw.unlock(); } else { m.unlock(); } }
+        void unlock_shared() { if ( sharedLatching ) { rw.unlock_shared(); } else { m.unlock(); } }
     };
 
     class ScopedLock;

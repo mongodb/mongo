@@ -30,10 +30,13 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/ops/query.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/type_explain.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -63,42 +66,33 @@ namespace mongo {
         return out;
     }
 
+    void DocumentSourceCursor::kill() {
+        _killed = true;
+        _cursorId = 0;
+    }
+
     void DocumentSourceCursor::dispose() {
         if (_cursorId) {
-            ClientCursor::erase(_cursorId);
+            Lock::DBRead lk(_ns);
+            Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+            Collection* collection = ctx.db()->getCollection( _ns );
+            if ( collection ) {
+                ClientCursor* cc = collection->cursorCache()->find( _cursorId );
+                if ( cc )
+                    collection->cursorCache()->deregisterCursor( cc );
+            }
             _cursorId = 0;
         }
 
-        _collMetadata.reset();
         _currentBatch.clear();
     }
 
-    bool DocumentSourceCursor::canUseCoveredIndex(ClientCursor* cursor) const {
-        // We can't use a covered index when we have collection metadata because we
-        // need to examine the object to see if it belongs on this shard
-        return (!_collMetadata &&
-                cursor->ok() && cursor->c()->keyFieldsOnly());
-    }
-
-    void DocumentSourceCursor::yieldSometimes(ClientCursor* cursor) {
-        try { // SERVER-5752 may make this try unnecessary
-            // if we are index only we don't need the recored
-            bool cursorOk = cursor->yieldSometimes(canUseCoveredIndex(cursor)
-                                                     ? ClientCursor::DontNeed
-                                                     : ClientCursor::WillNeed);
-            uassert( 16028, "collection or database disappeared when cursor yielded", cursorOk );
-        }
-        catch(SendStaleConfigException& e){
-            // We want to ignore this because the migrated documents will be filtered out of the
-            // cursor anyway and, we don't want to restart the aggregation after every migration.
-
-            log() << "Config changed during aggregation - command will resume" << endl;
-            // useful for debugging but off by default to avoid looking like a scary error.
-            LOG(1) << "aggregation stale config exception: " << e.what() << endl;
-        }
-    }
-
     void DocumentSourceCursor::loadBatch() {
+
+        Lock::DBRead lk(_ns);
+
+        uassert( 17361, "collection or index disappeared when cursor yielded", !_killed );
+
         if (!_cursorId) {
             dispose();
             return;
@@ -106,48 +100,28 @@ namespace mongo {
 
         // We have already validated the sharding version when we constructed the cursor
         // so we shouldn't check it again.
-        Lock::DBRead lk(ns);
-        Client::Context ctx(ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+        Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+        Collection* collection = ctx.db()->getCollection( _ns );
+        uassert( 17358, "Collection dropped.", collection );
 
-        ClientCursorPin pin(_cursorId);
+        ClientCursorPin pin(collection, _cursorId);
         ClientCursor* cursor = pin.c();
 
         uassert(16950, "Cursor deleted. Was the collection or database dropped?",
                 cursor);
 
-        cursor->c()->recoverFromYield();
+        Runner* runner = cursor->getRunner();
+        runner->restoreState();
 
         int memUsageBytes = 0;
-        for( ; cursor->ok(); cursor->advance() ) {
-
-            yieldSometimes(cursor);
-            if ( !cursor->ok() ) {
-                // The cursor was exhausted during the yield.
-                break;
-            }
-
-            if ( !cursor->currentMatches() || cursor->currentIsDup() )
-                continue;
-
-            // grab the matching document
-            if (canUseCoveredIndex(cursor)) {
-                // Can't have collection metadata if we are here
-                BSONObj indexKey = cursor->currKey();
-                _currentBatch.push_back(Document(cursor->c()->keyFieldsOnly()->hydrate(indexKey)));
+        BSONObj obj;
+        Runner::RunnerState state;
+        while ((state = runner->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
+            if (_dependencies) {
+                _currentBatch.push_back(_dependencies->extractFields(obj));
             }
             else {
-                BSONObj next = cursor->current();
-
-                // check to see if this is a new object we don't own yet
-                // because of a chunk migration
-                if (_collMetadata) {
-                    KeyPattern kp( _collMetadata->getKeyPattern() );
-                    if ( !_collMetadata->keyBelongsToMe( kp.extractSingleKey( next ) ) ) continue;
-                }
-
-                _currentBatch.push_back(_projection
-                                            ? documentFromBsonWithDeps(next, _dependencies)
-                                            : Document(next));
+                _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
             }
 
             if (_limit) {
@@ -161,25 +135,24 @@ namespace mongo {
 
             if (memUsageBytes > MaxBytesToReturnToClientAtOnce) {
                 // End this batch and prepare cursor for yielding.
-                cursor->advance();
-
-                if (cursor->c()->supportYields()) {
-                    ClientCursor::YieldData data;
-                    cursor->prepareToYield(data);
-                } else {
-                    cursor->c()->noteLocation();
-                }
-
+                runner->saveState();
+                cc().curop()->yielded();
                 return;
             }
         }
 
-        // If we got here, there aren't any more documents.
-        // The Cursor must be released, see SERVER-6123.
-        pin.release();
-        ClientCursor::erase(_cursorId);
+        // If we got here, there won't be any more documents, so destroy the cursor and runner.
         _cursorId = 0;
-        _collMetadata.reset();
+        pin.deleteUnderlying();
+
+        uassert(16028, "collection or index disappeared when cursor yielded",
+                state != Runner::RUNNER_DEAD);
+
+        uassert(17285, "cursor encountered an error",
+                state != Runner::RUNNER_ERROR);
+
+        massert(17286, str::stream() << "Unexpected return from Runner::getNext: " << state,
+                state == Runner::RUNNER_EOF || state == Runner::RUNNER_ADVANCED);
     }
 
     void DocumentSourceCursor::setSource(DocumentSource *pSource) {
@@ -207,30 +180,97 @@ namespace mongo {
         return false;
     }
 
+namespace {
+    Document extractInfo(ptr<const TypeExplain> info) {
+        MutableDocument out;
+
+        if (info->isClausesSet()) {
+            vector<Value> clauses;
+            for (size_t i = 0; i < info->sizeClauses(); i++) {
+                clauses.push_back(Value(extractInfo(info->getClausesAt(i))));
+            }
+            out[TypeExplain::clauses()] = Value::consume(clauses);
+        }
+
+        if (info->isCursorSet())
+            out[TypeExplain::cursor()] = Value(info->getCursor());
+
+        if (info->isIsMultiKeySet())
+            out[TypeExplain::isMultiKey()] = Value(info->getIsMultiKey());
+
+        if (info->isScanAndOrderSet())
+            out[TypeExplain::scanAndOrder()] = Value(info->getScanAndOrder());
+
+#if 0 // Disabled pending SERVER-12015 since until then no aggs will be index only.
+        if (info->isIndexOnlySet())
+            out[TypeExplain::indexOnly()] = Value(info->getIndexOnly());
+#endif
+
+        if (info->isIndexBoundsSet())
+            out[TypeExplain::indexBounds()] = Value(info->getIndexBounds());
+
+        if (info->isAllPlansSet()) {
+            vector<Value> allPlans;
+            for (size_t i = 0; i < info->sizeAllPlans(); i++) {
+                allPlans.push_back(Value(extractInfo(info->getAllPlansAt(i))));
+            }
+            out[TypeExplain::allPlans()] = Value::consume(allPlans);
+        }
+
+        return out.freeze();
+    }
+} // namespace
+
     Value DocumentSourceCursor::serialize(bool explain) const {
         // we never parse a documentSourceCursor, so we only serialize for explain
         if (!explain)
             return Value();
 
-        Lock::DBRead lk(ns);
-        Client::Context ctx(ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+        Status explainStatus(ErrorCodes::InternalError, "");
+        scoped_ptr<TypeExplain> plan;
+        {
+            Lock::DBRead lk(_ns);
+            Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+            Collection* collection = ctx.db()->getCollection( _ns );
+            uassert( 17362, "Collection dropped.", collection );
 
-        ClientCursorPin pin(_cursorId);
-        ClientCursor* cursor = pin.c();
+            ClientCursorPin pin(collection, _cursorId);
+            ClientCursor* cursor = pin.c();
 
-        uassert(17135, "Cursor deleted. Was the collection or database dropped?",
-                cursor);
+            uassert(17135, "Cursor deleted. Was the collection or database dropped?",
+                    cursor);
 
-        cursor->c()->recoverFromYield();
+            Runner* runner = cursor->getRunner();
+            runner->restoreState();
 
-        return Value(DOC(getSourceName() <<
-            DOC("query" << Value(_query)
-             << "sort" << (!_sort.isEmpty() ? Value(_sort) : Value())
-             << "limit" << (_limit ? Value(_limit->getLimit()) : Value())
-             << "fields" << (_projection ? Value(_projection->getSpec()) : Value())
-             << "indexOnly" << canUseCoveredIndex(cursor)
-             << "cursorType" << cursor->c()->toString()
-        ))); // TODO get more plan information
+            TypeExplain* explainRaw;
+            explainStatus = runner->getInfo(&explainRaw, NULL);
+            if (explainStatus.isOK())
+                plan.reset(explainRaw);
+
+            runner->saveState();
+        }
+
+        MutableDocument out;
+        out["query"] = Value(_query);
+
+        if (!_sort.isEmpty())
+            out["sort"] = Value(_sort);
+
+        if (_limit)
+            out["limit"] = Value(_limit->getLimit());
+
+        if (!_projection.isEmpty())
+            out["fields"] = Value(_projection);
+
+        if (explainStatus.isOK()) {
+            out["plan"] = Value(extractInfo(plan));
+        } else {
+            out["planError"] = Value(explainStatus.toString());
+        }
+
+
+        return Value(DOC(getSourceName() << out.freezeToValue()));
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,
@@ -238,11 +278,9 @@ namespace mongo {
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
         , _docsAddedToBatches(0)
-        , ns(ns)
+        , _ns(ns)
         , _cursorId(cursorId)
-        , _collMetadata(shardingState.needCollectionMetadata( ns )
-                        ? shardingState.getCollectionMetadata( ns )
-                        : CollectionMetadataPtr())
+        , _killed(false)
     {}
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
@@ -252,15 +290,10 @@ namespace mongo {
         return new DocumentSourceCursor(ns, cursorId, pExpCtx);
     }
 
-    void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
-        verify(!_projection);
-        _projection.reset(new Projection);
-        _projection->init(projection);
-
-        ClientCursorPin pin (_cursorId);
-        verify(pin.c());
-        pin.c()->fields = _projection;
-
+    void DocumentSourceCursor::setProjection(
+            const BSONObj& projection,
+            const boost::optional<ParsedDeps>& deps) {
+        _projection = projection;
         _dependencies = deps;
     }
 }

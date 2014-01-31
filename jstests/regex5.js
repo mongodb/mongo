@@ -43,6 +43,7 @@ assert.eq( {
             t.find( { x : { $in: [ 1, 2.5, "a", "b", /^b/, /^c/, /^d/ ] } } ).explain().indexBounds );
 
 // SERVER-505
-assert.eq( {x:[["a","a"]]}, t.find( { x : { $all: [ "a", /^a/ ] } } ).explain().indexBounds );
+// QUERY_MIGRATION: we can use an index isect plan to answer this.
+// assert.eq( {x:[["a","a"]]}, t.find( { x : { $all: [ "a", /^a/ ] } } ).explain().indexBounds );
 // These aren't the right bounds.  We won't retrieve an array that contains the regexp value.
 //assert.eq( {x:[["a","b"]]}, t.find( { x : { $all: [ /^a/ ] } } ).explain().indexBounds );

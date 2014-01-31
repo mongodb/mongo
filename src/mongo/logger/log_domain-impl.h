@@ -15,9 +15,11 @@
 
 #pragma once
 
-#include "mongo/logger/message_log_domain.h"
-
 #include <algorithm>
+#include <cstdlib>
+
+#include "mongo/base/status.h"
+#include "mongo/logger/message_log_domain.h"
 
 /*
  * Implementation of LogDomain<E>.  Include this in cpp files to instantiate new LogDomain types.
@@ -28,7 +30,9 @@ namespace mongo {
 namespace logger {
 
     template <typename E>
-    LogDomain<E>::LogDomain() : _minimumLoggedSeverity(LogSeverity::Log()) {}
+        LogDomain<E>::LogDomain() 
+        : _minimumLoggedSeverity(LogSeverity::Log()), _abortOnFailure(false) 
+    {}
 
     template <typename E>
     LogDomain<E>::~LogDomain() {
@@ -36,14 +40,21 @@ namespace logger {
     }
 
     template <typename E>
-    void LogDomain<E>::append(const E& event) {
+    Status LogDomain<E>::append(const E& event) {
         for (typename AppenderVector::const_iterator iter = _appenders.begin();
              iter != _appenders.end(); ++iter) {
 
             if (*iter) {
-                (*iter)->append(event);
+                Status status = (*iter)->append(event);
+                if (!status.isOK()) {
+                    if (_abortOnFailure) {
+                        ::abort();
+                    }
+                    return status;
+                }
             }
         }
+        return Status::OK();
     }
 
     template <typename E>

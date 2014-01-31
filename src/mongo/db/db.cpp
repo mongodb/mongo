@@ -84,10 +84,12 @@
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/ramlog.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/signal_win32.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
-#include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 #if !defined(_WIN32)
 # include <sys/file.h>
@@ -941,7 +943,12 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    Status status = mongo::runGlobalInitializers(argc, argv, envp);
+    if (!status.isOK()) {
+        severe() << "Failed global initialization: " << status;
+        ::_exit(EXIT_FAILURE);
+    }
+
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);
 
@@ -1086,6 +1093,7 @@ namespace mongo {
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
         sigaddset( &asyncSignals, SIGUSR1 );
+        sigaddset( &asyncSignals, SIGXCPU );
 
         set_terminate( myterminate );
         set_new_handler( my_new_handler );
@@ -1168,7 +1176,42 @@ namespace mongo {
         _set_purecall_handler( myPurecallHandler );
     }
 
-    void startSignalProcessingThread() {}
+    void eventProcessingThread() {
+        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
+
+        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
+        if (event == NULL) {
+            warning() << "eventProcessingThread CreateEvent failed: "
+                << errnoWithDescription();
+            return;
+        }
+
+        ON_BLOCK_EXIT(CloseHandle, event);
+
+        int returnCode = WaitForSingleObject(event, INFINITE);
+        if (returnCode != WAIT_OBJECT_0) {
+            if (returnCode == WAIT_FAILED) {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription();
+                return;
+            }
+            else {
+                warning() << "eventProcessingThread WaitForSingleObject failed: "
+                    << errnoWithDescription(returnCode);
+                return;
+            }
+        }
+
+        Client::initThread("eventTerminate");
+        log() << "shutdown event signaled, will terminate after current cmd ends";
+        exitCleanly(EXIT_CLEAN);
+    }
+
+    void startSignalProcessingThread() {
+        if (Command::testCommandsEnabled) {
+            boost::thread it(eventProcessingThread);
+        }
+    }
 
 #endif  // if !defined(_WIN32)
 

@@ -45,7 +45,7 @@ t.runTool("restore", "--dir", t.ext, "--drop")
 
 assert.soon("1 == db.system.users.find({user:'user'}).count()", "didn't restore users 2")
 assert.eq(0, db.system.users.find({user:'user2'}).count(), "didn't drop users")
-// assert.eq(0, db.system.roles.find({role:'role2'}).count(), "didn't drop roles") // SERVER-11461
+assert.eq(0, db.system.roles.find({role:'role2'}).count(), "didn't drop roles")
 assert.eq(1, db.system.roles.find({role:'role'}).count(), "didn't restore roles")
 assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}), "didn't maintain user indexes")
 assert.eq(2, db.system.indexes.count({ns: "admin.system.roles"}), "didn't maintain role indexes")

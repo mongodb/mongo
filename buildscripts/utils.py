@@ -87,7 +87,7 @@ def execsys( args ):
 def getprocesslist():
     raw = ""
     try:
-        raw = execsys( "/bin/ps -ax" )[0]
+        raw = execsys( "/bin/ps axww" )[0]
     except Exception,e:
         print( "can't get processlist: " + str( e ) )
 

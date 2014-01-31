@@ -6,7 +6,7 @@ ReplSetBridge = function(rst, from, to, delay) {
     this.host = rst.host+":"+this.port;
 
     this.dest = rst.host+":"+rst.ports[to];
-    this.delay = typeof delay !== 'undefined' ? delay : 0;
+    this.delay = delay || 0;
     this.start();
 };
 
@@ -24,4 +24,13 @@ ReplSetBridge.prototype.stop = function() {
 
 ReplSetBridge.prototype.toString = function() {
     return this.host+" -> "+this.dest;
+};
+
+/**
+ * Restart the bridge with a specified delay.
+ */
+ReplSetBridge.prototype.setDelay = function (delay) {
+    this.stop();
+    this.delay = delay || 0;
+    this.start();
 };

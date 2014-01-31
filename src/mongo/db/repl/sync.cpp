@@ -33,8 +33,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -49,8 +51,8 @@ namespace mongo {
         const char *ns = o.getStringField("ns");
 
         // capped collections
-        NamespaceDetails *nsd = nsdetails(ns);
-        if ( nsd && nsd->isCapped() ) {
+        Collection* collection = cc().database()->getCollection(ns);
+        if ( collection && collection->isCapped() ) {
             log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return BSONObj();
         }
@@ -120,8 +122,12 @@ namespace mongo {
             return false;
         }
         else {
-            DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
-            uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
+            Collection* collection = ctx.db()->getOrCreateCollection( ns );
+            verify( collection ); // should never happen
+            StatusWith<DiskLoc> result = collection->insertDocument( missingObj, true );
+            uassert(15917,
+                    str::stream() << "failed to insert missing doc: " << result.toString(),
+                    result.isOK() );
 
             LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
             return true;

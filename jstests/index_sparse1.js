@@ -19,7 +19,7 @@ assert.eq( 1 , t.getIndexes().length , "B3" )
 
 t.ensureIndex( { x : 1 } , { sparse : 1 } )
 assert.eq( 2 , t.getIndexes().length , "C1" )
-assert.eq( 3 , t.find().sort( { x : 1 } ).itcount() , "C2" )
+assert.eq( 5 , t.find().sort( { x : 1 } ).itcount() , "C2" )
 t.dropIndex( { x : 1 } )
 assert.eq( 1 , t.getIndexes().length , "C3" )
 

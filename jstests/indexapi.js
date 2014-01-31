@@ -37,4 +37,4 @@ assert( idx[1].unique , "M3" );
 //printjson( idx );
 
 db.system.indexes.insert( { ns : "test" , key : { x : 1 } , name : "x" } );
-assert( db.getLastError().indexOf( "invalid" ) >= 0 , "Z1" );
+assert( db.getLastError() != null , "Z1" );

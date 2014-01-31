@@ -43,10 +43,10 @@
   </ItemGroup>
 
   <PropertyGroup Label="Globals">
-    <ProjectName>mongod</ProjectName>
-    <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid>
+    <ProjectName>_TARGET_</ProjectName>
+    <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>mongod</RootNamespace>
+    <RootNamespace>_TARGET_</RootNamespace>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -98,8 +98,11 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <ObjectFileName>%(RelativeDir)/</ObjectFileName>
-      <AdditionalIncludeDirectories>src\mongo;src;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      <AdditionalIncludeDirectories>src;src\mongo;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2;src\third_party\yaml-cpp-0.5.1\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      <!-- above is temp - NTDDI etc. should be configurable, not finished yet, this gets us compiling some for now. 
+         <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      -->
       <DisableSpecificWarnings>4355;4800;4267;4244;4351</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>No</MinimalRebuild>
@@ -127,7 +130,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
-  <!-- RELEASE -->
+ <!-- RELEASE -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Win2008PlusRelease'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
@@ -154,9 +157,29 @@
     </Link>
   </ItemDefinitionGroup>
 
-  <!-- SPECIFICS -->
+<!-- temp commented out, not working yet
+-->
+  <!-- SRW / Windows2008+ -->
+<!--
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Win2008PlusRelease' Or '(Configuration)'=='Win2008PlusDebug'">
+    <ClCompile>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+-->
+  <!-- legacy -->
+<!--
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Debug'">
+    <ClCompile>
+      <PreprocessorDefinitions>NTDDI_VERSION=0x05020200;_WIN32_WINNT=0x0502;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+-->
+
+   <!-- SPECIFICS -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Link>
+      <!-- this is likely unnecessary and should be removed, but was in the old vcxproj: -->
       <IgnoreSpecificDefaultLibraries>msvcrtd;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>

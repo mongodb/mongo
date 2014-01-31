@@ -32,6 +32,7 @@
 
 #include <vector>
 
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 
@@ -40,6 +41,7 @@ namespace mongo {
     class Collection;
     class NamespaceDetails;
 
+    class BtreeInMemoryState;
     class IndexDescriptor;
     class IndexDetails;
     class IndexAccessMethod;
@@ -55,6 +57,11 @@ namespace mongo {
         IndexCatalog( Collection* collection, NamespaceDetails* details );
         ~IndexCatalog();
 
+        // must be called before used
+        Status init();
+
+        bool ok() const;
+
         // ---- accessors -----
 
         int numIndexesTotal() const;
@@ -66,86 +73,146 @@ namespace mongo {
          * in which case everything from this tree has to go away
          */
 
-        IndexDescriptor* findIdIndex();
+        bool haveIdIndex() const;
+
+        IndexDescriptor* findIdIndex() const;
 
         /**
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByName( const StringData& name,
-                                          bool includeUnfinishedIndexes = false );
+                                          bool includeUnfinishedIndexes = false ) const;
 
         /**
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByKeyPattern( const BSONObj& key,
-                                                bool includeUnfinishedIndexes = false );
+                                                bool includeUnfinishedIndexes = false ) const;
 
         /* Returns the index entry for the first index whose prefix contains
          * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
          * array attributes. Otherwise, returns NULL.
          */
         IndexDescriptor* findIndexByPrefix( const BSONObj &keyPattern,
-                                            bool requireSingleKey );
+                                            bool requireSingleKey ) const;
 
-
-        // throws
-        // never returns NULL
-        IndexDescriptor* getDescriptor( int idxNo );
+        void findIndexByType( const string& type , vector<IndexDescriptor*>& matches ) const;
 
         // never returns NULL
-        IndexAccessMethod* getIndex( IndexDescriptor* desc );
+        IndexAccessMethod* getIndex( const IndexDescriptor* desc );
+        const IndexAccessMethod* getIndex( const IndexDescriptor* desc ) const;
 
-        BtreeBasedAccessMethod* getBtreeBasedIndex( IndexDescriptor* desc );
+        class IndexIterator {
+        public:
+            bool more();
+            IndexDescriptor* next();
 
-        IndexAccessMethod* getBtreeIndex( IndexDescriptor* desc );
+            // returns the access method for the last return IndexDescriptor
+            IndexAccessMethod* accessMethod( IndexDescriptor* desc );
+        private:
+            IndexIterator( const IndexCatalog* cat, bool includeUnfinishedIndexes );
 
-        // TODO: add iterator, search methods
+            void _advance();
 
-        // ---- index modifiers ------
+            bool _includeUnfinishedIndexes;
+            const IndexCatalog* _catalog;
+            IndexCatalogEntryContainer::const_iterator _iterator;
+
+            bool _start; // only true before we've called next() or more()
+
+            IndexCatalogEntry* _prev;
+            IndexCatalogEntry* _next;
+
+            friend class IndexCatalog;
+        };
+
+        IndexIterator getIndexIterator( bool includeUnfinishedIndexes ) const {
+            return IndexIterator( this, includeUnfinishedIndexes );
+        };
+
+        // ---- index set modifiers ------
 
         Status ensureHaveIdIndex();
 
-        Status createIndex( BSONObj spec, bool mayInterrupt );
+        enum ShutdownBehavior {
+            SHUTDOWN_CLEANUP, // fully clean up this build
+            SHUTDOWN_LEAVE_DIRTY // leave as if kill -9 happened, so have to deal with on restart
+        };
+
+        Status createIndex( BSONObj spec,
+                            bool mayInterrupt,
+                            ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
 
         Status okToAddIndex( const BSONObj& spec ) const;
 
         Status dropAllIndexes( bool includingIdIndex );
 
         Status dropIndex( IndexDescriptor* desc );
-        Status dropIndex( int idxNo );
 
         /**
-         * drops ALL uncompleted indexes
-         * this is meant to only run at startup after a crash
+         * will drop all incompleted indexes and return specs
+         * after this, the indexes can be rebuilt
          */
-        Status blowAwayInProgressIndexEntries();
+        vector<BSONObj> getAndClearUnfinishedIndexes();
 
-        /**
-         * will drop an uncompleted index and return spec
-         * @return the info for a single index to retry
+        // ---- modify single index
+
+        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
+         * The specified index must already contain an expireAfterSeconds field, and the value in
+         * that field and newExpireSecs must both be numeric.
          */
-        BSONObj prepOneUnfinishedIndex();
+        void updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds );
 
-        void markMultikey( IndexDescriptor* idx, bool isMultikey = true );
+        bool isMultikey( const IndexDescriptor* idex );
 
         // --- these probably become private?
 
+
+        /**
+         * disk creation order
+         * 1) system.indexes entry
+         * 2) collection's NamespaceDetails
+         *    a) info + head
+         *    b) _indexBuildsInProgress++
+         * 3) indexes entry in .ns file
+         * 4) system.namespaces entry for index ns
+         */
         class IndexBuildBlock {
         public:
-            IndexBuildBlock( IndexCatalog* catalog, const StringData& indexName, const DiskLoc& loc );
+            IndexBuildBlock( Collection* collection,
+                             const BSONObj& spec );
             ~IndexBuildBlock();
 
-            IndexDetails* indexDetails() { return _indexDetails; }
+            Status init();
 
             void success();
 
+            /**
+             * index build failed, clean up meta data
+             */
+            void fail();
+
+            /**
+             * we're stopping the build
+             * do NOT cleanup, leave meta data as is
+             */
+            void abort();
+
+            IndexCatalogEntry* getEntry() { return _entry; }
+
         private:
+
+            Collection* _collection;
             IndexCatalog* _catalog;
             string _ns;
-            string _indexName;
 
-            NamespaceDetails* _nsd;
-            IndexDetails* _indexDetails;
+            BSONObj _spec;
+
+            string _indexName;
+            string _indexNamespace;
+
+            IndexCatalogEntry* _entry;
+            bool _inProgress;
         };
 
         // ----- data modifiers ------
@@ -163,8 +230,6 @@ namespace mongo {
 
         // ------- temp internal -------
 
-        int _removeFromSystemIndexes( const StringData& indexName );
-
         string getAccessMethodName(const BSONObj& keyPattern) {
             return _getAccessMethodName( keyPattern );
         }
@@ -179,52 +244,64 @@ namespace mongo {
 
     private:
 
-        void _deleteCacheEntry( unsigned i );
-        void _fixDescriptorCacheNumbers();
+        // creates a new thing, no caching
+        IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
+                                                IndexCatalogEntry* entry );
 
         Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 
-        /**
-         * this is just an attempt to clean up old orphaned stuff on a delete all indexes
-         * call. repair database is the clean solution, but this gives one a lighter weight
-         * partial option.  see dropIndexes()
-         * @param idIndex - can be NULL
-         * @return how many things were deleted, should be 0
-         */
-        int _assureSysIndexesEmptied( IndexDetails* idIndex );
+        int _removeFromSystemIndexes( const StringData& indexName );
 
-
-        bool _shouldOverridePlugin( const BSONObj& keyPattern );
+        bool _shouldOverridePlugin( const BSONObj& keyPattern ) const;
 
         /**
          * This differs from IndexNames::findPluginName in that returns the plugin name we *should*
          * use, not the plugin name inside of the provided key pattern.  To understand when these
          * differ, see shouldOverridePlugin.
          */
-        string _getAccessMethodName(const BSONObj& keyPattern);
+        string _getAccessMethodName(const BSONObj& keyPattern) const;
+
+        IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 
         void _checkMagic() const;
 
-        Status _indexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc );
-        Status _unindexRecord( int idxNo, const BSONObj& obj, const DiskLoc &loc, bool logIfError );
+
+        // checks if there is anything in _leftOverIndexes
+        // meaning we shouldn't modify catalog
+        Status _checkUnfinished() const;
+
+        Status _indexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc );
+        Status _unindexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc,
+                               bool logIfError );
 
         /**
          * this does no sanity checks
          */
-        Status _dropIndex( int idxNo );
+        Status _dropIndex( IndexCatalogEntry* entry );
+
+        // just does disk hanges
+        // doesn't change memory state, etc...
+        void _deleteIndexFromDisk( const string& indexName,
+                                   const string& indexNamespace,
+                                   int idxNo );
+
+        // descriptor ownership passes to _setupInMemoryStructures
+        IndexCatalogEntry* _setupInMemoryStructures( IndexDescriptor* descriptor );
 
         int _magic;
         Collection* _collection;
         NamespaceDetails* _details;
 
-        // these are caches, not source of truth
-        // they should be treated as such
+        IndexCatalogEntryContainer _entries;
 
-        std::vector<IndexDescriptor*> _descriptorCache;
-        std::vector<IndexAccessMethod*> _accessMethodCache;
-        std::vector<BtreeAccessMethod*> _forcedBtreeAccessMethodCache;
+        // These are the index specs of indexes that were "leftover"
+        // "Leftover" means they were unfinished when a mongod shut down
+        // Certain operations are prohibted until someone fixes
+        // get by calling getAndClearUnfinishedIndexes
+        std::vector<BSONObj> _unfinishedIndexes;
 
         static const BSONObj _idObj; // { _id : 1 }
+
     };
 
 }

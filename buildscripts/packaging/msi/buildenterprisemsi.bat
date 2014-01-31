@@ -10,7 +10,7 @@ SET SASLDIR=..\..\..\..\..\..\Utils\sasl\bin
 SET OPENSSLDIR=..\..\..\..\..\..\Utils\openssl\bin
 SET SNMPDIR=..\..\..\..\..\..\Utils\snmp\bin
 SET CLIENTHEADERDIR=..\..\..\build\win32\normal\client_build\include
-SET MERGEMODULESBASEPATH=C:\Program Files (x86)\Common Files\Merge Modules
+SET MERGEMODULESBASEPATH="C:\Program Files (x86)\Common Files\Merge Modules"
 
 :loop
 IF NOT "%1"=="" (

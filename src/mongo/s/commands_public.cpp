@@ -67,6 +67,68 @@ namespace mongo {
 
     namespace dbgrid_pub_cmds {
 
+        namespace {
+
+            /**
+             * Utility function to compute a single error code from a vector of command results.  If
+             * there is an error code common to all of the error results, returns that error code;
+             * otherwise, returns 0.
+             */
+            int getUniqueCode( const vector<Strategy::CommandResult>& results ) {
+                int commonErrCode = -1;
+                for ( vector<Strategy::CommandResult>::const_iterator it = results.begin();
+                      it != results.end();
+                      it++ ) {
+                    // Only look at shards with errors.
+                    if ( !it->result["ok"].trueValue() ) {
+                        int errCode = it->result["code"].numberInt();
+                        if ( commonErrCode == -1 ) {
+                            commonErrCode = errCode;
+                        }
+                        else if ( commonErrCode != errCode ) {
+                            // At least two shards with errors disagree on the error code.
+                            commonErrCode = 0;
+                        }
+                    }
+                }
+
+                // If no error encountered or shards with errors disagree on the error code, return
+                // 0.
+                if ( commonErrCode == -1 || commonErrCode == 0 ) {
+                    return 0;
+                }
+
+                // Otherwise, shards with errors agree on the error code; return that code.
+                return commonErrCode;
+            }
+
+            // Look for $gleStats in a command response, and fill in ClientInfo with the data,
+            // if found.
+            // This data will be used by subsequent GLE calls, to ensure we look for the correct
+            // write on the correct PRIMARY.
+            void saveGLEStats(const BSONObj& result, const std::string& conn) {
+                if (!ClientInfo::exists()) {
+                    return;
+                }
+                if (result[kGLEStatsFieldName].type() != Object) {
+                    return;
+                }
+                std::string errmsg;
+                ConnectionString shardConn = ConnectionString::parse(conn, errmsg);
+
+                BSONElement subobj = result[kGLEStatsFieldName];
+                OpTime lastOpTime = subobj[kGLEStatsLastOpTimeFieldName]._opTime();
+                OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
+                ClientInfo* clientInfo = ClientInfo::get( NULL );
+                fassert(17382, clientInfo);
+                LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 
+                       << " electionId:" << electionId;
+
+                clientInfo->addHostOpTime(shardConn, HostOpTime(lastOpTime, electionId));
+            }
+
+        } // namespace
+
         class PublicGridCommand : public Command {
         public:
             PublicGridCommand( const char* n, const char* oldname=NULL ) : Command( n, false, oldname ) {
@@ -110,6 +172,10 @@ namespace mongo {
                     conn.done();
                     throw RecvStaleConfigException( "command failed because of stale config", res );
                 }
+
+                // Save the last opTime written and electionId, to allow GLE to work
+                saveGLEStats(res, conn.getHost());
+
                 result.appendElements( res );
                 conn.done();
                 return ok;
@@ -152,6 +218,7 @@ namespace mongo {
                 BSONObjBuilder subobj (output.subobjStart("raw"));
                 BSONObjBuilder errors;
                 int commonErrCode = -1;
+
                 for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
                     shared_ptr<Future::CommandResult> res = *i;
                     if ( ! res->join() ) {
@@ -177,6 +244,9 @@ namespace mongo {
                         else if ( commonErrCode != errCode ) {
                             commonErrCode = 0;
                         }
+                        // Save the last opTime written and electionId on each shard for this 
+                        // client, to allow GLE to work
+                        saveGLEStats(result, res->getServer());
                     }
                     results.push_back( res->result() );
                     subobj.append( res->getServer() , res->result() );
@@ -255,6 +325,18 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
         } dropIndexesCmd;
+
+        class CreateIndexesCmd : public AllShardsCollectionCommand {
+        public:
+            CreateIndexesCmd() :  AllShardsCollectionCommand("createIndexes") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::createIndex);
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+            }
+        } createIndexesCmd;
 
         class ReIndexCmd : public AllShardsCollectionCommand {
         public:
@@ -687,6 +769,10 @@ namespace mongo {
                     countCmdBuilder.append( "limit", limit );
                 }
 
+                if (cmdObj.hasField("hint")) {
+                    countCmdBuilder.append(cmdObj["hint"]);
+                }
+
                 if (cmdObj.hasField("$queryOptions")) {
                     countCmdBuilder.append(cmdObj["$queryOptions"]);
                 }
@@ -697,7 +783,7 @@ namespace mongo {
 
                 vector<Strategy::CommandResult> countResult;
 
-                SHARDED->commandOp( dbName, countCmdBuilder.done(),
+                STRATEGY->commandOp( dbName, countCmdBuilder.done(),
                             options, fullns, filter, &countResult );
 
                 long long total = 0;
@@ -717,6 +803,12 @@ namespace mongo {
                         shardSubTotal.doneFast();
                         errmsg = "failed on : " + shardName;
                         result.append( "cause", iter->result );
+                        // Add "code" to the top-level response, if the failure of the sharded
+                        // command can be accounted to a single error.
+                        int code = getUniqueCode( countResult );
+                        if ( code != 0 ) {
+                            result.append( "code", code );
+                        }
                         return false;
                     }
                 }
@@ -773,6 +865,9 @@ namespace mongo {
                     {
                         ScopedDbConnection conn(i->getConnString());
                         if ( ! conn->runCommand( dbName , cmdObj , res ) ) {
+                            if ( !res["code"].eoo() ) {
+                                result.append( res["code"] );
+                            }
                             errmsg = "failed on shard: " + res.toString();
                             return false;
                         }
@@ -1146,7 +1241,7 @@ namespace mongo {
                     BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
                     vector<Strategy::CommandResult> results;
-                    SHARDED->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
+                    STRATEGY->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
                     verify(results.size() == 1); // querying on shard key so should only talk to one shard
                     BSONObj res = results.begin()->result;
 
@@ -1179,7 +1274,7 @@ namespace mongo {
 
                         vector<Strategy::CommandResult> results;
                         try {
-                            SHARDED->commandOp(dbName, shardCmd, 0, fullns, finder, &results);
+                            STRATEGY->commandOp(dbName, shardCmd, 0, fullns, finder, &results);
                         }
                         catch( DBException& e ){
                             //This is handled below and logged
@@ -1537,7 +1632,7 @@ namespace mongo {
                     */
 
                     try {
-                        SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
+                        STRATEGY->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
                     }
                     catch( DBException& e ){
                         e.addContext( str::stream() << "could not run map command on all shards for ns " << fullns << " and query " << q );
@@ -1582,6 +1677,12 @@ namespace mongo {
                     cleanUp( servers, dbName, shardResultCollection );
                     errmsg = "MR parallel processing failed: ";
                     errmsg += singleResult.toString();
+                    // Add "code" to the top-level response, if the failure of the sharded command
+                    // can be accounted to a single error.
+                    int code = getUniqueCode( results );
+                    if ( code != 0 ) {
+                        result.append( "code", code );
+                    }
                     return 0;
                 }
 
@@ -1682,7 +1783,7 @@ namespace mongo {
                         results.clear();
 
                         try {
-                            SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), &results );
+                            STRATEGY->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), &results );
                             ok = true;
                         }
                         catch( DBException& e ){
@@ -1941,7 +2042,7 @@ namespace mongo {
             // Run the command on the shards
             // TODO need to make sure cursors are killed if a retry is needed
             vector<Strategy::CommandResult> shardResults;
-            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
+            STRATEGY->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
             if (pPipeline->isExplain()) {
                 result << "splitPipeline" << DOC("shardsPart" << pShardPipeline->writeExplainOps()
@@ -2040,7 +2141,7 @@ namespace mongo {
 
             // Run the command on the shards
             vector<Strategy::CommandResult> shardResults;
-            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
+            STRATEGY->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
             mergePipeline->addInitialSource(
                     DocumentSourceCommandShards::create(shardResults, mergePipeline->getContext()));
@@ -2057,11 +2158,21 @@ namespace mongo {
                 DocumentSourceMergeCursors::CursorIds cursors;
                 for (size_t i = 0; i < shardResults.size(); i++) {
                     BSONObj result = shardResults[i].result;
-                    uassert(17022, str::stream()
-                                    << "sharded pipeline failed on shard "
-                                    << shardResults[i].shardTarget.getName() << ": "
-                                    << result.toString(),
-                            result["ok"].trueValue());
+
+                    if ( !result["ok"].trueValue() ) {
+                        // If the failure of the sharded command can be accounted to a single error,
+                        // throw a UserException with that error code; otherwise, throw with a
+                        // location uassert code.
+                        int errCode = getUniqueCode( shardResults );
+                        if ( errCode == 0 ) {
+                            errCode = 17022;
+                        }
+                        verify( errCode == result["code"].numberInt() || errCode == 17022 );
+                        uasserted( errCode, str::stream()
+                                             << "sharded pipeline failed on shard "
+                                             << shardResults[i].shardTarget.getName() << ": "
+                                             << result.toString() );
+                    }
 
                     BSONObj cursor = result["cursor"].Obj();
 

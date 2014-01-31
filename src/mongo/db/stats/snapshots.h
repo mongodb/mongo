@@ -30,9 +30,9 @@
 
 #pragma once
 #include "mongo/pch.h"
-#include "../jsobj.h"
+#include "mongo/db/jsobj.h"
 #include "top.h"
-#include "../../util/background.h"
+#include "mongo/util/background.h"
 
 /**
    handles snapshotting performance metrics and other such things

@@ -449,10 +449,8 @@ namespace mutablebson {
             // The index of our parent in the Document.
             Element::RepIdx parent;
 
-            // Pad this object out to 32 bytes.
-            //
-            // TODO: Cache element size here?
-            uint32_t pad;
+            // The cached field name size of this element, or -1 if unknown.
+            int32_t fieldNameSize;
         };
 #pragma pack(pop)
 
@@ -551,8 +549,14 @@ namespace mutablebson {
             , _damages()
             , _inPlaceMode(inPlaceMode) {
 
-            // We always have a BSONObj for the leaves, so reserve one.
-            _objects.reserve(1);
+            // We always have a BSONObj for the leaves, and we often have
+            // one for our base document, so reserve 2.
+            _objects.reserve(2);
+
+            // We always have at least one byte for the root field name, and we would like
+            // to be able to hold a few short field names without reallocation.
+            _fieldNames.reserve(8);
+
             // We need an object at _objects[0] so that we can access leaf elements we
             // construct with the leaf builder in the same way we access elements serialized in
             // other BSONObjs. So we call asTempObj on the builder and store the result in slot
@@ -560,6 +564,10 @@ namespace mutablebson {
             dassert(_objects.size() == kLeafObjIdx);
             _objects.push_back(_leafBuilder.asTempObj());
             dassert(_leafBuf.len() != 0);
+        }
+
+        ~Impl() {
+            _leafBuilder.abandon();
         }
 
         void reset(Document::InPlaceMode inPlaceMode) {
@@ -572,6 +580,7 @@ namespace mutablebson {
 
             // There is no way to reset the state of a BSONObjBuilder, so we need to call its
             // dtor, reset the underlying buf, and re-invoke the constructor in-place.
+            _leafBuilder.abandon();
             _leafBuilder.~BSONObjBuilder();
             _leafBuf.reset();
             new (&_leafBuilder) BSONObjBuilder(_leafBuf);
@@ -609,7 +618,7 @@ namespace mutablebson {
                 { Element::kInvalidRepIdx, Element::kInvalidRepIdx },
                 { Element::kInvalidRepIdx, Element::kInvalidRepIdx },
                 Element::kInvalidRepIdx,
-                0
+                -1
             };
 
             const Element::RepIdx id = *newIdx = _numElements++;
@@ -631,11 +640,12 @@ namespace mutablebson {
         }
 
         // Insert a new ElementRep for a leaf element at the given offset and return its ID.
-        Element::RepIdx insertLeafElement(int offset) {
+        Element::RepIdx insertLeafElement(int offset, int fieldNameSize = -1) {
             // BufBuilder hands back sizes in 'int's.
             Element::RepIdx inserted;
             ElementRep& rep = makeNewRep(&inserted);
 
+            rep.fieldNameSize = fieldNameSize;
             rep.objIdx = kLeafObjIdx;
             rep.serialized = true;
             dassert(offset >= 0);
@@ -679,7 +689,10 @@ namespace mutablebson {
         // Given a RepIdx, return the BSONElement that it represents.
         BSONElement getSerializedElement(const ElementRep& rep) const {
             const BSONObj& object = getObject(rep.objIdx);
-            return BSONElement(object.objdata() + rep.offset);
+            return BSONElement(
+                object.objdata() + rep.offset,
+                rep.fieldNameSize,
+                BSONElement::FieldNameSizeTag());
         }
 
         // A helper method that either inserts the field name into the field name heap and
@@ -765,6 +778,11 @@ namespace mutablebson {
                 getObject(rep->objIdx)).firstElement();
 
             if (!childElt.eoo()) {
+
+                // Do this now before other writes so compiler can exploit knowing
+                // that we are not eoo.
+                const int32_t fieldNameSize = childElt.fieldNameSize();
+
                 Element::RepIdx inserted;
                 ElementRep& newRep = makeNewRep(&inserted);
                 // Calling makeNewRep invalidates rep since it may cause a reallocation of
@@ -782,6 +800,7 @@ namespace mutablebson {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
+                newRep.fieldNameSize = fieldNameSize;
                 rep->child.left = inserted;
             } else {
                 rep->child.left = Element::kInvalidRepIdx;
@@ -832,6 +851,11 @@ namespace mutablebson {
             BSONElement rightElt(elt.rawdata() + elt.size());
 
             if (!rightElt.eoo()) {
+
+                // Do this now before other writes so compiler can exploit knowing
+                // that we are not eoo.
+                const int32_t fieldNameSize = rightElt.fieldNameSize();
+
                 Element::RepIdx inserted;
                 ElementRep& newRep = makeNewRep(&inserted);
                 // Calling makeNewRep invalidates rep since it may cause a reallocation of
@@ -850,6 +874,7 @@ namespace mutablebson {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
+                newRep.fieldNameSize = fieldNameSize;
                 rep->sibling.right = inserted;
             } else {
                 rep->sibling.right = Element::kInvalidRepIdx;
@@ -1295,26 +1320,28 @@ namespace mutablebson {
         return impl.resolveLeftChild(_repIdx) != kInvalidRepIdx;
     }
 
-    Element Element::leftSibling() const {
+    Element Element::leftSibling(size_t distance) const {
         verify(ok());
-
         const Document::Impl& impl = getDocument().getImpl();
-        const Element::RepIdx leftSibling = impl.getElementRep(_repIdx).sibling.left;
-        // If we have a left sibling, we are assured that it has already been expanded.
-        dassert(leftSibling != kOpaqueRepIdx);
-        return Element(_doc, leftSibling);
+        Element::RepIdx current = _repIdx;
+        while ((current != kInvalidRepIdx) && (distance-- != 0)) {
+            // We are (currently) never left opaque, so don't need to resolve.
+            current = impl.getElementRep(current).sibling.left;
+        }
+        return Element(_doc, current);
     }
 
-    Element Element::rightSibling() const {
+    Element Element::rightSibling(size_t distance) const {
         verify(ok());
 
         // Capturing Document::Impl by non-const ref exploits the constness loophole
         // created by our Impl so that we can let rightSibling be lazily evaluated, even for a
         // const Element.
         Document::Impl& impl = _doc->getImpl();
-        const Element::RepIdx rightSiblingIdx = impl.resolveRightSibling(_repIdx);
-        dassert(rightSiblingIdx != kOpaqueRepIdx);
-        return Element(_doc, rightSiblingIdx);
+        Element::RepIdx current = _repIdx;
+        while ((current != kInvalidRepIdx) && (distance-- != 0))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
     }
 
     Element Element::parent() const {
@@ -1323,6 +1350,80 @@ namespace mutablebson {
         const Element::RepIdx parentIdx = impl.getElementRep(_repIdx).parent;
         dassert(parentIdx != kOpaqueRepIdx);
         return Element(_doc, parentIdx);
+    }
+
+    Element Element::findNthChild(size_t n) const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        current = impl.resolveLeftChild(current);
+        while ((current != kInvalidRepIdx) && (n-- != 0))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
+    }
+
+    Element Element::findFirstChildNamed(const StringData& name) const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        current = impl.resolveLeftChild(current);
+        // TODO: Could DRY this loop with the identical logic in findElementNamed.
+        while ((current != kInvalidRepIdx) &&
+               (impl.getFieldName(impl.getElementRep(current)) != name))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
+    }
+
+    Element Element::findElementNamed(const StringData& name) const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        while ((current != kInvalidRepIdx) &&
+               (impl.getFieldName(impl.getElementRep(current)) != name))
+            current = impl.resolveRightSibling(current);
+        return Element(_doc, current);
+    }
+
+    size_t Element::countSiblingsLeft() const {
+        verify(ok());
+        const Document::Impl& impl = getDocument().getImpl();
+        Element::RepIdx current = _repIdx;
+        size_t result = 0;
+        while (true) {
+            // We are (currently) never left opaque, so don't need to resolve.
+            current = impl.getElementRep(current).sibling.left;
+            if (current == kInvalidRepIdx)
+                break;
+            ++result;
+        }
+        return result;
+    }
+
+    size_t Element::countSiblingsRight() const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        size_t result = 0;
+        while (true) {
+            current = impl.resolveRightSibling(current);
+            if (current == kInvalidRepIdx)
+                break;
+            ++result;
+        }
+        return result;
+    }
+
+    size_t Element::countChildren() const {
+        verify(ok());
+        Document::Impl& impl = _doc->getImpl();
+        Element::RepIdx current = _repIdx;
+        current = impl.resolveLeftChild(current);
+        size_t result = 0;
+        while (current != kInvalidRepIdx) {
+            ++result;
+            current = impl.resolveRightSibling(current);
+        }
+        return result;
     }
 
     bool Element::hasValue() const {
@@ -2088,7 +2189,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.append(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementString(const StringData& fieldName, const StringData& value) {
@@ -2099,7 +2200,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.append(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementObject(const StringData& fieldName) {
@@ -2121,7 +2222,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.append(fieldName, value);
-        Element::RepIdx newEltIdx = impl.insertLeafElement(leafRef);
+        Element::RepIdx newEltIdx = impl.insertLeafElement(leafRef, fieldName.size() + 1);
         ElementRep& newElt = impl.getElementRep(newEltIdx);
 
         newElt.child.left = Element::kOpaqueRepIdx;
@@ -2150,7 +2251,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendArray(fieldName, value);
-        Element::RepIdx newEltIdx = impl.insertLeafElement(leafRef);
+        Element::RepIdx newEltIdx = impl.insertLeafElement(leafRef, fieldName.size() + 1);
         ElementRep& newElt = impl.getElementRep(newEltIdx);
         newElt.child.left = Element::kOpaqueRepIdx;
         newElt.child.right = Element::kOpaqueRepIdx;
@@ -2168,7 +2269,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendBinData(fieldName, len, binType, data);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementUndefined(const StringData& fieldName) {
@@ -2178,7 +2279,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendUndefined(fieldName);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementNewOID(const StringData& fieldName) {
@@ -2194,7 +2295,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.append(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementBool(const StringData& fieldName, const bool value) {
@@ -2204,7 +2305,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendBool(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementDate(const StringData& fieldName, const Date_t value) {
@@ -2214,7 +2315,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendDate(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementNull(const StringData& fieldName) {
@@ -2224,7 +2325,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendNull(fieldName);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementRegex(const StringData& fieldName,
@@ -2238,7 +2339,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendRegex(fieldName, re, flags);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementDBRef(const StringData& fieldName,
@@ -2248,7 +2349,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendDBRef(fieldName, ns, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementCode(const StringData& fieldName, const StringData& value) {
@@ -2259,7 +2360,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendCode(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementSymbol(const StringData& fieldName, const StringData& value) {
@@ -2270,7 +2371,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendSymbol(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementCodeWithScope(const StringData& fieldName,
@@ -2283,7 +2384,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendCodeWScope(fieldName, code, scope);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementInt(const StringData& fieldName, const int32_t value) {
@@ -2293,7 +2394,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.append(fieldName, value);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementTimestamp(const StringData& fieldName, const OpTime value) {
@@ -2303,7 +2404,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendTimestamp(fieldName, value.asDate());
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementLong(const StringData& fieldName, const int64_t value) {
@@ -2313,7 +2414,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.append(fieldName, static_cast<long long int>(value));
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementMinKey(const StringData& fieldName) {
@@ -2323,7 +2424,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendMinKey(fieldName);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElementMaxKey(const StringData& fieldName) {
@@ -2333,7 +2434,7 @@ namespace mutablebson {
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
         builder.appendMaxKey(fieldName);
-        return Element(this, impl.insertLeafElement(leafRef));
+        return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
     Element Document::makeElement(const BSONElement& value) {
@@ -2354,7 +2455,7 @@ namespace mutablebson {
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
             builder.append(value);
-            return Element(this, impl.insertLeafElement(leafRef));
+            return Element(this, impl.insertLeafElement(leafRef, value.fieldNameSize()));
         }
     }
 
@@ -2375,7 +2476,7 @@ namespace mutablebson {
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
             builder.appendAs(value, fieldName);
-            return Element(this, impl.insertLeafElement(leafRef));
+            return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
         }
     }
 

@@ -35,7 +35,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database_holder.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/platform/bits.h"
@@ -418,9 +418,9 @@ namespace mongo {
     void Record::touch( bool entireRecrd ) const {
         if ( _lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
             const char * addr = _data;
-            const char * end = _data + _netLength();
-            for ( ; addr <= end ; addr += 2048 ) {
-                __record_touch_dummy += addr[0];
+            const int length = _netLength();
+            for ( int i = 0 ; i <= length ; i += 2048 ) {
+                __record_touch_dummy += addr[i];
 
                 break; // TODO: remove this, pending SERVER-3711
                 
@@ -522,11 +522,25 @@ namespace mongo {
 
         return this;
     }
-    
+
     Record* DiskLoc::rec() const {
-        Record *r = DataFileMgr::getRecord(*this);
-        memconcept::is(r, memconcept::concept::record);
-        return r;
+        // XXX-ERH
+        verify(a() != -1);
+        return cc().database()->getExtentManager().recordFor( *this );
+    }
+
+    DeletedRecord* DiskLoc::drec() const {
+        verify( _a != -1 );
+        return reinterpret_cast<DeletedRecord*>(rec());
+    }
+
+    Extent* DiskLoc::ext() const {
+        verify( a() != -1 );
+        return cc().database()->getExtentManager().getExtent(*this);
+    }
+
+    BSONObj DiskLoc::obj() const {
+        return BSONObj::make(rec()->accessed());
     }
 
     void Record::_accessing() const {

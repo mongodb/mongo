@@ -14,14 +14,25 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/db/btreebuilder.h"
+#include "mongo/db/structure/btree/btreebuilder.h"
 
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -31,6 +42,8 @@ namespace BtreeBuilderTests {
     static const char* const _ns = "unittests.btreebuilder";
     DBDirectClient _client;
 
+    // QUERY_MIGRATION
+#if 0
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to
      * partially construct a new IndexDetails in a manner that supports proper cleanup in
@@ -74,46 +87,10 @@ namespace BtreeBuilderTests {
     private:
         Client::WriteContext _ctx;
     };
+#endif
 
-    /**
-     * BtreeBuilder::commit() constructs a btree from the keys provided to BtreeBuilder::addKey().
-     */
-    class Commit : public IndexBuildBase {
-    public:
-        void run() {
-            IndexDetails& id = addIndexWithInfo();
-            // Create a btree builder.
-            BtreeBuilder<V1> builder( false, id );
-            // Add some keys to the builder, in order.
-            int32_t nKeys = 1000;
-            for( int32_t i = 0; i < nKeys; ++i ) {
-                BSONObj key = BSON( "a" << i );
-                builder.addKey( key, /* dummy location */ DiskLoc() );
-            }
-            // The root of the index has not yet been set.
-            ASSERT( id.head.isNull() );
-            // Call commit on the builder to finish building the btree.
-            builder.commit( true );
-            // The root of the index is now set.
-            ASSERT( !id.head.isNull() );
-            // Create a cursor over the index.
-            scoped_ptr<BtreeCursor> cursor(
-                    BtreeCursor::make( nsdetails( _ns ),
-                                       id,
-                                       BSON( "" << -1 ),    // startKey below minimum key value.
-                                       BSON( "" << nKeys ), // endKey above maximum key value.
-                                       true,                // endKeyInclusive true.
-                                       1                    // direction forward.
-                                       ) );
-            // Check that the keys in the index are the expected ones.
-            int32_t expectedKey = 0;
-            for( ; cursor->ok(); cursor->advance(), ++expectedKey ) {
-                ASSERT_EQUALS( expectedKey, cursor->currKey().firstElement().number() );
-            }
-            ASSERT_EQUALS( nKeys, expectedKey );
-        }
-    };
-
+    // QUERY_MIGRATION
+#if 0
     /**
      * BtreeBuilder::commit() is interrupted if there is a request to kill the current operation.
      */
@@ -154,6 +131,7 @@ namespace BtreeBuilderTests {
     private:
         bool _mayInterrupt;
     };
+#endif
 
     class BtreeBuilderTests : public Suite {
     public:
@@ -162,9 +140,9 @@ namespace BtreeBuilderTests {
         }
 
         void setupTests() {
-            add<Commit>();
-            add<InterruptCommit>( false );
-            add<InterruptCommit>( true );
+            // QUERY_MIGRATION
+            //add<InterruptCommit>( false );
+            //add<InterruptCommit>( true );
         }
     } btreeBuilderTests;
 

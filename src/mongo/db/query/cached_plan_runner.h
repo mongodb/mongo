@@ -32,32 +32,35 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/runner.h"
 
 namespace mongo {
 
     class BSONObj;
-    struct CachedSolution;
+    class CachedSolution;
     class CanonicalQuery;
     class DiskLoc;
     class PlanExecutor;
     class PlanStage;
     class TypeExplain;
+    struct PlanInfo;
     class WorkingSet;
 
     /**
      * CachedPlanRunner runs a plan retrieved from the cache.
-     *
-     * Cached plans are bundled with information describing why the plan is in the cache.
      *
      * If we run a plan from the cache and behavior wildly deviates from expected behavior, we may
      * remove the plan from the cache.  See plan_cache.h.
      */
     class CachedPlanRunner : public Runner {
     public:
-
-        /**  Takes ownership of all arguments. */
-        CachedPlanRunner(CanonicalQuery* canonicalQuery, CachedSolution* cached,
+        /**
+         * Takes ownership of all arguments.
+         * XXX: what args should this really take?  probably a cachekey as well?
+         */
+        CachedPlanRunner(const Collection* collection,
+                         CanonicalQuery* canonicalQuery, QuerySolution* solution,
                          PlanStage* root, WorkingSet* ws);
 
         virtual ~CachedPlanRunner();
@@ -70,7 +73,7 @@ namespace mongo {
 
         virtual bool restoreState();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
@@ -78,22 +81,45 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
         /**
-         * Returns OK, allocating and filling in '*explain' with details of the cached
-         * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
-         * the error.
+         * Returns OK, allocating and filling in '*explain' and '*planInfo' with details of
+         * the cached plan. Caller takes ownership of '*explain' and '*planInfo'. Otherwise,
+         * return a status describing the error.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
+
+        /**
+         * Takes ownership of all arguments.
+         */
+        void setBackupPlan(QuerySolution* qs, PlanStage* root, WorkingSet* ws);
 
     private:
         void updateCache();
 
+        const Collection* _collection;
+
         boost::scoped_ptr<CanonicalQuery> _canonicalQuery;
-        boost::scoped_ptr<CachedSolution> _cachedQuery;
+        boost::scoped_ptr<QuerySolution> _solution;
         boost::scoped_ptr<PlanExecutor> _exec;
+
+        // Owned here. If non-NULL, then this plan executor is capable
+        // of executing a backup plan in the case of a blocking sort.
+        std::auto_ptr<PlanExecutor> _backupPlan;
+
+        // Owned here. If non-NULL, contains the query solution corresponding
+        // to the backup plan.
+        boost::scoped_ptr<QuerySolution> _backupSolution;
+
+        // Whether the executor for the winning plan has produced results yet.
+        bool _alreadyProduced;
 
         // Have we updated the cache with our plan stats yet?
         bool _updatedCache;
+
+        // Has the runner been killed?
+        bool _killed;
     };
 
 }  // namespace mongo

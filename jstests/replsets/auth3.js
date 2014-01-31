@@ -1,4 +1,3 @@
-if ( !_isWindows() ) { // SERVER-5024
 var path = "jstests/libs/";
 
 var rs = new ReplSetTest({"nodes" : {node0 : {}, node1 : {}, arbiter : {}}, keyFile : path+"key1"});
@@ -67,4 +66,3 @@ print("doing rollback!");
 
 checkValidState(0);
 checkValidState(1);
-} // !_isWindows()

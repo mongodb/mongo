@@ -2,6 +2,10 @@ var coll = db.jstests_drop;
 
 coll.drop();
 
+res = coll.runCommand("drop");
+assert( !res.ok, tojson( res ) );
+
+
 assert.eq(0, db.system.indexes.find({ns : coll + ""}).count(), "A");
 coll.save({});
 assert.eq(1, db.system.indexes.find({ns : coll + ""}).count(), "B");

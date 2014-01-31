@@ -39,12 +39,13 @@ namespace mongo {
         */
     class CmdReplSetFresh : public ReplSetCommand {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetFresh);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
     private:
@@ -138,12 +139,13 @@ namespace mongo {
 
     class CmdReplSetElect : public ReplSetCommand {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         CmdReplSetElect() : ReplSetCommand("replSetElect") { }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetElect);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
     private:
@@ -266,7 +268,6 @@ namespace mongo {
             try {
                 vote = yea(whoid);
                 dassert( hopeful->id() == whoid );
-                rs.relinquish();
                 log() << "replSet info voting yea for " <<  hopeful->fullName() << " (" << whoid << ')' << rsLog;
             }
             catch(VoteException&) {

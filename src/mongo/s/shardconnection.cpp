@@ -35,6 +35,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
@@ -249,6 +250,9 @@ namespace mongo {
             vector<Shard> all;
             Shard::getAllShards( all );
 
+            // Don't report exceptions here as errors in GetLastError
+            LastError::Disabled ignoreForGLE(lastError.get(false));
+
             // Now only check top-level shard connections
             for ( unsigned i=0; i<all.size(); i++ ) {
 
@@ -264,11 +268,13 @@ namespace mongo {
 
                     versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
                 }
-                catch ( const std::exception& e ) {
+                catch ( const DBException& ex ) {
 
-                    warning() << "problem while initially checking shard versions on"
-                              << " " << shard.getName() << causedBy(e) << endl;
-                    throw;
+                    warning() << "problem while initially checking shard versions on" << " "
+                              << shard.getName() << causedBy( ex ) << endl;
+
+                    // NOTE: This is only a heuristic, to avoid multiple stale version retries
+                    // across multiple shards, and does not affect correctness.
                 }
             }
         }
@@ -488,15 +494,47 @@ namespace mongo {
         }
     }
 
-    bool ShardConnection::releaseConnectionsAfterResponse( false );
+    bool ShardConnection::releaseConnectionsAfterResponse( true );
 
-    ExportedServerParameter<bool> ReleaseConnectionsAfterResponse(
-        ServerParameterSet::getGlobal(),
-        "releaseConnectionsAfterResponse",
-         &ShardConnection::releaseConnectionsAfterResponse,
-        true,
-        true
-    );
+    namespace {
+
+        /**
+         * Custom deprecated RCAR server parameter
+         */
+        class DeprecatedRCARParameter : public ExportedServerParameter<bool> {
+        public:
+
+            DeprecatedRCARParameter( ServerParameterSet* sps,
+                                     const std::string& name,
+                                     bool* value,
+                                     bool allowedToChangeAtStartup,
+                                     bool allowedToChangeAtRuntime ) :
+                ExportedServerParameter<bool>( sps,
+                                               name,
+                                               value,
+                                               allowedToChangeAtStartup,
+                                               allowedToChangeAtRuntime ) {
+            }
+
+            virtual ~DeprecatedRCARParameter() {}
+
+        protected:
+            virtual Status validate( const bool& newValue ) {
+                if ( newValue == true )
+                    return Status::OK();
+
+                return Status( ErrorCodes::BadValue,
+                               "releaseConnectionAfterResponse is always true in v2.6 and above" );
+            }
+        };
+    }
+
+    DeprecatedRCARParameter //
+    ReleaseConnectionsAfterResponse( ServerParameterSet::getGlobal(),
+                                     "releaseConnectionsAfterResponse",
+                                     &ShardConnection::releaseConnectionsAfterResponse,
+                                     true,
+                                     true );
 
     void ShardConnection::releaseMyConnections() {
         ClientConnections::threadInstance()->releaseAll();

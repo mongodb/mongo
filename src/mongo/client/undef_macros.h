@@ -40,6 +40,8 @@
 #pragma pop_macro("uassert")
 #undef verify
 #pragma pop_macro("verify")
+#undef invariant
+#pragma pop_macro("invariant")
 #undef DESTRUCTOR_GUARD
 #pragma pop_macro("DESTRUCTOR_GUARD")
 

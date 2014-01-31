@@ -302,6 +302,24 @@ namespace mongo {
         return Status::OK();
     }
 
+    /**
+     * atexit handler to terminate the process before static destructors run.
+     *
+     * Mongo server processes cannot safely call ::exit() or std::exit(), but
+     * some third-party libraries may call one of those functions.  In that
+     * case, to avoid static-destructor problems in the server, this exits the
+     * process immediately with code EXIT_FAILURE.
+     *
+     * TODO: Remove once exit() executes safely in mongo server processes.
+     */
+    static void shortCircuitExit() { _exit(EXIT_FAILURE); }
+
+    MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
+        if (std::atexit(&shortCircuitExit) != 0)
+            return Status(ErrorCodes::InternalError, "Failed setting short-circuit exit handler.");
+        return Status::OK();
+    }
+
     bool initializeServerGlobalState() {
 
         Listener::globalTicketHolder.resize(serverGlobalParams.maxConns);

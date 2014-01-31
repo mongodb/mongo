@@ -33,16 +33,16 @@
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using namespace mongo;
 
-    BatchedErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
+    WriteErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
 
-        BatchedErrorDetail* error = new BatchedErrorDetail();
+        WriteErrorDetail* error = new WriteErrorDetail();
         error->setErrCode( code );
         error->setErrInfo( info );
         error->setErrMessage( message );
@@ -63,7 +63,7 @@ namespace {
         WriteOp writeOp( BatchItemRef( &request, 0 ) );
         ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "some message" ) );
 
@@ -224,7 +224,7 @@ namespace {
         ASSERT_EQUALS( targeted.size(), 1u );
         assertEndpointsEqual( targeted.front()->endpoint, endpoint );
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "some message" ) );
 
@@ -322,7 +322,7 @@ namespace {
 
         // Stale exception
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
                                                           BSON( "data" << 12345 ),
                                                           "some message" ) );
 

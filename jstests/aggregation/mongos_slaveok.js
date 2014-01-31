@@ -20,6 +20,9 @@ testDB.setSlaveOk(true);
 var secNode = st.rs0.getSecondary();
 secNode.getDB('test').setProfilingLevel(2);
 
+// wait for mongos to recognize that the slave is up
+ReplSetTest.awaitRSClientHosts(st.s, secNode, {ok: true });
+
 var res = testDB.runCommand({ aggregate: 'user', pipeline: [{ $project: { x: 1 }}]});
 assert(res.ok, 'aggregate command failed: ' + tojson(res));
 

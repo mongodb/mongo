@@ -40,64 +40,14 @@
 namespace mongo {
 
     /**
-     * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
-     *
-     * If the query is valid and a runner could be created, returns Status::OK()
-     * and populates *out with the Runner.
-     *
-     * If the query cannot be executed, returns a Status indicating why.  Deletes
-     * rawCanonicalQuery.
-     */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions = 0);
-
-    /**
-     * A switch to choose between old Cursor-based code and new Runner-based code.
-     */
-    bool isNewQueryFrameworkEnabled();
-
-    /**
-     * Use the new query framework.  Called from the dbtest initialization.
-     */
-    void enableNewQueryFramework();
-
-    /**
      * Called from the getMore entry point in ops/query.cpp.
      */
     QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
                             int pass, bool& exhaust, bool* isCursorAuthorized);
 
     /**
-     * Called from the runQuery entry point in ops/query.cpp.
-     *
-     * Takes ownership of cq.
+     * Run the query 'q' and place the result in 'result'.
      */
-    std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result);
-
-    /**
-     * Can the new system handle the provided query?
-     *
-     * Returns false if not.  cqOut is not modified.
-     * Returns true if so.  Caller owns *cqOut.
-     */
-    bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut);
-
-    /**
-     * RAII approach to ensuring that runners are deregistered in newRunQuery.
-     *
-     * While retrieving the first bach of results, newRunQuery manually registers the runner with
-     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
-     * fail to deregister the runner, we will call invalidate/kill on the
-     * still-registered-yet-deleted runner.
-     *
-     * For any subsequent calls to getMore, the runner is already registered with ClientCursor
-     * by virtue of being cached, so this exception-proofing is not required.
-     */
-    struct DeregisterEvenIfUnderlyingCodeThrows {
-        DeregisterEvenIfUnderlyingCodeThrows(Runner* runner) : _runner(runner) { }
-        ~DeregisterEvenIfUnderlyingCodeThrows() {
-            ClientCursor::deregisterRunner(_runner);
-        }
-        Runner* _runner;
-    };
+    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
 }  // namespace mongo

@@ -27,50 +27,49 @@
  */
 
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/lite_parsed_query.h"
 
 namespace mongo {
 
     string QuerySolutionNode::toString() const {
-        stringstream ss;
+        mongoutils::str::stream ss;
         appendToString(&ss, 0);
-        return ss.str();
+        return ss;
     }
 
     // static
-    void QuerySolutionNode::addIndent(stringstream* ss, int level) {
+    void QuerySolutionNode::addIndent(mongoutils::str::stream* ss, int level) {
         for (int i = 0; i < level; ++i) {
             *ss << "---";
         }
     }
 
-    void QuerySolutionNode::addCommon(stringstream* ss, int indent) const {
+    void QuerySolutionNode::addCommon(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
+        *ss << "fetched = " << fetched() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << '\n';
         addIndent(ss, indent + 1);
         *ss << "getSort = [";
         for (BSONObjSet::const_iterator it = getSort().begin(); it != getSort().end(); it++) {
             *ss << it->toString() << ", ";
         }
-        *ss << "]" << endl;
+        *ss << "]" << '\n';
     }
 
     //
     // TextNode
     //
 
-    void TextNode::appendToString(stringstream* ss, int indent) const {
+    void TextNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "TEXT\n";
         addIndent(ss, indent + 1);
-        *ss << "numWanted = " << _numWanted << endl;
+        *ss << "keyPattern = " << _indexKeyPattern.toString() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << _indexKeyPattern.toString() << endl;
+        *ss << "query = " << _query << '\n';
         addIndent(ss, indent + 1);
-        *ss << "query = " << _query << endl;
-        addIndent(ss, indent + 1);
-        *ss << "language = " << _language << endl;
+        *ss << "language = " << _language << '\n';
         addCommon(ss, indent);
     }
 
@@ -78,13 +77,13 @@ namespace mongo {
     // CollectionScanNode
     //
 
-    CollectionScanNode::CollectionScanNode() : tailable(false), direction(1) { }
+    CollectionScanNode::CollectionScanNode() : tailable(false), direction(1), maxScan(0) { }
 
-    void CollectionScanNode::appendToString(stringstream* ss, int indent) const {
+    void CollectionScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "COLLSCAN\n";
         addIndent(ss, indent + 1);
-        *ss <<  "ns = " << name << endl;
+        *ss <<  "ns = " << name << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
@@ -100,12 +99,12 @@ namespace mongo {
 
     AndHashNode::~AndHashNode() { }
 
-    void AndHashNode::appendToString(stringstream* ss, int indent) const {
+    void AndHashNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "AND_HASH\n";
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString() << endl;
+            *ss << " filter = " << filter->toString() << '\n';
         }
         addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
@@ -145,16 +144,17 @@ namespace mongo {
 
     AndSortedNode::~AndSortedNode() { }
 
-    void AndSortedNode::appendToString(stringstream* ss, int indent) const {
+    void AndSortedNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
-        *ss << "AND_SORTED";
+        *ss << "AND_SORTED\n";
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString() << endl;
+            *ss << " filter = " << filter->toString() << '\n';
         }
         addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
-            *ss << "Child " << i << ": ";
+            addIndent(ss, indent + 1);
+            *ss << "Child " << i << ":\n";
             children[i]->appendToString(ss, indent + 1);
         }
     }
@@ -189,19 +189,19 @@ namespace mongo {
 
     OrNode::~OrNode() { }
 
-    void OrNode::appendToString(stringstream* ss, int indent) const {
+    void OrNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "OR\n";
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString() << endl;
+            *ss << " filter = " << filter->toString() << '\n';
         }
         addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             addIndent(ss, indent + 1);
             *ss << "Child " << i << ":\n";
             children[i]->appendToString(ss, indent + 2);
-            *ss << endl;
+            *ss << '\n';
         }
     }
 
@@ -239,19 +239,19 @@ namespace mongo {
 
     MergeSortNode::~MergeSortNode() { }
 
-    void MergeSortNode::appendToString(stringstream* ss, int indent) const {
+    void MergeSortNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "MERGE_SORT\n";
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString() << endl;
+            *ss << " filter = " << filter->toString() << '\n';
         }
         addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             addIndent(ss, indent + 1);
             *ss << "Child " << i << ":\n";
             children[i]->appendToString(ss, indent + 2);
-            *ss << endl;
+            *ss << '\n';
         }
     }
 
@@ -287,7 +287,7 @@ namespace mongo {
 
     FetchNode::FetchNode() { }
 
-    void FetchNode::appendToString(stringstream* ss, int indent) const {
+    void FetchNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "FETCH\n";
         if (NULL != filter) {
@@ -299,7 +299,7 @@ namespace mongo {
         }
         addCommon(ss, indent);
         addIndent(ss, indent + 1);
-        *ss << "Child:" << endl;
+        *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
 
@@ -308,23 +308,23 @@ namespace mongo {
     //
 
     IndexScanNode::IndexScanNode()
-        : indexIsMultiKey(false), limit(0), direction(1) { }
+        : indexIsMultiKey(false), direction(1), maxScan(0), addKeyMetadata(false) { }
 
-    void IndexScanNode::appendToString(stringstream* ss, int indent) const {
+    void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "IXSCAN\n";
         addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << indexKeyPattern << endl;
+        *ss << "keyPattern = " << indexKeyPattern << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter= " << filter->toString() << endl;
+            *ss << " filter= " << filter->toString() << '\n';
         }
         addIndent(ss, indent + 1);
-        *ss << "direction = " << direction << endl;
+        *ss << "direction = " << direction << '\n';
         addIndent(ss, indent + 1);
-        *ss << "bounds = " << bounds.toString() << endl;
+        *ss << "bounds = " << bounds.toString() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
+        *ss << "fetched = " << fetched() << '\n';
         addCommon(ss, indent);
     }
 
@@ -373,7 +373,8 @@ namespace mongo {
         BSONObj sortPattern;
         {
             BSONObjBuilder sortBob;
-            BSONObjIterator it(indexKeyPattern);
+            BSONObj normalizedIndexKeyPattern(LiteParsedQuery::normalizeSortOrder(indexKeyPattern));
+            BSONObjIterator it(normalizedIndexKeyPattern);
             while (it.more()) {
                 BSONElement elt = it.next();
                 // Zero is returned if elt is not a number.  This happens when elt is hashed or
@@ -462,14 +463,13 @@ namespace mongo {
     // ProjectionNode
     //
 
-    void ProjectionNode::appendToString(stringstream* ss, int indent) const {
+    void ProjectionNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "PROJ\n";
-        verify(NULL != liteProjection);
         addIndent(ss, indent + 1);
-        *ss << "proj = " << liteProjection->getProjectionSpec().toString() << endl;
+        *ss << "proj = " << projection.toString() << '\n';
         addCommon(ss, indent);
-        *ss << "Child:" << endl;
+        *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
 
@@ -477,13 +477,17 @@ namespace mongo {
     // SortNode
     //
 
-    void SortNode::appendToString(stringstream* ss, int indent) const {
+    void SortNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "SORT\n";
         addIndent(ss, indent + 1);
-        *ss << "pattern = " << pattern.toString() << endl;
+        *ss << "pattern = " << pattern.toString() << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "query for bounds = " << query.toString() << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "limit = " << limit << '\n';
         addCommon(ss, indent);
-        *ss << "Child:" << endl;
+        *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
 
@@ -492,14 +496,14 @@ namespace mongo {
     //
     
 
-    void LimitNode::appendToString(stringstream* ss, int indent) const {
+    void LimitNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "LIMIT\n";
         addIndent(ss, indent + 1);
-        *ss << "limit = " << limit << endl;
+        *ss << "limit = " << limit << '\n';
         addIndent(ss, indent + 1);
         addCommon(ss, indent);
-        *ss << "Child:" << endl;
+        *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
 
@@ -507,13 +511,13 @@ namespace mongo {
     // SkipNode
     //
 
-    void SkipNode::appendToString(stringstream* ss, int indent) const {
+    void SkipNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "SKIP\n";
         addIndent(ss, indent + 1);
-        *ss << "skip= " << skip << endl;
+        *ss << "skip= " << skip << '\n';
         addCommon(ss, indent);
-        *ss << "Child:" << endl;
+        *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
 
@@ -521,13 +525,13 @@ namespace mongo {
     // GeoNear2DNode
     //
 
-    void GeoNear2DNode::appendToString(stringstream* ss, int indent) const {
+    void GeoNear2DNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "GEO_NEAR_2D\n";
         addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
+        *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
         addCommon(ss, indent);
-        *ss << "nearQuery = " << nq.toString() << endl;
+        *ss << "nearQuery = " << nq.toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
@@ -538,15 +542,15 @@ namespace mongo {
     // GeoNear2DSphereNode
     //
 
-    void GeoNear2DSphereNode::appendToString(stringstream* ss, int indent) const {
+    void GeoNear2DSphereNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "GEO_NEAR_2DSPHERE\n";
         addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
+        *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
         addCommon(ss, indent);
-        *ss << "baseBounds = " << baseBounds.toString() << endl;
+        *ss << "baseBounds = " << baseBounds.toString() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "nearQuery = " << nq.toString() << endl;
+        *ss << "nearQuery = " << nq.toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
@@ -557,11 +561,11 @@ namespace mongo {
     // Geo2DNode
     //
 
-    void Geo2DNode::appendToString(stringstream* ss, int indent) const {
+    void Geo2DNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "GEO_2D\n";
         addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
+        *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
         addCommon(ss, indent);
     }
 
@@ -579,7 +583,7 @@ namespace mongo {
     // ShardingFilterNode
     //
 
-    void ShardingFilterNode::appendToString(stringstream* ss, int indent) const {
+    void ShardingFilterNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "SHARDING_FILTER\n";
         if (NULL != filter) {
@@ -591,8 +595,58 @@ namespace mongo {
         }
         addCommon(ss, indent);
         addIndent(ss, indent + 1);
-        *ss << "Child:" << endl;
+        *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
+    }
+
+    //
+    // KeepMutationsNode
+    //
+
+    void KeepMutationsNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "KEEP_MUTATIONS\n";
+        if (NULL != filter) {
+            addIndent(ss, indent + 1);
+            StringBuilder sb;
+            *ss << "filter:\n";
+            filter->debugString(sb, indent + 2);
+            *ss << sb.str();
+        }
+        addCommon(ss, indent);
+        addIndent(ss, indent + 1);
+        *ss << "Child:" << '\n';
+        children[0]->appendToString(ss, indent + 2);
+    }
+
+    //
+    // DistinctNode
+    //
+
+    void DistinctNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "DISTINCT\n";
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "direction = " << direction << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "bounds = " << bounds.toString() << '\n';
+    }
+
+    //
+    // CountNode
+    //
+
+    void CountNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "COUNT\n";
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "startKey = " << startKey << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "endKey = " << endKey << '\n';
     }
 
 }  // namespace mongo

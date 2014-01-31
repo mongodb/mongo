@@ -78,8 +78,11 @@ namespace mongo {
         bool isSystemDotIndexes() const { return coll() == "system.indexes"; }
         bool isConfigDB() const { return db() == "config"; }
         bool isCommand() const { return coll() == "$cmd"; }
+        bool isOplog() const { return oplog( _ns ); }
         bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
         bool isSpecial() const { return special( _ns ); }
+        bool isNormal() const { return normal( _ns ); }
+
         /**
          * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
          */
@@ -170,10 +173,10 @@ namespace mongo {
     inline StringData nsToDatabaseSubstring( const StringData& ns ) {
         size_t i = ns.find( '.' );
         if ( i == std::string::npos ) {
-            massert(10078, "nsToDatabase: ns too long", ns.size() < MaxDatabaseNameLen );
+            massert(10078, "nsToDatabase: db too long", ns.size() < MaxDatabaseNameLen );
             return ns;
         }
-        massert(10088, "nsToDatabase: ns too long", i < static_cast<size_t>(MaxDatabaseNameLen));
+        massert(10088, "nsToDatabase: db too long", i < static_cast<size_t>(MaxDatabaseNameLen));
         return ns.substr( 0, i );
     }
 

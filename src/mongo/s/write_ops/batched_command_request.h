@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -35,6 +47,9 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(BatchedCommandRequest);
     public:
 
+        // Maximum number of write ops supported per batch
+        static const int kMaxWriteBatchSize = 1000;
+
         enum BatchType {
             BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown
         };
@@ -45,12 +60,23 @@ namespace mongo {
 
         BatchedCommandRequest( BatchType batchType );
 
+        /**
+         * insertReq ownership is transferred to here.
+         */
         BatchedCommandRequest( BatchedInsertRequest* insertReq ) :
                 _batchType( BatchType_Insert ), _insertReq( insertReq ) {
         }
+
+        /**
+         * updateReq ownership is transferred to here.
+         */
         BatchedCommandRequest( BatchedUpdateRequest* updateReq ) :
                 _batchType( BatchType_Update ), _updateReq( updateReq ) {
         }
+
+        /**
+         * deleteReq ownership is transferred to here.
+         */
         BatchedCommandRequest( BatchedDeleteRequest* deleteReq ) :
                 _batchType( BatchType_Delete ), _deleteReq( deleteReq ) {
         }
@@ -95,16 +121,7 @@ namespace mongo {
         bool isNSSet() const;
         const std::string& getNS() const;
 
-        /**
-         * Write ops are BSONObjs, whose format depends on the type of request
-         * TODO: Should be possible to further parse these ops generically if we come up with a
-         * good scheme.
-         */
-        void setWriteOps( const std::vector<BSONObj>& writeOps );
-        void unsetWriteOps();
-        bool isWriteOpsSet() const;
         std::size_t sizeWriteOps() const;
-        std::vector<BSONObj> getWriteOps() const;
 
         void setWriteConcern( const BSONObj& writeConcern );
         void unsetWriteConcern();
@@ -116,20 +133,10 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
-        void setShardName(const StringData& shardName);
-        void unsetShardName();
-        bool isShardNameSet() const;
-        const std::string& getShardName() const;
-
-        void setShardVersion( const ChunkVersion& shardVersion );
-        void unsetShardVersion();
-        bool isShardVersionSet() const;
-        const ChunkVersion& getShardVersion() const;
-
-        void setSession( long long session );
-        void unsetSession();
-        bool isSessionSet() const;
-        long long getSession() const;
+        void setMetadata(BatchedRequestMetadata* metadata);
+        void unsetMetadata();
+        bool isMetadataSet() const;
+        BatchedRequestMetadata* getMetadata() const;
 
         //
         // Helpers for auth pre-parsing
@@ -170,7 +177,6 @@ namespace mongo {
 
         BatchItemRef( const BatchedCommandRequest* request, int itemIndex ) :
             _request( request ), _itemIndex( itemIndex ) {
-            dassert( itemIndex < static_cast<int>( request->sizeWriteOps() ) );
         }
 
         const BatchedCommandRequest* getRequest() const {
@@ -185,15 +191,18 @@ namespace mongo {
             return _request->getBatchType();
         }
 
-        BSONObj getDocument() const {
+        const BSONObj& getDocument() const {
+            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getInsertRequest()->getDocumentsAt( _itemIndex );
         }
 
         const BatchedUpdateDocument* getUpdate() const {
+            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getUpdateRequest()->getUpdatesAt( _itemIndex );
         }
 
         const BatchedDeleteDocument* getDelete() const {
+            dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getDeleteRequest()->getDeletesAt( _itemIndex );
         }
 

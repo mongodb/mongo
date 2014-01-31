@@ -80,10 +80,9 @@ else:
 nix = not windows
 
 # --- options ----
+use_clang = False
 
 options = {}
-
-options_topass = {}
 
 def add_option( name, help, nargs, contributesToVariantDir,
                 dest=None, default = None, type="string", choices=None, metavar=None ):
@@ -113,7 +112,7 @@ def add_option( name, help, nargs, contributesToVariantDir,
 def get_option( name ):
     return GetOption( name )
 
-def _has_option( name ):
+def has_option( name ):
     x = get_option( name )
     if x is None:
         return False
@@ -126,19 +125,12 @@ def _has_option( name ):
 
     return True
 
-def has_option( name ):
-    x = _has_option(name)
-
-    if name not in options_topass:
-        # if someone already set this, don't overwrite
-        options_topass[name] = x
-
-    return x
-
 def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
 
 def get_variant_dir():
+    if has_option('variant-dir'):
+        return "#build/" + get_option('variant-dir') 
 
     substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
 
@@ -191,6 +183,7 @@ add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
 add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
 add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
+add_option( "variant-dir", "override variant subdirectory", 1, False )
 
 add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
 add_option( "full", "include client and headers when doing scons install", 0 , False )
@@ -220,9 +213,6 @@ add_option( "libpath", "Library path if you have libraries in a nonstandard dire
 add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" , 1 , True )
 add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , True )
 add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , True )
-
-add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
-add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
 add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , False )
 
@@ -461,6 +451,8 @@ env = Environment( BUILD_DIR=variantDir,
                    DIST_ARCHIVE_SUFFIX='.tgz',
                    EXTRAPATH=get_option("extrapath"),
                    MODULE_BANNERS=[],
+                   ARCHIVE_ADDITION_DIR_MAP={},
+                   ARCHIVE_ADDITIONS=[],
                    MODULETEST_ALIAS='moduletests',
                    MODULETEST_LIST='#build/moduletests.txt',
                    MSVS_ARCH=msarch ,
@@ -607,21 +599,8 @@ if has_option( "durableDefaultOn" ):
 if has_option( "durableDefaultOff" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
-boostCompiler = GetOption( "boostCompiler" )
-if boostCompiler is None:
-    boostCompiler = ""
-else:
-    boostCompiler = "-" + boostCompiler
-
-boostVersion = GetOption( "boostVersion" )
-if boostVersion is None:
-    boostVersion = ""
-else:
-    boostVersion = "-" + boostVersion
-
 if ( not ( usev8 or justClientLib) ):
     usev8 = True
-    options_topass["usev8"] = True
 
 extraLibPlaces = []
 
@@ -711,7 +690,7 @@ elif linux:
     if static:
         env.Append( LINKFLAGS=" -static " )
     if has_option( "static-libstdc++" ):
-        env.Append( LINKFLAGS=" -static-libstdc++ " )
+        env.Append( LINKFLAGS=["-static-libstdc++", "-static-libgcc"] )
 
 elif solaris:
      env.Append( CPPDEFINES=[ "__sunos__" ] )
@@ -753,7 +732,6 @@ elif windows:
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
-    # /WX abort build on compiler warnings
     env.Append(CCFLAGS=["/EHsc","/W3"])
 
     # some warnings we don't like:
@@ -770,6 +748,14 @@ elif windows:
     # 'conversion' conversion from 'type1' to 'type2', possible loss of data
     #  An integer type is converted to a smaller integer type.
     env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244"] )
+
+    # some warnings we should treat as errors:
+    # c4099
+    #  identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
+    #    This warning occurs when classes and structs are declared with a mix of struct and class
+    #    which can cause linker failures
+    env.Append( CCFLAGS=["/we4099"] )
+
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
     # this would be for pre-compiled headers, could play with it later  
@@ -888,6 +874,8 @@ if nix:
     if debugBuild:
         if not optBuild:
             env.Append( CCFLAGS=["-fstack-protector"] )
+            env.Append( LINKFLAGS=["-fstack-protector"] )
+            env.Append( SHLINKFLAGS=["-fstack-protector"] )
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
         env.Append( CPPDEFINES=["_DEBUG"] );
 
@@ -1042,6 +1030,9 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    global use_clang
+    use_clang = using_clang()
+
     # Figure out what our minimum windows version is. If the user has specified, then use
     # that. Otherwise, if they have explicitly selected between 32 bit or 64 bit, choose XP or
     # Vista respectively. Finally, if they haven't done either of these, try invoking the
@@ -1118,7 +1109,7 @@ def doConfigure(myenv):
         test_mutation = mutation
         if using_gcc():
             test_mutation = copy.deepcopy(mutation)
-            # GCC helpfully doesn't issue a diagnostic on unkown flags of the form -Wno-xxx
+            # GCC helpfully doesn't issue a diagnostic on unknown flags of the form -Wno-xxx
             # unless other diagnostics are triggered. That makes it tough to check for support
             # for -Wno-xxx. To work around, if we see that we are testing for a flag of the
             # form -Wno-xxx (but not -Wno-error=xxx), we also add -Wxxx to the flags. GCC does
@@ -1172,12 +1163,6 @@ def doConfigure(myenv):
         # Clang likes to warn about unused private fields, but some of our third_party
         # libraries have such things.
         AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
-
-        # Clang warns about struct/class tag mismatch, but most people think that that is not
-        # really an issue, see
-        # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. We disable the
-        # warning so it doesn't become an error.
-        AddToCCFLAGSIfSupported(myenv, '-Wno-mismatched-tags')
 
         # Prevents warning about using deprecated features (such as auto_ptr in c++11)
         # Using -Wno-error=deprecated-declarations does not seem to work on some compilers,
@@ -1378,11 +1363,12 @@ def doConfigure(myenv):
             Exit(1)
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
+
+        # Note that on Windows with using-system-boost builds, the following 
+        # FindSysLibDep calls do nothing useful (but nothing problematic either)
         for b in boostLibs:
-            l = "boost_" + b
-            conf.FindSysLibDep(l,
-                [ l + boostCompiler + "-mt" + boostVersion,
-                  l + boostCompiler + boostVersion ], language='C++' )
+            boostlib = "boost_" + b
+            conf.FindSysLibDep( boostlib, [ boostlib + "-mt", boostlib ], language='C++' )
 
     if conf.CheckHeader('unistd.h'):
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
@@ -1411,7 +1397,11 @@ def doConfigure(myenv):
 
     conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
     if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
-        "sasl2", "sasl/sasl.h", "C", "sasl_version_info(0, 0, 0, 0, 0, 0);", autoadd=False ):
+            "sasl2", 
+            ["stddef.h","sasl/sasl.h"], 
+            "C", 
+            "sasl_version_info(0, 0, 0, 0, 0, 0);", 
+            autoadd=False ):
         Exit(1)
 
     # requires ports devel/libexecinfo to be installed
@@ -1684,6 +1674,7 @@ Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("enforce_glibc")
 Export("s3push")
+Export("use_clang")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False)

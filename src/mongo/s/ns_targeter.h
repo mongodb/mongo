@@ -57,9 +57,9 @@ namespace mongo {
      *
      *   3. Goto 0.
      *
-     * The refreshIfNeeded() operation must make progress against noted targeting or stale config
-     * failures, see comments below.  No functions may block for shared resources or network calls
-     * except refreshIfNeeded().
+     * The refreshIfNeeded() operation must try to make progress against noted targeting or stale
+     * config failures, see comments below.  No functions may block for shared resources or network
+     * calls except refreshIfNeeded().
      *
      * Implementers are free to define more specific targeting error codes to allow more complex
      * error handling.
@@ -131,12 +131,13 @@ namespace mongo {
          *
          * After this function is called, the targeter should be in a state such that the noted
          * stale responses are not seen again and if a targeting failure occurred it reloaded -
-         * it should make progress.
+         * it should try to make progress.  If provided, wasChanged is set to true if the targeting
+         * information used here was changed.
          *
          * NOTE: This function may block for shared resources or network calls.
          * Returns !OK with message if could not refresh
          */
-        virtual Status refreshIfNeeded() = 0;
+        virtual Status refreshIfNeeded( bool* wasChanged ) = 0;
 
     };
 

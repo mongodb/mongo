@@ -195,6 +195,8 @@ namespace mongo {
         out->_usedBytes = _usedBytes;
         out->_numFields = _numFields;
         out->_hashTabMask = _hashTabMask;
+        out->_hasTextScore = _hasTextScore;
+        out->_textScore = _textScore;
 
         // Tell values that they have been memcpyed (updates ref counts)
         for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
@@ -243,6 +245,35 @@ namespace mongo {
         return bb.obj();
     }
 
+    const StringData Document::metaFieldTextScore("$textScore", StringData::LiteralTag());
+
+    BSONObj Document::toBsonWithMetaData() const {
+        BSONObjBuilder bb;
+        toBson(&bb);
+        if (hasTextScore())
+            bb.append(metaFieldTextScore, getTextScore());
+        return bb.obj();
+    }
+
+    Document Document::fromBsonWithMetaData(const BSONObj& bson) {
+        MutableDocument md;
+
+        BSONObjIterator it(bson);
+        while(it.more()) {
+            BSONElement elem(it.next());
+            if (elem.fieldName()[0] == '$') {
+                if (elem.fieldNameStringData() == metaFieldTextScore) {
+                    md.setTextScore(elem.Double());
+                    continue;
+                }
+            }
+
+            // Note: this will not parse out metadata in embedded documents.
+            md.addField(elem.fieldNameStringData(), Value(elem));
+        }
+
+        return md.freeze();
+    }
 
     MutableDocument::MutableDocument(size_t expectedFields)
         : _storageHolder(NULL)
@@ -393,6 +424,14 @@ namespace mongo {
             buf.appendStr(it->nameSD(), /*NUL byte*/ true);
             it->val.serializeForSorter(buf);
         }
+
+        if (hasTextScore()) {
+            buf.appendNum(char(1));
+            buf.appendNum(getTextScore());
+        }
+        else {
+            buf.appendNum(char(0));
+        }
     }
 
     Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
@@ -403,6 +442,10 @@ namespace mongo {
             doc.addField(name, Value::deserializeForSorter(buf,
                                                            Value::SorterDeserializeSettings()));
         }
+
+        if (buf.read<char>()) // hasTextScore
+            doc.setTextScore(buf.read<double>());
+
         return doc.freeze();
     }
 }

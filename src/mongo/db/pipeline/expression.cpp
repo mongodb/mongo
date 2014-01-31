@@ -153,7 +153,7 @@ namespace mongo {
         if (it != _variables.end())
             return it->second;
 
-        uassert(17276, str::stream() << "Use of undefinded variable: " << name,
+        uassert(17276, str::stream() << "Use of undefined variable: " << name,
                 name == "ROOT" || name == "CURRENT");
 
         return Variables::ROOT_ID;
@@ -587,7 +587,7 @@ namespace {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionCoerceToBool::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionCoerceToBool::addDependencies(DepsTracker* deps, vector<string>* path) const {
         pExpression->addDependencies(deps);
     }
 
@@ -782,7 +782,7 @@ namespace {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionConstant::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionConstant::addDependencies(DepsTracker* deps, vector<string>* path) const {
         /* nothing to do */
     }
 
@@ -901,13 +901,13 @@ namespace {
         return true;
     }
 
-    void ExpressionObject::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionObject::addDependencies(DepsTracker* deps, vector<string>* path) const {
         string pathStr;
         if (path) {
             if (path->empty()) {
                 // we are in the top level of a projection so _id is implicit
                 if (!_excludeId)
-                    deps.insert("_id");
+                    deps->fields.insert("_id");
             }
             else {
                 FieldPath f (*path);
@@ -930,7 +930,7 @@ namespace {
                 uassert(16407, "inclusion not supported in objects nested in $expressions",
                         path);
 
-                deps.insert(pathStr + it->first);
+                deps->fields.insert(pathStr + it->first);
             }
         }
     }
@@ -1201,9 +1201,6 @@ namespace {
     ExpressionFieldPath::ExpressionFieldPath(const string& theFieldPath, Variables::Id variable)
         : _fieldPath(theFieldPath)
         , _variable(variable)
-        , _baseVar(_fieldPath.getFieldName(0) == "CURRENT" ? CURRENT :
-                   _fieldPath.getFieldName(0) == "ROOT" ?    ROOT :
-                                                             OTHER)
     {}
 
     intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
@@ -1211,13 +1208,12 @@ namespace {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
-        // TODO consider state of variables
-        if (_baseVar == ROOT || _baseVar == CURRENT) {
+    void ExpressionFieldPath::addDependencies(DepsTracker* deps, vector<string>* path) const {
+        if (_variable == Variables::ROOT_ID) { // includes CURRENT when it is equivalent to ROOT.
             if (_fieldPath.getPathLength() == 1) {
-                deps.insert(""); // need full doc if just "$$ROOT" or "$$CURRENT"
+                deps->needWholeDocument = true; // need full doc if just "$$ROOT"
             } else {
-                deps.insert(_fieldPath.tail().getPath(false));
+                deps->fields.insert(_fieldPath.tail().getPath(false));
             }
         }
     }
@@ -1383,7 +1379,7 @@ namespace {
         return _subExpression->evaluateInternal(vars);
     }
 
-    void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionLet::addDependencies(DepsTracker* deps, vector<string>* path) const {
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
             it->second.expression->addDependencies(deps);
@@ -1500,9 +1496,39 @@ namespace {
         return Value::consume(output);
     }
 
-    void ExpressionMap::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionMap::addDependencies(DepsTracker* deps, vector<string>* path) const {
         _input->addDependencies(deps);
         _each->addDependencies(deps);
+    }
+
+    /* ------------------------- ExpressionMeta ----------------------------- */
+
+    REGISTER_EXPRESSION("$meta", ExpressionMeta::parse);
+    intrusive_ptr<Expression> ExpressionMeta::parse(
+            BSONElement expr,
+            const VariablesParseState& vpsIn) {
+
+        uassert(17307, "$meta only supports String arguments",
+                expr.type() == String);
+        uassert(17308, "Unsupported argument to $meta: " + expr.String(),
+                expr.String() == "textScore");
+
+        return new ExpressionMeta();
+    }
+
+    Value ExpressionMeta::serialize(bool explain) const {
+        return Value(DOC("$meta" << "textScore"));
+    }
+
+    Value ExpressionMeta::evaluateInternal(Variables* vars) const {
+        const Document& root = vars->getRoot();
+        return root.hasTextScore()
+                ? Value(root.getTextScore())
+                : Value();
+    }
+
+    void ExpressionMeta::addDependencies(DepsTracker* deps, vector<string>* path) const {
+        deps->needTextScore = true;
     }
 
     /* ------------------------- ExpressionMillisecond ----------------------------- */
@@ -1752,7 +1778,7 @@ namespace {
         return this;
     }
 
-    void ExpressionNary::addDependencies(set<string>& deps, vector<string>* path) const {
+    void ExpressionNary::addDependencies(DepsTracker* deps, vector<string>* path) const {
         for(ExpressionVector::const_iterator i(vpOperand.begin());
             i != vpOperand.end(); ++i) {
             (*i)->addDependencies(deps);
@@ -2006,6 +2032,19 @@ namespace {
 
     /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
+namespace {
+    Value setIsSubsetHelper(const vector<Value>& lhs, const ValueSet& rhs) {
+        // do not shortcircuit when lhs.size() > rhs.size()
+        // because lhs can have redundant entries
+        for (vector<Value>::const_iterator it = lhs.begin(); it != lhs.end(); ++it) {
+            if (!rhs.count(*it)) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+}
+
     Value ExpressionSetIsSubset::evaluateInternal(Variables* vars) const {
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
@@ -2017,18 +2056,56 @@ namespace {
                                      << "argument is of type: " << typeName(rhs.getType()),
                 rhs.getType() == Array);
 
-        const vector<Value>& potentialSubset = lhs.getArray();
-        const ValueSet& fullSet = arrayToSet(rhs);
+        return setIsSubsetHelper(lhs.getArray(), arrayToSet(rhs));
+    }
 
-        // do not shortcircuit when potentialSubset.size() > fullSet.size()
-        // because potentialSubset can have redundant entries
-        for (vector<Value>::const_iterator it = potentialSubset.begin();
-                it != potentialSubset.end(); ++it) {
-            if (!fullSet.count(*it)) {
-                return Value(false);
-            }
+    /**
+     * This class handles the case where the RHS set is constant.
+     *
+     * Since it is constant we can construct the hashset once which makes the runtime performance
+     * effectively constant with respect to the size of RHS. Large, constant RHS is expected to be a
+     * major use case for $redact and this has been verified to improve performance significantly.
+     */
+    class ExpressionSetIsSubset::Optimized : public ExpressionSetIsSubset {
+    public:
+        Optimized(const ValueSet& cachedRhsSet, const ExpressionVector& operands)
+            : _cachedRhsSet(cachedRhsSet)
+        {
+            vpOperand = operands;
         }
-        return Value(true);
+
+        virtual Value evaluateInternal(Variables* vars) const {
+            const Value lhs = vpOperand[0]->evaluateInternal(vars);
+
+            uassert(17310, str::stream() << "both operands of $setIsSubset must be arrays. First "
+                                         << "argument is of type: " << typeName(lhs.getType()),
+                    lhs.getType() == Array);
+
+            return setIsSubsetHelper(lhs.getArray(), _cachedRhsSet);
+        }
+
+    private:
+        const ValueSet _cachedRhsSet;
+    };
+
+    intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
+        // perfore basic optimizations
+        intrusive_ptr<Expression> optimized = ExpressionNary::optimize();
+
+        // if ExpressionNary::optimize() created a new value, return it directly
+        if (optimized.get() != this)
+            return optimized;
+
+        if (ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
+            const Value rhs = ec->getValue();
+            uassert(17311, str::stream() << "both operands of $setIsSubset must be arrays. Second "
+                                         << "argument is of type: " << typeName(rhs.getType()),
+                    rhs.getType() == Array);
+
+            return new Optimized(arrayToSet(rhs), vpOperand);
+        }
+
+        return optimized;
     }
 
     REGISTER_EXPRESSION("$setIsSubset", ExpressionSetIsSubset::parse);

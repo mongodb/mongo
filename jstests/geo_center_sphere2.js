@@ -104,7 +104,7 @@ for ( var test = 0; test < numTests; test++ ) {
 	var results = t.find( { loc : { $nearSphere : startPoint, $maxDistance : radius } } ).limit( 2 * pointsIn )
 			.toArray()
 				
-	assert.eq( pointsIn, results.length )
+	assert.eq( docsIn, results.length )
 	
 	var distance = 0;
 	for ( var i = 0; i < results.length; i++ ) {
@@ -137,7 +137,7 @@ for ( var test = 0; test < numTests; test++ ) {
 	}	
 	*/
 		
-	assert.eq( pointsIn, results.length )
+	assert.eq( docsIn, results.length )
 
 	var distance = 0;
 	for ( var i = 0; i < results.length; i++ ) {

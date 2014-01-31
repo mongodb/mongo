@@ -31,16 +31,34 @@ ReplSetTest.prototype.upgradeSet = function( binVersion, options ){
         
         var prevPrimaryId = this.getNodeId( primary )
         
-        this.upgradeNode( node, binVersion, true )
+        if( options.custom ){
+            options.custom.binVersion = binVersion;
+
+            for( var nodeName in this.nodeOptions ){
+                this.nodeOptions[ nodeName ] = options.custom
+            }
+        }
+
+        this.upgradeNode( node, binVersion, true, options )
         
         if( noDowntimePossible )
             assert.eq( this.getNodeId( primary ), prevPrimaryId )
     }
 }
 
-ReplSetTest.prototype.upgradeNode = function( node, binVersion, waitForState ){
-    
-    var node = this.restart( node, { binVersion : binVersion } )
+ReplSetTest.prototype.upgradeNode = function( node, binVersion, waitForState, options ){
+
+    var node;
+    if (options.custom) {
+        node = this.restart( node, options.custom );
+    } else {
+        node = this.restart( node, { binVersion : binVersion } );
+    }
+
+    if (options.auth) {
+        // Hardcode admin database, because otherwise can't get repl set status
+        node.getDB("admin").auth(options.auth);
+    }
     
     // By default, wait for primary or secondary state
     if( waitForState == undefined ) waitForState = true

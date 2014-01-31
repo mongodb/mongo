@@ -35,7 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/cc_by_loc.h" // for typedef CursorId
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
@@ -273,6 +273,8 @@ namespace mongo {
      */
     struct RangeDeleterEnv {
         virtual ~RangeDeleterEnv() {}
+
+        virtual void initThread() = 0;
 
         /**
          * Deletes the documents from the given range. This method should be

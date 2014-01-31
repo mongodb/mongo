@@ -82,7 +82,7 @@ namespace mongo {
         bool isFailed() const;
         double getSoTimeout() const;
         std::string getServerAddress() const;
-        std::string toString();
+        std::string toString() const;
 
         //
         // Unsupported methods (defined to get rid of virtual function was hidden error)

@@ -23,13 +23,19 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/startup_test.h"
 
 using namespace mongoutils;
+
+namespace {
+    mongo::AtomicUInt64 mmfNextId(0);
+}
 
 namespace mongo {
     static size_t fetchMinOSPageSizeBytes() {
@@ -38,8 +44,10 @@ namespace mongo {
         return minOSPageSizeBytes;
     }
     const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
+        
+    
 
-    MemoryMappedFile::MemoryMappedFile() {
+    MemoryMappedFile::MemoryMappedFile() : _uniqueId(mmfNextId.fetchAndAdd(1)) {
         fd = 0;
         maphandle = 0;
         len = 0;
@@ -67,29 +75,63 @@ namespace mongo {
 #define MAP_NORESERVE (0)
 #endif
 
+    namespace {
+        void* _pageAlign( void* p ) {
+            return (void*)((int64_t)p & ~(g_minOSPageSizeBytes-1));
+        }
+
+        class PageAlignTest : public StartupTest {
+        public:
+            void run() {
+                {
+                    int64_t x = g_minOSPageSizeBytes + 123;
+                    void* y = _pageAlign( reinterpret_cast<void*>( x ) );
+                    invariant( g_minOSPageSizeBytes == reinterpret_cast<size_t>(y) );
+                }
+                {
+                    int64_t a = static_cast<uint64_t>( numeric_limits<int>::max() );
+                    a = a / g_minOSPageSizeBytes;
+                    a = a * g_minOSPageSizeBytes;
+                    // a should now be page aligned
+
+                    // b is not page aligned
+                    int64_t b = a + 123;
+
+                    void* y = _pageAlign( reinterpret_cast<void*>( b ) );
+                    invariant( a == reinterpret_cast<int64_t>(y) );
+                }
+
+            }
+        } pageAlignTest;
+    }
+
 #if defined(__sunos__)
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 #else
     MAdvise::MAdvise(void *p, unsigned len, Advice a) {
-        
-        _p = (void*)((long)p & ~(g_minOSPageSizeBytes-1));
-        
-        _len = len +((unsigned long long)p-(unsigned long long)_p);
-        
+
+        _p = _pageAlign( p );
+
+        _len = len + static_cast<unsigned>( reinterpret_cast<size_t>(p) -
+                                            reinterpret_cast<size_t>(_p)  );
+
         int advice = 0;
         switch ( a ) {
-        case Sequential: advice = MADV_SEQUENTIAL; break;
-        case Random: advice = MADV_RANDOM; break;
-        default: verify(0);
+        case Sequential:
+            advice = MADV_SEQUENTIAL;
+            break;
+        case Random:
+            advice = MADV_RANDOM;
+            break;
         }
-        
+
         if ( madvise(_p,_len,advice ) ) {
-            error() << "madvise failed: " << errnoWithDescription() << endl;
+            error() << "madvise failed: " << errnoWithDescription();
         }
-        
+
     }
-    MAdvise::~MAdvise() { 
+    MAdvise::~MAdvise() {
         madvise(_p,_len,MADV_NORMAL);
     }
 #endif
@@ -198,30 +240,56 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         if ( views.empty() || fd == 0 )
             return;
-        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) )
-            problem() << "msync " << errnoWithDescription() << endl;
+        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) ) {
+            // msync failed, this is very bad
+            problem() << "msync failed: " << errnoWithDescription();
+            dataSyncFailedHandler();
+        }
     }
 
     class PosixFlushable : public MemoryMappedFile::Flushable {
     public:
-        PosixFlushable( void * view , HANDLE fd , long len )
-            : _view( view ) , _fd( fd ) , _len(len) {
+        PosixFlushable( MemoryMappedFile* theFile, void* view , HANDLE fd , long len)
+            : _theFile( theFile ), _view( view ), _fd(fd), _len(len), _id(_theFile->getUniqueId()) {
         }
 
         void flush() {
-            if ( _view && _fd )
-                if ( msync(_view, _len, MS_SYNC ) )
-                    problem() << "msync " << errnoWithDescription() << endl;
+            if ( _view == NULL || _fd == 0 )
+                return;
 
+            if ( msync(_view, _len, MS_SYNC ) == 0 )
+                return;
+
+            if ( errno == EBADF ) {
+                // ok, we were unlocked, so this file was closed
+                return;
+            }
+
+            // some error, lets see if we're supposed to exist
+            LockMongoFilesShared mmfilesLock;
+            std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
+            std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
+            if ( (it == mmfs.end()) || ((*it)->getUniqueId() != _id) ) {
+                log() << "msync failed with: " << errnoWithDescription()
+                      << " but file doesn't exist anymore, so ignoring";
+                // this was deleted while we were unlocked
+                return;
+            }
+
+            // we got an error, and we still exist, so this is bad, we fail
+            problem() << "msync " << errnoWithDescription() << endl;
+            dataSyncFailedHandler();
         }
 
+        MemoryMappedFile* _theFile;
         void * _view;
         HANDLE _fd;
         long _len;
+        const uint64_t _id;
     };
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new PosixFlushable( viewForFlushing() , fd , len );
+        return new PosixFlushable( this, viewForFlushing(), fd, len);
     }
 
 

@@ -31,7 +31,7 @@
 #include <sstream>
 
 // this violates the README rules for mongoutils:
-#include "../../bson/util/builder.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongoutils {
 

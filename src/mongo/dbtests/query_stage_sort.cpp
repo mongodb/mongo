@@ -12,17 +12,31 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -49,29 +63,34 @@ namespace QueryStageSortTests {
             _client.insert(ns(), obj);
         }
 
-        void getLocs(set<DiskLoc>* locs) {
-            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns());
-                 c->ok(); c->advance()) {
-
-                locs->insert(c->currLoc());
+        void getLocs(set<DiskLoc>* out, Collection* coll) {
+            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+                                                       CollectionScanParams::FORWARD);
+            while (!it->isEOF()) {
+                DiskLoc nextLoc = it->getNext();
+                out->insert(nextLoc);
             }
+            delete it;
         }
 
         /**
          * We feed a mix of (key, unowned, owned) data to the sort stage.
          */
-        void insertVarietyOfObjects(MockStage* ms) {
+        void insertVarietyOfObjects(MockStage* ms, Collection* coll) {
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
 
             set<DiskLoc>::iterator it = locs.begin();
 
             for (int i = 0; i < numObj(); ++i, ++it) {
+                ASSERT_FALSE(it == locs.end());
+
                 // Insert some owned obj data.
                 WorkingSetMember member;
-                member.state = WorkingSetMember::OWNED_OBJ;
-                member.obj = it->obj().getOwned();
-                ASSERT(member.obj.isOwned());
+                member.loc = *it;
+                member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                member.obj = it->obj();
+                ASSERT_FALSE(member.obj.isOwned());
                 ms->pushBack(member);
             }
         }
@@ -90,15 +109,16 @@ namespace QueryStageSortTests {
          * If extAllowed is true, sorting will use use external sorting if available.
          * If limit is not zero, we limit the output of the sort stage to 'limit' results.
          */
-        void sortAndCheck(int direction) {
+        void sortAndCheck(int direction, Collection* coll) {
             WorkingSet* ws = new WorkingSet();
             MockStage* ms = new MockStage(ws);
 
             // Insert a mix of the various types of data.
-            insertVarietyOfObjects(ms);
+            insertVarietyOfObjects(ms, coll);
 
             SortStageParams params;
             params.pattern = BSON("foo" << direction);
+            params.limit = limit();
 
             // Must fetch so we can look at the doc as a BSONObj.
             PlanExecutor runner(ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL));
@@ -121,11 +141,29 @@ namespace QueryStageSortTests {
                 last = current;
             }
 
+            checkCount(count);
+        }
+
+        /**
+         * Check number of results returned from sort.
+         */
+        void checkCount(int count) {
             // No limit, should get all objects back.
-            ASSERT_EQUALS(numObj(), count);
+            // Otherwise, result set should be smaller of limit and input data size.
+            if (limit() > 0 && limit() < numObj()) {
+                ASSERT_EQUALS(limit(), count);
+            }
+            else {
+                ASSERT_EQUALS(numObj(), count);
+            }
         }
 
         virtual int numObj() = 0;
+
+        // Returns sort limit
+        // Leave as 0 to disable limit.
+        virtual int limit() const { return 0; };
+
 
         static const char* ns() { return "unittests.QueryStageSort"; }
     private:
@@ -141,8 +179,14 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
             fillData();
-            sortAndCheck(1);
+            sortAndCheck(1, coll);
         }
     };
 
@@ -153,8 +197,23 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
             fillData();
-            sortAndCheck(-1);
+            sortAndCheck(-1, coll);
+        }
+    };
+
+    // Sort in descreasing order with limit applied
+    template <int LIMIT>
+    class QueryStageSortDecWithLimit : public QueryStageSortDec {
+    public:
+        virtual int limit() const {
+            return LIMIT;
         }
     };
 
@@ -165,8 +224,14 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
             fillData();
-            sortAndCheck(-1);
+            sortAndCheck(-1, coll);
         }
     };
 
@@ -177,19 +242,25 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
             fillData();
 
             // The data we're going to later invalidate.
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
 
-            // Build the mock stage which feeds the data.
+            // Build the mock scan stage which feeds the data.
             WorkingSet ws;
             auto_ptr<MockStage> ms(new MockStage(&ws));
-            insertVarietyOfObjects(ms.get());
+            insertVarietyOfObjects(ms.get(), coll);
 
             SortStageParams params;
             params.pattern = BSON("foo" << 1);
+            params.limit = limit();
             auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
 
             const int firstRead = 10;
@@ -204,7 +275,7 @@ namespace QueryStageSortTests {
             // We should have read in the first 'firstRead' locs.  Invalidate the first.
             ss->prepareToYield();
             set<DiskLoc>::iterator it = locs.begin();
-            ss->invalidate(*it++);
+            ss->invalidate(*it++, INVALIDATION_DELETION);
             ss->recoverFromYield();
 
             // Read the rest of the data from the mock stage.
@@ -219,11 +290,11 @@ namespace QueryStageSortTests {
             // Let's just invalidate everything now.
             ss->prepareToYield();
             while (it != locs.end()) {
-                ss->invalidate(*it++);
+                ss->invalidate(*it++, INVALIDATION_DELETION);
             }
             ss->recoverFromYield();
 
-            // The sort should still work.
+            // Invalidation of data in the sort stage fetches it but passes it through.
             int count = 0;
             while (!ss->isEOF()) {
                 WorkingSetID id;
@@ -235,9 +306,20 @@ namespace QueryStageSortTests {
                 ++count;
             }
 
-            // We've invalidated everything, but only 2/3 of our data had a DiskLoc to be
-            // invalidated.  We get the rest as-is.
-            ASSERT_EQUALS(count, numObj());
+            // Returns all docs.
+            ASSERT_EQUALS(limit() ? limit() : numObj(), count);
+        }
+    };
+
+    // Invalidation of everything fed to sort with limit enabled.
+    // Limit size of working set within sort stage to a small number
+    // Sort stage implementation should not try to invalidate DiskLocc that
+    // are no longer in the working set.
+    template<int LIMIT>
+    class QueryStageSortInvalidationWithLimit : public QueryStageSortInvalidation {
+    public:
+        virtual int limit() const {
+            return LIMIT;
         }
     };
 
@@ -248,8 +330,14 @@ namespace QueryStageSortTests {
         void setupTests() {
             add<QueryStageSortInc>();
             add<QueryStageSortDec>();
+            // Sort with limit has a general limiting strategy for limit > 1
+            add<QueryStageSortDecWithLimit<10> >();
+            // and a special case for limit == 1
+            add<QueryStageSortDecWithLimit<1> >();
             add<QueryStageSortExt>();
             add<QueryStageSortInvalidation>();
+            add<QueryStageSortInvalidationWithLimit<10> >();
+            add<QueryStageSortInvalidationWithLimit<1> >();
         }
     }  queryStageSortTest;
 

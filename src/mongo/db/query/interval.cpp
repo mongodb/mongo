@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/db/query/interval.h"
@@ -108,7 +120,7 @@ namespace mongo {
     }
 
     void Interval::init(BSONObj base, bool si, bool ei) {
-        dassert(base.nFields() >= 2);
+        verify(base.nFields() >= 2);
 
         _intervalData = base.getOwned();
         BSONObjIterator it(_intervalData);
@@ -120,6 +132,11 @@ namespace mongo {
 
     bool Interval::isEmpty() const {
         return _intervalData.nFields() == 0;
+    }
+
+    // XXX: move the stuff in the anonymous namespace into 'this' and clean this file up in general.
+    bool Interval::equals(const Interval& other) const {
+        return exact(*this, other);
     }
 
     // TODO: shortcut number of comparisons
@@ -150,7 +167,9 @@ namespace mongo {
         //
 
         if (precedes(*this, other)) {
-            if (0 == end.woCompare(other.start, false)) {
+            // It's not possible for both endInclusive and other.startInclusive to be true because
+            // the bounds would intersect. Refer to section on "Intersect cases" above.
+            if ((endInclusive || other.startInclusive) && 0 == end.woCompare(other.start, false)) {
                 return INTERVAL_PRECEDES_COULD_UNION;
             }
             return INTERVAL_PRECEDES;
@@ -195,7 +214,7 @@ namespace mongo {
             break;
 
         default:
-            dassert(false);
+            verify(false);
         }
     }
 
@@ -232,7 +251,7 @@ namespace mongo {
             break;
 
         default:
-            dassert(false);
+            verify(false);
         }
     }
 

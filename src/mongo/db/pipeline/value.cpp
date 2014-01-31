@@ -477,19 +477,15 @@ namespace mongo {
     }
 
     string Value::coerceToString() const {
-        stringstream ss;
         switch(getType()) {
         case NumberDouble:
-            ss << _storage.doubleValue;
-            return ss.str();
+            return str::stream() << _storage.doubleValue;
 
         case NumberInt:
-            ss << _storage.intValue;
-            return ss.str();
+            return str::stream() << _storage.intValue;
 
         case NumberLong:
-            ss << _storage.longValue;
-            return ss.str();
+            return str::stream() << _storage.longValue;
 
         case Code:
         case Symbol:
@@ -497,8 +493,7 @@ namespace mongo {
             return getStringData().toString();
 
         case Timestamp:
-            ss << getTimestamp().toStringPretty();
-            return ss.str();
+            return getTimestamp().toStringPretty();
 
         case Date:
             return tmToISODateString(coerceToTm());

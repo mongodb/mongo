@@ -15,12 +15,14 @@
 
 #include "mongo/db/json.h"
 
+#include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -46,7 +48,9 @@ namespace mongo {
         BINDATA_RESERVE_SIZE = 4096,
         BINDATATYPE_RESERVE_SIZE = 4096,
         NS_RESERVE_SIZE = 64,
-        DB_RESERVE_SIZE = 64
+        DB_RESERVE_SIZE = 64,
+        NUMBERLONG_RESERVE_SIZE = 64,
+        DATE_RESERVE_SIZE = 64
     };
 
     static const char* LBRACE = "{",
@@ -261,6 +265,15 @@ namespace mongo {
                 return ret;
             }
         }
+        else if (firstField == "$numberLong") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $numberLong");
+            }
+            Status ret = numberLongObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
         else { // firstField != <reserved field name>
             // Normal object
 
@@ -369,20 +382,72 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
-        Date_t date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
-        if (_input == endptr) {
-            return parseError("Date expecting integer milliseconds");
-        }
-        if (errno == ERANGE) {
-            /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
-            * See SERVER-8330 and SERVER-8573 */
-            errno = 0;
-            date = strtoull(_input, &endptr, 10);
-            if (errno == ERANGE) {
-                return parseError("Date milliseconds overflow");
+        Date_t date;
+
+        if (peekToken(DOUBLEQUOTE)) {
+            std::string dateString;
+            dateString.reserve(DATE_RESERVE_SIZE);
+            Status ret = quotedString(&dateString);
+            if (!ret.isOK()) {
+                return ret;
             }
+            StatusWith<Date_t> dateRet = dateFromISOString(dateString);
+            if (!dateRet.isOK()) {
+                return dateRet.getStatus();
+            }
+            date = dateRet.getValue();
         }
-        _input = endptr;
+        else if (readToken(LBRACE)) {
+            std::string fieldName;
+            fieldName.reserve(FIELD_RESERVE_SIZE);
+            Status ret = field(&fieldName);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+            if (fieldName != "$numberLong") {
+                return parseError("Expected field name: $numberLong for $date value object");
+            }
+            if (!readToken(COLON)) {
+                return parseError("Expecting ':'");
+            }
+
+            // The number must be a quoted string, since large long numbers could overflow a double
+            // and thus may not be valid JSON
+            std::string numberLongString;
+            numberLongString.reserve(NUMBERLONG_RESERVE_SIZE);
+            ret = quotedString(&numberLongString);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            long long numberLong;
+            ret = parseNumberFromString(numberLongString, &numberLong);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            date = numberLong;
+        }
+        else {
+            // SERVER-11920: We should use parseNumberFromString here, but that function requires
+            // that we know ahead of time where the number ends, which is not currently the case.
+            date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
+            if (_input == endptr) {
+                return parseError("Date expecting integer milliseconds");
+            }
+            if (errno == ERANGE) {
+                /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
+                * See SERVER-8330 and SERVER-8573 */
+                errno = 0;
+                // SERVER-11920: We should use parseNumberFromString here, but that function
+                // requires that we know ahead of time where the number ends, which is not currently
+                // the case.
+                date = strtoull(_input, &endptr, 10);
+                if (errno == ERANGE) {
+                    return parseError("Date milliseconds overflow");
+                }
+            }
+            _input = endptr;
+        }
         builder.appendDate(fieldName, date);
         return Status::OK();
     }
@@ -406,6 +471,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t seconds = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp seconds overflow");
@@ -428,6 +495,8 @@ namespace mongo {
             return parseError("Negative increment in \"$timestamp\"");
         }
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t count = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp increment overflow");
@@ -540,6 +609,30 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status JParse::numberLongObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!readToken(COLON)) {
+            return parseError("Expecting ':'");
+        }
+
+        // The number must be a quoted string, since large long numbers could overflow a double and
+        // thus may not be valid JSON
+        std::string numberLongString;
+        numberLongString.reserve(NUMBERLONG_RESERVE_SIZE);
+        Status ret = quotedString(&numberLongString);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        long long numberLong;
+        ret = parseNumberFromString(numberLongString, &numberLong);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        builder.appendNumber(fieldName, numberLong);
+        return Status::OK();
+    }
+
     Status JParse::array(const StringData& fieldName, BSONObjBuilder& builder) {
         MONGO_JSON_DEBUG("fieldName: " << fieldName);
         uint32_t index(0);
@@ -583,6 +676,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         Date_t date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
         if (_input == endptr) {
             return parseError("Date expecting integer milliseconds");
@@ -591,6 +686,8 @@ namespace mongo {
             /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
             * See SERVER-8330 and SERVER-8573 */
             errno = 0;
+            // SERVER-11920: We should use parseNumberFromString here, but that function requires
+            // that we know ahead of time where the number ends, which is not currently the case.
             date = strtoull(_input, &endptr, 10);
             if (errno == ERANGE) {
                 return parseError("Date milliseconds overflow");
@@ -613,6 +710,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t seconds = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp seconds overflow");
@@ -628,6 +727,8 @@ namespace mongo {
             return parseError("Negative seconds in \"$timestamp\"");
         }
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         uint32_t count = strtoul(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("Timestamp increment overflow");
@@ -672,12 +773,14 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         int64_t val = strtoll(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("NumberLong out of range");
         }
         if (_input == endptr) {
-            return parseError("Expecting unsigned number in NumberLong");
+            return parseError("Expecting number in NumberLong");
         }
         _input = endptr;
         if (!readToken(RPAREN)) {
@@ -693,6 +796,8 @@ namespace mongo {
         }
         errno = 0;
         char* endptr;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         int32_t val = strtol(_input, &endptr, 10);
         if (errno == ERANGE) {
             return parseError("NumberInt out of range");
@@ -806,6 +911,8 @@ namespace mongo {
 
         // reset errno to make sure that we are getting it from strtod
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         retd = strtod(_input, &endptrd);
         // if pointer does not move, we found no digits
         if (_input == endptrd) {
@@ -816,6 +923,8 @@ namespace mongo {
         }
         // reset errno to make sure that we are getting it from strtoll
         errno = 0;
+        // SERVER-11920: We should use parseNumberFromString here, but that function requires that
+        // we know ahead of time where the number ends, which is not currently the case.
         retll = strtoll(_input, &endptrll, 10);
         if (endptrll < endptrd || errno == ERANGE) {
             // The number either had characters only meaningful for a double or

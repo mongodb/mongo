@@ -38,15 +38,17 @@
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
 
 namespace mongo {
 
     class TargetedWriteBatch;
     struct ShardError;
+    struct ShardWCError;
     class TrackedErrors;
-    class BatchWriteStats;
+    struct BatchWriteStats;
 
     /**
      * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -130,7 +132,14 @@ namespace mongo {
          * BatchWriteOp, and so a response is not available.
          */
         void noteBatchError( const TargetedWriteBatch& targetedBatch,
-                             const BatchedErrorDetail& error );
+                             const WriteErrorDetail& error );
+
+        /**
+         * Sets a command error for this batch op directly.
+         *
+         * Should only be used when there are no outstanding batches to return.
+         */
+        void setBatchError( const WriteErrorDetail& error );
 
         /**
          * Returns false if the batch write op needs more processing.
@@ -141,6 +150,14 @@ namespace mongo {
          * Fills a batch response to send back to the client.
          */
         void buildClientResponse( BatchedCommandResponse* batchResp );
+
+        //
+        // Accessors
+        //
+
+        int numWriteOps() const;
+
+        int numWriteOpsIn( WriteOpState state ) const;
 
     private:
 
@@ -155,10 +172,15 @@ namespace mongo {
         std::set<const TargetedWriteBatch*> _targeted;
 
         // Write concern responses from all write batches so far
-        OwnedPointerVector<ShardError> _wcErrors;
+        OwnedPointerVector<ShardWCError> _wcErrors;
 
         // Upserted ids for the whole write batch
         OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
+
+        // Use to store a top-level error indicating that the batch aborted unexpectedly and we
+        // can't report on any of the writes sent.  May also include a ShardEndpoint indicating
+        // where the root problem was.
+        scoped_ptr<ShardError> _batchError;
 
         // Stats for the entire batch op
         scoped_ptr<BatchWriteStats> _stats;
@@ -171,6 +193,7 @@ namespace mongo {
         int numInserted;
         int numUpserted;
         int numUpdated;
+        int numModified;
         int numDeleted;
 
     };
@@ -222,13 +245,29 @@ namespace mongo {
      */
     struct ShardError {
 
-        ShardError( const ShardEndpoint& endpoint, const BatchedErrorDetail& error ) :
+        ShardError( const ShardEndpoint& endpoint, const WriteErrorDetail& error ) :
             endpoint( endpoint ) {
             error.cloneTo( &this->error );
         }
 
         const ShardEndpoint endpoint;
-        BatchedErrorDetail error;
+        WriteErrorDetail error;
+    };
+
+    /**
+     * Simple struct for storing a write concern error with an endpoint.
+     *
+     * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+     */
+    struct ShardWCError {
+
+        ShardWCError( const ShardEndpoint& endpoint, const WCErrorDetail& error ) :
+            endpoint( endpoint ) {
+            error.cloneTo( &this->error );
+        }
+
+        const ShardEndpoint endpoint;
+        WCErrorDetail error;
     };
 
     /**

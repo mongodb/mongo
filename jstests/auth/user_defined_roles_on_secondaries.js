@@ -111,10 +111,10 @@ rstest.nodes.forEach(function (node) {
     assert.eq(2, role.roles.length, node);
     assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
     assertListContainsRole(role.roles, {role: "r2", db: "db1"}, node);
-    assert.eq(3, role.indirectRoles.length, node);
-    assertListContainsRole(role.indirectRoles, {role: "r1", db: "db1"}, node);
-    assertListContainsRole(role.indirectRoles, {role: "r2", db: "db1"}, node);
-    assertListContainsRole(role.indirectRoles, {role: "read", db: "db1"}, node);
+    assert.eq(3, role.inheritedRoles.length, node);
+    assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
+    assertListContainsRole(role.inheritedRoles, {role: "r2", db: "db1"}, node);
+    assertListContainsRole(role.inheritedRoles, {role: "read", db: "db1"}, node);
 });
 
 // Verify that updating roles propagates.
@@ -133,9 +133,9 @@ rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("r3");
     assert.eq(1, role.roles.length, node);
     assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
-    assert.eq(2, role.indirectRoles.length, node);
-    assertListContainsRole(role.indirectRoles, {role: "r1", db: "db1"}, node);
-    assertListContainsRole(role.indirectRoles, {role: "dbAdmin", db: "db1"}, node);
+    assert.eq(2, role.inheritedRoles.length, node);
+    assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
+    assertListContainsRole(role.inheritedRoles, {role: "dbAdmin", db: "db1"}, node);
 });
 
 // Verify that dropping the admin database propagates.

@@ -31,14 +31,14 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/cursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/parsed_query.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query_optimizer.h"
+#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/s/d_logic.h"
-
 
 namespace mongo {
 
@@ -54,8 +54,8 @@ namespace {
 
         bool isCapped(const NamespaceString& ns) {
             Client::ReadContext ctx(ns.ns());
-            NamespaceDetails* nsd = nsdetails(ns.ns());
-            return nsd && nsd->isCapped();
+            Collection* collection = ctx.ctx().db()->getCollection(ns);
+            return collection && collection->isCapped();
         }
 
     private:
@@ -100,29 +100,13 @@ namespace {
             sources.pop_front();
         }
 
+        // Find the set of fields in the source documents depended on by this pipeline.
+        const DepsTracker deps = pPipeline->getDependencies(queryObj);
 
-        /* Look for an initial simple project; we'll avoid constructing Values
-         * for fields that won't make it through the projection.
-         */
-
-        bool haveProjection = false;
-        BSONObj projection;
-        DocumentSource::ParsedDeps dependencies;
-        {
-            set<string> deps;
-            DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
-            for (size_t i=0; i < sources.size() && status == DocumentSource::SEE_NEXT; i++) {
-                status = sources[i]->getDependencies(deps);
-                if (deps.count(string())) // empty string means we need the full doc
-                    status = DocumentSource::NOT_SUPPORTED;
-            }
-
-            if (status == DocumentSource::EXHAUSTIVE) {
-                projection = DocumentSource::depsToProjection(deps);
-                dependencies = DocumentSource::parseDeps(deps);
-                haveProjection = true;
-            }
-        }
+        // Passing query an empty projection since it is faster to use ParsedDeps::extractFields().
+        // This will need to change to support covering indexes (SERVER-12015). There is an
+        // exception for textScore since that can only be retrieved by a query projection.
+        const BSONObj projectionForQuery = deps.needTextScore ? deps.toProjection() : BSONObj();
 
         /*
           Look for an initial sort; we'll try to add this to the
@@ -131,15 +115,13 @@ namespace {
           will already come sorted in the specified order as a result of the
           index scan.
         */
-        intrusive_ptr<DocumentSourceSort> pSort;
+        intrusive_ptr<DocumentSourceSort> sortStage;
         BSONObj sortObj;
         if (!sources.empty()) {
-            const intrusive_ptr<DocumentSource> &pSC = sources.front();
-            pSort = dynamic_cast<DocumentSourceSort *>(pSC.get());
-
-            if (pSort) {
+            sortStage = dynamic_cast<DocumentSourceSort*>(sources.front().get());
+            if (sortStage) {
                 // build the sort key
-                sortObj = pSort->serializeSortKey().toBson();
+                sortObj = sortStage->serializeSortKey(/*explain*/false).toBson();
             }
         }
 
@@ -156,115 +138,102 @@ namespace {
              fullName << "\n----\n");
         }
 
-        // Create the necessary context to use a Cursor, including taking a namespace read lock,
-        // see SERVER-6123.
+        // Create the necessary context to use a Runner, including taking a namespace read lock.
         // Note: this may throw if the sharding version for this connection is out of date.
         Client::ReadContext context(fullName);
-
-        /*
-          Create the cursor.
-
-          If we try to create a cursor that includes both the match and the
-          sort, and the two are incompatible wrt the available indexes, then
-          we don't get a cursor back.
-
-          So we try to use both first.  If that fails, try again, without the
-          sort.
-
-          If we don't have a sort, jump straight to just creating a cursor
-          without the sort.
-
-          If we are able to incorporate the sort into the cursor, remove it
-          from the head of the pipeline.
-
-          LATER - we should be able to find this out before we create the
-          cursor.  Either way, we can then apply other optimizations there
-          are tickets for, such as SERVER-4507.
-         */
-
-        shared_ptr<Cursor> pCursor;
-        bool initSort = false;
-        if (pSort) {
-            const BSONObj queryAndSort = BSON("$query" << queryObj << "$orderby" << sortObj);
-            shared_ptr<ParsedQuery> pq (new ParsedQuery(
-                fullName.c_str(), 0, 0, QueryOption_NoCursorTimeout, queryAndSort, projection));
-
-            /* try to create the cursor with the query and the sort */
-            shared_ptr<Cursor> pSortedCursor(
-                getOptimizedCursor(
-                    fullName.c_str(), queryObj, sortObj,
-                    QueryPlanSelectionPolicy::any(), pq));
-
-            if (pSortedCursor.get()) {
-                /* success:  remove the sort from the pipeline */
+        Collection* collection = context.ctx().db()->getCollection(fullName);
+        if ( !collection ) {
+            intrusive_ptr<DocumentSource> source(DocumentSourceBsonArray::create(BSONObj(),
+                                                                                 pExpCtx));
+            while (!sources.empty() && source->coalesce(sources.front())) {
                 sources.pop_front();
+            }
+            pPipeline->addInitialSource( source );
+            return;
+        }
 
-                if (pSort->getLimitSrc()) {
+        // Create the Runner.
+        //
+        // If we try to create a Runner that includes both the match and the
+        // sort, and the two are incompatible wrt the available indexes, then
+        // we don't get a Runner back.
+        //
+        // So we try to use both first.  If that fails, try again, without the
+        // sort.
+        //
+        // If we don't have a sort, jump straight to just creating a Runner
+        // without the sort.
+        //
+        // If we are able to incorporate the sort into the Runner, remove it
+        // from the head of the pipeline.
+        //
+        // LATER - we should be able to find this out before we create the
+        // cursor.  Either way, we can then apply other optimizations there
+        // are tickets for, such as SERVER-4507.
+        const size_t runnerOptions = QueryPlannerParams::DEFAULT
+                                   | QueryPlannerParams::INCLUDE_COLLSCAN
+                                   | QueryPlannerParams::INCLUDE_SHARD_FILTER
+                                   | QueryPlannerParams::NO_BLOCKING_SORT
+                                   ;
+        auto_ptr<Runner> runner;
+        bool sortInRunner = false;
+        if (sortStage) {
+            CanonicalQuery* cq;
+            Status status =
+                CanonicalQuery::canonicalize(pExpCtx->ns,
+                                             queryObj,
+                                             sortObj,
+                                             projectionForQuery,
+                                             &cq);
+            Runner* rawRunner;
+            if (status.isOK() && getRunner(cq, &rawRunner, runnerOptions).isOK()) {
+                // success: The Runner will handle sorting for us using an index.
+                runner.reset(rawRunner);
+                sortInRunner = true;
+
+                sources.pop_front();
+                if (sortStage->getLimitSrc()) {
                     // need to reinsert coalesced $limit after removing $sort
-                    sources.push_front(pSort->getLimitSrc());
+                    sources.push_front(sortStage->getLimitSrc());
                 }
-
-                pCursor = pSortedCursor;
-                initSort = true;
             }
         }
 
-        if (!pCursor.get()) {
-            shared_ptr<ParsedQuery> pq (new ParsedQuery(
-                fullName.c_str(), 0, 0, QueryOption_NoCursorTimeout, queryObj, projection));
+        if (!runner.get()) {
+            const BSONObj noSort;
+            CanonicalQuery* cq;
+            uassertStatusOK(
+                CanonicalQuery::canonicalize(pExpCtx->ns,
+                                             queryObj,
+                                             noSort,
+                                             projectionForQuery,
+                                             &cq));
 
-            /* try to create the cursor without the sort */
-            shared_ptr<Cursor> pUnsortedCursor(
-                getOptimizedCursor(
-                    fullName.c_str(), queryObj, BSONObj(),
-                    QueryPlanSelectionPolicy::any(), pq));
-
-            pCursor = pUnsortedCursor;
+            Runner* rawRunner;
+            uassertStatusOK(getRunner(cq, &rawRunner, runnerOptions));
+            runner.reset(rawRunner);
         }
 
-        // Now wrap the Cursor in ClientCursor
-        ClientCursorHolder cursor(
-                new ClientCursor(QueryOption_NoCursorTimeout, pCursor, fullName));
+        // Now wrap the Runner in ClientCursor
+        auto_ptr<ClientCursor> cursor(new ClientCursor(collection, runner.release()));
+        verify(cursor->getRunner());
         CursorId cursorId = cursor->cursorid();
-        massert(16917, str::stream()
-                            << "cursor " << cursor->c()->toString()
-                            << "does its own locking so it can't be used with aggregation",
-                cursor->c()->requiresLock());
 
         // Prepare the cursor for data to change under it when we unlock
-        if (cursor->c()->supportYields()) {
-            ClientCursor::YieldData data;
-            cursor->prepareToYield(data);
-        }
-        else {
-            massert(16915, str::stream()
-                                << "cursor " << cursor->c()->toString()
-                                << " supports neither yields nor getMore, one of which"
-                                << " must be supported in an aggregation source",
-                    cursor->c()->supportGetMore());
-
-            cursor->c()->noteLocation();
-        }
+        cursor->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
+        cursor->getRunner()->saveState();
         cursor.release(); // it is now owned by the client cursor manager
 
         /* wrap the cursor with a DocumentSource and return that */
         intrusive_ptr<DocumentSourceCursor> pSource(
             DocumentSourceCursor::create( fullName, cursorId, pExpCtx ) );
 
-        /*
-          Note the query and sort
-
-          This records them for explain, and keeps them alive; they are
-          referenced (by reference) by the cursor, which doesn't make its
-          own copies of them.
-        */
+        // Note the query, sort, and projection for explain.
         pSource->setQuery(queryObj);
-        if (initSort)
+        if (sortInRunner)
             pSource->setSort(sortObj);
 
-        if (haveProjection) {
-            pSource->setProjection(projection, dependencies);
-        }
+        pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
 
         while (!sources.empty() && pSource->coalesce(sources.front())) {
             sources.pop_front();

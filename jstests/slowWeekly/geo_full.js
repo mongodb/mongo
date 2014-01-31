@@ -27,10 +27,7 @@ var randEnvironment = function(){
 	if( Random.rand() < 0.5 ){
 		return { max : 180, 
 				 min : -180, 
-                 // QUERY_MIGRATION: if it's spherical we don't change the # of bits.
-                 // The "will this wrap" function for query planning currently ignores the error
-                 // from low #s of bits.  See SERVER-11387.
-				 // bits : Math.floor( Random.rand() * 32 ) + 1, 
+				 bits : Math.floor( Random.rand() * 32 ) + 1, 
 				 earth : true,
 				 bucketSize : 360 / ( 4 * 1024 * 1024 * 1024 ) }
 	}
@@ -41,6 +38,7 @@ var randEnvironment = function(){
 	
     var max = Random.rand() * scale + offset
 	var min = - Random.rand() * scale + offset
+	var bits = Math.floor( Random.rand() * 32 ) + 1
 	var bits = Math.floor( Random.rand() * 32 ) + 1
 	var range = max - min
     var bucketSize = range / ( 4 * 1024 * 1024 * 1024 )
@@ -123,9 +121,17 @@ function computexscandist(y, maxDistDegrees) {
                                      Math.cos(deg2rad(Math.max(-89.0, y - maxDistDegrees))));
 }
 
-function pointIsOK(startPoint, radius) {
-    // QUERY_MIGRATION: figure out a better error
-    yscandist = rad2deg(radius) + 0.01;
+function errorMarginForPoint(env) {
+    if (!env.bits) {
+        return 0.01;
+    }
+    var scalingFactor = Math.pow(2, env.bits);
+    return ((env.max - env.min) / scalingFactor) * Math.sqrt(2);
+}
+
+function pointIsOK(startPoint, radius, env) {
+    var error = errorMarginForPoint(env);
+    yscandist = rad2deg(radius) + error;
     xscandist = computexscandist(startPoint[1], yscandist);
     return (startPoint[0] + xscandist < 180)
            && (startPoint[0] - xscandist > -180)
@@ -146,7 +152,7 @@ var randQuery = function( env ) {
 		for( i = 0; i < 5; i++ ){
             sphereRadius = Random.rand() * 45 * Math.PI / 180
             sphereCenter = randPoint( env )
-            if (pointIsOK(sphereCenter, sphereRadius)) { break; }
+            if (pointIsOK(sphereCenter, sphereRadius, env)) { break; }
             /*
 			var t = db.testSphere; t.drop(); t.ensureIndex({ loc : "2d" }, env )
 			try{ t.find({ loc : { $within : { $centerSphere : [ sphereCenter, sphereRadius ] } } } ).count(); var err; if( err = db.getLastError() ) throw err;  }
@@ -459,41 +465,62 @@ for ( var test = 0; test < numTests; test++ ) {
 	// $polygon
 	print( "Polygon query..." )
 	assert.eq( results.poly.docsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } ).count() )
-					 
-	// $near
-	print( "Near query..." )
-	assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.find( { "locs.loc" : { $near : query.center, $maxDistance : query.radius } } ).count( true ) )
 
-	if( query.sphereRadius >= 0 ){
-		print( "Near sphere query...")
-		// $centerSphere
-		assert.eq( results.sphere.locsIn > 100 ? 100 : results.sphere.locsIn, t.find( { "locs.loc" : { $nearSphere : query.sphereCenter, $maxDistance : query.sphereRadius } } ).count( true ) )
-	}
-	
-	// geoNear
-	// results limited by size of objects
-	if( data.maxLocs < 100 ){
-	    
-	    // GeoNear query
-	    print( "GeoNear query..." )
-	    assert.eq( results.center.locsIn > 100 ? 100 : results.center.locsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius }).results.length )
-	    // GeoNear query
-        assert.eq( results.center.docsIn > 100 ? 100 : results.center.docsIn, t.getDB().runCommand({ geoNear : "testAllGeo", near : query.center, maxDistance : query.radius, uniqueDocs : true }).results.length )
-       
-	    
-		var num = 2 * results.center.locsIn;
-		if( num > 200 ) num = 200;
-		
+    // $near, $nearSphere and geoNear results have a default document limit of 100.
+    var defaultDocLimit = 100;
+
+    // $near
+    print( "Near query..." )
+    assert.eq( Math.min( defaultDocLimit, results.center.docsIn ),
+               t.find( { "locs.loc" : { $near : query.center,
+                                        $maxDistance : query.radius } } ).count( true ),
+               "Near query: center: " + query.center +
+               "; radius: " + query.radius +
+               "; docs: " + results.center.docsIn +
+               "; locs: " + results.center.locsIn )
+
+    if( query.sphereRadius >= 0 ){
+        print( "Near sphere query...")
+        // $centerSphere
+        assert.eq( Math.min( defaultDocLimit, results.sphere.docsIn ),
+                   t.find( { "locs.loc" : { $nearSphere : query.sphereCenter,
+                                            $maxDistance : query.sphereRadius } } ).count( true ),
+                   "Near sphere query: sphere center: " + query.sphereCenter +
+                   "; radius: " + query.sphereRadius +
+                   "; docs: " + results.sphere.docsIn + "; locs: " + results.sphere.locsIn )
+    }
+
+    // geoNear
+    // results limited by size of objects
+    if( data.maxLocs < defaultDocLimit ){
+
+        // GeoNear query
+        print( "GeoNear query..." )
+        assert.eq( Math.min( defaultDocLimit, results.center.docsIn ),
+                   t.getDB().runCommand( { geoNear : "testAllGeo", near : query.center,
+                                           maxDistance : query.radius } ).results.length,
+                   "GeoNear query: center: " + query.center +
+                   "; radius: " + query.radius +
+                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn )
+
+
+        var num = Math.min( 2* defaultDocLimit, 2 * results.center.docsIn);
+
 		var output = db.runCommand( {
 			geoNear : "testAllGeo", 
 			near : query.center, 
 			maxDistance : query.radius ,
 			includeLocs : true,
 			num : num } ).results
-				
-		assert.eq( Math.min( 200, results.center.locsIn ), output.length )
-	
-		var distance = 0;
+
+        assert.eq( Math.min( num, results.center.docsIn ),
+                   output.length,
+                   "GeoNear query with limit of " + num +
+                   ": center: " + query.center +
+                   "; radius: " + query.radius +
+                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn )
+
+    	var distance = 0;
 		for ( var i = 0; i < output.length; i++ ) {
 			var retDistance = output[i].dis
 			var retLoc = locArray( output[i].loc )

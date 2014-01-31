@@ -29,12 +29,14 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/namespace_details.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
+
+    class NamespaceDetails;
 
     /**
      * OplogStart walks a collection backwards to find the first object in the collection that
@@ -65,12 +67,17 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
         virtual void prepareToYield();
         virtual void recoverFromYield();
 
         // PS. don't call this.
         virtual PlanStageStats* getStats() { return NULL; }
+
+        // For testing only.
+        void setBackwardsScanTime(int newTime) { _backwardsScanTime = newTime; }
+        bool isExtentHopping() { return _extentHopping; }
+        bool isBackwardsScanning() { return _backwardsScanning; }
     private:
         // Copied verbatim.
         static DiskLoc prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec);
@@ -111,6 +118,8 @@ namespace mongo {
         string _ns;
         
         MatchExpression* _filter;
+
+        static int _backwardsScanTime;
     };
 
 }  // namespace mongo

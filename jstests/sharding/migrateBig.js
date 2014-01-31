@@ -15,7 +15,9 @@ for ( x=0; x<100; x++ )
     coll.insert( { x : x , big : big } )
 db.getLastError();
 
-s.adminCommand( { split : "test.foo" , middle : { x : 33 } } )
+db.printShardingStatus()
+
+s.adminCommand( { split : "test.foo" , middle : { x : 30 } } )
 s.adminCommand( { split : "test.foo" , middle : { x : 66 } } )
 s.adminCommand( { movechunk : "test.foo" , find : { x : 90 } , to : s.getOther( s.getServer( "test" ) ).name } )
 

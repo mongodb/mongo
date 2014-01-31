@@ -50,7 +50,7 @@ namespace mongo {
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (0 == _specificStats.matchTested.size()) {
-            _specificStats.matchTested = vector<uint64_t>(_children.size(), 0);
+            _specificStats.matchTested = vector<size_t>(_children.size(), 0);
         }
 
         WorkingSetID id;
@@ -58,10 +58,9 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
-            verify(member->hasLoc());
 
-            // If we're deduping...
-            if (_dedup) {
+            // If we're deduping (and there's something to dedup by)
+            if (_dedup && member->hasLoc()) {
                 ++_specificStats.dupsTested;
 
                 // ...and we've seen the DiskLoc before
@@ -135,18 +134,18 @@ namespace mongo {
         }
     }
 
-    void OrStage::invalidate(const DiskLoc& dl) {
+    void OrStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl);
+            _children[i]->invalidate(dl, type);
         }
 
         // If we see DL again it is not the same record as it once was so we still want to
         // return it.
-        if (_dedup) {
+        if (_dedup && INVALIDATION_DELETION == type) {
             unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _seen.find(dl);
             if (_seen.end() != it) {
                 ++_specificStats.locsForgotten;

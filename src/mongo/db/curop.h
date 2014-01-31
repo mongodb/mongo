@@ -35,7 +35,7 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
-#include "mongo/db/catalog/ondisk/namespace.h"
+#include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
@@ -93,7 +93,7 @@ namespace mongo {
         bool idhack;         // indicates short circuited code path on an update to make the update faster
         bool scanAndOrder;   // scanandorder query plan aspect was used
         long long  nupdated; // number of records updated (including no-ops)
-        long long  nupdateNoops; // number of records updated which were noops
+        long long  nModified; // number of records written (no no-ops)
         long long  nmoved;   // updates resulted in a move (moves are expensive)
         long long  ninserted;
         long long  ndeleted;
@@ -101,6 +101,11 @@ namespace mongo {
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert
         int keyUpdates;
+        std::string planSummary; // a brief string describing the query solution
+
+        // New Query Framework debugging/profiling info
+        // XXX: should this really be an opaque BSONObj?  Not sure.
+        BSONObj execStats;
 
         // error handling
         ExceptionInfo exceptionInfo;
@@ -192,7 +197,7 @@ namespace mongo {
         void leave( Client::Context * context );
         void reset();
         void reset( const HostAndPort& remote, int op );
-        void markCommand() { _command = true; }
+        void markCommand() { _isCommand = true; }
         OpDebug& debug()           { return _debug; }
         int profileLevel() const   { return _dbprofile; }
         const char * getNS() const { return _ns; }
@@ -270,7 +275,10 @@ namespace mongo {
 
         void setQuery(const BSONObj& query) { _query.set( query ); }
         Client * getClient() const { return _client; }
-
+        
+        Command * getCommand() const { return _command; }
+        void setCommand(Command* command) { _command = command; }
+        
         BSONObj info();
 
         // Fetches less information than "info()"; used to search for ops with certain criteria
@@ -323,12 +331,13 @@ namespace mongo {
         static AtomicUInt _nextOpNum;
         Client * _client;
         CurOp * _wrapped;
+        Command * _command;
         unsigned long long _start;
         unsigned long long _end;
         bool _active;
         bool _suppressFromCurop; // unless $all is set
         int _op;
-        bool _command;
+        bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
         char _ns[Namespace::MaxNsLen+2];

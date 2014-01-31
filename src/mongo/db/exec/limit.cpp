@@ -74,9 +74,9 @@ namespace mongo {
         _child->recoverFromYield();
     }
 
-    void LimitStage::invalidate(const DiskLoc& dl) {
+    void LimitStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl);
+        _child->invalidate(dl, type);
     }
 
     PlanStageStats* LimitStage::getStats() {

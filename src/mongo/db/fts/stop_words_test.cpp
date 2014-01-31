@@ -28,6 +28,7 @@
 *    it in the license file.
 */
 
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/unittest/unittest.h"
 
@@ -35,8 +36,7 @@ namespace mongo {
     namespace fts {
 
         TEST( English, Basic1 ) {
-            FTSLanguage language = FTSLanguage::makeFTSLanguage( "english" ).getValue();
-            const StopWords* englishStopWords = StopWords::getStopWords( language );
+            const StopWords* englishStopWords = StopWords::getStopWords( languageEnglishV2 );
             ASSERT( englishStopWords->isStopWord( "the" ) );
             ASSERT( !englishStopWords->isStopWord( "computer" ) );
         }

@@ -270,59 +270,7 @@ namespace {
         argv.push_back("config.json");
         std::map<std::string, std::string> env_map;
 
-        parser.setConfig("config.json", "{ verbose : \"vvvv\" }");
-
-        ASSERT_OK(parser.run(options, argv, env_map, &environment));
-
-        ASSERT_OK(::mongo::storeServerOptions(environment, argv));
-
-        int verbosity = 4;
-        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
-                      ::mongo::logger::LogSeverity::Debug(verbosity));
-    }
-
-    TEST(Verbosity, JSONConfigBadString) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-        moe::OptionSection options;
-
-        // Reset the log level before we test
-        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-                ::mongo::logger::LogSeverity::Info());
-
-        ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json", "{ verbose : \"beloud\" }");
-
-        ASSERT_OK(parser.run(options, argv, env_map, &environment));
-
-        ASSERT_NOT_OK(::mongo::storeServerOptions(environment, argv));
-    }
-
-    TEST(Verbosity, JSONConfigEmptyString) {
-        OptionsParserTester parser;
-        moe::Environment environment;
-        moe::OptionSection options;
-
-        // Reset the log level before we test
-        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-                ::mongo::logger::LogSeverity::Info());
-
-        ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("--config");
-        argv.push_back("config.json");
-        std::map<std::string, std::string> env_map;
-
-        parser.setConfig("config.json", "{ verbose : \"vvvv\", vv : true }");
+        parser.setConfig("config.json", "{ \"systemLog.verbosity\" : 4 }");
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
@@ -352,7 +300,7 @@ namespace {
         argv.push_back("vvv");
         std::map<std::string, std::string> env_map;
 
-        parser.setConfig("config.json", "{ verbose : \"vvvv\", vv : true }");
+        parser.setConfig("config.json", "{ \"systemLog.verbosity\" : 4 }");
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 

@@ -27,8 +27,8 @@ assert.eq( 1, explain.allPlans[ 0 ].n );
 
 explain = t.find( {a:{$gt:0},b:{$gt:0}} ).explain( true );
 assert.eq( 1, explain.n );
-assert.eq( 1, explain.allPlans[ 0 ].n );
-assert.eq( 1, explain.allPlans[ 1 ].n );
+//assert.eq( 1, explain.allPlans[ 0 ].n );
+//assert.eq( 1, explain.allPlans[ 1 ].n );
 
 explain = t.find( {$or:[{a:{$gt:0},b:{$gt:0}},{a:{$gt:-1},b:{$gt:-1}}]} ).explain( true );
 assert.eq( 1, explain.n );
@@ -38,7 +38,7 @@ assert.eq( 1, explain.n );
 // "allPlan", ie the alternative plans, are not a property of each of the $or clause.
 // They are a propery of the plan itself.
 // So they chould be checked at 'explain.allPlans' not under clauses.
-assert.eq( 1, explain.clauses[ 0 ].n );
+// assert.eq( 1, explain.clauses[ 0 ].n );
 // assert.eq( 1, explain.clauses[ 0 ].allPlans[ 0 ].n );
 // assert.eq( 1, explain.clauses[ 0 ].allPlans[ 1 ].n );
 

@@ -19,7 +19,7 @@
 
 #include "mongo/shell/shell_utils.h"
 
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
@@ -27,7 +27,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"
-#include "mongo/util/version.h"
+#include "mongo/util/version_reporting.h"
 
 namespace mongo {
 

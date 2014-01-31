@@ -1,0 +1,233 @@
+// Test that authorization information gets propogated correctly to secondaries and slaves.
+
+var baseName = "jstests_auth_repl";
+var rsName = baseName + "_rs";
+var rtName = baseName + "_rt";
+var mongoOptions = {auth: null, keyFile: "jstests/libs/key1"};
+var authErrCode = 13;
+
+var AuthReplTest = function(spec) {
+    var that = {};
+
+    // argument validation
+    assert("primaryConn" in spec);
+    assert("secondaryConn" in spec);
+
+    // private vars
+    var primaryConn, secondaryConn;
+    var adminPri, adminSec;
+    var testUser = "testUser", testRole = "testRole", testRole2 = "testRole2";
+
+    primaryConn = spec.primaryConn;
+    secondaryConn = spec.secondaryConn;
+
+    adminPri = primaryConn.getDB("admin");
+    adminPri.addUser({user: "super", pwd: "super", roles: ["__system"]});
+    assert(adminPri.auth("super", "super"), "could not authenticate as superuser");
+
+    adminSec = secondaryConn.getDB("admin");
+
+    /* --- private functions --- */
+
+    /**
+     * Create user and roles in preparation
+     * for the test.
+     */
+    var createUserAndRoles = function() {
+        var roles = [testRole, testRole2];
+        var actions = ["hostInfo", "listDatabases"];
+        for (var i = 0; i < roles.length; i++) {
+            var res = adminPri.runCommand({
+                createRole: roles[i],
+                privileges: [
+                    { resource: {cluster: true}, actions: [ actions[i] ] }
+                ],
+                roles: [ ],
+                writeConcern: {w: 2, wtimeout: 5000}
+            });
+            assert.commandWorked(res);
+        }
+
+        var res = adminPri.runCommand({
+            createUser: testUser,
+            pwd: testUser,
+            roles: [testRole],
+            writeConcern: {w: 2, wtimeout: 5000}
+        });
+        assert.commandWorked(res);
+    };
+
+    var authOnSecondary = function() {
+        assert(adminSec.auth(testUser, testUser), "could not authenticate as test user");
+    };
+
+    /**
+     * Use the rolesInfo command to check that the test
+     * role is as expected on the secondary/slave
+     */
+    var confirmRolesInfo = function(actionType) {
+        var role = adminSec.getRole(testRole, {showPrivileges: true});
+        assert.eq(1, role.privileges.length);
+        assert.eq(role.privileges[0].actions[0], actionType);
+    };
+
+    /**
+     * Use the usersInfo command to check that the test
+     * user is as expected on the secondary/slave
+     */
+    var confirmUsersInfo = function(roleName) {
+        var user = adminSec.getUser(testUser);
+        assert.eq(1, user.roles.length);
+        assert.eq(user.roles[0].role, roleName);
+    };
+
+    /**
+     * Ensure that the test user has the proper privileges
+     * on the secondary/slave
+     */
+    var confirmPrivilegeBeforeUpdate = function() {
+        // can run hostInfo
+        var res = adminSec.runCommand({hostInfo: 1});
+        assert.commandWorked(res);
+
+        // but cannot run listDatabases
+        res = adminSec.runCommand({listDatabases: 1});
+        assert.commandFailedWithCode(res, authErrCode);
+    };
+
+    var updateRole = function() {
+        var res = adminPri.runCommand({
+            updateRole: testRole,
+            privileges: [
+                { resource: {cluster: true}, actions: ["listDatabases"] }
+            ],
+            writeConcern: {w: 2, wtimeout: 5000}
+        });
+        assert.commandWorked(res);
+    };
+
+    var updateUser = function() {
+        var res = adminPri.runCommand({
+            updateUser: testUser,
+            roles: [testRole2],
+            writeConcern: {w: 2, wtimeout: 5000}
+        });
+        assert.commandWorked(res);
+    };
+
+    /**
+     * Ensure that the auth changes have taken effect
+     * properly on the secondary/slave
+     */
+    var confirmPrivilegeAfterUpdate = function() {
+        // cannot run hostInfo
+        var res = adminSec.runCommand({hostInfo: 1});
+        assert.commandFailedWithCode(res, authErrCode);
+
+        // but can run listDatabases
+        res = adminSec.runCommand({listDatabases: 1});
+        assert.commandWorked(res);
+    };
+
+    /**
+     * Remove test users and roles
+     */
+    var cleanup = function() {
+        var res = adminPri.runCommand({dropUser: testUser,
+                                       writeConcern: {w: 2, wtimeout: 5000}});
+        assert.commandWorked(res);
+        res = adminPri.runCommand({dropAllRolesFromDatabase: 1,
+                                   writeConcern: {w: 2, wtimeout: 5000}});
+        assert.commandWorked(res);
+    };
+
+    /* --- public functions --- */
+
+    /**
+     * Top-level test for updating a user and ensuring that the update
+     * has the correct effect on the secondary/slave
+     */
+    that.testUsers = function() {
+        createUserAndRoles();
+        authOnSecondary();
+        confirmPrivilegeBeforeUpdate();
+        confirmUsersInfo(testRole);
+        updateUser();
+        confirmPrivilegeAfterUpdate();
+        confirmUsersInfo(testRole2);
+        cleanup();
+    };
+
+    /**
+     * Top-level test for updating a role and ensuring that the update
+     * has the correct effect on the secondary/slave
+     */
+    that.testRoles = function() {
+        createUserAndRoles();
+        authOnSecondary();
+        confirmPrivilegeBeforeUpdate();
+        confirmRolesInfo("hostInfo");
+        updateRole();
+        confirmPrivilegeAfterUpdate();
+        confirmRolesInfo("listDatabases");
+        cleanup();
+    };
+
+    /**
+     * Main entry point for running the tests
+     */
+    that.testAll = function() {
+        this.testUsers();
+        this.testRoles();
+    };
+
+    return that;
+}
+
+/* -- test replica sets -- */
+
+var rs = new ReplSetTest({name: rsName, nodes: 2});
+var nodes = rs.startSet(mongoOptions);
+rs.initiate();
+rs.awaitReplication();
+
+var primary = rs.getPrimary();
+var secondary = rs.getSecondary();
+
+var authReplTest = AuthReplTest({
+    primaryConn: primary,
+    secondaryConn: secondary
+});
+authReplTest.testAll();
+
+rs.stopSet();
+
+/* -- test master/slave -- */
+
+var rt = new ReplTest(rtName);
+
+// start and stop without auth in order to ensure
+// existence of the correct dbpath
+var master = rt.start(true, {}, false, true);
+rt.stop(true);
+var slave = rt.start(false, {}, false, true);
+rt.stop(false);
+
+// start master/slave with auth
+master = rt.start(true, mongoOptions, true);
+slave = rt.start(false, mongoOptions, true);
+var masterDB = master.getDB("admin");
+
+// ensure that master/slave replication is up and running
+masterDB.foo.save({});
+masterDB.runCommand({getLastError: 1, w: 2, wtimeout: 5000});
+masterDB.foo.drop();
+
+authReplTest = AuthReplTest({
+    primaryConn: master,
+    secondaryConn: slave
+});
+authReplTest.testAll();
+
+rt.stop();
+

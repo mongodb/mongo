@@ -84,11 +84,6 @@ namespace mongo {
         void releasingWriteLock();
     }
 
-    // e.g. externalobjsortmutex uses hlmutex as it can be locked for very long times
-    // todo : report HLMutex status in db.currentOp() output
-    // perhaps move this elsewhere as this could be used in mongos and this file is for mongod
-    HLMutex::HLMutex(const char *name) : SimpleMutex(name) { }
-
     /* dbname->lock
        Currently these are never deleted - will linger if db was closed. (that should be fine.)
        We don't put the lock inside the Database object as those can come and go with open and 
@@ -314,7 +309,10 @@ namespace mongo {
         long long acquisitionTime = _timer.micros();
         _timer.reset();
         _stat = stat;
+
+        // increment the operation level statistics
         cc().curop()->lockStat().recordAcquireTimeMicros( _type , acquisitionTime );
+
         return acquisitionTime;
     }
 
@@ -341,11 +339,9 @@ namespace mongo {
     
     void Lock::ScopedLock::relock() {
         _pbws_lk.relock();
-        _relock();
         resetTime();
+        _relock();
     }
-
-
 
     Lock::TempRelease::TempRelease() : cant( Lock::nested() )
     {

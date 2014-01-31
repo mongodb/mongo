@@ -25,15 +25,6 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops")
 }
 
-function testPrimaryMetrics(primary, opCount, offset) {
-    var ss = primary.getDB("test").serverStatus()
-    printjson(ss.metrics)
-
-    assert.eq(ss.metrics.repl.oplog.insert.num, opCount + offset, "wrong oplog insert count")
-    assert(ss.metrics.repl.oplog.insert.totalMillis >= 0, "no oplog inserts time")
-    assert(ss.metrics.repl.oplog.insertBytes > 0, "no oplog inserted bytes")
-}
-
 var rt = new ReplSetTest( { name : "server_status_metrics" , nodes: 2, oplogSize: 100 } );
 rt.startSet()
 rt.initiate()
@@ -44,24 +35,23 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
-var ss = primary.getDB("test").serverStatus();
-var primaryBaseOplogInserts = ss.metrics.repl.oplog.insert.num;
+testDB.b.insert( {} );
+printjson( testDB.getLastErrorObj(2) );
 
 var ss = secondary.getDB("test").serverStatus();
-var secondaryBaseOplogInserts = ss.metrics.repl.oplog.insert.num;
+var secondaryBaseOplogInserts = ss.metrics.repl.apply.ops;
 
 //add test docs
 for(x=0;x<10000;x++){ testDB.a.insert({}) }
 
-testPrimaryMetrics(primary, 10000, primaryBaseOplogInserts);
 testDB.getLastError(2);
 
-testSecondaryMetrics(secondary, 10000, secondaryBaseOplogInserts -1);
+testSecondaryMetrics(secondary, 10000, secondaryBaseOplogInserts );
 
 testDB.a.update({}, {$set:{d:new Date()}},true, true)
 testDB.getLastError(2);
 
-testSecondaryMetrics(secondary, 20000, secondaryBaseOplogInserts -1);
+testSecondaryMetrics(secondary, 20000, secondaryBaseOplogInserts );
 
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005

@@ -138,10 +138,10 @@ namespace optionenvironment {
 
     OptionDescription& OptionDescription::composing() {
 
-        if (_type != StringVector) {
+        if (_type != StringVector && _type != StringMap) {
             StringBuilder sb;
             sb << "Could not register option \"" << _dottedName << "\": "
-                << "only options registered as StringVector can be composing";
+                << "only options registered as StringVector or StringMap can be composing";
             throw DBException(sb.str(), ErrorCodes::InternalError);
         }
 
@@ -215,6 +215,28 @@ namespace optionenvironment {
         }
 
         return addConstraint(new NumericKeyConstraint(_dottedName, min, max));
+    }
+
+    OptionDescription& OptionDescription::incompatibleWith(const std::string& otherDottedName) {
+        return addConstraint(new MutuallyExclusiveKeyConstraint(_dottedName, otherDottedName));
+    }
+
+    OptionDescription& OptionDescription::requires(const std::string& otherDottedName) {
+        return addConstraint(new RequiresOtherKeyConstraint(_dottedName, otherDottedName));
+    }
+
+    OptionDescription& OptionDescription::format(const std::string& regexFormat,
+                                                 const std::string& displayFormat) {
+        if (_type != String) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << _dottedName << "\": "
+               << "only options registered as a string type can have a required format, "
+               << "but option has type: " << _type;
+            throw DBException(sb.str(), ErrorCodes::InternalError);
+        }
+
+        return addConstraint(new StringFormatKeyConstraint(_dottedName, regexFormat,
+                                                           displayFormat));
     }
 
 } // namespace optionenvironment

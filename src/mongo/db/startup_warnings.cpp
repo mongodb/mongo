@@ -87,7 +87,16 @@ namespace mongo {
             warned = true;
         }
 
-        if (boost::filesystem::exists("/sys/devices/system/node/node1")){
+        bool hasMultipleNumaNodes = false;
+        try {
+            hasMultipleNumaNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
+        } catch(boost::filesystem::filesystem_error& e) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: Cannot detect if NUMA interleaving is enabled. "
+                  << "Failed to probe \"" << e.path1().string() << "\": " << e.code().message()
+                  << startupWarningsLog;
+        }
+        if (hasMultipleNumaNodes) {
             // We are on a box with a NUMA enabled kernel and more than 1 numa node (they start at
             // node0)
             // Now we look at the first line of /proc/self/numa_maps
@@ -202,6 +211,24 @@ namespace mongo {
                   << startupWarningsLog;
         }
 #endif
+
+#ifdef _WIN32
+        ProcessInfo p;
+
+        if (p.hasNumaEnabled()) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: You are running on a NUMA machine."
+                << startupWarningsLog;
+            log() << "**          We suggest disabling NUMA in the machine BIOS " 
+                << startupWarningsLog;
+            log() << "**          by enabling interleaving to avoid performance problems. " 
+                << startupWarningsLog;
+            log() << "**          See your BIOS documentation for more information." 
+                << startupWarningsLog;
+            warned = true;
+        }
+#endif // #ifdef _WIN32
+
         if (warned) {
             log() << startupWarningsLog;
         }

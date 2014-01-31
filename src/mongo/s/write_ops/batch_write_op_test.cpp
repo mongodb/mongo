@@ -32,7 +32,7 @@
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
-#include "mongo/s/write_ops/batched_error_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -93,9 +93,9 @@ namespace {
         ASSERT( clientResponse.getOk() );
     }
 
-    BatchedErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
+    WriteErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {
 
-        BatchedErrorDetail* error = new BatchedErrorDetail();
+        WriteErrorDetail* error = new WriteErrorDetail();
         error->setErrCode( code );
         error->setErrInfo( info );
         error->setErrMessage( message );
@@ -103,11 +103,10 @@ namespace {
         return error;
     }
 
-    void setBatchError( const BatchedErrorDetail& error, BatchedCommandResponse* response ) {
+    void setBatchError( const WriteErrorDetail& error, BatchedCommandResponse* response ) {
         response->setOk( false );
         response->setN( 0 );
         response->setErrCode( error.getErrCode() );
-        response->setErrInfo( error.getErrInfo() );
         response->setErrMessage( error.getErrMessage() );
         ASSERT( response->isValid( NULL ) );
     }
@@ -153,7 +152,7 @@ namespace {
         ASSERT_EQUALS( targeted.size(), 1u );
         assertEndpointsEqual( targeted.front()->getEndpoint(), endpoint );
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "message" ) );
         BatchedCommandResponse response;
@@ -167,9 +166,7 @@ namespace {
 
         ASSERT( !clientResponse.getOk() );
         ASSERT_EQUALS( clientResponse.getErrCode(), error->getErrCode() );
-        ASSERT_EQUALS( clientResponse.getErrInfo()["data"].Int(),
-                       error->getErrInfo()["data"].Int() );
-        ASSERT_EQUALS( clientResponse.getErrMessage(), error->getErrMessage() );
+        ASSERT( clientResponse.getErrMessage().find( error->getErrMessage()) != string::npos );
     }
 
     TEST(WriteOpTests, TargetMultiOpSameShard) {
@@ -448,7 +445,7 @@ namespace {
 
         // Second shard write fails
         BatchedCommandResponse errorResponse;
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "message" ) );
         setBatchError( *error, &errorResponse );
@@ -458,7 +455,7 @@ namespace {
         BatchedCommandResponse clientResponse;
         batchOp.buildClientResponse( &clientResponse );
         ASSERT( !clientResponse.getOk() );
-        ASSERT_EQUALS( clientResponse.sizeErrDetails(), 2u );
+        ASSERT_FALSE( clientResponse.isErrDetailsSet() );
     }
 
     TEST(WriteOpTests, TargetMultiOpFailedTarget) {
@@ -511,8 +508,108 @@ namespace {
 
         BatchedCommandResponse clientResponse;
         batchOp.buildClientResponse( &clientResponse );
-        ASSERT( !clientResponse.getOk() );
+        ASSERT( clientResponse.getOk() );
         ASSERT_EQUALS( clientResponse.sizeErrDetails(), 2u );
+    }
+
+    TEST(WriteOpTests, TargetMultiOpTwoShardsEachWCError) {
+
+        //
+        // Multi-op targeting test where each op goes to both shards and both will return a
+        // write concern error.
+        //
+
+        NamespaceString nss( "foo.bar" );
+
+        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED() );
+        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED() );
+
+        vector<MockRange*> mockRanges;
+        mockRanges.push_back( new MockRange( endpointA,
+                                             nss,
+                                             BSON( "x" << MINKEY ),
+                                             BSON( "x" << 0 ) ) );
+        mockRanges.push_back( new MockRange( endpointB,
+                                             nss,
+                                             BSON( "x" << 0 ),
+                                             BSON( "x" << MAXKEY ) ) );
+
+        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
+        request.setNS( nss.ns() );
+        request.setOrdered( false );
+        request.setWriteConcern( BSONObj() );
+
+        // Each op goes to both shards
+
+        BSONObj queryA = BSON( "x" << GTE << -1 << LT << 2 );
+        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << queryA ) ) );
+        BSONObj queryB = BSON( "x" << GTE << -2 << LT << 1 );
+        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << queryB ) ) );
+
+        BatchWriteOp batchOp;
+        batchOp.initClientRequest( &request );
+        ASSERT( !batchOp.isFinished() );
+
+        MockNSTargeter targeter;
+        targeter.init( mockRanges );
+
+        OwnedPointerVector<TargetedWriteBatch> targetedOwned;
+        vector<TargetedWriteBatch*>& targeted = targetedOwned.mutableVector();
+        Status status = batchOp.targetBatch( targeter, false, &targeted );
+
+        ASSERT( status.isOK() );
+        ASSERT( !batchOp.isFinished() );
+        ASSERT_EQUALS( targeted.size(), 2u );
+        sortByEndpoint( &targeted );
+        assertEndpointsEqual( targeted.front()->getEndpoint(), endpointA );
+        assertEndpointsEqual( targeted.back()->getEndpoint(), endpointB );
+        ASSERT_EQUALS( targeted.front()->getWrites().size(), 2u );
+        ASSERT_EQUALS( targeted.back()->getWrites().size(), 2u );
+
+        // First shard write write concern fails.
+        BatchedCommandResponse response;
+        response.setOk( true );
+        response.setN( 0 );
+
+        WCErrorDetail* firstShardWCError = new WCErrorDetail;
+        firstShardWCError->setErrCode( ErrorCodes::UnknownError );
+        string firstShardWCMsg( "s1 unknown" );
+        firstShardWCError->setErrMessage( firstShardWCMsg );
+
+        response.setWriteConcernError( firstShardWCError );
+
+        ASSERT( response.isValid( NULL ) );
+
+        batchOp.noteBatchResponse( *targeted.front(), response, NULL );
+        ASSERT( !batchOp.isFinished() );
+
+        // Second shard write write concern fails.
+        BatchedCommandResponse response2;
+        response2.setOk( true );
+        response2.setN( 0 );
+
+        WCErrorDetail* secondShardWCError = new WCErrorDetail;
+        secondShardWCError->setErrCode( ErrorCodes::UnknownError );
+        string secondShardWCMsg( "s2 unknown" );
+        secondShardWCError->setErrMessage( secondShardWCMsg );
+        response2.setWriteConcernError( secondShardWCError );
+
+        ASSERT( response2.isValid( NULL ) );
+
+        batchOp.noteBatchResponse( *targeted.back(), response2, NULL );
+        ASSERT( batchOp.isFinished() );
+
+        BatchedCommandResponse clientResponse;
+        batchOp.buildClientResponse( &clientResponse );
+        ASSERT( clientResponse.getOk() );
+        ASSERT_FALSE( clientResponse.isErrDetailsSet() );
+
+        const WCErrorDetail* fullWCError = clientResponse.getWriteConcernError();
+        ASSERT_EQUALS( ErrorCodes::WriteConcernFailed, fullWCError->getErrCode() );
+
+        const string wcMessage( fullWCError->getErrMessage() );
+        ASSERT( wcMessage.find( firstShardWCMsg ) != string::npos );
+        ASSERT( wcMessage.find( secondShardWCMsg ) != string::npos );
     }
 
     //
@@ -561,11 +658,14 @@ namespace {
         ASSERT( batchOp.targetBatch( targeter, false, &targeted ).isOK() );
         ASSERT_EQUALS( targeted.size(), 1u );
 
-        scoped_ptr<BatchedErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
-                                                          BSONObj(),
-                                                          "mock stale version" ) );
+        auto_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
+                                                      BSONObj(),
+                                                      "mock stale version" ) );
+        error->setIndex( 0 );
+
         BatchedCommandResponse response;
-        setBatchError( *error, &response );
+        response.addToErrDetails( error.release() );
+        response.setOk( 1 );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( !batchOp.isFinished() );

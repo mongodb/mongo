@@ -147,6 +147,8 @@ namespace {
             OpTime::setLast( lastOp[ "ts" ].date() );
         }
 
+        // Generate new election unique id
+        elect.setElectionId(OID::gen());
         changeState(MemberState::RS_PRIMARY);
 
         // This must be done after becoming primary but before releasing the write lock. This adds
@@ -509,6 +511,13 @@ namespace {
             lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
         }
+    }
+
+    OpTime ReplSetImpl::getEarliestOpTimeWritten() const {
+        Lock::DBRead lk(rsoplog);
+        BSONObj o;
+        uassert(17347, "Problem reading earliest entry from oplog", Helpers::getFirst(rsoplog, o));
+        return o["ts"]._opTime();
     }
 
     /* call after constructing to start - returns fairly quickly after launching its threads */

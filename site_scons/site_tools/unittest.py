@@ -41,7 +41,9 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     return result
 
 def generate(env):
-    unit_test_list_builder = env.Builder(action=unit_test_list_builder_action, multi=True)
+    unit_test_list_builder = env.Builder(
+        action=env.Action(unit_test_list_builder_action, "Generating $TARGET"),
+        multi=True)
     env.Append(BUILDERS=dict(_UnitTestList=unit_test_list_builder))
     env.AddMethod(register_unit_test, 'RegisterUnitTest')
     env.AddMethod(build_cpp_unit_test, 'CppUnitTest')

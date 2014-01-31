@@ -30,12 +30,12 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/db/storage/extent.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 
@@ -97,7 +97,7 @@ namespace mongo {
 
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false
-            if ( nsd->isCapped() ){
+            if ( collection->isCapped() ){
                 result.append("capped", nsd->isCapped());
                 result.appendNumber("max", nsd->maxCappedDocs());
             }
@@ -266,24 +266,15 @@ namespace mongo {
 
                         if (full){
                             BSONObj obj = BSONObj::make(r);
-                            if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
+                            const Status status = validateBSON(obj.objdata(), obj.objsize());
+                            if (!status.isOK()) {
                                 valid = false;
                                 if (nInvalid == 0) // only log once;
                                     errors << "invalid bson object detected (see logs for more info)";
 
                                 nInvalid++;
-                                if (strcmp("_id", obj.firstElementFieldName()) == 0){
-                                    try {
-                                        obj.firstElement().validate(); // throws on error
-                                        log() << "Invalid bson detected in " << ns << " with _id: " << obj.firstElement().toString(false) << endl;
-                                    }
-                                    catch(...){
-                                        log() << "Invalid bson detected in " << ns << " with corrupt _id" << endl;
-                                    }
-                                }
-                                else {
-                                    log() << "Invalid bson detected in " << ns << " and couldn't find _id" << endl;
-                                }
+                                log() << "Invalid bson detected in " << ns
+                                      << ": " << status.reason();
                             }
                             else {
                                 bsonLen += obj.objsize();
@@ -380,21 +371,19 @@ namespace mongo {
                 try  {
                     IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-                    result.append("nIndexes", nsd->getCompletedIndexCount());
+                    result.append("nIndexes", indexCatalog->numIndexesReady() );
                     BSONObjBuilder indexes; // not using subObjStart to be exception safe
-                    NamespaceDetails::IndexIterator i = nsd->ii();
+                    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(false);
                     while( i.more() ) {
-                        IndexDetails& id = i.next();
-                        log() << "validating index " << idxn << ": " << id.indexNamespace() << endl;
-
-                        IndexDescriptor* descriptor = indexCatalog->getDescriptor( idxn );
-                        verify( descriptor );
+                        IndexDescriptor* descriptor = i.next();
+                        log() << "validating index " << descriptor->indexNamespace() << endl;
                         IndexAccessMethod* iam = indexCatalog->getIndex( descriptor );
                         verify( iam );
 
                         int64_t keys;
                         iam->validate(&keys);
-                        indexes.appendNumber(id.indexNamespace(), static_cast<long long>(keys));
+                        indexes.appendNumber(descriptor->indexNamespace(),
+                                             static_cast<long long>(keys));
                         idxn++;
                     }
                     result.append("keysPerIndex", indexes.done());
@@ -418,7 +407,7 @@ namespace mongo {
             }
             
             if ( !valid ) {
-                result.append("advice", "ns corrupt, requires repair");
+                result.append("advice", "ns corrupt. See http://dochub.mongodb.org/core/data-recovery");
             }
 
         }

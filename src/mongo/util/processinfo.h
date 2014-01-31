@@ -86,6 +86,11 @@ namespace mongo {
         bool hasNumaEnabled() const { return sysInfo().hasNuma; }
 
         /**
+         * Determine if file zeroing is necessary for newly allocated data files.
+         */
+        static bool isDataFileZeroingNeeded() { return systemInfo->fileZeroNeeded;  }
+
+        /**
          * Get extra system stats
          */
         void appendSystemDetails( BSONObjBuilder& details ) const {
@@ -139,12 +144,19 @@ namespace mongo {
             string cpuArch;
             bool hasNuma;
             BSONObj _extraStats;
+
+            // This is an OS specific value, which determines whether files should be zero-filled
+            // at allocation time in order to avoid Microsoft KB 2731284.
+            //
+            bool fileZeroNeeded;
+
             SystemInfo() :
                     addrSize( 0 ),
                     memSize( 0 ),
                     numCores( 0 ),
                     pageSize( 0 ),
-                    hasNuma( false ) { 
+                    hasNuma( false ),
+                    fileZeroNeeded (false) { 
                 // populate SystemInfo during construction
                 collectSystemInfo();
             }

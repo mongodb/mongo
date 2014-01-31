@@ -28,17 +28,18 @@
 
 #pragma once
 
-#include "mongo/db/btree.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
+    class IndexCatalogEntry;
+
     /**
      * We have two Btree on-disk formats which support identical operations.  We hide this as much
      * as possible by having one implementation of this interface per format.
      *
-     * For documentation on all of the methods here, look at mongo/db/btree.h
+     * For documentation on all of the methods here, look at mongo/db/structure/btree/btree.h
      */
     class BtreeInterface {
     public:
@@ -50,63 +51,64 @@ namespace mongo {
         // was deleted.  Calling code needs to be able to recognize this and possibly ignore it.
         static const int deletedBucketCode = 16738;
 
-        virtual int bt_insert(const DiskLoc thisLoc,
+        virtual int bt_insert(IndexCatalogEntry* btreeState,
+                              const DiskLoc thisLoc,
                               const DiskLoc recordLoc,
                               const BSONObj& key,
-                              const Ordering &order,
-                              bool dupsAllowed,
-                              IndexDetails& idx,
-                              bool toplevel = true) const = 0;
+                              bool dupsallowed,
+                              bool toplevel = true) = 0;
 
-        virtual bool unindex(const DiskLoc thisLoc,
-                             IndexDetails& id,
+        virtual bool unindex(IndexCatalogEntry* btreeState,
+                             const DiskLoc thisLoc,
                              const BSONObj& key,
-                             const DiskLoc recordLoc) const = 0;
+                             const DiskLoc recordLoc) = 0;
 
-        virtual DiskLoc locate(const IndexDetails& idx,
+        virtual DiskLoc locate(const IndexCatalogEntry* btreeState,
                                const DiskLoc& thisLoc,
                                const BSONObj& key,
-                               const Ordering& order,
-                               int& pos,
-                               bool& found,
-                               const DiskLoc& recordLoc,
+                               int& pos, // out
+                               bool& found, // out
+                               const DiskLoc& recordLoc, // out
                                int direction = 1) const = 0;
 
-        virtual bool wouldCreateDup(const IndexDetails& idx,
+        virtual bool wouldCreateDup(const IndexCatalogEntry* btreeState,
                                     const DiskLoc& thisLoc,
                                     const BSONObj& key,
-                                    const Ordering& order,
                                     const DiskLoc& self) const = 0;
 
-        virtual void customLocate(DiskLoc& locInOut,
+        virtual void customLocate(const IndexCatalogEntry* btreeState,
+                                  DiskLoc& locInOut,
                                   int& keyOfs,
                                   const BSONObj& keyBegin,
                                   int keyBeginLen, bool afterKey,
                                   const vector<const BSONElement*>& keyEnd,
                                   const vector<bool>& keyEndInclusive,
-                                  const Ordering& order,
                                   int direction,
-                                  pair<DiskLoc, int>& bestParent) = 0 ;
+                                  pair<DiskLoc, int>& bestParent) const = 0 ;
 
-        virtual void advanceTo(DiskLoc &thisLoc,
+        virtual void advanceTo(const IndexCatalogEntry* btreeState,
+                               DiskLoc &thisLoc,
                                int &keyOfs,
                                const BSONObj &keyBegin,
                                int keyBeginLen,
                                bool afterKey,
                                const vector<const BSONElement*>& keyEnd,
                                const vector<bool>& keyEndInclusive,
-                               const Ordering& order, int direction) const = 0;
+                               int direction) const = 0;
 
-        virtual string dupKeyError(DiskLoc bucket,
-                                   const IndexDetails &idx,
+        virtual string dupKeyError(const IndexCatalogEntry* btreeState,
+                                   DiskLoc bucket,
                                    const BSONObj& keyObj) const =0;
 
-        virtual DiskLoc advance(const DiskLoc& thisLoc,
+        virtual DiskLoc advance(const IndexCatalogEntry* btreeState,
+                                const DiskLoc& thisLoc,
                                 int& keyOfs,
                                 int direction,
                                 const char* caller) const = 0;
 
-        virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj& keyPattern) = 0;
+        virtual long long fullValidate(const IndexCatalogEntry* btreeState,
+                                       const DiskLoc& thisLoc,
+                                       const BSONObj& keyPattern) = 0;
 
         /**
          * These methods are here so that the BtreeCursor doesn't need to do any templating for the
@@ -114,25 +116,36 @@ namespace mongo {
          */
 
         /**
+         * Returns number of total keys just in provided bucket
+         * (not recursive)
+         */
+        virtual int nKeys(const IndexCatalogEntry* btreeState,
+                          DiskLoc bucket ) = 0;
+
+        /**
          * Is the key at (bucket, keyOffset) being used or not?
          * Some keys are marked as not used and skipped.
          */
-        virtual bool keyIsUsed(DiskLoc bucket, int keyOffset) const = 0;
+        virtual bool keyIsUsed(const IndexCatalogEntry* btreeState,
+                               DiskLoc bucket, int keyOffset) const = 0;
 
         /**
          * Get the BSON representation of the key at (bucket, keyOffset).
          */
-        virtual BSONObj keyAt(DiskLoc bucket, int keyOffset) const = 0;
+        virtual BSONObj keyAt(const IndexCatalogEntry* btreeState,
+                              DiskLoc bucket, int keyOffset) const = 0;
 
         /**
          * Get the DiskLoc that the key at (bucket, keyOffset) points at.
          */
-        virtual DiskLoc recordAt(DiskLoc bucket, int keyOffset) const = 0;
+        virtual DiskLoc recordAt(const IndexCatalogEntry* btreeState,
+                                 DiskLoc bucket, int keyOffset) const = 0;
 
         /**
          * keyAt and recordAt at the same time.
          */
-        virtual void keyAndRecordAt(DiskLoc bucket, int keyOffset, BSONObj* keyOut,
+        virtual void keyAndRecordAt(const IndexCatalogEntry* btreeState,
+                                    DiskLoc bucket, int keyOffset, BSONObj* keyOut,
                                     DiskLoc* recordOut) const = 0;
     };
 

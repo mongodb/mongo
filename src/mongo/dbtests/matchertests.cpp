@@ -15,16 +15,26 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
 
-#include "mongo/db/cursor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/matcher/matcher.h"
-#include "mongo/db/namespace_details.h"
-#include "mongo/db/query_optimizer.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -211,87 +221,6 @@ namespace MatcherTests {
         }
     };
 
-    namespace Covered { // Tests for CoveredIndexMatcher.
-    
-        /**
-         * Test that MatchDetails::elemMatchKey() is set correctly after an unindexed cursor match.
-         */
-        class ElemMatchKeyUnindexed : public CollectionBase {
-        public:
-            void run() {
-                client().insert( ns(), fromjson( "{ a:[ {}, { b:1 } ] }" ) );
-                
-                Client::ReadContext context( ns() );
-
-                CoveredIndexMatcher matcher( BSON( "a.b" << 1 ), BSON( "$natural" << 1 ) );
-                MatchDetails details;
-                details.requestElemMatchKey();
-                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), BSONObj() );
-                // Verify that the cursor is unindexed.
-                ASSERT_EQUALS( "BasicCursor", cursor->toString() );
-                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
-                // The '1' entry of the 'a' array is matched.
-                ASSERT( details.hasElemMatchKey() );
-                ASSERT_EQUALS( string( "1" ), details.elemMatchKey() );
-            }
-        };
-        
-        /**
-         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match.
-         */
-        class ElemMatchKeyIndexed : public CollectionBase {
-        public:
-            void run() {
-                client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
-                client().insert( ns(), fromjson( "{ a:[ {}, { b:9 }, { b:1 } ] }" ) );
-                
-                Client::ReadContext context( ns() );
-                
-                BSONObj query = BSON( "a.b" << 1 );
-                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
-                MatchDetails details;
-                details.requestElemMatchKey();
-                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), query );
-                // Verify that the cursor is indexed.
-                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
-                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
-                // The '2' entry of the 'a' array is matched.
-                ASSERT( details.hasElemMatchKey() );
-                ASSERT_EQUALS( string( "2" ), details.elemMatchKey() );
-            }
-        };
-        
-        /**
-         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match
-         * on a non multikey index.
-         */
-        class ElemMatchKeyIndexedSingleKey : public CollectionBase {
-        public:
-            void run() {
-                client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
-                client().insert( ns(), fromjson( "{ a:[ { b:1 } ] }" ) );
-                
-                Client::ReadContext context( ns() );
-                
-                BSONObj query = BSON( "a.b" << 1 );
-                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
-                MatchDetails details;
-                details.requestElemMatchKey();
-                boost::shared_ptr<Cursor> cursor = getOptimizedCursor( ns(), query );
-                // Verify that the cursor is indexed.
-                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
-                // Verify that the cursor is not multikey.
-                ASSERT( !cursor->isMultiKey() );
-                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
-                // The '0' entry of the 'a' array is matched.
-                ASSERT( details.hasElemMatchKey() );
-                ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
-            }
-        };
-
-    } // namespace Covered
-
-
     template< typename M >
     class TimingBase {
     public:
@@ -323,125 +252,6 @@ namespace MatcherTests {
     };
 
 
-    template <typename M>
-      class AtomicMatchTest {
-    public:
-        void run() {
-
-            {
-                M m( BSON( "x" << 5 ) );
-                ASSERT( !m.atomic() );
-            }
-
-            {
-                M m( BSON( "x" << 5 << "$atomic" << false ) );
-                ASSERT( !m.atomic() );
-            }
-
-            {
-                M m( BSON( "x" << 5 << "$atomic" << true ) );
-                ASSERT( m.atomic() );
-            }
-
-            {
-                bool threwError = false;
-                try {
-                    M m( BSON( "x" << 5 <<
-                               "$or" << BSON_ARRAY( BSON( "$atomic" << true << "y" << 6 ) ) ) );
-                }
-                catch ( ... ) {
-                    threwError = true;
-                }
-                ASSERT( threwError );
-            }
-        }
-    };
-
-    template <typename M>
-    class SingleSimpleCriterion {
-    public:
-        void run() {
-
-            {
-                M m( BSON( "x" << 5 ) );
-                ASSERT( m.singleSimpleCriterion() );
-            }
-
-            {
-                M m( BSON( "x" << 5 << "y" << 5 ) );
-                ASSERT( !m.singleSimpleCriterion() );
-            }
-
-            {
-                M m( BSON( "x" << BSON( "$gt" << 5 ) ) );
-                ASSERT( !m.singleSimpleCriterion() );
-            }
-
-        }
-    };
-
-    template <typename M>
-    class IndexPortion1 {
-    public:
-        void run() {
-            M full( BSON( "x" << 5 << "y" << 7 ) );
-            M partial( full, BSON( "x" << 1) );
-
-            ASSERT( full.matches( BSON( "x" << 5 << "y" << 7 ) ) );
-            ASSERT( partial.matches( BSON( "x" << 5 << "y" << 7 ) ) );
-
-            ASSERT( !full.matches( BSON( "x" << 5 << "y" << 8 ) ) );
-            ASSERT( partial.matches( BSON( "x" << 5 << "y" << 8 ) ) );
-
-            ASSERT( !full.keyMatch( partial ) );
-            ASSERT( full.keyMatch( full ) );
-            ASSERT( partial.keyMatch( partial ) );
-        }
-    };
-
-    template <typename M>
-    class ExistsFalse1 {
-    public:
-        void run() {
-            {
-                M m( BSON( "a" << BSON( "$exists" << true ) ) );
-                ASSERT( !m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "a" << BSON( "$exists" << false ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "a" << BSON( "$not" << BSON( "$exists" << false ) ) ) );
-                ASSERT( !m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$or" << BSON_ARRAY( BSON( "a" << BSON( "$exists" << true ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-            {
-                M m( BSON( "$and" << BSON_ARRAY( BSON( "a" << BSON( "$not" << BSON( "$exists" << true ) ) ) ) ) );
-                ASSERT( m.hasExistsFalse() );
-            }
-
-
-        }
-    };
-
     class All : public Suite {
     public:
         All() : Suite( "matcher" ) {
@@ -460,17 +270,10 @@ namespace MatcherTests {
             ADD_BOTH(MixedNumericEmbedded);
             ADD_BOTH(ElemMatchKey);
             ADD_BOTH(WhereSimple1);
-            add<Covered::ElemMatchKeyUnindexed>();
-            add<Covered::ElemMatchKeyIndexed>();
-            add<Covered::ElemMatchKeyIndexedSingleKey>();
             ADD_BOTH(AllTiming);
             ADD_BOTH(WithinBox);
             ADD_BOTH(WithinCenter);
             ADD_BOTH(WithinPolygon);
-            ADD_BOTH(AtomicMatchTest);
-            ADD_BOTH(SingleSimpleCriterion);
-            ADD_BOTH(IndexPortion1);
-            ADD_BOTH(ExistsFalse1);
         }
     } dball;
 

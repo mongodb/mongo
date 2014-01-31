@@ -37,11 +37,9 @@
 namespace mongo {
 
     PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt)
-        : _workingSet(ws) , _root(rt) , _killed(false) {
-    }
+        : _workingSet(ws) , _root(rt) , _killed(false) { }
 
-    PlanExecutor::~PlanExecutor() {
-    }
+    PlanExecutor::~PlanExecutor() { }
 
     WorkingSet* PlanExecutor::getWorkingSet() {
         return _workingSet.get();
@@ -62,8 +60,8 @@ namespace mongo {
         return !_killed;
     }
 
-    void PlanExecutor::invalidate(const DiskLoc& dl) {
-        if (!_killed) { _root->invalidate(dl); }
+    void PlanExecutor::invalidate(const DiskLoc& dl, InvalidationType type) {
+        if (!_killed) { _root->invalidate(dl, type); }
     }
 
     void PlanExecutor::setYieldPolicy(Runner::YieldPolicy policy) {
@@ -91,22 +89,32 @@ namespace mongo {
             PlanStage::StageState code = _root->work(&id);
 
             if (PlanStage::ADVANCED == code) {
+                // Fast count.
+                if (WorkingSet::INVALID_ID == id) {
+                    invariant(NULL == objOut);
+                    invariant(NULL == dlOut);
+                    return Runner::RUNNER_ADVANCED;
+                }
+
                 WorkingSetMember* member = _workingSet->get(id);
+                bool hasRequestedData = true;
 
                 if (NULL != objOut) {
                     if (WorkingSetMember::LOC_AND_IDX == member->state) {
                         if (1 != member->keyData.size()) {
                             _workingSet->free(id);
-                            return Runner::RUNNER_ERROR;
+                            hasRequestedData = false;
                         }
-                        *objOut = member->keyData[0].keyData;
+                        else {
+                            *objOut = member->keyData[0].keyData;
+                        }
                     }
                     else if (member->hasObj()) {
                         *objOut = member->obj;
                     }
                     else {
                         _workingSet->free(id);
-                        return Runner::RUNNER_ERROR;
+                        hasRequestedData = false;
                     }
                 }
 
@@ -116,11 +124,15 @@ namespace mongo {
                     }
                     else {
                         _workingSet->free(id);
-                        return Runner::RUNNER_ERROR;
+                        hasRequestedData = false;
                     }
                 }
-                _workingSet->free(id);
-                return Runner::RUNNER_ADVANCED;
+
+                if (hasRequestedData) {
+                    _workingSet->free(id);
+                    return Runner::RUNNER_ADVANCED;
+                }
+                // This result didn't have the data the caller wanted, try again.
             }
             else if (PlanStage::NEED_TIME == code) {
                 // Fall through to yield check at end of large conditional.

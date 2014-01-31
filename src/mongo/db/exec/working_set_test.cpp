@@ -30,6 +30,8 @@
  * This file contains tests for mongo/db/exec/working_set.cpp
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
@@ -43,18 +45,19 @@ namespace {
     class WorkingSetFixture : public mongo::unittest::Test {
     protected:
         void setUp() {
-            WorkingSetID id = ws.allocate();
+            ws.reset(new WorkingSet());
+            WorkingSetID id = ws->allocate();
             ASSERT(id != WorkingSet::INVALID_ID);
-            member = ws.get(id);
+            member = ws->get(id);
             ASSERT(NULL != member);
         }
 
         void tearDown() {
-            ws = WorkingSet();
+            ws.reset();
             member = NULL;
         }
 
-        WorkingSet ws;
+        boost::scoped_ptr<WorkingSet> ws;
         WorkingSetMember* member;
     };
 

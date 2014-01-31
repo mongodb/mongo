@@ -114,7 +114,6 @@ namespace mongo {
               isNearSphere(false) { }
 
         bool parseFrom(const BSONObj &obj);
-        bool parseFromGeoNear(const BSONObj &obj, double radius);
 
         // The name of the field that contains the geometry.
         string field;
@@ -148,8 +147,8 @@ namespace mongo {
     // This represents either a $within or a $geoIntersects.
     class GeoQuery {
     public:
-        GeoQuery() : field(""), predicate(INVALID), _uniqueDocs(true) {}
-        GeoQuery(const string& f) : field(f), predicate(INVALID), _uniqueDocs(true) {}
+        GeoQuery() : field(""), predicate(INVALID) {}
+        GeoQuery(const string& f) : field(f), predicate(INVALID) {}
 
         enum Predicate {
             WITHIN,
@@ -167,8 +166,6 @@ namespace mongo {
         Predicate getPred() const { return predicate; }
         const GeometryContainer& getGeometry() const { return geoContainer; }
 
-        bool uniqueDocs() const { return _uniqueDocs; }
-
     private:
         // Try to parse the provided object into the right place.
         bool parseLegacyQuery(const BSONObj &obj);
@@ -178,6 +175,5 @@ namespace mongo {
         string field;
         GeometryContainer geoContainer;
         Predicate predicate;
-        bool _uniqueDocs;
     };
 }  // namespace mongo

@@ -12,17 +12,29 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -89,9 +101,7 @@ namespace QueryStageTests {
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Client::ReadContext ctx(ns());
             Collection* collection = ctx.ctx().db()->getCollection( ns() );
-            NamespaceDetails* nsd = collection->details();
-            int idxNo = nsd->findIndexByKeyPattern(obj);
-            return collection->getIndexCatalog()->getDescriptor( idxNo );
+            return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
 
         static int numObj() { return 50; }
@@ -195,50 +205,6 @@ namespace QueryStageTests {
         }
     };
 
-    class QueryStageIXScan2dSphere : public IndexScanBase {
-    public:
-        virtual ~QueryStageIXScan2dSphere() { }
-
-        void run() {
-            // Add numObj() geo points.  Make sure we get them back.
-            makeGeoData();
-            addIndex(BSON("geo" << "2dsphere"));
-
-            IndexScanParams params;
-            params.descriptor = getIndex(BSON("geo" << "2dsphere"));
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = BSON("geo" << BSON("$geoNear" << BSON("$geometry"
-                                  << BSON("type" << "Point"
-                                        << "coordinates" << BSON_ARRAY(0 << 0)))));
-            params.bounds.endKey = BSONObj();
-            params.bounds.endKeyInclusive = true;
-            params.direction = 1;
-
-            ASSERT_EQUALS(countResults(params), numObj());
-        }
-    };
-
-    class QueryStageIXScan2d : public IndexScanBase {
-    public:
-        virtual ~QueryStageIXScan2d() { }
-
-        void run() {
-            makeGeoData();
-            addIndex(BSON("geo" << "2d"));
-
-            // 2d should also work.
-            IndexScanParams params;
-            params.descriptor = getIndex(BSON("geo" << "2d"));
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = BSON("geo" << BSON("$near" << BSON_ARRAY(0 << 0)));
-            params.bounds.endKey = BSONObj();
-            params.bounds.endKeyInclusive = true;
-            params.direction = 1;
-
-            ASSERT_EQUALS(countResults(params), numObj());
-        }
-    };
-
     class All : public Suite {
     public:
         All() : Suite( "query_stage_tests" ) { }
@@ -249,8 +215,6 @@ namespace QueryStageTests {
             add<QueryStageIXScanLowerUpperIncl>();
             add<QueryStageIXScanLowerUpperInclFilter>();
             add<QueryStageIXScanCantMatch>();
-            add<QueryStageIXScan2dSphere>();
-            add<QueryStageIXScan2d>();
         }
     }  queryStageTestsAll;
 

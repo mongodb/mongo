@@ -27,7 +27,7 @@ function test(db, sharded, indexType) {
         var lat = 90 - Random.rand() * 180;
         var lng = 180 - Random.rand() * 360;
         db[coll].insert({rand:Math.random(), loc: [lng, lat]})
-        assert(!db.getLastError());
+        assert.eq(null, db.getLastError());
     }
     assert.eq(db[coll].count(), numPts);
 

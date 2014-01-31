@@ -27,3 +27,14 @@ res = t.distinct( "a.b" );
 assert.eq( "a,b,c" , res.toString() , "B1" );
 printjson(t._distinct( "a.b" ).stats);
 assert.eq( "BasicCursor" , t._distinct( "a.b" ).stats.cursor , "B2" )
+
+t.drop();
+
+t.save({_id: 1, a: 1});
+t.save({_id: 2, a: 2});
+
+// Test distinct with _id.
+res = t.distinct( "_id" );
+assert.eq( "1,2", res.toString(), "C1" );
+res = t.distinct( "a", {_id: 1} );
+assert.eq( "1", res.toString(), "C2" );

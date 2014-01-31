@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
@@ -87,7 +87,7 @@ namespace mongo {
             }
             if( all || cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
                 result.append("replMonitorMaxFailedChecks",
-                              ReplicaSetMonitor::getMaxFailedChecks());
+                              ReplicaSetMonitor::maxConsecutiveFailedChecks);
             }
 
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
@@ -150,9 +150,9 @@ namespace mongo {
                 s++;
             }
             if( cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
-                if( s == 0 ) result.append( "was", ReplicaSetMonitor::getMaxFailedChecks() );
-                ReplicaSetMonitor::setMaxFailedChecks(
-                        cmdObj["replMonitorMaxFailedChecks"].numberInt() );
+                if( s == 0 ) result.append( "was", ReplicaSetMonitor::maxConsecutiveFailedChecks );
+                ReplicaSetMonitor::maxConsecutiveFailedChecks =
+                    cmdObj["replMonitorMaxFailedChecks"].numberInt();
                 s++;
             }
 
@@ -272,7 +272,8 @@ namespace mongo {
                 return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
                                 "Unable to set sslMode, SSL support is not compiled into server");
 #endif
-                if (str != "preferSSL" && str != "requireSSL") { 
+                if (str != "disabled" && str != "allowSSL" &&
+                    str != "preferSSL" && str != "requireSSL") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                                     "Invalid value for sslMode via setParameter command: " 
                                     << str);
@@ -331,7 +332,8 @@ namespace mongo {
             }
 
             virtual Status setFromString(const std::string& str) {
-                if (str != "sendX509" && str != "x509") { 
+                if (str != "keyFile" && str != "sendKeyFile" &&
+                    str != "sendX509" && str != "x509") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                                     "Invalid value for clusterAuthMode via setParameter command: "
                                     << str);

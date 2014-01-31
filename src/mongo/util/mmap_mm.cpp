@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    MemoryMappedFile::MemoryMappedFile() {
+    MemoryMappedFile::MemoryMappedFile() : _uniqueId(0) {
         fd = 0;
         maphandle = 0;
         view = 0;

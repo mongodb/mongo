@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -25,6 +37,7 @@
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
+#include "mongo/s/write_ops/batched_request_metadata.h"
 
 namespace mongo {
 
@@ -48,9 +61,7 @@ namespace mongo {
         static const BSONField<std::vector<BatchedDeleteDocument*> > deletes;
         static const BSONField<BSONObj> writeConcern;
         static const BSONField<bool> ordered;
-        static const BSONField<string> shardName;
-        static const BSONField<ChunkVersion> shardVersion;
-        static const BSONField<long long> session;
+        static const BSONField<BSONObj> metadata;
 
         //
         // construction / destruction
@@ -82,6 +93,10 @@ namespace mongo {
         const std::string& getCollName() const;
 
         void setDeletes(const std::vector<BatchedDeleteDocument*>& deletes);
+
+        /**
+         * deletes ownership is transferred to here.
+         */
         void addToDeletes(BatchedDeleteDocument* deletes);
         void unsetDeletes();
         bool isDeletesSet() const;
@@ -99,20 +114,13 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
-        void setShardName(const StringData& shardName);
-        void unsetShardName();
-        bool isShardNameSet() const;
-        const std::string& getShardName() const;
-
-        void setShardVersion(const ChunkVersion& shardVersion);
-        void unsetShardVersion();
-        bool isShardVersionSet() const;
-        const ChunkVersion& getShardVersion() const;
-
-        void setSession(long long session);
-        void unsetSession();
-        bool isSessionSet() const;
-        long long getSession() const;
+        /*
+         * metadata ownership will be transferred to this.
+         */
+        void setMetadata(BatchedRequestMetadata* metadata);
+        void unsetMetadata();
+        bool isMetadataSet() const;
+        BatchedRequestMetadata* getMetadata() const;
 
     private:
         // Convention: (M)andatory, (O)ptional
@@ -133,16 +141,8 @@ namespace mongo {
         bool _ordered;
         bool _isOrderedSet;
 
-        // (O)  shard name we're sending this batch to
-        std::string _shardName;
-        bool _isShardNameSet;
-
-        // (O)  version for this collection on a given shard
-        boost::scoped_ptr<ChunkVersion> _shardVersion;
-
-        // (O)  session number the inserts belong to
-        long long _session;
-        bool _isSessionSet;
+        // (O)  metadata associated with this request for internal use.
+        scoped_ptr<BatchedRequestMetadata> _metadata;
     };
 
 } // namespace mongo

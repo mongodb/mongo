@@ -10,31 +10,25 @@ for( i = 0; i < 100; ++i ) {
 }
 
 for( i = 0; i < 40; ++i ) {
-    t.save( {a:big} );
+    t.save( {a:0,x:big} );
 }
 
 function memoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
+    var ex = assert.throws( function() {
+        t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
+    } );
+    assert( ex.toString().match( /sort/ ) );
     assert.throws( function() {
-                  t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
-                  } );
-    assert( db.getLastError().match( /sort/ ) );
-    assert.throws( function() {
-                  t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true )
-                  } );
-    assert( db.getLastError().match( /sort/ ) );
+        t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true )
+    } );
+    assert( ex.toString().match( /sort/ ) );
 }
 
 function noMemoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
     t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount();
-    if ( 0 ) { // SERVER-5016
-    assert( !db.getLastError() );
-    }
     t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true );
-    if ( 0 ) { // SERVER-5016
-    assert( !db.getLastError() );
-    }
 }
 
 // Unindexed sorts.
@@ -45,9 +39,13 @@ memoryException( {b:1} );
 noMemoryException( {_id:1} );
 noMemoryException( {$natural:1} );
 
+assert.eq( 1, t.getIndexes().length );
+
 t.ensureIndex( {a:1} );
 t.ensureIndex( {b:1} );
 t.ensureIndex( {c:1} );
+
+assert.eq( 4, t.getIndexes().length );
 
 // These sorts are now indexed.
 noMemoryException( {a:1} );

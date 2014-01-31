@@ -17,6 +17,12 @@
 
 #include "mongo/util/log.h"
 
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 #include "mongo/logger/ramlog.h"
 #include "mongo/logger/rotatable_file_manager.h"
 #include "mongo/util/assert_util.h"
@@ -110,17 +116,38 @@ namespace mongo {
         return s.str();
     }
 
+    namespace {
+        bool rawOutToStderr = false;
+    } // namespace
+
+    void setRawOutToStderr() {
+        rawOutToStderr = true;
+    }
+
     /*
      * NOTE(schwerin): Called from signal handlers; should not be taking locks or allocating
      * memory.
      */
     void rawOut(const StringData &s) {
-        for (size_t i = 0; i < s.size(); ++i) {
+        // Can't use STDxxx_FILENO macros since they don't exist on windows.
+        const int fd = rawOutToStderr
+                        ? 2 // STDERR_FILENO
+                        : 1 // STDOUT_FILENO
+                        ;
+
+        const char* ptr = s.rawData();
+        size_t bytesRemaining = s.size();
+        while (bytesRemaining) {
 #ifdef _WIN32
-            putc(s[i], stdout);
+            int ret = _write(fd, ptr, bytesRemaining);
 #else
-            putc_unlocked(s[i], stdout);
+            ssize_t ret = write(fd, ptr, bytesRemaining);
 #endif
+            if (ret < 0)
+                return; // Nothing to do. Can't even log since that is what is failing.
+
+            ptr += ret;
+            bytesRemaining -= ret;
         }
     }
 

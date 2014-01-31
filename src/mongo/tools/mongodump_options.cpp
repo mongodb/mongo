@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/tools/mongodump_options.h"
@@ -60,6 +72,9 @@ namespace mongo {
         options->addOptionChaining("forceTableScan", "forceTableScan", moe::Switch,
                 "force a table scan (do not use $snapshot)");
 
+        options->addOptionChaining("dumpDbUsersAndRoles", "dumpDbUsersAndRoles", moe::Switch,
+                "Dump user and role definitions for the given database")
+                        .requires("db").incompatibleWith("collection");
 
         return Status::OK();
     }
@@ -106,7 +121,7 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "oplog mode is only supported on full dumps");
             }
         }
-        mongoDumpGlobalParams.outputFile = getParam("out");
+        mongoDumpGlobalParams.outputDirectory = getParam("out");
         mongoDumpGlobalParams.snapShotQuery = false;
         if (!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) {
             mongoDumpGlobalParams.snapShotQuery = true;
@@ -117,7 +132,20 @@ namespace mongo {
             toolGlobalParams.db = "";
         }
 
-        if (mongoDumpGlobalParams.outputFile == "-") {
+        if (hasParam("dumpDbUsersAndRoles") && toolGlobalParams.db == "admin") {
+            return Status(ErrorCodes::BadValue,
+                          "Cannot provide --dumpDbUsersAndRoles when dumping the admin db as "
+                          "user and role definitions for the whole server are dumped by default "
+                          "when dumping the admin db");
+        }
+
+        // Always dump users and roles if doing a full dump.  If doing a db dump, only dump users
+        // and roles if --dumpDbUsersAndRoles provided or you're dumping the admin db.
+        mongoDumpGlobalParams.dumpUsersAndRoles = hasParam("dumpDbUsersAndRoles") ||
+                (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty()) ||
+                (toolGlobalParams.db == "admin" && toolGlobalParams.coll.empty());
+
+        if (mongoDumpGlobalParams.outputDirectory == "-") {
             // write output to standard error to avoid mangling output
             // must happen early to avoid sending junk to stdout
             toolGlobalParams.canUseStdout = false;

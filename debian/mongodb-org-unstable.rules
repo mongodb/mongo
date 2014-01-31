@@ -1,10 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
+TOOLS=bsondump mongodump mongoexport mongofiles mongoimport mongooplog mongoperf mongorestore mongostat mongotop
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
@@ -13,7 +9,6 @@ export DH_VERBOSE=1
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
-        # Add here commands to configure the package.
 
 	touch configure-stamp
 
@@ -23,21 +18,15 @@ build: build-stamp
 build-stamp: configure-stamp  
 	dh_testdir
 
-        # Add here commands to compile the package.
-# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
 	# scons 
-        #docbook-to-man debian/mongodb.sgml > mongodb.1
-	echo debian/bsondump.1 > debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongodump.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongoexport.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongofiles.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongoimport.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongooplog.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongoperf.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongorestore.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongosniff.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongostat.1 >> debian/mongodb-org-unstable-tools.manpages
-	echo debian/mongotop.1 >> debian/mongodb-org-unstable-tools.manpages
+	#docbook-to-man debian/mongodb.sgml > mongodb.1
+
+	echo -n > debian/mongodb-org-unstable-tools.manpages
+	for binary in ${TOOLS} ; \
+	do \
+	  echo debian/$$binary.1 >> debian/mongodb-org-unstable-tools.manpages ; \
+	done
 
 	echo debian/mongo.1 > debian/mongodb-org-unstable-shell.manpages
 	echo debian/mongod.1 > debian/mongodb-org-unstable-server.manpages
@@ -86,7 +75,7 @@ install: build
 	dh_prep
 	dh_installdirs
 
-# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
 	# scons --prefix=$(CURDIR)/debian/mongodb/usr install
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-shell/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
@@ -96,16 +85,10 @@ install: build
 	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
 	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
 
-	cp -v $(CURDIR)/BINARIES/usr/bin/bsondump $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongodump $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongoexport $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongofiles $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongoimport $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongooplog $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongoperf $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongorestore $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongostat $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongotop $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
+	for binary in ${TOOLS} ; \
+	do \
+	  cp -v $(CURDIR)/BINARIES/usr/bin/$$binary $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin ; \
+	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/etc
 	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-org-unstable-server/etc/mongod.conf 

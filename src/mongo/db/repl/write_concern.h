@@ -47,11 +47,12 @@ namespace mongo {
 
     /** @return true if op has made it to w servers */
     bool opReplicatedEnough( OpTime op , int w );
+    bool opReplicatedEnough( OpTime op , const string& w );
     bool opReplicatedEnough( OpTime op , BSONElement w );
 
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait );
 
-    std::vector<BSONObj> getHostsWrittenTo(OpTime& op);
+    std::vector<BSONObj> getHostsWrittenTo( const OpTime& op );
 
     void resetSlaveCache();
     unsigned getSlaveCount();

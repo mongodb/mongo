@@ -13,6 +13,7 @@
  *    limitations under the License.
  */
 
+#include <limits>
 #include <string>
 
 #include "mongo/bson/util/bson_extract.h"
@@ -95,4 +96,44 @@ TEST(ExtractBSON, ExtractBooleanFieldWithDefault) {
 
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   bsonExtractBooleanFieldWithDefault(obj1, "b", true, &b));
+}
+
+TEST(ExtractBSON, ExtractIntegerField) {
+    long long v;
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractIntegerField(
+                          BSON("a" << 1),
+                          "b",
+                          &v));
+    ASSERT_OK(bsonExtractIntegerFieldWithDefault(
+                      BSON("a" << 1),
+                      "b",
+                      -1LL,
+                      &v));
+    ASSERT_EQUALS(-1LL, v);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractIntegerField(
+                          BSON("a" << false),
+                          "a",
+                          &v));
+    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
+                          BSON("a" << std::numeric_limits<float>::quiet_NaN()),
+                          "a",
+                          &v));
+    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
+                          BSON("a" << pow(2.0, 64)),
+                          "a",
+                          &v));
+    ASSERT_EQUALS(ErrorCodes::BadValue, bsonExtractIntegerField(
+                          BSON("a" << -1.5),
+                          "a",
+                          &v));
+    ASSERT_OK(bsonExtractIntegerField(
+                      BSON("a" << -pow(2.0, 55)),
+                      "a",
+                      &v));
+    ASSERT_EQUALS(-(1LL << 55), v);
+    ASSERT_OK(bsonExtractIntegerField(
+                      BSON("a" << 5178),
+                      "a",
+                      &v));
+    ASSERT_EQUALS(5178, v);
 }

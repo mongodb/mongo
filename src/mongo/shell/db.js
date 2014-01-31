@@ -80,6 +80,7 @@ DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
         capped: if true, this is a capped collection (where old data rolls out).
     </li>
     <li> max: maximum number of objects if capped (optional).</li>
+    <li> usePowerOf2Sizes: if true, set usePowerOf2Sizes allocation for the collection.</li>
     </ul>
 
     <p>Example:</p>
@@ -100,6 +101,8 @@ DB.prototype.createCollection = function(name, opt) {
         cmd.capped = options.capped;
     if (options.size != undefined)
         cmd.size = options.size;
+    if (options.usePowerOf2Sizes != undefined) 
+        cmd.flags = options.usePowerOf2Sizes ? 1 : 0;
     var res = this._dbCommand(cmd);
     return res;
 }
@@ -789,14 +792,7 @@ DB.prototype.listCommands = function(){
         var c = x.commands[name];
 
         var s = name + ": ";
-        
-        switch ( c.lockType ){
-        case -1: s += "read-lock"; break;
-        case  0: s += "no-lock"; break;
-        case  1: s += "write-lock"; break;
-        default: s += c.lockType;
-        }
-        
+
         if (c.adminOnly) s += " adminOnly ";
         if (c.adminOnly) s += " slaveOk ";
 
@@ -1000,14 +996,6 @@ DB.prototype._createUser = function(userObj, writeConcern) {
         return false;
     }
 
-    // We can't detect replica set shards via mongos, so we'll sometimes get this error
-    // In this case though, we've already checked the local error before returning norepl, so
-    // the user has been written and we're happy
-    if (res.errmsg == "norepl" || res.errmsg == "noreplset") {
-        // nothing we can do
-        return true;
-    }
-
     if (res.errmsg == "timeout") {
         throw Error("timed out while waiting for user authentication to replicate - " +
                     "database will not be fully secured until replication finishes");
@@ -1114,11 +1102,6 @@ DB.prototype.updateUser = function(name, updateObject, writeConcern) {
         return;
     }
 
-    if (res.errmsg == "noreplset") {
-        // nothing we can do
-        return;
-    }
-
     throw Error("Updating user failed: " + res.errmsg);
 };
 
@@ -1132,7 +1115,7 @@ DB.prototype.logout = function(){
 
 // For backwards compatibility
 DB.prototype.removeUser = function( username, writeConcern ) {
-    print("WARNING: db.removeUser has been deprected, please use db.dropUser instead");
+    print("WARNING: db.removeUser has been deprecated, please use db.dropUser instead");
     return db.dropUser(username, writeConcern);
 }
 
@@ -1201,7 +1184,7 @@ DB.prototype._authOrThrow = function () {
     else if (arguments.length == 1) {
         if (typeof(arguments[0]) != "object")
             throw Error("Single-argument form of auth expects a parameter object");
-        params = arguments[0];
+        params = Object.extend({}, arguments[0]);
     }
     else {
         throw Error(
@@ -1272,8 +1255,10 @@ DB.prototype.getUser = function(username) {
     return res.users[0];
 }
 
-DB.prototype.getUsers = function() {
-    var res = this.runCommand({usersInfo: 1});
+DB.prototype.getUsers = function(args) {
+    var cmdObj = {usersInfo: 1};
+    Object.extend(cmdObj, args);
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }

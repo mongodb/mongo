@@ -29,7 +29,9 @@
 #include "mongo/s/config_upgrade.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -73,16 +75,16 @@ namespace mongo {
         // If the cluster has not previously been initialized, we need to set the version before
         // using so subsequent mongoses use the config data the same way.  This requires all three
         // config servers online initially.
-        try {
-            ScopedDbConnection conn(configLoc, 30);
-            conn->update(VersionType::ConfigNS, BSON("_id" << 1), versionInfo.toBSON(), true);
-            _checkGLE(conn);
-            conn.done();
-        }
-        catch (const DBException& e) {
+        Status result = clusterUpdate(VersionType::ConfigNS, BSON("_id" << 1),
+                versionInfo.toBSON(),
+                true /* upsert */,
+                false /* multi */,
+                WriteConcernOptions::AllConfigs,
+                NULL);
 
-            *errMsg = stream() << "error writing initial config version" << causedBy(e);
-
+        if ( !result.isOK() ) {
+            *errMsg = stream() << "error writing initial config version: "
+                               << result.reason();
             return false;
         }
 

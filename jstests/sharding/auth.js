@@ -116,12 +116,10 @@ d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 )
 
 s.getDB(testUser.db).createUser({user: testUser.username,
                                  pwd: testUser.password,
-                                 roles: jsTest.basicUserRoles},
-                                {w: 3, wtimeout: 30000} )
+                                 roles: jsTest.basicUserRoles})
 s.getDB(testUserReadOnly.db).createUser({user: testUserReadOnly.username,
                                          pwd: testUserReadOnly.password,
-                                         roles: jsTest.readOnlyUserRoles},
-                                        {w: 3, wtimeout:30000});
+                                         roles: jsTest.readOnlyUserRoles});
 
 logout(adminUser);
 

@@ -36,6 +36,9 @@ namespace mongo {
      * This class implements the deleter methods to be used for a shard.
      */
     struct RangeDeleterDBEnv : public RangeDeleterEnv {
+
+        virtual void initThread();
+
         /**
          * Deletes the documents from the given range synchronously.
          *

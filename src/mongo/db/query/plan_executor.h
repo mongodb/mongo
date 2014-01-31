@@ -76,7 +76,7 @@ namespace mongo {
         bool restoreState();
 
         /** TODO document me */
-        void invalidate(const DiskLoc& dl);
+        void invalidate(const DiskLoc& dl, InvalidationType type);
 
         //
         // Running Support

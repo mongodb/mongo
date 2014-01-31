@@ -30,7 +30,6 @@
 
 #include "mongo/pch.h"
 #include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/query/new_find.h"
 
 namespace mongo {
 

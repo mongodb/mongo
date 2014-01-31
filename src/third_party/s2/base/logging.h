@@ -14,12 +14,9 @@
 #ifndef BASE_LOGGING_H
 #define BASE_LOGGING_H
 
-#include <stdlib.h>
-#include <stdlib.h>
-#include <iostream>
-using std::ostream;
-using std::cout;
-using std::endl;
+#include <iosfwd>
+
+#include "mongo/util/log.h"
 
 #include "macros.h"
 
@@ -53,46 +50,21 @@ using std::endl;
 #endif
 
 #include "base/port.h"
-#define INFO std::cout
-#define FATAL std::cerr
-#define DFATAL std::cerr
+#define INFO mongo::log().stream()
+#define FATAL LogMessageFatal(__FILE__, __LINE__).stream()
+#define DFATAL LogMessageFatal(__FILE__, __LINE__).stream()
 
 #define S2LOG(x) x
 #define VLOG(x) if (x>0) {} else S2LOG(INFO)
 
-namespace google_base {
-class DateLogger {
+class LogMessageFatal {
  public:
-  DateLogger();
-  char* const HumanDate();
- private:
-  char buffer_[9];
-};
-}  // namespace google_base
-
-class LogMessage {
- public:
-  LogMessage(const char* file, int line) {
-    std::cerr << "[" << pretty_date_.HumanDate() << "] "
-              << file << ":" << line << ": ";
-  }
-  ~LogMessage() { std::cerr << "\n"; }
-  std::ostream& stream() { return std::cerr; }
+  LogMessageFatal(const char* file, int line);
+  ~LogMessageFatal();
+  std::ostream& stream() { return _lsb.stream(); }
 
  private:
-  google_base::DateLogger pretty_date_;
-  DISALLOW_COPY_AND_ASSIGN(LogMessage);
-};
-
-class LogMessageFatal : public LogMessage {
- public:
-  LogMessageFatal(const char* file, int line)
-    : LogMessage(file, line) { }
-  ~LogMessageFatal() {
-    std::cerr << "\n";
-    ::abort();
-  }
- private:
+    mongo::logger::LogstreamBuilder _lsb;
   DISALLOW_COPY_AND_ASSIGN(LogMessageFatal);
 };
 

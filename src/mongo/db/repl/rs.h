@@ -30,10 +30,11 @@
 
 #pragma once
 
+#include "mongo/bson/oid.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
@@ -177,6 +178,7 @@ namespace mongo {
     };
 
     class Consensus {
+    private:
         ReplSetImpl &rs;
         struct LastYea {
             LastYea() : when(0), who(0xffffffff) { }
@@ -190,6 +192,10 @@ namespace mongo {
         void _electSelf();
         bool weAreFreshest(bool& allUp, int& nTies);
         bool sleptLast; // slept last elect() pass
+
+        // This is a unique id that is changed each time we transition to PRIMARY, as the
+        // result of an election.
+        OID _electionId;
     public:
         Consensus(ReplSetImpl *t) : rs(*t) {
             sleptLast = false;
@@ -207,6 +213,9 @@ namespace mongo {
         void electSelf();
         void electCmdReceived(BSONObj, BSONObjBuilder*);
         void multiCommand(BSONObj cmd, list<Target>& L);
+
+        OID getElectionId() const { return _electionId; }
+        void setElectionId(OID oid) { _electionId = oid; }
     };
 
     /**
@@ -367,6 +376,8 @@ namespace mongo {
         SyncSourceFeedback syncSourceFeedback;
 
         OpTime lastOpTimeWritten;
+        OpTime getEarliestOpTimeWritten() const;
+
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
@@ -380,6 +391,8 @@ namespace mongo {
         void veto(const string& host, unsigned secs=10);
         bool gotForceSync();
         void goStale(const Member* m, const BSONObj& o);
+
+        OID getElectionId() const { return elect.getElectionId(); }
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
@@ -738,7 +751,7 @@ namespace mongo {
             _hbinfo.health = 1.0;
     }
 
-    inline bool ignoreUniqueIndex(IndexDescriptor* idx) {
+    inline bool ignoreUniqueIndex(const IndexDescriptor* idx) {
         if (!idx->unique()) {
             return false;
         }
@@ -759,34 +772,6 @@ namespace mongo {
         }
         // Never ignore _id index
         if (idx->isIdIndex()) {
-            return false;
-        }
-
-        return true;
-    }
-
-
-    inline bool ignoreUniqueIndex(IndexDetails& idx) {
-        if (!idx.unique()) {
-            return false;
-        }
-        if (!theReplSet) {
-            return false;
-        }
-        // see SERVER-6671
-        MemberState ms = theReplSet->state();
-        if (! ((ms == MemberState::RS_STARTUP2) ||
-               (ms == MemberState::RS_RECOVERING) ||
-               (ms == MemberState::RS_ROLLBACK))) {
-            return false;
-        }
-        // 2 is the oldest oplog version where operations
-        // are fully idempotent.
-        if (theReplSet->oplogVersion < 2) {
-            return false;
-        }
-        // Never ignore _id index
-        if (idx.isIdIndex()) {
             return false;
         }
 

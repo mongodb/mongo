@@ -1,27 +1,23 @@
 
 t = db.bigkeysidxtest;
 
-var keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+var keys = []
 
 var str = "aaaabbbbccccddddeeeeffffgggghhhh";
-str = str + str;
 
-for (var i = 2; i < 10; i++) {
-    keys[i] = str;
+while ( str.length < 20000 ) {
+    keys.push( str );
     str = str + str;
 }
-print(str.length);
 
-var dir = 1;
-
-function go() {
-    if (dir == 1) {
-        for (var i = 1; i < 10; i++) {
+function doInsert( order ) {
+    if (order == 1) {
+        for (var i = 0; i < 10; i++) {
             t.insert({ _id: i, k: keys[i] });
         }
     }
     else {
-        for (var i = 10; i >= 1; i--) {
+        for (var i = 9; i >= 0; i--) {
             t.insert({ _id: i, k: keys[i] });
         }
     }
@@ -29,50 +25,35 @@ function go() {
 
 var expect = null;
 
-var ok = true;
-
 function check() {
     assert(t.validate().valid);
+    assert.eq( 5, t.count() );
 
     var c = t.find({ k: /^a/ }).count();
-
-    print("keycount:" + c);
-
-    if (expect) {
-        if (expect != c) {
-            print("count of keys doesn't match expected count of : " + expect + " got: " + c);
-            ok = false;
-        }
-    }
-    else {
-        expect = c;
-    }
-
-    //print(t.validate().result);
+    assert.eq( 5, c );
 }
 
-for (var pass = 1; pass <= 2; pass++) {
-    print("pass:" + pass);
-
+function runTest( order ) {
     t.drop();
     t.ensureIndex({ k: 1 });
-    go();
+    doInsert( order );
     check(); // check incremental addition
 
     t.reIndex();
     check(); // check bottom up
 
     t.drop();
-    go();
+    doInsert( order );
+    assert.eq( 1, t.getIndexes().length );
     t.ensureIndex({ k: 1 });
-    check(); // check bottom up again without reindex explicitly
+    assert.eq( 1, t.getIndexes().length );
 
     t.drop();
-    go();
+    doInsert( order );
+    assert.eq( 1, t.getIndexes().length );
     t.ensureIndex({ k: 1 }, { background: true });
-    check(); // check background (which should be incremental)
-
-    dir = -1;
+    assert.eq( 1, t.getIndexes().length );
 }
 
-assert(ok,"not ok");
+runTest( 1 );
+runTest( 2 );

@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 /**
@@ -59,8 +71,17 @@ namespace RunnerRegistry {
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             // Owns all args
-            auto_ptr<Runner> run(new SingleSolutionRunner(cq, NULL, scan.release(), ws.release()));
+            auto_ptr<Runner> run(new SingleSolutionRunner(_ctx->ctx().db()->getCollection( ns() ),
+                                                          cq, NULL, scan.release(), ws.release()));
             return run.release();
+        }
+
+        void registerRunner( Runner* runner ) {
+            _ctx->ctx().db()->getOrCreateCollection( ns() )->cursorCache()->registerRunner( runner );
+        }
+
+        void deregisterRunner( Runner* runner ) {
+            _ctx->ctx().db()->getOrCreateCollection( ns() )->cursorCache()->deregisterRunner( runner );
         }
 
         int N() { return 50; }
@@ -87,7 +108,7 @@ namespace RunnerRegistry {
 
             // Register it.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
             // At this point it's safe to yield.  forceYield would do that.  Let's now simulate some
             // stuff going on in the yield.
 
@@ -98,7 +119,7 @@ namespace RunnerRegistry {
             // At this point, we're done yielding.  We recover our lock.
 
             // Unregister the runner.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
 
             // And clean up anything that happened before.
             run->restoreState();
@@ -129,13 +150,13 @@ namespace RunnerRegistry {
 
             // Save state and register.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
 
             // Drop a collection that's not ours.
             _client.dropCollection("unittests.someboguscollection");
 
             // Unregister and restore state.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
             run->restoreState();
 
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
@@ -143,13 +164,13 @@ namespace RunnerRegistry {
 
             // Save state and register.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
 
             // Drop our collection.
             _client.dropCollection(ns());
 
             // Unregister and restore state.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
             run->restoreState();
 
             // Runner was killed.
@@ -174,13 +195,13 @@ namespace RunnerRegistry {
 
             // Save state and register.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
 
             // Drop all indices.
             _client.dropIndexes(ns());
 
             // Unregister and restore state.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
             run->restoreState();
 
             // Runner was killed.
@@ -205,13 +226,13 @@ namespace RunnerRegistry {
 
             // Save state and register.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
 
             // Drop a specific index.
             _client.dropIndex(ns(), BSON("foo" << 1));
 
             // Unregister and restore state.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
             run->restoreState();
 
             // Runner was killed.
@@ -234,7 +255,7 @@ namespace RunnerRegistry {
 
             // Save state and register.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
 
             // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
             // requires a "global write lock."
@@ -243,7 +264,7 @@ namespace RunnerRegistry {
             _ctx.reset(new Client::WriteContext(ns()));
 
             // Unregister and restore state.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
             run->restoreState();
 
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
@@ -251,7 +272,7 @@ namespace RunnerRegistry {
 
             // Save state and register.
             run->saveState();
-            ClientCursor::registerRunner(run.get());
+            registerRunner(run.get());
 
             // Drop our DB.  Once again, must give up the lock.
             _ctx.reset();
@@ -259,7 +280,7 @@ namespace RunnerRegistry {
             _ctx.reset(new Client::WriteContext(ns()));
 
             // Unregister and restore state.
-            ClientCursor::deregisterRunner(run.get());
+            deregisterRunner(run.get());
             run->restoreState();
 
             // Runner was killed.

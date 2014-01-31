@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {
 
@@ -39,12 +40,8 @@ namespace mongo {
         _results.pop();
 
         if (PlanStage::ADVANCED == state) {
-            // We advanced.  Put the mock obj into the working set.
-            WorkingSetID id = _ws->allocate();
-            WorkingSetMember* member = _ws->get(id);
-            *member = _members.front();
+            *out = _members.front();
             _members.pop();
-            *out = id;
         }
 
         return state;
@@ -58,7 +55,13 @@ namespace mongo {
 
     void MockStage::pushBack(const WorkingSetMember& member) {
         _results.push(PlanStage::ADVANCED);
-        _members.push(member);
+
+        WorkingSetID id = _ws->allocate();
+        WorkingSetMember* ourMember = _ws->get(id);
+        WorkingSetCommon::initFrom(ourMember, member);
+
+        // member lives in _ws.  We'll return it when _results hits ADVANCED.
+        _members.push(id);
     }
 
 }  // namespace mongo

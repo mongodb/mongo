@@ -168,7 +168,8 @@ namespace mongo {
     }
 
     bool SyncSourceFeedback::connect(const Member* target) {
-        boost::unique_lock<boost::mutex> lock(_connmtx);
+        boost::unique_lock<boost::mutex> lock(_mtx);
+        boost::unique_lock<boost::mutex> connlock(_connmtx);
         resetConnection();
         resetOplogReaderConnection();
         _syncTarget = target;

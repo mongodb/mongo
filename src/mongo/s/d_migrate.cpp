@@ -44,7 +44,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -72,6 +71,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/assert_util.h"
@@ -200,7 +200,6 @@ namespace mongo {
 
     class MigrateFromStatus {
     public:
-
         MigrateFromStatus() : _mutex("MigrateFromStatus") {
             _active = false;
             _inCriticalSection = false;
@@ -243,6 +242,10 @@ namespace mongo {
         void done() {
             log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
                     "section" << endl;
+
+
+            _dummyRunner.reset( NULL );
+
             Lock::GlobalWrite lk;
             log() << "MigrateFromStatus::done Global lock acquired" << endl;
 
@@ -396,6 +399,9 @@ namespace mongo {
                 return false;
             }
 
+            invariant( _dummyRunner.get() == NULL );
+            _dummyRunner.reset( new DummyRunner( _ns, collection ) );
+
             IndexDescriptor *idx =
                 collection->getIndexCatalog()->findIndexByPrefix( _shardKeyPattern ,
                                                                   true );  /* require single key */
@@ -409,7 +415,7 @@ namespace mongo {
             BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
             BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
 
-            auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max, false));
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx, min, max, false));
             // we can afford to yield here because any change to the base data that we might miss is
             // already being  queued and will be migrated in the 'transferMods' stage
             runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -541,17 +547,7 @@ namespace mongo {
             return true;
         }
 
-        void aboutToDelete( const Database* db , const DiskLoc& dl ) {
-            verify(db);
-            Lock::assertWriteLocked(db->name());
-
-            if ( ! _getActive() )
-                return;
-
-            if ( ! db->ownsNS( _ns ) )
-                return;
-
-            
+        void aboutToDelete( const DiskLoc& dl ) {
             // not needed right now
             // but trying to prevent a future bug
             scoped_spinlock lk( _trackerLocks ); 
@@ -627,7 +623,69 @@ namespace mongo {
         bool _getActive() const { scoped_lock l(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock l(_mutex); _active = b; }
 
+
+        class DummyRunner : public Runner {
+        public:
+            DummyRunner( const StringData& ns,
+                         Collection* collection ) {
+                _ns = ns.toString();
+                _collection = collection;
+                _collection->cursorCache()->registerRunner( this );
+            }
+            ~DummyRunner() {
+                if ( !_collection )
+                    return;
+                Client::ReadContext ctx( _ns );
+                Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                invariant( _collection == collection );
+                _collection->cursorCache()->deregisterRunner( this );
+            }
+            virtual void setYieldPolicy(YieldPolicy policy) {
+                invariant( false );
+            }
+            virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
+                invariant( false );
+            }
+            virtual bool isEOF() {
+                invariant( false );
+                return false;
+            }
+            virtual void kill() {
+                _collection = NULL;
+            }
+            virtual void saveState() {
+                invariant( false );
+            }
+            virtual bool restoreState() {
+                invariant( false );
+            }
+            virtual const string& ns() {
+                invariant( false );
+                return _ns;
+            }
+            virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+            virtual const Collection* collection() {
+                return _collection;
+            }
+            virtual Status getInfo(TypeExplain** explain, PlanInfo** planInfo) const {
+                return Status( ErrorCodes::InternalError, "no" );
+            }
+
+        private:
+            string _ns;
+            Collection* _collection;
+        };
+
+        scoped_ptr<DummyRunner> _dummyRunner;
+
     } migrateFromStatus;
+
+    void MigrateFromStatus::DummyRunner::invalidate(const DiskLoc& dl,
+                                                    InvalidationType type) {
+        if ( type == INVALIDATION_DELETION ) {
+            migrateFromStatus.aboutToDelete( dl );
+        }
+    }
 
     struct MigrateStatusHolder {
         MigrateStatusHolder( const std::string& ns ,
@@ -660,25 +718,15 @@ namespace mongo {
         migrateFromStatus.logOp(opstr, ns, obj, patt, notInActiveChunk);
     }
 
-    void aboutToDeleteForSharding( const StringData& ns,
-                                   const Database* db,
-                                   const NamespaceDetails* nsd,
-                                   const DiskLoc& dl )
-    {
-        // Note: namespace is currently unused since we only have a single migration per host,
-        // but will be needed for parallel migrations.
-        if ( nsd->isCapped() ) return;
-        migrateFromStatus.aboutToDelete( db, dl );
-    }
-
     class TransferModsCommand : public ChunkCommandHelper {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         TransferModsCommand() : ChunkCommandHelper( "_transferMods" ) {}
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::_transferMods);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -689,12 +737,13 @@ namespace mongo {
 
     class InitialCloneCommand : public ChunkCommandHelper {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         InitialCloneCommand() : ChunkCommandHelper( "_migrateClone" ) {}
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::_migrateClone);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -2036,20 +2085,30 @@ namespace mongo {
         }
 
         bool startCommit() {
+
             if ( state != STEADY )
                 return false;
             state = COMMIT_START;
             
-            Timer t;
-            // we wait for the commit to succeed before giving up
-            while ( t.seconds() <= 30 ) {
-                log() << "Waiting for commit to finish" << endl;
-                sleepmillis(1);
-                if ( state == DONE )
-                    return true;
+            boost::xtime xt;
+            boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
+            xt.sec += 30;
+
+            scoped_lock lock(m_active);
+            while ( active ) {
+                if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
+                    // TIMEOUT
+                    state = FAIL;
+                    log() << "startCommit never finished!" << migrateLog;
+                    return false;
+                }
             }
-            state = FAIL;
-            log() << "startCommit never finished!" << migrateLog;
+
+            if ( state == DONE ) {
+                return true;
+            }
+
+            log() << "startCommit failed, final data failed to transfer" << migrateLog;
             return false;
         }
 
@@ -2059,10 +2118,15 @@ namespace mongo {
         }
 
         bool getActive() const { scoped_lock l(m_active); return active; }
-        void setActive( bool b ) { scoped_lock l(m_active); active = b; }
+        void setActive( bool b ) { 
+            scoped_lock l(m_active);
+            active = b;
+            isActiveCV.notify_all(); 
+        }
 
         mutable mongo::mutex m_active;
         bool active;
+        boost::condition isActiveCV;
 
         string ns;
         string from;
@@ -2097,6 +2161,7 @@ namespace mongo {
 
     class RecvChunkStartCommand : public ChunkCommandHelper {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         RecvChunkStartCommand() : ChunkCommandHelper( "_recvChunkStart" ) {}
 
         virtual LockType locktype() const { return NONE; }
@@ -2104,7 +2169,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::_recvChunkStart);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -2197,12 +2262,13 @@ namespace mongo {
 
     class RecvChunkStatusCommand : public ChunkCommandHelper {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         RecvChunkStatusCommand() : ChunkCommandHelper( "_recvChunkStatus" ) {}
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::_recvChunkStatus);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -2214,12 +2280,13 @@ namespace mongo {
 
     class RecvChunkCommitCommand : public ChunkCommandHelper {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         RecvChunkCommitCommand() : ChunkCommandHelper( "_recvChunkCommit" ) {}
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::_recvChunkCommit);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -2232,12 +2299,13 @@ namespace mongo {
 
     class RecvChunkAbortCommand : public ChunkCommandHelper {
     public:
+        void help(stringstream& h) const { h << "internal"; }
         RecvChunkAbortCommand() : ChunkCommandHelper( "_recvChunkAbort" ) {}
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::_recvChunkAbort);
+            actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {

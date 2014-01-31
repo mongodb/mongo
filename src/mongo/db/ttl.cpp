@@ -38,7 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/database_holder.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"
@@ -105,23 +105,33 @@ namespace mongo {
                     b.appendDate( "$lt" , curTimeMillis64() - ( 1000 * idx[secondsExpireField].numberLong() ) );
                     query = BSON( key.firstElement().fieldName() << b.obj() );
                 }
-                
+
                 LOG(1) << "TTL: " << key << " \t " << query << endl;
-                
+
                 long long n = 0;
                 {
                     string ns = idx["ns"].String();
                     Client::WriteContext ctx( ns );
-                    NamespaceDetails* nsd = nsdetails( ns );
-                    if ( ! nsd ) {
+                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    if ( !collection ) {
                         // collection was dropped
                         continue;
                     }
+
+                    NamespaceDetails* nsd = collection->details();
                     if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
+                        // TODO: wish there was a cleaner way to do this
                         nsd->syncUserFlags( ns );
                     }
+
                     // only do deletes if on master
                     if ( ! isMaster ) {
+                        continue;
+                    }
+
+                    if ( collection->getIndexCatalog()->findIndexByKeyPattern( key ) == NULL ) {
+                        // index not finished yet
+                        LOG(1) << " skipping index because not finished";
                         continue;
                     }
 

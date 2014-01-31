@@ -46,17 +46,14 @@ namespace mongo {
         static HostAndPort me();
 
         bool operator<(const HostAndPort& r) const {
-            string h = host();
-            string rh = r.host();
-            if( h < rh )
-                return true;
-            if( h == rh )
-                return port() < r.port();
-            return false;
+            const int cmp = host().compare(r.host());
+            if (cmp)
+                return cmp < 0;
+            return port() < r.port();
         }
 
         bool operator==(const HostAndPort& r) const { 
-            return host() == r.host() && port() == r.port(); 
+            return host() == r.host() && port() == r.port();
         }
 
         bool operator!=(const HostAndPort& r) const { return !(*this == r); }
@@ -78,7 +75,7 @@ namespace mongo {
         bool empty() const {
             return _host.empty() && _port < 0;
         }
-        string host() const {
+        const string& host() const {
             return _host;
         }
         int port() const {

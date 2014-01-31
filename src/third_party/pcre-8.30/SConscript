@@ -5,7 +5,7 @@ Import( "env" )
 env = env.Clone()
 env.Append( CPPDEFINES=[ "HAVE_CONFIG_H" ] )
 
-env.StaticLibrary( "pcrecpp", [
+env.Library( "pcrecpp", [
         # pcre
         "pcre_byte_order.c",
         "pcre_compile.c",

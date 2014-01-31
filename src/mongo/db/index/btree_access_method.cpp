@@ -40,205 +40,9 @@
 
 namespace mongo {
 
-    BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexDescriptor *descriptor)
-        : _descriptor(descriptor), _ordering(Ordering::make(_descriptor->keyPattern())) {
-
-        verify(0 == descriptor->version() || 1 == descriptor->version());
-        _interface = BtreeInterface::interfaces[descriptor->version()];
-    }
-
-    // Find the keys for obj, put them in the tree pointing to loc
-    Status BtreeBasedAccessMethod::insert(const BSONObj& obj, const DiskLoc& loc,
-            const InsertDeleteOptions& options, int64_t* numInserted) {
-
-        *numInserted = 0;
-
-        BSONObjSet keys;
-        // Delegate to the subclass.
-        getKeys(obj, &keys);
-
-        Status ret = Status::OK();
-
-        for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            try {
-                _interface->bt_insert(_descriptor->getHead(), loc, *i, _ordering,
-                                      options.dupsAllowed, _descriptor->getOnDisk(), true);
-                ++*numInserted;
-            } catch (AssertionException& e) {
-                if (10287 == e.getCode() && _descriptor->isBackgroundIndex()) {
-                    // This is the duplicate key exception.  We ignore it for some reason in BG
-                    // indexing.
-                    DEV log() << "info: key already in index during bg indexing (ok)\n";
-                } else if (!options.dupsAllowed) {
-                    // Assuming it's a duplicate key exception.  Clean up any inserted keys.
-                    for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
-                        removeOneKey(*j, loc);
-                    }
-                    *numInserted = 0;
-                    return Status(ErrorCodes::DuplicateKey, e.what(), e.getCode());
-                } else {
-                    problem() << " caught assertion addKeysToIndex "
-                              << _descriptor->indexNamespace()
-                              << obj["_id"] << endl;
-                    ret = Status(ErrorCodes::InternalError, e.what(), e.getCode());
-                }
-            }
-        }
-
-        if (*numInserted > 1) {
-            _descriptor->setMultikey();
-        }
-
-        return ret;
-    }
-
-    bool BtreeBasedAccessMethod::removeOneKey(const BSONObj& key, const DiskLoc& loc) {
-        bool ret = false;
-
-        try {
-            ret = _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), key, loc);
-        } catch (AssertionException& e) {
-            problem() << "Assertion failure: _unindex failed "
-                << _descriptor->indexNamespace() << endl;
-            out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
-            out() << "  obj:" << loc.obj().toString() << '\n';
-            out() << "  key:" << key.toString() << '\n';
-            out() << "  dl:" << loc.toString() << endl;
-            logContext();
-        }
-
-        return ret;
-    }
-
-    // Remove the provided doc from the index.
-    Status BtreeBasedAccessMethod::remove(const BSONObj &obj, const DiskLoc& loc,
-        const InsertDeleteOptions &options, int64_t* numDeleted) {
-
-        BSONObjSet keys;
-        getKeys(obj, &keys);
-        *numDeleted = 0;
-
-        for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            bool thisKeyOK = removeOneKey(*i, loc);
-
-            if (thisKeyOK) {
-                ++*numDeleted;
-            } else if (options.logIfError) {
-                log() << "unindex failed (key too big?) " << _descriptor->indexNamespace()
-                      << " key: " << *i << " " << loc.obj()["_id"] << endl;
-            }
-        }
-
-        return Status::OK();
-    }
-
-    // Return keys in l that are not in r.
-    // Lifted basically verbatim from elsewhere.
-    static void setDifference(const BSONObjSet &l, const BSONObjSet &r, vector<BSONObj*> *diff) {
-        // l and r must use the same ordering spec.
-        verify(l.key_comp().order() == r.key_comp().order());
-        BSONObjSet::const_iterator i = l.begin();
-        BSONObjSet::const_iterator j = r.begin();
-        while ( 1 ) {
-            if ( i == l.end() )
-                break;
-            while ( j != r.end() && j->woCompare( *i ) < 0 )
-                j++;
-            if ( j == r.end() || i->woCompare(*j) != 0  ) {
-                const BSONObj *jo = &*i;
-                diff->push_back( (BSONObj *) jo );
-            }
-            i++;
-        }
-    }
-
-    Status BtreeBasedAccessMethod::touch(const BSONObj& obj) {
-        BSONObjSet keys;
-        getKeys(obj, &keys);
-
-        for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            int unusedPos;
-            bool unusedFound;
-            DiskLoc unusedDiskLoc;
-            _interface->locate(_descriptor->getOnDisk(), _descriptor->getHead(), *i, _ordering,
-                               unusedPos, unusedFound, unusedDiskLoc, 1);
-        }
-
-        return Status::OK();
-    }
-
-    Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
-        *numKeys = _interface->fullValidate(_descriptor->getHead(), _descriptor->keyPattern());
-        return Status::OK();
-    }
-
-    Status BtreeBasedAccessMethod::validateUpdate(
-        const BSONObj &from, const BSONObj &to, const DiskLoc &record,
-        const InsertDeleteOptions &options, UpdateTicket* status) {
-
-        BtreeBasedPrivateUpdateData *data = new BtreeBasedPrivateUpdateData();
-        status->_indexSpecificUpdateData.reset(data);
-
-        getKeys(from, &data->oldKeys);
-        getKeys(to, &data->newKeys);
-        data->loc = record;
-        data->dupsAllowed = options.dupsAllowed;
-
-        setDifference(data->oldKeys, data->newKeys, &data->removed);
-        setDifference(data->newKeys, data->oldKeys, &data->added);
-
-        bool checkForDups = !data->added.empty()
-            && (KeyPattern::isIdKeyPattern(_descriptor->keyPattern()) || _descriptor->unique())
-            && !options.dupsAllowed;
-
-        if (checkForDups) {
-            for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                if (_interface->wouldCreateDup(_descriptor->getOnDisk(), _descriptor->getHead(),
-                                               **i, _ordering, record)) {
-                    status->_isValid = false;
-                    return Status(ErrorCodes::DuplicateKey,
-                                  _interface->dupKeyError(_descriptor->getHead(),
-                                                          _descriptor->getOnDisk(),
-                                                          **i));
-                }
-            }
-        }
-
-        status->_isValid = true;
-
-        return Status::OK();
-    }
-
-    Status BtreeBasedAccessMethod::update(const UpdateTicket& ticket, int64_t* numUpdated) {
-        if (!ticket._isValid) {
-            return Status(ErrorCodes::InternalError, "Invalid updateticket in update");
-        }
-
-        BtreeBasedPrivateUpdateData* data =
-            static_cast<BtreeBasedPrivateUpdateData*>(ticket._indexSpecificUpdateData.get());
-
-        if (data->oldKeys.size() + data->added.size() - data->removed.size() > 1) {
-            _descriptor->setMultikey();
-        }
-
-        for (size_t i = 0; i < data->added.size(); ++i) {
-            _interface->bt_insert(_descriptor->getHead(), data->loc, *data->added[i], _ordering,
-                                  data->dupsAllowed, _descriptor->getOnDisk(), true);
-        }
-
-        for (size_t i = 0; i < data->removed.size(); ++i) {
-            _interface->unindex(_descriptor->getHead(), _descriptor->getOnDisk(), *data->removed[i],
-                                data->loc);
-        }
-
-        *numUpdated = data->added.size();
-
-        return Status::OK();
-    }
-
     // Standard Btree implementation below.
-    BtreeAccessMethod::BtreeAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
 
         // The key generation wants these values.
         vector<const char*> fieldNames;
@@ -251,10 +55,10 @@ namespace mongo {
             fixed.push_back(BSONElement());
         }
 
-        if (0 == descriptor->version()) {
+        if (0 == _descriptor->version()) {
             _keyGenerator.reset(new BtreeKeyGeneratorV0(fieldNames, fixed,
                 _descriptor->isSparse()));
-        } else if (1 == descriptor->version()) {
+        } else if (1 == _descriptor->version()) {
             _keyGenerator.reset(new BtreeKeyGeneratorV1(fieldNames, fixed,
                 _descriptor->isSparse()));
         } else {
@@ -264,11 +68,6 @@ namespace mongo {
 
     void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
         _keyGenerator->getKeys(obj, keys);
-    }
-
-    Status BtreeAccessMethod::newCursor(IndexCursor** out) {
-        *out = new BtreeIndexCursor(_descriptor, _ordering, _interface);
-        return Status::OK();
     }
 
 }  // namespace mongo

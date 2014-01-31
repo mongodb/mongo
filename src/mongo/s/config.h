@@ -83,7 +83,7 @@ namespace mongo {
             bool isDirty() const { return _dirty; }
             bool wasDropped() const { return _dropped; }
             
-            void save( const string& ns , DBClientBase* conn );
+            void save( const string& ns );
             
             bool unique() const { return _unqiue; }
             BSONObj key() const { return _key; } 
@@ -259,7 +259,7 @@ namespace mongo {
             return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
         }
 
-        void replicaSetChange( const ReplicaSetMonitor * monitor );
+        void replicaSetChange(const string& setName, const string& newConnectionString);
 
         static int VERSION;
 

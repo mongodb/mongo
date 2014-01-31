@@ -34,15 +34,18 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
-#include "mongo/db/query_plan_selection_policy.h"
 
 namespace mongo {
 
+    class CanonicalQuery;
     class UpdateDriver;
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug);
 
-    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver);
+    UpdateResult update(const UpdateRequest& request,
+                        OpDebug* opDebug,
+                        UpdateDriver* driver,
+                        CanonicalQuery* cq);
 
     /**
      * takes the from document and returns a new document

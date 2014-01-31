@@ -32,12 +32,14 @@
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
+#include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
@@ -69,40 +71,11 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(int* outVersion) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::usersCollectionNamespace));
-            BSONObj cmdResult;
-            conn->get()->runCommand(
-                    "admin",
-                    BSON("getParameter" << 1 <<
-                         AuthorizationManager::schemaVersionServerParameter << 1),
-                    cmdResult);
-            if (!cmdResult["ok"].trueValue()) {
-                std::string errmsg = cmdResult["errmsg"].str();
-                if (errmsg == "no option found to get" ||
-                    StringData(errmsg).startsWith("no such cmd")) {
-
-                    *outVersion = 1;
-                    conn->done();
-                    return Status::OK();
-                }
-                int code = cmdResult["code"].numberInt();
-                if (code == 0) {
-                    code = ErrorCodes::UnknownError;
-                }
-                return Status(ErrorCodes::Error(code), errmsg);
-            }
-            BSONElement versionElement =
-                cmdResult[AuthorizationManager::schemaVersionServerParameter];
-            if (versionElement.eoo())
-                return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
-            *outVersion = versionElement.numberInt();
-            conn->done();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                AuthorizationManager::usersCollectionNamespace));
+        Status status = auth::getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
+        conn->done();
+        return status;
     }
 
     Status AuthzManagerExternalStateMongos::getUserDescription(const UserName& userName,
@@ -129,7 +102,8 @@ namespace mongo {
 
             std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
             if (foundUsers.size() == 0) {
-                return Status(ErrorCodes::UserNotFound, "User not found");
+                return Status(ErrorCodes::UserNotFound,
+                              "User \"" + userName.toString() + "\" not found");
             }
             if (foundUsers.size() > 1) {
                 return Status(ErrorCodes::UserDataInconsistent,
@@ -166,7 +140,19 @@ namespace mongo {
                 if (code == 0) code = ErrorCodes::UnknownError;
                 return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
             }
-            *result = cmdResult["roles"]["0"].Obj().getOwned();
+
+            std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
+            if (foundRoles.size() == 0) {
+                return Status(ErrorCodes::RoleNotFound,
+                              "Role \"" + roleName.toString() + "\" not found");
+            }
+            if (foundRoles.size() > 1) {
+                return Status(ErrorCodes::RoleDataInconsistent,
+                              mongoutils::str::stream() << "Found multiple roles on the \"" <<
+                                      roleName.getDB() << "\" database with name \"" <<
+                                      roleName.getRole() << "\"");
+            }
+            *result = foundRoles[0].Obj().getOwned();
             conn->done();
             return Status::OK();
         } catch (const DBException& e) {
@@ -205,15 +191,17 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMongos::findOne(
             const NamespaceString& collectionName,
-            const BSONObj& query,
+            const BSONObj& queryDoc,
             BSONObj* result) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            Query query(queryDoc);
+            query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
             *result = conn->get()->findOne(collectionName, query).getOwned();
             conn->done();
             if (result->isEmpty()) {
                 return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
-                              "No document in " << collectionName.ns() << " matches " << query);
+                              "No document in " << collectionName.ns() << " matches " << queryDoc);
             }
             return Status::OK();
         } catch (const DBException& e) {
@@ -223,11 +211,13 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMongos::query(
             const NamespaceString& collectionName,
-            const BSONObj& query,
+            const BSONObj& queryDoc,
             const BSONObj& projection,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            Query query(queryDoc);
+            query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
             conn->get()->query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
@@ -262,30 +252,7 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
-
-            conn->get()->insert(collectionName, document);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string errstr = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (errstr.empty()) {
-                return Status::OK();
-            }
-            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-                return Status(ErrorCodes::DuplicateKey, errstr);
-            }
-            return Status(ErrorCodes::UnknownError, errstr);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+        return clusterInsert(collectionName, document, writeConcern, NULL);
     }
 
     Status AuthzManagerExternalStateMongos::update(const NamespaceString& collectionName,
@@ -295,29 +262,20 @@ namespace mongo {
                                                    bool multi,
                                                    const BSONObj& writeConcern,
                                                    int* numUpdated) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+        BatchedCommandResponse response;
+        Status res = clusterUpdate(collectionName,
+                query,
+                updatePattern,
+                upsert,
+                multi,
+                writeConcern,
+                &response);
 
-            conn->get()->update(collectionName, query, updatePattern, upsert, multi);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string err = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (!err.empty()) {
-                return Status(ErrorCodes::UnknownError, err);
-            }
-
-            *numUpdated = res["n"].numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+        if (res.isOK()) {
+            *numUpdated = response.getN();
         }
+
+        return res;
     }
 
     Status AuthzManagerExternalStateMongos::remove(
@@ -325,29 +283,14 @@ namespace mongo {
             const BSONObj& query,
             const BSONObj& writeConcern,
             int* numRemoved) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+        BatchedCommandResponse response;
+        Status res = clusterDelete(collectionName, query, 0 /* limit */, writeConcern, &response);
 
-            conn->get()->remove(collectionName, query);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string err = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (!err.empty()) {
-                return Status(ErrorCodes::UnknownError, err);
-            }
-
-            *numRemoved = res["n"].numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+        if (res.isOK()) {
+            *numRemoved = response.getN();
         }
+
+        return res;
     }
 
     Status AuthzManagerExternalStateMongos::createIndex(
@@ -355,30 +298,7 @@ namespace mongo {
             const BSONObj& pattern,
             bool unique,
             const BSONObj& writeConcern) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
-
-            if (conn->get()->ensureIndex(collectionName.ns(), pattern, unique)) {
-
-                // Handle write concern
-                BSONObjBuilder gleBuilder;
-                gleBuilder.append("getLastError", 1);
-                gleBuilder.appendElements(writeConcern);
-                BSONObj res;
-                conn->get()->runCommand("admin", gleBuilder.done(), res);
-                string err = conn->get()->getLastErrorString(res);
-
-                if (!err.empty()) {
-                    conn->done();
-                    return Status(ErrorCodes::UnknownError, err);
-                }
-            }
-            conn->done();
-            return Status::OK();
-
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
+        return clusterCreateIndex(collectionName, pattern, unique, writeConcern, NULL);
     }
 
     Status AuthzManagerExternalStateMongos::dropIndexes(

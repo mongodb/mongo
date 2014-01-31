@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/db/lasterror.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -40,20 +42,23 @@ namespace mongo {
     // NOTE: These functions throw on invalid message format.
     //
 
-    BatchedCommandRequest* msgToBatchRequest( const Message& msg );
+    void msgToBatchRequests( const Message& msg, std::vector<BatchedCommandRequest*>* requests );
 
-    BatchedCommandRequest* msgToBatchInsert( const Message& insertMsg );
+    // Batch inserts may get mapped to multiple batch requests, to avoid spilling MaxBSONObjSize
+    void msgToBatchInserts( const Message& insertMsg,
+                            std::vector<BatchedCommandRequest*>* insertRequests );
 
     BatchedCommandRequest* msgToBatchUpdate( const Message& updateMsg );
 
     BatchedCommandRequest* msgToBatchDelete( const Message& deleteMsg );
 
-    //
-    // Utility function for recording completed batch writes into the LastError object.
-    // (Interpreting the response requires the request object as well.)
-    //
-
-    void batchErrorToLastError( const BatchedCommandRequest& request,
+    /**
+     * Utility function for recording completed batch writes into the LastError object.
+     * (Interpreting the response requires the request object as well.)
+     *
+     * Returns true if an error occurred in the batch.
+     */
+    bool batchErrorToLastError( const BatchedCommandRequest& request,
                                 const BatchedCommandResponse& response,
                                 LastError* error );
 

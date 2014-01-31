@@ -33,6 +33,8 @@
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 
@@ -71,10 +73,16 @@ namespace mongo {
                                           const std::string& dbname,
                                           const BSONObj& cmdObj ) {
 
-        return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
-                                               _writeType,
-                                               NamespaceString( parseNs( dbname, cmdObj ) ),
-                                               cmdObj );
+        Status status( auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                _writeType,
+                NamespaceString( parseNs( dbname, cmdObj ) ),
+                cmdObj ));
+
+        if ( !status.isOK() ) {
+            setLastError( status.code(), status.reason().c_str() );
+        }
+
+        return status;
     }
 
     // Write commands are counted towards their corresponding opcounters, not command opcounters.
@@ -93,22 +101,7 @@ namespace mongo {
         BatchedCommandResponse response;
 
         if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
-
-            // Batch parse failure
-            response.setOk( false );
-            response.setN( 0 );
-            response.setErrCode( ErrorCodes::FailedToParse );
-            response.setErrMessage( errMsg );
-
-            dassert( response.isValid( &errMsg ) );
-            result.appendElements( response.toBSON() );
-
-            // TODO
-            // There's a pending issue about how to report response here. If we use
-            // the command infra-structure, we should reuse the 'errmsg' field. But
-            // we have already filed that message inside the BatchCommandResponse.
-            // return response.getOk();
-            return true;
+            return appendCommandStatus( result, Status( ErrorCodes::FailedToParse, errMsg ) );
         }
 
         // Note that this is a runCommmand, and therefore, the database and the collection name
@@ -119,8 +112,9 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
 
-        if ( cc().curop() )
-            cc().curop()->setNS( nss.ns() );
+        Status status = userAllowedWriteNS( nss );
+        if ( !status.isOK() )
+            return appendCommandStatus( result, status );
 
         BSONObj defaultWriteConcern;
         // This is really bad - it's only safe because we leak the defaults by overriding them with
@@ -141,13 +135,7 @@ namespace mongo {
         writeBatchExecutor.executeBatch( request, &response );
 
         result.appendElements( response.toBSON() );
-
-        // TODO
-        // There's a pending issue about how to report response here. If we use
-        // the command infra-structure, we should reuse the 'errmsg' field. But
-        // we have already filed that message inside the BatchCommandResponse.
-        // return response.getOk();
-        return true;
+        return response.getOk();
     }
 
     CmdInsert::CmdInsert() :

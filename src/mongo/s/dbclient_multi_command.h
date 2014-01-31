@@ -44,6 +44,8 @@ namespace mongo {
     class DBClientMultiCommand : public MultiCommandDispatch {
     public:
 
+        DBClientMultiCommand() : _timeoutMillis( 0 ) {}
+
         ~DBClientMultiCommand();
 
         void addCommand( const ConnectionString& endpoint,
@@ -55,6 +57,8 @@ namespace mongo {
         int numPending() const;
 
         Status recvAny( ConnectionString* endpoint, BSONSerializable* response );
+
+        void setTimeoutMillis( int milliSecs );
 
     private:
 
@@ -79,6 +83,7 @@ namespace mongo {
 
         typedef std::deque<PendingCommand*> PendingQueue;
         PendingQueue _pendingCommands;
+        int _timeoutMillis;
     };
 
 }

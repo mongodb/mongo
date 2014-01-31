@@ -125,6 +125,14 @@ namespace mongo {
         throw e;
     }
 
+    NOINLINE_DECL void invariantFailed(const char *msg, const char *file, unsigned line) {
+        problem() << "Invariant failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        logContext();
+        breakpoint();
+        log() << "\n\n***aborting after invariant() failure\n\n" << endl;
+        abort();
+    }
+
     NOINLINE_DECL void fassertFailed( int msgid ) {
         problem() << "Fatal Assertion " << msgid << endl;
         logContext();
@@ -180,6 +188,34 @@ namespace mongo {
         log() << "Assertion: " << msgid << ":" << msg << endl;
         setLastError(msgid,msg && *msg ? msg : "massert failure");
         throw MsgAssertionException(msgid, msg);
+    }
+
+    void msgassertedNoTrace(int msgid, const std::string& msg) {
+        msgassertedNoTrace(msgid, msg.c_str());
+    }
+
+    std::string causedBy( const char* e ) {
+        return std::string(" :: caused by :: ") + e;
+    }
+
+    std::string causedBy( const DBException& e ){
+        return causedBy( e.toString() );
+    }
+
+    std::string causedBy( const std::exception& e ) {
+        return causedBy( e.what() );
+    }
+
+    std::string causedBy( const std::string& e ){
+        return causedBy( e.c_str() );
+    }
+
+    std::string causedBy( const std::string* e ) {
+        return (e && *e != "") ? causedBy(*e) : "";
+    }
+
+    std::string causedBy( const Status& e ){
+        return causedBy( e.reason() );
     }
 
     NOINLINE_DECL void streamNotGood( int code , const std::string& msg , std::ios& myios ) {

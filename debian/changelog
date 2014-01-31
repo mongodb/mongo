@@ -1,3 +1,9 @@
+mongodb (2.5.4) unstable; urgency=low
+
+  * see http://jira.mongodb.org/browse/SERVER/fixforversion/12898
+
+ -- Ernie Hershey <ernie.hershey@mongodb.com>  Thu, 19 Dec 2013 00:41:46 -0500
+
 mongodb (2.1.2) unstable; urgency=low
 
   * see http://jira.mongodb.org/browse/SERVER/fixforversion/10894

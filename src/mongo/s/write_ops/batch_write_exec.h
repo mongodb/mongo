@@ -30,7 +30,11 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include <map>
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/optime.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/shard_resolver.h"
@@ -38,6 +42,8 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
+
+    class BatchWriteExecStats;
 
     /**
      * The BatchWriteExec is able to execute client batch write requests, resulting in a batch
@@ -60,22 +66,20 @@ namespace mongo {
 
         BatchWriteExec( NSTargeter* targeter,
                         ShardResolver* resolver,
-                        MultiCommandDispatch* dispatcher ) :
-            _targeter( targeter ), _resolver( resolver ), _dispatcher( dispatcher ) {
-        }
+                        MultiCommandDispatch* dispatcher );
 
         /**
          * Executes a client batch write request by sending child batches to several shard
          * endpoints, and returns a client batch write response.
          *
-         * Several network round-trips are generally required to execute a write batch.
-         *
          * This function does not throw, any errors are reported via the clientResponse.
-         *
-         * TODO: Stats?
          */
         void executeBatch( const BatchedCommandRequest& clientRequest,
                            BatchedCommandResponse* clientResponse );
+
+        const BatchWriteExecStats& getStats();
+
+        BatchWriteExecStats* releaseStats();
 
     private:
 
@@ -87,5 +91,52 @@ namespace mongo {
 
         // Not owned here
         MultiCommandDispatch* _dispatcher;
+
+        // Stats
+        auto_ptr<BatchWriteExecStats> _stats;
+    };
+
+    // Useful comparator for using connection strings in ordered sets and maps
+    struct ConnectionStringComp {
+        bool operator()( const ConnectionString& connStrA,
+                         const ConnectionString& connStrB ) const {
+            return connStrA.toString().compare( connStrB.toString() ) < 0;
+        }
+    };
+
+    struct HostOpTime {
+        HostOpTime(OpTime ot, OID e) : opTime(ot), electionId(e) {};
+        HostOpTime() {};
+        OpTime opTime;
+        OID electionId;
+    };
+
+    typedef std::map<ConnectionString, HostOpTime, ConnectionStringComp> HostOpTimeMap;
+
+    class BatchWriteExecStats {
+    public:
+
+        BatchWriteExecStats() :
+           numRounds( 0 ), numTargetErrors( 0 ), numResolveErrors( 0 ), numStaleBatches( 0 ) {
+        }
+
+        void noteWriteAt(const ConnectionString& host, OpTime opTime, const OID& electionId);
+
+        const HostOpTimeMap& getWriteOpTimes() const;
+
+        // Expose via helpers if this gets more complex
+
+        // Number of round trips required for the batch
+        int numRounds;
+        // Number of times targeting failed
+        int numTargetErrors;
+        // Number of times host resolution failed
+        int numResolveErrors;
+        // Number of stale batches
+        int numStaleBatches;
+
+    private:
+
+        HostOpTimeMap _writeOpTimes;
     };
 }

@@ -100,7 +100,7 @@ namespace mongo {
         void flushFiles( bool sync );
 
         /* allocate a new Extent, does not check free list
-           @param capped - true if capped collection
+         * @param maxFileNoForQuota - 0 for unlimited
         */
         DiskLoc createExtent( int approxSize, int maxFileNoForQuota );
 
@@ -110,6 +110,7 @@ namespace mongo {
         DiskLoc allocFromFreeList( int approxSize, bool capped );
 
         /**
+         * @param quotaMax 0 == no limit
          * TODO: this isn't quite in the right spot
          *  really need the concept of a NamespaceStructure in the current paradigm
          */
@@ -136,6 +137,11 @@ namespace mongo {
          * @param loc - has to be for a specific Record (not an Extent)
          */
         Extent* extentFor( const DiskLoc& loc ) const;
+
+        /**
+         * @param loc - has to be for a specific Record (not an Extent)
+         */
+        DiskLoc extentLocFor( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Extent

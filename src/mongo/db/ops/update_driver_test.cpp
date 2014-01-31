@@ -145,6 +145,14 @@ namespace {
         ASSERT_OK(driver.populateDocumentWithQueryFields(fromjson("{'a.c':1, 'a.b':1}"), doc));
     }
 
+    TEST(CreateFromQuery, AllArrayDoesntHaveOrdinalName) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        Document doc;
+
+        ASSERT_OK(driver.populateDocumentWithQueryFields(fromjson("{a:{$all:[1]}}"), doc));
+        ASSERT_EQUALS(fromjson("{a:1}"), doc);
+    }
 
     // Failures
     TEST(CreateFromQuery, DupFieldsFail) {
@@ -153,5 +161,13 @@ namespace {
         Document doc;
 
         ASSERT_NOT_OK(driver.populateDocumentWithQueryFields(fromjson("{a:1, 'a.b':1}"), doc));
+    }
+
+    TEST(CreateFromQuery, AllArrayMultipleVals) {
+        UpdateDriver::Options opts;
+        UpdateDriver driver(opts);
+        Document doc;
+
+        ASSERT_NOT_OK(driver.populateDocumentWithQueryFields(fromjson("{a:{$all:[1, 2]}}"), doc));
     }
 } // unnamed namespace

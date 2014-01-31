@@ -82,6 +82,7 @@ scratch
 /mongofiles
 /mongoexport
 
+/mongoadmin
 /mongoimport
 /mongosniff
 /mongobridge
@@ -131,6 +132,7 @@ debian/mongodb
 #osx
 .DS_Store
 ._.DS_Store
+*.fuse_*
 
 # QtCreator
 *.config

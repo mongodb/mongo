@@ -93,11 +93,7 @@ namespace mongo {
         }
 
         if (rs->box.getState().primary()) {
-            // make sure exactly one primary steps down
-            if (rs->selfId() < m->id()) {
-                return;
-            }
-
+            log() << "stepping down; another primary seen in replicaset";
             rs->relinquish();
         }
 

@@ -246,6 +246,15 @@ assert.commandFailed = function(res, msg){
     doassert("command worked when it should have failed: " + tojson(res) + " : " + msg);
 }
 
+assert.commandFailedWithCode = function(res, code, msg){
+    if (assert._debug && msg) print("in assert for: " + msg);
+
+    assert(!res.ok, "Command result indicates success, but expected failure with code " + code +
+          ": " + tojson(res));
+    assert.eq(res.code, code, "Expected failure code did not match actual in command result: " +
+              tojson(res));
+}
+
 assert.isnull = function(what, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
 
@@ -329,10 +338,10 @@ assert.gleError = function(db, msg) {
 
 assert.gleErrorCode = function(db, code, msg) {
     var gle = db.getLastErrorObj();
-    if (gle.err && (gle.code == code)) {
+    if (!gle.err || gle.code != code) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
-        doassert("getLastError not null or missing code( " + code + "): " 
+        doassert("getLastError is null or has code other than \"" + code + "\": "
                  + tojson(gle) + " :" + msg);
     }
 }

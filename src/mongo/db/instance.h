@@ -95,7 +95,7 @@ namespace mongo {
             return true;
         }
 
-        virtual string toString() {
+        virtual string toString() const {
             return "DBDirectClient";
         }
         virtual string getServerAddress() const {
@@ -136,7 +136,5 @@ namespace mongo {
     void maybeCreatePidFile();
 
     void exitCleanly( ExitCode code );
-
-    void checkAndInsert(const char *ns, BSONObj& js);
 
 } // namespace mongo

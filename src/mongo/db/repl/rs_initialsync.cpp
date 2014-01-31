@@ -109,7 +109,7 @@ namespace mongo {
             options.syncData = dataPass;
             options.syncIndexes = ! dataPass;
 
-            if (!cloner.go(master, options, err, &errCode)) {
+            if (!cloner.go(ctx.ctx(), master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
                                        << (dataPass ? "cloning " : "indexing ") << db
                                        << ".  " << (err.empty() ? "" : err + ".  ")
@@ -125,14 +125,14 @@ namespace mongo {
 
     static void emptyOplog() {
         Client::WriteContext ctx(rsoplog);
-        NamespaceDetails *d = nsdetails(rsoplog);
+        Collection* collection = ctx.ctx().db()->getCollection(rsoplog);
 
         // temp
-        if( d && d->numRecords() == 0 )
+        if( collection->numRecords() == 0 )
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;
-        d->emptyCappedCollection(rsoplog);
+        collection->details()->emptyCappedCollection(rsoplog);
     }
 
     bool Member::syncable() const {

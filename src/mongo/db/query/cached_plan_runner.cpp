@@ -28,6 +28,9 @@
 
 #include "mongo/db/query/cached_plan_runner.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -36,28 +39,56 @@
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
-    CachedPlanRunner::CachedPlanRunner(CanonicalQuery* canonicalQuery,
-                                       CachedSolution* cached,
+    CachedPlanRunner::CachedPlanRunner(const Collection* collection,
+                                       CanonicalQuery* canonicalQuery,
+                                       QuerySolution* solution,
                                        PlanStage* root,
                                        WorkingSet* ws)
-        : _canonicalQuery(canonicalQuery),
-          _cachedQuery(cached),
+        : _collection(collection),
+          _canonicalQuery(canonicalQuery),
+          _solution(solution),
           _exec(new PlanExecutor(ws, root)),
-          _updatedCache(false) {
-    }
+          _alreadyProduced(false),
+          _updatedCache(false),
+          _killed(false) { }
 
     CachedPlanRunner::~CachedPlanRunner() {
+        // The runner may produce all necessary results without
+        // hitting EOF. In this case, we still want to update
+        // the cache with feedback.
+        if (!_updatedCache) {
+            updateCache();
+        }
     }
 
     Runner::RunnerState CachedPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         Runner::RunnerState state = _exec->getNext(objOut, dlOut);
+
+        if (Runner::RUNNER_ADVANCED == state) {
+            // Indicate that the plan executor already produced results.
+            _alreadyProduced = true;
+        }
+
+        // If the plan executor errors before producing any results,
+        // and we have a backup plan available, then fall back on the
+        // backup plan. This can happen if '_exec' has a blocking sort.
+        if (Runner::RUNNER_ERROR == state && !_alreadyProduced && NULL != _backupPlan.get()) {
+            _exec.reset(_backupPlan.release());
+            state = _exec->getNext(objOut, dlOut);
+        }
+
+        // This could be called several times and we don't want to update the cache every time.
         if (Runner::RUNNER_EOF == state && !_updatedCache) {
             updateCache();
         }
+
         return state;
     }
 
@@ -67,18 +98,30 @@ namespace mongo {
 
     void CachedPlanRunner::saveState() {
         _exec->saveState();
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->saveState();
+        }
     }
 
     bool CachedPlanRunner::restoreState() {
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->restoreState();
+        }
         return _exec->restoreState();
     }
 
-    void CachedPlanRunner::invalidate(const DiskLoc& dl) {
-        _exec->invalidate(dl);
+    void CachedPlanRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
+        _exec->invalidate(dl, type);
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->invalidate(dl, type);
+        }
     }
 
     void CachedPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
         _exec->setYieldPolicy(policy);
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->setYieldPolicy(policy);
+        }
     }
 
     const std::string& CachedPlanRunner::ns() {
@@ -86,30 +129,45 @@ namespace mongo {
     }
 
     void CachedPlanRunner::kill() {
+        _killed = true;
+        _collection = NULL;
         _exec->kill();
+        if (NULL != _backupPlan.get()) {
+            _backupPlan->kill();
+        }
     }
 
-    Status CachedPlanRunner::getExplainPlan(TypeExplain** explain) const {
-        dassert(_exec.get());
+    Status CachedPlanRunner::getInfo(TypeExplain** explain,
+                                     PlanInfo** planInfo) const {
+        if (NULL != explain) {
+            verify(_exec.get());
 
-        scoped_ptr<PlanStageStats> stats(_exec->getStats());
-        if (NULL == stats.get()) {
-            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
-        }
+            scoped_ptr<PlanStageStats> stats(_exec->getStats());
+            if (NULL == stats.get()) {
+                return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+            }
 
-        Status status = explainPlan(*stats, explain, true /* full details */);
-        if (!status.isOK()) {
-            return status;
-        }
+            Status status = explainPlan(*stats, explain, true /* full details */);
+            if (!status.isOK()) {
+                return status;
+            }
 
-        // Fill in explain fields that are accounted by on the runner level.
-        TypeExplain* chosenPlan = NULL;
-        explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (chosenPlan) {
-            (*explain)->addToAllPlans(chosenPlan);
+            // Fill in explain fields that are accounted by on the runner level.
+            TypeExplain* chosenPlan = NULL;
+            explainPlan(*stats, &chosenPlan, false /* no full details */);
+            if (chosenPlan) {
+                (*explain)->addToAllPlans(chosenPlan);
+            }
+            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
+            (*explain)->setNScannedAllPlans((*explain)->getNScanned());
         }
-        (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
-        (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+        else if (NULL != planInfo) {
+            if (NULL == _solution.get()) {
+                return Status(ErrorCodes::InternalError,
+                              "no solution available for plan info");
+            }
+            getPlanInfo(*_solution, planInfo);
+        }
 
         return Status::OK();
     }
@@ -117,27 +175,41 @@ namespace mongo {
     void CachedPlanRunner::updateCache() {
         _updatedCache = true;
 
-        // We're done.  Update the cache.
-        PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
-
-        // TODO: Is this an error?
-        if (NULL == cache) { return; }
-
-        // TODO: How do we decide this?
-        bool shouldRemovePlan = false;
-
-        if (shouldRemovePlan) {
-            if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
-                warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
-                    " somebody else did already?";
-                return;
-            }
+        if (_killed) {
+            return;
         }
 
-        // We're done running.  Update cache.
-        auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
-        feedback->stats = _exec->getStats();
-        cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
+        Database* db = cc().database();
+        // XXX: We need to check for NULL because this is called upon
+        // destruction of the CachedPlanRunner. In some cases, the db
+        // or collection could be dropped without kill() being called
+        // on the runner (for example, timeout of a ClientCursor holding
+        // the runner).
+        if (NULL == db) { return; }
+        Collection* collection = db->getCollection(_canonicalQuery->ns());
+        if (NULL == collection) { return; }
+        PlanCache* cache = collection->infoCache()->getPlanCache();
+
+        std::auto_ptr<PlanCacheEntryFeedback> feedback(new PlanCacheEntryFeedback());
+        // XXX: what else can we provide here?
+        feedback->stats.reset(_exec->getStats());
+        feedback->score = PlanRanker::scoreTree(feedback->stats.get());
+
+        Status fbs = cache->feedback(*_canonicalQuery, feedback.release());
+
+        if (!fbs.isOK()) {
+            QLOG() << _canonicalQuery->ns() << ": Failed to update cache with feedback: "
+                   << fbs.toString() << " - "
+                   << "(query: " << _canonicalQuery->getQueryObj()
+                   << "; sort: " << _canonicalQuery->getParsed().getSort()
+                   << "; projection: " << _canonicalQuery->getParsed().getProj()
+                   << ") is no longer in plan cache.";
+        }
+    }
+
+    void CachedPlanRunner::setBackupPlan(QuerySolution* qs, PlanStage* root, WorkingSet* ws) {
+        _backupSolution.reset(qs);
+        _backupPlan.reset(new PlanExecutor(ws, root));
     }
 
 } // namespace mongo

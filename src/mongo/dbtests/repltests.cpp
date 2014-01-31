@@ -15,6 +15,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -24,15 +36,14 @@
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query_plan.h"
 #include "mongo/db/queryutil.h"
-#include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -101,21 +112,39 @@ namespace ReplTests {
             return client()->findOne( cllNS(), BSONObj() );
         }
         int count() const {
-            int count = 0;
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
-            for(; c->ok(); c->advance(), ++count ) {
-//                cout << "obj: " << c->current().toString() << endl;
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns() );
+            if ( !coll ) {
+                coll = db->createCollection( ns() );
             }
+
+            int count = 0;
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            for ( ; !it->isEOF(); it->getNext() ) {
+                ++count;
+            }
+            delete it;
             return count;
         }
         static int opCount() {
             Lock::GlobalWrite lk;
             Client::Context ctx( cllNS() );
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( cllNS() );
+            if ( !coll ) {
+                coll = db->createCollection( cllNS() );
+            }
+
             int count = 0;
-            for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
+            }
+            delete it;
             return count;
         }
         static void applyAllOperations() {
@@ -123,8 +152,16 @@ namespace ReplTests {
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
-                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
-                    ops.push_back( c->current() );
+                Database* db = ctx.db();
+                Collection* coll = db->getCollection( cllNS() );
+
+                CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                            CollectionScanParams::FORWARD );
+                while ( !it->isEOF() ) {
+                    DiskLoc currLoc = it->getNext();
+                    ops.push_back( currLoc.obj() );
+                }
+                delete it;
             }
             {
                 Client::Context ctx( ns() );
@@ -143,32 +180,62 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
-            boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
-            vector< DiskLoc > toDelete;
-            out() << "all for " << ns << endl;
-            for(; c->ok(); c->advance() ) {
-                out() << c->current().toString() << endl;
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns );
+            if ( !coll ) {
+                coll = db->createCollection( ns );
             }
+
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            out() << "all for " << ns << endl;
+            while ( !it->isEOF() ) {
+                DiskLoc currLoc = it->getNext();
+                out() << currLoc.obj().toString() << endl;
+            }
+            delete it;
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
-            Collection* collection = ctx.db()->getCollection( ns );
-
-            boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
-            vector< DiskLoc > toDelete;
-            for(; c->ok(); c->advance() ) {
-                toDelete.push_back( c->currLoc() );
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns );
+            if ( !coll ) {
+                coll = db->createCollection( ns );
             }
+
+            vector< DiskLoc > toDelete;
+            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
+            while ( !it->isEOF() ) {
+                toDelete.push_back( it->getNext() );
+            }
+            delete it;
             for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-                collection->deleteDocument( *i, true );
+                coll->deleteDocument( *i, true );
             }
         }
-        static void insert( const BSONObj &o, bool god = false ) {
+        static void insert( const BSONObj &o ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection( ns() );
+            if ( !coll ) {
+                coll = db->createCollection( ns() );
+            }
+
+            if ( o.hasField( "_id" ) ) {
+                coll->insertDocument( o, true );
+                return;
+            }
+
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID( "_id", &id );
+            b.appendElements( o );
+            coll->insertDocument( b.obj(), true );
         }
         static BSONObj wid( const char *json ) {
             class BSONObjBuilder b;
@@ -663,8 +730,8 @@ namespace ReplTests {
             }
             void reset() const {
                 deleteAll( ns() );
-                insert( ot_, true );
-                insert( o_, true );
+                insert( ot_ );
+                insert( o_ );
             }
         protected:
             BSONObj o_, u_, ot_;
@@ -1294,251 +1361,6 @@ namespace ReplTests {
         }
     };
 
-    /**
-     * Check against oldest document in the oplog before scanning backward
-     * from the newest document.
-     */
-    class FindingStartCursorStale : public Base {
-    public:
-        void run() {
-            for( int i = 0; i < 10; ++i ) {
-                client()->insert( ns(), BSON( "_id" << i ) );
-            }
-            Lock::GlobalWrite lk;
-            Client::Context ctx( cllNS() );
-            NamespaceDetails *nsd = nsdetails( cllNS() );
-            BSONObjBuilder b;
-            b.appendTimestamp( "$gte" );
-            BSONObj query = BSON( "ts" << b.obj() );
-            FieldRangeSetPair frsp( cllNS(), query );
-            BSONObj order = BSON( "$natural" << 1 );
-            scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd, -1, frsp, &frsp, query, order ) );
-            scoped_ptr<FindingStartCursor> fsc( FindingStartCursor::make( *qp ) );
-            ASSERT( fsc->done() );
-            ASSERT_EQUALS( 0, fsc->cursor()->current()[ "o" ].Obj()[ "_id" ].Int() );
-        }
-    };
-
-    /** Check unsuccessful yield recovery with FindingStartCursor */
-    class FindingStartCursorYield : public Base {
-    public:
-        void run() {
-            for( int i = 0; i < 10; ++i ) {
-                client()->insert( ns(), BSON( "_id" << i ) );
-            }
-            Date_t ts = client()->query( "local.oplog.$main", Query().sort( BSON( "$natural" << 1 ) ), 1, 4 )->next()[ "ts" ].date();
-            Client::Context ctx( cllNS() );
-            NamespaceDetails *nsd = nsdetails( cllNS() );
-            BSONObjBuilder b;
-            b.appendDate( "$gte", ts );
-            BSONObj query = BSON( "ts" << b.obj() );
-            FieldRangeSetPair frsp( cllNS(), query );
-            BSONObj order = BSON( "$natural" << 1 );
-            scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd, -1, frsp, &frsp, query, order ) );
-            scoped_ptr<FindingStartCursor> fsc( FindingStartCursor::make( *qp ) );
-            ASSERT( !fsc->done() );
-            fsc->next();
-            ASSERT( !fsc->done() );
-            ASSERT( fsc->prepareToYield() );
-            ClientCursor::invalidate( "local.oplog.$main" );
-            ASSERT_THROWS( fsc->recoverFromYield(), MsgAssertionException );
-        }
-    };
-
-    class FindingStartExtentTraversalBase : public Base {
-    public:
-        FindingStartExtentTraversalBase() {
-            client()->dropCollection( ns() );
-        }
-        virtual ~FindingStartExtentTraversalBase() {
-            client()->dropCollection( ns() );
-        }
-        void run() {
-            BSONObj info;
-            // Create a capped collection ...
-            ASSERT( client()->runCommand( "unittests",
-                                          BSON( "create" << "repltests.findingstart" <<
-                                                "capped" << true <<
-                                                // ... with the specified extent sizes.
-                                                "$nExtents" << extentSizes() <<
-                                                "autoIndexId" << false ), info ) );
-            // Populate documents.
-            for( int i = 0; i < numDocs(); ++i ) {
-                client()->insert( ns(), BSON( "ts" << i << "payload" << payload8k() ) );
-            }
-            NamespaceDetails *nsd = nsdetails( ns() );
-            BSONObj query = BSON( "ts" << BSON( "$gte" << 0 ) );
-            FieldRangeSetPair frsp( ns(), query );
-            BSONObj order = BSON( "$natural" << 1 );
-            // Create a QueryPlan.
-            scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd, -1, frsp, &frsp, query, order ) );
-            // Create a FindingStartCursor.
-            scoped_ptr<FindingStartCursor> fsc( FindingStartCursor::make( *qp ) );
-            // Check the result of FindingStartCursor::prevExtentFirstLoc() called on the specified
-            // target().
-            ASSERT_EQUALS( expectedPrevExtentFirstLoc().toString(),
-                           fsc->prevExtentFirstLoc( target() ).toString() );
-        }
-    protected:
-        static const char* ns() { return "unittests.repltests.findingstart"; }
-        static const NamespaceDetails* nsd() { return nsdetails( ns() ); }
-        /** Document payload. */
-        static string payload8k() { return string( 8*1024, 'a' ); }
-        /** An extent of this size is too small to contain one document containing payload8k(). */
-        static int tooSmall() { return 1*1024; }
-        /** An extent of this size fits one document. */
-        static int fitsOne() { return 10*1024; }
-        /** An extent of this size fits many documents. */
-        static int fitsMany() { return 50*1024; }
-        virtual BSONArray extentSizes() const = 0;
-        virtual int numDocs() const = 0;
-        virtual DiskLoc target() const = 0;
-        virtual DiskLoc expectedPrevExtentFirstLoc() const = 0;
-    };
-
-    class FindingStartEmptyExtentNonLoopedBase : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const {
-            // Insert two documents.  Empty extents may exist betwen or preceding them depending on
-            // the test case.
-            return 2;
-        }
-        /** Target the prevExtentFirstLoc() request on the non looped collection's last record. */
-        virtual DiskLoc target() const { return nsd()->lastRecord(); }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->firstRecord(); }
-    };
-
-    class FindingStartEmptyExtentLoopedBase : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const {
-            // Insert three documents.  Empty extents may exist betwen or preceding them depending
-            // on the test case.  Some documents may overwrite others (it is a capped collection).
-            return 3;
-        }
-        /**
-         * Target the prevExtentFirstLoc() request on the looped collection's first record.  (The
-         * most recently saved record is the first in the collection due to extent allocation
-         * looping.)
-         */
-        virtual DiskLoc target() const { return nsd()->firstRecord(); }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->lastRecord(); }
-    };
-    
-    /**
-     * FindingStartCursor properly skips an empty extent in 'FindExtent' mode of a non looped
-     * capped collection.
-     */
-    class FindingStartEmptyExtentNonLooped : public FindingStartEmptyExtentNonLoopedBase {
-        virtual BSONArray extentSizes() const {
-            // Iteration          2 <--------< 1 <---------< 0
-            return BSON_ARRAY( fitsOne() << tooSmall() << fitsOne() );
-        }
-    };
-
-    /** Properly skips two empty extents of a non looped capped collection. */
-    class FindingStartTwoEmptyExtentsNonLooped : public FindingStartEmptyExtentNonLoopedBase {
-        virtual BSONArray extentSizes() const {
-            // Iteration          3 <--------< 2 <---------< 1 <---------< 0
-            return BSON_ARRAY( fitsOne() << tooSmall() << tooSmall() << fitsOne() );
-        }
-    };
-
-    /** Properly stops iteration at the beginning of a non looped capped collection. */
-    class FindingStartTwoEmptyEarlyExtentsNonLooped : public FindingStartEmptyExtentNonLoopedBase {
-        virtual BSONArray extentSizes() const {
-            // Iteration          2 <---------< 1 <----------< 0
-            return BSON_ARRAY( tooSmall() << tooSmall() << fitsMany() );
-        }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
-    };
-
-    /** The first record of the previous extent is returned (as opposed to some other record). */
-    class FindingStartFirstRecordNonLooped : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const { return 10; }
-        virtual BSONArray extentSizes() const {
-            // Iteration          1 <--------< 0
-            return BSON_ARRAY( fitsMany() << fitsMany() );
-        }
-        virtual DiskLoc target() const { return nsd()->lastRecord(); }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->firstRecord(); }
-    };
-
-    /** Properly skips an empty extent of a looped capped collection. */
-    class FindingStartEmptyExtentLooped : public FindingStartEmptyExtentLoopedBase {
-        virtual BSONArray extentSizes() const {
-            // Iteration      ---< 0            2 <--------< 1 <----
-            return BSON_ARRAY( fitsOne() << fitsOne() << tooSmall() );
-        }
-    };
-
-    /** Properly skips two empty extents of a looped capped collection. */
-    class FindingStartTwoEmptyExtentsLooped : public FindingStartEmptyExtentLoopedBase {
-        virtual BSONArray extentSizes() const {
-            // Iteration      ---< 0            3 <--------< 2 <---------< 1 <---
-            return BSON_ARRAY( fitsOne() << fitsOne() << tooSmall() << tooSmall() );
-        }
-    };
-
-    /** Properly stops iteration at the loop point of a looped capped collection. */
-    class FindingStartTwoEmptyEarlyExtentsLooped : public FindingStartEmptyExtentLoopedBase {
-        virtual BSONArray extentSizes() const {
-            // Iteration      --< 0  3 <------< 2 <--------< 1 <-----
-            return BSON_ARRAY( fitsOne() << tooSmall() << tooSmall() );
-        }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
-    };
-
-    /** The first record of the previous extent is returned (as opposed to some other record). */
-    class FindingStartFirstRecordLooped : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const { return 35; }
-        virtual BSONArray extentSizes() const {
-            // Iteration          1 <--------< 0
-            return BSON_ARRAY( fitsMany() << fitsMany() );
-        }
-        virtual DiskLoc target() const { return nsd()->lastRecord(); }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->firstRecord(); }
-    };
-
-    /** Advance from the fresh side of the cap extent to its previous extent. */
-    class CapExtentFreshSidePrevExtent : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const {
-            // Looped allocation with capExtent the first extent.
-            return 10;
-        }
-        virtual BSONArray extentSizes() const {
-            // Iteration      ---< 0            1 <----
-            return BSON_ARRAY( fitsMany() << fitsOne() );
-        }
-        virtual DiskLoc target() const {
-            DiskLoc lastRecord = nsd()->lastRecord();
-            // Return last record in first extent (second to last record overall).
-            return lastRecord.rec()->getPrev( lastRecord );
-        }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->lastRecord(); }
-    };
-    
-    /**
-     * Advance from the stale side of the cap extent to its previous extent.  This is not optimal,
-     * but good enough.  See comments in FindingStartCursor::extentFirstLoc().
-     */
-    class CapExtentStaleSidePrevExtent : public CapExtentFreshSidePrevExtent {
-        virtual DiskLoc target() const { return nsd()->firstRecord(); }
-    };
-
-    /** prevExtentFirstLoc() when there is only one extent (non looped) returns DiskLoc(). */
-    class FindingStartSingleExtentNonLooped : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const { return 2; }
-        virtual BSONArray extentSizes() const { return BSON_ARRAY( fitsMany() ); }
-        virtual DiskLoc target() const { return nsd()->lastRecord(); }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
-    };
-
-    /** prevExtentFirstLoc() when there is only one extent (looped) returns DiskLoc(). */
-    class FindingStartSingleExtentLooped : public FindingStartExtentTraversalBase {
-        virtual int numDocs() const { return 10; }
-        virtual BSONArray extentSizes() const { return BSON_ARRAY( fitsMany() ); }
-        virtual DiskLoc target() const { return nsd()->lastRecord(); }
-        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
-    };
-    
     /** Check ReplSetConfig::MemberCfg equality */
     class ReplSetMemberCfgEquality : public Base {
     public:
@@ -1663,20 +1485,6 @@ namespace ReplTests {
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
-            add< FindingStartCursorStale >();
-            add< FindingStartCursorYield >();
-            add< FindingStartEmptyExtentNonLooped >();
-            add< FindingStartTwoEmptyExtentsNonLooped >();
-            add< FindingStartTwoEmptyEarlyExtentsNonLooped >();
-            add< FindingStartFirstRecordNonLooped >();
-            add< FindingStartEmptyExtentLooped >();
-            add< FindingStartTwoEmptyExtentsLooped >();
-            add< FindingStartTwoEmptyEarlyExtentsLooped >();
-            add< FindingStartFirstRecordLooped >();
-            add< CapExtentFreshSidePrevExtent >();
-            add< CapExtentStaleSidePrevExtent >();
-            add< FindingStartSingleExtentNonLooped >();
-            add< FindingStartSingleExtentLooped >();
             add< ReplSetMemberCfgEquality >();
             add< ShouldRetry >();
         }

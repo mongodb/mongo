@@ -44,13 +44,15 @@ namespace mongo {
     }
 
     bool ElapsedTracker::intervalHasElapsed() {
-        if ( ( ++_pings % _hitsBetweenMarks ) == 0 ) {
+        if ( ++_pings >= _hitsBetweenMarks ) {
+            _pings = 0;
             _last = Listener::getElapsedTimeMillis();
             return true;
         }
 
         long long now = Listener::getElapsedTimeMillis();
         if ( now - _last > _msBetweenMarks ) {
+            _pings = 0;
             _last = now;
             return true;
         }
@@ -59,6 +61,7 @@ namespace mongo {
     }
 
     void ElapsedTracker::resetLastTime() {
+        _pings = 0;
         _last = Listener::getElapsedTimeMillis();
     }
 

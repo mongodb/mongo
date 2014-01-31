@@ -59,15 +59,15 @@ namespace mongo {
     FieldRefSet::FieldRefSet() {
     }
 
-    void FieldRefSet::getConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {
+    bool FieldRefSet::findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {
+        bool foundConflict = false;
 
         // If the set is empty, there is no work to do.
         if (_fieldSet.empty())
-            return;
+            return foundConflict;
 
         StringData prefixStr = safeFirstPart(toCheck);
-        FieldRef prefixField;
-        prefixField.parse(prefixStr);
+        FieldRef prefixField(prefixStr);
 
         FieldSet::iterator it = _fieldSet.lower_bound(&prefixField);
         // Now, iterate over all the present fields in the set that have the same prefix.
@@ -75,10 +75,16 @@ namespace mongo {
         while (it != _fieldSet.end() && safeFirstPart(*it) == prefixStr) {
             size_t common = (*it)->commonPrefixSize(*toCheck);
             if ((*it)->numParts() == common || toCheck->numParts() == common) {
+                if (!conflicts)
+                    return true;
+
                 conflicts->_fieldSet.insert(*it);
+                foundConflict = true;
             }
             ++it;
         }
+
+        return foundConflict;
     }
 
     void FieldRefSet::keepShortest(const FieldRef* toInsert) {
@@ -115,8 +121,7 @@ namespace mongo {
         // At each insertion, we only need to bother checking the fields in the set that have
         // at least some common prefix with the 'toInsert' field.
         StringData  prefixStr = safeFirstPart(toInsert);
-        FieldRef prefixField;
-        prefixField.parse(prefixStr);
+        FieldRef prefixField(prefixStr);
         FieldSet::iterator it = _fieldSet.lower_bound(&prefixField);
 
         // Now, iterate over all the present fields in the set that have the same prefix.

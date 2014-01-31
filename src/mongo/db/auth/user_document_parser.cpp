@@ -44,6 +44,7 @@ namespace {
     const std::string ADMIN_DBNAME = "admin";
 
     const std::string ROLES_FIELD_NAME = "roles";
+    const std::string PRIVILEGES_FIELD_NAME = "inheritedPrivileges";
     const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
     const std::string READONLY_FIELD_NAME = "readOnly";
     const std::string CREDENTIALS_FIELD_NAME = "credentials";
@@ -440,19 +441,19 @@ namespace {
 
     Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSONObj& doc,
                                                                           User* user) const {
-        BSONElement privilegesElement = doc["privileges"];
+        BSONElement privilegesElement = doc[PRIVILEGES_FIELD_NAME];
         if (privilegesElement.eoo())
             return Status::OK();
         if (privilegesElement.type() != Array) {
             return Status(ErrorCodes::UnsupportedFormat,
-                          "User document 'privileges' element must be Array if present.");
+                          "User document 'inheritedPrivileges' element must be Array if present.");
         }
         PrivilegeVector privileges;
         std::string errmsg;
         for (BSONObjIterator it(privilegesElement.Obj()); it.more(); it.next()) {
             if ((*it).type() != Object) {
-                warning() << "Wrong type of element in privileges array for " << user->getName() <<
-                    ": " << *it;
+                warning() << "Wrong type of element in inheritedPrivileges array for " <<
+                        user->getName() << ": " << *it;
                 continue;
             }
             Privilege privilege;

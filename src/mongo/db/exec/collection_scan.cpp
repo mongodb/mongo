@@ -28,11 +28,11 @@
 
 #include "mongo/db/exec/collection_scan.h"
 
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/client.h" // XXX-ERH
@@ -43,7 +43,10 @@ namespace mongo {
     CollectionScan::CollectionScan(const CollectionScanParams& params,
                                    WorkingSet* workingSet,
                                    const MatchExpression* filter)
-        : _workingSet(workingSet), _filter(filter), _params(params), _nsDropped(false) { }
+        : _workingSet(workingSet),
+          _filter(filter),
+          _params(params),
+          _nsDropped(false) { }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -105,14 +108,20 @@ namespace mongo {
     }
 
     bool CollectionScan::isEOF() {
+        if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
+            return true;
+        }
         if (_nsDropped) { return true; }
         if (NULL == _iter) { return false; }
         return _iter->isEOF();
     }
 
-    void CollectionScan::invalidate(const DiskLoc& dl) {
+    void CollectionScan::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        if (NULL != _iter) {
+
+        // We don't care about mutations since we apply any filters to the result when we (possibly)
+        // return it.  Deletions can harm the underlying CollectionIterator so we pass them down.
+        if (NULL != _iter && (INVALIDATION_DELETION == type)) {
             _iter->invalidate(dl);
         }
     }

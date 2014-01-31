@@ -1,4 +1,3 @@
-
 s = new ShardingTest( "shard_existing" , 2 /* numShards */, 1 /* verboseLevel */, 1 /* numMongos */, { chunksize : 1 } )
 
 db = s.getDB( "test" )
@@ -6,11 +5,15 @@ db = s.getDB( "test" )
 var stringSize = 10000;
 var numDocs = 2000;
 
+
 // we want a lot of data, so lets make a string to cheat :)
 var bigString = new Array(stringSize).toString();
 var docSize = Object.bsonsize({ _id: numDocs, s: bigString });
 var totalSize = docSize * numDocs;
 print("NumDocs: " + numDocs + " DocSize: " + docSize + " TotalSize: " + totalSize);
+
+// turn off powerOf2Sizes as this tests regular allocation
+db.createCollection('data', {usePowerOf2Sizes: false});
 
 for (i=0; i<numDocs; i++) {
     db.data.insert({_id: i, s: bigString});

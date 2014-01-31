@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/rs.h"
@@ -37,6 +38,11 @@
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
+
+    void RangeDeleterDBEnv::initThread() {
+        if ( currentClient.get() == NULL )
+            Client::initThread( "RangeDeleter" );
+    }
 
     /**
      * Outline of the delete process:
@@ -59,8 +65,6 @@ namespace mongo {
         if (!initiallyHaveClient) {
             Client::initThread("RangeDeleter");
         }
-
-        cc().getAuthorizationSession()->grantInternalAuthorization();
 
         ShardForceVersionOkModeBlock forceVersion;
         {
@@ -124,8 +128,9 @@ namespace mongo {
             while (!opReplicatedEnough(lastOpApplied,
                                        BSON("w" << "majority").firstElement())) {
                 if (elapsedTime.seconds() >= 3600) {
-                    *errMsg = str::stream() << "moveChunk repl sync timed out after "
-                                            << elapsedTime.seconds() << " seconds";
+                    *errMsg = str::stream() << "rangeDeleter timed out after "
+                                            << elapsedTime.seconds() << " seconds while waiting"
+                                            << " for deletions to be replicated to majority nodes";
 
                     if (!initiallyHaveClient) {
                         cc().shutdown();
@@ -138,8 +143,8 @@ namespace mongo {
             }
 
             LOG(elapsedTime.seconds() < 30 ? 1 : 0)
-                << "moveChunk repl sync took "
-                << elapsedTime.seconds() << " seconds" << endl;
+                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
+                << " waiting for deletes to be replicated to majority nodes" << endl;
         }
 
         if (!initiallyHaveClient) {
@@ -151,6 +156,11 @@ namespace mongo {
 
     void RangeDeleterDBEnv::getCursorIds(const StringData& ns,
                                          std::set<CursorId>* openCursors) {
-        ClientCursor::find(ns.toString(), *openCursors);
+        Client::ReadContext ctx(ns.toString());
+        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        if ( !collection )
+            return;
+
+        collection->cursorCache()->getCursorIds( openCursors );
     }
 }

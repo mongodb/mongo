@@ -413,7 +413,6 @@ def skipTest(path):
 
         authTestsToSkip = [("jstests", "drop2.js"), # SERVER-8589,
                            ("jstests", "killop.js"), # SERVER-10128
-                           ("sharding", "replmonitor_bad_seed.js"), # SERVER-10420
                            ("sharding", "trace_missing_docs_test.js"), # SERVER-10640
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
@@ -656,12 +655,13 @@ def run_tests(tests):
             tests_run = 0
             for tests_run, test in enumerate(tests):
                 test_result = { "start": time.time() }
+                (test_path, use_db) = test
 
-                if test[0].startswith(mongo_repo + os.path.sep):
-                    test_result["test_file"] = test[0][len(mongo_repo)+1:]
+                if test_path.startswith(mongo_repo + os.path.sep):
+                    test_result["test_file"] = test_path[len(mongo_repo)+1:]
                 else:
                     # user could specify a file not in repo. leave it alone.
-                    test_result["test_file"] = test[0]
+                    test_result["test_file"] = test_path
 
                 try:
                     fails.append(test)
@@ -674,9 +674,12 @@ def run_tests(tests):
                     test_result["status"] = "pass"
                     test_report["results"].append( test_result )
 
+                    if skipTest(test_path):
+                        test_result["status"] = "skip"
+
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
-                    elif test[1]: # reach inside test and see if "usedb" is true
+                    elif use_db: # reach inside test and see if "usedb" is true
                         if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
@@ -774,11 +777,66 @@ suiteGlobalConfig = {"js": ("[!_]*.js", True),
                      "failPoint": ("fail_point/*.js", False),
                      "ssl": ("ssl/*.js", True),
                      "sslSpecial": ("sslSpecial/*.js", True),
+                     "jsCore": ("core/[!_]*.js", True),
                      }
 
+def get_module_suites():
+    """Attempts to discover and return information about module test suites
+
+    Returns a dictionary of module suites in the format:
+
+    {
+        "<suite_name>" : "<full_path_to_suite_directory/[!_]*.js>",
+        ...
+    }
+
+    This means the values of this dictionary can be used as "glob"s to match all jstests in the
+    suite directory that don't start with an underscore
+
+    The module tests should be put in 'src/mongo/db/modules/<module_name>/<suite_name>/*.js'
+
+    NOTE: This assumes that if we have more than one module the suite names don't conflict
+    """
+    modules_directory = 'src/mongo/db/modules'
+    test_suites = {}
+
+    # Return no suites if we have no modules
+    if not os.path.exists(modules_directory) or not os.path.isdir(modules_directory):
+        return {}
+
+    module_directories = os.listdir(modules_directory)
+    for module_directory in module_directories:
+
+        test_directory = os.path.join(modules_directory, module_directory, "jstests")
+
+        # Skip this module if it has no "jstests" directory
+        if not os.path.exists(test_directory) or not os.path.isdir(test_directory):
+            continue
+
+        # Get all suites for this module
+        for test_suite in os.listdir(test_directory):
+            test_suites[test_suite] = os.path.join(test_directory, test_suite, "[!_]*.js")
+
+    return test_suites
+
 def expand_suites(suites,expandUseDB=True):
+    """Takes a list of suites and expands to a list of tests according to a set of rules.
+
+    Keyword arguments:
+        suites -- list of suites specified by the user
+        expandUseDB -- expand globs (such as [!_]*.js) for tests that are run against a database
+                       (default True)
+
+    This function handles expansion of globs (such as [!_]*.js), aliases (such as "client" and
+    "all"), detection of suites in the "modules" directory, and enumerating the test files in a
+    given suite.  It returns a list of tests of the form (path_to_test, usedb), where the second
+    part of the tuple specifies whether the test is run against the database (see --nodb in the
+    mongo shell)
+
+    """
     globstr = None
     tests = []
+    module_suites = get_module_suites()
     for suite in suites:
         if suite == 'all':
             return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'],expandUseDB=expandUseDB)
@@ -821,6 +879,13 @@ def expand_suites(suites,expandUseDB=True):
                     usedb = suiteGlobalConfig[name][1]
                     break
             tests += [ ( os.path.join( mongo_repo , suite ) , usedb ) ]
+        elif suite in module_suites:
+            # Currently we connect to a database in all module tests since there's no mechanism yet
+            # to configure it independently
+            usedb = True
+            paths = glob.glob(module_suites[suite])
+            paths.sort()
+            tests += [(path, usedb) for path in paths]
         else:
             try:
                 globstr, usedb = suiteGlobalConfig[suite]

@@ -2,15 +2,18 @@
 
 Import("env")
 
-env.StaticLibrary(
+env.Library(
     target='query_planner',
     source=[
         "canonical_query.cpp",
-        "index_bounds_builder.cpp",
+        "query_settings.cpp",
         "index_tag.cpp",
-        "lite_projection.cpp",
+        "parsed_projection.cpp",
+        "plan_cache.cpp",
         "plan_enumerator.cpp",
-        "qlog.cpp",
+        "planner_access.cpp",
+        "planner_analysis.cpp",
+        "planner_ixselect.cpp",
         "query_planner.cpp",
         "query_solution.cpp",
     ],
@@ -18,19 +21,18 @@ env.StaticLibrary(
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
-        "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/expressions",
-        "$BUILD_DIR/mongo/expressions_geo",
-        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target='query',
     source=[
         "cached_plan_runner.cpp",
         "eof_runner.cpp",
         "explain_plan.cpp",
+        "get_runner.cpp",
+        "idhack_runner.cpp",
         "internal_runner.cpp",
         "multi_plan_runner.cpp",
         "new_find.cpp",
@@ -46,18 +48,37 @@ env.StaticLibrary(
     ],
 )
 
-env.StaticLibrary(
+env.CppUnitTest(
+    target="get_runner_test",
+    source=[
+        "get_runner_test.cpp"
+    ],
+    LIBDEPS=[
+        "query",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/mocklib",
+    ],
+    NO_CRUTCH = True,
+)
+
+env.Library(
     target="index_bounds",
     source=[
         "index_bounds.cpp",
+        "index_bounds_builder.cpp",
         "interval.cpp",
     ],
     LIBDEPS=[
+        "query_logger",
         "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/mongohasher",
     ],
 )
 
-env.StaticLibrary(
+env.Library(
     target="lite_parsed_query",
     source=[
         "lite_parsed_query.cpp"
@@ -67,10 +88,51 @@ env.StaticLibrary(
     ],
 )
 
+env.Library(
+    target="query_planner_test_lib",
+    source=[
+        "query_planner_test_lib.cpp",
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.Library(
+    target="query_logger",
+    source=[
+        "qlog.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/server_parameters",
+    ],
+)
+
+env.CppUnitTest(
+    target="canonical_query_test",
+    source=[
+        "canonical_query_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+        "$BUILD_DIR/mongo/expressions_text",
+    ],
+)
+
 env.CppUnitTest(
     target="index_bounds_test",
     source=[
         "index_bounds_test.cpp"
+    ],
+    LIBDEPS=[
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="index_bounds_builder_test",
+    source=[
+        "index_bounds_builder_test.cpp"
     ],
     LIBDEPS=[
         "index_bounds",
@@ -88,11 +150,60 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="lite_parsed_query_test",
+    source=[
+        "lite_parsed_query_test.cpp"
+    ],
+    LIBDEPS=[
+        "lite_parsed_query",
+    ],
+)
+
+env.CppUnitTest(
+    target="lru_key_value_test",
+    source=[
+        "lru_key_value_test.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.CppUnitTest(
+    target="parsed_projection_test",
+    source=[
+        "parsed_projection_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="plan_cache_test",
+    source=[
+        "plan_cache_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_lib",
+    ],
+)
+
+env.CppUnitTest(
+    target="planner_ixselect_test",
+    source=[
+        "planner_ixselect_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
     target="query_planner_test",
     source=[
         "query_planner_test.cpp"
     ],
     LIBDEPS=[
-        "query_planner",
+        "query_planner_test_lib",
     ],
 )

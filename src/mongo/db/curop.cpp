@@ -31,8 +31,9 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/matcher.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -63,6 +64,7 @@ namespace mongo {
         _reset();
         _op = 0;
         _opNum = _nextOpNum++;
+        _command = NULL;
         // These addresses should never be written to again.  The zeroes are
         // placed here as a precaution because currentOp may be accessed
         // without the db mutex.
@@ -71,7 +73,7 @@ namespace mongo {
 
     void CurOp::_reset() {
         _suppressFromCurop = false;
-        _command = false;
+        _isCommand = false;
         _dbprofile = 0;
         _end = 0;
         _maxTimeMicros = 0;
@@ -205,7 +207,7 @@ namespace mongo {
         if ( _client ) {
             const LockState& ls = _client->lockState();
             verify( ls.threadState() );
-            Top::global.record( _ns , _op , ls.hasAnyWriteLock() ? 1 : -1 , micros , _command );
+            Top::global.record( _ns , _op , ls.hasAnyWriteLock() ? 1 : -1 , micros , _isCommand );
         }
     }
 
@@ -228,6 +230,10 @@ namespace mongo {
         }
         else {
             _query.append(b , "query");
+        }
+
+        if ( !debug().planSummary.empty() ) {
+            b.append( "planSummary" , debug().planSummary );
         }
 
         if( !_remote.empty() ) {

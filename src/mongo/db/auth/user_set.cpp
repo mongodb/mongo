@@ -23,6 +23,27 @@
 
 namespace mongo {
 
+namespace {
+    class UserSetNameIteratorImpl : public UserNameIterator::Impl {
+        MONGO_DISALLOW_COPYING(UserSetNameIteratorImpl);
+    public:
+        UserSetNameIteratorImpl(const UserSet::iterator& begin,
+                                const UserSet::iterator& end) :
+            _curr(begin), _end(end) {}
+        virtual ~UserSetNameIteratorImpl() {}
+        virtual bool more() const { return _curr != _end; }
+        virtual const UserName& next() { return (*(_curr++))->getName(); }
+        virtual const UserName& get() const { return (*_curr)->getName(); }
+        virtual UserNameIterator::Impl* doClone() const {
+            return new UserSetNameIteratorImpl(_curr, _end);
+        }
+
+    private:
+        UserSet::iterator _curr;
+        UserSet::iterator _end;
+    };
+} // namespace
+
     UserSet::UserSet() : _users(), _usersEnd(_users.end()) {}
     UserSet::~UserSet() {}
 
@@ -90,4 +111,7 @@ namespace mongo {
         return NULL;
     }
 
+    UserNameIterator UserSet::getNames() const {
+        return UserNameIterator(new UserSetNameIteratorImpl(begin(), end()));
+    }
 } // namespace mongo

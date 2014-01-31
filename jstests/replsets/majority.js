@@ -1,5 +1,3 @@
-if (!_isWindows()) {
-
 var testInsert = function() {
     master.getDB("foo").bar.insert({x:1});
     var result = master.getDB("foo").runCommand({getLastError:1, w:"majority", wtimeout:timeout});
@@ -59,6 +57,12 @@ config.version = 2;
 config.members.pop();
 config.members.pop();
 
+// wait for nodes 3 and 4 to come back as arbiters
+assert.soon(function() {
+    var status = master.getDB("admin").runCommand({replSetGetStatus:1});
+    return status.members[3].state == 7 && status.members[4].state == 7;
+});
+
 try {
     master.getDB("admin").runCommand({replSetReconfig : config});
 }
@@ -117,4 +121,3 @@ assert.contains(config.members[1], result);
 assert.contains(config.members[2], result);
 
 replTest.stopSet();
-}

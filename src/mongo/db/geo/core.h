@@ -46,16 +46,4 @@ namespace mongo {
                                     cos(deg2rad(max(-89.0, y - maxDistDegrees))));
     }
 
-    inline bool twoDWontWrap(double x, double y, double radius) {
-        // XXX XXX XXX SERVER-11387
-        // The 0.001 for error is totally bogus and must depend on the bits used.
-        double yscandist = rad2deg(radius) + 0.001;
-        double xscandist = computeXScanDistance(y, yscandist);
-        bool ret = x + xscandist < 180
-               && x - xscandist > -180
-               && y + yscandist < 90
-               && y - yscandist > -90;
-        return ret;
-    }
-
 }

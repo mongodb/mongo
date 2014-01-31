@@ -51,7 +51,9 @@ namespace mongo {
     class FieldRef {
         MONGO_DISALLOW_COPYING(FieldRef);
     public:
-        FieldRef() : _size(0) {}
+        FieldRef();
+
+        explicit FieldRef(const StringData& path);
 
         /**
          * Field parts accessed through getPart() calls no longer would be valid, after the
@@ -125,6 +127,11 @@ namespace mongo {
         // handle larger dotted fields if it is. The idea is not to penalize the common case
         // with allocations.
         static const size_t kReserveAhead = 4;
+
+        /**
+         * Parses 'path' into parts.
+         */
+        void _parse(const StringData& path);
 
         /** Converts the field part index to the variable part equivalent */
         size_t getIndex(size_t i) const { return i-kReserveAhead; }

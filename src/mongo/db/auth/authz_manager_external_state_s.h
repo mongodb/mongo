@@ -35,9 +35,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/client/distlock.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/s/distlock.h"
 
 namespace mongo {
 
@@ -64,13 +64,27 @@ namespace mongo {
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
+        /**
+         * Implements findOne of the AuthzManagerExternalState interface
+         *
+         * NOTE: The data returned from this helper may be from any config server or replica set
+         * node.  The first config server or primary node is preferred, when available.
+         */
         virtual Status findOne(const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result);
+
+        /**
+         * Implements query of the AuthzManagerExternalState interface
+         *
+         * NOTE: The data returned from this helper may be from any config server or replica set
+         * node.  The first config server or primary node is preferred, when available.
+         */
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection,
                              const boost::function<void(const BSONObj&)>& resultProcessor);
+
         virtual Status insert(const NamespaceString& collectionName,
                               const BSONObj& document,
                               const BSONObj& writeConcern);

@@ -27,23 +27,80 @@
  */
 
 #include "mongo/db/exec/2dcommon.h"
+
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/query/index_bounds_builder.h"
 
 namespace mongo {
 namespace twod_exec {
 
     //
+    // A MatchableDocument that will load the doc if need be but records if it does.
+    //
+
+    class GeoMatchableDocument : public MatchableDocument {
+    public:
+        GeoMatchableDocument(const BSONObj& keyPattern, const BSONObj& key, DiskLoc loc, bool *fetched)
+            : _keyPattern(keyPattern),
+              _key(key),
+              _loc(loc),
+              _fetched(fetched) { }
+
+        BSONObj toBSON() const {
+            *_fetched = true;
+            return _loc.obj();
+        }
+
+        virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+            BSONObjIterator keyPatternIt(_keyPattern);
+            BSONObjIterator keyDataIt(_key);
+
+            // Skip the "2d"-indexed stuff.  We might have a diff. predicate over that field
+            // and those can't be covered.
+            keyPatternIt.next();
+            keyDataIt.next();
+
+            // Look in the key.
+            while (keyPatternIt.more()) {
+                BSONElement keyPatternElt = keyPatternIt.next();
+                verify(keyDataIt.more());
+                BSONElement keyDataElt = keyDataIt.next();
+
+                if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                    if (Array == keyDataElt.type()) {
+                        return new SimpleArrayElementIterator(keyDataElt, true);
+                    }
+                    else {
+                        return new SingleElementElementIterator(keyDataElt);
+                    }
+                }
+            }
+
+            // All else fails, fetch.
+            *_fetched = true;
+            return new BSONElementIterator(path, _loc.obj());
+        }
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            delete iterator;
+        }
+
+    private:
+        BSONObj _keyPattern;
+        BSONObj _key;
+        DiskLoc _loc;
+        bool* _fetched;
+    };
+
+
+    //
     // GeoAccumulator
     //
 
-    GeoAccumulator::GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter, bool uniqueDocs,
-            bool needDistance)
+    GeoAccumulator::GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter)
         : _accessMethod(accessMethod), _converter(accessMethod->getParams().geoHashConverter),
-        _lookedAt(0), _matchesPerfd(0), _objectsLoaded(0), _pointsLoaded(0), _found(0),
-        _uniqueDocs(uniqueDocs), _needDistance(needDistance) {
-
-            _filter = filter;
-        }
+          _filter(filter),
+          _lookedAt(0), _matchesPerfd(0), _objectsLoaded(0), _pointsLoaded(0), _found(0) { }
 
     GeoAccumulator::~GeoAccumulator() { }
 
@@ -65,22 +122,30 @@ namespace twod_exec {
 
         //cout << "newDoc: " << newDoc << endl;
         if(newDoc) {
+            bool fetched = false;
+
             if (NULL != _filter) {
-                // XXX: use key information to match...shove in WSM, try loc_and_idx, then fetch obj
-                // and try that.
-                BSONObj obj = node.recordLoc.obj();
-                bool good = _filter->matchesBSON(obj, NULL);
+                GeoMatchableDocument md(_accessMethod->getDescriptor()->keyPattern(),
+                                        node._key,
+                                        node.recordLoc,
+                                        &fetched);
+                bool good = _filter->matches(&md);
+
                 _matchesPerfd++;
 
-                //if (details.hasLoadedRecord())
-                //_objectsLoaded++;
+                if (fetched) {
+                    _objectsLoaded++;
+                }
 
                 if (! good) {
                     _matched[ node.recordLoc ] = false;
                     return;
                 }
             }
-            _matched[ node.recordLoc ] = true;
+            // Don't double-count.
+            if (!fetched) {
+                _objectsLoaded++;
+            }
         } else if(!((*match).second)) {
             return;
         }
@@ -155,7 +220,7 @@ namespace twod_exec {
     // The only time these may be equal is when we actually equal the location
     // itself, otherwise our expanding algorithm will fail.
     // static
-    bool BtreeLocation::initial(IndexDescriptor* descriptor, const TwoDIndexingParams& params,
+    bool BtreeLocation::initial(const IndexDescriptor* descriptor, const TwoDIndexingParams& params,
             BtreeLocation& min, BtreeLocation& max, GeoHash start) {
         verify(descriptor);
 
@@ -167,8 +232,7 @@ namespace twod_exec {
         // Two scans: one for min one for max.
         IndexScanParams minParams;
         minParams.direction = -1;
-        minParams.forceBtreeAccessMethod = true;
-        minParams.descriptor = descriptor->clone();
+        minParams.descriptor = descriptor;
         minParams.bounds.fields.resize(descriptor->keyPattern().nFields());
         minParams.doNotDedup = true;
         // First field of start key goes (MINKEY, start] (in reverse)
@@ -178,9 +242,8 @@ namespace twod_exec {
         minParams.bounds.fields[0].intervals.push_back(Interval(firstBob.obj(), false, true));
 
         IndexScanParams maxParams;
-        maxParams.forceBtreeAccessMethod = true;
         maxParams.direction = 1;
-        maxParams.descriptor = descriptor->clone();
+        maxParams.descriptor = descriptor;
         maxParams.bounds.fields.resize(descriptor->keyPattern().nFields());
         // Don't have the ixscan dedup since we want dup DiskLocs because of multi-point docs.
         maxParams.doNotDedup = true;
@@ -235,8 +298,8 @@ namespace twod_exec {
     // GeoBrowse
     //
 
-    GeoBrowse::GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter, bool uniqueDocs, bool needDistance)
-        : GeoAccumulator(accessMethod, filter, uniqueDocs, needDistance),
+    GeoBrowse::GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter)
+        : GeoAccumulator(accessMethod, filter),
         _type(type), _firstCall(true), _nscanned(),
         _centerPrefix(0, 0, 0),
         _descriptor(accessMethod->getDescriptor()),
@@ -525,7 +588,7 @@ namespace twod_exec {
             return 0;
         }
 
-        if(_uniqueDocs && ! onBounds) {
+        if(! onBounds) {
             //log() << "Added ind to " << _type << endl;
             _stack.push_front(GeoPoint(node));
             found++;
@@ -548,8 +611,8 @@ namespace twod_exec {
                     //log() << "Added mult to " << _type << endl;
                     _stack.push_front(GeoPoint(node));
                     found++;
-                    // If returning unique, just exit after first point is added
-                    if(_uniqueDocs) break;
+                    // IExit after first point is added
+                    break;
                 }
             }
         }
@@ -577,11 +640,15 @@ namespace twod_exec {
         // b << "pointsRemovedOnYield" << _nRemovedOnYield;
     }
 
-    void GeoBrowse::invalidate(const DiskLoc& dl) {
-        if (_firstCall) { return; }
+    bool GeoBrowse::invalidate(const DiskLoc& dl) {
+        if (_firstCall) { return false; }
+
+        // Are we tossing out a result that we (probably) would have returned?
+        bool found = false;
 
         if (_cur._loc == dl) {
             advance();
+            found = true;
         }
 
         list<GeoPoint>::iterator it = _stack.begin();
@@ -590,6 +657,7 @@ namespace twod_exec {
                 list<GeoPoint>::iterator old = it;
                 it++;
                 _stack.erase(old);
+                found = true;
             }
             else {
                 it++;
@@ -611,6 +679,8 @@ namespace twod_exec {
             }
             _max.prepareToYield();
         }
+
+        return found;
     }
 
 }  // namespace twod_exec

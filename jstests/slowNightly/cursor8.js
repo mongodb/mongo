@@ -12,6 +12,7 @@ db.getMongo().getDB( "admin" ).runCommand( {closeAllDatabases:1} );
 
 function test( want , msg ){
     var res = db.runCommand( { cursorInfo:1 } );
+    assert.eq( want , res.totalOpen , msg + " " + tojson( res ) );
     assert.eq( want , res.clientCursors_size , msg + " " + tojson( res ) );
 }
 

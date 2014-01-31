@@ -86,6 +86,52 @@ namespace optionenvironment {
         Value _value;
     };
 
+    /** Implementation of a Constraint that makes two keys mutually exclusive.  Fails if both keys
+     *  are set.
+     */
+    class MutuallyExclusiveKeyConstraint : public KeyConstraint {
+    public:
+        MutuallyExclusiveKeyConstraint(const Key& key, const Key& otherKey) : KeyConstraint(key),
+                                                                              _otherKey(otherKey)
+    { }
+        virtual ~MutuallyExclusiveKeyConstraint() {}
+    private:
+        virtual Status check(const Environment& env);
+        Key _otherKey;
+    };
+
+    /** Implementation of a Constraint that makes one key require another.  Fails if the first key
+     *  is set but the other is not.
+     */
+    class RequiresOtherKeyConstraint : public KeyConstraint {
+    public:
+        RequiresOtherKeyConstraint(const Key& key, const Key& otherKey) : KeyConstraint(key),
+                                                                          _otherKey(otherKey)
+    { }
+        virtual ~RequiresOtherKeyConstraint() {}
+    private:
+        virtual Status check(const Environment& env);
+        Key _otherKey;
+    };
+
+    /** Implementation of a Constraint that enforces a specific format on a string value.  Fails if
+     *  the value of the key is not a string or does not match the given regex.
+     */
+    class StringFormatKeyConstraint : public KeyConstraint {
+    public:
+        StringFormatKeyConstraint(const Key& key,
+                                  const std::string& regexFormat,
+                                  const std::string& displayFormat) : KeyConstraint(key),
+                                                                      _regexFormat(regexFormat),
+                                                                      _displayFormat(displayFormat)
+    { }
+        virtual ~StringFormatKeyConstraint() {}
+    private:
+        virtual Status check(const Environment& env);
+        std::string _regexFormat;
+        std::string _displayFormat;
+    };
+
     /** Implementation of a Constraint on the type of a Value.  Fails if we cannot extract the given
      *  type from our Value, which means the implementation of the access functions of Value
      *  controls which types are "compatible"

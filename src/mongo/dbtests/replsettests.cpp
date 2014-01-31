@@ -15,6 +15,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -135,8 +147,24 @@ namespace ReplSetTests {
 
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::DBWrite lk(ns());
-            Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
+            Client::Context ctx(ns());
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            if (o.hasField("_id")) {
+                coll->insertDocument(o, true);
+                return;
+            }
+
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID("_id", &id);
+            b.appendElements(o);
+            coll->insertDocument(b.obj(), true);
         }
 
         BSONObj findOne( const BSONObj &query = BSONObj() ) const {
@@ -152,7 +180,7 @@ namespace ReplSetTests {
                 return;
             }
 
-            c.ctx().db()->dropCollection( ns() );
+            c.ctx().db()->dropCollection(ns());
         }
         static void setup() {
             replSettings.replSet = "foo";
@@ -543,7 +571,7 @@ namespace ReplSetTests {
             t4.finish();
 
             // Build indexes
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            IndexBuilder::restoreIndexes(indexes);
 
             DBDirectClient cli;
             time_t max = time(0)+10;
@@ -590,7 +618,7 @@ namespace ReplSetTests {
                 Lock::DBWrite lk(ns());
                 std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
                 ASSERT_EQUALS(1U, indexes.size());
-                IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+                IndexBuilder::restoreIndexes(indexes);
             }
             ASSERT(!t2.finished());
             t2.finish();
@@ -672,7 +700,7 @@ namespace ReplSetTests {
             {
                 Lock::DBWrite lk(ns());
                 std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
-                IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+                IndexBuilder::restoreIndexes(indexes);
             }
             ASSERT(!t2.finished());
             t2.finish();
@@ -746,7 +774,7 @@ namespace ReplSetTests {
             ASSERT(!t4.finished());
             ASSERT(!t5.finished());
 
-            IndexBuilder::restoreIndexes(dbname+".system.indexes", indexes);
+            IndexBuilder::restoreIndexes(indexes);
 
             ASSERT(!t3.finished());
             ASSERT(!t4.finished());
@@ -954,13 +982,15 @@ namespace ReplSetTests {
         }
 
         void insert() {
-            Client::Context ctx( cappedNs() );
+            Client::Context ctx(cappedNs());
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(cappedNs());
+            if (!coll) {
+                coll = db->createCollection(cappedNs());
+            }
+
             BSONObj o = BSON(GENOID << "x" << 456);
-            DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(),
-                                                 o.objdata(),
-                                                 o.objsize(),
-                                                 false,
-                                                 false );
+            DiskLoc loc = coll->insertDocument(o, true).getValue();
             verify(!loc.isNull());
         }
     public:
@@ -978,8 +1008,8 @@ namespace ReplSetTests {
 
             // check _id index created
             Client::Context ctx(cappedNs());
-            NamespaceDetails *nsd = nsdetails(cappedNs());
-            verify(nsd->findIdIndex() > -1);
+            Collection* collection = ctx.db()->getCollection( cappedNs() );
+            verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
 
@@ -1006,8 +1036,8 @@ namespace ReplSetTests {
             // this changed in 2.1.2
             // we now have indexes on capped collections
             Client::Context ctx(cappedNs());
-            NamespaceDetails *nsd = nsdetails(cappedNs());
-            verify(nsd->findIdIndex() >= 0);
+            Collection* collection = ctx.db()->getCollection( cappedNs() );
+            verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
 

@@ -389,4 +389,4 @@ library_files = [('src/'+s) for s in LIBRARY_FILES]
 library_files.append('src/macros.py')
 env.JS2C(['src/libraries.cc'], library_files, TYPE='CORE', COMPRESSION='off')
 
-env.StaticLibrary("v8", sources)
+env.Library("v8", sources)

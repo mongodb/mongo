@@ -30,7 +30,7 @@
 
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 
@@ -50,7 +50,6 @@ namespace mongo {
         if (!_initted) {
             _initted = true;
 
-            // I hate this.
             Database* database = cc().database();
             if ( !database )
                 return PlanStage::IS_EOF;
@@ -59,15 +58,12 @@ namespace mongo {
             if ( !collection )
                 return PlanStage::IS_EOF;
 
-            int idxNo = collection->details()->findIndexByKeyPattern(_params.indexKeyPattern);
-            if (-1 == idxNo)
+            _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+            if ( _descriptor == NULL )
                 return PlanStage::IS_EOF;
 
-            _descriptor = collection->getIndexCatalog()->getDescriptor( idxNo );
-            verify( _descriptor );
             _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
             verify( _am );
-            // I hate this.
 
             if (NULL != _params.gq.getGeometry()._cap.get()) {
                 _browse.reset(new twod_exec::GeoCircleBrowse(_params, _am));
@@ -113,9 +109,21 @@ namespace mongo {
         }
     }
 
-    void TwoD::invalidate(const DiskLoc& dl) {
+    void TwoD::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (NULL != _browse) {
-            _browse->invalidate(dl);
+            // If the invalidation actually tossed out a result...
+            if (_browse->invalidate(dl)) {
+                // Create a new WSM
+                WorkingSetID id = _workingSet->allocate();
+                WorkingSetMember* member = _workingSet->get(id);
+                member->loc = dl;
+                member->obj = member->loc.obj();
+                member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+
+                // And flag it for later.
+                WorkingSetCommon::fetchAndInvalidateLoc(member);
+                _workingSet->flagForReview(id);
+            }
         }
     }
 
@@ -138,7 +146,7 @@ namespace twod_exec {
     //
 
     GeoCircleBrowse::GeoCircleBrowse(const TwoDParams& params, TwoDAccessMethod* accessMethod)
-        : GeoBrowse(accessMethod, "circle", params.filter, params.gq.uniqueDocs()) {
+        : GeoBrowse(accessMethod, "circle", params.filter) {
 
         _converter = accessMethod->getParams().geoHashConverter;
 
@@ -209,7 +217,7 @@ namespace twod_exec {
     //
 
     GeoBoxBrowse::GeoBoxBrowse(const TwoDParams& params, TwoDAccessMethod* accessMethod)
-        : GeoBrowse(accessMethod, "box", params.filter, params.gq.uniqueDocs()) {
+        : GeoBrowse(accessMethod, "box", params.filter) {
 
         _converter = accessMethod->getParams().geoHashConverter;
 
@@ -251,7 +259,7 @@ namespace twod_exec {
     //
 
     GeoPolygonBrowse::GeoPolygonBrowse(const TwoDParams& params, TwoDAccessMethod* accessMethod)
-        : GeoBrowse(accessMethod, "polygon", params.filter, params.gq.uniqueDocs()) {
+        : GeoBrowse(accessMethod, "polygon", params.filter) {
 
         _converter = accessMethod->getParams().geoHashConverter;
 

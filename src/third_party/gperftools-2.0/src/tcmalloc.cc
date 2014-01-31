@@ -86,6 +86,8 @@
 // * allocation of a reasonably complicated struct
 //   goes from about 1100 ns to about 300 ns.
 
+#include "mongo/platform/compiler.h"
+
 #include "config.h"
 #include <gperftools/tcmalloc.h>
 
@@ -481,7 +483,7 @@ static void PrintStats(int level) {
   char* buffer = new char[kBufferSize];
   TCMalloc_Printer printer(buffer, kBufferSize);
   DumpStats(&printer, level);
-  write(STDERR_FILENO, buffer, strlen(buffer));
+  MONGO_COMPILER_VARIABLE_UNUSED ssize_t ignored = write(STDERR_FILENO, buffer, strlen(buffer));
   delete[] buffer;
 }
 
@@ -991,7 +993,7 @@ static void ReportLargeAlloc(Length num_pages, void* result) {
     printer.printf(" %p", stack.stack[i]);
   }
   printer.printf("\n");
-  write(STDERR_FILENO, buffer, strlen(buffer));
+  MONGO_COMPILER_VARIABLE_UNUSED ssize_t ignored = write(STDERR_FILENO, buffer, strlen(buffer));
 }
 
 inline void* cpp_alloc(size_t size, bool nothrow);

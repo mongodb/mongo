@@ -30,7 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/s2common.h"
-#include "mongo/db/index/btree_access_method_internal.h"
+#include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
@@ -43,15 +43,10 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        S2AccessMethod(IndexDescriptor* descriptor);
+        S2AccessMethod(IndexCatalogEntry* btreeState);
         virtual ~S2AccessMethod() { }
 
-        virtual Status newCursor(IndexCursor** out);
-
     private:
-        friend class Geo2dFindNearCmd;
-        const S2IndexingParams& getParams() const { return _params; }
-
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         // getKeys calls the helper methods below.

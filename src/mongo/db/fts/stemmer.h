@@ -48,7 +48,7 @@ namespace mongo {
          */
         class Stemmer {
         public:
-            Stemmer( const FTSLanguage language );
+            Stemmer( const FTSLanguage& language );
             ~Stemmer();
 
             std::string stem( const StringData& word ) const;

@@ -35,16 +35,18 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
-#include "mongo/db/query_optimizer.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
@@ -336,52 +338,86 @@ namespace mongo {
 
             dropTempCollections();
             if (_useIncremental) {
-                // create the inc collection and make sure we have index on "0" key
-                {
-                    Client::WriteContext ctx( _config.incLong );
-                    string err;
-                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 << "temp" << true ) , err , false ) ) {
-                        uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
-                    }
+                // Create the inc collection and make sure we have index on "0" key.
+                Client::WriteContext incCtx( _config.incLong );
+                Collection* incColl = incCtx.ctx().db()->getCollection( _config.incLong );
+                if ( !incColl ) {
+                    const BSONObj options = BSON( "autoIndexId" << false << "temp" << true );
+                    incColl = incCtx.ctx().db()->createCollection( _config.incLong, false,
+                                                                   &options, true );
+                    // Log the createCollection operation.
+                    BSONObjBuilder b;
+                    b.append( "create", nsToCollectionSubstring( _config.incLong ));
+                    b.appendElements( options );
+                    string logNs = nsToDatabase( _config.incLong ) + ".$cmd";
+                    logOp( "c", logNs.c_str(), b.obj() );
                 }
 
-                BSONObj sortKey = BSON( "0" << 1 );
-                _db.ensureIndex( _config.incLong , sortKey );
+                BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
+                                          << "name" << "_temp_0" );
+                Status status = incColl->getIndexCatalog()->createIndex( indexSpec, false );
+                // Log the createIndex operation.
+                string logNs = nsToDatabase( _config.incLong ) + ".system.indexes";
+                logOp( "i", logNs.c_str(), indexSpec );
+                if ( !status.isOK() ) {
+                    uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
+                            _config.incLong << " err: " << status.code() );
+                }
             }
 
-            // create temp collection
+            vector<BSONObj> indexesToInsert;
+
             {
-                Client::WriteContext ctx( _config.tempNamespace.c_str() );
-                string errmsg;
-                if ( ! userCreateNS( _config.tempNamespace.c_str() , BSON("temp" << true) , errmsg , true ) ) {
-                    uasserted(13630, str::stream() << "userCreateNS failed for mr tempLong ns: "
-                              << _config.tempNamespace << " err: " << errmsg );
+                // copy indexes into temporary storage
+                Client::WriteContext finalCtx( _config.outputOptions.finalNamespace );
+                Collection* finalColl =
+                    finalCtx.ctx().db()->getCollection( _config.outputOptions.finalNamespace );
+                if ( finalColl ) {
+                    IndexCatalog::IndexIterator ii =
+                        finalColl->getIndexCatalog()->getIndexIterator( true );
+                    // Iterate over finalColl's indexes.
+                    while ( ii.more() ) {
+                        IndexDescriptor* currIndex = ii.next();
+                        BSONObjBuilder b;
+                        b.append( "ns" , _config.tempNamespace );
+
+                        // Copy over contents of the index descriptor's infoObj.
+                        BSONObjIterator j( currIndex->infoObj() );
+                        while ( j.more() ) {
+                            BSONElement e = j.next();
+                            if ( str::equals( e.fieldName() , "_id" ) ||
+                                    str::equals( e.fieldName() , "ns" ) )
+                                continue;
+                            b.append( e );
+                        }
+                        indexesToInsert.push_back( b.obj() );
+                    }
                 }
             }
 
             {
-                // copy indexes
-                auto_ptr<DBClientCursor> idx = _db.getIndexes(_config.outputOptions.finalNamespace);
-                while ( idx->more() ) {
-                    BSONObj i = idx->nextSafe();
-
-                    BSONObjBuilder b( i.objsize() + 16 );
-                    b.append( "ns" , _config.tempNamespace );
-                    BSONObjIterator j( i );
-                    while ( j.more() ) {
-                        BSONElement e = j.next();
-                        if ( str::equals( e.fieldName() , "_id" ) ||
-                                str::equals( e.fieldName() , "ns" ) )
-                            continue;
-
-                        b.append( e );
-                    }
-
-                    BSONObj indexToInsert = b.obj();
-                    NamespaceString tempNamespace(_config.tempNamespace);
-                    insert(tempNamespace.getSystemIndexesCollection(), indexToInsert);
+                // create temp collection and insert the indexes from temporary storage
+                Client::WriteContext tempCtx( _config.tempNamespace );
+                Collection* tempColl = tempCtx.ctx().db()->getCollection( _config.tempNamespace );
+                if ( !tempColl ) {
+                    const BSONObj options = BSON( "temp" << true );
+                    tempColl = tempCtx.ctx().db()->createCollection( _config.tempNamespace, false,
+                                                                     &options, true );
+                    // Log the createCollection operation.
+                    BSONObjBuilder b;
+                    b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
+                    b.appendElements( options );
+                    string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
+                    logOp( "c", logNs.c_str(), b.obj() );
                 }
 
+                for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
+                        it != indexesToInsert.end(); ++it ) {
+                    tempColl->getIndexCatalog()->createIndex( *it, false );
+                    // Log the createIndex operation.
+                    string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
+                    logOp( "i", logNs.c_str(), *it );
+                }
             }
 
         }
@@ -586,8 +622,23 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( ns );
+            Collection* coll = ctx.ctx().db()->getCollection( ns );
+            if ( !coll )
+                uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
+                                                  " collection during a mr operation." <<
+                                                  " collection expected: " << ns );
 
-            theDataFileMgr.insertAndLog( ns.c_str() , o , false );
+            class BSONObjBuilder b;
+            if ( !o.hasField( "_id" ) ) {
+                OID id;
+                id.init();
+                b.appendOID( "_id", NULL, true );
+            }
+            b.appendElements(o);
+            BSONObj bo = b.obj();
+
+            coll->insertDocument( bo, true );
+            logOp( "i", ns.c_str(), bo );
         }
 
         /**
@@ -595,7 +646,16 @@ namespace mongo {
          */
         void State::_insertToInc( BSONObj& o ) {
             verify( _onDisk );
-            theDataFileMgr.insertWithObjMod( _config.incLong.c_str(), o, false, true );
+
+            Client::WriteContext ctx( _config.incLong );
+            Collection* coll = ctx.ctx().db()->getCollection( _config.incLong );
+            if ( !coll )
+                uasserted(13631, str::stream() << "attempted to insert into nonexistent"
+                                                  " collection during a mr operation." <<
+                                                  " collection expected: " << _config.incLong );
+
+            coll->insertDocument( o, true );
+            logOp( "i", _config.incLong.c_str(), o );
             getDur().commitIfNeeded();
         }
 
@@ -861,12 +921,18 @@ namespace mongo {
             // use index on "0" to pull sorted data
             verify( _temp->size() == 0 );
             BSONObj sortKey = BSON( "0" << 1 );
-            {
-                bool foundIndex = false;
 
-                auto_ptr<DBClientCursor> idx = _db.getIndexes( _config.incLong );
-                while ( idx.get() && idx->more() ) {
-                    BSONObj x = idx->nextSafe();
+            {
+                Client::WriteContext incCtx( _config.incLong );
+                Collection* incColl = incCtx.ctx().db()->getCollection( _config.incLong );
+
+                bool foundIndex = false;
+                IndexCatalog::IndexIterator ii =
+                    incColl->getIndexCatalog()->getIndexIterator( true );
+                // Iterate over incColl's indexes.
+                while ( ii.more() ) {
+                    IndexDescriptor* currIndex = ii.next();
+                    BSONObj x = currIndex->infoObj();
                     if ( sortKey.woCompare( x["key"].embeddedObject() ) == 0 ) {
                         foundIndex = true;
                         break;
@@ -892,10 +958,8 @@ namespace mongo {
             verify(getRunner(cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
-            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-            ClientCursor::registerRunner(runner.get());
+            const ScopedRunnerRegistration safety(runner.get());
             runner->setYieldPolicy(Runner::YIELD_AUTO);
-            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
             // iterate over all sorted objects
             BSONObj o;
@@ -972,7 +1036,6 @@ namespace mongo {
                     // only 1 value for this key
                     if ( _onDisk ) {
                         // this key has low cardinality, so just write to collection
-                        Client::WriteContext ctx(_config.incLong.c_str());
                         _insertToInc( *(all.begin()) );
                     }
                     else {
@@ -1000,7 +1063,6 @@ namespace mongo {
                 return;
 
             Lock::DBWrite kl(_config.incLong);
-            Client::Context ctx(_config.incLong);
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
                 BSONList& all = i->second;
@@ -1153,7 +1215,9 @@ namespace mongo {
                 auto_ptr<RangePreserver> rangePreserver;
                 {
                     Client::ReadContext ctx(config.ns);
-                    rangePreserver.reset(new RangePreserver(config.ns));
+                    Collection* collection = ctx.ctx().db()->getCollection( config.ns );
+                    if ( collection )
+                        rangePreserver.reset(new RangePreserver(collection));
 
                     // Get metadata before we check our version, to make sure it doesn't increment
                     // in the meantime.  Need to do this in the same lock scope as the block.
@@ -1230,10 +1294,8 @@ namespace mongo {
                         }
 
                         auto_ptr<Runner> runner(rawRunner);
-                        auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
-                        ClientCursor::registerRunner(runner.get());
+                        const ScopedRunnerRegistration safety(runner.get());
                         runner->setYieldPolicy(Runner::YIELD_AUTO);
-                        safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
                         Timer mt;
                         // go through each doc
@@ -1335,6 +1397,7 @@ namespace mongo {
          */
         class MapReduceFinishCommand : public Command {
         public:
+            void help(stringstream& h) const { h << "internal"; }
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
             virtual bool slaveOk() const { return !replSet; }
             virtual bool slaveOverrideOk() const { return true; }
@@ -1343,7 +1406,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
-                actions.addAction(ActionType::mapReduceShardedFinish);
+                actions.addAction(ActionType::internal);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
             bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {

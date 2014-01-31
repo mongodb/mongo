@@ -96,5 +96,34 @@ namespace {
         ASSERT( parsed.epoch().isSet() );
     }
 
+    TEST(Comparison, StrictEqual) {
+
+        OID epoch = OID::gen();
+
+        ASSERT( ChunkVersion( 3, 1, epoch ).isStrictlyEqualTo( ChunkVersion( 3, 1, epoch ) ) );
+        ASSERT( !ChunkVersion( 3, 1, epoch ).isStrictlyEqualTo( ChunkVersion( 3, 1, OID() ) ) );
+        ASSERT( !ChunkVersion( 3, 1, OID() ).isStrictlyEqualTo( ChunkVersion( 3, 1, epoch ) ) );
+        ASSERT( ChunkVersion( 3, 1, OID() ).isStrictlyEqualTo( ChunkVersion( 3, 1, OID() ) ) );
+        ASSERT( !ChunkVersion( 4, 2, epoch ).isStrictlyEqualTo( ChunkVersion( 4, 1, epoch ) ) );
+    }
+
+    TEST(Comparison, OlderThan) {
+
+        OID epoch = OID::gen();
+
+        ASSERT( ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 4, 1, epoch ) ) );
+        ASSERT( !ChunkVersion( 4, 1, epoch ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+
+        ASSERT( ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 3, 2, epoch ) ) );
+        ASSERT( !ChunkVersion( 3, 2, epoch ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+
+        ASSERT( !ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 4, 1, OID() ) ) );
+        ASSERT( !ChunkVersion( 4, 1, OID() ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+
+        ASSERT( ChunkVersion( 3, 2, epoch ).isOlderThan( ChunkVersion( 4, 1, epoch ) ) );
+
+        ASSERT( !ChunkVersion( 3, 1, epoch ).isOlderThan( ChunkVersion( 3, 1, epoch ) ) );
+    }
+
 } // unnamed namespace
 } // namespace mongo

@@ -40,20 +40,18 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/index_set.h"
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/query_optimizer.h"
-#include "mongo/db/query_runner.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -62,6 +60,7 @@ namespace mongo {
     namespace {
 
         const char idFieldName[] = "_id";
+        const FieldRef idFieldRef(idFieldName);
 
         // TODO: Make this a function on NamespaceString, or make it cleaner.
         inline void validateUpdate(const char* ns ,
@@ -207,15 +206,13 @@ namespace mongo {
          *
          * If updateFields is empty then it was replacement and/or we need to check all fields
          */
-        inline Status validate(const bool idRequired,
-                               const BSONObj& original,
+        inline Status validate(const BSONObj& original,
                                const FieldRefSet& updatedFields,
                                const mb::Document& updated,
                                const std::vector<FieldRef*>* immutableAndSingleValueFields,
                                const ModifierInterface::Options& opts) {
 
             LOG(3) << "update validate options -- "
-                   << " id required: " << idRequired
                    << " updatedFields: " << updatedFields
                    << " immutableAndSingleValueFields.size:"
                    << (immutableAndSingleValueFields ? immutableAndSingleValueFields->size() : 0)
@@ -268,19 +265,24 @@ namespace mongo {
                             return s;
                     }
                     // Check if the updated field conflicts with immutable fields
-                    immutableFieldRef.getConflicts(&current, &changedImmutableFields);
+                    immutableFieldRef.findConflicts(&current, &changedImmutableFields);
                 }
+            }
+
+            const bool idChanged = updatedFields.findConflicts(&idFieldRef, NULL);
+
+            // Add _id to fields to check since it too is immutable
+            if (idChanged)
+                changedImmutableFields.keepShortest(&idFieldRef);
+            else if (changedImmutableFields.empty()) {
+                // Return early if nothing changed which is immutable
+                return Status::OK();
             }
 
             LOG(4) << "Changed immutable fields: " << changedImmutableFields;
             // 2.) Now compare values of the changed immutable fields (to make sure they haven't)
 
             const mutablebson::ConstElement newIdElem = updated.root()[idFieldName];
-
-            // Add _id to fields to check since it too is immutable
-            FieldRef idFR;
-            idFR.parse(idFieldName);
-            changedImmutableFields.keepShortest(&idFR);
 
             FieldRefSet::const_iterator where = changedImmutableFields.begin();
             const FieldRefSet::const_iterator end = changedImmutableFields.end();
@@ -296,7 +298,7 @@ namespace mongo {
                 if (!newElem.ok()) {
                     if (original.isEmpty()) {
                         // If the _id is missing and not required, then skip this check
-                        if (!(current.dottedField() == idFieldName && idRequired))
+                        if (!(current.dottedField() == idFieldName))
                             return Status(ErrorCodes::NoSuchKey,
                                           mongoutils::str::stream()
                                           << "After applying the update, the new"
@@ -306,8 +308,7 @@ namespace mongo {
 
                     }
                     else {
-                        if (current.dottedField() != idFieldName ||
-                                (current.dottedField() != idFieldName && idRequired))
+                        if (current.dottedField() != idFieldName)
                             return Status(ErrorCodes::ImmutableField,
                                           mongoutils::str::stream()
                                           << "After applying the update to the document with "
@@ -357,6 +358,90 @@ namespace mongo {
             return Status::OK();
         }
 
+        Status recoverFromYield(UpdateLifecycle* lifecycle,
+                                UpdateDriver* driver,
+                                Collection* collection,
+                                const NamespaceString& nsString) {
+            // We yielded and recovered OK, and our cursor is still good. Details about
+            // our namespace may have changed while we were yielded, so we re-acquire
+            // them here. If we can't do so, escape the update loop. Otherwise, refresh
+            // the driver so that it knows about what is currently indexed.
+            Collection* oldCollection = collection;
+            collection = cc().database()->getCollection(nsString.ns());
+
+            // We should not get a new pointer to the same collection...
+            if (oldCollection && (oldCollection != collection))
+                return Status(ErrorCodes::IllegalOperation,
+                              str::stream() << "Collection changed during the Update: ok?"
+                                            << " old: " << oldCollection->ok()
+                                            << " new:" << collection->ok());
+
+            if (!collection)
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "collection pointer NULL.");
+
+            if (!collection->ok())
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "collection not ok().");
+
+            IndexCatalog* idxCatalog = collection->getIndexCatalog();
+            if (!idxCatalog)
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "IndexCatalog pointer NULL.");
+
+            if (!idxCatalog->ok())
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield -- "
+                              "IndexCatalog not ok().");
+
+            if (lifecycle) {
+
+                lifecycle->setCollection(collection);
+
+                if (!lifecycle->canContinue()) {
+                    return Status(ErrorCodes::IllegalOperation,
+                                  "Update aborted due to invalid state transitions after yield.",
+                                  17270);
+                }
+
+                driver->refreshIndexKeys(lifecycle->getIndexKeys());
+            }
+
+            return Status::OK();
+        }
+
+        Status ensureIdAndFirst(mb::Document& doc) {
+            mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
+
+            // Move _id as first element if it exists
+            if (idElem.ok()) {
+                if (idElem.leftSibling().ok()) {
+                    Status s = idElem.remove();
+                    if (!s.isOK())
+                        return s;
+                    s = doc.root().pushFront(idElem);
+                    if (!s.isOK())
+                        return s;
+                }
+            }
+            else {
+                // Create _id if the document does not currently have one.
+                idElem = doc.makeElementNewOID(idFieldName);
+                if (!idElem.ok())
+                    return Status(ErrorCodes::BadValue,
+                                  "Could not create new _id ObjectId element.",
+                                  17268);
+                Status s = doc.root().pushFront(idElem);
+                if (!s.isOK())
+                    return s;
+            }
+
+            return Status::OK();
+
+        }
     } // namespace
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug) {
@@ -383,99 +468,155 @@ namespace mongo {
             uasserted(16840, status.reason());
         }
 
-        return update(request, opDebug, &driver);
+        CanonicalQuery* cq;
+        status = CanonicalQuery::canonicalize(request.getNamespaceString(),
+                                              request.getQuery(),
+                                              &cq);
+        if (!status.isOK()) {
+            uasserted(17242, "could not canonicalize query " + request.getQuery().toString() +
+                      "; " + causedBy(status));
+        }
+        return update(request, opDebug, &driver, cq);
     }
 
-    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver) {
+    static bool isQueryIsolated(const BSONObj& query) {
+        BSONObjIterator iter(query);
+        while (iter.more()) {
+            BSONElement elt = iter.next();
+            if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
+                return true;
+            if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
+                return true;
+        }
+        return false;
+    }
+
+    UpdateResult update(
+            const UpdateRequest& request,
+            OpDebug* opDebug,
+            UpdateDriver* driver,
+            CanonicalQuery* cq) {
 
         LOG(3) << "processing update : " << request;
+
+        std::auto_ptr<CanonicalQuery> cqHolder(cq);
         const NamespaceString& nsString = request.getNamespaceString();
+        UpdateLifecycle* lifecycle = request.getLifecycle();
+        const CurOp* curOp = cc().curop();
+        Collection* collection = cc().database()->getCollection(nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
-        Collection* collection = cc().database()->getCollection(nsString.ns());
 
         // TODO: This seems a bit circuitious.
         opDebug->updateobj = request.getUpdates();
 
-        if (request.getLifecycle()) {
-            IndexPathSet indexes;
-            request.getLifecycle()->getIndexKeys(&indexes);
-            driver->refreshIndexKeys(indexes);
-        }
-
-        CanonicalQuery* cq;
-        if (!CanonicalQuery::canonicalize(nsString, request.getQuery(), &cq).isOK()) {
-            uasserted(17242, "could not canonicalize query " + request.getQuery().toString());
+        if (lifecycle) {
+            lifecycle->setCollection(collection);
+            driver->refreshIndexKeys(lifecycle->getIndexKeys());
         }
 
         Runner* rawRunner;
-        if (!getRunner(cq, &rawRunner).isOK()) {
-            uasserted(17243, "could not get runner " + request.getQuery().toString());
-        }
+        Status status = cq ?
+            getRunner(collection, cqHolder.release(), &rawRunner) :
+            getRunner(collection, nsString.ns(), request.getQuery(), &rawRunner, &cq);
+        uassert(17243,
+                "could not get runner " + request.getQuery().toString() + "; " + causedBy(status),
+                status.isOK());
 
+        // Create the runner and setup all deps.
         auto_ptr<Runner> runner(rawRunner);
+
+        // Register Runner with ClientCursor
+        const ScopedRunnerRegistration safety(runner.get());
+
+        // Custom ("manual") yield policy
         RunnerYieldPolicy yieldPolicy;
+        runner->setYieldPolicy(Runner::YIELD_AUTO);
 
         // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
         // yield while evaluating the update loop below.
-        const bool isolated = QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC);
+        const bool isolated =
+            (cq && QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC)) ||
+            isQueryIsolated(request.getQuery());
 
         //
         // We'll start assuming we have one or more documents for this update. (Otherwise,
-        // we'll fallback to upserting.)
+        // we'll fall-back to insert case (if upsert is true).)
         //
 
-        // We record that this will not be an upsert, in case a mod doesn't want to be applied
-        // when in strict update mode.
+        // We are an update until we fall into the insert case below.
         driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
 
         int numMatched = 0;
-        unordered_set<DiskLoc, DiskLoc::Hasher> updatedLocs;
+
+        // NOTE: When doing a multi-update, we only store the locs of moved docs, since the
+        // runner will keep track of the rest.
+        typedef unordered_set<DiskLoc, DiskLoc::Hasher> DiskLocSet;
+        const scoped_ptr<DiskLocSet> updatedLocs(request.isMulti() ? new DiskLocSet : NULL);
 
         // Reset these counters on each call. We might re-enter this function to retry this
         // update if we throw a page fault exception below, and we rely on these counters
         // reflecting only the actions taken locally. In particlar, we must have the no-op
         // counter reset so that we can meaningfully comapre it with numMatched above.
         opDebug->nscanned = 0;
-        opDebug->nupdateNoops = 0;
+        opDebug->nModified = 0;
 
-        mutablebson::Document doc;
+        // Get the cached document from the update driver.
+        mutablebson::Document& doc = driver->getDocument();
         mutablebson::DamageVector damages;
 
+        // Used during iteration of docs
         BSONObj oldObj;
-        DiskLoc loc;
-        Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&oldObj, &loc))) {
-            if (!isolated && opDebug->nscanned != 0) {
-                if (yieldPolicy.shouldYield()) {
-                    if (!yieldPolicy.yieldAndCheckIfOK(runner.get())) {
-                        // TODO: Error?
-                        break;
-                    }
 
-                    // We yielded and recovered OK, and our cursor is still good. Details about
-                    // our namespace may have changed while we were yielded, so we re-acquire
-                    // them here. If we can't do so, escape the update loop. Otherwise, refresh
-                    // the driver so that it knows about what is currently indexed.
+        // Keep track if we have done a write in isolation mode, which will indicate we can't yield
+        bool isolationModeWriteOccured = false;
 
-                    const UpdateLifecycle* lifecycle = request.getLifecycle();
-                    collection = cc().database()->getCollection(nsString.ns());
-                    if (!collection || (lifecycle && !lifecycle->canContinue())) {
-                        uasserted(17270,
-                                  "Update aborted due to invalid state transitions after yield.");
-                    }
+        // Get first doc, and location
+        Runner::RunnerState state = Runner::RUNNER_ADVANCED;
 
-                    if (lifecycle && lifecycle->canContinue()) {
-                        IndexPathSet indexes;
-                        lifecycle->getIndexKeys(&indexes);
-                        driver->refreshIndexKeys(indexes);
-                    }
+        // Keep track of yield count so we can see if one happens on the getNext() calls below
+        int oldYieldCount = curOp->numYields();
+
+        while (true) {
+            // See if we have a write in isolation mode
+            isolationModeWriteOccured = isolated && (opDebug->nModified > 0);
+
+            // Change to manual yielding (no yielding) if we have written in isolation mode
+            if (isolationModeWriteOccured) {
+                runner->setYieldPolicy(Runner::YIELD_MANUAL);
+            }
+
+            // keep track of the yield count before calling getNext (which might yield).
+            oldYieldCount = curOp->numYields();
+
+            // Get next doc, and location
+            DiskLoc loc;
+            state = runner->getNext(&oldObj, &loc);
+            const bool didYield = (oldYieldCount != curOp->numYields());
+
+            if (state != Runner::RUNNER_ADVANCED) {
+                if (state == Runner::RUNNER_EOF) {
+                    if (didYield)
+                        uassertStatusOK(recoverFromYield(lifecycle, driver, collection, nsString));
+
+                    // We have reached the logical end of the loop, so do yielding recovery
+                    break;
+                }
+                else {
+                    uassertStatusOK(Status(ErrorCodes::InternalError,
+                                           str::stream() << " Update query failed -- "
+                                                         << Runner::statestr(state)));
                 }
             }
 
-            // We fill this with the new locs of updates so we don't double-update anything.
-            if (updatedLocs.count(loc)) {
+            // Refresh things after a yield.
+            if (didYield)
+                uassertStatusOK(recoverFromYield(lifecycle, driver, collection, nsString));
+
+            // We fill this with the new locs of moved doc so we don't double-update.
+            // NOTE: The runner will de-dup non-moved things.
+            if (updatedLocs && updatedLocs->count(loc) > 0) {
                 continue;
             }
 
@@ -495,35 +636,51 @@ namespace mongo {
             doc.reset(oldObj, mutablebson::Document::kInPlaceEnabled);
             BSONObj logObj;
 
-            // If there was a matched field, obtain it.
-            // TODO: Only do this when needed (need requirements from update_driver/mods)
-            MatchDetails matchDetails;
-            matchDetails.requestElemMatchKey();
-            // TODO: Find out if can move this to the query side so we don't need to double match
-            verify(cq->root()->matchesBSON(oldObj, &matchDetails));
-
-            string matchedField;
-            if (matchDetails.hasElemMatchKey())
-                matchedField = matchDetails.elemMatchKey();
 
             FieldRefSet updatedFields;
-            Status status = driver->update(matchedField, &doc, &logObj, &updatedFields);
+
+            Status status = Status::OK();
+            if (!driver->needMatchDetails()) {
+                // If we don't need match details, avoid doing the rematch
+                status = driver->update(StringData(), &doc, &logObj, &updatedFields);
+            }
+            else {
+                // If there was a matched field, obtain it.
+                MatchDetails matchDetails;
+                matchDetails.requestElemMatchKey();
+
+                if (!cq) {
+                    dassert(!cqHolder.get());
+                    status = CanonicalQuery::canonicalize(request.getNamespaceString(),
+                                                          request.getQuery(),
+                                                          &cq);
+                    if (!status.isOK()) {
+                        uasserted(17353, "could not canonicalize query " +
+                                  request.getQuery().toString() + "; " + causedBy(status));
+                    }
+
+                    cqHolder.reset(cq);
+                }
+                verify(cq->root()->matchesBSON(oldObj, &matchDetails));
+
+                string matchedField;
+                if (matchDetails.hasElemMatchKey())
+                    matchedField = matchDetails.elemMatchKey();
+
+                // TODO: Right now, each mod checks in 'prepare' that if it needs positional
+                // data, that a non-empty StringData() was provided. In principle, we could do
+                // that check here in an else clause to the above conditional and remove the
+                // checks from the mods.
+
+                status = driver->update(matchedField, &doc, &logObj, &updatedFields);
+            }
+
             if (!status.isOK()) {
                 uasserted(16837, status.reason());
             }
 
-            dassert(collection->details());
-            const bool idRequired = collection->details()->haveIdIndex();
-
-            // Move _id as first element
-            mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
-            if (idElem.ok()) {
-                if (idElem.leftSibling().ok()) {
-                    uassertStatusOK(idElem.remove());
-                    uassertStatusOK(doc.root().pushFront(idElem));
-                }
-            }
-
+            // Ensure _id exists and is first
+            uassertStatusOK(ensureIdAndFirst(doc));
 
             // If the driver applied the mods in place, we can ask the mutable for what
             // changed. We call those changes "damages". :) We use the damages to inform the
@@ -535,7 +692,7 @@ namespace mongo {
             // This code flow is admittedly odd. But, right now, journaling is baked in the file
             // manager. And if we aren't using the file manager, we have to do jounaling
             // ourselves.
-            bool objectWasChanged = false;
+            bool docWasModified = false;
             BSONObj newObj;
             const char* source = NULL;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
@@ -545,11 +702,10 @@ namespace mongo {
             if ((!inPlace || !damages.empty()) ) {
                 if (!(request.isFromReplication() || request.isFromMigration())) {
                     const std::vector<FieldRef*>* immutableFields = NULL;
-                    if (const UpdateLifecycle* lifecycle = request.getLifecycle())
+                    if (lifecycle)
                         immutableFields = lifecycle->getImmutableFields();
 
-                    uassertStatusOK(validate(idRequired,
-                                             oldObj,
+                    uassertStatusOK(validate(oldObj,
                                              updatedFields,
                                              doc,
                                              immutableFields,
@@ -557,6 +713,7 @@ namespace mongo {
                 }
             }
 
+            // Save state before making changes
             runner->saveState();
 
             if (inPlace && !driver->modsAffectIndices()) {
@@ -564,6 +721,9 @@ namespace mongo {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
+
+                    // Broadcast the mutation so that query results stay correct.
+                    collection->cursorCache()->invalidateDocument(loc, INVALIDATION_MUTATION);
 
                     collection->details()->paddingFits();
 
@@ -577,7 +737,7 @@ namespace mongo {
                             where->size);
                         std::memcpy(targetPtr, sourcePtr, where->size);
                     }
-                    objectWasChanged = true;
+                    docWasModified = true;
                     opDebug->fastmod = true;
                 }
                 newObj = oldObj;
@@ -593,18 +753,21 @@ namespace mongo {
                 uassertStatusOK(res.getStatus());
                 DiskLoc newLoc = res.getValue();
 
-                // If we've moved this object to a new location, make sure we don't apply
-                // that update again if our traversal picks the object again.
-                //
-                // We also take note that the diskloc if the updates are affecting indices.
-                // Chances are that we're traversing one of them and they may be multi key and
-                // therefore duplicate disklocs.
-                if (newLoc != loc || driver->modsAffectIndices()) {
-                    updatedLocs.insert(newLoc);
+                // If we are tracking updated DiskLocs because we are doing a multi-update, and
+                // if we've moved this object to a new location, make sure we don't apply that
+                // update again if our traversal picks the object again. NOTE: The runner takes
+                // care of deduping non-moved docs.
+                if (updatedLocs && (newLoc != loc)) {
+                    updatedLocs->insert(newLoc);
                 }
 
-                objectWasChanged = true;
+                docWasModified = true;
             }
+
+            // Restore state after modification
+            uassert(17278,
+                    "Update could not restore runner state after updating a document.",
+                    runner->restoreState());
 
             // Call logOp if requested.
             if (request.shouldCallLogOp()) {
@@ -615,19 +778,16 @@ namespace mongo {
                 }
             }
 
-            // If it was noop since the document didn't change, record that.
-            if (!objectWasChanged)
-                opDebug->nupdateNoops++;
+            // Only record doc modifications if they wrote (exclude no-ops)
+            if (docWasModified)
+                opDebug->nModified++;
 
             if (!request.isMulti()) {
                 break;
             }
 
+            // Opportunity for journaling to write during the update.
             getDur().commitIfNeeded();
-
-            if (!runner->restoreState()) {
-                break;
-            }
         }
 
         // TODO: Can this be simplified?
@@ -635,7 +795,8 @@ namespace mongo {
             opDebug->nupdated = numMatched;
             return UpdateResult(numMatched > 0 /* updated existing object(s) */,
                                 !driver->isDocReplacement() /* $mod or obj replacement */,
-                                numMatched /* # of docments update, even no-ops */,
+                                opDebug->nModified /* number of modified docs, no no-ops */,
+                                numMatched /* # of docs matched/updated, even no-ops */,
                                 BSONObj());
         }
 
@@ -662,58 +823,42 @@ namespace mongo {
 
         // Calling createFromQuery will populate the 'doc' with fields from the query which
         // creates the base of the update for the inserterd doc (because upsert was true)
-        uassertStatusOK(driver->populateDocumentWithQueryFields(request.getQuery(), doc));
-        if (!driver->isDocReplacement()) {
-            opDebug->fastmodinsert = true;
-            // We need all the fields from the query to compare against for validation below.
-            original = doc.getObject();
+        if (cq) {
+            uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
+            if (!driver->isDocReplacement()) {
+                opDebug->fastmodinsert = true;
+                // We need all the fields from the query to compare against for validation below.
+                original = doc.getObject();
+            }
+            else {
+                original = request.getQuery();
+            }
         }
         else {
-            original = request.getQuery();
+            fassert(17354, CanonicalQuery::isSimpleIdQuery(request.getQuery()));
+            BSONElement idElt = request.getQuery()["_id"];
+            original = idElt.wrap();
+            fassert(17352, doc.root().appendElement(idElt));
         }
 
         // Apply the update modifications and then log the update as an insert manually.
         FieldRefSet updatedFields;
-        Status status = driver->update(StringData(), &doc, NULL, &updatedFields);
+        status = driver->update(StringData(), &doc, NULL, &updatedFields);
         if (!status.isOK()) {
             uasserted(16836, status.reason());
         }
 
-        // If the collection doesn't exist or has an _id index, then an _id is required
-        const bool idRequired = collection ? collection->details()->haveIdIndex() : true;
-
-        mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
-
-        // Move _id as first element if it exists
-        if (idElem.ok()) {
-            if (idElem.leftSibling().ok()) {
-                uassertStatusOK(idElem.remove());
-                uassertStatusOK(doc.root().pushFront(idElem));
-            }
-        }
-        else {
-            // Create _id if an _id is required but the document does not currently have one.
-            if (idRequired) {
-                // TODO: don't search for _id again, get it from above somewhere
-                idElem = doc.makeElementNewOID(idFieldName);
-                if (!idElem.ok())
-                    uasserted(17268, "Could not create new _id ObjectId element.");
-                Status s = doc.root().pushFront(idElem);
-                if (!s.isOK())
-                    uasserted(17269,
-                            str::stream() << "Could not create new _id for insert: " << s.reason());
-            }
-        }
+        // Ensure _id exists and is first
+        uassertStatusOK(ensureIdAndFirst(doc));
 
         // Validate that the object replacement or modifiers resulted in a document
         // that contains all the immutable keys and can be stored.
         if (!(request.isFromReplication() || request.isFromMigration())){
             const std::vector<FieldRef*>* immutableFields = NULL;
-            if (const UpdateLifecycle* lifecycle = request.getLifecycle())
+            if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
 
-            uassertStatusOK(validate(idRequired,
-                                     original,
+            uassertStatusOK(validate(original,
                                      updatedFields,
                                      doc,
                                      immutableFields,
@@ -741,6 +886,7 @@ namespace mongo {
         opDebug->nupdated = 1;
         return UpdateResult(false /* updated a non existing document */,
                             !driver->isDocReplacement() /* $mod or obj replacement? */,
+                            1 /* docs written*/,
                             1 /* count of updated documents */,
                             newObj /* object that was upserted */ );
     }

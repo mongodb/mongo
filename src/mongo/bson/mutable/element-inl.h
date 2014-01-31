@@ -18,6 +18,14 @@
 namespace mongo {
 namespace mutablebson {
 
+    inline Element Element::operator[](size_t n) const {
+        return findNthChild(n);
+    }
+
+    inline Element Element::operator[](const StringData& name) const {
+        return findFirstChildNamed(name);
+    }
+
     inline double Element::getValueDouble() const {
         dassert(hasValue() && isType(mongo::NumberDouble));
         return getValue()._numberDouble();

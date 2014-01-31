@@ -31,15 +31,11 @@
 
 namespace mongo {
 
-    FTSAccessMethod::FTSAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor), _ftsSpec(descriptor->infoObj()) { }
+    FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState)
+        : BtreeBasedAccessMethod(btreeState), _ftsSpec(btreeState->descriptor()->infoObj()) { }
 
     void FTSAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
         fts::FTSIndexFormat::getKeys(_ftsSpec, obj, keys);
-    }
-
-    Status FTSAccessMethod::newCursor(IndexCursor** out) {
-        return Status::OK();
     }
 
 }  // namespace mongo

@@ -6,17 +6,16 @@
 # also may change between versions.
 ["addShard",
 "anyAction", # Special ActionType that represents *all* actions
-"applicationMessage",  # Not used for permissions checks, but to id the event in logs.
+"appendOplogNote",
+"applicationMessage",
 "auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "authSchemaUpgrade",
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
-"captrunc",
 "changeCustomData",
 "changePassword",
 "changeOwnPassword",
 "changeOwnCustomData",
-"clean",
 "cleanupOrphaned",
 "closeAllDatabases",
 "collMod",
@@ -39,7 +38,7 @@
 "dropAllUsersFromDatabase",  # Not used for permissions checks, but to id the event in logs.
 "dropCollection",
 "dropDatabase",
-"dropIndex",  # Not used for permissions checks, but to id the event in logs.
+"dropIndex",
 "dropRole",
 "dropUser",
 "emptycapped",
@@ -54,23 +53,26 @@
 "getShardMap",
 "getShardVersion",
 "grantRole",
-"grantPrivilegesToRole",
+"grantPrivilegesToRole",  # Not used for permissions checks, but to id the event in logs.
 "grantRolesToRole",  # Not used for permissions checks, but to id the event in logs.
 "grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
-"handshake",
 "hostInfo",
+"impersonate",
 "indexStats",
 "inprog",
 "insert",
+"internal", # Special action type that represents internal actions
 "invalidateUserCache",
 "killCursors",
 "killop",
 "listDatabases",
 "listShards",
 "logRotate",
-"mapReduceShardedFinish",
 "moveChunk",
 "netstat",
+"planCacheIndexFilter", # view/update index filters
+"planCacheRead", # view contents of plan cache
+"planCacheWrite", # clear cache, drop cache entry, pin/unpin/shun plans
 "reIndex",
 "remove",
 "removeShard",
@@ -78,22 +80,18 @@
 "renameCollectionSameDB",
 "repairDatabase",
 "replSetConfigure",
-"replSetElect",
-"replSetFresh",
-"replSetGetRBID",
 "replSetGetStatus",
 "replSetHeartbeat",
 "replSetReconfig",  # Not used for permissions checks, but to id the event in logs.
 "replSetStateChange",
-"replSetUpdatePosition",
 "resync",
 "revokeRole",
-"revokePrivilegesFromRole",
+"revokePrivilegesFromRole",  # Not used for permissions checks, but to id the event in logs.
 "revokeRolesFromRole",  # Not used for permissions checks, but to id the event in logs.
 "revokeRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
 "serverStatus",
 "setParameter",
-"setShardVersion",
+"shardCollection",  # Not used for permissions checks, but to id the event in logs.
 "shardingState",
 "shutdown",
 "splitChunk",
@@ -102,19 +100,10 @@
 "top",
 "touch",
 "unlock",
-"unsetSharding",
 "update",
 "updateRole",  # Not used for permissions checks, but to id the event in logs.
 "updateUser",  # Not used for permissions checks, but to id the event in logs.
 "validate",
 "viewRole",
-"viewUser",
-"writebacklisten",
-"writeBacksQueued",
-"_migrateClone",
-"_recvChunkAbort",
-"_recvChunkCommit",
-"_recvChunkStart",
-"_recvChunkStatus",
-"_transferMods"]
+"viewUser"]
 

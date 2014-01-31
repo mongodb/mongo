@@ -28,14 +28,13 @@
 *    it in the license file.
 */
 
-#include <map>
 #include <set>
 #include <string>
 
 #include "mongo/db/fts/stop_words.h"
 
 #include "mongo/base/init.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 
 
@@ -43,10 +42,10 @@ namespace mongo {
 
     namespace fts {
 
-        void loadStopWordMap( std::map< std::string, std::set< std::string > >* m );
+        void loadStopWordMap( StringMap< std::set< std::string > >* m );
 
         namespace {
-            unordered_map<string,StopWords*> STOP_WORDS;
+            StringMap<StopWords*> STOP_WORDS;
             StopWords* empty = NULL;
         }
 
@@ -59,8 +58,8 @@ namespace mongo {
                 _words.insert( *i );
         }
 
-        const StopWords* StopWords::getStopWords( const FTSLanguage language ) {
-            unordered_map<string,StopWords*>::const_iterator i = STOP_WORDS.find( language.str() );
+        const StopWords* StopWords::getStopWords( const FTSLanguage& language ) {
+            StringMap<StopWords*>::const_iterator i = STOP_WORDS.find( language.str() );
             if ( i == STOP_WORDS.end() )
                 return empty;
             return i->second;
@@ -70,9 +69,9 @@ namespace mongo {
         MONGO_INITIALIZER(StopWords)(InitializerContext* context) {
             empty = new StopWords();
 
-            std::map< std::string, std::set< std::string > > raw;
+            StringMap< std::set< std::string > > raw;
             loadStopWordMap( &raw );
-            for ( std::map< std::string, std::set< std::string > >::const_iterator i = raw.begin();
+            for ( StringMap< std::set< std::string > >::const_iterator i = raw.begin();
                   i != raw.end();
                   ++i ) {
                 STOP_WORDS[i->first] = new StopWords( i->second );

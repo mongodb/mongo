@@ -34,20 +34,21 @@
 #include "mongo/db/geo/core.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/2d_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
 
-    static double configValueWithDefault(IndexDescriptor *desc, const string& name, double def) {
+    static double configValueWithDefault(const IndexDescriptor *desc, const string& name, double def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberDouble(); }
         return def;
     }
 
-    TwoDAccessMethod::TwoDAccessMethod(IndexDescriptor* descriptor)
-        : BtreeBasedAccessMethod(descriptor) {
+    TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState)
+        : BtreeBasedAccessMethod(btreeState) {
+
+        const IndexDescriptor* descriptor = btreeState->descriptor();
 
         BSONObjIterator i(descriptor->keyPattern());
         while (i.more()) {
@@ -66,13 +67,13 @@ namespace mongo {
         }
         uassert(16802, "no geo field specified", _params.geo.size());
 
-        double bits =  configValueWithDefault(_descriptor, "bits", 26);  // for lat/long, ~ 1ft
+        double bits =  configValueWithDefault(descriptor, "bits", 26);  // for lat/long, ~ 1ft
         uassert(16803, "bits in geo index must be between 1 and 32", bits > 0 && bits <= 32);
 
         GeoHashConverter::Parameters params;
         params.bits = static_cast<unsigned>(bits);
-        params.max = configValueWithDefault(_descriptor, "max", 180.0);
-        params.min = configValueWithDefault(_descriptor, "min", -180.0);
+        params.max = configValueWithDefault(descriptor, "max", 180.0);
+        params.min = configValueWithDefault(descriptor, "min", -180.0);
         double numBuckets = (1024 * 1024 * 1024 * 4.0);
         params.scaling = numBuckets / (params.max - params.min);
 
@@ -188,11 +189,6 @@ namespace mongo {
                 if(singleElement) break;
             }
         }
-    }
-
-    Status TwoDAccessMethod::newCursor(IndexCursor** out) {
-        *out = new TwoDIndexCursor(this);
-        return Status::OK();
     }
 
 }  // namespace mongo

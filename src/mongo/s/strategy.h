@@ -36,15 +36,19 @@
 
 namespace mongo {
 
+    /**
+     * Legacy interface for processing client read/write/cmd requests.
+     */
     class Strategy {
     public:
-        Strategy() {}
-        virtual ~Strategy() {}
-        virtual void queryOp( Request& r ) = 0;
-        virtual void getMore( Request& r ) = 0;
-        virtual void writeOp( int op , Request& r ) = 0;
 
-        void insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags=0 , bool safe=false );
+        Strategy() {}
+
+        void queryOp( Request& r );
+
+        void getMore( Request& r );
+
+        void writeOp( int op , Request& r );
 
         struct CommandResult {
             Shard shardTarget;
@@ -52,36 +56,35 @@ namespace mongo {
             BSONObj result;
         };
 
-        virtual void commandOp( const string& db,
-                                const BSONObj& command,
-                                int options,
-                                const string& versionedNS,
-                                const BSONObj& targetingQuery,
-                                vector<CommandResult>* results )
-        {
-            // Only call this from sharded, for now.
-            // TODO:  Refactor all this.
-            verify( false );
-        }
+        /**
+         * Executes a command against a particular database, and targets the command based on a
+         * collection in that database.
+         *
+         * This version should be used by internal commands when possible.
+         */
+        void commandOp( const string& db,
+                        const BSONObj& command,
+                        int options,
+                        const string& versionedNS,
+                        const BSONObj& targetingQuery,
+                        vector<CommandResult>* results );
 
-        // These interfaces will merge soon, so make it easy to share logic
-        friend class ShardStrategy;
-        friend class SingleStrategy;
-
-        static bool useClusterWriteCommands;
+        /**
+         * Executes a command represented in the Request on the sharded cluster.
+         *
+         * DEPRECATED: should not be used by new code.
+         */
+        void clientCommandOp( Request& r );
 
     protected:
-        void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
-        void doIndexQuery( Request& r , const Shard& shard );
-        void broadcastWrite(int op, Request& r); // Sends to all shards in cluster. DOESN'T CHECK VERSION
 
-        void insert( const Shard& shard , const char * ns , const vector<BSONObj>& v , int flags=0 , bool safe=false );
-        void update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags=0, bool safe=false );
+        void doIndexQuery( Request& r , const Shard& shard );
+
+        bool handleSpecialNamespaces( Request& r , QueryMessage& q );
 
     };
 
-    extern Strategy * SINGLE;
-    extern Strategy * SHARDED;
+    extern Strategy* STRATEGY;
 
 }
 

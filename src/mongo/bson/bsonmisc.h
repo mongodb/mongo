@@ -20,6 +20,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -82,32 +83,38 @@ namespace mongo {
        Example:
          std::cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
     */
-    extern struct GENOIDLabeler { } GENOID;
+    struct MONGO_CLIENT_API GENOIDLabeler { };
+    extern MONGO_CLIENT_API GENOIDLabeler GENOID;
 
     /* Utility class to add a Date element with the current time
        Example:
          std::cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
     */
-    extern struct DateNowLabeler { } DATENOW;
+    struct MONGO_CLIENT_API DateNowLabeler { };
+    extern MONGO_CLIENT_API DateNowLabeler DATENOW;
 
     /* Utility class to assign a NULL value to a given attribute
        Example:
          std::cout << BSON( "a" << BSONNULL ); // { a : null }
     */
-    extern struct NullLabeler { } BSONNULL;
+    struct MONGO_CLIENT_API NullLabeler { };
+    extern MONGO_CLIENT_API NullLabeler BSONNULL;
 
     /* Utility class to assign an Undefined value to a given attribute
        Example:
          std::cout << BSON( "a" << BSONUndefined ); // { a : undefined }
     */
-    extern struct UndefinedLabeler { } BSONUndefined;
+    struct MONGO_CLIENT_API UndefinedLabeler { };
+    extern MONGO_CLIENT_API UndefinedLabeler BSONUndefined;
 
     /* Utility class to add the minKey (minus infinity) to a given attribute
        Example:
          std::cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
     */
-    extern struct MinKeyLabeler { } MINKEY;
-    extern struct MaxKeyLabeler { } MAXKEY;
+    struct MONGO_CLIENT_API MinKeyLabeler { };
+    extern MONGO_CLIENT_API MinKeyLabeler MINKEY;
+    struct MONGO_CLIENT_API MaxKeyLabeler { };
+    extern MONGO_CLIENT_API MaxKeyLabeler MAXKEY;
 
     // Utility class to implement GT, GTE, etc as described above.
     class Labeler {
@@ -172,13 +179,13 @@ namespace mongo {
         OID oid;
     };
 
-    extern Labeler::Label GT;
-    extern Labeler::Label GTE;
-    extern Labeler::Label LT;
-    extern Labeler::Label LTE;
-    extern Labeler::Label NE;
-    extern Labeler::Label NIN;
-    extern Labeler::Label BSIZE;
+    extern MONGO_CLIENT_API Labeler::Label GT;
+    extern MONGO_CLIENT_API Labeler::Label GTE;
+    extern MONGO_CLIENT_API Labeler::Label LT;
+    extern MONGO_CLIENT_API Labeler::Label LTE;
+    extern MONGO_CLIENT_API Labeler::Label NE;
+    extern MONGO_CLIENT_API Labeler::Label NIN;
+    extern MONGO_CLIENT_API Labeler::Label BSIZE;
 
 
     // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT << 6));
@@ -191,7 +198,7 @@ namespace mongo {
     // definitions in bsonobjbuilder.h b/c of incomplete types
 
     // Utility class to implement BSON( key << val ) as described above.
-    class BSONObjBuilderValueStream : public boost::noncopyable {
+    class MONGO_CLIENT_API BSONObjBuilderValueStream : public boost::noncopyable {
     public:
         friend class Labeler;
         BSONObjBuilderValueStream( BSONObjBuilder * builder );

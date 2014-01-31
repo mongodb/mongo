@@ -12,21 +12,44 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/multi_plan_runner.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryMultiPlanRunner {
+
+    /**
+     * Create query solution.
+     */
+    QuerySolution* createQuerySolution() {
+        std::auto_ptr<QuerySolution> soln(new QuerySolution());
+        soln->cacheData.reset(new SolutionCacheData());
+        soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
+        soln->cacheData->tree.reset(new PlanCacheIndexTree());
+        return soln.release();
+    }
 
     class MultiPlanRunnerBase {
     public:
@@ -42,9 +65,7 @@ namespace QueryMultiPlanRunner {
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Collection* collection = cc().database()->getCollection( ns() );
-            NamespaceDetails* nsd = collection->details();
-            int idxNo = nsd->findIndexByKeyPattern(obj);
-            return collection->getIndexCatalog()->getDescriptor( idxNo );
+            return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
         void insert(const BSONObj& obj) {
@@ -109,9 +130,9 @@ namespace QueryMultiPlanRunner {
             CanonicalQuery* cq = NULL;
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
-            MultiPlanRunner mpr(cq);
-            mpr.addPlan(new QuerySolution(), firstRoot.release(), firstWs.release());
-            mpr.addPlan(new QuerySolution(), secondRoot.release(), secondWs.release());
+            MultiPlanRunner mpr(ctx.ctx().db()->getCollection(ns()),cq);
+            mpr.addPlan(createQuerySolution(), firstRoot.release(), firstWs.release());
+            mpr.addPlan(createQuerySolution(), secondRoot.release(), secondWs.release());
 
             // Plan 0 aka the first plan aka the index scan should be the best.
             size_t best;

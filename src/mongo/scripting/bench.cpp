@@ -14,6 +14,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 
@@ -24,6 +36,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
@@ -331,6 +344,10 @@ namespace mongo {
 
                 int delay = e["delay"].eoo() ? 0 : e["delay"].Int();
 
+                // Let's default to writeCmd == false.
+                bool useWriteCmd = e["writeCmd"].eoo() ? false : 
+                    e["writeCmd"].Bool();
+
                 BSONObj context = e["context"].eoo() ? BSONObj() : e["context"].Obj();
 
                 auto_ptr<Scope> scope;
@@ -469,10 +486,30 @@ namespace mongo {
 
                         {
                             BenchRunEventTrace _bret(&_stats.updateCounter);
-                            conn->update( ns, fixQuery( query, bsonTemplateEvaluator ), update,
-                                          upsert , multi );
-                            if (safe)
-                                result = conn->getLastErrorDetailed();
+
+                            if (useWriteCmd) {
+                                // TODO: Replace after SERVER-11774.
+                                BSONObjBuilder builder;
+                                builder.append("update",
+                                    nsToCollectionSubstring(ns));
+                                BSONArrayBuilder docBuilder(
+                                    builder.subarrayStart("updates"));
+                                docBuilder.append(BSON("q" << query <<
+                                                       "u" << update <<
+                                                       "multi" << multi <<
+                                                       "upsert" << upsert));
+                                docBuilder.done();
+                                conn->runCommand(
+                                    nsToDatabaseSubstring(ns).toString(),
+                                    builder.obj(), result);
+                            }
+                            else {
+                                conn->update(ns, fixQuery(query,
+                                            bsonTemplateEvaluator), update,
+                                            upsert , multi);
+                                if (safe)
+                                    result = conn->getLastErrorDetailed();
+                            }
                         }
 
                         if( safe ){
@@ -497,11 +534,30 @@ namespace mongo {
                     else if( op == "insert" ) {
                         bool safe = e["safe"].trueValue();
                         BSONObj result;
+
                         {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
-                            conn->insert( ns, fixQuery( e["doc"].Obj(), bsonTemplateEvaluator ) );
-                            if (safe)
-                                result = conn->getLastErrorDetailed();
+
+                            if (useWriteCmd) {
+                                // TODO: Replace after SERVER-11774.
+                                BSONObjBuilder builder;
+                                builder.append("insert",
+                                    nsToCollectionSubstring(ns));
+                                BSONArrayBuilder docBuilder(
+                                    builder.subarrayStart("documents"));
+                                docBuilder.append(fixQuery(e["doc"].Obj(),
+                                    bsonTemplateEvaluator));
+                                docBuilder.done();
+                                conn->runCommand(
+                                    nsToDatabaseSubstring(ns).toString(),
+                                    builder.obj(), result);
+                            }
+                            else {
+                                conn->insert(ns, fixQuery(e["doc"].Obj(),
+                                    bsonTemplateEvaluator));
+                                if (safe)
+                                    result = conn->getLastErrorDetailed();
+                            }
                         }
 
                         if( safe ){
@@ -532,9 +588,28 @@ namespace mongo {
 
                         {
                             BenchRunEventTrace _bret(&_stats.deleteCounter);
-                            conn->remove( ns, fixQuery( query, bsonTemplateEvaluator ), ! multi );
-                            if (safe)
-                                result = conn->getLastErrorDetailed();
+
+                            if (useWriteCmd) {
+                                // TODO: Replace after SERVER-11774.
+                                BSONObjBuilder builder;
+                                builder.append("delete",
+                                    nsToCollectionSubstring(ns));
+                                BSONArrayBuilder docBuilder(
+                                    builder.subarrayStart("deletes"));
+                                int limit = (multi == true) ? 0 : 1;
+                                docBuilder.append(BSON("q" << query <<
+                                                       "limit" << limit));
+                                docBuilder.done();
+                                conn->runCommand(
+                                    nsToDatabaseSubstring(ns).toString(),
+                                    builder.obj(), result);
+                            }
+                            else {
+                                conn->remove(ns, fixQuery(query,
+                                    bsonTemplateEvaluator), !multi);
+                                if (safe)
+                                    result = conn->getLastErrorDetailed();
+                            }
                         }
 
                         if( safe ){
@@ -602,7 +677,7 @@ namespace mongo {
                     _stats.errCount++;
                 }
 
-                if ( ++count % 100 == 0 ) {
+                if (++count % 100 == 0 && !useWriteCmd) {
                     conn->getLastError();
                 }
 

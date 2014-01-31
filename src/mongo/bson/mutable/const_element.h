@@ -43,11 +43,18 @@ namespace mutablebson {
         inline ConstElement leftChild() const;
         inline ConstElement rightChild() const;
         inline bool hasChildren() const;
-        inline ConstElement leftSibling() const;
-        inline ConstElement rightSibling() const;
+        inline ConstElement leftSibling(size_t distance = 1) const;
+        inline ConstElement rightSibling(size_t distance = 1) const;
         inline ConstElement parent() const;
+        inline ConstElement findNthChild(size_t n) const;
         inline ConstElement operator[](size_t n) const;
+        inline ConstElement findFirstChildNamed(const StringData& name) const;
         inline ConstElement operator[](const StringData& n) const;
+        inline ConstElement findElementNamed(const StringData& name) const;
+
+        inline size_t countSiblingsLeft() const;
+        inline size_t countSiblingsRight() const;
+        inline size_t countChildren() const;
 
         inline bool hasValue() const;
         inline const BSONElement getValue() const;

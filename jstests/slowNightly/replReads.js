@@ -125,4 +125,5 @@ function testReadLoadBalancing(numReplicas) {
 //}
 
 // Is there a way that this can be run multiple times with different values?
-testReadLoadBalancing(3)
+// Disabled until SERVER-11956 is solved
+// testReadLoadBalancing(3)

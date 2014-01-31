@@ -21,7 +21,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/s/shard.h"
 
@@ -325,8 +325,6 @@ namespace mongo {
 
 
         map<ConnectionString::ConnectionType,long long> createdByType;
-
-        set<string> replicaSets;
         
         BSONObjBuilder bb( b.subobjStart( "hosts" ) );
         {
@@ -352,7 +350,7 @@ namespace mongo {
         bb.done();
         
         // Always report all replica sets being tracked
-        ReplicaSetMonitor::getAllTrackedSets(&replicaSets);
+        set<string> replicaSets = ReplicaSetMonitor::getAllTrackedSets();
         
         BSONObjBuilder setBuilder( b.subobjStart( "replicaSets" ) );
         for ( set<string>::iterator i=replicaSets.begin(); i!=replicaSets.end(); ++i ) {

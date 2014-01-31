@@ -169,6 +169,8 @@ namespace mongo {
              */
             virtual void syncDataAndTruncateJournal() = 0;
 
+            virtual bool isDurable() const = 0;
+
             static DurableInterface& getDur() { return *_impl; }
 
         private:
@@ -202,6 +204,7 @@ namespace mongo {
             bool commitIfNeeded(bool) { return false; }
             bool aCommitIsNeeded() const { return false; }
             void syncDataAndTruncateJournal() {}
+            bool isDurable() const { return false; }
         };
 
         class DurableImpl : public DurableInterface {
@@ -216,6 +219,7 @@ namespace mongo {
             bool aCommitIsNeeded() const;
             bool commitIfNeeded(bool);
             void syncDataAndTruncateJournal();
+            bool isDurable() const { return true; }
         };
 
     } // namespace dur

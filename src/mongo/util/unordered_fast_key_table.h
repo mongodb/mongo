@@ -119,6 +119,8 @@ namespace mongo {
         size_t erase( const K_L& key );
 
         class const_iterator {
+            friend class UnorderedFastKeyTable;
+
         public:
             const_iterator() { _position = -1; }
             const_iterator( const Area* area ) {
@@ -171,6 +173,8 @@ namespace mongo {
             int _position;
             int _max; // inclusive
         };
+
+        void erase( const_iterator it );
 
         /**
          * @return either a one-shot iterator with the key, or end()

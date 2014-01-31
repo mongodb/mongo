@@ -46,13 +46,14 @@ namespace mongo {
      */
     class CollectionScan : public PlanStage {
     public:
-        CollectionScan(const CollectionScanParams& params, WorkingSet* workingSet,
+        CollectionScan(const CollectionScanParams& params,
+                       WorkingSet* workingSet,
                        const MatchExpression* filter);
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
         virtual void prepareToYield();
         virtual void recoverFromYield();
 

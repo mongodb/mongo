@@ -125,7 +125,7 @@ namespace mongo {
                 int x;
                 try {
                     x = psock->unsafe_recv( buf + len , left );
-                } catch (const SocketException& se) {
+                } catch (const SocketException&) {
                     psock->close();
                     return;
                 }

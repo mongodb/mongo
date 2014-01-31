@@ -15,6 +15,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -23,7 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
-#include "mongo/db/key.h"
+#include "mongo/db/structure/btree/key.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/float_utils.h"
 #include "mongo/util/mongoutils/checksum.h"
@@ -327,50 +339,6 @@ namespace JsobjTests {
                     ASSERT(  b.obj().woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 ); // SERVER-282
                 }
 
-            }
-        };
-
-        class TimestampTest : public Base {
-        public:
-            void run() {
-                Client *c = currentClient.get();
-                if( c == 0 ) {
-                    Client::initThread("pretouchN");
-                    c = &cc();
-                }
-                Lock::GlobalWrite lk; // for initTimestamp
-        
-                BSONObjBuilder b;
-                b.appendTimestamp( "a" );
-                BSONObj o = b.done();
-                o.toString();
-                ASSERT( o.valid() );
-                ASSERT_EQUALS( Timestamp, o.getField( "a" ).type() );
-                BSONObjIterator i( o );
-                ASSERT( i.moreWithEOO() );
-                ASSERT( i.more() );
-
-                BSONElement e = i.next();
-                ASSERT_EQUALS( Timestamp, e.type() );
-                ASSERT( i.moreWithEOO() );
-                ASSERT( ! i.more() );
-
-                e = i.next();
-                ASSERT( e.eoo() );
-
-                OpTime before = OpTime::_now();
-                BSONElementManipulator( o.firstElement() ).initTimestamp();
-                OpTime after = OpTime::_now();
-
-                OpTime test = OpTime( o.firstElement().date() );
-                ASSERT( before < test && test < after );
-
-                BSONElementManipulator( o.firstElement() ).initTimestamp();
-                test = OpTime( o.firstElement().date() );
-                ASSERT( before < test && test < after );
-
-                OpTime x(123,456);
-                ASSERT_EQUALS( 528280977864LL , x.asLL() );
             }
         };
 
@@ -2174,7 +2142,6 @@ namespace JsobjTests {
             add< BSONObjTests::WoSortOrder >();
             add< BSONObjTests::IsPrefixOf >();
             add< BSONObjTests::MultiKeySortOrder > ();
-            add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();
             add< BSONObjTests::AsTempObj >();
             add< BSONObjTests::AppendIntOrLL >();

@@ -28,6 +28,9 @@
 
 #include "mongo/s/dbclient_multi_command.h"
 
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/audit.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/shard.h"
@@ -111,14 +114,17 @@ namespace mongo {
     // THROWS
     static void sayAsCmd( DBClientBase* conn, const StringData& dbName, const BSONObj& cmdObj ) {
         Message toSend;
-
+        BSONObjBuilder usersBuilder;
+        usersBuilder.appendElements(cmdObj);
+        audit::appendImpersonatedUsers(&usersBuilder);
+        
         // see query.h for the protocol we are using here.
         BufBuilder bufB;
         bufB.appendNum( 0 ); // command/query options
         bufB.appendStr( dbName.toString() + ".$cmd" ); // write command ns
         bufB.appendNum( 0 ); // ntoskip (0 for command)
         bufB.appendNum( 1 ); // ntoreturn (1 for command)
-        cmdObj.appendSelfToBufBuilder( bufB );
+        usersBuilder.obj().appendSelfToBufBuilder( bufB );
         toSend.setData( dbQuery, bufB.buf(), bufB.len() );
 
         // Send our command
@@ -148,10 +154,12 @@ namespace mongo {
             dassert( NULL == command->conn );
 
             try {
-                // TODO: Figure out how to handle repl sets, configs
                 dassert( command->endpoint.type() == ConnectionString::MASTER ||
                     command->endpoint.type() == ConnectionString::CUSTOM );
-                command->conn = shardConnectionPool.get( command->endpoint, 0 /*timeout*/);
+
+                // TODO: Fix the pool up to take millis directly
+                int timeoutSecs = _timeoutMillis / 1000;
+                command->conn = shardConnectionPool.get( command->endpoint, timeoutSecs );
 
                 if ( hasBatchWriteFeature( command->conn )
                      || !isBatchWriteCommand( command->cmdObj ) ) {
@@ -256,5 +264,9 @@ namespace mongo {
         }
 
         _pendingCommands.clear();
+    }
+
+    void DBClientMultiCommand::setTimeoutMillis( int milliSecs ) {
+        _timeoutMillis = milliSecs;
     }
 }

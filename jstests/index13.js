@@ -60,12 +60,14 @@ assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ MIN, MAX ]] },
 
 
 // Cases relating to parse order and inclusion of intersected ranges.
+/*
 assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ MIN, MAX ]] },
                              { 'a.b':1, a:{ $elemMatch:{ b:{ $gt:0 }, c:1 } } } );
 assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ MIN, MAX ]] },
                              { 'a.b':1, a:{ $elemMatch:{ b:{ $gt:0 }, c:1 } } } );
 assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ MIN, MAX ]] },
                              { a:{ $elemMatch:{ b:1, c:1 } }, 'a.b':1 } );
+*/
 
 // QUERY MIGRATION
 // Bounds with elem match

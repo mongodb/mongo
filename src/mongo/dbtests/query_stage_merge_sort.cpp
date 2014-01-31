@@ -12,18 +12,31 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/merge_sort.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -45,11 +58,8 @@ namespace QueryStageMergeSortTests {
             _client.ensureIndex(ns(), obj);
         }
 
-        IndexDescriptor* getIndex(const BSONObj& obj) {
-            Collection* collection = cc().database()->getCollection( ns() );
-            NamespaceDetails* nsd = collection->details();
-            int idxNo = nsd->findIndexByKeyPattern(obj);
-            return collection->getIndexCatalog()->getDescriptor( idxNo );
+        IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
+            return coll->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
 
         void insert(const BSONObj& obj) {
@@ -60,12 +70,14 @@ namespace QueryStageMergeSortTests {
             _client.remove(ns(), obj);
         }
 
-        void getLocs(set<DiskLoc>* out) {
-            for (boost::shared_ptr<Cursor> c = theDataFileMgr.findAll(ns()); c->ok();
-                 c->advance()) {
-
-                out->insert(c->currLoc());
+        void getLocs(set<DiskLoc>* out, Collection* coll) {
+            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+                                                       CollectionScanParams::FORWARD);
+            while (!it->isEOF()) {
+                DiskLoc nextLoc = it->getNext();
+                out->insert(nextLoc);
             }
+            delete it;
         }
 
         BSONObj objWithMinKey(int start) {
@@ -95,6 +107,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             const int N = 50;
 
@@ -117,7 +134,7 @@ namespace QueryStageMergeSortTests {
 
             // a:1
             IndexScanParams params;
-            params.descriptor = getIndex(firstIndex);
+            params.descriptor = getIndex(firstIndex, coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = objWithMinKey(1);
             params.bounds.endKey = objWithMaxKey(1);
@@ -126,7 +143,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
-            params.descriptor = getIndex(secondIndex);
+            params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // Must fetch if we want to easily pull out an obj.
@@ -153,6 +170,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             const int N = 50;
 
@@ -175,7 +197,7 @@ namespace QueryStageMergeSortTests {
 
             // a:1
             IndexScanParams params;
-            params.descriptor = getIndex(firstIndex);
+            params.descriptor = getIndex(firstIndex, coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = objWithMinKey(1);
             params.bounds.endKey = objWithMaxKey(1);
@@ -184,7 +206,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
-            params.descriptor = getIndex(secondIndex);
+            params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
@@ -210,6 +232,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             const int N = 50;
 
@@ -232,7 +259,7 @@ namespace QueryStageMergeSortTests {
 
             // a:1
             IndexScanParams params;
-            params.descriptor = getIndex(firstIndex);
+            params.descriptor = getIndex(firstIndex, coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = objWithMinKey(1);
             params.bounds.endKey = objWithMaxKey(1);
@@ -241,7 +268,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
-            params.descriptor = getIndex(secondIndex);
+            params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
@@ -268,6 +295,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             const int N = 50;
 
@@ -291,7 +323,7 @@ namespace QueryStageMergeSortTests {
 
             // a:1
             IndexScanParams params;
-            params.descriptor = getIndex(firstIndex);
+            params.descriptor = getIndex(firstIndex, coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = objWithMaxKey(1);
             params.bounds.endKey = objWithMinKey(1);
@@ -301,7 +333,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
-            params.descriptor = getIndex(secondIndex);
+            params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
@@ -327,6 +359,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             const int N = 50;
 
@@ -349,7 +386,7 @@ namespace QueryStageMergeSortTests {
 
             // a:1
             IndexScanParams params;
-            params.descriptor = getIndex(firstIndex);
+            params.descriptor = getIndex(firstIndex, coll);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = objWithMinKey(1);
             params.bounds.endKey = objWithMaxKey(1);
@@ -358,7 +395,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:51 (EOF)
-            params.descriptor = getIndex(secondIndex);
+            params.descriptor = getIndex(secondIndex, coll);
             params.bounds.startKey = BSON("" << 51 << "" << MinKey);
             params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
             ms->addChild(new IndexScan(params, ws, NULL));
@@ -384,6 +421,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             WorkingSet* ws = new WorkingSet();
             // Sort by foo:1
@@ -406,7 +448,7 @@ namespace QueryStageMergeSortTests {
 
                 BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
                 addIndex(indexSpec);
-                params.descriptor = getIndex(indexSpec);
+                params.descriptor = getIndex(indexSpec, coll);
                 ms->addChild(new IndexScan(params, ws, NULL));
             }
 
@@ -431,6 +473,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
 
             WorkingSet ws;
             // Sort by foo:1
@@ -455,12 +502,12 @@ namespace QueryStageMergeSortTests {
 
                 BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
                 addIndex(indexSpec);
-                params.descriptor = getIndex(indexSpec);
+                params.descriptor = getIndex(indexSpec, coll);
                 ms->addChild(new IndexScan(params, &ws, NULL));
             }
 
             set<DiskLoc> locs;
-            getLocs(&locs);
+            getLocs(&locs, coll);
 
             set<DiskLoc>::iterator it = locs.begin();
 
@@ -485,7 +532,7 @@ namespace QueryStageMergeSortTests {
 
             // Invalidate locs[11].  Should force a fetch.  We don't get it back.
             ms->prepareToYield();
-            ms->invalidate(*it);
+            ms->invalidate(*it, INVALIDATION_DELETION);
             ms->recoverFromYield();
 
             // Make sure locs[11] was fetched for us.

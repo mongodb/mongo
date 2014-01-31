@@ -47,11 +47,20 @@ namespace mongo {
             return bob.obj();
         }
 
-        static void cover2dsphere(const S2Region& region, OrderedIntervalList* oilOut) {
-            // XXX: should grab coarsest level from the index since the user can possibly change it.
-            int coarsestIndexedLevel = 
-                        S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / kRadiusOfEarthInMeters);
+        // TODO: what should we really pass in for indexInfoObj?
+        static void cover2dsphere(const S2Region& region,
+                                  const BSONObj& indexInfoObj,
+                                  OrderedIntervalList* oilOut) {
 
+            int coarsestIndexedLevel;
+            BSONElement ce = indexInfoObj["coarsestIndexedLevel"];
+            if (ce.isNumber()) {
+                coarsestIndexedLevel = ce.numberInt();
+            }
+            else {
+                coarsestIndexedLevel =
+                    S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / kRadiusOfEarthInMeters);
+            }
 
             // The min level of our covering is the level whose cells are the closest match to the
             // *area* of the region (or the max indexed level, whichever is smaller) The max level

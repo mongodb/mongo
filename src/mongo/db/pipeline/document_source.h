@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
@@ -73,6 +74,11 @@ namespace mongo {
          * not be advanced until eof(), see SERVER-6123.
          */
         virtual void dispose();
+
+        /**
+         * See ClientCursor::kill()
+         */
+        virtual void kill();
 
         /**
            Get the source's name.
@@ -128,32 +134,19 @@ namespace mongo {
         virtual void optimize();
 
         enum GetDepsReturn {
-            NOT_SUPPORTED, // This means the set should be ignored and the full object is required.
-            EXHAUSTIVE, // This means that everything needed should be in the set
-            SEE_NEXT, // Add the next Source's deps to the set
+            NOT_SUPPORTED = 0x0, // The full object and all metadata may be required
+            SEE_NEXT = 0x1, // Later stages could need either fields or metadata
+            EXHAUSTIVE_FIELDS = 0x2, // Later stages won't need more fields from input
+            EXHAUSTIVE_META = 0x4, // Later stages won't need more metadata from input
+            EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META, // Later stages won't need either
         };
 
-        /** Get the fields this operation needs to do its job.
-         *  Deps should be in "a.b.c" notation
-         *  An empty string in deps means the whole document is needed.
-         *
-         *  @param deps results are added here. NOT CLEARED
+        /**
+         * Get the dependencies this operation needs to do its job.
          */
-        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
             return NOT_SUPPORTED;
         }
-
-        /** This takes dependencies from getDependencies and
-         *  returns a projection that includes all of them
-         */
-        static BSONObj depsToProjection(const set<string>& deps);
-
-        /** These functions take the same input as depsToProjection but are able to
-         *  produce a Document from a BSONObj with the needed fields much faster.
-         */
-        typedef Document ParsedDeps; // See implementation for structure
-        static ParsedDeps parseDeps(const set<string>& deps);
-        static Document documentFromBsonWithDeps(const BSONObj& object, const ParsedDeps& deps);
 
         /**
          * In the default case, serializes the DocumentSource and adds it to the vector<Value>.
@@ -166,7 +159,7 @@ namespace mongo {
 
         /// Returns true if doesn't require an input source (most DocumentSources do).
         virtual bool isValidInitialSource() const { return false; }
-        
+
     protected:
         /**
            Base constructor.
@@ -356,13 +349,8 @@ namespace mongo {
         virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual bool isValidInitialSource() const { return true; }
-
-        /**
-         * Release the Cursor and the read lock it requires, but without changing the other data.
-         * Releasing the lock is required for proper concurrency, see SERVER-6123.  This
-         * functionality is also used by the explain version of pipeline execution.
-         */
         virtual void dispose();
+        virtual void kill();
 
         /**
          * Create a document source based on a passed-in cursor.
@@ -382,12 +370,6 @@ namespace mongo {
             const string& ns,
             CursorId cursorId,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /*
-          Record the namespace.  Required for explain.
-
-          @param namespace the namespace
-        */
 
         /*
           Record the query that was specified for the cursor this wraps, if
@@ -415,7 +397,14 @@ namespace mongo {
          */
         void setSort(const BSONObj& sort) { _sort = sort; }
 
-        void setProjection(const BSONObj& projection, const ParsedDeps& deps);
+        /**
+         * Informs this object of projection and dependency information.
+         *
+         * @param projection A projection specification describing the fields needed by the rest of
+         *                   the pipeline.
+         * @param deps The output of DepsTracker::toParsedDeps
+         */
+        void setProjection(const BSONObj& projection, const boost::optional<ParsedDeps>& deps);
 
         /// returns -1 for no limit
         long long getLimit() const;
@@ -433,26 +422,14 @@ namespace mongo {
         // BSONObj members must outlive _projection and cursor.
         BSONObj _query;
         BSONObj _sort;
-        shared_ptr<Projection> _projection; // shared with pClientCursor
-        ParsedDeps _dependencies;
+        BSONObj _projection;
+        boost::optional<ParsedDeps> _dependencies;
         intrusive_ptr<DocumentSourceLimit> _limit;
         long long _docsAddedToBatches; // for _limit enforcement
 
-        string ns; // namespace
+        string _ns; // namespace
         CursorId _cursorId;
-        CollectionMetadataPtr _collMetadata;
-
-        bool canUseCoveredIndex(ClientCursor* cursor) const;
-
-        /*
-          Yield the cursor sometimes.
-
-          If the state of the world changed during the yield such that we
-          are unable to continue execution of the query, this will release the
-          client cursor, and throw an error.  NOTE This differs from the
-          behavior of most other operations, see SERVER-2454.
-         */
-        void yieldSometimes(ClientCursor* cursor);
+        bool _killed;
     };
 
 
@@ -463,7 +440,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void optimize();
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
         virtual void dispose();
         virtual Value serialize(bool explain = false) const;
 
@@ -594,6 +571,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual Value serialize(bool explain = false) const;
+        virtual void setSource(DocumentSource* Source);
 
         /**
           Create a filter.
@@ -622,11 +600,15 @@ namespace mongo {
          */
         BSONObj redactSafePortion() const;
 
+        static bool isTextQuery(const BSONObj& query);
+        bool isTextQuery() const { return _isTextQuery; }
+
     private:
         DocumentSourceMatch(const BSONObj &query,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         scoped_ptr<Matcher> matcher;
+        bool _isTextQuery;
     };
 
     class DocumentSourceMergeCursors :
@@ -695,6 +677,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual Value serialize(bool explain = false) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
@@ -743,7 +726,7 @@ namespace mongo {
         virtual void optimize();
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.
@@ -817,7 +800,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual void dispose();
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         virtual intrusive_ptr<DocumentSource> getShardSource();
         virtual intrusive_ptr<DocumentSource> getMergeSource();
@@ -835,7 +818,7 @@ namespace mongo {
         void addKey(const string &fieldPath, bool ascending);
 
         /// Write out a Document whose contents are the sort key.
-        Document serializeSortKey() const;
+        Document serializeSortKey(bool explain) const;
 
         /**
           Create a sorting DocumentSource from BSON.
@@ -892,8 +875,8 @@ namespace mongo {
         void populateFromBsonArrays(const vector<BSONArray>& arrays);
 
         /* these two parallel each other */
-        typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
-        SortPaths vSortKey;
+        typedef vector<intrusive_ptr<Expression> > SortKey;
+        SortKey vSortKey;
         vector<char> vAscending; // used like vector<bool> but without specialization
 
         /// Extracts the fields in vSortKey from the Document;
@@ -931,7 +914,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
             return SEE_NEXT; // This doesn't affect needed fields
         }
 
@@ -987,7 +970,7 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
             return SEE_NEXT; // This doesn't affect needed fields
         }
 
@@ -1041,7 +1024,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual Value serialize(bool explain = false) const;
 
-        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.
@@ -1080,7 +1063,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual void setSource(DocumentSource *pSource); // errors out since this must be first
+        virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual bool isValidInitialSource() const { return true; }
         virtual Value serialize(bool explain = false) const;

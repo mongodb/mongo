@@ -43,6 +43,7 @@ namespace mongo {
     class PlanStage;
     struct QuerySolution;
     class TypeExplain;
+    struct PlanInfo;
     class WorkingSet;
 
     /**
@@ -56,8 +57,8 @@ namespace mongo {
     class InternalRunner : public Runner {
     public:
 
-        /** Takes ownership of all arguments. */
-        InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws);
+        /** Takes ownership of root and ws. */
+        InternalRunner(const Collection* collection, PlanStage* root, WorkingSet* ws);
 
         virtual ~InternalRunner();
 
@@ -71,25 +72,29 @@ namespace mongo {
 
         virtual const std::string& ns();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
         virtual void kill();
 
+        virtual const Collection* collection() { return _collection; }
+
         /**
          * Returns OK, allocating and filling in '*explain' with details of the plan used by
-         * this runner. Caller takes ownership of '*explain'. Otherwise, return a status
-         * describing the error.
+         * this runner. Caller takes ownership of '*explain'. Similarly fills in '*planInfo',
+         * which the caller takes ownership of. Otherwise, return a status describing the
+         * error.
          *
          * Strictly speaking, an InternalRunner's explain is never exposed, simply because an
          * InternalRunner itself is not exposed. But we implement the explain here anyway so
          * to help in debugging situations.
          */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        virtual Status getInfo(TypeExplain** explain,
+                               PlanInfo** planInfo) const;
 
     private:
-        std::string _ns;
+        const Collection* _collection;
 
         boost::scoped_ptr<PlanExecutor> _exec;
         Runner::YieldPolicy _policy;

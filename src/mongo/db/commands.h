@@ -227,6 +227,11 @@ namespace mutablebson {
         // @return s.isOK()
         static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
 
+        // Converts "result" into a Status object.  The input is expected to be the object returned
+        // by running a command.  Returns ErrorCodes::CommandResultSchemaViolation if "result" does
+        // not look like the result of a command.
+        static Status getStatusFromCommandResult(const BSONObj& result);
+
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
 

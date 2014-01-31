@@ -128,6 +128,9 @@ DBCollection.prototype._massageObject = function( q ){
 
 
 DBCollection.prototype._validateObject = function( o ){
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
     if (typeof(o) != "object")
         throw "attempted to save a " + typeof(o) + " value.  document expected.";
 
@@ -138,6 +141,9 @@ DBCollection.prototype._validateObject = function( o ){
 DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
 DBCollection.prototype._validateForStorage = function( o ){
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
     this._validateObject( o );
     for ( var k in o ){
         if ( k.indexOf( "." ) >= 0 ) {
@@ -153,7 +159,6 @@ DBCollection.prototype._validateForStorage = function( o ){
         }
     }
 };
-
 
 DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
     var cursor = new DBQuery( this._mongo , this._db , this ,
@@ -184,47 +189,47 @@ DBCollection.prototype.findOne = function( query , fields, options ){
 DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     if ( ! obj )
         throw "no object passed to insert!";
-    if ( ! _allow_dot ) {
-        this._validateForStorage( obj );
-    }
-    
+
     if ( typeof( options ) == "undefined" ) options = 0;
-    
-    if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
-        var tmp = obj; // don't want to modify input
-        obj = {_id: new ObjectId()};
-        for (var key in tmp){
-            obj[key] = tmp[key];
-        }
-    }
 
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
 
     if ( this._mongo.useWriteCommands() ) {
-        var documents = obj;
-        if (!Array.isArray(obj)) {
-            documents = [obj];
+        // bit 0 of option flag is continueOnError.
+        var batch = ((options & 1) == 0) ? this.initializeUnorderedBulkOp() :
+                this.initializeOrderedBulkOp();
+
+        if (Array.isArray(obj)) {
+            obj.forEach(function(doc) {
+                batch.insert(doc);
+            });
+        }
+        else {
+            batch.insert(obj);
         }
 
-        var cmdColl = this._db.getCollection('$cmd');
-        var cmdObj = { insert: this.getName(),
-                       documents: documents,
-                       // bit 0 flag is continueOnError
-                       ordered: ((options & 1) == 0)};
-
-        if ( this._mongo.getWriteConcern() ) {
-            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
+        var writeConcern = null;
+        if (this._mongo.getWriteConcern()) {
+            writeConcern = this._mongo.getWriteConcern().toJSON();
         }
 
-        // Bypass runCommand to ignore slaveOk and read pref settings
-        result = new WriteResult( 'insert',
-            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
-                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
-                        0 /* flags */).next() );
+        result = batch.execute(writeConcern).toSingleResult();
     }
     else {
+        if ( ! _allow_dot ) {
+            this._validateForStorage( obj );
+        }
+
+        if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
+            var tmp = obj; // don't want to modify input
+            obj = {_id: new ObjectId()};
+            for (var key in tmp){
+                obj[key] = tmp[key];
+            }
+        }
+
         this._mongo.insert( this._fullName , obj, options );
     }
 
@@ -233,63 +238,69 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     return result;
 };
 
-DBCollection.prototype.remove = function( t , justOne ){
-    for ( var k in t ){
-        if ( k == "_id" && typeof( t[k] ) == "undefined" ){
-            throw "can't have _id set to undefined in a remove expression"
+DBCollection.prototype._validateRemoveDoc = function(doc) {
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
+
+    for (var k in doc) {
+        if (k == "_id" && typeof( doc[k] ) == "undefined") {
+          throw new Error("can't have _id set to undefined in a remove expression");
         }
     }
+};
 
+DBCollection.prototype.remove = function( t , justOne ){
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
-    
+
     if ( this._mongo.useWriteCommands() ) {
-        
         var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
-        
-        var limit = 0;
-        if (typeof(justOne) != 'undefined' && justOne != null && justOne) {
-            limit = 1;
+        var batch = this.initializeOrderedBulkOp();
+        var removeOp = batch.find(query);
+
+        if (justOne) {
+            removeOp.removeOne();
         }
-        
-        var cmdColl = this._db.getCollection('$cmd');
-        var cmdObj = { 'delete': this.getName(),
-                       deletes: [{ q: query,
-                                   limit: limit }]};
-        
-        if ( this._mongo.getWriteConcern() ) {
-            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
+        else {
+            removeOp.remove();
         }
 
-        // Bypass runCommand to ignore slaveOk and read pref settings
-        result = new WriteResult( 'remove',
-            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
-                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
-                        0 /* flags */).next() );
+        var writeConcern = null;
+        if (this._mongo.getWriteConcern()) {
+            writeConcern = this._mongo.getWriteConcern().toJSON();
+        }
+
+        result = batch.execute(writeConcern).toSingleResult();
     }
     else {
+        this._validateRemoveDoc(t);
         this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
     }
-    
+
     this._printExtraInfo("Removed", startTime);
     return result;
 }
 
-DBCollection.prototype.update = function( query , obj , upsert , multi ){
-    assert( query , "need a query" );
-    assert( obj , "need an object" );
+DBCollection.prototype._validateUpdateDoc = function(doc) {
+    // Hidden property for testing purposes.
+    if (this._mongo._skipValidation) return;
 
     var firstKey = null;
-    for (var k in obj) { firstKey = k; break; }
+    for (var key in doc) { firstKey = key; break; }
 
     if (firstKey != null && firstKey[0] == '$') {
         // for mods we only validate partially, for example keys may have dots
-        this._validateObject( obj );
+        this._validateObject( doc );
     } else {
         // we're basically inserting a brand new object, do full validation
-        this._validateForStorage( obj );
+        this._validateForStorage( doc );
     }
+};
+
+DBCollection.prototype.update = function( query , obj , upsert , multi ){
+    assert( query , "need a query" );
+    assert( obj , "need an object" );
 
     // can pass options via object for improved readability
     if ( typeof(upsert) === 'object' ) {
@@ -305,25 +316,29 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
                      !_verboseShell) ? 0 : new Date().getTime();
 
     if ( this._mongo.useWriteCommands() ) {
+        var batch = this.initializeOrderedBulkOp();
+        var updateOp = batch.find(query);
 
-        var cmdColl = this._db.getCollection('$cmd');
-        var cmdObj = { update: this.getName(),
-                       updates: [{ q: query,
-                                   u: obj,
-                                   upsert: (upsert? true : false),
-                                   multi: (multi? true : false) }]};
-
-        if ( this._mongo.getWriteConcern() ) {
-            cmdObj.writeConcern = this._mongo.getWriteConcern().tojson();
+        if (upsert) {
+            updateOp = updateOp.upsert();
         }
 
-        // Bypass runCommand to ignore slaveOk and read pref settings
-        result = new WriteResult( 'update',
-            new DBQuery(this._mongo, this._db, cmdColl, cmdColl.getFullName(), cmdObj,
-                        {} /* proj */, -1 /* limit */, 0 /* skip */, 0 /* batchSize */,
-                        0 /* flags */).next() );
+        if (multi) {
+            updateOp.update(obj);
+        }
+        else {
+            updateOp.updateOne(obj);
+        }
+
+        var writeConcern = null;
+        if (this._mongo.getWriteConcern()) {
+            writeConcern = this._mongo.getWriteConcern().toJSON();
+        }
+
+        result = batch.execute(writeConcern).toSingleResult();
     }
     else {
+        this._validateUpdateDoc(obj);
         this._mongo.update(this._fullName, query, obj,
                            upsert ? true : false, multi ? true : false );
     }
@@ -431,11 +446,25 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
 
 DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
-    this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+
+    if ( this._mongo.useWriteCommands() ) {
+        delete o.ns; // ns is passed to the first element in the command.
+        return this._db.runCommand({ createIndexes: this.getName(), indexes: [o] });
+    }
+    else {
+        this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+    }
 }
 
 DBCollection.prototype.ensureIndex = function( keys , options ){
-    this.createIndex(keys, options);
+    var result = this.createIndex(keys, options);
+
+    if (result != null) {
+        if (!result.ok) return result;
+        // Preserve old behavior of returning undefined on success.
+        return;
+    }
+
     err = this.getDB().getLastErrorObj();
     if (err.err) {
         return err;
@@ -1329,3 +1358,105 @@ DBCollection.prototype.getQueryOptions = function() {
     return options;
 }
 
+/**
+ * Returns a PlanCache for the collection.
+ */
+DBCollection.prototype.getPlanCache = function() {
+    return new PlanCache( this );
+}
+
+// plan cache commands
+
+/**
+ * PlanCache
+ * Holds a reference to the collection.
+ * Proxy for planCache* commands.
+ */
+if ( ( typeof  PlanCache ) == "undefined" ){
+    PlanCache = function( collection ){
+        this._collection = collection;
+    }
+}
+
+/**
+ * Name of PlanCache.
+ * Same as collection.
+ */
+PlanCache.prototype.getName = function(){
+    return this._collection.getName();
+}
+
+/**
+ * Displays help for a PlanCache object.
+ */
+PlanCache.prototype.help = function () {
+    var shortName = this.getName();
+    print("DBCollection help");
+    print("\tdb." + shortName + ".getPlanCache().help() - show PlanCache help");
+    print("\tdb." + shortName + ".getPlanCache().listQueryShapes() - " +
+          "displays all query shapes in a collection");
+    print("\tdb." + shortName + ".getPlanCache().clear() - " +
+          "drops all cached queries in a collection");
+    print("\tdb." + shortName + ".getPlanCache().clearPlansByQuery(query[, projection, sort]) - " +
+          "drops query shape from plan cache");
+    print("\tdb." + shortName + ".getPlanCache().getPlansByQuery(query[, projection, sort]) - " +
+          "displays the cached plans for a query shape");
+    return __magicNoPrint;
+}
+
+/**
+ * Internal function to parse query shape.
+ */
+PlanCache.prototype._parseQueryShape = function(query, projection, sort) {
+    if (query == undefined) {
+        throw new Error("required parameter query missing");
+    }
+    var shape = {
+        query: query,
+        projection: projection == undefined ? {} : projection,
+        sort: sort == undefined ? {} : sort,
+    };
+    return shape;
+}
+
+/**
+ * Internal function to run command.
+ */
+PlanCache.prototype._runCommandThrowOnError = function(cmd, params) {
+    var res = this._collection.runCommand(cmd, params);
+    if (!res.ok) {
+        throw new Error(res.errmsg);
+    }
+    return res;
+}
+
+/**
+ * Lists query shapes in a collection.
+ */
+PlanCache.prototype.listQueryShapes = function() {
+    return this._runCommandThrowOnError("planCacheListQueryShapes", {}).shapes;
+}
+
+/**
+ * Clears plan cache in a collection.
+ */
+PlanCache.prototype.clear = function() {
+    this._runCommandThrowOnError("planCacheClear", {});
+    return;
+}
+
+/**
+ * List plans for a query shape.
+ */
+PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
+    return this._runCommandThrowOnError("planCacheListPlans",
+                                        this._parseQueryShape(query, projection, sort)).plans;
+}
+
+/**
+ * Drop query shape from the plan cache.
+ */
+PlanCache.prototype.clearPlansByQuery = function(query, projection, sort) {
+    this._runCommandThrowOnError("planCacheDrop", this._parseQueryShape(query, projection, sort));
+    return;
+}

@@ -99,8 +99,18 @@ namespace mongo {
         if (coll.empty())
             return false;
 
-        return coll.find('$') == std::string::npos;
+        for (StringData::const_iterator iter = coll.begin(), end = coll.end();
+                iter != end; ++iter) {
+            switch (*iter) {
+            case '\0':
+            case '$':
+                return false;
+            default:
+                continue;
+            }
+        }
 
+        return true;
     }
 
     inline NamespaceString::NamespaceString() : _ns(), _dotIndex(0) {}
@@ -126,7 +136,8 @@ namespace mongo {
         _dotIndex = dbName.size();
         dassert(it == _ns.end());
         dassert(_ns[_dotIndex] == '.');
-        dassert(_ns.find('\0') == std::string::npos);
+        uassert(17295, "namespaces cannot have embedded null characters",
+                   _ns.find('\0') == std::string::npos);
     }
 
     inline int nsDBHash( const std::string& ns ) {

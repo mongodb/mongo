@@ -35,6 +35,6 @@ assert(stats.numExtents < 20);
 assert(stats.nindexes == 1);
 var pf = stats.paddingFactor;
 print("update.js padding factor: " + pf);
-assert(pf > 1.7 && pf < 2);
+assert(pf > 1.7 && pf <= 2);
 
 asdf.drop();

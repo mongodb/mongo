@@ -137,7 +137,7 @@ namespace auth {
         return Status::OK();
     }
 
-    Status _parseUserNamesFromBSONArray(const BSONArray& usersArray,
+    Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
                                         const StringData& dbname,
                                        std::vector<UserName>* parsedUserNames) {
         return _parseNamesFromBSONArray(usersArray,
@@ -359,9 +359,9 @@ namespace auth {
         if (cmdObj["usersInfo"].numberInt() == 1) {
             parsedArgs->allForDB = true;
         } else if (cmdObj["usersInfo"].type() == Array) {
-            status = _parseUserNamesFromBSONArray(BSONArray(cmdObj["usersInfo"].Obj()),
-                                                  dbname,
-                                                  &parsedArgs->userNames);
+            status = parseUserNamesFromBSONArray(BSONArray(cmdObj["usersInfo"].Obj()),
+                                                 dbname,
+                                                 &parsedArgs->userNames);
             if (!status.isOK()) {
                 return status;
             }
@@ -584,6 +584,11 @@ namespace auth {
         if (!status.isOK()) {
             return status;
         }
+        if (!parsedPrivileges->size()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << cmdName << " command requires a non-empty "
+                                  "\"privileges\" array");
+        }
 
         return Status::OK();
     }
@@ -638,15 +643,39 @@ namespace auth {
 
     Status parseAuthSchemaUpgradeStepCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
+                                             int* maxSteps,
+                                             bool* shouldUpgradeShards,
                                              BSONObj* parsedWriteConcern) {
+        static const int minUpgradeSteps = 1;
+        static const int maxUpgradeSteps = 2;
+
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("authSchemaUpgradeStep");
+        validFieldNames.insert("authSchemaUpgrade");
+        validFieldNames.insert("maxSteps");
+        validFieldNames.insert("upgradeShards");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "authSchemaUpgradeStep", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "authSchemaUpgrade", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
+
+        status = bsonExtractBooleanFieldWithDefault(
+                cmdObj, "upgradeShards", true, shouldUpgradeShards);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        long long steps;
+        status = bsonExtractIntegerFieldWithDefault(cmdObj, "maxSteps", maxUpgradeSteps, &steps);
+        if (!status.isOK())
+            return status;
+        if (steps < minUpgradeSteps || steps > maxUpgradeSteps) {
+            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                          "Legal values for \"maxSteps\" are at least " << minUpgradeSteps <<
+                          " and no more than " << maxUpgradeSteps << "; found " << steps);
+        }
+        *maxSteps = static_cast<int>(steps);
 
         status = _extractWriteConcern(cmdObj, parsedWriteConcern);
         if (!status.isOK()) {

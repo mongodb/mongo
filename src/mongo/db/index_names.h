@@ -46,7 +46,6 @@ namespace mongo {
         static const string GEO_HAYSTACK;
         static const string GEO_2DSPHERE;
         static const string TEXT;
-        static const string TEXT_INTERNAL;
         static const string HASHED;
 
         /**
@@ -73,7 +72,6 @@ namespace mongo {
                    || name == IndexNames::GEO_2DSPHERE
                    || name == IndexNames::GEO_HAYSTACK
                    || name == IndexNames::TEXT
-                   || name == IndexNames::TEXT_INTERNAL
                    || name == IndexNames::HASHED;
         }
     };

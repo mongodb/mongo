@@ -33,9 +33,12 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/query/lite_projection.h"
+#include "mongo/db/query/parsed_projection.h"
 
 namespace mongo {
+
+    // TODO: Is this binary data really?
+    typedef std::string PlanCacheKey;
 
     class CanonicalQuery {
     public:
@@ -52,6 +55,30 @@ namespace mongo {
         static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
                                    const BSONObj& proj, CanonicalQuery** out);
 
+        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+                                   const BSONObj& proj,
+                                   long long skip, long long limit,
+                                   CanonicalQuery** out);
+
+        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+                                   const BSONObj& proj,
+                                   long long skip, long long limit,
+                                   const BSONObj& hint,
+                                   CanonicalQuery** out);
+
+        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+                                   const BSONObj& proj,
+                                   long long skip, long long limit,
+                                   const BSONObj& hint,
+                                   const BSONObj& minObj, const BSONObj& maxObj,
+                                   bool snapshot, CanonicalQuery** out);
+
+        /**
+         * Returns true if "query" describes an exact-match query on _id, possibly with
+         * the $isolated/$atomic modifier.
+         */
+        static bool isSimpleIdQuery(const BSONObj& query);
+
         // What namespace is this query over?
         const string& ns() const { return _pq->ns(); }
 
@@ -61,13 +88,49 @@ namespace mongo {
         MatchExpression* root() const { return _root.get(); }
         BSONObj getQueryObj() const { return _pq->getFilter(); }
         const LiteParsedQuery& getParsed() const { return *_pq; }
-        LiteProjection* getLiteProj() const { return _liteProj.get(); }
+        const ParsedProjection* getProj() const { return _proj.get(); }
 
+        /**
+         * Get the cache key for this canonical query.
+         */
+        const PlanCacheKey& getPlanCacheKey() const;
+
+        // Debugging
         string toString() const;
+
+        /**
+         * Validates match expression, checking for certain
+         * combinations of operators in match expression and
+         * query options in LiteParsedQuery.
+         * Since 'root' is derived from 'filter' in LiteParsedQuery,
+         * 'filter' is not validated.
+         *
+         * TODO: Move this to query_validator.cpp
+         */
+        static Status isValid(MatchExpression* root, const LiteParsedQuery& parsed);
+
+        /**
+         * Returns the normalized version of the subtree rooted at 'root'.
+         *
+         * Takes ownership of 'root'.
+         */
+        static MatchExpression* normalizeTree(MatchExpression* root);
+
+        /**
+         * Traverses expression tree post-order.
+         * Sorts children at each non-leaf node by (MatchType, path(), cacheKey)
+         */
+        static void sortTree(MatchExpression* tree);
 
     private:
         // You must go through canonicalize to create a CanonicalQuery.
         CanonicalQuery() { }
+
+        /**
+         * Computes and stores the cache key / query shape
+         * for this query.
+         */
+        void generateCacheKey(void);
 
         // Takes ownership of lpq
         Status init(LiteParsedQuery* lpq);
@@ -77,7 +140,13 @@ namespace mongo {
         // _root points into _pq->getFilter()
         scoped_ptr<MatchExpression> _root;
 
-        scoped_ptr<LiteProjection> _liteProj;
+        scoped_ptr<ParsedProjection> _proj;
+
+        /**
+         * Cache key is a string-ified combination of the query and sort obfuscated
+         * for minimal user comprehension.
+         */
+        PlanCacheKey _cacheKey;
     };
 
 }  // namespace mongo

@@ -30,24 +30,18 @@
 
 #include <string>
 
-#include "mongo/db/storage/index_details.h"  // For IndexDetails.
+#include "mongo/db/structure/catalog/index_details.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_details.h"  // For NamespaceDetails.
-#include "mongo/db/structure/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"  // For NamespaceDetails.
+#include "mongo/db/catalog/collection.h"
 
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
     class IndexCatalog;
-
-    /**
-     * OnDiskIndexData (aka IndexDetails) is memory-mapped on-disk index data.
-     * It contains two DiskLocs:
-     * The first points to the head of the index.  This is currently turned into a Btree node.
-     * The second points to a BSONObj which describes the index.
-     */
-    typedef IndexDetails OnDiskIndexData;
+    class IndexCatalogEntry;
+    class IndexCatalogEntryContainer;
 
     /**
      * A cache of information computed from the memory-mapped per-index data (OnDiskIndexData).
@@ -62,10 +56,9 @@ namespace mongo {
          * OnDiskIndexData is a pointer to the memory mapped per-index data.
          * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
          */
-        IndexDescriptor(Collection* collection, int indexNumber, OnDiskIndexData* data,
-                        BSONObj infoObj)
+        IndexDescriptor(Collection* collection, BSONObj infoObj)
             : _magic(123987),
-              _collection(collection), _indexNumber(indexNumber), _onDiskData(data),
+              _collection(collection),
               _infoObj(infoObj.getOwned()),
               _numFields(infoObj.getObjectField("key").nFields()),
               _keyPattern(infoObj.getObjectField("key").getOwned()),
@@ -74,9 +67,10 @@ namespace mongo {
               _isIdIndex(IndexDetails::isIdIndexPattern( _keyPattern )),
               _sparse(infoObj["sparse"].trueValue()),
               _dropDups(infoObj["dropDups"].trueValue()),
-              _unique( _isIdIndex || infoObj["unique"].trueValue() )
+              _unique( _isIdIndex || infoObj["unique"].trueValue() ),
+              _cachedEntry( NULL )
         {
-            _indexNamespace = _parentNS + ".$" + _indexNamespace;
+            _indexNamespace = _parentNS + ".$" + _indexName;
 
             _version = 0;
             BSONElement e = _infoObj["v"];
@@ -87,11 +81,6 @@ namespace mongo {
 
         ~IndexDescriptor() {
             _magic = 555;
-        }
-
-        // XXX this is terrible
-        IndexDescriptor* clone() const {
-            return new IndexDescriptor(_collection, _indexNumber, _onDiskData, _infoObj);
         }
 
         //
@@ -138,7 +127,7 @@ namespace mongo {
         bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
-        bool isMultikey() const { _checkOk(); return _collection->details()->isMultikey(_indexNumber); }
+        bool isMultikey() const { _checkOk(); return _collection->getIndexCatalog()->isMultikey( this ); }
 
         bool isIdIndex() const { _checkOk(); return _isIdIndex; }
 
@@ -148,36 +137,17 @@ namespace mongo {
 
         // Allow access to arbitrary fields in the per-index info object.  Some indices stash
         // index-specific data there.
-        BSONElement getInfoElement(const string& name) { return _infoObj[name]; }
+        BSONElement getInfoElement(const string& name) const { return _infoObj[name]; }
 
         //
         // "Internals" of accessing the index, used by IndexAccessMethod(s).
         //
-
-        // Return the memory-mapped index data block.
-        OnDiskIndexData& getOnDisk() { _checkOk(); return *_onDiskData; }
-
-        // Return the mutable head of the index.
-        const DiskLoc& getHead() const { _checkOk(); return _onDiskData->head; }
 
         // Return a (rather compact) string representation.
         string toString() const { _checkOk(); return _infoObj.toString(); }
 
         // Return the info object.
         const BSONObj& infoObj() const { _checkOk(); return _infoObj; }
-
-        // Set multikey attribute.  We never unset it.
-        void setMultikey() {
-            _collection->getIndexCatalog()->markMultikey( this );
-        }
-
-        // Is this index being created in the background?
-        bool isBackgroundIndex() const {
-            return _indexNumber >= _collection->details()->getCompletedIndexCount();
-        }
-
-        // this is the collection over which the index is over
-        Collection* getIndexedCollection() const { return _collection; }
 
         // this is the owner of this IndexDescriptor
         IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
@@ -191,18 +161,10 @@ namespace mongo {
             verify(0);
         }
 
-        int getIndexNumber() const { return _indexNumber; }
-
         int _magic;
 
         // Related catalog information of the parent collection
         Collection* _collection;
-
-        // What # index are we in the catalog represented by _namespaceDetails?  Needed for setting
-        // and getting multikey.
-        int _indexNumber;
-
-        OnDiskIndexData* _onDiskData;
 
         // The BSONObj describing the index.  Accessed through the various members above.
         const BSONObj _infoObj;
@@ -220,7 +182,13 @@ namespace mongo {
         bool _unique;
         int _version;
 
+        // only used by IndexCatalogEntryContainer to do caching for perf
+        // users not allowed to touch, and not part of API
+        IndexCatalogEntry* _cachedEntry;
+
         friend class IndexCatalog;
+        friend class IndexCatalogEntry;
+        friend class IndexCatalogEntryContainer;
     };
 
 }  // namespace mongo

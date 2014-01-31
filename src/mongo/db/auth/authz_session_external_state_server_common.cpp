@@ -46,7 +46,7 @@ namespace {
     AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(
             AuthorizationManager* authzManager) :
                     AuthzSessionExternalState(authzManager),
-                    _allowLocalhost(true) {}
+                    _allowLocalhost(enableLocalhostAuthBypass) {}
     AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
     void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost() {
@@ -73,7 +73,7 @@ namespace {
     bool AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks() const {
         ClientBasic* client = ClientBasic::getCurrent();
         return !_authzManager->isAuthEnabled() ||
-                (enableLocalhostAuthBypass &&client->getIsLocalHostConnection() && _allowLocalhost);
+                (_allowLocalhost && client->getIsLocalHostConnection());
     }
 
 } // namespace mongo

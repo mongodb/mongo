@@ -25,6 +25,8 @@
 #error dbclient.h is for C++ driver consumer use only
 #endif
 
+#define LIBMONGOCLIENT_CONSUMER
+
 #include "mongo/client/redef_macros.h"
 
 #include "mongo/pch.h"

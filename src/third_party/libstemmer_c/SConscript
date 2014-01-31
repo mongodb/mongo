@@ -43,4 +43,4 @@ stemmer_files = [
     ['src_c/stem_%s.c' % p for p in stemming_packages],
     ]
 
-env.StaticLibrary( "stemmer", stemmer_files )
+env.Library( "stemmer", stemmer_files )

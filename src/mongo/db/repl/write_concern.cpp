@@ -173,7 +173,10 @@ namespace mongo {
                 return false;
             }
 
-            string wStr = w.String();
+            return opReplicatedEnough( op, w.String() );
+        }
+
+        bool opReplicatedEnough( OpTime op , const string& wStr ) {
             if (wStr == "majority") {
                 // use the entire set, including arbiters, to prevent writing
                 // to a majority of the set but not a majority of voters
@@ -181,14 +184,16 @@ namespace mongo {
             }
 
             map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(wStr);
-            uassert(14830, str::stream() << "unrecognized getLastError mode: " << wStr,
+            uassert(ErrorCodes::UnknownReplWriteConcern,
+                    str::stream() << "unrecognized getLastError mode: " << wStr,
                     it != theReplSet->config().rules.end());
 
             return op <= (*it).second->last;
         }
 
         bool replicatedToNum(OpTime& op, int w) {
-            massert( 16805, "replicatedToNum called but not master anymore", _isMaster() );
+            massert( ErrorCodes::NotMaster,
+                     "replicatedToNum called but not master anymore", _isMaster() );
 
             if ( w <= 1 )
                 return true;
@@ -199,7 +204,7 @@ namespace mongo {
         }
 
         bool waitForReplication(OpTime& op, int w, int maxSecondsToWait) {
-            static const int noLongerMasterAssertCode = 16806;
+            static const int noLongerMasterAssertCode = ErrorCodes::NotMaster;
             massert(noLongerMasterAssertCode, 
                     "waitForReplication called but not master anymore", _isMaster() );
 
@@ -237,7 +242,7 @@ namespace mongo {
             return numSlaves <= 0;
         }
 
-        std::vector<BSONObj> getHostsAtOp(OpTime& op) {
+        std::vector<BSONObj> getHostsAtOp(const OpTime& op) {
             std::vector<BSONObj> result;
             if (theReplSet) {
                 result.push_back(theReplSet->myConfig().asBson());
@@ -337,11 +342,15 @@ namespace mongo {
         return slaveTracking.replicatedToNum( op , w );
     }
 
+    bool opReplicatedEnough( OpTime op , const string& w ) {
+        return slaveTracking.opReplicatedEnough( op , w );
+    }
+
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait ) {
         return slaveTracking.waitForReplication( op, w, maxSecondsToWait );
     }
 
-    vector<BSONObj> getHostsWrittenTo(OpTime& op) {
+    vector<BSONObj> getHostsWrittenTo( const OpTime& op ) {
         return slaveTracking.getHostsAtOp(op);
     }
 

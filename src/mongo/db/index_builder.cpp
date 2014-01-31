@@ -29,6 +29,8 @@
 #include "mongo/db/index_builder.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/str.h"
@@ -37,8 +39,8 @@ namespace mongo {
 
     AtomicUInt IndexBuilder::_indexBuildCount = 0;
 
-    IndexBuilder::IndexBuilder(const std::string ns, const BSONObj index) :
-        BackgroundJob(true /* self-delete */), _ns(ns), _index(index.getOwned()),
+    IndexBuilder::IndexBuilder(const BSONObj& index) :
+        BackgroundJob(true /* self-delete */), _index(index.getOwned()),
         _name(str::stream() << "repl index builder " << (_indexBuildCount++).get()) {
     }
 
@@ -49,19 +51,37 @@ namespace mongo {
     }
 
     void IndexBuilder::run() {
-        LOG(2) << "building index " << _index << " on " << _ns << endl;
+        LOG(2) << "IndexBuilder building index " << _index;
+
         Client::initThread(name().c_str());
         replLocalAuth();
 
-        Client::WriteContext ctx(_ns);
-        build();
+        cc().curop()->reset(HostAndPort(), dbInsert);
+        NamespaceString ns(_index["ns"].String());
+        Client::WriteContext ctx(ns.getSystemIndexesCollection());
+
+        Status status = build( ctx.ctx() );
+        if ( !status.isOK() ) {
+            log() << "IndexBuilder could not build index: " << status.toString();
+        }
 
         cc().shutdown();
     }
 
-    void IndexBuilder::build() const {
-        theDataFileMgr.insert(_ns.c_str(), _index.objdata(), _index.objsize(),
-                              true /* mayInterrupt */);
+    Status IndexBuilder::build( Client::Context& context ) const {
+        string ns = _index["ns"].String();
+        Database* db = context.db();
+        Collection* c = db->getCollection( ns );
+        if ( !c ) {
+            c = db->getOrCreateCollection( ns );
+            verify(c);
+        }
+        Status status = c->getIndexCatalog()->createIndex( _index, 
+                                                           true, 
+                                                           IndexCatalog::SHUTDOWN_LEAVE_DIRTY );
+        if ( status.code() == ErrorCodes::IndexAlreadyExists )
+            return Status::OK();
+        return status;
     }
 
     std::vector<BSONObj> IndexBuilder::killMatchingIndexBuilds(const BSONObj& criteria) {
@@ -72,6 +92,7 @@ namespace mongo {
             BSONObj index = op->query();
             killCurrentOp.kill(op->opNum());
             indexes.push_back(index);
+            log() << "halting index build: " << index;
         }
         if (indexes.size() > 0) {
             log() << "halted " << indexes.size() << " index build(s)" << endl;
@@ -79,10 +100,10 @@ namespace mongo {
         return indexes;
     }
 
-    void IndexBuilder::restoreIndexes(const std::string& ns, const std::vector<BSONObj>& indexes) {
+    void IndexBuilder::restoreIndexes(const std::vector<BSONObj>& indexes) {
         log() << "restarting " << indexes.size() << " index build(s)" << endl;
         for (int i = 0; i < static_cast<int>(indexes.size()); i++) {
-            IndexBuilder* indexBuilder = new IndexBuilder(ns, indexes[i]);
+            IndexBuilder* indexBuilder = new IndexBuilder(indexes[i]);
             // This looks like a memory leak, but indexBuilder deletes itself when it finishes
             indexBuilder->go();
         }

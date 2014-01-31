@@ -12,6 +12,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -174,65 +186,6 @@ namespace mongo {
         INVOKE( getCollName );
     }
 
-    void BatchedCommandRequest::setWriteOps( const std::vector<BSONObj>& writeOps ) {
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            _insertReq->setDocuments( writeOps );
-            return;
-        case BatchedCommandRequest::BatchType_Update:
-            _updateReq->unsetUpdates();
-            for ( std::vector<BSONObj>::const_iterator it = writeOps.begin(); it != writeOps.end();
-                    ++it ) {
-                auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument );
-                string errMsg;
-                bool parsed = updateDoc->parseBSON( *it, &errMsg ) && updateDoc->isValid( &errMsg );
-                (void) parsed; // Suppress warning in non-debug
-                dassert( parsed );
-                _updateReq->addToUpdates( updateDoc.release() );
-            }
-            return;
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            _deleteReq->unsetDeletes();
-            for ( std::vector<BSONObj>::const_iterator it = writeOps.begin(); it != writeOps.end();
-                    ++it ) {
-                auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
-                string errMsg;
-                bool parsed = deleteDoc->parseBSON( *it, &errMsg ) && deleteDoc->isValid( &errMsg );
-                (void) parsed; // Suppress warning in non-debug
-                dassert( parsed );
-                _deleteReq->addToDeletes( deleteDoc.release() );
-            }
-            return;
-        }
-    }
-
-    void BatchedCommandRequest::unsetWriteOps() {
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            _insertReq->unsetDocuments();
-            return;
-        case BatchedCommandRequest::BatchType_Update:
-            _updateReq->unsetUpdates();
-            return;
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            _deleteReq->unsetDeletes();
-        }
-    }
-
-    bool BatchedCommandRequest::isWriteOpsSet() const {
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            return _insertReq->isDocumentsSet();
-        case BatchedCommandRequest::BatchType_Update:
-            return _updateReq->isUpdatesSet();
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            return _deleteReq->isDeletesSet();
-        }
-    }
-
     std::size_t BatchedCommandRequest::sizeWriteOps() const {
         switch ( getBatchType() ) {
         case BatchedCommandRequest::BatchType_Insert:
@@ -241,27 +194,6 @@ namespace mongo {
             return _updateReq->sizeUpdates();
         default:
             return _deleteReq->sizeDeletes();
-        }
-    }
-
-    std::vector<BSONObj> BatchedCommandRequest::getWriteOps() const {
-        vector<BSONObj> writeOps;
-        switch ( getBatchType() ) {
-        case BatchedCommandRequest::BatchType_Insert:
-            return _insertReq->getDocuments();
-        case BatchedCommandRequest::BatchType_Update:
-            for ( std::vector<BatchedUpdateDocument*>::const_iterator it = _updateReq->getUpdates()
-                    .begin(); it != _updateReq->getUpdates().end(); ++it ) {
-                writeOps.push_back( ( *it )->toBSON() );
-            }
-            return writeOps;
-        default:
-            dassert( getBatchType() == BatchedCommandRequest::BatchType_Delete );
-            for ( std::vector<BatchedDeleteDocument*>::const_iterator it = _deleteReq->getDeletes()
-                    .begin(); it != _deleteReq->getDeletes().end(); ++it ) {
-                writeOps.push_back( ( *it )->toBSON() );
-            }
-            return writeOps;
         }
     }
 
@@ -297,52 +229,20 @@ namespace mongo {
         INVOKE( getOrdered );
     }
 
-    void BatchedCommandRequest::setShardName( const StringData& shardName ) {
-        INVOKE( setShardName, shardName );
+    void BatchedCommandRequest::setMetadata(BatchedRequestMetadata* metadata) {
+        INVOKE( setMetadata, metadata );
     }
 
-    void BatchedCommandRequest::unsetShardName() {
-        INVOKE( unsetShardName );
+    void BatchedCommandRequest::unsetMetadata() {
+        INVOKE( unsetMetadata );
     }
 
-    bool BatchedCommandRequest::isShardNameSet() const {
-        INVOKE( isShardNameSet );
+    bool BatchedCommandRequest::isMetadataSet() const {
+        INVOKE( isMetadataSet );
     }
 
-    const string& BatchedCommandRequest::getShardName() const {
-        INVOKE( getShardName );
-    }
-
-    void BatchedCommandRequest::setShardVersion( const ChunkVersion& shardVersion ) {
-        INVOKE( setShardVersion, shardVersion );
-    }
-
-    void BatchedCommandRequest::unsetShardVersion() {
-        INVOKE( unsetShardVersion );
-    }
-
-    bool BatchedCommandRequest::isShardVersionSet() const {
-        INVOKE( isShardVersionSet );
-    }
-
-    const ChunkVersion& BatchedCommandRequest::getShardVersion() const {
-        INVOKE( getShardVersion );
-    }
-
-    void BatchedCommandRequest::setSession( long long sessionId ) {
-        INVOKE( setSession, sessionId );
-    }
-
-    void BatchedCommandRequest::unsetSession() {
-        INVOKE( unsetSession );
-    }
-
-    bool BatchedCommandRequest::isSessionSet() const {
-        INVOKE( isSessionSet );
-    }
-
-    long long BatchedCommandRequest::getSession() const {
-        INVOKE( getSession );
+    BatchedRequestMetadata* BatchedCommandRequest::getMetadata() const {
+        INVOKE( getMetadata );
     }
 
     bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {

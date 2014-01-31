@@ -15,6 +15,18 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -134,6 +146,64 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.append( "a", -1 );
                 ASSERT_EQUALS( "{ \"a\" : -1 }", b.done().jsonString( Strict ) );
+            }
+        };
+
+        class NumberLongStrict {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", 20000LL);
+                ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"20000\" } }",
+                              b.done().jsonString(Strict));
+            }
+        };
+
+        // Test a NumberLong that is too big to fit into a 32 bit integer
+        class NumberLongStrictLarge {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", 9223372036854775807LL);
+                ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"9223372036854775807\" } }",
+                              b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberLongStrictNegative {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", -20000LL);
+                ASSERT_EQUALS("{ \"a\" : { \"$numberLong\" : \"-20000\" } }",
+                              b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberDoubleNaN {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", std::numeric_limits<double>::quiet_NaN());
+                ASSERT_EQUALS("{ \"a\" : NaN }", b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberDoubleInfinity {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", std::numeric_limits<double>::infinity());
+                ASSERT_EQUALS("{ \"a\" : Infinity }", b.done().jsonString(Strict));
+            }
+        };
+
+        class NumberDoubleNegativeInfinity {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.append("a", -std::numeric_limits<double>::infinity());
+                ASSERT_EQUALS("{ \"a\" : -Infinity }", b.done().jsonString(Strict));
             }
         };
 
@@ -291,16 +361,68 @@ namespace JsonTests {
             }
         };
 
+#ifdef _WIN32
+            char tzEnvString[] = "TZ=EST+5EDT";
+#else
+            char tzEnvString[] = "TZ=America/New_York";
+#endif
+
         class Date {
         public:
+            Date() {
+                char *_oldTimezonePtr = getenv("TZ");
+                _oldTimezone = std::string(_oldTimezonePtr ? _oldTimezonePtr : "");
+                if (-1 == putenv(tzEnvString)) {
+                    FAIL(errnoWithDescription());
+                }
+                tzset();
+            }
+            ~Date() {
+                if (!_oldTimezone.empty()) {
+#ifdef _WIN32
+                    errno_t ret = _putenv_s("TZ", _oldTimezone.c_str());
+                    if (0 != ret) {
+                        StringBuilder sb;
+                        sb << "Error setting TZ environment variable to:  " << _oldTimezone
+                           << ".  Error code:  " << ret;
+                        FAIL(sb.str());
+                    }
+#else
+                    if (-1 == setenv("TZ", _oldTimezone.c_str(), 1)) {
+                        FAIL(errnoWithDescription());
+                    }
+#endif
+                }
+                else {
+#ifdef _WIN32
+                    errno_t ret = _putenv_s("TZ", "");
+                    if (0 != ret) {
+                        StringBuilder sb;
+                        sb << "Error unsetting TZ environment variable.  Error code:  " << ret;
+                        FAIL(sb.str());
+                    }
+#else
+                    if (-1 == unsetenv("TZ")) {
+                        FAIL(errnoWithDescription());
+                    }
+#endif
+                }
+                tzset();
+            }
+
             void run() {
                 BSONObjBuilder b;
                 b.appendDate( "a", 0 );
                 BSONObj built = b.done();
-                ASSERT_EQUALS( "{ \"a\" : { \"$date\" : 0 } }", built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : { \"$date\" : \"1969-12-31T19:00:00.000-0500\" } }",
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( JS ) );
             }
+
+        private:
+            std::string _oldTimezone;
+
         };
 
         class DateNegative {
@@ -309,7 +431,8 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.appendDate( "a", -1 );
                 BSONObj built = b.done();
-                ASSERT_EQUALS( "{ \"a\" : { \"$date\" : -1 } }", built.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : { \"$date\" : { \"$numberLong\" : \"-1\" } } }",
+                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : Date( -1 ) }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : Date( -1 ) }", built.jsonString( JS ) );
             }
@@ -358,9 +481,25 @@ namespace JsonTests {
         public:
             void run() {
                 BSONObjBuilder b;
-                b.appendCode( "x" , "function(){ return 1; }" );
+                b.appendCode( "x" , "function(arg){ var string = \"\\n\"; return 1; }" );
                 BSONObj o = b.obj();
-                ASSERT_EQUALS( "{ \"x\" : function(){ return 1; } }" , o.jsonString() );
+                ASSERT_EQUALS( "{ \"x\" : \"function(arg){ var string = \\\"\\\\n\\\"; "
+                                                          "return 1; }\" }" , o.jsonString() );
+            }
+        };
+
+        class CodeWScopeTests {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.appendCodeWScope( "x" , "function(arg){ var string = \"\\n\"; return x; }" ,
+                                           BSON("x" << 1 ) );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : "
+                                 "{ \"$code\" : "
+                                   "\"function(arg){ var string = \\\"\\\\n\\\"; return x; }\" , "
+                                   "\"$scope\" : { \"x\" : 1 } } }" ,
+                               o.jsonString() );
             }
         };
 
@@ -1371,11 +1510,11 @@ namespace JsonTests {
         class DateNonzero : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", 100 );
+                b.appendDate( "a", 1000000000 );
                 return b.obj();
             }
             virtual string json() const {
-                return "{ \"a\" : { \"$date\" : 100 } }";
+                return "{ \"a\" : { \"$date\" : 1000000000 } }";
             }
         };
 
@@ -2477,6 +2616,12 @@ namespace JsonTests {
             add< JsonStringTests::InvalidNumbers >();
             add< JsonStringTests::NumberPrecision >();
             add< JsonStringTests::NegativeNumber >();
+            add< JsonStringTests::NumberLongStrict >();
+            add< JsonStringTests::NumberLongStrictLarge >();
+            add< JsonStringTests::NumberLongStrictNegative >();
+            add< JsonStringTests::NumberDoubleNaN >();
+            add< JsonStringTests::NumberDoubleInfinity >();
+            add< JsonStringTests::NumberDoubleNegativeInfinity >();
             add< JsonStringTests::SingleBoolMember >();
             add< JsonStringTests::SingleNullMember >();
             add< JsonStringTests::SingleUndefinedMember >();
@@ -2495,6 +2640,7 @@ namespace JsonTests {
             add< JsonStringTests::RegexEscape >();
             add< JsonStringTests::RegexManyOptions >();
             add< JsonStringTests::CodeTests >();
+            add< JsonStringTests::CodeWScopeTests >();
             add< JsonStringTests::TimestampTests >();
             add< JsonStringTests::NullString >();
             add< JsonStringTests::AllTypes >();
@@ -2580,8 +2726,13 @@ namespace JsonTests {
             add< FromJsonTests::BinDataEmptyType >();
             add< FromJsonTests::BinDataNoType >();
             add< FromJsonTests::BinDataInvalidType >();
-            add< FromJsonTests::Date >();
-            add< FromJsonTests::DateNegZero >();
+            // DOCS-2539:  We cannot parse dates generated with a Unix timestamp of zero in local
+            // time, since the body of the date may be before the Unix Epoch.  This causes parsing
+            // to fail even if the offset would properly adjust the time.  For example,
+            // "1969-12-31T19:00:00-05:00" actually represents the Unix timestamp of zero, but we
+            // cannot parse it because the body of the date is before 1970.
+            //add< FromJsonTests::Date >();
+            //add< FromJsonTests::DateNegZero >();
             add< FromJsonTests::DateNonzero >();
             add< FromJsonTests::DateStrictTooLong >();
             add< FromJsonTests::DateTooLong >();

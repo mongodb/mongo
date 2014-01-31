@@ -446,7 +446,7 @@ namespace mongo {
             if (theReplSet) {
                 string s = theReplSet->hbmsg();
                 if( !s.empty() )
-                    bb.append("errmsg", s);
+                    bb.append("infoMessage", s);
             }
             bb.append("self", true);
             v.push_back(bb.obj());

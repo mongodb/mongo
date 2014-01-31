@@ -4,7 +4,7 @@
 var doTest = function() {
 
 var rsOpts = { oplogSize: 10, verbose : 2, useHostname : false };
-var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 1, config : 3,
+var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 2, config : 3,
                             rs : rsOpts, other : { nopreallocj : 1, verbose : 2, useHostname : false }});
 
 var mongos = st.s;
@@ -24,12 +24,11 @@ var rwUser = 'rwUser';
 var roUser = 'roUser';
 var password = 'password';
 
-adminDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles}, st.rs0.numNodes );
+adminDB.createUser({user: rwUser, pwd: password, roles: jsTest.adminUserRoles});
 
 assert( adminDB.auth( rwUser, password ) );
-adminDB.createUser( roUser, password, true );
-testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles}, st.rs0.numNodes );
-testDB.createUser({user: roUser, pwd: password, roles: jsTest.basicUserRoles}, st.rs0.numNodes );
+testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles});
+testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles});
 
 authenticatedConn = new Mongo( mongos.host );
 authenticatedConn.getDB( 'admin' ).auth( rwUser, password );
@@ -115,6 +114,8 @@ var checkReadOps = function( hasReadAuth ) {
         print( "Checking read operations, should work" );
         assert.eq( 1000, testDB.foo.find().itcount() );
         assert.eq( 1000, testDB.foo.count() );
+        // NOTE: This is an explicit check that GLE can be run with read prefs, not the result of
+        // above.
         assert.eq( null, testDB.runCommand({getlasterror : 1}).err );
         checkCommandSucceeded( testDB, {dbstats : 1} );
         checkCommandSucceeded( testDB, {collstats : 'foo'} );
@@ -196,17 +197,19 @@ var checkWriteOps = function( hasWriteAuth ) {
     }
 }
 
-var checkAdminReadOps = function( hasReadAuth ) {
-    if ( hasReadAuth ) {
-        checkCommandSucceeded( adminDB, {getShardVersion : 'test.foo'} );
+var checkAdminOps = function( hasAuth ) {
+    if ( hasAuth ) {
         checkCommandSucceeded( adminDB, {getCmdLineOpts : 1} );
         checkCommandSucceeded( adminDB, {serverStatus : 1} );
         checkCommandSucceeded( adminDB, {listShards : 1} );
         checkCommandSucceeded( adminDB, {whatsmyuri : 1} );
         checkCommandSucceeded( adminDB, {isdbgrid : 1} );
         checkCommandSucceeded( adminDB, {ismaster : 1} );
+        checkCommandSucceeded( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
+        chunk = configDB.chunks.findOne({ shard : st.rs0.name });
+        checkCommandSucceeded( adminDB, {moveChunk : 'test.foo', find : chunk.min,
+                                         to : st.rs1.name, _waitForDelete : true} );
     } else {
-        checkCommandFailed( adminDB, {getShardVersion : 'test.foo'} );
         checkCommandFailed( adminDB, {getCmdLineOpts : 1} );
         checkCommandFailed( adminDB, {serverStatus : 1} );
         checkCommandFailed( adminDB, {listShards : 1} );
@@ -214,28 +217,10 @@ var checkAdminReadOps = function( hasReadAuth ) {
         checkCommandSucceeded( adminDB, {whatsmyuri : 1} );
         checkCommandSucceeded( adminDB, {isdbgrid : 1} );
         checkCommandSucceeded( adminDB, {ismaster : 1} );
-    }
-}
-
-var checkAdminWriteOps = function( hasWriteAuth ) {
-    if ( hasWriteAuth ) {
-        checkCommandSucceeded( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
-        chunk = configDB.chunks.findOne({ shard : st.rs0.name });
-        checkCommandSucceeded( adminDB, {moveChunk : 'test.foo', find : chunk.min,
-                                         to : st.rs1.name, _waitForDelete : true} );
-        // $eval is now an admin operation
-        checkCommandSucceeded( testDB, { $eval : 'db.baz.insert({a:1});'} );
-        assert.eq(1, testDB.baz.findOne().a);
-        res = checkCommandSucceeded( testDB, { $eval : 'return db.baz.findOne();'} );
-        assert.eq(1, res.retval.a);
-    } else {
         checkCommandFailed( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunkKey = { i : { $minKey : 1 }, j : { $minKey : 1 } };
         checkCommandFailed( adminDB, {moveChunk : 'test.foo', find : chunkKey,
                                       to : st.rs1.name, _waitForDelete : true} );
-        checkCommandFailed( testDB, { $eval : 'return db.baz.insert({a:1});'} );
-        // Takes full admin privilege to run $eval, even if it's only doing a read operation
-        checkCommandFailed( testDB, { $eval : 'return db.baz.findOne();'} );
 
     }
 }
@@ -266,19 +251,12 @@ var checkAddShard = function( hasWriteAuth ) {
 
 st.stopBalancer();
 
-jsTestLog("Checking admin commands with read-write auth credentials");
-checkAdminWriteOps( true );
+jsTestLog("Checking admin commands with admin auth credentials");
+checkAdminOps( true );
 assert( adminDB.logout().ok );
 
 jsTestLog("Checking admin commands with no auth credentials");
-checkAdminReadOps( false );
-checkAdminWriteOps( false );
-
-jsTestLog("Checking admin commands with read-only auth credentials");
-assert( adminDB.auth( roUser, password ) );
-checkAdminReadOps( true );
-checkAdminWriteOps( false );
-assert( adminDB.logout().ok );
+checkAdminOps( false );
 
 jsTestLog("Checking commands with no auth credentials");
 checkReadOps( false );
@@ -300,8 +278,6 @@ checkWriteOps( true );
 jsTestLog("Check drainging/removing a shard");
 assert( testDB.logout().ok );
 checkRemoveShard( false );
-assert( adminDB.auth( roUser, password ) );
-checkRemoveShard( false );
 assert( adminDB.auth( rwUser, password ) );
 assert( testDB.dropDatabase().ok );
 checkRemoveShard( true );
@@ -309,8 +285,6 @@ adminDB.printShardingStatus();
 
 jsTestLog("Check adding a shard")
 assert( adminDB.logout().ok );
-checkAddShard( false );
-assert( adminDB.auth( roUser, password ) );
 checkAddShard( false );
 assert( adminDB.auth( rwUser, password ) );
 checkAddShard( true );
@@ -320,6 +294,4 @@ adminDB.printShardingStatus();
 st.stop();
 }
 
-if (0) { // SERVER-10668
-    doTest();
-}
+doTest();
