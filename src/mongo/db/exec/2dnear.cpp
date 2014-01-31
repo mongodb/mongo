@@ -76,7 +76,7 @@ namespace mongo {
             // This is where all the work is done.  :(
             search->exec();
             _specificStats.objectsLoaded = search->_objectsLoaded;
-            _specificStats.nscanned = search->_nscanned;
+            _specificStats.nscanned = search->_lookedAt;
 
             for (twod_exec::GeoHopper::Holder::iterator it = search->_points.begin();
                  it != search->_points.end(); it++) {

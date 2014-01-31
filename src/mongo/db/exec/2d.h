@@ -63,6 +63,7 @@ namespace mongo {
         IndexDescriptor* _descriptor;
         TwoDAccessMethod* _am;
         CommonStats _commonStats;
+        TwoDStats _specificStats;
     };
 }
 

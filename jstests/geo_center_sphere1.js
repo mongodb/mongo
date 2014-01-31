@@ -82,13 +82,12 @@ function test(index) {
 
         assert.eq( numExpected , t.find( q ).itcount() , "itcount : " + tojson( searches[i] ) );
         assert.eq( numExpected , t.find( q ).count() , "count : " + tojson( searches[i] ) );
-        // QUERY_MIGRATION: explain for 2d
-        /*
         if (index == "2d") {
-            assert.gt( numExpected * 2 , t.find(q).explain().nscanned ,
-                     "nscanned : " + tojson( searches[i] ) )
+            var explain = t.find( q ).explain();
+            print( 'explain for ' + tojson( q , '' , true ) + ' = ' + tojson( explain ) );
+            assert.gt( numExpected * 2 , explain.nscanned ,
+                       "nscanned : " + tojson( searches[i] ) )
         }
-        */
     }
 }
 

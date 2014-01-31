@@ -75,6 +75,7 @@ namespace mongo {
                 verify(NULL != _params.gq.getGeometry()._box.get());
                 _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am));
             }
+            _specificStats.type = _browse->_type;
             return PlanStage::NEED_TIME;
         }
 
@@ -94,6 +95,8 @@ namespace mongo {
         _browse->advance();
 
         *out = id;
+        _commonStats.advanced++;
+        _commonStats.works++;
         return PlanStage::ADVANCED;
     }
 
@@ -129,7 +132,9 @@ namespace mongo {
 
     PlanStageStats* TwoD::getStats() {
         _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_GEO_2D);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_GEO_2D));
+        ret->specific.reset(new TwoDStats(_specificStats));
+        return ret.release();
     }
 }
 

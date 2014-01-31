@@ -37,6 +37,7 @@ for ( i=0; i<searches.length; i++ ){
     
     assert.eq( correct[i].length , t.find( q ).itcount() , "itcount : " + tojson( searches[i] ) );
     assert.eq( correct[i].length , t.find( q ).count() , "count : " + tojson( searches[i] ) );
-    // QUERY_MIGRATION
-    //assert.gt( correct[i].length * 2 , t.find(q).explain().nscanned , "nscanned : " + tojson( searches[i] ) )
+    var explain = t.find( q ).explain();
+    print( 'explain for ' + tojson( q , '' , true ) + ' = ' + tojson( explain ) );
+    assert.gt( correct[i].length * 2 , explain.nscanned , "nscanned : " + tojson( searches[i] ) );
 }

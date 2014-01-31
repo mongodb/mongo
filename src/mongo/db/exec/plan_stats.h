@@ -342,6 +342,17 @@ namespace mongo {
         size_t chunkSkips;
     };
 
+    struct TwoDStats : public SpecificStats {
+        TwoDStats() { }
+
+        virtual SpecificStats* clone() const {
+            TwoDStats* specific = new TwoDStats(*this);
+            return specific;
+        }
+
+        std::string type;
+    };
+
     struct TwoDNearStats : public SpecificStats {
         TwoDNearStats() : objectsLoaded(0), nscanned(0) { }
 

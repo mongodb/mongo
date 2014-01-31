@@ -223,12 +223,27 @@ namespace mongo {
             res->setIndexOnly(false);
             res->setIsMultiKey(false);
         }
+        else if (leaf->stageType == STAGE_GEO_2D) {
+            // Cursor name depends on type of GeoBrowse.
+            // TODO: We could omit the shape from the cursor name.
+            TwoDStats* nStats = static_cast<TwoDStats*>(leaf->specific.get());
+            res->setCursor("GeoBrowse-" + nStats->type);
+            res->setNScanned(leaf->common.works);
+            res->setNScannedObjects(leaf->common.works);
+            // XXX: adding empty index bounds for backwards compatibility.
+            res->setIndexBounds(BSONObj());
+            // TODO: Could be multikey.
+            res->setIsMultiKey(false);
+            res->setIndexOnly(false);
+        }
         else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
             // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
             res->setCursor("S2NearCursor");
             // The first work() is an init.  Every subsequent work examines a document.
             res->setNScanned(leaf->common.works);
             res->setNScannedObjects(leaf->common.works);
+            // XXX: adding empty index bounds for backwards compatibility.
+            res->setIndexBounds(BSONObj());
             // TODO: Could be multikey.
             res->setIsMultiKey(false);
             res->setIndexOnly(false);
@@ -239,6 +254,8 @@ namespace mongo {
             // The first work() is an init.  Every subsequent work examines a document.
             res->setNScanned(nStats->nscanned);
             res->setNScannedObjects(nStats->objectsLoaded);
+            // XXX: adding empty index bounds for backwards compatibility.
+            res->setIndexBounds(BSONObj());
             // TODO: Could be multikey.
             res->setIsMultiKey(false);
             res->setIndexOnly(false);
