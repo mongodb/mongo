@@ -260,6 +260,26 @@ namespace mongo {
                 BSON( "$ref" << "colly" << "$id" << oidy << "$db" << "db" ) ) ) ) );
     }
 
+    TEST( MatchExpressionParserLeafTest, INDBRefWithOptionalField1 ) {
+        OID oid = OID::gen();
+        BSONObj query =
+            BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        OID oidx = OID::gen();
+        ASSERT( !result.getValue()->matchesBSON(
+            BSON( "x" << BSON( "$ref" << "coll" << "$id" << oidx << "$db" << "db" ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON(
+            BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "collx" << "$id" << oidx << "foo" << 12345 ) <<
+                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) ) );
+    }
+
     TEST( MatchExpressionParserLeafTest, INInvalidDBRefs ) {
         // missing $id
         BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
@@ -270,24 +290,6 @@ namespace mongo {
         // second field is not $id
         query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
                     BSON( "$ref" << "coll" <<
-                          "$foo" << 1 ) ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        // optional third field is not $db
-        OID oid = OID::gen();
-        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                    BSON( "$ref" << "coll" <<
-                          "$id" << oid <<
-                          "$foo" << 1 ) ) ) );
-        result = MatchExpressionParser::parse( query );
-        ASSERT_FALSE( result.isOK() );
-
-        // fourth field should result in invalid DBRef
-        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
-                    BSON( "$ref" << "coll" <<
-                          "$id" << oid <<
-                          "$db" << "db" <<
                           "$foo" << 1 ) ) ) );
         result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );

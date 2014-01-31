@@ -319,6 +319,17 @@ namespace mongo {
                 }
                 else if ( mongoutils::str::equals( "comment", rest ) ) {
                 }
+                else if ( mongoutils::str::equals( "ref", rest ) ||
+                          mongoutils::str::equals( "id", rest ) ||
+                          mongoutils::str::equals( "db", rest ) ) {
+                    // DBRef fields.
+                    std::auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+                    Status s = eq->init( e.fieldName(), e );
+                    if ( !s.isOK() )
+                        return StatusWithMatchExpression( s );
+
+                    root->add( eq.release() );
+                }
                 else {
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  mongoutils::str::stream()
@@ -431,7 +442,6 @@ namespace mongo {
     /**
      * DBRef fields are ordered
      * Required fields: $ref and $id (in that order)
-     * Optional field: $db
      * Field names are checked but not field types.
      */
     bool MatchExpressionParser::_isDBRefDocument( const BSONObj& obj ) {
@@ -459,25 +469,8 @@ namespace mongo {
             return false;
         }
 
-        // $db
-        if ( !i.more() ) {
-            // $db is optional
-            return true;
-        }
-        element = i.next();
-        fieldName = element.fieldName();
-        if ( !mongoutils::str::equals( "$db", fieldName ) ) {
-            return false;
-        }
-
-        // Additional fields encountered beyond $db
-        // should invalidate the DBRef
-        if ( !i.more() ) {
-            return true;
-        }
-
-        // Document has more than 3 fields - invalid DBRef
-        return false;
+        // OK to have additional fields after $ref and $id.
+        return true;
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseMOD( const char* name,
@@ -624,26 +617,8 @@ namespace mongo {
         }
 
         // DBRef value case
-        // A DBRef document under a $elemMatch should be treated as a value case
-        // with an implied $eq.
-
-        if ( _isDBRefDocument( obj ) ) {
-
-            std::auto_ptr<EqualityMatchExpression> eq( new EqualityMatchExpression() );
-            Status s = eq->init( "", e );
-            if ( !s.isOK() ) {
-                return StatusWithMatchExpression( s );
-            }
-
-            std::auto_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
-            s = temp->init( name );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-
-            temp->add( eq.release() );
-
-            return StatusWithMatchExpression( temp.release() );
-        }
+        // A DBRef document under a $elemMatch should be treated as an object case
+        // because it may contain non-DBRef fields in addition to $ref, $id and $db.
 
         // object case
 

@@ -104,6 +104,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 6 ) ) ) );
     }
 
+    // with explicit $eq
     TEST( MatchExpressionParserArrayTest, ElemMatchDBRef1 ) {
         OID oid = OID::gen();
         BSONObj match = BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" );
@@ -119,7 +120,6 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
     }
 
-    // with explicit $eq
     TEST( MatchExpressionParserArrayTest, ElemMatchDBRef2 ) {
         OID oid = OID::gen();
         BSONObj match = BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" );
@@ -133,6 +133,26 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+    }
+
+    // Additional fields after $ref and $id.
+    TEST( MatchExpressionParserArrayTest, ElemMatchDBRef3 ) {
+        OID oid = OID::gen();
+        BSONObj match = BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 );
+        OID oidx = OID::gen();
+        BSONObj notMatch = BSON( "$ref" << "coll" << "$id" << oidx << "foo" << 12345 );
+
+        BSONObj query = BSON( "x" << BSON( "$elemMatch" << match ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+
+        // Document contains fields not referred to in $elemMatch query.
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(
+                BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 << "bar" << 678 ) ) ) ) );
     }
 
     TEST( MatchExpressionParserArrayTest, All1 ) {
