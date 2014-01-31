@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/platform/random.h"
@@ -185,8 +186,12 @@ namespace mongo {
             }
         }
 
-        Client::ReadContext ctx( ns );
-        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        Lock::DBRead lock( ns );
+        Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
+        if ( !db )
+            return false;
+        Client::Context context( ns, db );
+        Collection* collection = db->getCollection( ns );
         ClientCursor* cursor = NULL;
         if ( collection ) {
             cursor = collection->cursorCache()->find( id );
@@ -229,8 +234,12 @@ namespace mongo {
 
         for ( unsigned i = 0; i < todo.size(); i++ ) {
             const string& ns = todo[i];
-            Client::ReadContext context( ns );
-            Collection* collection = context.ctx().db()->getCollection( ns );
+            Lock::DBRead lock( ns );
+            Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
+            if ( !db )
+                continue;
+            Client::Context context( ns, db );
+            Collection* collection = db->getCollection( ns );
             if ( collection == NULL ) {
                 continue;
             }

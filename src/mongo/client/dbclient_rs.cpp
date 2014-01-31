@@ -183,6 +183,18 @@ namespace {
         _runCommandHook = func;
     }
 
+    void DBClientReplicaSet::setPostRunCommandHook
+    (DBClientWithCommands::PostRunCommandHookFunc func) {
+        // Set the hooks in both our sub-connections and in ourselves.
+        if (_master) {
+            _master->setPostRunCommandHook(func);
+        }
+        if (_lastSlaveOkConn) {
+           _lastSlaveOkConn->setPostRunCommandHook(func);
+        }
+        _postRunCommandHook = func;
+    }
+
     // A replica set connection is never disconnected, since it controls its own reconnection
     // logic.
     //
@@ -297,6 +309,7 @@ namespace {
         _master.reset(newConn);
         _master->setReplSetClientCallback(this);
         _master->setRunCommandHook(_runCommandHook);
+        _master->setPostRunCommandHook(_postRunCommandHook);
 
         _auth( _master.get() );
         return _master.get();
@@ -679,6 +692,7 @@ namespace {
         _lastSlaveOkConn.reset(newConn);
         _lastSlaveOkConn->setReplSetClientCallback(this);
         _lastSlaveOkConn->setRunCommandHook(_runCommandHook);
+        _lastSlaveOkConn->setPostRunCommandHook(_postRunCommandHook);
 
         _auth(_lastSlaveOkConn.get());
 

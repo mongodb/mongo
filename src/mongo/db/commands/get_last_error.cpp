@@ -219,7 +219,7 @@ namespace mongo {
                     // Ignore electionIds of 0 from mongos.
                     if (electionId != OID()) {
                         errmsg = "wElectionId passed but no replication active";
-                        result.append("code", ErrorCodes::NoReplicationEnabled);
+                        result.append("code", ErrorCodes::BadValue);
                         return false;
                     }
                 } 
@@ -228,7 +228,7 @@ namespace mongo {
                         LOG(3) << "oid passed in is " << electionId
                                << ", but our id is " << theReplSet->getElectionId();
                         errmsg = "election occurred after write";
-                        result.append("code", ErrorCodes::OperationIncomplete);
+                        result.append("code", ErrorCodes::WriteConcernFailed);
                         return false;
                     }
                 }

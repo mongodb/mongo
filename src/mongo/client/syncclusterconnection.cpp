@@ -162,6 +162,7 @@ namespace mongo {
         log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
         c->setRunCommandHook(_runCommandHook);
+        c->setPostRunCommandHook(_postRunCommandHook);
         c->setSoTimeout( _socketTimeout );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
@@ -533,5 +534,16 @@ namespace mongo {
             }
         }
         _runCommandHook = func;
+    }
+
+    void SyncClusterConnection::setPostRunCommandHook
+    (DBClientWithCommands::PostRunCommandHookFunc func) {
+        // Set the hooks in both our sub-connections and in ourselves.
+        for (size_t i = 0; i < _conns.size(); ++i) {
+            if (_conns[i]) { 
+                _conns[i]->setPostRunCommandHook(func);
+            }
+        }
+        _postRunCommandHook = func;
     }
 }

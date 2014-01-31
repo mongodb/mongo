@@ -114,6 +114,7 @@ namespace mongo {
         virtual bool lazySupported() const { return false; }
 
         virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
+        virtual void setPostRunCommandHook(DBClientWithCommands::PostRunCommandHookFunc func);
 
     protected:
         virtual void _auth(const BSONObj& params);

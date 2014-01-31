@@ -59,10 +59,16 @@ namespace mongo {
 
     /** Selectively release the mutex based on a parameter. */
     class dbtempreleaseif {
+        MONGO_DISALLOW_COPYING(dbtempreleaseif);
     public:
         dbtempreleaseif( bool release ) : _impl( release ? new dbtemprelease() : 0 ) {}
+        ~dbtempreleaseif() throw(DBException) {
+            if (_impl)
+                delete _impl;
+        }
     private:
-        shared_ptr< dbtemprelease > _impl;
+        // can't use a smart pointer because we need throw annotation on destructor
+        dbtemprelease* _impl;
     };
 
     void mayInterrupt( bool mayBeInterrupted ) {

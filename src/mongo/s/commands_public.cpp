@@ -102,31 +102,6 @@ namespace mongo {
                 return commonErrCode;
             }
 
-            // Look for $gleStats in a command response, and fill in ClientInfo with the data,
-            // if found.
-            // This data will be used by subsequent GLE calls, to ensure we look for the correct
-            // write on the correct PRIMARY.
-            void saveGLEStats(const BSONObj& result, const std::string& conn) {
-                if (!ClientInfo::exists()) {
-                    return;
-                }
-                if (result[kGLEStatsFieldName].type() != Object) {
-                    return;
-                }
-                std::string errmsg;
-                ConnectionString shardConn = ConnectionString::parse(conn, errmsg);
-
-                BSONElement subobj = result[kGLEStatsFieldName];
-                OpTime lastOpTime = subobj[kGLEStatsLastOpTimeFieldName]._opTime();
-                OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
-                ClientInfo* clientInfo = ClientInfo::get( NULL );
-                fassert(17382, clientInfo);
-                LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 
-                       << " electionId:" << electionId;
-
-                clientInfo->addHostOpTime(shardConn, HostOpTime(lastOpTime, electionId));
-            }
-
         } // namespace
 
         class PublicGridCommand : public Command {
@@ -172,9 +147,6 @@ namespace mongo {
                     conn.done();
                     throw RecvStaleConfigException( "command failed because of stale config", res );
                 }
-
-                // Save the last opTime written and electionId, to allow GLE to work
-                saveGLEStats(res, conn.getHost());
 
                 result.appendElements( res );
                 conn.done();
@@ -244,9 +216,6 @@ namespace mongo {
                         else if ( commonErrCode != errCode ) {
                             commonErrCode = 0;
                         }
-                        // Save the last opTime written and electionId on each shard for this 
-                        // client, to allow GLE to work
-                        saveGLEStats(result, res->getServer());
                     }
                     results.push_back( res->result() );
                     subobj.append( res->getServer() , res->result() );

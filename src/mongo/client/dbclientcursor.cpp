@@ -111,6 +111,14 @@ namespace mongo {
         }
 
         dataReceived( retry, _lazyHost );
+
+        if (DBClientWithCommands::PostRunCommandHookFunc hook = _client->getPostRunCommandHook()) {
+            if (NamespaceString(ns).isCommand()) {
+                BSONObj cmdResponse = peekFirst();
+                hook(cmdResponse, _lazyHost);
+            }
+        }
+
         return ! retry;
     }
 

@@ -53,6 +53,7 @@
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/dbclient_multi_command.h"
+#include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_chunk.h"
@@ -1562,13 +1563,31 @@ namespace mongo {
                 // For compatibility with 2.4 sharded GLE, we always enforce the write concern
                 // across all shards.
 
+                HostOpTimeMap hostOpTimes(ClientInfo::get()->getPrevHostOpTimes());
+                HostOpTimeMap resolvedHostOpTimes;
+                Status status(Status::OK());
+                for ( HostOpTimeMap::const_iterator it = hostOpTimes.begin(); 
+                      it != hostOpTimes.end();
+                      ++it ) {
+
+                    const ConnectionString& shardEndpoint = it->first;
+                    const HostOpTime hot = it->second;
+                    ConnectionString resolvedHost;
+                    status = DBClientShardResolver::findMaster(shardEndpoint.toString(), 
+                                                               &resolvedHost);
+                    if (!status.isOK()) break;
+                    resolvedHostOpTimes[resolvedHost] = hot;
+                }
+
                 DBClientMultiCommand dispatcher;
                 vector<LegacyWCResponse> wcResponses;
-                Status status = enforceLegacyWriteConcern( &dispatcher,
-                                                           dbName,
-                                                           cmdObj,
-                                                           ClientInfo::get()->getPrevHostOpTimes(),
-                                                           &wcResponses );
+                if (status.isOK()) {
+                    status = enforceLegacyWriteConcern( &dispatcher,
+                                                        dbName,
+                                                        cmdObj,
+                                                        resolvedHostOpTimes,
+                                                        &wcResponses );
+                }
 
                 // Don't forget about our last hosts, reset the client info
                 ClientInfo::get()->disableForCommand();

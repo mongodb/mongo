@@ -416,6 +416,10 @@ namespace mongo {
         _runCommandHook = func;
     }
 
+    void DBClientWithCommands::setPostRunCommandHook(PostRunCommandHookFunc func) {
+        _postRunCommandHook = func;
+    }
+
     bool DBClientWithCommands::runCommand(const string &dbname,
                                           const BSONObj& cmd,
                                           BSONObj &info,
@@ -430,6 +434,9 @@ namespace mongo {
         }
         else {
             info = findOne(ns, cmd, 0 , options);
+        }
+        if (_postRunCommandHook) {
+            _postRunCommandHook(info, getServerAddress());
         }
         return isOk(info);
     }

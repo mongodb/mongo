@@ -155,6 +155,7 @@ namespace mongo {
                                       int queryOptions );
 
         virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
+        virtual void setPostRunCommandHook(DBClientWithCommands::PostRunCommandHookFunc func);
 
     protected:
         /** Authorize.  Authorizes all nodes as needed

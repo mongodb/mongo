@@ -58,6 +58,13 @@ namespace mongo {
          * Returns !OK with message if the shard host could not be found for other reasons.
          */
         Status chooseWriteHost( const std::string& shardName, ConnectionString* shardHost ) const;
+        
+        /**
+         *  Resolves a replica set connection string to a master, if possible.
+         * Returns HostNotFound if the master is not reachable
+         * Returns ReplicaSetNotFound if the replica set is not being tracked
+         */
+        static Status findMaster( const std::string connString, ConnectionString* resolvedHost );
 
     };
 

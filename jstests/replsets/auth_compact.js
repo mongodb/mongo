@@ -23,7 +23,6 @@ var replTest = new ReplSetTest({name: 'compact', nodes: 3, keyFile: "jstests/lib
 replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
-var compactingSlave = replTest.liveNodes.slaves[0];
 
 // populate data
 for (i=0; i<1000; i++) {
@@ -38,8 +37,9 @@ for (i=0; i<1000; i++) {
 replTest.awaitReplication(1000*60*10);
 
 // run compact in parallel
-print("starting first compact");
-var cmd = "db.getSiblingDB('compact').runCommand({'compact': 'foo', 'paddingFactor': 2});";
+var compactingSlave = replTest.liveNodes.slaves[0];
+print("starting first compact on port: " + compactingSlave);
+var cmd = "printjson(db.getSiblingDB('compact').runCommand({'compact': 'foo', 'paddingFactor': 2}));";
 var compactor = startParallelShell(cmd, compactingSlave.port);
 
 // wait for compact to have lock and then see if heartbeats work
@@ -73,8 +73,8 @@ assert.soon(function() {
 
 // auth and run compact in parallel
 print("starting second compact");
-cmd = "db.getSiblingDB('admin').auth('admin','hunter2');"
-      + " db.getSiblingDB('compact').runCommand({'compact': 'foo', 'paddingFactor': 2});";
+cmd = "printjson(db.getSiblingDB('admin').auth('admin','hunter2'));"
+      + " printjson(db.getSiblingDB('compact').runCommand({'compact': 'foo', 'paddingFactor': 2}));";
 var compactor2 = startParallelShell(cmd, compactingSlave.port);
 
 // wait for compact to have lock and then check if auth works

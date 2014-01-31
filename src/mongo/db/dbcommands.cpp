@@ -784,14 +784,12 @@ namespace mongo {
 
                 // Save state, yield, run the MD5, and reacquire lock.
                 runner->saveState();
-                // auto_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
-                scoped_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
-
-                md5_append( &st , (const md5_byte_t*)(data) , len );
-                n++;
 
                 try {
-                    yield.reset();
+                    dbtempreleasecond yield;
+
+                    md5_append( &st , (const md5_byte_t*)(data) , len );
+                    n++;
                 }
                 catch (SendStaleConfigException&) {
                     log() << "metadata changed during filemd5" << endl;

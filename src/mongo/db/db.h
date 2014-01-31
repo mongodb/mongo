@@ -41,6 +41,12 @@ namespace mongo {
     // todo: relocked is being called when there was no unlock below. 
     //       that is weird.
 
+    /**
+     * Releases the current lock for the duration of its lifetime.
+     *
+     * WARNING: do not put in a smart pointer or any other class. If you absolutely must, you need
+     * to add the throw(DBException) annotation to it's destructor.
+     */
     struct dbtemprelease {
         Client::Context * _context;
         scoped_ptr<Lock::TempRelease> tr;
@@ -58,34 +64,7 @@ namespace mongo {
             verify( c.curop() );
             c.curop()->yielded();
         }
-        ~dbtemprelease() {
-            tr.reset();
-            if ( _context ) 
-                _context->relocked();
-        }
-    };
-
-    /** must be write locked
-        no verify(and no release) if nested write lock 
-        a lot like dbtempreleasecond, eliminate?
-    */
-    struct dbtempreleasewritelock {
-        Client::Context * _context;
-        int _locktype;
-        scoped_ptr<Lock::TempRelease> tr;
-        dbtempreleasewritelock() {
-            const Client& c = cc();
-            _context = c.getContext();
-            verify( Lock::isW() );
-            if( Lock::nested() )
-                return;
-            if ( _context ) 
-                _context->unlocked();
-            tr.reset(new Lock::TempRelease);
-            verify( c.curop() );
-            c.curop()->yielded();            
-        }
-        ~dbtempreleasewritelock() {
+        ~dbtemprelease() throw(DBException) {
             tr.reset();
             if ( _context ) 
                 _context->relocked();
@@ -93,7 +72,10 @@ namespace mongo {
     };
 
     /**
-       only does a temp release if we're not nested and have a lock
+     * only does a temp release if we're not nested and have a lock
+     *
+     * WARNING: do not put in a smart pointer or any other class. If you absolutely must, you need
+     * to add the throw(DBException) annotation to it's destructor.
      */
     class dbtempreleasecond : boost::noncopyable {
         dbtemprelease * real;
@@ -107,7 +89,7 @@ namespace mongo {
                 }
             }
         }
-        ~dbtempreleasecond() {
+        ~dbtempreleasecond() throw(DBException) {
             if ( real ) {
                 delete real;
                 real = 0;
