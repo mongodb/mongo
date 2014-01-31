@@ -56,9 +56,7 @@ createCollectionWithData = function (db, collectionName, dataGenerator) {
         nextDoc._id = numInserted;
         print("collection.insert(" + JSON.stringify(nextDoc) + ");");
         var insertResult = collection.insert(nextDoc);
-        // XXX: Is this the real way to check for errors?
-        assert(insertResult === undefined || insertResult._result.ok == 1,
-               JSON.stringify(insertResult));
+        assert(db.getLastError() == null);
         numInserted++;
     }
 
