@@ -99,7 +99,8 @@ assert.eq(buildinfo, latestStartUpLog.buildinfo, "buildinfo doesn't match that f
 var version = latestStartUpLog.buildinfo.version.split('-')[0];
 var versionArray = latestStartUpLog.buildinfo.versionArray;
 var versionArrayCleaned = [];
-for(var i in versionArray) if (versionArray[i] >= 0) { versionArrayCleaned.push(versionArray[i]); }
+// Only create a string with 2 dots (2.5.5, not 2.5.5.0)
+for (var i = 0; i < (versionArray.length - 1); i++) if (versionArray[i] >= 0) { versionArrayCleaned.push(versionArray[i]); }
 
 assert.eq(serverStatus.version, latestStartUpLog.buildinfo.version, "Mongo version doesn't match that from ServerStatus");
 assert.eq(version, versionArrayCleaned.join('.'), "version doesn't match that from the versionArray");
