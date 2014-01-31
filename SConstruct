@@ -765,8 +765,7 @@ elif windows:
     # /Gy function level linking (implicit when using /Z7)
     # /Z7 debug info goes into each individual .obj file -- no .pdb created 
     
-    # JSB: no debug info
-    # env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
+    env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
 
     # /DEBUG will tell the linker to create a .pdb file
     # which WinDbg and Visual Studio will use to resolve
@@ -775,8 +774,7 @@ elif windows:
     #
     # Please also note that this has nothing to do with _DEBUG or optimization.
     
-    # JSB: node debug info
-    # env.Append( LINKFLAGS=["/DEBUG"] )
+    env.Append( LINKFLAGS=["/DEBUG"] )
 
     # /MD:  use the multithreaded, DLL version of the run-time library (MSVCRT.lib/MSVCR###.DLL)
     # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
