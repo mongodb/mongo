@@ -1,8 +1,8 @@
 // test preservePadding
 
-var db = db.getSiblingDB('compactPreservePadding');
+var mydb = db.getSiblingDB('compactPreservePadding');
 var collName = "compactPreservePadding";
-var t = db.getCollection(collName);
+var t = mydb.getCollection(collName);
 t.drop();
 
 // use larger keyname to avoid hitting an edge case with extents 
@@ -17,7 +17,7 @@ originalSize = t.stats().size;
 originalStorage = t.stats().storageSize;
 
 // compact!
-db.runCommand({compact: collName, preservePadding: true});
+mydb.runCommand({compact: collName, preservePadding: true});
 printjson(t.stats());
 
 // object sizes ('size') should be the same (unless we hit an edge case involving extents, which
