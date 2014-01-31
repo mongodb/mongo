@@ -733,7 +733,7 @@ namespace mongo {
             if ( collection != 0 ) {\
                 collection->unsubcribeToChange( waitNotification );\
             }\
-            delete waitNotification\
+            delete waitNotification;\
         }
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
@@ -783,7 +783,7 @@ namespace mongo {
                         }
                     }
 
-                    msgdata = processGetMore(ns,
+                    msgdata = newGetMore(ns,
                                              ntoreturn,
                                              cursorid,
                                              curop,
@@ -798,7 +798,7 @@ namespace mongo {
                         // because it may now be out of sync with the client's iteration state.
                         // SERVER-7952
                         // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                        ClientCursor::erase( cursorid );
+                        CollectionCursorCache::eraseCursorGlobal( cursorid );
                     }
                     ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                     ok = false;
@@ -827,7 +827,7 @@ namespace mongo {
                         scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
                         collection = ctx->ctx().db()->getCollection(ns);
                         // TODO: Add unique assertion number here????
-                        uassert( 17383, "collection dropped between processGetMore calls", collection );
+                        uassert( 17383, "collection dropped between newGetMore calls", collection );
                         collection->subscribeToChange( waitNotification ); 
                         /* After creating the notification and subscripting we will do one more loop before waiting
                            because of concurrency, a new item *may* have been inserted in the collection while we were
