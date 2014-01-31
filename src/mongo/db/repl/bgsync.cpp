@@ -450,6 +450,8 @@ namespace replset {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _lastH = o["h"].numberLong();
                 _lastOpTimeFetched = o["ts"]._opTime();
+                LOG(3) << "replSet lastOpTimeFetched: "
+                       << _lastOpTimeFetched.toStringPretty() << rsLog;
             }
         }
     }
@@ -502,8 +504,6 @@ namespace replset {
             log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong() << rsLog;
             log() << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
         }
-        LOG(3) << "replSet remoteOldestOp: " << remoteTs.toStringLong() << rsLog;
-        LOG(3) << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
 
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
