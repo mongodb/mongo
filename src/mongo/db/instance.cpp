@@ -760,6 +760,7 @@ namespace mongo {
         try{
             while( 1 ) {
                 bool isCursorAuthorized = false;
+                NotifyAll::When lastWaitTime;
                 try {
                     const NamespaceString nsString( ns );
                     uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
@@ -828,6 +829,7 @@ namespace mongo {
                         collection = ctx->ctx().db()->getCollection(ns);
                         // TODO: Add unique assertion number here????
                         uassert( 17383, "collection dropped between newGetMore calls", collection );
+                        lastWaitTime = waitNotification->now();
                         collection->subscribeToChange( waitNotification ); 
                         /* After creating the notification and subscripting we will do one more loop before waiting
                            because of concurrency, a new item *may* have been inserted in the collection while we were
@@ -840,7 +842,8 @@ namespace mongo {
                            TODO: It will be nice in the future to tune
                            implementaiton or usage of NotifyAll to detect that case and avoid sacrifice of those 2
                            precious milliseconds waiting while there was data waiting */
-                        waitNotification->timedAwaitBeyondNow( 2 );
+                        waitNotification->timedWaitFor( lastWaitTime, 2 );
+                        lastWaitTime = waitNotification->now();
                     }
 
                     // note: the 1100 is because of the waitForDifferent above
