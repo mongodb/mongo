@@ -68,7 +68,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	HELIUM_PATH							\
 	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
-#define	BZIP_RAW_PATH	".libs/bzip_raw_compress.so"
 #define	LZO_PATH	".libs/lzo_compress.so"
 
 #undef	M
