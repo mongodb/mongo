@@ -2143,8 +2143,8 @@ struct __wt_compressor {
 	 * WiredTiger will accumulate more rows and repeat the call.
 	 *
 	 * If no rows could be compressed into the provided destination buffer,
-	 * \c compress_raw should set \c result_slotsp to zero and \c
-	 * result_lenp to a non-zero value.
+	 * \c compress_raw should set \c result_slotsp to 0 and \c result_lenp
+	 * to a non-zero value.
 	 *
 	 * If there are no more rows to accumulate or the callback indicates
 	 * that it cannot be retried, WiredTiger writes the remaining rows
