@@ -247,8 +247,6 @@ namespace mongo {
         // use it keep state.  This seems valid as const correctness of Collection
         // should be about the data.
         mutable CollectionCursorCache _cursorCache;
-        RWLock _changeSubscribersLock;
-        list<NotifyAll*>* _changeSubscribers;
 
         friend class Database;
         friend class FlatIterator;
