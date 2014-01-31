@@ -240,13 +240,13 @@ namespace mongo {
         scoped_ptr<RecordStore> _recordStore;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
+        RWLock _changeSubscribersLock;
+        list<NotifyAll*>* _changeSubscribers;
 
         // this is mutable because read only users of the Collection class
         // use it keep state.  This seems valid as const correctness of Collection
         // should be about the data.
         mutable CollectionCursorCache _cursorCache;
-        RWLock _changeSubscribersLock;
-        list<NotifyAll*>* _changeSubscribers;
 
         friend class Database;
         friend class FlatIterator;

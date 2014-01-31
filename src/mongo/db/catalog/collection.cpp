@@ -75,8 +75,8 @@ namespace mongo {
         : _ns( fullNS ),
           _infoCache( this ),
           _indexCatalog( this, details ),
-          _cursorCache( fullNS ),
-          _changeSubscribersLock( "collection_subscribers_lock" ){
+          _changeSubscribersLock( "collection_subscribers_lock" ),
+          _cursorCache( fullNS ) {
         _details = details;
         _database = database;
 
@@ -261,7 +261,7 @@ namespace mongo {
         }
 
         /* Let's trigger event notifier only for capped collections */
-        if( _details->isCapped() ) {
+        if( isCapped() ) {
             triggerChangeSubscribersNotification();
         }
 
