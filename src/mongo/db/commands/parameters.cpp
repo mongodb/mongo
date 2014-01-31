@@ -234,7 +234,10 @@ namespace mongo {
 
         class SSLModeSetting : public ServerParameter {
         public:
-            SSLModeSetting() : ServerParameter(ServerParameterSet::getGlobal(), "sslMode") {}
+            SSLModeSetting() : ServerParameter(ServerParameterSet::getGlobal(), "sslMode",
+                                               false, // allowedToChangeAtStartup
+                                               true // allowedToChangeAtRuntime
+                                              ) {}
 
             std::string sslModeStr() {
                 switch (sslGlobalParams.sslMode.load()) {
@@ -298,7 +301,10 @@ namespace mongo {
         class ClusterAuthModeSetting : public ServerParameter {
         public:
             ClusterAuthModeSetting() : 
-                ServerParameter(ServerParameterSet::getGlobal(), "clusterAuthMode") {}
+                ServerParameter(ServerParameterSet::getGlobal(), "clusterAuthMode",
+                                false, // allowedToChangeAtStartup
+                                true // allowedToChangeAtRuntime
+                               ) {}
 
             std::string clusterAuthModeStr() {
                 switch (serverGlobalParams.clusterAuthMode.load()) {
