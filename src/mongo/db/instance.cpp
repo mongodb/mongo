@@ -728,6 +728,14 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
+    #define CLEANUP_COLLECTION_CHANGE_SUBSCRIPTION \
+        if( waitNotification != 0) {\
+            if ( collection != 0 ) {\
+                collection->unsubcribeToChange( waitNotification );\
+            }\
+            delete waitNotification\
+        }
+
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
 
@@ -747,84 +755,109 @@ namespace mongo {
         bool exhaust = false;
         QueryResult* msgdata = 0;
         OpTime last;
-        while( 1 ) {
-            bool isCursorAuthorized = false;
-            try {
-                const NamespaceString nsString( ns );
-                uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
+        NotifyAll* waitNotification = 0;        
+        Collection* collection = 0;
+        try{
+            while( 1 ) {
+                bool isCursorAuthorized = false;
+                try {
+                    const NamespaceString nsString( ns );
+                    uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
-                        nsString, cursorid);
-                audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
-                uassertStatusOK(status);
+                    Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
+                            nsString, cursorid);
+                    audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
+                    uassertStatusOK(status);
 
-                if (str::startsWith(ns, "local.oplog.")){
-                    while (MONGO_FAIL_POINT(rsStopGetMore)) {
-                        sleepmillis(0);
+                    if (str::startsWith(ns, "local.oplog.")){
+                        while (MONGO_FAIL_POINT(rsStopGetMore)) {
+                            sleepmillis(0);
+                        }
+
+                        if (pass == 0) {
+                            mutex::scoped_lock lk(OpTime::m);
+                            last = OpTime::getLast(lk);
+                        }
+                        else {
+                            last.waitForDifferent(1000/*ms*/);
+                        }
                     }
 
-                    if (pass == 0) {
-                        mutex::scoped_lock lk(OpTime::m);
-                        last = OpTime::getLast(lk);
+                    msgdata = processGetMore(ns,
+                                             ntoreturn,
+                                             cursorid,
+                                             curop,
+                                             pass,
+                                             exhaust,
+                                             &isCursorAuthorized);
+                }
+                catch ( AssertionException& e ) {
+                    if ( isCursorAuthorized ) {
+                        // If a cursor with id 'cursorid' was authorized, it may have been advanced
+                        // before an exception terminated processGetMore.  Erase the ClientCursor
+                        // because it may now be out of sync with the client's iteration state.
+                        // SERVER-7952
+                        // TODO Temporary code, see SERVER-4563 for a cleanup overview.
+                        ClientCursor::erase( cursorid );
+                    }
+                    ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
+                    ok = false;
+                    break;
+                }
+                
+                if (msgdata == 0) {
+                    // this should only happen with QueryOption_AwaitData
+                    exhaust = false;
+                    massert(13073, "shutting down", !inShutdown() );
+                    if ( ! timer ) {
+                        timer.reset( new Timer() );
                     }
                     else {
-                        last.waitForDifferent(1000/*ms*/);
+                        if ( timer->seconds() >= 4 ) {
+                            // after about 4 seconds, return. pass stops at 1000 normally.
+                            // we want to return occasionally so slave can checkpoint.
+                            pass = 10000;
+                        }
                     }
-                }
+                    pass++;
+                    if (debug)
+                        sleepmillis(20);
+                    else if( waitNotification == 0 ) {
+                        waitNotification = new NotifyAll();
+                        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
+                        collection = ctx->ctx().db()->getCollection(ns);
+                        // TODO: Add unique assertion number here????
+                        uassert( 17356, "collection dropped between getMore calls", collection );
+                        collection->subscribeToChange( waitNotification ); 
+                        /* After creating the notification and subscripting we will do one more loop before waiting
+                           because of concurrency, a new item *may* have been inserted in the collection while we were
+                           setting up our notification and subscribing to the event */                   
+                    } else {                    
+                        /* There's cases where an item is inserted *BEFORE* we execute the wait bellow
+                           with current implementation of NotifyAll we won't detect that the event is signaled
+                           therefore control will return with timeout of 2ms. 
+                           
+                           TODO: It will be nice in the future to tune
+                           implementaiton or usage of NotifyAll to detect that case and avoid sacrifice of those 2
+                           precious milliseconds waiting while there was data waiting */
+                        waitNotification->timedAwaitBeyondNow( 2 );
+                    }
 
-                msgdata = newGetMore(ns,
-                                     ntoreturn,
-                                     cursorid,
-                                     curop,
-                                     pass,
-                                     exhaust,
-                                     &isCursorAuthorized);
-            }
-            catch ( AssertionException& e ) {
-                if ( isCursorAuthorized ) {
-                    // If a cursor with id 'cursorid' was authorized, it may have been advanced
-                    // before an exception terminated processGetMore.  Erase the ClientCursor
-                    // because it may now be out of sync with the client's iteration state.
-                    // SERVER-7952
-                    // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                    CollectionCursorCache::eraseCursorGlobal( cursorid );
-                }
-                ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
-                ok = false;
+                    // note: the 1100 is because of the waitForDifferent above
+                    // should eventually clean this up a bit
+                    curop.setExpectedLatencyMs( 1100 + timer->millis() );
+                    
+                    continue;
+                }                       
                 break;
-            }
-            
-            if (msgdata == 0) {
-                // this should only happen with QueryOption_AwaitData
-                exhaust = false;
-                massert(13073, "shutting down", !inShutdown() );
-                if ( ! timer ) {
-                    timer.reset( new Timer() );
-                }
-                else {
-                    if ( timer->seconds() >= 4 ) {
-                        // after about 4 seconds, return. pass stops at 1000 normally.
-                        // we want to return occasionally so slave can checkpoint.
-                        pass = 10000;
-                    }
-                }
-                pass++;
-                if (debug)
-                    sleepmillis(20);
-                // Let's go really fast the first 400 passes (arbitrary number), yield to thread with no sleeping.
-                // If there was no new data in capped collection, let's slow down on burning the CPU
-                // by doing a sleep(1) for about >~2 second. Finally, let's move to 2ms wait in between
-                // loops after that until we reach the limit of 4 seconds in the code above
-                else sleepmillis( pass < 400 ? 0 : pass < 2000 ? 1 : 2 );                    
-                
-                // note: the 1100 is because of the waitForDifferent above
-                // should eventually clean this up a bit
-                curop.setExpectedLatencyMs( 1100 + timer->millis() );
-                
-                continue;
-            }
-            break;
-        };
+            };
+        } catch(...){
+            /* We don't want to leave a dangling change notification on the collection object. That's why we will catch
+               any exception do cleanup, and re-throw */
+            CLEANUP_COLLECTION_CHANGE_SUBSCRIPTION; 
+            throw;                   
+        }             
+        CLEANUP_COLLECTION_CHANGE_SUBSCRIPTION; 
 
         if (ex) {
             BSONObjBuilder err;
