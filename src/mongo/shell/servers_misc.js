@@ -310,9 +310,9 @@ function startParallelShell( jsCode, port ){
         if (!port && hostAndPort.length >= 2) {
             var port = hostAndPort[1];
         }
-        if (port) {
-            args.push("--port", port);
-        }
+    }
+    if (port) {
+        args.push("--port", port);
     }
 
     if( jsTestOptions().useSSL ) {
