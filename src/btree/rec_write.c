@@ -1616,7 +1616,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * We can't compress the first 64B of the block (it must be
 		 * written without compression), and a possible split point
 		 * may appear in that 64B; keep it simple, ignore the first
-		 * allocation size of data, anybody splitting a smaller than
+		 * allocation size of data, anybody splitting smaller than
 		 * that (as calculated before compression), is doing it wrong.
 		 */
 		len = WT_PTRDIFF(cell, dsk);
