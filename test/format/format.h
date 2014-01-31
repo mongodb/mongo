@@ -68,8 +68,8 @@ extern WT_EXTENSION_API *wt_api;
 #define	HELIUM_PATH							\
 	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
+#define	BZIP_RAW_PATH	".libs/bzip_raw_compress.so"
 #define	LZO_PATH	".libs/lzo_compress.so"
-#define	RAW_PATH	".libs/raw_compress.so"
 
 #undef	M
 #define	M(v)		((v) * 1000000)		/* Million */
@@ -197,8 +197,8 @@ typedef struct {
 
 #define	COMPRESS_NONE		1
 #define	COMPRESS_BZIP		2
-#define	COMPRESS_LZO		3
-#define	COMPRESS_RAW		4
+#define	COMPRESS_BZIP_RAW	3
+#define	COMPRESS_LZO		4
 #define	COMPRESS_SNAPPY		5
 #define	COMPRESS_ZLIB		6
 	u_int c_compression_flag;		/* Compression flag value */

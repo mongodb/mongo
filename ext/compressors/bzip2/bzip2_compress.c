@@ -42,7 +42,7 @@ bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 static int
 bzip2_terminate(WT_COMPRESSOR *, WT_SESSION *);
-#ifdef WIREDTIGER_TEST_COMPRESS_RAW
+#ifdef WIREDTIGER_TEST_COMPRESS_BZIP_RAW
 static int
 bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
     size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
@@ -110,10 +110,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	bzip_compressor->bz_small = 0;
 
 						/* Load the compressor */
-#ifdef WIREDTIGER_TEST_COMPRESS_RAW
+#ifdef WIREDTIGER_TEST_COMPRESS_BZIP_RAW
 	bzip_compressor->compressor.compress_raw = bzip2_compress_raw;
 	return (connection->add_compressor(
-	    connection, "raw", (WT_COMPRESSOR *)bzip_compressor, NULL));
+	    connection, "bzip2-raw", (WT_COMPRESSOR *)bzip_compressor, NULL));
 #else
 	return (connection->add_compressor(
 	    connection, "bzip2", (WT_COMPRESSOR *)bzip_compressor, NULL));
@@ -238,7 +238,7 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (0);
 }
 
-#ifdef WIREDTIGER_TEST_COMPRESS_RAW
+#ifdef WIREDTIGER_TEST_COMPRESS_BZIP_RAW
 /*
  * __bzip2_compress_raw_random --
  *	Return a 32-bit pseudo-random number.
