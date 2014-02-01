@@ -405,7 +405,7 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 
 #if 0
 static void
-helium_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
+helium_dump_kv(const char *pfx, uint8_t *p, size_t len, FILE *fp)
 {
 	(void)fprintf(stderr, "%s %3zu: ", pfx, len);
 	for (; len > 0; --len, ++p)
@@ -423,7 +423,7 @@ helium_dump_print(const char *pfx, uint8_t *p, size_t len, FILE *fp)
  *	Dump the records in a Helium store.
  */
 static int
-helium_dump(he_t he, const char *tag)
+helium_dump(WT_EXTENSION_API *wtext, he_t he, const char *tag)
 {
 	HE_ITEM *r, _r;
 	uint8_t k[4 * 1024], v[4 * 1024];
@@ -436,11 +436,19 @@ helium_dump(he_t he, const char *tag)
 
 	(void)fprintf(stderr, "== %s\n", tag);
 	while ((ret = he_next(he, r, (size_t)0, sizeof(v))) == 0) {
-		helium_dump_print("K: ", r->key, r->key_len, stderr);
-		helium_dump_print("V: ", r->val, r->val_len, stderr);
+#if 0
+		uint64_t recno;
+		if ((ret = wtext->struct_unpack(wtext,
+		    NULL, r->key, r->key_len, "r", &recno)) != 0)
+			return (ret);
+		fprintf(stderr, "K: %" PRIu64, recno);
+#else
+		helium_dump_kv("K: ", r->key, r->key_len, stderr);
+#endif
+		helium_dump_kv("V: ", r->val, r->val_len, stderr);
 	}
 	if (ret != HE_ERR_ITEM_NOT_FOUND) {
-		fprintf(stderr, "== error: %s\n", he_strerror(ret));
+		fprintf(stderr, "he_next: %s\n", he_strerror(ret));
 		ret = WT_ERROR;
 	}
 	return (ret);
