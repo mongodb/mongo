@@ -2531,7 +2531,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 	HE_ITEM *r;
 	WT_SOURCE *ws;
 	uint64_t txnid;
-	int locked, recovery, ret = 0;
+	int locked, pushed, recovery, ret = 0;
 
 	/*
 	 * Called in two ways: in normal processing mode where we're supplied a
@@ -2550,7 +2550,7 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 	cursor = (CURSOR *)wtcursor;
 	ws = cursor->ws;
 	r = &cursor->record;
-	locked = 0;
+	locked = pushed = 0;
 
 	/*
 	 * For every cache key where all updates are globally visible:
@@ -2577,6 +2577,8 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 			cache_value_last_not_aborted(wtcursor, &cp);
 		if (cp == NULL)
 			continue;
+
+		pushed = 1;
 		if (cp->remove) {
 			if ((ret = he_delete(ws->he, r)) == 0)
 				continue;
@@ -2615,6 +2617,14 @@ cache_cleaner(WT_EXTENSION_API *wtext,
 		ret = 0;
 	if (ret != 0)
 		ERET(wtext, NULL, ret, "he_next: %s", he_strerror(ret));
+
+	/*
+	 * If we didn't move any keys from the cache to the primary, quit.  It's
+	 * possible we could still remove values from the cache, but not likely,
+	 * and another pass would probably be wasted effort (especially locked).
+	 */
+	if (!pushed)
+		return (0);
 
 	/*
 	 * Push the store to stable storage for correctness.  (It doesn't matter
