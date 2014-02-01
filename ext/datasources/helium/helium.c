@@ -167,9 +167,6 @@ typedef struct __wt_source {
 	he_t	he_cache;			/* Underlying Helium cache */
 	int	he_cache_inuse;
 
-	uint64_t cleaner_bytes;			/* Bytes since clean */
-	uint64_t cleaner_ops;			/* Operations since clean */
-
 	struct __he_source *hs;			/* Underlying Helium source */
 	struct __wt_source *next;		/* List of WiredTiger objects */
 } WT_SOURCE;
@@ -1502,9 +1499,8 @@ helium_cursor_insert(WT_CURSOR *wtcursor)
 		EMSG(wtext, session, ret, "he_update: %s", he_strerror(ret));
 
 	/* Update the state while still holding the lock. */
-	ws->he_cache_inuse = 1;
-	ws->cleaner_bytes += wtcursor->value.size;
-	++ws->cleaner_ops;
+	if (ws->he_cache_inuse == 0)
+		ws->he_cache_inuse = 1;
 
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
@@ -1615,10 +1611,8 @@ update(WT_CURSOR *wtcursor, int remove_op)
 		EMSG(wtext, session, ret, "he_update: %s", he_strerror(ret));
 
 	/* Update the state while still holding the lock. */
-	ws->he_cache_inuse = 1;
-	if (!remove_op)
-		ws->cleaner_bytes += wtcursor->value.size;
-	++ws->cleaner_ops;
+	if (ws->he_cache_inuse == 0)
+		ws->he_cache_inuse = 1;
 
 	/* Discard the lock. */
 err:	ESET(unlock(wtext, session, &ws->lock));
@@ -2774,6 +2768,7 @@ cache_cleaner_worker(void *arg)
 	struct timeval t;
 	CURSOR *cursor;
 	HELIUM_SOURCE *hs;
+	HE_STATS stats;
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
@@ -2789,25 +2784,7 @@ cache_cleaner_worker(void *arg)
 		EMSG_ERR(wtext, NULL, ret, "cleaner: %s", strerror(ret));
 	cursor = (CURSOR *)wtcursor;
 
-	for (delay = 1;;) {
-		/*
-		 * Check the underlying caches for either a number of operations
-		 * or a number of bytes.  It's more expensive to return values
-		 * from the cache (because we have to marshall/unmarshall them),
-		 * but there's no information yet on how to tune the values.
-		 *
-		 * For now, use 10MB as the limit, and a corresponding number of
-		 * operations, assuming roughly 40B per key/value pair.
-		 */
-#undef	BYTELIMIT
-#define	BYTELIMIT	(10 * 1048576)
-#undef	OPLIMIT
-#define	OPLIMIT		(BYTELIMIT / (2 * 20))
-		for (ws = hs->ws_head; ws != NULL; ws = ws->next)
-			if (ws->cleaner_ops > OPLIMIT ||
-			    ws->cleaner_bytes > BYTELIMIT)
-				break;
-
+	for (cleaner_stop = delay = 0; !cleaner_stop;) {
 		/*
 		 * Check if this will be the final run; cleaner_stop is declared
 		 * volatile, and so the read will happen.  We don't much care if
@@ -2816,14 +2793,43 @@ cache_cleaner_worker(void *arg)
 		 * the variable twice might race.
 		 */
 		cleaner_stop = hs->cleaner_stop;
-		if (ws == NULL && !cleaner_stop) {
-			if (delay < 5)		/* At least every 5 seconds. */
-				++delay;
+
+		/*
+		 * Delay if this isn't the final run and the last pass didn't
+		 * find any work to do.
+		 */
+		if (!cleaner_stop && delay != 0) {
 			t.tv_sec = delay;
 			t.tv_usec = 0;
 			(void)select(0, NULL, NULL, NULL, &t);
-			continue;
 		}
+
+		/* Run at least every 5 seconds. */
+		if (delay < 5)
+			++delay;
+
+		/*
+		 * Clean the datastore caches, depending on their size.  It's
+		 * both more and less expensive to return values from the cache:
+		 * more because we have to marshall/unmarshall the values, less
+		 * because there's only a single call, to the cache store rather
+		 * one to the cache and one to the primary.  I have no turning
+		 * information, for now simply set the limit at 50MB.
+		 */
+#undef	CACHE_SIZE_TRIGGER
+#define	CACHE_SIZE_TRIGGER	(50 * 1048576)
+		for (ws = hs->ws_head; ws != NULL; ws = ws->next) {
+			if ((ret = he_stats(ws->he_cache, &stats)) != 0)
+				EMSG_ERR(wtext, NULL,
+				    ret, "he_stats: %s", he_strerror(ret));
+			if (stats.size > CACHE_SIZE_TRIGGER)
+				break;
+		}
+		if (!cleaner_stop && ws == NULL)
+			continue;
+
+		/* There was work to do, don't delay before checking again. */
+		delay = 0;
 
 		/*
 		 * Get the oldest transaction ID not yet visible to a running
@@ -2833,6 +2839,9 @@ cache_cleaner_worker(void *arg)
 		oldest = wtext->transaction_oldest(wtext);
 
 		/*
+		 * If any cache needs cleaning, clean them all, because we have
+		 * to know the minimum transaction ID referenced by any cache.
+		 *
 		 * For each cache/primary pair, migrate whatever records we can,
 		 * tracking the lowest transaction ID of any entry in any cache.
 		 */
@@ -2858,9 +2867,6 @@ cache_cleaner_worker(void *arg)
 		cursor->ws = NULL;
 		if ((ret = txn_cleaner(wtcursor, hs->he_txn, txnmin)) != 0)
 			goto err;
-
-		if (cleaner_stop)
-			break;
 	}
 
 err:	cursor_destroy(cursor);
