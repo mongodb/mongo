@@ -827,22 +827,19 @@ namespace mongo {
                         waitNotification = new NotifyAll();
                         scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
                         collection = ctx->ctx().db()->getCollection(ns);
-                        // TODO: Add unique assertion number here????
-                        uassert( 17383, "collection dropped between newGetMore calls", collection );
+                        /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
+                        uassert( 77383, "collection dropped between newGetMore calls", collection );
                         lastWaitTime = waitNotification->now();
-                        collection->subscribeToChange( waitNotification ); 
+                        collection->subscribeToChange( waitNotification );
                         /* After creating the notification and subscripting we will do one more loop before waiting
                            because of concurrency, a new item *may* have been inserted in the collection while we were
-                           setting up our notification and subscribing to the event */                   
-                    } else {                    
-                        /* There's cases where an item is inserted *BEFORE* we execute the wait bellow
-                           with current implementation of NotifyAll we won't detect that the event is signaled
-                           therefore control will return with timeout of 2ms. 
-                           
-                           TODO: It will be nice in the future to tune
-                           implementaiton or usage of NotifyAll to detect that case and avoid sacrifice of those 2
-                           precious milliseconds waiting while there was data waiting */
-                        waitNotification->timedWaitFor( lastWaitTime, 2 );
+                           setting up our notification and subscribing to the event */
+                    } else {
+                        /* TODO: Review this wait.
+                           Bellow we could wait even for the full 4 seconds, but there's something I don't understand
+                           with the call to setExpectedLatencyMs(), so I figure I better break the wait every so often to call
+                           that notification method */          
+                        waitNotification->timedWaitFor( lastWaitTime, 200 );
                         lastWaitTime = waitNotification->now();
                     }
 
