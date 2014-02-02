@@ -2138,14 +2138,13 @@ struct __wt_compressor {
 	 *
 	 * There is no requirement the callback encode any or all of the byte
 	 * strings passed by WiredTiger.  If the callback does not encode any
-	 * of the byte strings and compression should be retried with
-	 * additional byte strings, the callback must set \c result_slotsp and
-	 * \c result_lenp to 0.  In this case, WiredTiger will accumulate more
-	 * rows and repeat the call.
+	 * of the byte strings and compression should not be retried, the
+	 * callback should set \c result_slotsp to 0.
 	 *
 	 * If the callback does not encode any of the byte strings and
-	 * compression should not be retried, the callback should set
-	 * \c result_slotsp to 0 and \c result_lenp to a non-zero value.
+	 * compression should be retried with additional byte strings, the
+	 * callback must return \c EAGAIN.  In that case, WiredTiger will
+	 * accumulate more rows and repeat the call.
 	 *
 	 * If there are no more rows to accumulate or the callback indicates
 	 * that it cannot be retried, WiredTiger writes the remaining rows

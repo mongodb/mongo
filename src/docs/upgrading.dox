@@ -10,6 +10,15 @@ In the 2.1 release of WiredTiger WT_ITEM::size type has changed from
 resolve compile-time errors.
 </dd>
 
+<dt>WT_COMPRESSOR::compress_raw signature</dt>
+<dd>
+In the 2.1 release of WiredTiger, the behavior of the compress_raw
+callback has changed so that it will only be retried if it returns
+\c EAGAIN.  If it returns zero and sets \c result_slots to zero,
+WiredTiger will assume that raw compression has failed and will fall
+back to calling WT_COMPRESSOR::compress.
+</dd>
+
 @section version_20 Upgrading to Version 2.0
 <dl>
 

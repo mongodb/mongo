@@ -1677,12 +1677,19 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 * compression function.
 	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
-	WT_ERR(compressor->compress_raw(compressor, wt_session,
+	ret = compressor->compress_raw(compressor, wt_session,
 	    r->page_size_max, btree->split_pct,
 	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    result_len, final, &result_len, &result_slots));
+	    result_len, final, &result_len, &result_slots);
+	if (ret == EAGAIN) {
+		ret = 0;
+		if (!final)
+			goto more_rows;
+		result_slots = 0;
+	}
+	WT_ERR(ret);
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {
@@ -1729,7 +1736,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		}
 
 		bnd->already_compressed = 1;
-	} else if (final || result_len != 0) {
+	} else if (final) {
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
 too_small:	/*

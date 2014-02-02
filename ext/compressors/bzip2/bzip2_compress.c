@@ -340,7 +340,7 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    (uintmax_t)page_max, split_pct, (uintmax_t)extra,
 	    slots, take, offsets[take], (uintmax_t)*result_lenp);
 #endif
-	return (0);
+	return (take == 0 ? EAGAIN : 0);
 }
 
 static int
