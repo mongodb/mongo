@@ -233,7 +233,7 @@ namespace mongo {
         }
 
         if ( !debug().planSummary.empty() ) {
-            b.append( "planSummary" , debug().planSummary );
+            b.append( "planSummary" , debug().planSummary.toString() );
         }
 
         if( !_remote.empty() ) {

@@ -618,7 +618,7 @@ namespace mongo {
         }
 
         if (!planSummary.empty()) {
-            s << " planSummary: " << planSummary;
+            s << " planSummary: " << planSummary.toString();
         }
         
         if ( ! updateobj.isEmpty() ) {
@@ -747,9 +747,7 @@ namespace mongo {
         OPDEBUG_APPEND_NUMBER( responseLength );
         b.append( "millis" , executionTime );
 
-        if (!execStats.isEmpty()) {
-            b.append("execStats", execStats);
-        }
+        execStats.append(b, "execStats");
 
         return true;
     }

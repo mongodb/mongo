@@ -502,7 +502,9 @@ namespace mongo {
         if (infoStatus.isOK()) {
             gotPlanInfo = true;
             planInfo.reset(rawInfo);
-            curop.debug().planSummary = planInfo->planSummary;
+            // planSummary is really a ThreadSafeString which copies the data from
+            // the provided pointer.
+            curop.debug().planSummary = planInfo->planSummary.c_str();
         }
 
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -526,7 +528,9 @@ namespace mongo {
                 if (infoStatus.isOK()) {
                     gotPlanInfo = true;
                     planInfo.reset(rawInfo);
-                    curop.debug().planSummary = planInfo->planSummary;
+                    // planSummary is really a ThreadSafeString which copies the data from
+                    // the provided pointer.
+                    curop.debug().planSummary = planInfo->planSummary.c_str();
                 }
             }
 
@@ -718,7 +722,9 @@ namespace mongo {
             }
 
             if (!explain->stats.isEmpty()) {
-                curop.debug().execStats = explain->stats;
+                // execStats is a CachedBSONObj because it lives in the race-prone
+                // curop.
+                curop.debug().execStats.set(explain->stats);
             }
         }
 
