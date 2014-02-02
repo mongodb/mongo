@@ -13,6 +13,7 @@ DbCursor
 DbEnv
 DbMultiple
 EB
+EAGAIN
 EBUSY
 EINVAL
 EmpId

@@ -231,7 +231,7 @@ config_compression(void)
 			break;
 		case 6:					/* 10% */
 			if (access(BZIP_PATH, R_OK) == 0)
-				cstr = "compression=raw";
+				cstr = "compression=bzip-raw";
 			break;
 		case 7: case 8:				/* 20% */
 			if (access(SNAPPY_PATH, R_OK) == 0)
@@ -247,7 +247,7 @@ config_compression(void)
 
 	switch (g.c_compression_flag) {
 	case COMPRESS_BZIP:
-	case COMPRESS_RAW:
+	case COMPRESS_BZIP_RAW:
 		if (access(BZIP_PATH, R_OK) != 0)
 			die(0, "bzip library not found or not readable");
 		break;
@@ -485,10 +485,10 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_NONE;
 	else if (strcmp(s, "bzip") == 0)
 		*vp = COMPRESS_BZIP;
+	else if (strcmp(s, "bzip-raw") == 0)
+		*vp = COMPRESS_BZIP_RAW;
 	else if (strcmp(s, "lzo") == 0)
 		*vp = COMPRESS_LZO;
-	else if (strcmp(s, "raw") == 0)
-		*vp = COMPRESS_RAW;
 	else if (strcmp(s, "snappy") == 0)
 		*vp = COMPRESS_SNAPPY;
 	else if (strcmp(s, "zlib") == 0)
