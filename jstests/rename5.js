@@ -22,16 +22,16 @@ assert.eq( 2, t.findOne().x );
 // Check similar cases with upserts.
 t.drop();
 
-t.remove();
+t.remove({});
 t.update( { b:1 }, { $rename:{ a:'b' } }, true );
 assert.eq( 1, t.findOne().b );
 
-t.remove();
+t.remove({});
 t.update( { b:1 }, { $rename:{ a:'b' }, $set:{ c:1 } }, true );
 assert.eq( 1, t.findOne().b );
 assert.eq( 1, t.findOne().c );
 
-t.remove();
+t.remove({});
 t.update( { b:1, c:2 }, { $rename:{ a:'b' }, $inc:{ c:1 } }, true );
 assert.eq( 1, t.findOne().b );
 assert.eq( 3, t.findOne().c );

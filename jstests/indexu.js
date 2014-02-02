@@ -14,7 +14,7 @@ assert( !db.getLastError() );
 t.ensureIndex( {'a.0':1} );
 assert( db.getLastError() );
 
-t.remove();
+t.remove({});
 t.ensureIndex( {'a.0':1} );
 assert( !db.getLastError() );
 t.save( dupDoc );
@@ -27,7 +27,7 @@ assert( !db.getLastError() );
 t.ensureIndex( {'a.1':1} );
 assert( db.getLastError() );
 
-t.remove();
+t.remove({});
 t.ensureIndex( {'a.1':1} );
 assert( !db.getLastError() );
 t.save( dupDoc2 );

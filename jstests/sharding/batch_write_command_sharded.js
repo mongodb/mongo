@@ -55,7 +55,7 @@ assert.commandWorked(admin.runCommand({ moveChunk : brokenColl.toString(),
 
 // Rewrite the old chunks back to the config server
 
-config.chunks.remove();
+config.chunks.remove({});
 assert.eq(null, config.getLastError());
 for ( var i = 0; i < oldChunks.length; i++ )
     config.chunks.insert(oldChunks[i]);

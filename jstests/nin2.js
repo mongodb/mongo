@@ -24,7 +24,7 @@ checkOperators( [null], true );
 checkOperators( [null,1], true );
 checkOperators( [1,null], true );
 
-t.remove();
+t.remove({});
 t.save({foo:null});
 
 assert.eq( 1, t.count( {foo:null} ) );
@@ -39,7 +39,7 @@ checkOperators( [null], true );
 checkOperators( [null,1], true );
 checkOperators( [1,null], true );
 
-t.remove();
+t.remove({});
 t.save({foo:1});
 
 assert.eq( 0, t.count( {foo:null} ) );
@@ -51,17 +51,17 @@ checkOperators( [null], false );
 checkOperators( [null,1], true );
 checkOperators( [1,null], true );
 
-t.remove();
+t.remove({});
 t.save( {foo:[0,1]} );
 // Check exact match of embedded array.
 checkOperators( [[0,1]], true );
 
-t.remove();
+t.remove({});
 t.save( {foo:[]} );
 // Check exact match of embedded empty array.
 checkOperators( [[]], true );
 
-t.remove();
+t.remove({});
 t.save( {foo:'foo'} );
 // Check regex match.
 checkOperators( [/o/], true );

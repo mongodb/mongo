@@ -50,7 +50,7 @@ check( 1, 2, { $or: [ { b: { $gte:1,$lte:3 }, a: 3 }, { a: 2, b: 2 } ] } );
 check( 1, 2, { $or: [ { b: { $gte:2,$lte:3 }, a: 3 }, { a: 2, b: 2 } ] } );
 check( 1, 1, { $or: [ { b: { $gte:1,$lte:3 }, a: 2 }, { a: 2, b: 2 } ] } );
 
-t.remove();
+t.remove({});
 
 t.save( {a:1,b:5} );
 t.save( {a:5,b:1} );

@@ -37,7 +37,7 @@ assert.eq( [ { _id:0 } ], t.find().toArray(), "No update occurred." );
 
 
 // Seed the collection with a document suitable for the following check.
-t.remove();
+t.remove({});
 t.save( { _id:0, a:[ { b:{ c:1 } } ] } );
 
 // Now, attempt to apply an update with two nested positional operators.  There is a positional

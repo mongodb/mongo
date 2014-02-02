@@ -5,7 +5,7 @@ t = db.jstests_update_arraymatch7;
 t.drop();
 
 function testPositionalInc() {
-    t.remove();
+    t.remove({});
     t.save( { a:[ { b:'match', count:0 } ] } );
     t.update( { 'a.b':'match' }, { $inc:{ 'a.$.count':1 } } );
     // Check that the positional $inc succeeded.

@@ -66,7 +66,7 @@ bad( "t.update( {}, {$rename:{'f.g':'a'}} )" );
 bad( "t.update( {}, {$rename:{'a':'f.g'}} )" );
 
 function good( start, mod, expected ) {
-    t.remove();
+    t.remove({});
     t.save( start );
     t.update( {}, mod );
     assert( !db.getLastError() );
@@ -130,7 +130,7 @@ t.drop();
 t.ensureIndex( {a:1} );
 
 function l( start, mod, query, expected ) {
-    t.remove();
+    t.remove({});
     t.save( start );
     t.update( {}, mod );
     assert( !db.getLastError() );

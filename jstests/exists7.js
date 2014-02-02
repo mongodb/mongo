@@ -5,7 +5,7 @@ t = db.jstests_explain7;
 t.drop();
 
 function testIntegerExistsSpec() {
-    t.remove();
+    t.remove({});
     t.save( {} );
     t.save( {a:1} );
     t.save( {a:2} );

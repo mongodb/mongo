@@ -21,7 +21,7 @@ for ( i=0; i<N; i++ )
 
 orig = t.stats();
 
-t.remove();
+t.remove({});
 
 for ( i=0; i<N; i++ )
     t.insert( { _id : i , s : s } );

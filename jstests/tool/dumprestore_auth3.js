@@ -125,7 +125,7 @@ function runTest(shutdownServer) {
     db.createUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
     db.dropRole('role')
     db.createRole({role: 'role2', roles: [], privileges:[]});
-    db.system.users.remove();
+    db.system.users.remove({});
     db.system.users.insert({user:'dbuser2', pwd: 'pwd', roles: ['readWrite']});
 
     jsTestLog("Restore foo database (and user data) with --drop so it overrides the changes made");

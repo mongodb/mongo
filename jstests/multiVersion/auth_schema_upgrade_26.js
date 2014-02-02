@@ -177,7 +177,7 @@ load('jstests/multiVersion/libs/multi_rs.js');
         "Expected RemoteValidationFailed error code");
     MongoRunner.stopMongos(oldMongoS);
 
-    s0AdminConn.getDB("config").mongos.remove();
+    s0AdminConn.getDB("config").mongos.remove({});
     assert.gleSuccess(s0AdminConn.getDB("config"), "Flushing ping time data failed.");
 
     print('\n--------------------\n' +

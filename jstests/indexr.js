@@ -9,7 +9,7 @@ assert.eq( 1, t.count( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ) );
 assert.eq( 1, t.count( { a:{ b:3, c:6 }, 'a.c': { $lt:4 } } ) );
 
 // Check with single key indexes.
-t.remove();
+t.remove({});
 t.ensureIndex( {'a.b':1,'a.c':1} );
 t.ensureIndex( {a:1,'a.c':1} );
 assert.eq( 0, t.count( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ) );
@@ -24,7 +24,7 @@ assert.eq( 4, t.find( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ).explain().indexBou
 assert.eq( 4, t.find( { a:{ b:3, c:3 }, 'a.c': { $lt:4 } } ).explain().indexBounds['a.c'][0][1] );
 
 // Check with multikey indexes.
-t.remove();
+t.remove({});
 t.save( { a: [ { b: 3, c: 6 }, { b: 1, c: 1 } ] } );
 
 assert.eq( 1, t.count( { 'a.b':{ $gt:2 }, 'a.c': { $lt:4 } } ) );

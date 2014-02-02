@@ -27,7 +27,7 @@ checkRanges( {a:[[2,2]],b:[[3,3],[4,4]],c:[[5,5]]}, t.find( {a:2,b:{$in:[3,4]},c
 t.save( {a:2,b:3,c:5} );
 t.save( {a:2,b:3,c:4} );
 assert.eq( 1, t.find( {a:2,b:{$in:[3,4]},c:5} ).hint( {a:1,b:1,c:1} ).explain().nscanned );
-t.remove();
+t.remove({});
 t.save( {a:2,b:4,c:5} );
 t.save( {a:2,b:4,c:4} );
 assert.eq( 2, t.find( {a:2,b:{$in:[3,4]},c:5} ).hint( {a:1,b:1,c:1} ).explain().nscanned );

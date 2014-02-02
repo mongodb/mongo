@@ -9,7 +9,7 @@ var no = function( dbName ) {
 }
 
 assert.eq( 0, t.find().toArray().length );
-t.remove();
+t.remove({});
 t.update( {}, { a:1 } );
 t.drop();
 

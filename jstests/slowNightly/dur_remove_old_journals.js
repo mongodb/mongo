@@ -21,7 +21,7 @@ while (numInserted < NUM_TO_INSERT){
     if (numInserted % 100 == 0){
         print("numInserted: " + numInserted);
         db.adminCommand({fsync:1});
-        db.foo.remove();
+        db.foo.remove({});
         db.adminCommand({fsync:1});
     }
 }

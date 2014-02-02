@@ -79,7 +79,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
                                             find: { _id: 0 }, to: 'shard0000' });
         assert(r.ok, "error moving chunks: " + tojson(r));
 
-        db1.col.remove();
+        db1.col.remove({});
 
     } catch(e) {
         if (shouldSucceed) throw e;

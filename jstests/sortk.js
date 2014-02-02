@@ -76,7 +76,7 @@ assert.eq( 0, inThreeIntervalQueryWithLimit( -2 )[ 0 ].b );
 assert.eq( 1, inThreeIntervalQueryWithLimit( -2 )[ 1 ].b );
 
 // The index is multikey.
-t.remove();
+t.remove({});
 t.save( { a:1, b:[ 0, 1, 2 ] } );
 t.save( { a:2, b:[ 0, 1, 2 ] } );
 t.save( { a:1, b:5 } );

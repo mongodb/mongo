@@ -7,7 +7,7 @@ t.ensureIndex( { a:1 } );
 
 // Make the index multikey to trigger cursor dedup checking.
 t.insert( { a:[ -1, -2 ] } );
-t.remove();
+t.remove({});
 
 // Insert some data.
 for( i = 0; i < 20000; ++i ) {

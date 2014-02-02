@@ -4,7 +4,7 @@ var test = new SyncCCTest( "sync1" );
 
 var db = test.conn.getDB( "test" );
 var t = db.sync8;
-t.remove();
+t.remove({});
 
 t.update({_id:1}, {$set:{a:1}}, true);
 var le = db.getLastErrorObj();

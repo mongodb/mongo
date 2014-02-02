@@ -9,7 +9,7 @@ var x;
 // assert._debug = true;
 
 // clear out any data from old tests
-testdb.system.js.remove();
+testdb.system.js.remove({});
 delete myfunc;
 delete myfunc2;
 

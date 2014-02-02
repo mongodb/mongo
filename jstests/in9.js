@@ -4,7 +4,7 @@ t = db.jstests_in9;
 t.drop(); 
 
 function someData() {
- 	t.remove();   
+    t.remove({});
     t.save( {key: []} ); 
 }
 

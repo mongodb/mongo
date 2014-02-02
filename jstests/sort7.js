@@ -15,7 +15,7 @@ assert.eq( unindexed, indexed );
 
 // Now check when there are two objects in the array.
 
-t.remove();
+t.remove({});
 t.save( { a : [ { x : 2 }, { x : 3 } ] } );
 t.save( { a : [ { x : 1 }, { x : 4 } ] } );
 t.save( { a : [ { x : 3 }, { x : 2 } ] } );

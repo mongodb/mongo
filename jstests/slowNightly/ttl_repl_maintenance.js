@@ -38,7 +38,7 @@ var restartWithConfig = function() {
 
 var restartWithoutConfig = function() {
     var localDB = conn.getDB("local");
-    localDB.system.replset.remove();
+    localDB.system.replset.remove({});
     localDB.getLastError();
 
     stopMongod(runner.port(), 15);

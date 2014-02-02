@@ -147,6 +147,6 @@ assertErrorCode(t, {$project: {a: {$week: [new Date(2020, 1, 28),
                 16020);
 
 // From a field path expression.
-t.remove();
+t.remove({});
 t.save( { a:new Date( 2020, 2, 1 ) } );
 assertWeek( 9, '$a' );

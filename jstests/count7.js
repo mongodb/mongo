@@ -16,7 +16,7 @@ t.save( {a:'zope'} );
 
 assert.eq( 5, t.count( {a:/p/} ) );
 
-t.remove();
+t.remove({});
 
 t.save( {a:[1,2,3]} );
 t.save( {a:[1,2,3]} );

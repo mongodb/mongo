@@ -39,7 +39,7 @@ var getDirectShardedConn = function( st, collName ) {
 var shard0Coll = getDirectShardedConn(st, coll.getFullName()).getCollection(coll.getFullName());
 
 // No shard key
-shard0Coll.remove()
+shard0Coll.remove({})
 shard0Coll.save({_id:3})
 assert.gleError(shard0Coll.getDB(), function(gle) {
     return "save without shard key passed - " + tojson(gle) + " doc: " + tojson(shard0Coll.findOne()) 
@@ -50,12 +50,12 @@ shard0Coll.save({_id: 1, a: 1})
 assert.gleSuccess(shard0Coll.getDB(), "save with shard key failed");
 
 // Full shard key on replacement (basically the same as above)
-shard0Coll.remove()
+shard0Coll.remove({})
 shard0Coll.update({_id: 1}, {a:1}, true)
 assert.gleSuccess(shard0Coll.getDB(), "update + upsert (replacement) with shard key failed"); 
 
 // Full shard key after $set
-shard0Coll.remove()
+shard0Coll.remove({})
 shard0Coll.update({_id: 1}, {$set: {a: 1}}, true)
 assert.gleSuccess(shard0Coll.getDB(), "update + upsert ($set) with shard key failed"); 
 
@@ -76,7 +76,7 @@ shard0Coll.update({_id: 1}, {$unset: {a: 1}})
 assert.gleError(shard0Coll.getDB(), "update ($unset) removes shard key"); 
 
 // Error due to removing all the embedded fields.
-shard0Coll.remove()
+shard0Coll.remove({})
 
 shard0Coll.save({_id: 2, a:{c:1, b:1}})
 assert.gleSuccess(shard0Coll.getDB(), "save with shard key failed -- 1"); 

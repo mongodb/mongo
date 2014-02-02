@@ -250,6 +250,7 @@ DBCollection.prototype._validateRemoveDoc = function(doc) {
 };
 
 DBCollection.prototype.remove = function( t , justOne ){
+    if (t == undefined) throw "remove needs a query";
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();

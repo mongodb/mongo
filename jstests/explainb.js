@@ -37,7 +37,8 @@ printjson(explain);
 assert.eq( 2, explain.n );
 
 // A non $or case where nscanned != number of results
-t.remove();
+t.remove({});
+
 t.save( { a:'0', b:'1' } );
 t.save( { a:'1', b:'0' } );
 explain = t.find( { a:/0/, b:/1/ } ).explain( true );

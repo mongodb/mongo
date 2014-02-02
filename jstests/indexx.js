@@ -26,7 +26,7 @@ function checkFailingOperations() {
     shouldFail( function() { idx.count(); } );
     shouldFail( function() { idx.find().itcount(); } );
     shouldFail( function() { idx.insert({}); } );
-    shouldFail( function() { idx.remove(); } );
+    shouldFail( function() { idx.remove({}); } );
     shouldFail( function() { idx.update({},{}); } );
     assert.commandFailed( idx.runCommand( 'compact' ) );
     
