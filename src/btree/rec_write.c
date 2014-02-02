@@ -1619,8 +1619,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * allocation size of data, anybody splitting smaller than
 		 * that (as calculated before compression), is doing it wrong.
 		 */
-		len = WT_PTRDIFF(cell, dsk);
-		if (len > btree->allocsize - WT_BLOCK_COMPRESS_SKIP)
+		if ((len = WT_PTRDIFF(cell, dsk)) > btree->allocsize)
 			r->raw_offsets[++slots] =
 			    WT_STORE_SIZE(len - WT_BLOCK_COMPRESS_SKIP);
 
