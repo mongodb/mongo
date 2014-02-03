@@ -158,28 +158,24 @@ namespace mongo {
                     m.header()->id = r.id();
                     replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
                 }
-                else {
-                    le->raiseError( ex.getCode() , ex.what() );
-                }
+
+                // We *always* populate the last error for now
+                le->raiseError( ex.getCode() , ex.what() );
             }
             catch ( const DBException& ex ) {
 
                 log() << "Exception thrown"
-                    << " while processing " << opToString( m.operation() ) << " op"
-                    << " for " << r.getns() << causedBy( ex ) << endl;
+                      << " while processing " << opToString( m.operation() ) << " op"
+                      << " for " << r.getns() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
                     m.header()->id = r.id();
                     replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
                 }
-                else {
-                    le->raiseError( ex.getCode() , ex.what() );
-                }
-            }
 
-            // Clear out the last error for GLE unless it's been explicitly disabled
-            if ( r.expectResponse() && !le->disabled )
-                le->reset();
+                // We *always* populate the last error for now
+                le->raiseError( ex.getCode() , ex.what() );
+            }
         }
 
         virtual void disconnected( AbstractMessagingPort* p ) {

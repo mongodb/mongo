@@ -78,6 +78,7 @@ namespace mongo {
                 NamespaceString( parseNs( dbname, cmdObj ) ),
                 cmdObj ));
 
+        // TODO: Remove this when we standardize GLE reporting from commands
         if ( !status.isOK() ) {
             setLastError( status.code(), status.reason().c_str() );
         }

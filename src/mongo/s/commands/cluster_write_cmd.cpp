@@ -33,6 +33,7 @@
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -70,10 +71,18 @@ namespace mongo {
                                     const std::string& dbname,
                                     const BSONObj& cmdObj ) {
 
-            return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
-                                                   _writeType,
-                                                   NamespaceString( parseNs( dbname, cmdObj ) ),
-                                                   cmdObj );
+            Status status = auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                                                            _writeType,
+                                                            NamespaceString( parseNs( dbname,
+                                                                                      cmdObj ) ),
+                                                            cmdObj );
+
+            // TODO: Remove this when we standardize GLE reporting from commands
+            if ( !status.isOK() ) {
+                setLastError( status.code(), status.reason().c_str() );
+            }
+
+            return status;
         }
 
         // Cluster write command entry point.
@@ -151,23 +160,39 @@ namespace mongo {
         BatchedCommandResponse response;
         ClusterWriter writer( true /* autosplit */, 0 /* timeout */ );
 
-        // TODO: if we do namespace parsing, push this to the type
-        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+        // NOTE: Sometimes this command is invoked with LE disabled for legacy writes
+        LastError* cmdLastError = lastError.get( false );
 
-            // Batch parse failure
-            response.setOk( false );
-            response.setErrCode( ErrorCodes::FailedToParse );
-            response.setErrMessage( errMsg );
+        {
+            // Disable the last error object for the duration of the write
+            LastError::Disabled disableLastError( cmdLastError );
+
+            // TODO: if we do namespace parsing, push this to the type
+            if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+
+                // Batch parse failure
+                response.setOk( false );
+                response.setErrCode( ErrorCodes::FailedToParse );
+                response.setErrMessage( errMsg );
+            }
+            else {
+
+                // Fixup the namespace to be a full ns internally
+                NamespaceString nss( dbName, request.getNS() );
+                request.setNS( nss.ns() );
+
+                writer.write( request, &response );
+            }
+
+            dassert( response.isValid( NULL ) );
         }
-        else {
 
-            // Fixup the namespace to be a full ns internally
-            NamespaceString nss( dbName, request.getNS() );
-            request.setNS( nss.ns() );
-            writer.write( request, &response );
+        if ( cmdLastError ) {
+            // Populate the lastError object based on the write response
+            cmdLastError->reset();
+            batchErrorToLastError( request, response, cmdLastError );
         }
 
-        dassert( response.isValid( NULL ) );
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work
         if ( ClientInfo::exists() && writer.getStats().hasShardStats() ) {

@@ -31,6 +31,8 @@ assert.commandWorked( admin.runCommand({ moveChunk : coll.toString(),
 
 st.printShardingStatus();
 
+var gle = null;
+
 //
 // No journal insert, GLE fails
 coll.remove({});
@@ -97,7 +99,6 @@ coll.remove({});
 coll.insert([{ _id : 1 }, { _id : -1 }]);
 // Wait for write to be written to shards before shutting it down.
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
-
 st.rs0.stop(st.rs0.getPrimary(), true); // wait for stop
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
 // Should get an error about contacting dead host.
@@ -110,7 +111,15 @@ assert.eq(coll.count({ _id : 1 }), 1);
 // NOTE: This is DIFFERENT from 2.4, since we don't need to contact a host we didn't get
 // successful writes from.
 coll.remove({ _id : 1 });
-coll.insert([{ _id : 1 }, { _id : -1 }]);
+// The insert throws if write commands are enabled, since we get a response
+if ( coll.getMongo().useWriteCommands() ) {
+    assert.throws( function() {
+        coll.insert([{ _id : 1 }, { _id : -1 }]);
+    });
+}
+else {
+    coll.insert([{ _id : 1 }, { _id : -1 }]);
+}
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
 assert(gle.ok);
 assert(gle.err);

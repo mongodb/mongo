@@ -1,5 +1,6 @@
 //
 // Ensures GLE correctly reports basic write stats and failures
+// Note that test should work correctly with and without write commands.
 //
 
 var options = { separateConfig : true };
@@ -22,9 +23,6 @@ assert.commandWorked( admin.runCommand({ moveChunk : coll.toString(),
                                          to : shards[1]._id }) );
 
 st.printShardingStatus();
-
-// Don't use write commands
-coll.getMongo().useWriteCommands = function(){ return false; };
 
 var gle = null;
 
@@ -128,6 +126,24 @@ assert(gle.shards);
 assert.eq(coll.count(), 0);
 
 //
+// Repeated calls to GLE should work
+coll.remove({});
+coll.update({ _id : 1 }, { $invalid : "xxx" }, true);
+printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
+assert(gle.ok);
+assert(gle.err);
+assert(gle.code);
+assert(!gle.errmsg);
+assert(gle.singleShard);
+printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
+assert(gle.ok);
+assert(gle.err);
+assert(gle.code);
+assert(!gle.errmsg);
+assert(gle.singleShard);
+assert.eq(coll.count(), 0);
+
+//
 // First shard down
 //
 
@@ -148,7 +164,15 @@ assert(gle.errmsg);
 // NOTE: This is DIFFERENT from 2.4, since we don't need to contact a host we didn't get
 // successful writes from.
 coll.remove({ _id : 1 });
-coll.insert([{ _id : 1 }, { _id : -1 }]);
+// The insert throws if write commands are enabled, since we get a response
+if ( coll.getMongo().useWriteCommands() ) {
+    assert.throws( function() {
+        coll.insert([{ _id : 1 }, { _id : -1 }]);
+    });
+}
+else {
+    coll.insert([{ _id : 1 }, { _id : -1 }]);
+}
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
 assert(gle.ok);
 assert(gle.err);

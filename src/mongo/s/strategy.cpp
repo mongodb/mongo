@@ -547,20 +547,16 @@ namespace mongo {
             (void) parsed; // for compile
             dassert( parsed && response.isValid( NULL ) );
 
-            // Populate the lastError object based on the write
+            // Populate the lastError object based on the write response
             lastError.get( false )->reset();
-            bool hadError = batchErrorToLastError( *request,
-                                                   response,
-                                                   lastError.get( false ) );
+            bool hadError = batchErrorToLastError( *request, response, lastError.get( false ) );
 
             // Need to specially count inserts
             if ( op == dbInsert ) {
                 for( int i = 0; i < response.getN(); ++i )
                     r.gotInsert();
             }
-
-            // If this is an ordered batch and we had a non-write-concern error, we should
-            // stop sending.
+            // Check if this is an ordered batch and we had an error which should stop processing
             if ( request->getOrdered() && hadError )
                 break;
         }
