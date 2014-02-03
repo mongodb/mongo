@@ -60,3 +60,13 @@ printjson(x);
 // hack.  When we use the distinct hack we scan 16, currently.
 assert.lte(x.stats.n, 171);
 assert.eq( 0 , x.stats.nscannedObjects , "BB3" )
+
+
+
+// Cursor name should not be empty when using $or with hashed index.
+// 
+t.dropIndexes();
+t.ensureIndex( { a : "hashed" } );
+x = d( "a", { $or : [ { a : 3 }, { a : 5 } ] } );
+assert.eq( 188, x.stats.n, "DA1" );
+assert.neq( "", x.stats.cursor, "DA2" );

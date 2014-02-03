@@ -212,6 +212,8 @@ namespace mongo {
                     nScannedObjects += childExplain->getNScanned();
                 }
             }
+            // XXX: Pick cursor name for backwards compatibility with 2.4.
+            res->setCursor("QueryOptimizerCursor");
             res->setNScanned(nScanned);
             res->setNScannedObjects(nScannedObjects);
         }
