@@ -56,8 +56,10 @@ var _bulk_api_module = (function() {
   /**
    * Wraps the result for write commands and presents a convenient api for accessing
    * single results & errors (returns the last one if there are multiple).
+   * singleBatch is passed in on bulk operations consisting of a single batch and
+   * are used to filter the SingleWriteResult to only include relevant result fields.
    */
-  var SingleWriteResult = function(bulkResult) {
+  var SingleWriteResult = function(bulkResult, singleBatch) {
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
@@ -92,7 +94,7 @@ var _bulk_api_module = (function() {
       if (bulkResult.writeConcernErrors.length == 0) {
         return null;
       } else {
-        return bulkResult.writeConcernErrors[bulkResult.writeConcernErrors - 1];
+        return bulkResult.writeConcernErrors[0];
       }
     };
 
@@ -100,15 +102,46 @@ var _bulk_api_module = (function() {
      * @return {string}
      */
     this.tojson = function(indent, nolint) {
-      return tojson(bulkResult, indent, nolint);
+      var result = {}
+
+      if(singleBatch && singleBatch.batchType == INSERT) {
+        result.nInserted = this.nInserted;
+      }
+
+      if(singleBatch && singleBatch.batchType == UPDATE) {
+        result.nUpdated = this.nUpdated;
+        result.nUpserted = this.nUpserted;
+        result.nModified = this.nModified;
+
+        if(Array.isArray(bulkResult.upserted)
+            && bulkResult.upserted.length == 1) {
+          result._id = bulkResult.upserted[0]._id;
+        }
+      }
+
+      if(singleBatch && singleBatch.batchType == REMOVE) {
+        result.nRemoved = bulkResult.nRemoved;
+      }
+
+      if(this.getWriteError() != null) {
+        result.writeError = {};
+        result.writeError.code = this.getWriteError().code;
+        result.writeError.errmsg = this.getWriteError().errmsg;
+      }
+
+      if(this.getWriteConcernError() != null) {
+        result.writeConcernError = this.getWriteConcernError();
+      }
+
+      return tojson(result, indent, nolint);
     };
 
     this.toString = function() {
-      return "SingleWriteResult(" + tojson(bulkResult) + ")";
+      return this.tojson();
     };
 
     this.shellPrint = function() {
-      return this.toString();
+      return "WriteResult(" + this.toString() + ")";
     };
 
     this.isOK = function() {
@@ -119,7 +152,7 @@ var _bulk_api_module = (function() {
   /**
    * Wraps the result for the commands
    */
-  var BulkWriteResult = function(bulkResult) {
+  var BulkWriteResult = function(bulkResult, singleBatch) {
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
@@ -209,7 +242,8 @@ var _bulk_api_module = (function() {
      * @return {SingleWriteResult} the simplified results condensed into one.
      */
     this.toSingleResult = function() {
-      return new SingleWriteResult(bulkResult);
+      if(singleBatch == null) throw "Cannot output SingleWriteResult from multiple batch result";
+      return new SingleWriteResult(bulkResult, singleBatch);
     }
   };
 
@@ -281,7 +315,6 @@ var _bulk_api_module = (function() {
     this.originalZeroIndex = originalZeroIndex;
     this.batchType = batchType;
     this.operations = [];
-    this.size = 0;
   }
 
   /**
@@ -337,6 +370,45 @@ var _bulk_api_module = (function() {
     var currentBatchSize = 0;
     var currentBatchSizeBytes = 0;
     var batches = [];
+
+    var defineBatchTypeCounter = function(self, name, type) {
+      Object.defineProperty(self, name, {
+          enumerable: true
+        , get: function() {
+          var counter = 0;
+
+          for(var i = 0; i < batches.length; i++) {
+            if(batches[i].batchType == type) {
+              counter += batches[i].operations.length;
+            }
+          }
+
+          if(currentBatch && currentBatch.batchType == type) {
+            counter += currentBatch.operations.length;
+          }
+
+          return counter;
+        }
+      });
+    }
+
+    defineBatchTypeCounter(this, "nInsertOps", INSERT);
+    defineBatchTypeCounter(this, "nUpdateOps", UPDATE);
+    defineBatchTypeCounter(this, "nRemoveOps", REMOVE);
+
+    // Convert bulk into string
+    this.toString = function() {
+      return this.tojson();
+    }
+
+    this.tojson = function() {
+      return tojson({
+          nInsertOps: this.nInsertOps
+        , nUpdateOps: this.nUpdateOps
+        , nRemoveOps: this.nRemoveOps
+        , nBatches: batches.length + (currentBatch == null ? 0 : 1)
+      })
+    }
 
     // Add to internal list of documents
     var addToOperationsList = function(docType, document) {
@@ -806,7 +878,7 @@ var _bulk_api_module = (function() {
     //
     // Execute the batch
     this.execute = function(_writeConcern) {
-      if(executed) throw "batch cannot be re-executed";
+      if(executed) throw "operations cannot be re-executed";
 
       // If writeConcern set
       if(_writeConcern) writeConcern = _writeConcern;
@@ -838,8 +910,14 @@ var _bulk_api_module = (function() {
         }
       }
 
-      // Execute the batch and return the final results
+      // Set as executed
       executed = true;
+
+      if(batches.length == 1) {
+        return new BulkWriteResult(bulkResult, batches[0]);
+      }
+
+      // Execute the batch and return the final results
       return new BulkWriteResult(bulkResult);
     }
   }

@@ -46,18 +46,14 @@ var executeTests = function() {
     assert.eq(3, upsert.index);
     assert(upsert._id != null);
 
-    var singleResult = result.toSingleResult();
-    assert.eq(2, singleResult.nInserted);
-    assert.eq(1, singleResult.nUpserted);
-    assert.eq(2, singleResult.nUpdated);
-    if (coll.getMongo().useWriteCommands()) {
-        assert.eq(1, singleResult.nModified);
-    }
-    else {
-        // Legacy updates does not support nModified.
-        assert.eq(0, singleResult.nModified);
-    }
-    assert.eq(1, singleResult.nRemoved);
+
+    // illegal to try to convert a multi-batch op into a SingleWriteResult
+    assert.throws(function() { result.toSingleResult(); } );
+
+    // Test SingleWriteResult
+    var singleBatch = coll.initializeOrderedBulkOp();
+    singleBatch.find({a:4}).upsert().updateOne({$set: {b:1}});
+    var singleResult = singleBatch.execute().toSingleResult();
     assert(singleResult.getUpsertedId() != null);
 
     // Create unique index
