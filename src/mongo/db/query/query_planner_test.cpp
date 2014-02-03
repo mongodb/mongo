@@ -997,6 +997,13 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {a: 1}}}}}");
     }
 
+    // $not can appear as a value operator inside of an elemMatch (value).  We shouldn't crash if we
+    // see it.
+    TEST_F(QueryPlannerTest, ElemMatchWithNotInside) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{a: {$elemMatch: {$not: {$gte: 6}}}}"));
+    }
+
     //
     // Geo
     // http://docs.mongodb.org/manual/reference/operator/query-geospatial/#geospatial-query-compatibility-chart

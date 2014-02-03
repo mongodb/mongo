@@ -253,6 +253,12 @@ namespace mongo {
             // Therefore, a fetch is required.
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
+        else if (MatchExpression::NOT == expr->matchType()) {
+            // TODO: We could look at the child of 'expr', compute bounds, and take
+            // the complement.
+            oilOut->intervals.push_back(allValues());
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
             translateEquality(node->getData(), isHashed, oilOut, tightnessOut);
