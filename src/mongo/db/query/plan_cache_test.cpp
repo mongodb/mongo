@@ -262,7 +262,12 @@ namespace {
         qs.cacheData->tree.reset(new PlanCacheIndexTree());
         std::vector<QuerySolution*> solns;
         solns.push_back(&qs);
+
+        // Check if key is in cache before and after add().
+        ASSERT_FALSE(planCache.contains(*cq));
         ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
+
+        ASSERT_TRUE(planCache.contains(*cq));
         ASSERT_EQUALS(planCache.size(), 1U);
     }
 

@@ -275,6 +275,11 @@ namespace mongo {
             }
 
             scoped_ptr<CanonicalQuery> cq(cqRaw);
+
+            if (!planCache->contains(*cq)) {
+                return Status(ErrorCodes::NoSuchKey, "query shape doesn't exist in PlanCache");
+            }
+
             Status result = planCache->remove(*cq);
             if (!result.isOK()) {
                 return result;
@@ -327,6 +332,11 @@ namespace mongo {
         }
 
         scoped_ptr<CanonicalQuery> cq(cqRaw);
+
+        if (!planCache.contains(*cq)) {
+            return Status(ErrorCodes::NoSuchKey, "query shape doesn't exist in PlanCache");
+        }
+
         PlanCacheEntry* entryRaw;
         Status result = planCache.getEntry(*cq, &entryRaw);
         if (!result.isOK()) {

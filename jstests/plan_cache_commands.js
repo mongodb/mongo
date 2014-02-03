@@ -231,6 +231,13 @@ assert.eq(t.getName(), planCache.getName(), 'name of plan cache should match col
 planCache.help();
 
 //
+// shellPrint
+//
+
+print('plan cache:');
+print(planCache);
+
+//
 // collection.getPlanCache().listQueryShapes
 //
 

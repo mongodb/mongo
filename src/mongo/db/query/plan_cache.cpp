@@ -465,6 +465,11 @@ namespace mongo {
         return entries;
     }
 
+    bool PlanCache::contains(const CanonicalQuery& cq) const {
+        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        return _cache.hasKey(cq.getPlanCacheKey());
+    }
+
     size_t PlanCache::size() const {
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         return _cache.size();

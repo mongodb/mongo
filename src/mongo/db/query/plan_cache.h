@@ -392,6 +392,12 @@ namespace mongo {
         std::vector<PlanCacheEntry*> getAllEntries() const;
 
         /**
+         * Returns true if there is an entry in the cache for the 'query'.
+         * Internally calls hasKey() on the LRU cache.
+         */
+        bool contains(const CanonicalQuery& cq) const;
+
+        /**
          * Returns number of entries in cache.
          * Used for testing.
          */

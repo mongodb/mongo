@@ -160,7 +160,7 @@ namespace mongo {
         Status remove(const K& key) {
             KVMapConstIt i = _kvMap.find(key);
             if (i == _kvMap.end()) {
-                return Status(ErrorCodes::BadValue, "no such key in LRU key-value store");
+                return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
             }
             KVListIt found = i->second;
             delete found->second;
@@ -180,6 +180,13 @@ namespace mongo {
             _kvList.clear();
             _kvMap.clear();
             _currentSize = 0;
+        }
+
+        /**
+         * Returns true if entry is found in the kv-store.
+         */
+        bool hasKey(const K& key) const {
+            return _kvMap.find(key) != _kvMap.end();
         }
 
         /**

@@ -1386,12 +1386,22 @@ PlanCache.prototype.getName = function(){
     return this._collection.getName();
 }
 
+
+/**
+ * toString prints the name of the collection
+ */
+PlanCache.prototype.toString = function(){
+    return "PlanCache for collection " + this.getName() + '. Type help() for more info.';
+}
+
+PlanCache.prototype.shellPrint = PlanCache.prototype.toString;
+
 /**
  * Displays help for a PlanCache object.
  */
 PlanCache.prototype.help = function () {
     var shortName = this.getName();
-    print("DBCollection help");
+    print("PlanCache help");
     print("\tdb." + shortName + ".getPlanCache().help() - show PlanCache help");
     print("\tdb." + shortName + ".getPlanCache().listQueryShapes() - " +
           "displays all query shapes in a collection");
