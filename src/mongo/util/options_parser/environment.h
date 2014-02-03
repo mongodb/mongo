@@ -194,7 +194,7 @@ namespace optionenvironment {
             BSONObj toBSON() const;
 
             /* Debugging */
-            void dump();
+            void dump() const;
 
         protected:
             std::vector<Constraint*> constraints;
