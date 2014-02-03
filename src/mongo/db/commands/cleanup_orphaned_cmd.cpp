@@ -210,21 +210,24 @@ namespace mongo {
                 return false;
             }
 
+            if (!shardingState.enabled()) {
+                errmsg = str::stream() << "server is not part of a sharded cluster or "
+                                       << "the sharding metadata is not yet initialized.";
+                return false;
+            }
+
             ChunkVersion shardVersion;
             Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
             if ( !status.isOK() ) {
                 if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
-                    warning() << "orphaned cleanup needs to be retried, "
-                              << "collection metadata at shard version " << shardVersion
-                              << " changed during reload" << endl;
-                    // Version changed and is not yet in steady state, return the same starting
-                    // key so the client can retry again.
-                    result.append( stoppedAtKeyField(), startingFromKey );
-                    return true;
+                    warning() << "Shard version in transition detected while refreshing "
+                              << "metadata for " << ns << " at version " << shardVersion << endl;
                 }
-
-                errmsg = str::stream() << "failed to refresh shard metadata: " << status.reason();
-                return false;
+                else {
+                    errmsg = str::stream() << "failed to refresh shard metadata: "
+                                           << status.reason();
+                    return false;
+                }
             }
 
             BSONObj stoppedAtKey;
