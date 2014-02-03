@@ -80,6 +80,12 @@ namespace mongo {
                         return StatusWith<BSONObj>( ErrorCodes::BadValue,
                                                     "can't use an array for _id" );
                     }
+                    if ( e.type() == Object ) {
+                        BSONObj o = e.Obj();
+                        Status s = o.storageValidEmbedded();
+                        if ( !s.isOK() )
+                            return StatusWith<BSONObj>( s );
+                    }
                 }
 
             }

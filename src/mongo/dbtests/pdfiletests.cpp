@@ -100,6 +100,16 @@ namespace PdfileTests {
                 ASSERT( a.timestampValue() > 0 );
             }
         };
+
+        class ValidId : public Base {
+        public:
+            void run() {
+                ASSERT( fixDocumentForInsert( BSON( "_id" << 5 ) ).isOK() );
+                ASSERT( fixDocumentForInsert( BSON( "_id" << BSON( "x" << 5 ) ) ).isOK() );
+                ASSERT( !fixDocumentForInsert( BSON( "_id" << BSON( "$x" << 5 ) ) ).isOK() );
+                ASSERT( !fixDocumentForInsert( BSON( "_id" << BSON( "$oid" << 5 ) ) ).isOK() );
+            }
+        };
     } // namespace Insert
 
     class ExtentSizing {
@@ -164,6 +174,7 @@ namespace PdfileTests {
         void setupTests() {
             add< Insert::InsertNoId >();
             add< Insert::UpdateDate >();
+            add< Insert::ValidId >();
             add< ExtentSizing >();
         }
     } myall;
