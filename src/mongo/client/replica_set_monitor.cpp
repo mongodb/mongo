@@ -308,6 +308,12 @@ namespace {
         return node ? node->isMaster : false;
     }
 
+    bool ReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
+        boost::mutex::scoped_lock lk(_state->mutex);
+        Node* node = _state->findNode(host);
+        return node ? node->isUp : false;
+    }
+
     int ReplicaSetMonitor::getConsecutiveFailedScans() const {
         boost::mutex::scoped_lock lk(_state->mutex);
         return _state->consecutiveFailedScans;

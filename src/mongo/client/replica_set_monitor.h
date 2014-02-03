@@ -90,6 +90,12 @@ namespace mongo {
         bool isPrimary(const HostAndPort& host) const;
 
         /**
+         * Returns true if host is part of this set and is considered up (meaning it can accept
+         * queries).
+         */
+        bool isHostUp(const HostAndPort& host) const;
+
+        /**
          * How may times in a row have we tried to refresh without successfully contacting any hosts
          * who claim to be members of this set?
          */

@@ -316,18 +316,23 @@ namespace {
     }
 
     bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
-        if (_lastSlaveOkHost.empty()) {
+        // Can't use a cached host if we don't have one.
+        if (!_lastSlaveOkConn || _lastSlaveOkHost.empty()) {
             return false;
         }
 
-        ReplicaSetMonitorPtr monitor = _getMonitor();
+        // Don't pin if the readPrefs differ.
+        if (!_lastReadPref || !_lastReadPref->equals(*readPref)) {
+            return false;
+        }
 
-        if (_lastSlaveOkConn && _lastSlaveOkConn->isFailed()) {
+        // Make sure we don't think the host is down.
+        if (_lastSlaveOkConn->isFailed() || !_getMonitor()->isHostUp(_lastSlaveOkHost)) {
             invalidateLastSlaveOkCache();
             return false;
         }
 
-        return _lastSlaveOkConn && _lastReadPref && _lastReadPref->equals(*readPref);
+        return true;
     }
 
     void DBClientReplicaSet::_auth( DBClientConnection * conn ) {
