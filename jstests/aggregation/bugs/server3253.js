@@ -84,12 +84,10 @@ test(inputDoesntExist,
      [],
      []);
 
-if (0) { // SERVER-12586
 // ensure we cant do dangerous things to system collections
-outputInSystem = db.system.server3253_out;
-assertErrorCode(input, {$out: outputInSystem.getName()}, 16994);
+var outputInSystem = db.system.server3253_out;
+assertErrorCode(input, {$out: outputInSystem.getName()}, 17385);
 assert(!collectionExists(outputInSystem));
-}
 
 // shoudn't leave temp collections laying around
 assert.eq([], db.system.namespaces.find({name: /tmp\.agg_out/}).toArray());
