@@ -25,9 +25,9 @@ In the 2.1 release of WiredTiger the ::wiredtiger_open \c transaction_sync
 configuration setting default value has changed from "dsync" to "fsync".
 This is due to enhancements to the group commit implementation in
 WiredTiger - which mean that greater throughput can be achieved with
-explicit "fsync" calls than by enabling "dsync" on a file handle. Single
-threaded application may see greater throughput with transaction_sync set
-to "dsync".
+explicit "fsync" calls than by enabling "dsync" on a file handle.
+Applications that don't execute concurrent transactions may see better
+throughput with transaction_sync set to "dsync".
 </dd>
 
 @section version_20 Upgrading to Version 2.0
