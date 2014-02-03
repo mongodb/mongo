@@ -10,7 +10,6 @@ var x509_options = {sslMode : "requireSSL",
 var st = new ShardingTest({ name : "sharding_with_x509" ,
                             shards : 2,
                             mongos : 1,
-                            keyFile : "jstests/libs/key1",
                             other: {
                                 configOptions : x509_options,
                                 mongosOptions : x509_options,
@@ -18,8 +17,9 @@ var st = new ShardingTest({ name : "sharding_with_x509" ,
                                 shardOptions : x509_options
                             }});
 
-var mongos = new Mongo( "localhost:" + st.s0.port )
-var coll = mongos.getCollection( "test.foo" )
+st.s.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
+st.s.getDB('admin').auth('admin', 'pwd');
+var coll = st.s.getCollection( "test.foo" )
 
 st.shardColl( coll, { _id : 1 }, false )
 

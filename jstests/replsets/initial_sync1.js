@@ -54,7 +54,10 @@ var ports = allocatePorts( 3 );
 var basePath = MongoRunner.dataPath + basename;
 var hostname = getHostName();
 
-var slave2 = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} )
+var slave2 = startMongodTest (ports[2],
+                              basename,
+                              false,
+                              Object.merge({replSet : basename, oplogSize : 2}, x509_options2));
 
 var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
