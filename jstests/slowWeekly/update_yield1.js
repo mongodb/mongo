@@ -2,6 +2,7 @@
 load( "jstests/libs/slow_weekly_util.js" )
 testServer = new SlowWeeklyMongod( "update_yield1" )
 db = testServer.getDB( "test" );
+testServer.getDB("admin").runCommand( {setParameter:1, ttlMonitorEnabled : false} );
 
 t = db.update_yield1;
 t.drop()
