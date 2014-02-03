@@ -71,11 +71,17 @@ sum_ops(CONFIG *cfg, size_t field_offset)
 {
 	CONFIG_THREAD *thread;
 	uint64_t total;
-	int64_t i;
+	int64_t i, th_cnt;
 
 	total = 0;
-	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < cfg->workers_cnt; ++i, ++thread)
+	if (cfg->popthreads == NULL) {
+		thread = cfg->workers;
+		th_cnt = cfg->workers_cnt;
+	} else {
+		thread = cfg->popthreads;
+		th_cnt = cfg->populate_threads;
+	}
+	for (i = 0; thread != NULL && i < th_cnt; ++i, ++thread)
 		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
 
 	return (total);
@@ -108,15 +114,21 @@ latency_op(CONFIG *cfg,
 	CONFIG_THREAD *thread;
 	TRACK *track;
 	uint64_t ops, latency, tmp;
-	int64_t i;
+	int64_t i, th_cnt;
 	uint32_t max, min;
 
 	ops = latency = 0;
 	max = 0;
 	min = UINT32_MAX;
 
-	for (i = 0, thread = cfg->workers;
-	    thread != NULL && i < cfg->workers_cnt; ++i, ++thread) {
+	if (cfg->popthreads == NULL) {
+		thread = cfg->workers;
+		th_cnt = cfg->workers_cnt;
+	} else {
+		thread = cfg->popthreads;
+		th_cnt = cfg->populate_threads;
+	}
+	for (i = 0; thread != NULL && i < th_cnt; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
 		tmp = track->latency_ops;
 		ops += tmp - track->last_latency_ops;
