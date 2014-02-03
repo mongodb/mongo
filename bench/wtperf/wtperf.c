@@ -30,6 +30,7 @@
 /* Default values. */
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
+	"WT_TEST",			/* monitor dir */
 	NULL,				/* uri */
 	NULL,				/* conn */
 	NULL,				/* logf */
@@ -630,12 +631,12 @@ monitor(void *arg)
 	path = NULL;
 
 	/* Open the logging file. */
-	len = strlen(cfg->home) + 100;
+	len = strlen(cfg->monitor_dir) + 100;
 	if ((path = malloc(len)) == NULL) {
 		(void)enomem(cfg);
 		goto err;
 	}
-	snprintf(path, len, "%s/monitor", cfg->home);
+	snprintf(path, len, "%s/monitor", cfg->monitor_dir);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
 		goto err;
@@ -1079,15 +1080,15 @@ main(int argc, char *argv[])
 	pthread_t monitor_thread;
 	size_t len;
 	uint64_t req_len, total_ops;
-	int ch, monitor_created, ret, t_ret;
+	int ch, monitor_created, monitor_set, ret, t_ret;
 	const char *helium_mount;
-	const char *opts = "C:H:h:LMO:o:ST:";
+	const char *opts = "C:H:h:LMm:O:o:ST:";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
 	session = NULL;
-	monitor_created = ret = 0;
+	monitor_created = monitor_set = ret = 0;
 	helium_mount = user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
@@ -1103,11 +1104,22 @@ main(int argc, char *argv[])
 		case 'h':
 			cfg->home = optarg;
 			break;
+		case 'm':
+			cfg->monitor_dir = optarg;
+			monitor_set = 1;
+			break;
 		case '?':
 			fprintf(stderr, "Invalid option\n");
 			usage();
 			goto einval;
 		}
+
+	/*
+	 * If the user did not specify a monitor directory
+	 * then set the monitor directory to the home dir.
+	 */
+	if (!monitor_set)
+		cfg->monitor_dir = cfg->home;
 
 	/*
 	 * Create a temporary directory underneath the test directory in which

@@ -273,7 +273,7 @@ latency_print_single(CONFIG *cfg, TRACK *total, const char *name)
 	uint64_t cumops;
 	char path[1024];
 
-	snprintf(path, sizeof(path), "%s/latency.%s", cfg->home, name);
+	snprintf(path, sizeof(path), "%s/latency.%s", cfg->monitor_dir, name);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
 		return;
