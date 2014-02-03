@@ -705,6 +705,7 @@ if nix:
                          "-ggdb",
                          "-pthread",
                          "-Wall",
+                         "-Wno-unused-local-typedefs", # SERVER-12272, for GCC 4.8+
                          "-Wsign-compare",
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
