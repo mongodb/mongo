@@ -182,8 +182,8 @@ namespace optionenvironment {
     }
 
     /* Debugging */
-    void Environment::dump() {
-        std::map<Key, Value>::iterator iter;
+    void Environment::dump() const {
+        std::map<Key, Value>::const_iterator iter;
         for (iter = values.begin(); iter != values.end(); ++iter) {
             std::cout << "Key: '"
                       << iter->first
