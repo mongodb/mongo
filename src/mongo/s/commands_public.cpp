@@ -1407,6 +1407,37 @@ namespace mongo {
             }
         } geo2dFindNearCmd;
 
+        /**
+         * Outline for sharded map reduce for sharded output, $out replace:
+         *
+         * ============= mongos =============
+         * 1. Send map reduce command to all relevant shards with some extra info like
+         *    the value for the chunkSize and the name of the temporary output collection.
+         *
+         * ============= shard =============
+         * 2. Does normal map reduce.
+         * 3. Calls splitVector on itself against the output collection and puts the results
+         *    to the response object.
+         *
+         * ============= mongos =============
+         * 4. If the output collection is *not* sharded, uses the information from splitVector
+         *    to create a pre-split sharded collection.
+         * 5. Grabs the distributed lock for the final output collection.
+         * 6. Sends mapReduce.shardedfinish.
+         *
+         * ============= shard =============
+         * 7. Extracts the list of shards from the mapReduce.shardedfinish and performs a
+         *    broadcast query against all of them to obtain all documents that this shard owns.
+         * 8. Performs the reduce operation against every document from step #7 and outputs them
+         *    to another temporary collection. Also keeps track of the BSONObject size of
+         *    the every "reduced" documents for each chunk range.
+         * 9. Atomically drops the old output collection and renames the temporary collection to
+         *    the output collection.
+         *
+         * ============= mongos =============
+         * 10. Releases the distributed lock acquired at step #5.
+         * 11. Inspects the BSONObject size from step #8 and determines if it needs to split.
+         */
         class MRCmd : public PublicGridCommand {
         public:
             AtomicUInt JOB_NUMBER;
