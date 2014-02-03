@@ -293,6 +293,23 @@ namespace mongo {
                           "$foo" << 1 ) ) ) );
         result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
+
+        OID oid = OID::gen();
+
+        // missing $ref field
+        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                    BSON( "$id" << oid <<
+                          "foo" << 3 ) ) ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
+        // missing $id and $ref field
+        query = BSON( "x" << BSON( "$in" << BSON_ARRAY(
+                    BSON( "$db" << "test" <<
+                          "foo" << 3 ) ) ) );
+        result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+
     }
 
     TEST( MatchExpressionParserLeafTest, INExpressionDocument ) {

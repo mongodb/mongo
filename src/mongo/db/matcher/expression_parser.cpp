@@ -440,37 +440,31 @@ namespace mongo {
     }
 
     /**
-     * DBRef fields are ordered
-     * Required fields: $ref and $id (in that order)
+     * DBRef fields are ordered in the collection.
+     * In the query, we consider an embedded object a query on
+     * a DBRef as long as it contains $ref and $id.
+     * Required fields: $ref and $id/
      * Field names are checked but not field types.
      */
     bool MatchExpressionParser::_isDBRefDocument( const BSONObj& obj ) {
+        bool hasRef = false;
+        bool hasID = false;
+
         BSONObjIterator i( obj );
-        BSONElement element;
-        const char* fieldName;
-
-        // $ref
-        if ( !i.more() ) {
-            return false;
-        }
-        element = i.next();
-        fieldName = element.fieldName();
-        if ( !mongoutils::str::equals( "$ref", fieldName ) ) {
-            return false;
-        }
-
-        // $id
-        if ( !i.more() ) {
-            return false;
-        }
-        element = i.next();
-        fieldName = element.fieldName();
-        if ( !mongoutils::str::equals( "$id", fieldName ) ) {
-            return false;
+        while ( i.more() && !( hasRef && hasID ) ) {
+            BSONElement element = i.next();
+            const char *fieldName = element.fieldName();
+            // $ref
+            if ( !hasRef && mongoutils::str::equals( "$ref", fieldName ) ) {
+                hasRef = true;
+            }
+            // $id
+            else if ( !hasID && mongoutils::str::equals( "$id", fieldName ) ) {
+                hasID = true;
+            }
         }
 
-        // OK to have additional fields after $ref and $id.
-        return true;
+        return hasRef && hasID;
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseMOD( const char* name,
