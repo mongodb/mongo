@@ -533,100 +533,65 @@ populate_thread(void *arg)
 	}
 
 	/* Populate the database. */
-	if (cfg->populate_ops_per_txn == 0)
-		for (;;) {
-			op = get_next_incr();
-			if (op > cfg->icount)
-				break;
+	for (intxn = 0, opcount = 0;;) {
+		op = get_next_incr();
+		if (op > cfg->icount)
+			break;
 
-			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-			measure_latency = cfg->sample_interval != 0 && (
-			    trk->ops % cfg->sample_rate == 0);
-			if (measure_latency &&
-			    (ret = __wt_epoch(NULL, &start)) != 0) {
-				lprintf(cfg, ret, 0, "Get time call failed");
+		if (cfg->populate_ops_per_txn != 0 && !intxn) {
+			if ((ret = session->begin_transaction(
+			    session, cfg->transaction_config)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Failed starting transaction.");
 				goto err;
 			}
-			cursor->set_key(cursor, key_buf);
-			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
-			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Failed inserting");
-				goto err;
-			}
-			/* Gather statistics */
-			if (measure_latency) {
-				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-					lprintf(cfg, ret, 0,
-					    "Get time call failed");
-					goto err;
-				}
-				++trk->latency_ops;
-				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
-				track_operation(trk, usecs);
-			}
-			++thread->insert.ops; 	/* Same as trk->ops */
+			intxn = 1;
 		}
-	else {
-		for (intxn = 0, opcount = 0;;) {
-			op = get_next_incr();
-			if (op > cfg->icount)
-				break;
-
-			if (!intxn) {
-				if ((ret = session->begin_transaction(
-				    session, cfg->transaction_config)) != 0) {
-					lprintf(cfg, ret, 0,
-					    "Failed starting transaction.");
-					goto err;
-				}
-				intxn = 1;
-			}
-			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-			measure_latency = cfg->sample_interval != 0 && (
-			    trk->ops % cfg->sample_rate == 0);
-			if (measure_latency &&
-			    (ret = __wt_epoch(NULL, &start)) != 0) {
-				lprintf(cfg, ret, 0, "Get time call failed");
+		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		measure_latency = cfg->sample_interval != 0 && (
+		    trk->ops % cfg->sample_rate == 0);
+		if (measure_latency &&
+		    (ret = __wt_epoch(NULL, &start)) != 0) {
+			lprintf(cfg, ret, 0, "Get time call failed");
+			goto err;
+		}
+		cursor->set_key(cursor, key_buf);
+		if (cfg->random_value)
+			randomize_value(cfg, value_buf);
+		cursor->set_value(cursor, value_buf);
+		if ((ret = cursor->insert(cursor)) != 0) {
+			lprintf(cfg, ret, 0, "Failed inserting");
+			goto err;
+		}
+		/* Gather statistics */
+		if (measure_latency) {
+			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Get time call failed");
 				goto err;
 			}
-			cursor->set_key(cursor, key_buf);
-			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
-			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Failed inserting");
-				goto err;
-			}
-			/* Gather statistics */
-			if (measure_latency) {
-				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-					lprintf(cfg, ret, 0,
-					    "Get time call failed");
-					goto err;
-				}
-				++trk->latency_ops;
-				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
-				track_operation(trk, usecs);
-			}
-			++thread->insert.ops;	/* Same as trk->ops */
+			++trk->latency_ops;
+			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+			track_operation(trk, usecs);
+		}
+		++thread->insert.ops;	/* Same as trk->ops */
 
+		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
 				continue;
 			opcount = 0;
 
-			if ((ret =
-			    session->commit_transaction(session, NULL)) != 0)
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0)
 				lprintf(cfg, ret, 0,
 				    "Fail committing, transaction was aborted");
 			intxn = 0;
 		}
-		if (intxn &&
-		    (ret = session->commit_transaction(session, NULL)) != 0)
-			lprintf(cfg, ret, 0,
-			    "Fail committing, transaction was aborted");
 	}
+	if (intxn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0)
+		lprintf(cfg, ret, 0,
+		    "Fail committing, transaction was aborted");
 
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session in populate");
