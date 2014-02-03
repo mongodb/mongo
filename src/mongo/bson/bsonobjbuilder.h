@@ -839,6 +839,8 @@ namespace mongo {
         int len() const { return _b.len(); }
         int arrSize() const { return _i; }
 
+        BufBuilder& bb() { return _b.bb(); }
+
     private:
         // These two are undefined privates to prevent their accidental
         // use as we don't support unsigned ints in BSON

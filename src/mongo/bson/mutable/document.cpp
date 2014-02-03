@@ -1021,6 +1021,13 @@ namespace mutablebson {
             }
         }
 
+        template<typename Builder>
+        void writeElement(Element::RepIdx repIdx, Builder* builder,
+                          const StringData* fieldName = NULL) const;
+
+        template<typename Builder>
+        void writeChildren(Element::RepIdx repIdx, Builder* builder) const;
+
     private:
 
         // Insert the given field name into the field name heap, and return an ID for this
@@ -1633,9 +1640,9 @@ namespace mutablebson {
         if (thisRep.parent == kInvalidRepIdx && _repIdx == kRootRepIdx) {
             // If this is the root element, then we need to handle it differently, since it
             // doesn't have a field name and should embed directly, rather than as an object.
-            writeChildren(builder);
+            impl.writeChildren(_repIdx, builder);
         } else {
-            writeElement(builder);
+            impl.writeElement(_repIdx, builder);
         }
     }
 
@@ -1644,7 +1651,7 @@ namespace mutablebson {
         const Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
         verify(impl.getType(thisRep) == mongo::Array);
-        return writeChildren(builder);
+        return impl.writeChildren(_repIdx, builder);
     }
 
     Status Element::setValueDouble(const double value) {
@@ -2080,22 +2087,20 @@ namespace mutablebson {
     } // namespace
 
     template<typename Builder>
-    void Element::writeElement(Builder* builder, const StringData* fieldName) const {
-        // No need to verify(ok()) since we are only called from methods that have done so.
-        dassert(ok());
+    void Document::Impl::writeElement(Element::RepIdx repIdx, Builder* builder,
+                                      const StringData* fieldName) const {
 
-        const Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
+        const ElementRep& rep = getElementRep(repIdx);
 
-        if (impl.hasValue(thisRep)) {
-            BSONElement element = impl.getSerializedElement(thisRep);
+        if (hasValue(rep)) {
+            const BSONElement element = getSerializedElement(rep);
             if (fieldName)
                 builder->appendAs(element, *fieldName);
             else
                 builder->append(element);
         } else {
-            const BSONType type = impl.getType(thisRep);
-            const StringData subName = fieldName ? *fieldName : impl.getFieldName(thisRep);
+            const BSONType type = getType(rep);
+            const StringData subName = fieldName ? *fieldName : getFieldName(rep);
             SubBuilder<Builder> subBuilder(builder, type, subName);
 
             // Otherwise, this is a 'dirty leaf', which is impossible.
@@ -2103,37 +2108,81 @@ namespace mutablebson {
 
             if (type == mongo::Array) {
                 BSONArrayBuilder child_builder(subBuilder.buffer);
-                writeChildren(&child_builder);
+                writeChildren(repIdx, &child_builder);
                 child_builder.doneFast();
             } else {
                 BSONObjBuilder child_builder(subBuilder.buffer);
-                writeChildren(&child_builder);
+                writeChildren(repIdx, &child_builder);
                 child_builder.doneFast();
             }
         }
     }
 
     template<typename Builder>
-    void Element::writeChildren(Builder* builder) const {
-        // No need to verify(ok()) since we are only called from methods that have done so.
-        dassert(ok());
+    void Document::Impl::writeChildren(Element::RepIdx repIdx, Builder* builder) const {
 
         // TODO: In theory, I think we can walk rightwards building a write region from all
         // serialized embedded children that share an obj id and form a contiguous memory
         // region. For arrays we would need to know something about how many elements we wrote
         // that way so that the indexes would come out right.
         //
-        // Also in theory instead of walking all the way right, we can walk right until we hit
-        // an opaque node. Then we can bulk copy the opaque region, maybe? Probably that
-        // doesn't work for arrays.
-        //
-        // However, both of the above ideas involve walking the memory twice: once two build
-        // the copy region, and another time to actually copy it. It is unclear if this is
-        // better than just walking it once with the recursive solution.
-        Element current = leftChild();
-        while (current.ok()) {
-            current.writeElement(builder);
-            current = current.rightSibling();
+        // However, that involves walking the memory twice: once to build the copy region, and
+        // another time to actually copy it. It is unclear if this is better than just walking
+        // it once with the recursive solution.
+
+        const ElementRep& rep = getElementRep(repIdx);
+
+        // OK, need to resolve left if we haven't done that yet.
+        Element::RepIdx current = rep.child.left;
+        if (current == Element::kOpaqueRepIdx)
+            current = const_cast<Impl*>(this)->resolveLeftChild(repIdx);
+
+        // We need write the element, and then walk rightwards.
+        while (current != Element::kInvalidRepIdx) {
+            writeElement(current, builder);
+
+            // If we have an opaque region to the right, and we are not in an array, then we
+            // can bulk copy from the end of the element we just wrote to the end of our
+            // parent.
+            const ElementRep& currentRep = getElementRep(current);
+
+            if (currentRep.sibling.right == Element::kOpaqueRepIdx) {
+
+                // Obtain the current parent, so we can see if we can bulk copy the right
+                // siblings.
+                const ElementRep& parentRep = getElementRep(currentRep.parent);
+
+                // Bulk copying right only works on objects
+                if ((getType(parentRep) == mongo::Object) &&
+                    (currentRep.objIdx != kInvalidObjIdx) &&
+                    (currentRep.objIdx == parentRep.objIdx)) {
+
+                    BSONElement currentElt = getSerializedElement(currentRep);
+                    const uint32_t currentSize = currentElt.size();
+
+                    const BSONObj parentObj = (currentRep.parent == kRootRepIdx) ?
+                        getObject(parentRep.objIdx) :
+                        getSerializedElement(parentRep).Obj();
+                    const uint32_t parentSize = parentObj.objsize();
+
+                    const uint32_t currentEltOffset = getElementOffset(parentObj, currentElt);
+                    const uint32_t nextEltOffset = currentEltOffset + currentSize;
+
+                    const char* copyBegin = parentObj.objdata() + nextEltOffset;
+                    const uint32_t copyBytes = parentSize - nextEltOffset;
+
+                    // The -1 is because we don't want to copy in the terminal EOO.
+                    builder->bb().appendBuf(copyBegin, copyBytes - 1);
+
+                    // We are done with all children.
+                    break;
+                }
+
+                // We couldn't bulk copy, and our right sibling is opaque. We need to resolve.
+                const_cast<Impl*>(this)->resolveRightSibling(current);
+            }
+
+            current = currentRep.sibling.right;
         }
     }
 
@@ -2538,27 +2587,34 @@ namespace mutablebson {
     }
 
     Element Document::makeElement(ConstElement element, const StringData* fieldName) {
+
+        Impl& impl = getImpl();
+
         if (this == &element.getDocument()) {
+
             // If the Element that we want to build from belongs to this Document, then we have
             // to first copy it to the side, and then back in, since otherwise we might be
             // attempting both read to and write from the underlying BufBuilder simultaneously,
             // which will not work.
             BSONObjBuilder builder;
-            element.writeElement(&builder, fieldName);
-            BSONObj built = builder.obj();
+            impl.writeElement(element.getIdx(), &builder, fieldName);
+            BSONObj built = builder.done();
             BSONElement newElement = built.firstElement();
             return makeElement(newElement);
+
         } else {
+
             // If the Element belongs to another document, then we can just stream it into our
             // builder. We still do need to dassert that the field name doesn't alias us
             // somehow.
-            Impl& impl = getImpl();
             if (fieldName) {
                 dassert(impl.doesNotAlias(*fieldName));
             }
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
-            element.writeElement(&builder, fieldName);
+
+            const Impl& oImpl = element.getDocument().getImpl();
+            oImpl.writeElement(element.getIdx(), &builder, fieldName);
             return Element(this, impl.insertLeafElement(leafRef));
         }
     }
