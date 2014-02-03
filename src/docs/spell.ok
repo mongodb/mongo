@@ -13,6 +13,7 @@ DbCursor
 DbEnv
 DbMultiple
 EB
+EAGAIN
 EBUSY
 EINVAL
 EmpId
@@ -151,6 +152,7 @@ firstname
 fnv
 fput
 freelist
+fsync
 gcc
 gdbm
 getopt

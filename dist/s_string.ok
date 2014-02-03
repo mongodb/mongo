@@ -662,6 +662,7 @@ nocase
 nonliteral
 noop
 nop
+noraw
 notfound
 notset
 notsup

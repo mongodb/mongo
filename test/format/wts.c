@@ -86,7 +86,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "buffer_alignment=512,error_prefix=\"%s\","
 	    "%s,%s,%s,"
 	    "extensions="
-	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
+	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
@@ -96,8 +96,6 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
-	    (access(RAW_PATH, R_OK) == 0 &&
-	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
@@ -247,13 +245,13 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2\"");
 		break;
+	case COMPRESS_BZIP_RAW:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"bzip2-raw-test\"");
+		break;
 	case COMPRESS_LZO:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"LZO1B-6\"");
-		break;
-	case COMPRESS_RAW:
-		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"raw\"");
 		break;
 	case COMPRESS_SNAPPY:
 		p += snprintf(p, (size_t)(end - p),

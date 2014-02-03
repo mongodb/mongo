@@ -1,5 +1,4 @@
-AM_CPPFLAGS = -DWIREDTIGER_TEST_COMPRESS_RAW \
-	-DBERKELEY_DB_PATH=\"$(BERKELEY_DB_PATH)\" \
+AM_CPPFLAGS = -DBERKELEY_DB_PATH=\"$(BERKELEY_DB_PATH)\" \
 	-I$(top_builddir) -I$(top_srcdir)/src/include \
 	-I$(BERKELEY_DB_PATH)/include
 
@@ -12,8 +11,7 @@ t_SOURCES =\
 t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BERKELEY_DB_PATH)/lib -ldb
 t_LDFLAGS = -static
 
-noinst_LTLIBRARIES = raw_compress.la
-#noinst_LTLIBRARIES = lzo_compress.la raw_compress.la
+#noinst_LTLIBRARIES = lzo_compress.la
 
 # libtool hack: noinst_LTLIBRARIES turns off building shared libraries as well
 # as installation, it will only build static libraries.  As far as I can tell,
@@ -22,20 +20,9 @@ noinst_LTLIBRARIES = raw_compress.la
 #lzo_compress_la_LIBADD = -llzo2 -lm
 #lzo_compress_la_LDFLAGS = -avoid-version -module -rpath /nowhere
 
-# libtool hack: noinst_LTLIBRARIES turns off building shared libraries as well
-# as installation, it will only build static libraries.  As far as I can tell,
-# the "approved" libtool way to turn them back on is by adding -rpath.
-raw_compress_la_SOURCES = bzip2_compress.c
-raw_compress_la_LIBADD = -lbz2
-raw_compress_la_LDFLAGS = -avoid-version -module -rpath /nowhere
-
 s_dumpcmp: $(srcdir)/s_dumpcmp.sh
 	cp $(srcdir)/s_dumpcmp.sh $@
 	chmod +x $@
-
-# We build bzip_compress.c with special behaviors, retrieve our own local copy.
-bzip2_compress.c: $(srcdir)/../../ext/compressors/bzip2/bzip2_compress.c
-	cp $? .
 
 backup:
 	rm -rf BACKUP && cp -p -r RUNDIR BACKUP
@@ -43,4 +30,4 @@ backup:
 TESTS = smoke.sh
 
 clean-local:
-	rm -rf RUNDIR *.core bzip2_compress.c
+	rm -rf RUNDIR *.core

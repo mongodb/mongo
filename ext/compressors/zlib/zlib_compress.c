@@ -34,19 +34,6 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-static int
-zlib_compress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
-static int
-zlib_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
-    size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
-    size_t *, uint32_t *);
-static int
-zlib_decompress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *);
-static int
-zlib_terminate(WT_COMPRESSOR *, WT_SESSION *);
-
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
@@ -64,34 +51,6 @@ typedef struct {
 	WT_COMPRESSOR *compressor;
 	WT_SESSION *session;
 } ZLIB_OPAQUE;
-
-int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
-{
-	ZLIB_COMPRESSOR *zlib_compressor;
-
-	(void)config;				/* Unused parameters */
-
-	if ((zlib_compressor = calloc(1, sizeof(ZLIB_COMPRESSOR))) == NULL)
-		return (errno);
-
-	zlib_compressor->compressor.compress = zlib_compress;
-	zlib_compressor->compressor.compress_raw = zlib_compress_raw;
-	zlib_compressor->compressor.decompress = zlib_decompress;
-	zlib_compressor->compressor.pre_size = NULL;
-	zlib_compressor->compressor.terminate = zlib_terminate;
-
-	zlib_compressor->wt_api = connection->get_extension_api(connection);
-
-	/*
-	 * between 0-10: level: see zlib manual.
-	 */
-	zlib_compressor->zlib_level = Z_DEFAULT_COMPRESSION;
-
-						/* Load the compressor */
-	return (connection->add_compressor(
-	    connection, "zlib", (WT_COMPRESSOR *)zlib_compressor, NULL));
-}
 
 /*
  * zlib_error --
@@ -161,7 +120,9 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
 	zs.avail_out = (uint32_t)dst_len - 1;
-	if ((ret = deflate(&zs, Z_FINISH)) == Z_STREAM_END) {
+	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	if (ret == Z_STREAM_END) {
 		*compression_failed = 0;
 		*result_lenp = zs.total_out;
 	} else
@@ -183,15 +144,14 @@ zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 {
 	uint32_t base, indx, limit;
 
-	indx = 0;
+	indx = 1;
 
 	/* Figure out which slot we got to: binary search */
 	if (target >= offsets[slots])
 		indx = slots;
-	else if (target >= offsets[1])
-		for (base = 1, limit = slots - 1; limit != 0; limit >>= 1) {
+	else if (target > offsets[1])
+		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-
 			if (target < offsets[indx])
 				continue;
 			base = indx + 1;
@@ -241,9 +201,10 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.next_out = dst;
 	/*
 	 * Experimentally derived, reserve this many bytes for zlib to finish
-	 * up a buffer.
+	 * up a buffer.  If this isn't sufficient, we don't fail but we will be
+	 * inefficient.
 	 */
-#define	WT_ZLIB_RESERVED	6
+#define	WT_ZLIB_RESERVED	12
 	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
 	last_zs = zs;
 
@@ -252,49 +213,62 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * input.  Continue until there is no input small enough or the
 	 * compression fails to fit.
 	 */
-	for (;;) {
+	while (zs.avail_out > 0) {
 		/* Find the slot we will try to compress up to. */
 		if ((curr_slot = zlib_find_slot(
-		    zs.total_in + zs.avail_out, offsets, slots)) == last_slot)
+		    zs.total_in + zs.avail_out, offsets, slots)) <= last_slot)
 			break;
 
 		zs.avail_in = offsets[curr_slot] - offsets[last_slot];
 		/* Save the stream state in case the chosen data doesn't fit. */
 		last_zs = zs;
 
-		if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
-			return (
-			    zlib_error(compressor, session, "deflate", ret));
+		while (zs.avail_in > 0 && zs.avail_out > 0)
+			if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
+				return (zlib_error(
+				    compressor, session, "deflate", ret));
 
-		if (zs.avail_out == 0 && zs.avail_in > 0) {
-			/* Roll back the last operation: it didn't complete */
+		/* Roll back the if the last deflate didn't complete. */
+		if (zs.avail_in > 0) {
 			zs = last_zs;
 			break;
-		}
-
-		last_slot = curr_slot;
+		} else
+			last_slot = curr_slot;
 	}
 
 	zs.avail_out += WT_ZLIB_RESERVED;
-	if ((ret = deflate(&zs, Z_FINISH)) != Z_STREAM_END)
+	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	/*
+	 * If the end marker didn't fit, report that we got no work done.  WT
+	 * will compress the (possibly large) page image using ordinary
+	 * compression instead.
+	 */
+	if (ret == Z_BUF_ERROR)
+		last_slot = 0;
+	else if (ret != Z_STREAM_END)
 		return (
-		    zlib_error(compressor, session, "deflate", ret));
+		    zlib_error(compressor, session, "deflate end block", ret));
+
+	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
+		return (
+		    zlib_error(compressor, session, "deflateEnd", ret));
 
 	if (last_slot > 0) {
 		*result_slotsp = last_slot;
 		*result_lenp = zs.total_out;
+	} else {
+		/* We didn't manage to compress anything: don't retry. */
+		*result_slotsp = 0;
+		*result_lenp = 1;
 	}
-
-	if ((ret = deflateEnd(&zs)) != Z_OK)
-		return (
-		    zlib_error(compressor, session, "deflateEnd", ret));
 
 #if 0
 	fprintf(stderr,
 	    "zlib_compress_raw (%s): page_max %" PRIuMAX ", slots %" PRIu32
 	    ", take %" PRIu32 ": %" PRIu32 " -> %" PRIuMAX "\n",
 	    final ? "final" : "not final", (uintmax_t)page_max,
-	    slots, last_slot, offset[last_slot], (uintmax_t)*result_lenp);
+	    slots, last_slot, offsets[last_slot], (uintmax_t)*result_lenp);
 #endif
 	return (0);
 }
@@ -324,7 +298,9 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
 	zs.avail_out = (uint32_t)dst_len;
-	if ((ret = inflate(&zs, Z_FINISH)) == Z_STREAM_END) {
+	while ((ret = inflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	if (ret == Z_STREAM_END) {
 		*result_lenp = zs.total_out;
 		ret = Z_OK;
 	}
@@ -342,5 +318,50 @@ zlib_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	(void)session;					/* Unused parameters */
 
 	free(compressor);
+	return (0);
+}
+
+static int
+zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
+{
+	ZLIB_COMPRESSOR *zlib_compressor;
+
+	/*
+	 * There are two almost identical zlib compressors: one supporting raw
+	 * compression, and one without.
+	 */
+	if ((zlib_compressor = calloc(1, sizeof(ZLIB_COMPRESSOR))) == NULL)
+		return (errno);
+
+	zlib_compressor->compressor.compress = zlib_compress;
+	zlib_compressor->compressor.compress_raw = raw ?
+	    zlib_compress_raw : NULL;
+	zlib_compressor->compressor.decompress = zlib_decompress;
+	zlib_compressor->compressor.pre_size = NULL;
+	zlib_compressor->compressor.terminate = zlib_terminate;
+
+	zlib_compressor->wt_api = connection->get_extension_api(connection);
+
+	/*
+	 * between 0-10: level: see zlib manual.
+	 */
+	zlib_compressor->zlib_level = Z_DEFAULT_COMPRESSION;
+
+	/* Load the standard compressor. */
+	return (connection->add_compressor(
+	    connection, name, &zlib_compressor->compressor, NULL));
+}
+
+int
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	int ret;
+
+	(void)config;				/* Unused parameters */
+
+	if ((ret = zlib_add_compressor(connection, 1, "zlib")) != 0)
+		return (ret);
+	if ((ret = zlib_add_compressor(connection, 0, "zlib-noraw")) != 0)
+		return (ret);
 	return (0);
 }
