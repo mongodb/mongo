@@ -179,7 +179,8 @@ namespace mongo {
     }
 
     DBClientBase* DBConnectionPool::_get(const string& ident , double socketTimeout ) {
-        verify( ! inShutdown() );
+        uassert(17382, "Can't use connection pool during shutdown",
+                !inShutdown());
         scoped_lock L(_mutex);
         PoolForHost& p = _pools[PoolKey(ident,socketTimeout)];
         p.initializeHostName(ident);
