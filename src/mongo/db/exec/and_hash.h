@@ -67,8 +67,11 @@ namespace mongo {
         virtual PlanStageStats* getStats();
 
     private:
+        static const size_t kLookAheadWorks;
+
         StageState readFirstChild(WorkingSetID* out);
         StageState hashOtherChildren(WorkingSetID* out);
+        StageState workChild(size_t childNo, WorkingSetID* out);
 
         // Not owned by us.
         WorkingSet* _ws;
@@ -77,7 +80,12 @@ namespace mongo {
         const MatchExpression* _filter;
 
         // The stages we read from.  Owned by us.
-        vector<PlanStage*> _children;
+        std::vector<PlanStage*> _children;
+
+        // We want to see if any of our children are EOF immediately.  This requires working them a
+        // few times to see if they hit EOF or if they produce a result.  If they produce a result,
+        // we place that result here.
+        std::vector<WorkingSetID> _lookAheadResults;
 
         // _dataMap is filled out by the first child and probed by subsequent children.  This is the
         // hash table that we create by intersecting _children and probe with the last child.

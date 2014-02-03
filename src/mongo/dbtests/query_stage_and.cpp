@@ -205,6 +205,83 @@ namespace QueryStageAnd {
         }
     };
 
+    // Invalidate one of the "are we EOF?" lookahead results.
+    class QueryStageAndHashInvalidateLookahead : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("_id" << i << "foo" << i << "bar" << i << "baz" << i));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+            addIndex(BSON("baz" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL));
+
+            // Foo <= 20 (descending)
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Bar <= 19 (descending)
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            params.bounds.startKey = BSON("" << 19);
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // First call to work reads the first result from the children.
+            // The first result is for the first scan over foo is {foo: 20, bar: 20, baz: 20}.
+            // The first result is for the second scan over bar is {foo: 19, bar: 19, baz: 19}.
+            WorkingSetID id;
+            PlanStage::StageState status = ah->work(&id);
+            ASSERT_EQUALS(PlanStage::NEED_TIME, status);
+
+            const unordered_set<WorkingSetID>& flagged = ws.getFlagged();
+            ASSERT_EQUALS(size_t(0), flagged.size());
+
+            // "delete" deletedObj (by invalidating the DiskLoc of the obj that matches it).
+            BSONObj deletedObj = BSON("_id" << 20 << "foo" << 20 << "bar" << 20 << "baz" << 20);
+            ah->prepareToYield();
+            set<DiskLoc> data;
+            getLocs(&data, coll);
+            for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
+                if (0 == deletedObj.woCompare(it->obj())) {
+                    ah->invalidate(*it, INVALIDATION_DELETION);
+                    break;
+                }
+            }
+            ah->recoverFromYield();
+
+            // The deleted obj should show up in flagged.
+            ASSERT_EQUALS(size_t(1), flagged.size());
+
+            // And not in our results.
+            int count = 0;
+            while (!ah->isEOF()) {
+                WorkingSetID id;
+                PlanStage::StageState status = ah->work(&id);
+                if (PlanStage::ADVANCED != status) { continue; }
+                WorkingSetMember* wsm = ws.get(id);
+                ASSERT_NOT_EQUALS(0, deletedObj.woCompare(wsm->loc.obj()));
+                ++count;
+            }
+
+            ASSERT_EQUALS(count, 20);
+        }
+    };
 
     // An AND with three children.
     class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
@@ -299,7 +376,22 @@ namespace QueryStageAnd {
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
-            ASSERT_EQUALS(0, countResults(ah.get()));
+            int count = 0;
+            int works = 0;
+            while (!ah->isEOF()) {
+                WorkingSetID id;
+                ++works;
+                PlanStage::StageState status = ah->work(&id);
+                if (PlanStage::ADVANCED != status) { continue; }
+                ++count;
+            }
+
+            ASSERT_EQUALS(0, count);
+
+            // We check the "look ahead for EOF" here by examining the number of works required to
+            // hit EOF.  Our first call to work will pick up that bar==5 is EOF and the AND will EOF
+            // immediately.
+            ASSERT_EQUALS(works, 1);
         }
     };
 
@@ -777,6 +869,7 @@ namespace QueryStageAnd {
             add<QueryStageAndHashWithNothing>();
             add<QueryStageAndHashProducesNothing>();
             add<QueryStageAndHashWithMatcher>();
+            add<QueryStageAndHashInvalidateLookahead>();
             add<QueryStageAndSortedInvalidation>();
             add<QueryStageAndSortedThreeLeaf>();
             add<QueryStageAndSortedWithNothing>();
