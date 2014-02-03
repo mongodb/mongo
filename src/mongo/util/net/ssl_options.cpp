@@ -29,7 +29,7 @@ namespace mongo {
                                   .setSources(moe::SourceAllLegacy);
 
         options->addOptionChaining("net.ssl.mode", "sslMode", moe::String,
-                "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
+                "set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)");
 
         options->addOptionChaining("net.ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
                 "PEM file for ssl");
