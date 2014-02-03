@@ -852,12 +852,15 @@ execute_populate(CONFIG *cfg)
 
 	/*
 	 * Move popthreads aside to narrow possible race with the monitor
-	 * thread.
+	 * thread. The latency tracking code also requires that popthreads be
+	 * NULL when the populate phase is finished, to know that the workload
+	 * phase has started.
 	 */
 	popth = cfg->popthreads;
 	cfg->popthreads = NULL;
-	if ((ret =
-	    stop_threads(cfg, cfg->populate_threads, popth)) != 0)
+	ret = stop_threads(cfg, cfg->populate_threads, popth);
+	free(popth);
+	if (ret != 0)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
