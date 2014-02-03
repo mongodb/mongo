@@ -42,8 +42,8 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 	 * Ignore split and empty pages, they get merged into the parent.
 	 */
 	if (mod == NULL || F_ISSET(mod, WT_PM_REC_MASK) == 0) {
-		WT_RET(__wt_ref_info(session,
-		    page->parent, page->ref, &addr, &addr_size, NULL));
+		WT_RET(__wt_ref_info(session, page->parent,
+		    __wt_page_ref(session, page), &addr, &addr_size, NULL));
 		if (addr == NULL)
 			return (0);
 		WT_RET(

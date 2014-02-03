@@ -270,15 +270,6 @@ struct __wt_page_modify {
  * The WT_PAGE structure describes the in-memory page information.
  */
 struct __wt_page {
-	/*
-	 * Two links to the parent: the physical parent page, and the internal
-	 * page's reference structure used to find this page.
-	 */
-#define	WT_PAGE_IS_ROOT(page)						\
-	((page)->parent == NULL)
-	WT_PAGE	*parent;			/* Page's parent */
-	WT_REF	*ref;				/* Parent reference */
-
 	/* Per page-type information. */
 	union {
 		/*
@@ -364,6 +355,15 @@ struct __wt_page {
 	uint64_t read_gen;
 
 	uint64_t memory_footprint;	/* Memory attached to the page */
+
+	/*
+	 * The page's parent: a link to the physical parent page, and a hint
+	 * offset for the matching parent page's WT_REF structure.
+	 */
+#define	WT_PAGE_IS_ROOT(page)						\
+	((page)->parent == NULL)
+	WT_PAGE	*parent;		/* Page's parent */
+	uint32_t ref_hint;		/* Page's WT_REF hint */
 
 	/*
 	 * In-memory pages optionally reference a number of entries originally
@@ -504,13 +504,20 @@ struct __wt_ref {
 	    (ref) = (page)->u.intl.t; (i) > 0; ++(ref), --(i))
 
 /*
+ * WT_REF_SLOT --
+ *	Return the 0-based array offset based on a parent page and WT_REF slot.
+ */
+#define	WT_REF_SLOT(page, ref)						\
+	((uint32_t)(((WT_REF *)ref) - (page)->u.intl.t))
+
+/*
  * WT_LINK_PAGE --
  * Link a child page into a reference in its parent.
  */
 #define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
 	(pref)->page = (cpage);						\
 	(cpage)->parent = (ppage);					\
-	(cpage)->ref = (pref);						\
+	(cpage)->ref_hint = WT_REF_SLOT(ppage, pref);			\
 } while (0)
 
 /*

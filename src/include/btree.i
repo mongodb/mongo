@@ -195,6 +195,50 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_page_ref --
+ *      Return the page's WT_REF structure.
+ */
+static inline WT_REF *
+__wt_page_ref(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	uint32_t i;
+
+	/* The root page has no WT_REF structure. */
+	if (WT_PAGE_IS_ROOT(page))
+		return (NULL);
+
+	/*
+	 * Use the page's WT_REF hint: unless the page has split it should point
+	 * to the correct location.  It's not an error for the hint to be zero,
+	 * we don't bother initializing it everywhere, it only implies the first
+	 * retrieval is slower.
+	 */
+	if (page->parent->u.intl.t[page->ref_hint].page == page)
+		return (&page->parent->u.intl.t[page->ref_hint]);
+
+	for (i = page->ref_hint + 1; i < page->parent->entries; ++i)
+		if (page->parent->u.intl.t[i].page == page) {
+			page->ref_hint = i;
+			return (&page->parent->u.intl.t[i]);
+		}
+
+	/*
+	 * If we don't find it, the page must have split, start the search from
+	 * the beginning of the page.
+	 */
+	for (i = 0; i < page->parent->entries; ++i)
+		if (page->parent->u.intl.t[i].page == page) {
+			page->ref_hint = i;
+			return (&page->parent->u.intl.t[i]);
+		}
+	/* NOTREACHED */
+
+	/* If we don't find it, there's a serious problem. */
+	WT_ASSERT(session, 0);
+	return (NULL);
+}
+
+/*
  * __wt_page_modify_init --
  *	A page is about to be modified, allocate the modification structure.
  */
@@ -570,6 +614,7 @@ static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
+	WT_REF *ref;
 
 	/*
 	 * Discard our hazard pointer.  Ignore pages we don't have and the root
@@ -582,13 +627,17 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Try to immediately evict pages if they have the special "oldest"
 	 * read generation and we have some chance of succeeding.
 	 */
-	if (!WT_TXN_ACTIVE(&session->txn) &&
-	    (page->modify == NULL ||
-	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) &&
-	    page->read_gen == WT_READ_GEN_OLDEST &&
-	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+	if (page->read_gen != WT_READ_GEN_OLDEST)
+		goto skip;
+	if (WT_TXN_ACTIVE(&session->txn))
+		goto skip;
+	if (page->modify != NULL &&
+	    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
+		goto skip;
+	ref = __wt_page_ref(session, page);
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
-			page->ref->state = WT_REF_MEM;
+			ref->state = WT_REF_MEM;
 			return (ret);
 		}
 
@@ -603,6 +652,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (ret);
 	}
 
+skip:
 	return (__wt_hazard_clear(session, page));
 }
 

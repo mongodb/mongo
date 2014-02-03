@@ -411,7 +411,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	}
 	root->entries = 1;
 	root->parent = NULL;
-	root->ref = NULL;
 
 	/*
 	 * Mark the leaf page dirty: we didn't create an entirely valid root

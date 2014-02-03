@@ -35,7 +35,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page = *pagep;
 	*pagep = NULL;
 	page->parent = NULL;
-	page->ref = NULL;
 
 	/*
 	 * We should never discard the file's current eviction point or a page

@@ -325,7 +325,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 
 	/* If it's not the root page, unpack the parent cell. */
 	if (!WT_PAGE_IS_ROOT(page)) {
-		__wt_cell_unpack(page->ref->addr, unpack);
+		__wt_cell_unpack(__wt_page_ref(session, page)->addr, unpack);
 
 		/* Compare the parent cell against the page type. */
 		switch (page->type) {

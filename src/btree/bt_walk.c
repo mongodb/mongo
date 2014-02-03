@@ -236,7 +236,7 @@ ascend:	/*
 	 * Figure out the current slot in the parent page's WT_REF array and
 	 * switch to the parent.
 	 */
-	ref = page->ref;
+	ref = __wt_page_ref(session, page);
 	slot = (uint32_t)(ref - page->parent->u.intl.t);
 	page = page->parent;
 
@@ -280,7 +280,8 @@ ascend:	/*
 					    __wt_page_release(session, couple));
 				else
 					WT_RET(__wt_page_swap(
-					    session, couple, page, page->ref));
+					    session, couple, page,
+					    __wt_page_ref(session, page)));
 			}
 
 			*pagep = page;

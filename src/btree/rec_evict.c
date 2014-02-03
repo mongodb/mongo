@@ -58,7 +58,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if exclusive is set: we won't check
 	 * hazard pointers in that case.
 	 */
-	parent_ref = page->ref;
+	parent_ref = __wt_page_ref(session, page);
 	WT_ERR(__rec_review(session,
 	    parent_ref, page, exclusive, merge, 1, &inmem_split, &istree));
 
@@ -392,9 +392,10 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 
 	if (btree->checkpointing && top)
 		for (t = page->parent;; t = t->parent) {
-			if (t == NULL || t->ref == NULL)	/* root */
+			if (t == NULL || t->parent == NULL)	/* root */
 				goto ckpt;
-			if (t->ref->state != WT_REF_MEM)	/* scary */
+								/* scary */
+			if (__wt_page_ref(session, t)->state != WT_REF_MEM)
 				goto ckpt;
 			if (t->modify == NULL ||		/* not merged */
 			    !F_ISSET(t->modify, WT_PM_REC_EMPTY |

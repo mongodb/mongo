@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+#if 0
 /*
  * __split_row_page_inmem --
  *	Split a row leaf page in memory. This is done when we are unable to
@@ -252,3 +253,11 @@ __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	return (__split_row_page_inmem(session, page));
 }
+#else
+	int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	(void)session;
+	(void)page;
+	return (EBUSY);
+}
+#endif

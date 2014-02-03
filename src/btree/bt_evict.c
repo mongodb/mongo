@@ -89,10 +89,15 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_EVICT_ENTRY *evict;
 	uint32_t i, elem;
 
-	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
-	    page->ref->page != page ||
-	    page->ref->state == WT_REF_EVICT_WALK ||
-	    page->ref->state == WT_REF_LOCKED);
+#ifdef HAVE_DIAGNOSTIC
+	if (!WT_PAGE_IS_ROOT(page)) {
+		WT_REF *ref = __wt_page_ref(session, page);
+		WT_ASSERT(session,
+		    ref->page != page ||
+		    ref->state == WT_REF_EVICT_WALK ||
+		    ref->state == WT_REF_LOCKED);
+	}
+#endif
 
 	/* Fast path: if the page isn't on the queue, don't bother searching. */
 	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
@@ -306,7 +311,7 @@ __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Clear the current eviction point. */
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
-		ref = page->ref;
+		ref = __wt_page_ref(session, page);
 		page = page->parent;
 		WT_ASSERT(session, page != btree->evict_page);
 		if (ref->state == WT_REF_EVICT_WALK)
@@ -815,7 +820,8 @@ __evict_init_candidate(
 	u_int slot;
 
 	cache = S2C(session)->cache;
-	WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
+	WT_ASSERT(session,
+	    __wt_page_ref(session, page)->state == WT_REF_EVICT_WALK);
 
 	/* Keep track of the maximum slot we are using. */
 	slot = (u_int)(evict - cache->evict);
@@ -854,8 +860,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		end = cache->evict + cache->evict_slots;
 
 	WT_ASSERT(session, btree->evict_page == NULL ||
-	    WT_PAGE_IS_ROOT(btree->evict_page) ||
-	    btree->evict_page->ref->state == WT_REF_EVICT_WALK);
+	    WT_PAGE_IS_ROOT(btree->evict_page) || __wt_page_ref(
+	    session, btree->evict_page)->state == WT_REF_EVICT_WALK);
 
 	walk_flags = WT_TREE_EVICT;
 	if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
@@ -1074,7 +1080,7 @@ __evict_get_page(
 		 * multiple attempts to evict it.  For pages that are already
 		 * being evicted, this operation will fail and we will move on.
 		 */
-		ref = evict->page->ref;
+		ref = __wt_page_ref(session, evict->page);
 		WT_ASSERT(session, evict->page == ref->page);
 
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
@@ -1120,7 +1126,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_PAGE *page;
 
 	WT_RET(__evict_get_page(session, is_app, &btree, &page));
-	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
+	WT_ASSERT(session,
+	    __wt_page_ref(session, page)->state == WT_REF_LOCKED);
 
 	/*
 	 * In case something goes wrong, don't pick the same set of pages every

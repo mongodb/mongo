@@ -3885,7 +3885,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (WT_PAGE_IS_ROOT(page))
 			break;
 
-		ref = page->ref;
+		ref = __wt_page_ref(session, page);
 		if (ref->addr != NULL) {
 			/*
 			 * Free the page and clear the address (so we don't free
@@ -4140,7 +4140,7 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 	WT_RET(__wt_page_alloc(session, type, r->bnd_next, pagep));
 	page = *pagep;
 	page->parent = orig->parent;
-	page->ref = orig->ref;
+	page->ref_hint = orig->ref_hint;
 	if (type == WT_PAGE_COL_INT)
 		page->u.intl.recno = r->bnd[0].recno;
 	page->read_gen = WT_READ_GEN_NOTSET;
@@ -4232,7 +4232,8 @@ __rec_split_row(
 	if (WT_PAGE_IS_ROOT(orig))
 		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		__wt_ref_key(orig->parent, orig->ref, &p, &size);
+		__wt_ref_key(
+		    orig->parent, __wt_page_ref(session, orig), &p, &size);
 		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, p, size));
 	}
 
