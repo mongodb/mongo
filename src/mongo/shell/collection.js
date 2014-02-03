@@ -197,9 +197,9 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
                      !_verboseShell) ? 0 : new Date().getTime();
 
     if ( this._mongo.useWriteCommands() ) {
-        // bit 0 of option flag is continueOnError.
-        var batch = ((options & 1) == 0) ? this.initializeUnorderedBulkOp() :
-                this.initializeOrderedBulkOp();
+        // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
+        var batch = ((options & 1) == 0) ? this.initializeOrderedBulkOp() :
+                this.initializeUnorderedBulkOp();
 
         if (Array.isArray(obj)) {
             obj.forEach(function(doc) {
