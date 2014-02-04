@@ -1,3 +1,46 @@
+WiredTiger release 2.1.0, 2014-02-04
+------------------------------------
+
+The WiredTiger 2.1.0 release contains new features, performance enhancements
+and bug fixes.  Significant changes include:
+
+The WT_ITEM structure was changed so that the size field is a size_t rather
+than a uint32_t.  See upgrading documentation for details.
+
+A change to the compress_raw interface around repeating the call with more
+records.  See upgrading documentation for details.
+
+In LSM trees, the memory_page_max setting is ignored.  The effective setting
+is double the chunk size. [#861][#859]
+
+Add support for zlib compression. [#855] [#865]
+
+Various enhancements to how WiredTiger generates tree structures in memory to
+help maintain consistent performance as table size grows. [#851]
+
+Add support for Levyx Inc Helium as an external data source in WiredTiger
+[#849][#850]
+
+Improve insert performance when a table contains many identical overflow
+items.
+
+Various performance enhancements to btree searches. [#838][#839][#840]
+
+Add support for newer versions of autoconf up to 1.14. [#599][#841]
+
+Improve multi-threaded throughput of durable log writes, including changing
+the default wiredtiger_open transaction_sync configuration from dsync to
+fsync, see the upgrading documentation for further information. [#831][#832]
+
+In the Python and Java APIs, automatically close handles to prevent invalid
+accesses by applications. [#649][#800][#830]
+
+Various enhancements to the LSM merge algorithm, including improvements to how
+files are selected for merging, and throttling based on whether merges are
+keeping up (to limit write amplification).  Made the minimum number of chunks
+chosen to merge configurable. [#817][#819][#822]
+
+
 WiredTiger release 2.0.1, 2013-12-12
 ------------------------------------
 
