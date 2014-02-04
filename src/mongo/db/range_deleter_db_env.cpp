@@ -91,8 +91,8 @@ namespace mongo {
                                              true); /*onlyRemoveOrphans*/
 
                 if (numDeleted < 0) {
-                    warning() << "collection or index dropped "
-                              << "before data could be cleaned" << endl;
+                    *errMsg = "collection or index dropped before data could be cleaned";
+                    warning() << *errMsg << endl;
 
                     if (!initiallyHaveClient) {
                         cc().shutdown();
