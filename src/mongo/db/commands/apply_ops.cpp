@@ -112,6 +112,16 @@ namespace mongo {
 
                 string ns = temp["ns"].String();
 
+                // Run operations under a nested lock as a hack to prevent them from yielding.
+                //
+                // The list of operations is supposed to be applied atomically; yielding would break
+                // atomicity by allowing an interruption or a shutdown to occur after only some
+                // operations are applied.  We are already locked globally at this point, so taking
+                // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
+                // operations that hold a nested lock.
+                Lock::DBWrite lk(ns);
+                invariant(Lock::nested());
+
                 Client::Context ctx(ns);
                 bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
                 ab.append(!failed);
