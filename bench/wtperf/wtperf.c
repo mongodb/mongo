@@ -544,6 +544,7 @@ populate_thread(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
+	cursors = NULL;
 	ret = 0;
 	trk = &thread->insert;
 
