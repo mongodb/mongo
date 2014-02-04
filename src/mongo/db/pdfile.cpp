@@ -1589,7 +1589,8 @@ namespace mongo {
         Lock::assertWriteLocked(ns);
         NamespaceDetails* nsd = nsdetails(ns);
 
-        for (int i=offset; i<nsd->getTotalIndexCount(); i++) {
+        // offset is 0-based, so we subtract one from the index count
+        for (int i = offset; i < (nsd->getTotalIndexCount() - 1); i++) {
             if (i < NamespaceDetails::NIndexesMax-1) {
                 *getDur().writing(&nsd->idx(i)) = nsd->idx(i+1);
                 nsd->setIndexIsMultikey(ns, i, nsd->isMultikey(i+1));
