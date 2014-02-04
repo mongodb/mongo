@@ -29,6 +29,7 @@
 */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
@@ -37,7 +38,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
@@ -103,6 +104,20 @@ namespace mongo {
             if ( source.empty() || target.empty() ) {
                 errmsg = "invalid command syntax";
                 return false;
+            }
+
+            if (!fromRepl) { // If it got through on the master, need to allow it here too
+                Status sourceStatus = userAllowedWriteNS(source);
+                if (!sourceStatus.isOK()) {
+                    errmsg = "error with source namespace: " + sourceStatus.reason();
+                    return false;
+                }
+
+                Status targetStatus = userAllowedWriteNS(target);
+                if (!targetStatus.isOK()) {
+                    errmsg = "error with target namespace: " + targetStatus.reason();
+                    return false;
+                }
             }
 
             string sourceDB = nsToDatabase(source);
