@@ -296,24 +296,21 @@ var _bulk_api_module = (function() {
   /***********************************************************
    * Adds the initializers of bulk operations to the db collection
    ***********************************************************/
-  DBCollection.prototype.initializeUnorderedBulkOp = function(options) {
-    return new Bulk(this, false, options)
+  DBCollection.prototype.initializeUnorderedBulkOp = function() {
+    return new Bulk(this, false);
   }
 
-  DBCollection.prototype.initializeOrderedBulkOp = function(options) {
-    return new Bulk(this, true, options)
+  DBCollection.prototype.initializeOrderedBulkOp = function() {
+    return new Bulk(this, true);
   }
 
   /***********************************************************
    * Wraps the operations done for the batch
    ***********************************************************/
-  var Bulk = function(collection, ordered, options) {
-    options = options == null ? {} : options;
-
+  var Bulk = function(collection, ordered) {
     // Namespace for the operation
     var self = this;
     var namespace = collection.getName();
-    var maxTimeMS = options.maxTimeMS;
     var executed = false;
 
     // Set max byte size
@@ -635,20 +632,17 @@ var _bulk_api_module = (function() {
                                      _legacyOp.operation,
                                      ordered);
       } else if(_legacyOp.batchType == UPDATE) {
-        if(_legacyOp.operation.multi) options.multi = _legacyOp.operation.multi;
-        if(_legacyOp.operation.upsert) options.upsert = _legacyOp.operation.upsert;
-
         collection.getMongo().update(collection.getFullName(),
                                      _legacyOp.operation.q,
                                      _legacyOp.operation.u,
-                                     options.upsert,
-                                     options.multi);
+                                     _legacyOp.operation.upsert,
+                                     _legacyOp.operation.multi);
       } else if(_legacyOp.batchType == REMOVE) {
-        if(_legacyOp.operation.limit) options.single = true;
+        var single = Boolean(_legacyOp.operation.limit);
 
         collection.getMongo().remove(collection.getFullName(),
                                      _legacyOp.operation.q,
-                                     options.single);
+                                     single);
       }
     }
 
