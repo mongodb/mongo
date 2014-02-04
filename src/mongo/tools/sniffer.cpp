@@ -434,7 +434,8 @@ void processDiagLog( const char * file ) {
 
 void usage() {
     cout <<
-         "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
+         "Usage: mongosniff [--help] [--forward host:port] [--objcheck] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
+         "--help          Print this help message.\n"
          "--forward       Forward all parsed request messages to mongod instance at \n"
          "                specified host:port\n"
          "--source        Source of traffic to sniff, either a network interface or a\n"
@@ -447,7 +448,6 @@ void usage() {
          "                when there are dropped tcp packets.\n"
          "<port0>...      These parameters are used to filter sniffing.  By default, \n"
          "                only port 27017 is sniffed.\n"
-         "--help          Print this help message.\n"
          << endl;
 }
 
