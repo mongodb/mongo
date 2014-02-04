@@ -1,6 +1,6 @@
 /** @file bson.h
 
-    Main bson include file for mongodb c++ clients. MongoDB includes ../db/jsobj.h instead. 
+    Main bson include file for mongodb c++ clients. MongoDB includes ../db/jsobj.h instead.
     This file, however, pulls in much less code / dependencies.
 
     @see bsondemo
@@ -23,7 +23,8 @@
  */
 
 /**
-   Main include file for C++ BSON module when using standalone (sans MongoDB client).
+   Main include file for C++ BSON. This pulls in fewer dependencies than
+   mongo/client/dbclient.h, but still requires libmongoclient to link.
 
    "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
    represented in JSON (plus a few extensions useful for databases & other languages).
@@ -33,75 +34,15 @@
 
 #pragma once
 
-#if defined(MONGO_EXPOSE_MACROS)
-#error this header is for client programs, not the mongo database itself. include jsobj.h instead.
-/* because we define simplistic assert helpers here that don't pull in a bunch of util -- so that
-   BSON can be used header only.
-   */
+#ifdef MONGO_EXPOSE_MACROS
+#error bson.h is for C++ driver consumer use only
 #endif
 
-#include <cstdlib>
-#include <memory>
-#include <iostream>
-#include <sstream>
+#define LIBMONGOCLIENT_CONSUMER
 
-#include "mongo/platform/compiler.h"
+#include "mongo/client/redef_macros.h"
 
-namespace bson {
-
-    using std::string;
-    using std::stringstream;
-
-    class assertion : public std::exception {
-    public:
-        assertion( unsigned u , const std::string& s )
-            : id( u ) , msg( s ) {
-            std::stringstream ss;
-            ss << "BsonAssertion id: " << u << " " << s;
-            full = ss.str();
-        }
-
-        virtual ~assertion() throw() {}
-
-        virtual const char* what() const throw() { return full.c_str(); }
-
-        unsigned id;
-        std::string msg;
-        std::string full;
-    };
-}
-
-namespace mongo {
-#if !defined(verify)
-    inline void verify(bool expr) {
-        if(!expr) {
-            throw bson::assertion( 0 , "assertion failure in bson library" );
-        }
-    }
-#endif
-#if !defined(uassert)
-    MONGO_COMPILER_NORETURN inline void uasserted(int msgid, const std::string &s) {
-        throw bson::assertion( msgid , s );
-    }
-
-    inline void uassert(unsigned msgid, const std::string& msg, bool expr) {
-        if( !expr )
-            uasserted( msgid , msg );
-    }
-    MONGO_COMPILER_NORETURN inline void msgasserted(int msgid, const char *msg) {
-        throw bson::assertion( msgid , msg );
-    }
-    MONGO_COMPILER_NORETURN inline void msgasserted(int msgid, const std::string &msg) {
-        msgasserted(msgid, msg.c_str());
-    }
-    inline void massert(int msgid, const std::string& msg, bool expr) {
-        if(!expr) {
-            std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
-            throw bson::assertion( msgid , msg );
-        }
-    }
-#endif
-}
+#include "mongo/pch.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -111,3 +52,5 @@ namespace mongo {
 #include "mongo/bson/bson-inl.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
+
+#include "mongo/client/undef_macros.h"
