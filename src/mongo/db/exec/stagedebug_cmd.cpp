@@ -367,7 +367,7 @@ namespace mongo {
                 // that can only be checked for equality.  We ignore this now.
                 Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
                 if (!s.isOK()) {
-                    errmsg = s.toString();
+                    // errmsg = s.toString();
                     return NULL;
                 }
 
