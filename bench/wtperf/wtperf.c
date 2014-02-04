@@ -46,39 +46,6 @@ static const CONFIG default_cfg = {
 #undef OPT_DEFINE_DEFAULT
 };
 
-static const char * const small_config_str =
-    "conn_config=\"cache_size=500MB\","
-    "table_config=\"lsm=(chunk_size=5MB)\","
-    "icount=500000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=20,"
-    "populate_threads=1,"
-    "threads=((count=8,read=1)),";
-
-static const char * const med_config_str =
-    "conn_config=\"cache_size=1GB\","
-    "table_config=\"lsm=(chunk_size=20MB)\","
-    "icount=50000000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=100,"
-    "populate_threads=1,"
-    "threads=((count=16,read=1)),";
-
-static const char * const large_config_str =
-    "conn_config=\"cache_size=2GB\","
-    "table_config=\"lsm=(chunk_size=50MB)\","
-    "icount=500000000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=600,"
-    "populate_threads=1,"
-    "threads=((count=16,read=1)),";
-
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
@@ -1085,7 +1052,7 @@ main(int argc, char *argv[])
 	uint64_t req_len, total_ops;
 	int ch, monitor_created, monitor_set, ret, t_ret;
 	const char *helium_mount;
-	const char *opts = "C:H:h:LMm:O:o:ST:";
+	const char *opts = "C:H:h:m:O:o:T:";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
@@ -1159,18 +1126,6 @@ main(int argc, char *argv[])
 	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
-		case 'S':
-			if (config_opt_line(cfg, small_config_str) != 0)
-				goto einval;
-			break;
-		case 'M':
-			if (config_opt_line(cfg, med_config_str) != 0)
-				goto einval;
-			break;
-		case 'L':
-			if (config_opt_line(cfg, large_config_str) != 0)
-				goto einval;
-			break;
 		case 'O':
 			if (config_opt_file(cfg, optarg) != 0)
 				goto einval;
