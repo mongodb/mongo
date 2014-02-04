@@ -852,12 +852,15 @@ execute_populate(CONFIG *cfg)
 
 	/*
 	 * Move popthreads aside to narrow possible race with the monitor
-	 * thread.
+	 * thread. The latency tracking code also requires that popthreads be
+	 * NULL when the populate phase is finished, to know that the workload
+	 * phase has started.
 	 */
 	popth = cfg->popthreads;
 	cfg->popthreads = NULL;
-	if ((ret =
-	    stop_threads(cfg, cfg->populate_threads, popth)) != 0)
+	ret = stop_threads(cfg, cfg->populate_threads, popth);
+	free(popth);
+	if (ret != 0)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
@@ -1426,7 +1429,7 @@ static int
 start_threads(CONFIG *cfg,
     WORKLOAD *workp, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
 {
-	u_int end, i, j;
+	u_int i;
 	int ret;
 
 	for (i = 0; i < num; ++i, ++thread) {
@@ -1442,12 +1445,12 @@ start_threads(CONFIG *cfg,
 			return (enomem(cfg));
 		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
-		if (cfg->random_value) {
-			end = cfg->value_sz / sizeof(uint32_t);
-			for (j = 0; j < end; j+= sizeof(uint32_t))
-				thread->value_buf[j] = (char)__wt_random();
-		} else
-			memset(thread->value_buf, 'a', cfg->value_sz - 1);
+		/*
+		 * Initialize and then toss in a bit of random values if needed.
+		 */
+		memset(thread->value_buf, 'a', cfg->value_sz - 1);
+		if (cfg->random_value)
+			randomize_value(cfg, thread->value_buf);
 
 		/*
 		 * Every thread gets tracking information and is initialized
