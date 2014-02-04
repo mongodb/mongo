@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -15,6 +15,10 @@
 #define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
 #define	WT_EVICT_WALK_BASE     300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
+
+#define	WT_EVICT_PASS_ALL	0x01
+#define	WT_EVICT_PASS_DIRTY	0x02
+#define	WT_EVICT_PASS_INTERNAL	0x04
 
 /*
  * WT_EVICT_ENTRY --
@@ -90,9 +94,10 @@ struct __wt_cache {
 	/*
 	 * Flags.
 	 */
-#define	WT_EVICT_NO_PROGRESS	0x01	/* Check if pages are being evicted */
-#define	WT_EVICT_STUCK		0x02	/* Eviction server is stuck */
-#define	WT_EVICT_ACTIVE		0x04	/* Eviction server is active */
+#define	WT_EVICT_ACTIVE		0x01	/* Eviction server is active */
+#define	WT_EVICT_INTERNAL	0x02	/* Check for deep internal trees */
+#define	WT_EVICT_NO_PROGRESS	0x04	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x08	/* Eviction server is stuck */
 	uint32_t flags;
 };
 

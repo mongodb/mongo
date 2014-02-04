@@ -33,7 +33,7 @@ WiredTiger applications:
 @section programming_extending Extending WiredTiger
 
 - @subpage custom_data_sources
-- @subpage memrata
+- @subpage helium
 
 @section programming_admin Administering a WiredTiger database
 

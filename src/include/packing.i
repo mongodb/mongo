@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -364,7 +364,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 			s = maxlen;
 		WT_SIZE_CHECK(s, maxlen);
 		pv->u.item.data = *pp;
-		pv->u.item.size = WT_STORE_SIZE(s);
+		pv->u.item.size = s;
 		*pp += s;
 		break;
 	case 'b':

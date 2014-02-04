@@ -21,9 +21,9 @@ Tables may optionally have an associated schema, splitting the value
 into a set of columns.  Tables may also have associated indices, each
 of which is ordered by one or more columns.
 
-WiredTiger distributions are tested on Linux, FreeBSD and Mac OS X.
-WiredTiger should be portable to any 64-bit system which supports the
-ANSI C99, POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
+WiredTiger distributions are tested on Linux, FreeBSD and OS X.
+WiredTiger is portable to any 64-bit system supporting the ANSI C99,
+POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
 
 For more information about using WiredTiger, see:
 
@@ -41,7 +41,7 @@ For more information about using WiredTiger, see:
 
 - @subpage license
 
-To browse the WiredTiger source code or find out how to contact us, see:
+To browse the WiredTiger source code or contact us, see:
 
 - @subpage community
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -202,7 +202,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			key->data = cursor->raw_recno_buf;
 			WT_ERR(__wt_struct_size(
 			    session, &size, "q", cursor->recno));
-			key->size = (uint32_t)size;
+			key->size = size;
 			ret = __wt_struct_pack(session, cursor->raw_recno_buf,
 			    sizeof(cursor->raw_recno_buf), "q", cursor->recno);
 		} else
@@ -286,7 +286,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		WT_ERR_MSG(session, EINVAL,
 		    "Key size (%" PRIu64 ") out of range", (uint64_t)sz);
 	cursor->saved_err = 0;
-	cursor->key.size = WT_STORE_SIZE(sz);
+	cursor->key.size = sz;
 	F_SET(cursor, WT_CURSTD_KEY_EXT);
 	if (0) {
 err:		cursor->saved_err = ret;
@@ -382,7 +382,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 		    cursor->value_format, ap));
 	}
 	F_SET(cursor, WT_CURSTD_VALUE_EXT);
-	cursor->value.size = WT_STORE_SIZE(sz);
+	cursor->value.size = sz;
 
 	if (0) {
 err:		cursor->saved_err = ret;

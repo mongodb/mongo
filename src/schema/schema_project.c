@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -21,17 +21,17 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_PACK(pack);
 	WT_PACK_VALUE old_pv;
+	size_t len, offset, old_len;
+	u_long arg;
 	char *proj;
 	uint8_t *p, *end;
 	const uint8_t *next;
-	size_t len, offset, old_len;
-	uint32_t arg;
 
 	p = end = NULL;		/* -Wuninitialized */
 
 	/* Reset any of the buffers we will be setting. */
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 		if (*proj == WT_PROJ_KEY) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->key, 0));
@@ -42,7 +42,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 	}
 
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 
 		switch (*proj) {
 		case WT_PROJ_KEY:
@@ -97,7 +97,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 					p = (uint8_t *)buf->mem + buf->size;
 					WT_RET(__pack_write(
 					    session, &pv, &p, len));
-					buf->size += WT_STORE_SIZE(len);
+					buf->size += len;
 					end = (uint8_t *)buf->mem + buf->size;
 				} else if (*proj == WT_PROJ_SKIP)
 					WT_RET(__unpack_read(session,
@@ -131,7 +131,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 					memmove(p + len, p + old_len,
 					    buf->size - (offset + old_len));
 				WT_RET(__pack_write(session, &pv, &p, len));
-				buf->size += WT_STORE_SIZE(len);
+				buf->size += len;
 				break;
 
 			default:
@@ -157,14 +157,14 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 	WT_CURSOR *c;
 	WT_DECL_PACK(pack);
 	WT_DECL_PACK_VALUE(pv);
+	u_long arg;
 	char *proj;
 	uint8_t *p, *end;
-	uint32_t arg;
 
 	p = end = NULL;		/* -Wuninitialized */
 
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 
 		switch (*proj) {
 		case WT_PROJ_KEY:
@@ -227,11 +227,11 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_PACK_VALUE(vpv);
 	WT_PACK vpack;
+	u_long arg;
 	char *proj;
 	uint8_t *end, *p;
 	const uint8_t *next, *vp, *vend;
 	size_t len, offset, old_len;
-	uint32_t arg;
 	int skip;
 
 	p = end = NULL;		/* -Wuninitialized */
@@ -242,7 +242,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 
 	/* Reset any of the buffers we will be setting. */
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 		if (*proj == WT_PROJ_KEY) {
 			c = cp[arg];
 			WT_RET(__wt_buf_init(session, &c->key, 0));
@@ -254,7 +254,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 
 	skip = key_only;
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 
 		switch (*proj) {
 		case WT_PROJ_KEY:
@@ -315,7 +315,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 					WT_RET(__pack_write(
 					    session, &pv, &p, len));
 					end = p;
-					buf->size += WT_STORE_SIZE(len);
+					buf->size += len;
 				} else
 					WT_RET(__unpack_read(session,
 					    &pv, (const uint8_t **)&p,
@@ -364,7 +364,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 					memmove(p + len, p + old_len,
 					    buf->size - (offset + old_len));
 				WT_RET(__pack_write(session, &pv, &p, len));
-				buf->size += WT_STORE_SIZE(len - old_len);
+				buf->size += len - old_len;
 				end = (uint8_t *)buf->data + buf->size;
 				break;
 			default:
@@ -393,11 +393,11 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_PACK_VALUE(vpv);
 	WT_PACK vpack;
+	u_long arg;
 	char *proj;
 	const uint8_t *p, *end;
 	uint8_t *vp;
 	size_t len;
-	uint32_t arg;
 
 	p = end = NULL;		/* -Wuninitialized */
 
@@ -405,7 +405,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	WT_RET(__pack_init(session, &vpack, vformat));
 
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 
 		switch (*proj) {
 		case WT_PROJ_KEY:
@@ -457,7 +457,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				    value, value->size + len));
 				vp = (uint8_t *)value->mem + value->size;
 				WT_RET(__pack_write(session, &vpv, &vp, len));
-				value->size += WT_STORE_SIZE(len);
+				value->size += len;
 				break;
 			}
 		}

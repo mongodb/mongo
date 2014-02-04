@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2013 WiredTiger, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -35,8 +35,8 @@ from helper import key_populate, simple_populate
 #   operations in another thread
 class test_checkpoint02(wttest.WiredTigerTestCase):
     scenarios = [
-        ('table', dict(uri='table:test',fmt='L',dsize=100,nops=50000,nthreads=10)),
-        ('table', dict(uri='table:test',fmt='L',dsize=10,nops=50000,nthreads=30))
+        ('table-100', dict(uri='table:test',fmt='L',dsize=100,nops=50000,nthreads=10)),
+        ('table-10', dict(uri='table:test',fmt='L',dsize=10,nops=50000,nthreads=30))
         ]
 
 

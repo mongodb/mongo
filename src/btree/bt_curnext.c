@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.

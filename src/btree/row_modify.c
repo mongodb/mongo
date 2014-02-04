@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -182,7 +182,7 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc(session, 1, ins_size, &ins));
 
 	ins->u.key.offset = WT_STORE_SIZE(ins_size - key->size);
-	WT_INSERT_KEY_SIZE(ins) = key->size;
+	WT_INSERT_KEY_SIZE(ins) = WT_STORE_SIZE(key->size);
 	memcpy(WT_INSERT_KEY(ins), key->data, key->size);
 
 	*insp = ins;

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -253,8 +253,8 @@ ops(void *arg)
 			 * LSM and data-sources don't support named checkpoints,
 			 * else 25% of the time we name the checkpoint.
 			 */
-			if (DATASOURCE("lsm") || DATASOURCE("kvsbdb") ||
-			    DATASOURCE("memrata") || MMRAND(1, 4) == 1)
+			if (DATASOURCE("lsm") || DATASOURCE("helium") ||
+			    DATASOURCE("kvsbdb") || MMRAND(1, 4) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(config, sizeof(config),
@@ -1074,7 +1074,7 @@ print_item(const char *tag, WT_ITEM *item)
 {
 	static const char hex[] = "0123456789abcdef";
 	const uint8_t *data;
-	uint32_t size;
+	size_t size;
 	int ch;
 
 	data = item->data;

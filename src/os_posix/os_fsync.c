@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -18,7 +18,11 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	WT_VERBOSE_RET(session, fileops, "%s: fsync", fh->name);
 
+#ifdef HAVE_FDATASYNC
+	WT_SYSCALL_RETRY(fdatasync(fh->fd), ret);
+#else
 	WT_SYSCALL_RETRY(fsync(fh->fd), ret);
+#endif
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s fsync error", fh->name);
 

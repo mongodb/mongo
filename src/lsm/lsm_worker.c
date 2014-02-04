@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -149,7 +149,12 @@ __wt_lsm_merge_worker(void *vargs)
 			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
-			stallms += 100;
+			/*
+			 * Randomize the tracking of stall time so that with
+			 * multiple LSM trees open, they don't all get
+			 * aggressive in lock-step.
+			 */
+			stallms += __wt_random() % 200;
 
 			/*
 			 * Get aggressive if more than enough chunks for a
@@ -204,8 +209,8 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * Skip if a thread is still active in the chunk or it
 		 * isn't suitable.
 		 */
-		if (!F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) ||
-		    F_ISSET_ATOMIC(chunk,
+		if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
+		    F_ISSET(chunk,
 			WT_LSM_CHUNK_BLOOM | WT_LSM_CHUNK_MERGING) ||
 		    chunk->generation > 0 ||
 		    chunk->count == 0)
@@ -241,6 +246,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_TXN_ISOLATION saved_isolation;
 	u_int i, j;
 	int locked;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
@@ -276,21 +282,20 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * is also evicted.  Either way, there is no point
 			 * trying to checkpoint it again.
 			 */
-			if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK)) {
-				if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EVICTED))
-					continue;
-
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) &&
+			    !chunk->evicted) {
 				if ((ret = __lsm_discard_handle(
 				    session, chunk->uri, NULL)) == 0)
-					F_SET_ATOMIC(
-					    chunk, WT_LSM_CHUNK_EVICTED);
+					chunk->evicted = 1;
 				else if (ret == EBUSY)
 					ret = 0;
 				else
 					WT_ERR_MSG(session, ret,
 					    "discard handle");
-				continue;
 			}
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+				continue;
 
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker flushing %u", i);
@@ -320,7 +325,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    !locked && ret == 0 &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);) {
 				if ((ret = __wt_spin_trylock(session,
-				    &S2C(session)->checkpoint_lock)) == 0)
+				    &S2C(session)->checkpoint_lock, &id)) == 0)
 					locked = 1;
 				else if (ret == EBUSY) {
 					__wt_yield();
@@ -369,12 +374,12 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			++j;
 			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
-			F_SET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK);
+			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			ret = __wt_lsm_meta_write(session, lsm_tree);
 			++lsm_tree->dsk_gen;
 
 			/* Update the throttle time. */
-			__wt_lsm_tree_throttle(session, lsm_tree);
+			__wt_lsm_tree_throttle(session, lsm_tree, 1);
 			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 			/* Make sure we aren't pinning a transaction ID. */
@@ -434,7 +439,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 		WT_CLEAR(buf);
 		WT_RET(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
+		chunk->bloom_uri = __wt_buf_steal(session, &buf);
 	}
 
 	/*
@@ -485,7 +490,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	/* Ensure the bloom filter is in the metadata. */
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
-	F_SET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
+	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	++lsm_tree->dsk_gen;
 	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -509,6 +514,7 @@ __lsm_discard_handle(
 {
 	WT_DECL_RET;
 	int locked;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
@@ -525,8 +531,8 @@ __lsm_discard_handle(
 	 * the schema lock.
 	 */
 	locked = 0;
-	if (checkpoint == NULL && (ret =
-	    __wt_spin_trylock(session, &S2C(session)->checkpoint_lock)) == 0)
+	if (checkpoint == NULL && (ret = __wt_spin_trylock(
+	    session, &S2C(session)->checkpoint_lock, &id)) == 0)
 		locked = 1;
 	if (ret == 0)
 		F_SET(session->dhandle, WT_DHANDLE_DISCARD);
@@ -608,7 +614,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			continue;
 		}
 
-		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM)) {
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			/*
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
@@ -623,7 +629,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			} else
 				WT_ERR(ret);
 
-			F_CLR_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM);
+			F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
 		}
 		if (chunk->uri != NULL) {
 			/*

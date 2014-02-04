@@ -1,0 +1,15 @@
+.gitignore
+LICENSE
+MANIFEST.in
+Makefile
+NEWS
+README.rst
+setup.cfg
+setup.py
+extras/__init__.py
+extras.egg-info/PKG-INFO
+extras.egg-info/SOURCES.txt
+extras.egg-info/dependency_links.txt
+extras.egg-info/top_level.txt
+extras/tests/__init__.py
+extras/tests/test_extras.py

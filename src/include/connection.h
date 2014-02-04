@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -179,19 +179,28 @@ struct __wt_connection_impl {
 	int stat_clear;			/* "clear" statistics configured */
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-#define	WT_SPINLOCK_MAX	25
-	/* Spinlock blocking matrix: sized 2x the number of spinlocks. */
-	struct __wt_connection_stats_spinlock {
-		const char *name;		/* Mutex name */
-		const char *file;		/* Caller's file/line */
-		int line;
-						/* Count of blocked calls */
-		u_int blocked[WT_SPINLOCK_MAX * 2];
-	} spinlock_stats[WT_SPINLOCK_MAX * 2];
 
-	/* Spinlock list: sized 1x the number of spinlocks. */
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
+	/*
+	 * Spinlock registration, so we can track which spinlocks are heavily
+	 * used, which are blocking and where.
+	 *
+	 * There's an array of spinlocks, and an array of blocking IDs.
+	 */
+#define	WT_SPINLOCK_MAX			1024
+#define	WT_SPINLOCK_MAX_LOCATION_ID	60
 	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
+
+					/* Spinlock blocking matrix */
+	struct __wt_connection_stats_spinlock {
+		const char *name;	/* Mutex name */
+
+		const char *file;	/* Caller's file/line, ID location */
+		int line;
+
+		u_int total;		/* Count of total, blocked calls */
+		u_int blocked[WT_SPINLOCK_MAX_LOCATION_ID];
+	} spinlock_block[WT_SPINLOCK_MAX_LOCATION_ID];
 #endif
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
@@ -200,7 +209,7 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
 	FILE		*stat_fp;	/* Statistics log file handle */
-	const char	*stat_path;	/* Statistics log path format */
+	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */

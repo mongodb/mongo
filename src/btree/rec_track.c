@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -73,7 +73,7 @@ __ovfl_onpage_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static WT_OVFL_ONPAGE *
 __ovfl_onpage_skip_search(
-    WT_OVFL_ONPAGE **head, const void *addr, uint32_t addr_size)
+    WT_OVFL_ONPAGE **head, const void *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **e;
 	size_t len;
@@ -120,7 +120,7 @@ __ovfl_onpage_skip_search(
  */
 static void
 __ovfl_onpage_skip_search_stack(WT_OVFL_ONPAGE **head,
-    WT_OVFL_ONPAGE ***stack, const void *addr, uint32_t addr_size)
+    WT_OVFL_ONPAGE ***stack, const void *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **e;
 	size_t len;
@@ -240,7 +240,7 @@ __ovfl_onpage_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
  * on-page overflow records.
  */
 int
-__wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
+__wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **head;
 
@@ -260,7 +260,7 @@ __wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
  */
 int
 __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
-    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
+    WT_PAGE *page, const uint8_t *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **head, *onpage, **stack[WT_SKIP_MAXDEPTH];
 	size_t size;
@@ -312,6 +312,28 @@ __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_ovfl_onpage_discard --
+ *	Discard the page's list of onpage overflow records.
+ */
+void
+__wt_ovfl_onpage_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_ONPAGE *onpage;
+	WT_PAGE_MODIFY *mod;
+	void *next;
+
+	mod = page->modify;
+	if (mod == NULL || mod->ovfl_track == NULL)
+		return;
+
+	for (onpage = mod->ovfl_track->ovfl_onpage[0];
+	    onpage != NULL; onpage = next) {
+		next = onpage->next[0];
+		__wt_free(session, onpage);
+	}
+}
+
+/*
  * __ovfl_reuse_verbose --
  *	Dump information about a reuse overflow record.
  */
@@ -360,13 +382,13 @@ __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __ovfl_reuse_skip_search --
- *	Return the first matching value in the overflow reuse list.
+ *	Return the first, not in-use, matching value in the overflow reuse list.
  */
 static WT_OVFL_REUSE *
 __ovfl_reuse_skip_search(
-    WT_OVFL_REUSE **head, const void *value, uint32_t value_size)
+    WT_OVFL_REUSE **head, const void *value, size_t value_size)
 {
-	WT_OVFL_REUSE **e;
+	WT_OVFL_REUSE **e, *next;
 	size_t len;
 	int cmp, i;
 
@@ -382,13 +404,29 @@ __ovfl_reuse_skip_search(
 		}
 
 		/*
-		 * Return any exact matches: we don't care in what search level
-		 * we found a match.
+		 * Values are not unique, and it's possible to have long lists
+		 * of identical overflow items.  (We've seen it in benchmarks.)
+		 * Move through a list of identical items at the current level
+		 * as long as the next one is in-use, otherwise, drop down a
+		 * level.   When at the bottom level, return items if reusable,
+		 * else NULL.
 		 */
 		len = WT_MIN((*e)->value_size, value_size);
 		cmp = memcmp(WT_OVFL_REUSE_VALUE(*e), value, len);
-		if (cmp == 0 && (*e)->value_size == value_size)
-			return (*e);
+		if (cmp == 0 && (*e)->value_size == value_size) {
+			if (i == 0)
+				return (F_ISSET(*e,
+				    WT_OVFL_REUSE_INUSE) ? NULL : *e);
+			if ((next = (*e)->next[i]) == NULL ||
+			    !F_ISSET(next, WT_OVFL_REUSE_INUSE) ||
+			    next->value_size != len || memcmp(
+			    WT_OVFL_REUSE_VALUE(next), value, len) != 0) {
+				--i;		/* Drop down a level */
+				--e;
+			} else			/* Keep going at this level */
+				e = &(*e)->next[i];
+			continue;
+		}
 
 		/*
 		 * If the skiplist value is larger than the search value, or
@@ -411,7 +449,7 @@ __ovfl_reuse_skip_search(
  */
 static void
 __ovfl_reuse_skip_search_stack(WT_OVFL_REUSE **head,
-    WT_OVFL_REUSE ***stack, const void *value, uint32_t value_size)
+    WT_OVFL_REUSE ***stack, const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **e;
 	size_t len;
@@ -576,8 +614,8 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
-    uint8_t **addrp, uint32_t *addr_sizep,
-    const void *value, uint32_t value_size)
+    uint8_t **addrp, size_t *addr_sizep,
+    const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **head, *reuse;
 
@@ -590,28 +628,19 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
 	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/*
-	 * The search function returns the first matching record in the list,
-	 * which may be the first of many, overflow records may be identical.
-	 * Find one without the in-use flag set and put it back into service.
+	 * The search function returns the first matching record in the list
+	 * which does not have the in-use flag set, or NULL.
 	 */
 	if ((reuse = __ovfl_reuse_skip_search(head, value, value_size)) == NULL)
 		return (0);
-	do {
-		if (!F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
-			*addrp = WT_OVFL_REUSE_ADDR(reuse);
-			*addr_sizep = reuse->addr_size;
-			F_SET(reuse, WT_OVFL_REUSE_INUSE);
 
-			if (WT_VERBOSE_ISSET(session, overflow))
-				WT_RET(__ovfl_reuse_verbose(
-				    session, page, reuse, "reclaim"));
-			return (1);
-		}
-	} while ((reuse = reuse->next[0]) != NULL &&
-	    reuse->value_size == value_size &&
-	    memcmp(WT_OVFL_REUSE_VALUE(reuse), value, value_size) == 0);
+	*addrp = WT_OVFL_REUSE_ADDR(reuse);
+	*addr_sizep = reuse->addr_size;
+	F_SET(reuse, WT_OVFL_REUSE_INUSE);
 
-	return (0);
+	if (WT_VERBOSE_ISSET(session, overflow))
+		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "reclaim"));
+	return (1);
 }
 
 /*
@@ -621,8 +650,8 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 int
 __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const uint8_t *addr, uint32_t addr_size,
-    const void *value, uint32_t value_size)
+    const uint8_t *addr, size_t addr_size,
+    const void *value, size_t value_size)
 {
 	WT_OVFL_REUSE **head, *reuse, **stack[WT_SKIP_MAXDEPTH];
 	size_t size;
@@ -657,7 +686,7 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	reuse->value_offset = WT_PTRDIFF32(p, reuse);
-	reuse->value_size = value_size;
+	reuse->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
 	F_SET(reuse, WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
 
@@ -672,6 +701,28 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "add"));
 
 	return (0);
+}
+
+/*
+ * __wt_ovfl_reuse_discard --
+ *	Discard the page's list of overflow records tracked for reuse.
+ */
+void
+__wt_ovfl_reuse_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_REUSE *reuse;
+	WT_PAGE_MODIFY *mod;
+	void *next;
+
+	mod = page->modify;
+	if (mod == NULL || mod->ovfl_track == NULL)
+		return;
+
+	for (reuse = mod->ovfl_track->ovfl_reuse[0];
+	    reuse != NULL; reuse = next) {
+		next = reuse->next[0];
+		__wt_free(session, reuse);
+	}
 }
 
 /*
@@ -723,8 +774,7 @@ __ovfl_txnc_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Return the first matching addr in the overflow transaction-cache list.
  */
 static WT_OVFL_TXNC *
-__ovfl_txnc_skip_search(
-    WT_OVFL_TXNC **head, const void *addr, uint32_t addr_size)
+__ovfl_txnc_skip_search(WT_OVFL_TXNC **head, const void *addr, size_t addr_size)
 {
 	WT_OVFL_TXNC **e;
 	size_t len;
@@ -772,7 +822,7 @@ __ovfl_txnc_skip_search(
  */
 static void
 __ovfl_txnc_skip_search_stack(WT_OVFL_TXNC **head,
-    WT_OVFL_TXNC ***stack, const void *addr, uint32_t addr_size)
+    WT_OVFL_TXNC ***stack, const void *addr, size_t addr_size)
 {
 	WT_OVFL_TXNC **e;
 	size_t len;
@@ -870,7 +920,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_ovfl_txnc_search(
-    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size, WT_ITEM *store)
+    WT_PAGE *page, const uint8_t *addr, size_t addr_size, WT_ITEM *store)
 {
 	WT_OVFL_TXNC **head, *txnc;
 
@@ -894,8 +944,8 @@ __wt_ovfl_txnc_search(
  */
 int
 __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const uint8_t *addr, uint32_t addr_size,
-    const void *value, uint32_t value_size)
+    const uint8_t *addr, size_t addr_size,
+    const void *value, size_t value_size)
 {
 	WT_OVFL_TXNC **head, **stack[WT_SKIP_MAXDEPTH], *txnc;
 	size_t size;
@@ -930,7 +980,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	txnc->value_offset = WT_PTRDIFF32(p, txnc);
-	txnc->value_size = value_size;
+	txnc->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
 	txnc->current = S2C(session)->txn_global.current;
 
@@ -948,6 +998,28 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 		WT_RET(__ovfl_txnc_verbose(session, page, txnc, "add"));
 
 	return (0);
+}
+
+/*
+ * __wt_ovfl_txnc_discard --
+ *	Discard the page's list of transaction-cached overflow records.
+ */
+void
+__wt_ovfl_txnc_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_TXNC *txnc;
+	WT_PAGE_MODIFY *mod;
+	void *next;
+
+	mod = page->modify;
+	if (mod == NULL || mod->ovfl_track == NULL)
+		return;
+
+	for (txnc = mod->ovfl_track->ovfl_txnc[0];
+	    txnc != NULL; txnc = next) {
+		next = txnc->next[0];
+		__wt_free(session, txnc);
+	}
 }
 
 /*

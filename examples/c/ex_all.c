@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -542,6 +542,13 @@ session_ops(WT_SESSION *session)
 	    "block_compressor=snappy,key_format=S,value_format=S");
 	/*! [Create a snappy compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/*! [Create a zlib compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=zlib,key_format=S,value_format=S");
+	/*! [Create a zlib compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 #endif
 
 	/*! [Configure checksums to uncompressed] */
@@ -959,7 +966,7 @@ main(void)
 	/*! [Configure bzip2 extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "extensions=[/usr/local/lib/wiredtiger_bzip2.so]", &conn);
+	    "extensions=[/usr/local/lib/libwiredtiger_bzip2.so]", &conn);
 	/*! [Configure bzip2 extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
@@ -967,8 +974,16 @@ main(void)
 	/*! [Configure snappy extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"
-	    "extensions=[/usr/local/lib/wiredtiger_snappy.so]", &conn);
+	    "extensions=[/usr/local/lib/libwiredtiger_snappy.so]", &conn);
 	/*! [Configure snappy extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zlib extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_zlib.so]", &conn);
+	/*! [Configure zlib extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 

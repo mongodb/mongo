@@ -1,48 +1,36 @@
 /*! @page compression Compressors
 
 This section explains how to configure WiredTiger's builtin support for
-the bzip2 and snappy compression engines.
+the snappy and bzip2 compression engines.
 
-@section compression_bzip2 Using bzip2 compression
+@section compression_zlib Using zlib compression
 
-To use the builtin support for
-<a href="http://www.bzip.org/">Julian Seward's bzip2</a>
-compression, first check that bzip2 is installed in include and library
-directories searched by the compiler.  Once bzip2 is installed, you can
-enable bzip2 using the \c --enable-bzip2 option to configure.
+To use the builtin support for Greg Roelofs' and Mark Adler's
+<a href="http://www.zlib.net/">zlib</a>
+compression, first check that zlib is installed in include and library
+directories searched by the compiler.  Once zlib is installed, you can
+enable zlib using the \c --enable-zlib option to configure.
 
-If bzip2 is installed in a location not normally searched by the
-compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
-to indicate these locations.  For example, with the bzip2 includes and
+If zlib is installed in a location not normally searched by the compiler
+toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS to
+indicate these locations.  For example, with the zlib includes and
 libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-should run configure as follows:
+would run configure with the following additional arguments:
 
 @code
-cd build_posix
-../configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+--enable-zlib CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
-When opening the WiredTiger database, load the bzip2 shared library as
-an extension.  For example, with the bzip2 library installed in
+When opening the WiredTiger database, load the zlib shared library as
+an extension.  For example, with the WiredTiger library installed in
 \c /usr/local/lib, you would use the following extension:
 
-@snippet ex_all.c Configure bzip2 extension
+@snippet ex_all.c Configure zlib extension
 
 Finally, when creating the WiredTiger object, set \c block_compressor
-to \c bzip2:
+to \c zlib:
 
-@snippet ex_all.c Create a bzip2 compressed table
-
-If necessary, you can confirm the compressor is working by running the
-compression part of the test suite:
-
-@code
-cd build_posix
-python ../test/suite/run.py compress
-@endcode
-
-Review the test output to verify the bzip2 part of the test passes and
-was not skipped.
+@snippet ex_all.c Create a zlib compressed table
 
 @section compression_snappy Using snappy compression
 
@@ -56,15 +44,14 @@ If snappy is installed in a location not normally searched by the
 compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
 to indicate these locations.  For example, with the snappy includes and
 libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-should run configure as follows:
+would run configure with the following additional arguments:
 
 @code
-cd build_posix
-../configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+--enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
 When opening the WiredTiger database, load the snappy shared library as
-an extension.  For example, with the snappy library installed in
+an extension.  For example, with the WiredTiger library installed in
 \c /usr/local/lib, you would use the following extension:
 
 @snippet ex_all.c Configure snappy extension
@@ -74,16 +61,34 @@ to \c snappy:
 
 @snippet ex_all.c Create a snappy compressed table
 
-If necessary, you can confirm the compressor is working by running the
-compression part of the test suite:
+@section compression_bzip2 Using bzip2 compression
+
+To use the builtin support for
+<a href="http://www.bzip.org/">Julian Seward's bzip2</a>
+compression, first check that bzip2 is installed in include and library
+directories searched by the compiler.  Once bzip2 is installed, you can
+enable bzip2 using the \c --enable-bzip2 option to configure.
+
+If bzip2 is installed in a location not normally searched by the
+compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
+to indicate these locations.  For example, with the bzip2 includes and
+libraries installed in \c /usr/local/include and \c /usr/local/lib, you
+would run configure with the following additional arguments:
 
 @code
-cd build_posix
-python ../test/suite/run.py compress
+--enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
-Review the test output to verify the snappy part of the test passes and
-was not skipped.
+When opening the WiredTiger database, load the bzip2 shared library as
+an extension.  For example, with the WiredTiger library installed in
+\c /usr/local/lib, you would use the following extension:
+
+@snippet ex_all.c Configure bzip2 extension
+
+Finally, when creating the WiredTiger object, set \c block_compressor
+to \c bzip2:
+
+@snippet ex_all.c Create a bzip2 compressed table
 
 @section compression_upgrading Upgrading compression engines
 

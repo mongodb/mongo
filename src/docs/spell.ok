@@ -1,5 +1,6 @@
 personal_ws-1.1 en 200
 APIs
+Adler's
 Atomicity
 BLOBs
 CFLAGS
@@ -12,6 +13,7 @@ DbCursor
 DbEnv
 DbMultiple
 EB
+EAGAIN
 EBUSY
 EINVAL
 EmpId
@@ -28,18 +30,21 @@ LIBS
 LSB
 LSM
 Lameter
+Levyx
 MERCHANTABILITY
 MVCC's
 Makefiles
-Memrata
 Mewhort
 NOTFOUND
 NUMA
 NoSQL
+README
 RepMgr
+Roelofs
 Rrx
 Seward's
 SiS
+TXT
 URIs
 Vv
 WiredTiger
@@ -87,6 +92,7 @@ command's
 comparator
 cond
 config
+configurign
 conn
 const
 control's
@@ -146,6 +152,7 @@ firstname
 fnv
 fput
 freelist
+fsync
 gcc
 gdbm
 getopt
@@ -181,6 +188,7 @@ lastname
 len
 li
 libdir
+libhe
 libkvs
 libtool
 libwiredtiger
@@ -207,7 +215,6 @@ maxleafpage
 memalloc
 memfree
 memp
-memrata
 metadata
 minkey
 mkdir
@@ -356,3 +363,4 @@ writelocks
 wrlock
 xa
 yieldcpu
+zlib

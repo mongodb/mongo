@@ -104,6 +104,7 @@ Freelist
 Fsync
 GCC
 GIDs
+Gcc
 Geoff
 Givargis
 Google
@@ -141,6 +142,7 @@ LSN
 LSNs
 LZO
 LeafGreen
+Levyx
 Llqr
 Llqrt
 LoadLoad
@@ -154,7 +156,6 @@ MUTEX
 MVCC
 Manos
 Marsaglia's
-Memrata
 Metadata
 Mewhort
 Multi
@@ -212,6 +213,7 @@ SIMD
 SLIST
 SLVG
 SML
+SOURCE's
 SPINLOCK
 SQL
 SSD
@@ -251,8 +253,10 @@ UTF
 UnixLib
 Unmap
 Unmarshall
+Unregister
 VARCHAR
 VLDB
+VMSG
 Vanishingly
 Vc
 Vixie
@@ -267,8 +271,10 @@ WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
 WiredTigerHome
+WiredTigerInit
 WiredTigerLog
 WiredTigerStat
+WiredTigerTxn
 WithSeeds
 Wmissing
 Wuninitialized
@@ -392,6 +398,7 @@ database's
 datalen
 datasets
 datasource
+datastore
 dbc
 decile
 deciles
@@ -399,6 +406,8 @@ decl
 decr
 decrement
 decrementing
+deflateEnd
+deflateInit
 defno
 del
 delfmt
@@ -532,6 +541,8 @@ indices
 indirects
 indx
 infeasible
+inflateEnd
+inflateInit
 init
 initn
 initsize
@@ -561,12 +572,14 @@ latencies
 ld
 len
 lenp
+level's
 lex
 lexicographically
 lf
 lfence
 libdatasource
 libs
+libwiredtiger
 lld
 llll
 llu
@@ -604,7 +617,7 @@ membar
 memcpy
 memfree
 memmove
-memrata
+memset
 memsize
 mergeable
 metaconf
@@ -649,6 +662,7 @@ nocase
 nonliteral
 noop
 nop
+noraw
 notfound
 notset
 notsup
@@ -887,6 +901,7 @@ unmerged
 unmodify
 unpackv
 unreferenced
+unregister
 unsized
 untyped
 upd
@@ -930,3 +945,5 @@ xff
 xxxx
 xxxxx
 xxxxxx
+zlib
+zu

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -212,10 +212,10 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 void
 __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	uint32_t i;
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
+	uint32_t i;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:

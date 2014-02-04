@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -57,19 +57,25 @@ extern WT_EXTENSION_API *wt_api;
 	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	SNAPPY_PATH							\
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#define	ZLIB_PATH							\
+	EXTPATH "compressors/zlib/.libs/libwiredtiger_zlib.so"
 
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
 
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
-#define	MEMRATA_PATH							\
-	EXTPATH "test/memrata/.libs/libwiredtiger_memrata.so"
+#define	HELIUM_PATH							\
+	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
-#define	RAW_PATH	".libs/raw_compress.so"
 
+#undef	M
 #define	M(v)		((v) * 1000000)		/* Million */
+#undef	MEGABYTE
+#define	MEGABYTE(v)	((v) * 1048576)
+#undef	GIGABYTE
+#define	GIGABYTE(v)	((v) * 1073741824ULL)
 
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(rng() % (((max) + 1) - (min)) + (min))
@@ -93,6 +99,8 @@ typedef struct {
 	char *home_run;				/* Run file path */
 	char *home_stats;			/* Statistics file path */
 	char *home_salvage_copy;		/* Salvage copy command */
+
+	char *helium_mount;			/* Helium volume */
 
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
@@ -131,49 +139,50 @@ typedef struct {
 
 	char *config_open;			/* Command-line configuration */
 
-	u_int c_auto_throttle;			/* Config values */
-	u_int c_bitcnt;
-	u_int c_bloom;
-	u_int c_bloom_bit_count;
-	u_int c_bloom_hash_count;
-	u_int c_bloom_oldest;
-	u_int c_cache;
-	u_int c_compact;
+	uint32_t c_auto_throttle;		/* Config values */
+	uint32_t c_bitcnt;
+	uint32_t c_bloom;
+	uint32_t c_bloom_bit_count;
+	uint32_t c_bloom_hash_count;
+	uint32_t c_bloom_oldest;
+	uint32_t c_cache;
+	uint32_t c_compact;
 	char *c_checksum;
-	u_int c_chunk_size;
+	uint32_t c_chunk_size;
 	char *c_compression;
 	char *c_config_open;
-	u_int c_data_extend;
+	uint32_t c_data_extend;
 	char *c_data_source;
-	u_int c_delete_pct;
-	u_int c_dictionary;
-	u_int c_firstfit;
-	u_int c_hot_backups;
+	uint32_t c_delete_pct;
+	uint32_t c_dictionary;
+	uint32_t c_firstfit;
+	uint32_t c_hot_backups;
 	char *c_file_type;
-	u_int c_huffman_key;
-	u_int c_huffman_value;
-	u_int c_insert_pct;
-	u_int c_internal_key_truncation;
-	u_int c_intl_page_max;
-	u_int c_key_gap;
-	u_int c_key_max;
-	u_int c_key_min;
-	u_int c_leaf_page_max;
-	u_int c_merge_max;
-	u_int c_merge_threads;
-	u_int c_ops;
-	u_int c_prefix_compression;
-	u_int c_prefix_compression_min;
-	u_int c_repeat_data_pct;
-	u_int c_reverse;
-	u_int c_rows;
-	u_int c_runs;
-	u_int c_split_pct;
-	u_int c_statistics;
-	u_int c_threads;
-	u_int c_value_max;
-	u_int c_value_min;
-	u_int c_write_pct;
+	uint32_t c_huffman_key;
+	uint32_t c_huffman_value;
+	uint32_t c_insert_pct;
+	uint32_t c_internal_key_truncation;
+	uint32_t c_intl_page_max;
+	uint32_t c_key_gap;
+	uint32_t c_key_max;
+	uint32_t c_key_min;
+	uint32_t c_leaf_page_max;
+	uint32_t c_merge_max;
+	uint32_t c_merge_threads;
+	uint32_t c_mmap;
+	uint32_t c_ops;
+	uint32_t c_prefix_compression;
+	uint32_t c_prefix_compression_min;
+	uint32_t c_repeat_data_pct;
+	uint32_t c_reverse;
+	uint32_t c_rows;
+	uint32_t c_runs;
+	uint32_t c_split_pct;
+	uint32_t c_statistics;
+	uint32_t c_threads;
+	uint32_t c_value_max;
+	uint32_t c_value_min;
+	uint32_t c_write_pct;
 
 #define	FIX			1	
 #define	ROW			2
@@ -187,15 +196,16 @@ typedef struct {
 
 #define	COMPRESS_NONE		1
 #define	COMPRESS_BZIP		2
-#define	COMPRESS_LZO		3
-#define	COMPRESS_RAW		4
+#define	COMPRESS_BZIP_RAW	3
+#define	COMPRESS_LZO		4
 #define	COMPRESS_SNAPPY		5
+#define	COMPRESS_ZLIB		6
 	u_int c_compression_flag;		/* Compression flag value */
 
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */
 
-	uint16_t key_rand_len[1031];		/* Key lengths */
+	uint32_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
 
@@ -219,12 +229,12 @@ typedef struct {
 } TINFO;
 
 void	 bdb_close(void);
-void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
-void	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
+void	 bdb_insert(const void *, size_t, const void *, size_t);
+void	 bdb_np(int, void *, size_t *, void *, size_t *, int *);
 void	 bdb_open(void);
-void	 bdb_read(uint64_t, void *, uint32_t *, int *);
+void	 bdb_read(uint64_t, void *, size_t *, int *);
 void	 bdb_remove(uint64_t, int *);
-void	 bdb_update(const void *, uint32_t, const void *, uint32_t, int *);
+void	 bdb_update(const void *, size_t, const void *, size_t, int *);
 
 void	*compact(void *);
 void	 config_clear(void);
@@ -237,14 +247,14 @@ void	 die(int, const char *, ...);
 void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
-void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 key_gen(uint8_t *, size_t *, uint64_t, int);
 void	 path_setup(const char *);
 uint32_t rng(void);
 void	 rng_init(void);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
-void	 value_gen(uint8_t *, uint32_t *, uint64_t);
+void	 value_gen(uint8_t *, size_t *, uint64_t);
 void	 wts_close(void);
 void	 wts_create(void);
 void	 wts_dump(const char *, int);

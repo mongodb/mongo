@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -70,7 +70,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(value);
 	WT_DECL_RET;
-	const char *path;
+	char *path;
 
 	fp = NULL;
 	path = NULL;
@@ -216,7 +216,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, const char **valuep)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	int match;
-	const char *path;
+	char *path;
 
 	*valuep = NULL;
 
@@ -274,7 +274,8 @@ __wt_turtle_update(
 	FILE *fp;
 	WT_DECL_RET;
 	int vmajor, vminor, vpatch;
-	const char *path, *version;
+	const char *version;
+	char *path;
 
 	fp = NULL;
 	path = NULL;

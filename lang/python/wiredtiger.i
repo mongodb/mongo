@@ -1,13 +1,34 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
  *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
  * wiredtiger.i
  *	The SWIG interface file defining the wiredtiger python API.
  */
-
 %define DOCSTRING
 "@defgroup wt_python WiredTiger Python API
 Python wrappers aroung the WiredTiger C API.
@@ -36,7 +57,7 @@ from packing import pack, unpack
 }
 
 %typemap(in, numinputs=0) WT_EVENT_HANDLER * %{
-        $1 = &pyApiEventHandler;
+	$1 = &pyApiEventHandler;
 %}
 
 /* Set the return value to the returned connection, session, or cursor */
@@ -47,12 +68,25 @@ from packing import pack, unpack
 %typemap(argout) WT_SESSION ** {
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
 	    SWIGTYPE_p___wt_session, 0);
+	if (*$1 != NULL) {
+		PY_CALLBACK *pcb;
+
+		if (__wt_calloc_def((WT_SESSION_IMPL *)(*$1), 1, &pcb) != 0)
+			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+		else {
+			Py_XINCREF($result);
+			pcb->pyobj = $result;
+			((WT_SESSION_IMPL *)(*$1))->lang_private = pcb;
+		}
+	}
 }
 
 %typemap(argout) WT_CURSOR ** {
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
 	    SWIGTYPE_p___wt_cursor, 0);
 	if (*$1 != NULL) {
+		PY_CALLBACK *pcb;
+
 		(*$1)->flags |= WT_CURSTD_RAW;
 		PyObject_SetAttrString($result, "is_column",
 		    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
@@ -60,6 +94,14 @@ from packing import pack, unpack
 		    PyString_InternFromString((*$1)->key_format));
 		PyObject_SetAttrString($result, "value_format",
 		    PyString_InternFromString((*$1)->value_format));
+
+		if (__wt_calloc_def((WT_SESSION_IMPL *)(*$1)->session, 1, &pcb) != 0)
+			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+		else {
+			Py_XINCREF($result);
+			pcb->pyobj = $result;
+			(*$1)->lang_private = pcb;
+		}
 	}
 }
 
@@ -79,6 +121,7 @@ from packing import pack, unpack
 		
 		@copydoc class::method'''
 		try:
+			self._freecb()
 			return $action(self, *args)
 		finally:
 			self.this = None
@@ -98,7 +141,42 @@ DESTRUCTOR(__wt_session, close)
  * of error.
  */
 %header %{
+
+#include "../src/include/wt_internal.h"
+
+/*
+ * Closed handle checking:
+ *
+ * The typedef WT_CURSOR_NULLABLE used in wiredtiger.h is only made
+ * visible to the SWIG parser and is used to identify arguments of
+ * Cursor type that are permitted to be null.  Likewise, typedefs
+ * WT_{CURSOR,SESSION,CONNECTION}_CLOSED identify 'close' calls that
+ * need explicit nulling of the swigCPtr.  We do not match the *_CLOSED
+ * typedefs in Python SWIG, as we already have special cased 'close' methods.
+ *
+ * We want SWIG to see these 'fake' typenames, but not the compiler.
+ */
+#define WT_CURSOR_NULLABLE		WT_CURSOR
+#define WT_CURSOR_CLOSED		WT_CURSOR
+#define WT_SESSION_CLOSED		WT_SESSION
+#define WT_CONNECTION_CLOSED		WT_CONNECTION
+
+/*
+ * For Connections, Sessions and Cursors created in Python, each of
+ * WT_CONNECTION_IMPL, WT_SESSION_IMPL and WT_CURSOR have a
+ * lang_private field that store a pointer to a PY_CALLBACK, alloced
+ * during the various open calls.  {conn,session,cursor}CloseHandler()
+ * functions reach into the associated Python object, set the 'this'
+ * asttribute to None, and free the PY_CALLBACK.
+ */
+typedef struct {
+	PyObject *pyobj;	/* the python Session/Cursor object */
+} PY_CALLBACK;
+
 static PyObject *wtError;
+
+static int sessionFreeHandler(WT_SESSION *session_arg);
+static int cursorFreeHandler(WT_CURSOR *cursor_arg);
 %}
 
 %init %{
@@ -133,6 +211,28 @@ class IterableCursor:
 ## @endcond
 %}
 
+/* Bail out if arg or arg.this is None, else set res to the C pointer. */
+%define CONVERT_WITH_NULLCHECK(argp, res)
+	if ($input == Py_None) {
+		SWIG_exception_fail(SWIG_NullReferenceError,
+		    "in method '$symname', "
+		    "argument $argnum of type '$type' is None");
+	} else {
+		res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
+		if (!SWIG_IsOK(res)) {
+			if (SWIG_Python_GetSwigThis($input) == 0) {
+				SWIG_exception_fail(SWIG_NullReferenceError,
+				    "in method '$symname', "
+				    "argument $argnum of type '$type' is None");
+			} else {
+				SWIG_exception_fail(SWIG_ArgError(res),
+				    "in method '$symname', "
+				    "argument $argnum of type '$type'");
+			}
+		}
+	}
+%enddef
+
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
@@ -146,38 +246,46 @@ class IterableCursor:
  */
 %define SELFHELPER(type, name)
 %typemap(in) (type *self, type *name) (void *argp = 0, int res = 0) %{
-	res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
-	if (!SWIG_IsOK(res)) { 
-		SWIG_exception_fail(SWIG_ArgError(res), "in method '$symname', "
-		    "argument $argnum of type '$type'");
-	}
+	CONVERT_WITH_NULLCHECK(argp, res)
 	$2 = $1 = ($ltype)(argp);
 %}
+%typemap(in) type ## _NULLABLE * {
+	$1 = *(type **)&$input;
+}
+
 %enddef
 
 SELFHELPER(struct __wt_connection, connection)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 
+ /*
+  * Create an error exception if it has not already
+  * been done.
+  */
+%define SWIG_ERROR_IF_NOT_SET(result)
+do {
+	if (PyErr_Occurred() == NULL) {
+		/* We could use PyErr_SetObject for more complex reporting. */
+		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
+	}
+	SWIG_fail;
+} while(0)
+%enddef
+
 /* Error handling.  Default case: a non-zero return is an error. */
 %exception {
 	$action
-	if (result != 0) {
-		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
-		SWIG_fail;
-	}
+	if (result != 0)
+		SWIG_ERROR_IF_NOT_SET(result);
 }
 
 /* Cursor positioning methods can also return WT_NOTFOUND. */
 %define NOTFOUND_OK(m)
 %exception m {
 	$action
-	if (result != 0 && result != WT_NOTFOUND) {
-		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
-		SWIG_fail;
-	}
+	if (result != 0 && result != WT_NOTFOUND)
+		SWIG_ERROR_IF_NOT_SET(result);
 }
 %enddef
 
@@ -185,11 +293,8 @@ SELFHELPER(struct __wt_cursor, cursor)
 %define COMPARE_OK(m)
 %exception m {
 	$action
-	if ((result < -1 || result > 1) && result != WT_NOTFOUND) {
-		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_SetErrorMsg(wtError, wiredtiger_strerror(result));
-		SWIG_fail;
-	}
+	if ((result < -1 || result > 1) && result != WT_NOTFOUND)
+		SWIG_ERROR_IF_NOT_SET(result);
 }
 %enddef
 
@@ -310,13 +415,25 @@ typedef int int_void;
 	/* compare and search_near need special handling. */
 	int compare(WT_CURSOR *other) {
 		int cmp = 0;
-		int ret = $self->compare($self, other, &cmp);
-		/*
-		 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
-		 * colliding with other errors.
-		 */
-		return ((ret != 0) ? ret :
-		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
+		int ret = 0;
+		if (other == NULL) {
+			SWIG_Error(SWIG_NullReferenceError,
+			    "in method 'Cursor_compare', "
+			    "argument 1 of type 'struct __wt_cursor *' "
+			    "is None");
+			ret = EINVAL;  /* any non-zero value will do. */
+		}
+		else {
+			ret = $self->compare($self, other, &cmp);
+
+			/*
+			 * Map less-than-zero to -1 and greater-than-zero to 1
+			 * to avoid colliding with other errors.
+			 */
+			ret = ((ret != 0) ? ret :
+			    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
+		}
+		return (ret);
 	}
 
 	int search_near() {
@@ -328,6 +445,10 @@ typedef int int_void;
 		 */
 		return ((ret != 0) ? ret :
 		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
+	}
+
+	int _freecb() {
+		return (cursorFreeHandler($self));
 	}
 
 %pythoncode %{
@@ -407,8 +528,18 @@ typedef int int_void;
 
 %extend __wt_session {
 	int log_printf(const char *msg) {
-                return self->log_printf(self, "%s", msg);
-        }
+		return self->log_printf(self, "%s", msg);
+	}
+
+	int _freecb() {
+		return (sessionFreeHandler(self));
+	}
+};
+
+%extend __wt_connection {
+	int _freecb() {
+		return (0);
+	}
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
@@ -451,7 +582,6 @@ typedef int int_void;
 
 /* Add event handler support. */
 %{
-
 static int
 writeToPythonStream(const char *streamname, const char *message)
 {
@@ -471,7 +601,7 @@ writeToPythonStream(const char *streamname, const char *message)
 	strcpy(&msg[msglen], "\n");
 
 	/* Acquire python Global Interpreter Lock. Otherwise can segfault. */
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
+	SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
 
 	ret = 1;
 	if ((sys = PyImport_ImportModule("sys")) == NULL)
@@ -487,7 +617,7 @@ writeToPythonStream(const char *streamname, const char *message)
 	ret = 0;
 
 err:    /* Release python Global Interpreter Lock */
-        SWIG_PYTHON_THREAD_END_BLOCK;
+	SWIG_PYTHON_THREAD_END_BLOCK;
 
 	if (arglist)
 		Py_XDECREF(arglist);
@@ -518,11 +648,107 @@ pythonMessageCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 	return writeToPythonStream("stdout", message);
 }
 
+/* Zero out SWIG's pointer to the C object,
+ * equivalent to 'pyobj.this = None' in Python.
+ */
+static int
+pythonClose(PY_CALLBACK *pcb)
+{
+	int ret;
+
+	/*
+	 * Ensure the global interpreter lock is held - so that Python
+	 * doesn't shut down threads while we use them.
+	 */
+	SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+
+	ret = 0;
+	if (PyObject_SetAttrString(pcb->pyobj, "this", Py_None) == -1) {
+		SWIG_Error(SWIG_RuntimeError, "WT SetAttr failed");
+		ret = EINVAL;  /* any non-zero value will do. */
+	}
+	Py_XDECREF(pcb->pyobj);
+
+	SWIG_PYTHON_THREAD_END_BLOCK;
+
+	return (ret);
+}
+
+/* Session specific close handler. */
+static int
+sessionCloseHandler(WT_SESSION *session_arg)
+{
+	int ret;
+	PY_CALLBACK *pcb;
+	WT_SESSION_IMPL *session;
+
+	ret = 0;
+	session = (WT_SESSION_IMPL *)session_arg;
+	pcb = (PY_CALLBACK *)session->lang_private;
+	session->lang_private = NULL;
+	if (pcb != NULL)
+		ret = pythonClose(pcb);
+	__wt_free(session, pcb);
+
+	return (ret);
+}
+
+/* Cursor specific close handler. */
+static int
+cursorCloseHandler(WT_CURSOR *cursor)
+{
+	int ret;
+	PY_CALLBACK *pcb;
+
+	ret = 0;
+	pcb = (PY_CALLBACK *)cursor->lang_private;
+	cursor->lang_private = NULL;
+	if (pcb != NULL)
+		ret = pythonClose(pcb);
+	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
+
+	return (ret);
+}
+
+/* Session specific close handler. */
+static int
+sessionFreeHandler(WT_SESSION *session_arg)
+{
+	PY_CALLBACK *pcb;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)session_arg;
+	pcb = (PY_CALLBACK *)session->lang_private;
+	session->lang_private = NULL;
+	__wt_free(session, pcb);
+	return (0);
+}
+
+/* Cursor specific close handler. */
+static int
+cursorFreeHandler(WT_CURSOR *cursor)
+{
+	PY_CALLBACK *pcb;
+
+	pcb = (PY_CALLBACK *)cursor->lang_private;
+	cursor->lang_private = NULL;
+	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
+	return (0);
+}
+
 static int
 pythonCloseCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
     WT_CURSOR *cursor)
 {
-	return 0;
+	int ret;
+
+	WT_UNUSED(handler);
+
+	if (cursor != NULL)
+		ret = cursorCloseHandler(cursor);
+	else
+		ret = sessionCloseHandler(session);
+	return (ret);
 }
 
 WT_EVENT_HANDLER pyApiEventHandler = {

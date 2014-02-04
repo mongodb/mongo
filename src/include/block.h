@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -140,39 +140,37 @@ struct __wt_block_ckpt {
 struct __wt_bm {
 						/* Methods */
 	int (*addr_string)
-	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, uint32_t);
-	int (*addr_valid)
-	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
+	int (*addr_valid)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
 	u_int (*block_header)(WT_BM *);
 	int (*checkpoint)
 	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, int);
 	int (*checkpoint_load)(WT_BM *, WT_SESSION_IMPL *,
-	    const uint8_t *, uint32_t, uint8_t *, uint32_t *, int);
+	    const uint8_t *, size_t, uint8_t *, size_t *, int);
 	int (*checkpoint_resolve)(WT_BM *, WT_SESSION_IMPL *);
 	int (*checkpoint_unload)(WT_BM *, WT_SESSION_IMPL *);
 	int (*close)(WT_BM *, WT_SESSION_IMPL *);
 	int (*compact_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*compact_page_skip)
-	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t, int *);
+	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, int *);
 	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int *);
 	int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
-	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
-	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
+	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
 	int (*read)
-	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, uint32_t);
+	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
 	int (*salvage_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*salvage_next)
-	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, uint32_t *, int *);
+	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, int *);
 	int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
-	int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, uint32_t);
+	int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t);
 	int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
 	int (*sync)(WT_BM *, WT_SESSION_IMPL *);
-	int (*verify_addr)
-	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
 	int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*verify_start)(WT_BM *, WT_SESSION_IMPL *, WT_CKPT *);
 	int (*write) (WT_BM *,
-	    WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, uint32_t *, int);
+	    WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, size_t *, int);
 	int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
 
 	WT_BLOCK *block;			/* Underlying file */
@@ -203,10 +201,10 @@ struct __wt_block {
 	int	 allocfirst;		/* Allocation is first-fit */
 	int	 allocfirst_save;	/* Allocation is first-fit, saved */
 	uint32_t allocsize;		/* Allocation size */
-	int64_t	 os_cache;		/* System buffer cache flush max */
-	int64_t	 os_cache_max;
-	int64_t	 os_cache_dirty;	/* System buffer cache write max */
-	int64_t	 os_cache_dirty_max;
+	size_t	 os_cache;		/* System buffer cache flush max */
+	size_t	 os_cache_max;
+	size_t	 os_cache_dirty;	/* System buffer cache write max */
+	size_t	 os_cache_dirty_max;
 
 	u_int	 block_header;		/* Header length */
 

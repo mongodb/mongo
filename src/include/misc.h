@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -137,7 +137,17 @@
 		WT_TRET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
 
-/* Clear a structure. */
+/*
+ * Clear a structure, two flavors: inline when we want to guarantee there's
+ * no function call or setup/tear-down of a loop, and the default where the
+ * compiler presumably chooses.  Gcc 4.3 is supposed to get this right, but
+ * we've seen problems when calling memset to clear structures in performance
+ * critical paths.
+ */
+#define	WT_CLEAR_INLINE(type, s) do {					\
+	static const type __clear;					\
+	s = __clear;							\
+} while (0)
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 

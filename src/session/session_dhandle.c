@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -282,7 +282,8 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
-		if (dhandle->session_inuse == 0 &&
+		if (dhandle != session->dhandle &&
+		    dhandle->session_inuse == 0 &&
 		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			WT_RET(
@@ -340,6 +341,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	if (dhandle_cache != NULL) {
 		candidate = 1;
+		/* We found the data handle, don't try to get it again. */
+		LF_SET(WT_DHANDLE_HAVE_REF);
 		session->dhandle = dhandle;
 
 		/*

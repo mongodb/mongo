@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -259,7 +259,7 @@ struct __wt_update;
 
 #include "intpack.i"			/* required by cell.i, packing.i */
 #include "packing.i"
-#include "cell.i"
+#include "cell.i"			/* required by btree.i */
 
 #include "mutex.i"			/* required by btree.i */
 #include "txn.i"			/* required by btree.i */

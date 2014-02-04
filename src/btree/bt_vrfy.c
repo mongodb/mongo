@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -30,7 +30,7 @@ typedef struct {
 static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
 static int  __verify_overflow(
-	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
+	WT_SESSION_IMPL *, const uint8_t *, size_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
 	WT_SESSION_IMPL *, WT_PAGE *, int *, WT_VSTUFF *);
 static int  __verify_row_int_key_order(
@@ -51,7 +51,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
 	WT_VSTUFF *vs, _vstuff;
-	uint32_t root_addr_size;
+	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 	int bm_start;
 
@@ -228,6 +228,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
+	WT_CLEAR(*unpack);	/* -Wuninitialized */
 
 	WT_VERBOSE_RET(session, verify, "%s %s",
 	    __wt_page_addr_string(session, vs->tmp1, page),
@@ -266,8 +267,8 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 		WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
-	/* Optionally dump the page in debugging mode. */
-	if (vs->dump_blocks && page->dsk != NULL)
+	/* Optionally dump the blocks or page in debugging mode. */
+	if (vs->dump_blocks)
 		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
 	if (vs->dump_pages)
 		WT_RET(__wt_debug_page(session, page, NULL));
@@ -323,11 +324,10 @@ recno_chk:	if (recno != vs->record_total + 1)
 	}
 
 	/* If it's not the root page, unpack the parent cell. */
-	if (!WT_PAGE_IS_ROOT(page))
+	if (!WT_PAGE_IS_ROOT(page)) {
 		__wt_cell_unpack(page->ref->addr, unpack);
 
-	/* Compare the parent cell against the page type. */
-	if (!WT_PAGE_IS_ROOT(page))
+		/* Compare the parent cell against the page type. */
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 			if (unpack->raw != WT_CELL_ADDR_LEAF_NO)
@@ -351,6 +351,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    __wt_cell_type_string(unpack->raw));
 			break;
 		}
+	}
 
 	/*
 	 * Check overflow pages.  We check overflow cells separately from other
@@ -606,7 +607,7 @@ err:	WT_RET_MSG(session, ret,
  */
 static int
 __verify_overflow(WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, WT_VSTUFF *vs)
+    const uint8_t *addr, size_t addr_size, WT_VSTUFF *vs)
 {
 	WT_BM *bm;
 	WT_PAGE_HEADER *dsk;

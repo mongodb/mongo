@@ -3,7 +3,7 @@ conn_config="cache_size=2G"
 table_config="lsm=(chunk_size=50MB,merge_threads=3),type=lsm"
 icount=200000000
 report_interval=5
-merge_sleep=600
 run_time=1200
 populate_threads=10
+compact=true
 threads=((count=2,inserts=1),(count=10,reads=1),(count=2,updates=1))

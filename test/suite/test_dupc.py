@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2013 WiredTiger, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -41,10 +41,10 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
     config = 'key_format='
 
     scenarios = [
-        ('file', dict(uri='file:', fmt='r')),
-        ('file', dict(uri='file:', fmt='S')),
-        ('table', dict(uri='table:', fmt='r')),
-        ('table', dict(uri='table:', fmt='S'))
+        ('file-r', dict(uri='file:', fmt='r')),
+        ('file-S', dict(uri='file:', fmt='S')),
+        ('table-r', dict(uri='table:', fmt='r')),
+        ('table-S', dict(uri='table:', fmt='S'))
         ]
 
     # Iterate through an object, duplicate the cursor and checking that it

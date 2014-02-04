@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -13,7 +13,7 @@
  */
 static int
 __ovfl_read(WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, WT_ITEM *store)
+    const uint8_t *addr, size_t addr_size, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 
@@ -124,8 +124,8 @@ __ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	size_t addr_size;
 	const uint8_t *addr;
-	uint32_t addr_size;
 
 	addr = unpack->data;
 	addr_size = unpack->size;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -43,7 +43,7 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 * Sync/checkpoint reconcile dirty pages from the cache to the backing
 	 * block manager.  Reconciliation is just another reader of the page,
 	 * so with some care, it can be done in the current thread, leaving the
-	 * eviction thread to keep freeing spaces if the cache is full.  Sync
+	 * eviction thread to keep freeing pages if the cache is full.  Sync
 	 * and eviction cannot operate on the same page at the same time, and
 	 * there are different modes inside __wt_tree_walk to make sure they
 	 * don't trip over each other.

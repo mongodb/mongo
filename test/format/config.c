@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -36,6 +36,7 @@ static int	   config_find_is_perm(const char *, size_t);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
+static void	   config_sanity(void);
 
 /*
  * config_setup --
@@ -60,29 +61,21 @@ config_setup(void)
 			config_single("data_source=file", 0);
 			break;
 		case 2:
-#if 0
 			config_single("data_source=lsm", 0);
 			break;
-#endif
 		case 3:
 			config_single("data_source=table", 0);
 			break;
 		}
 
 	if (!config_find_is_perm("file_type", strlen("file_type")))
-		switch (MMRAND(1, 3)) {
+		switch (DATASOURCE("lsm") ? 3 : MMRAND(1, 3)) {
 		case 1:
-			if (!DATASOURCE("lsm")) {
-				config_single("file_type=fix", 0);
-				break;
-			}
-			/* FALLTHROUGH */
+			config_single("file_type=fix", 0);
+			break;
 		case 2:
-			if (!DATASOURCE("lsm")) {
-				config_single("file_type=var", 0);
-				break;
-			}
-			/* FALLTHROUGH */
+			config_single("file_type=var", 0);
+			break;
 		case 3:
 			config_single("file_type=row", 0);
 			break;
@@ -108,7 +101,7 @@ config_setup(void)
 	if ((g.uri = malloc(256)) == NULL)
 		syserr("malloc");
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
-	if (DATASOURCE("memrata"))
+	if (DATASOURCE("helium"))
 		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
@@ -133,14 +126,14 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
-	/* KVS requires shared libraries. */
+	/* Required shared libraries. */
+	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
+		die(errno, "Levyx/helium shared library: %s", HELIUM_PATH);
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
 		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
-	if (DATASOURCE("memrata") && access(MEMRATA_PATH, R_OK) != 0)
-		die(errno, "memrata shared library: %s", MEMRATA_PATH);
 
-	/* KVS doesn't support user-specified collations. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	/* Some data-sources don't support user-specified collations. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		g.c_reverse = 0;
 
 	config_checksum();
@@ -163,8 +156,15 @@ config_setup(void)
 			g.c_delete_pct = 0;
 	}
 
-	/* If it's an LSM run, crank up the insert percentage. */
+	/*
+	 * If this is an LSM run, set the cache size and crank up the insert
+	 * percentage.
+	 */
 	if (DATASOURCE("lsm")) {
+		cp = config_find("cache", strlen("cache"));
+		if (!(cp->flags & C_PERM))
+			g.c_cache = 30 * g.c_chunk_size;
+
 		cp = config_find("insert_pct", strlen("insert_pct"));
 		if (cp->name != NULL &&
 		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
@@ -173,6 +173,9 @@ config_setup(void)
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
+
+	/* Perform any final sanity checks. */
+	config_sanity();
 }
 
 /*
@@ -220,19 +223,23 @@ config_compression(void)
 	if (!(cp->flags & C_PERM)) {
 		cstr = "compression=none";
 		switch (MMRAND(1, 10)) {
-		case 1:					/* 10% */
+		case 1: case 2: case 3:			/* 30% */
 			break;
-		case 2: case 3: case 4: case 5:		/* 40% */
+		case 4: case 5:				/* 20% */
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=bzip";
 			break;
 		case 6:					/* 10% */
 			if (access(BZIP_PATH, R_OK) == 0)
-				cstr = "compression=raw";
+				cstr = "compression=bzip-raw";
 			break;
-		case 7: case 8: case 9: case 10:	/* 40% */
+		case 7: case 8:				/* 20% */
 			if (access(SNAPPY_PATH, R_OK) == 0)
 				cstr = "compression=snappy";
+			break;
+		case 9: case 10:			/* 20% */
+			if (access(ZLIB_PATH, R_OK) == 0)
+				cstr = "compression=zlib";
 			break;
 		}
 		config_single(cstr, 0);
@@ -240,7 +247,7 @@ config_compression(void)
 
 	switch (g.c_compression_flag) {
 	case COMPRESS_BZIP:
-	case COMPRESS_RAW:
+	case COMPRESS_BZIP_RAW:
 		if (access(BZIP_PATH, R_OK) != 0)
 			die(0, "bzip library not found or not readable");
 		break;
@@ -251,6 +258,11 @@ config_compression(void)
 	case COMPRESS_SNAPPY:
 		if (access(SNAPPY_PATH, R_OK) != 0)
 			die(0, "snappy library not found or not readable");
+		break;
+	case COMPRESS_ZLIB:
+		if (access(ZLIB_PATH, R_OK) != 0)
+			die(0, "zlib library not found or not readable");
+		break;
 	}
 }
 
@@ -382,9 +394,9 @@ config_single(const char *s, int perm)
 	if (cp->flags & C_STRING) {
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("helium", ep, strlen("helium")) != 0 &&
 		    strncmp("kvsbdb", ep, strlen("kvsbdb")) != 0 &&
 		    strncmp("lsm", ep, strlen("lsm")) != 0 &&
-		    strncmp("memrata", ep, strlen("memrata")) != 0 &&
 		    strncmp("table", ep, strlen("table")) != 0) {
 			    fprintf(stderr,
 				"Invalid data source option: %s\n", ep);
@@ -473,12 +485,14 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_NONE;
 	else if (strcmp(s, "bzip") == 0)
 		*vp = COMPRESS_BZIP;
+	else if (strcmp(s, "bzip-raw") == 0)
+		*vp = COMPRESS_BZIP_RAW;
 	else if (strcmp(s, "lzo") == 0)
 		*vp = COMPRESS_LZO;
-	else if (strcmp(s, "raw") == 0)
-		*vp = COMPRESS_RAW;
 	else if (strcmp(s, "snappy") == 0)
 		*vp = COMPRESS_SNAPPY;
+	else if (strcmp(s, "zlib") == 0)
+		*vp = COMPRESS_ZLIB;
 	else
 		die(EINVAL, "illegal compression configuration: %s", s);
 }
@@ -533,4 +547,17 @@ config_file_type(u_int type)
 		break;
 	}
 	return ("error: unknown file type");
+}
+
+/*
+ * config_sanity --
+ *	Once configuration is done, any remaining sanity checks.
+ */
+static void
+config_sanity(void)
+{
+	if (g.c_key_min > g.c_key_max)
+		die(EINVAL, "key_min may not be larger than key_max");
+	if (g.c_value_min > g.c_value_max)
+		die(EINVAL, "value_min may not be larger than value_max");
 }

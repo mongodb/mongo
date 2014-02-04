@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -13,7 +13,7 @@
  */
 int
 __wt_bt_read(WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -84,7 +84,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 */
 		if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 			WT_ERR(
-			    F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR) ?
+			    F_ISSET(btree, WT_BTREE_VERIFY) ||
+			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
 	} else
@@ -127,7 +128,7 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
-    uint8_t *addr, uint32_t *addr_size, int checkpoint, int compressed)
+    uint8_t *addr, size_t *addr_sizep, int checkpoint, int compressed)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -144,8 +145,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
-	    (checkpoint == 0 && addr != NULL && addr_size != NULL) ||
-	    (checkpoint == 1 && addr == NULL && addr_size == NULL));
+	    (checkpoint == 0 && addr != NULL && addr_sizep != NULL) ||
+	    (checkpoint == 1 && addr == NULL && addr_sizep == NULL));
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -180,9 +181,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Optionally stream-compress the data, but don't compress blocks that
 	 * are already as small as they're going to get.
 	 */
-	if (buf->size <= btree->allocsize ||
-	    btree->compressor == NULL ||
-	    btree->compressor->compress == NULL || compressed) {
+	if (btree->compressor == NULL ||
+	    btree->compressor->compress == NULL || compressed)
+		ip = buf;
+	else if (buf->size <= btree->allocsize) {
 		ip = buf;
 		WT_STAT_FAST_DATA_INCR(session, compress_write_too_small);
 	} else {
@@ -286,7 +288,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
 	    bm->checkpoint(bm, session, ip, btree->ckpt, data_cksum) :
-	    bm->write(bm, session, ip, addr, addr_size, data_cksum));
+	    bm->write(bm, session, ip, addr, addr_sizep, data_cksum));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_write);
 	WT_STAT_FAST_DATA_INCR(session, cache_write);

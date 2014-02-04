@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2013 WiredTiger, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -255,10 +255,10 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 # Check that you can't write checkpoint cursors.
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
     scenarios = [
-        ('file', dict(uri='file:checkpoint',fmt='r')),
-        ('file', dict(uri='file:checkpoint',fmt='S')),
-        ('table', dict(uri='table:checkpoint',fmt='r')),
-        ('table', dict(uri='table:checkpoint',fmt='S'))
+        ('file-r', dict(uri='file:checkpoint',fmt='r')),
+        ('file-S', dict(uri='file:checkpoint',fmt='S')),
+        ('table-r', dict(uri='table:checkpoint',fmt='r')),
+        ('table-S', dict(uri='table:checkpoint',fmt='S'))
         ]
 
     def test_checkpoint_cursor_update(self):

@@ -14,18 +14,35 @@ cd "`dirname \"$0\"`"
 # There's a cleanup function so we can easily clean out the directory.
 clean()
 {
+	# Use the Makefile to remove object files if they exist.
 	test -f Makefile && make distclean > /dev/null
-	rm -rf ../Makefile.am ../Makefile.in ../aclocal.m4 ../autom4te.cache \
-	    ../config.hin ../config.hin~ ../configure gnu-support mklog
+
+	# Remove automatically generated files.
+	rm -rf	Makefile \
+		Makefile.am \
+		Makefile.in \
+		aclocal.m4 \
+		auto-includes.chk \
+		autom4te.cache \
+		config.hin \
+		config.hin~ \
+		config.log \
+		config.status \
+		configure \
+		gnu-support \
+		mklog
 }
+
+# We always clean things up, assume build_posix and the top-level directory
+# are the build spots.
+(cd .. && clean)
+clean
 
 while :
 	do case "$1" in
-	-c)
-		clean			# Clean and leave empty
+	-c)				# Clean and leave empty
 		exit 0;;
-	*)
-		clean			# Clean and then re-create
+	*)				# Clean and then re-create
 		break;;
 	esac
 done

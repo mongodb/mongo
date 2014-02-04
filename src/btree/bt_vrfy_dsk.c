@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -19,17 +19,19 @@ static int __verify_dsk_col_int(
 	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 static int __verify_dsk_col_var(
 	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
+static int __verify_dsk_memsize(
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *, WT_CELL *);
 static int __verify_dsk_row(
 	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 
 #define	WT_ERR_VRFY(session, ...) do {					\
-	if (!(F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)))		\
+	if (!(F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK)))		\
 		__wt_errx(session, __VA_ARGS__);			\
 	goto err;							\
 } while (0)
 
 #define	WT_RET_VRFY(session, ...) do {					\
-	if (!(F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)))		\
+	if (!(F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK)))		\
 		__wt_errx(session, __VA_ARGS__);			\
 	return (WT_ERROR);						\
 } while (0)
@@ -42,9 +44,10 @@ int
 __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
-	uint32_t size;
+	size_t size;
 	uint8_t *p, *end;
 	u_int i;
+	uint8_t flags;
 
 	dsk = buf->mem;
 	size = buf->size;
@@ -88,15 +91,25 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 	}
 
 	/* Check the page flags. */
-	switch (dsk->flags) {
-	case 0:
-	case WT_PAGE_COMPRESSED:
-		break;
-	default:
-		WT_RET_VRFY(session,
-		    "page at %s has an invalid flags value of 0x%" PRIx32,
-		    addr, (uint32_t)dsk->flags);
+	flags = dsk->flags;
+	if (LF_ISSET(WT_PAGE_COMPRESSED))
+		LF_CLR(WT_PAGE_COMPRESSED);
+	if (dsk->type == WT_PAGE_ROW_LEAF) {
+		if (LF_ISSET(WT_PAGE_EMPTY_V_ALL) &&
+		    LF_ISSET(WT_PAGE_EMPTY_V_NONE))
+			WT_RET_VRFY(session,
+			    "page at %s has invalid flags combination: 0x%"
+			    PRIx8,
+			    addr, dsk->flags);
+		if (LF_ISSET(WT_PAGE_EMPTY_V_ALL))
+			LF_CLR(WT_PAGE_EMPTY_V_ALL);
+		if (LF_ISSET(WT_PAGE_EMPTY_V_NONE))
+			LF_CLR(WT_PAGE_EMPTY_V_NONE);
 	}
+	if (flags != 0)
+		WT_RET_VRFY(session,
+		    "page at %s has invalid flags set: 0x%" PRIx8,
+		    addr, flags);
 
 	/* Unused bytes */
 	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
@@ -152,7 +165,7 @@ __verify_dsk_row(
 	WT_ITEM *last;
 	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
 	void *huffman;
-	uint32_t cell_num, cell_type, i, prefix;
+	uint32_t cell_num, cell_type, i, key_cnt, prefix;
 	uint8_t *end;
 	int cmp;
 
@@ -170,11 +183,12 @@ __verify_dsk_row(
 
 	last_cell_type = FIRST;
 	cell_num = 0;
+	key_cnt = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0) {
+		if (__wt_cell_unpack_safe(NULL, cell, unpack, end) != 0) {
 			ret = __err_cell_corrupted(session, cell_num, addr);
 			goto err;
 		}
@@ -199,6 +213,7 @@ __verify_dsk_row(
 		switch (cell_type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
+			++key_cnt;
 			switch (last_cell_type) {
 			case FIRST:
 			case WAS_VALUE:
@@ -287,8 +302,7 @@ __verify_dsk_row(
 			WT_ERR_VRFY(session,
 			    "key %" PRIu32 " on page at %s has a prefix "
 			    "compression count of %" PRIu32
-			    ", larger than the length of the previous key, %"
-			    PRIu32,
+			    ", larger than the length of the previous key, %zu",
 			    cell_num, addr, prefix, last->size);
 
 		/*
@@ -367,6 +381,39 @@ key_compare:	/*
 		}
 		WT_ASSERT(session, last != current);
 	}
+	WT_ERR(__verify_dsk_memsize(session, addr, dsk, cell));
+
+	/*
+	 * On row-store internal pages, and on row-store leaf pages, where the
+	 * "no empty values" flag is set, the key count should be equal to half
+	 * the number of physical entries.  On row-store leaf pages where the
+	 * "all empty values" flag is set, the key count should be equal to the
+	 * number of physical entries.
+	 */
+	if (dsk->type == WT_PAGE_ROW_INT && key_cnt * 2 != dsk->u.entries)
+		WT_ERR_VRFY(session,
+		    "%s page at %s has a key count of %" PRIu32 " and a "
+		    "physical entry count of %" PRIu32,
+		    __wt_page_type_string(dsk->type),
+		    addr, key_cnt, dsk->u.entries);
+	if (dsk->type == WT_PAGE_ROW_LEAF &&
+	    F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL) &&
+	    key_cnt != dsk->u.entries)
+		WT_ERR_VRFY(session,
+		    "%s page at %s with the 'all empty values' flag set has a "
+		    "key count of %" PRIu32 " and a physical entry count of %"
+		    PRIu32,
+		    __wt_page_type_string(dsk->type),
+		    addr, key_cnt, dsk->u.entries);
+	if (dsk->type == WT_PAGE_ROW_LEAF &&
+	    F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE) &&
+	    key_cnt * 2 != dsk->u.entries)
+		WT_ERR_VRFY(session,
+		    "%s page at %s with the 'no empty values' flag set has a "
+		    "key count of %" PRIu32 " and a physical entry count of %"
+		    PRIu32,
+		    __wt_page_type_string(dsk->type),
+		    addr, key_cnt, dsk->u.entries);
 
 	if (0) {
 eof:		ret = __err_eof(session, cell_num, addr);
@@ -407,7 +454,7 @@ __verify_dsk_col_int(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(NULL, cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */
@@ -420,6 +467,7 @@ __verify_dsk_col_int(
 		if (!bm->addr_valid(bm, session, unpack->data, unpack->size))
 			return (__err_eof(session, cell_num, addr));
 	}
+	WT_RET(__verify_dsk_memsize(session, addr, dsk, cell));
 
 	return (0);
 }
@@ -453,7 +501,8 @@ __verify_dsk_col_var(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	uint32_t cell_num, cell_type, i, last_size;
+	size_t last_size;
+	uint32_t cell_num, cell_type, i;
 	int last_deleted;
 	const uint8_t *last_data;
 	uint8_t *end;
@@ -472,7 +521,7 @@ __verify_dsk_col_var(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(NULL, cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */
@@ -522,8 +571,33 @@ match_err:			WT_RET_VRFY(session,
 			break;
 		}
 	}
+	WT_RET(__verify_dsk_memsize(session, addr, dsk, cell));
 
 	return (0);
+}
+
+/*
+ * __verify_dsk_memsize --
+ *	Verify the last cell on the page matches the page's memory size.
+ */
+static int
+__verify_dsk_memsize(WT_SESSION_IMPL *session,
+    const char *addr, WT_PAGE_HEADER *dsk, WT_CELL *cell)
+{
+	size_t len;
+
+	/*
+	 * We use the fact that cells exactly fill a page to detect the case of
+	 * a row-store leaf page where the last cell is a key (that is, there's
+	 * no subsequent value cell).  Check for any page type containing cells.
+	 */
+	len = WT_PTRDIFF((uint8_t *)dsk + dsk->mem_size, cell);
+	if (len == 0)
+		return (0);
+	WT_RET_VRFY(session,
+	    "%s page at %s has %zu unexpected bytes of data after the last "
+	    "cell",
+	    __wt_page_type_string(dsk->type), addr, len);
 }
 
 /*

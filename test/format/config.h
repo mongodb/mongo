@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -55,12 +55,12 @@ typedef struct {
 
 	/* Value is a string. */
 #define	C_STRING	0x020
-	uint32_t 	flags;
+	u_int	 	flags;
 
 	uint32_t	min;		/* Minimum value */
 	uint32_t	maxrand;	/* Maximum value randomly chosen */
 	uint32_t	maxset;		/* Maximum value explicitly set */
-	u_int		*v;		/* Value for this run */
+	uint32_t	*v;		/* Value for this run */
 	char		**vstr;		/* Value for string options */
 } CONFIG;
 
@@ -116,7 +116,7 @@ static CONFIG c[] = {
 	  0x0, C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
-	  "type of compression (none | bzip | lzo | raw | snappy)",
+	  "type of compression (none | bzip | bzip-raw | lzo | snappy | zlib)",
 	  0x0, C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
 
 	{ "data_extend",
@@ -124,7 +124,7 @@ static CONFIG c[] = {
 	  0x0, C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
-	  "data source (file | kvsbdb | lsm | memrata | table)",
+	  "data source (file | helium | kvsbdb | lsm | table)",
 	  0x0, C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
@@ -169,7 +169,7 @@ static CONFIG c[] = {
 
 	{ "key_max",
 	  "maximum size of keys",
-	  C_ROW, 0x0, 64, 128, 4096, &g.c_key_max, NULL },
+	  C_ROW, 0x0, 64, 128, MEGABYTE(10), &g.c_key_max, NULL },
 
 	{ "key_min",
 	  "minimum size of keys",
@@ -186,6 +186,10 @@ static CONFIG c[] = {
 	{ "merge_threads",
 	  "the number of threads to perform merge operations",
 	  0x0, 0x0, 1, 4, 10, &g.c_merge_threads, NULL },
+
+	{ "mmap",
+	  "configure for mmap operations",			/* 90% */
+	 0x0, C_BOOL, 90, 0, 0, &g.c_mmap, NULL },
 
 	{ "ops",
 	  "the number of modification operations done per run",
@@ -229,7 +233,7 @@ static CONFIG c[] = {
 
 	{ "value_max",
 	  "maximum size of values",
-	  C_ROW|C_VAR, 0x0, 32, 4096, 65536, &g.c_value_max, NULL },
+	  C_ROW|C_VAR, 0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },
 
 	{ "value_min",
 	  "minimum size of values",

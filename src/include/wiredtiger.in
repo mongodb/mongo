@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -93,9 +93,10 @@ typedef WT_CONNECTION			WT_CONNECTION_CLOSED;
 #endif
 
 /*!
- * A raw item of data to be managed.  Data items have a pointer to the data and
- * a length (limited to 4GB for items stored in tables).  WT_ITEM structures do
- * not need to be cleared before use.
+ * A raw item of data to be managed, including a pointer to the data and a
+ * length.
+ *
+ * WT_ITEM structures do not need to be cleared before use.
  */
 struct __wt_item {
 	/*!
@@ -109,8 +110,12 @@ struct __wt_item {
 
 	/*!
 	 * The number of bytes in the data item.
+	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
 	 */
-	uint32_t size;
+	size_t size;
 
 #ifndef DOXYGEN
 #define	WT_ITEM_ALIGNED					0x00000001
@@ -396,6 +401,10 @@ struct __wt_cursor {
 	 * loading the data in sorted order will be much faster than doing
 	 * out-of-order inserts.  See @ref bulk_load for more information.
 	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 * In particular, if \c overwrite is not configured and a record with
@@ -421,6 +430,10 @@ struct __wt_cursor {
 	 * On success, the cursor ends positioned at the modified record; to
 	 * minimize cursor resources, the WT_CURSOR::reset method should be
 	 * called as soon as the cursor no longer needs that position.
+	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -842,20 +855,27 @@ struct __wt_session {
 	 * value can be created.  Must be larger than chunk_size., an integer
 	 * between 100MB and 10TB; default \c 5GB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
-	 * in-memory chunk of an LSM tree., an integer between 512K and 500MB;
+	 * in-memory chunk of an LSM tree.  This limit is soft - it is possible
+	 * for chunks to be temporarily larger than this value.  This overrides
+	 * the \c memory_page_max setting., an integer between 512K and 500MB;
 	 * default \c 10MB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the
 	 * maximum number of chunks to include in a merge operation., an integer
 	 * between 2 and 100; default \c 15.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of threads
-	 * to perform merge operations., an integer between 1 and 10; default \c
-	 * 1.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_min, the minimum number of
+	 * chunks to include in a merge operation.  If set to 0 or 1 half the
+	 * value of merge_max is used., an integer no more than 100; default \c
+	 * 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of
+	 * threads to perform merge operations., an integer between 1 and 10;
+	 * default \c 2.}
 	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
 	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>. This
 	 * limit is soft - it is possible for pages to be temporarily larger
-	 * than this value., an integer between 512B and 10TB; default \c 5MB.}
+	 * than this value.  This setting is ignored for LSM trees\, see \c
+	 * chunk_size., an integer between 512B and 10TB; default \c 5MB.}
 	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\,
 	 * in bytes.  If non-zero\, schedule writes for dirty blocks belonging
 	 * to this object in the system buffer cache after that many bytes from
@@ -1518,7 +1538,7 @@ struct __wt_connection {
  * processes). <b>Not yet supported in WiredTiger</b>., a boolean flag; default
  * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
- * threads)., an integer greater than or equal to 1; default \c 50.}
+ * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
  * should configure either a cache_size or a shared_cache not both., a set of
  * related configuration options defined below.}
@@ -1555,12 +1575,12 @@ struct __wt_connection {
  * log records are written\, may contain ISO C standard strftime conversion
  * specifications.  If the value is not an absolute path name\, the file is
  * created relative to the database home., a string; default \c
- * "WiredTigerStat.%H".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if non-empty\,
- * include statistics for the list of data source URIs\, if they are open at the
- * time of the statistics logging.  The list may include URIs matching a single
- * data source ("table:mytable")\, or a URI matching all data sources of a
- * particular type ("table:")., a list of strings; default empty.}
+ * "WiredTigerStat.%d.%H".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if
+ * non-empty\, include statistics for the list of data source URIs\, if they are
+ * open at the time of the statistics logging.  The list may include URIs
+ * matching a single data source ("table:mytable")\, or a URI matching all data
+ * sources of a particular type ("table:")., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log
  * record\, may contain strftime conversion specifications., a string; default
  * \c "%b %d %H:%M:%S".}
@@ -1570,7 +1590,7 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{transaction_sync, how to sync log records when the transaction
  * commits., a string\, chosen from the following options: \c "dsync"\, \c
- * "fsync"\, \c "none"; default \c dsync.}
+ * "fsync"\, \c "none"; default \c fsync.}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
  * process is running with special privileges.  See @ref home for more
@@ -2116,14 +2136,19 @@ struct __wt_compressor {
 	 * set \c result_slotsp to the number of byte strings encoded and
 	 * \c result_lenp to the bytes needed for the encoded representation.
 	 *
-	 * WiredTiger repeatedly calls the callback function until all rows on
-	 * the page have been encoded.  There is no requirement the callback
-	 * encode any or all of the byte strings passed by WiredTiger.  If the
-	 * callback does not encode any of the byte strings, the callback must
-	 * set \c result_slotsp to 0.  In this case, WiredTiger will accumulate
-	 * more rows and repeat the call; if there are no more rows to
-	 * accumulate, WiredTiger writes the remaining rows without further
-	 * calls to the callback.
+	 * There is no requirement the callback encode any or all of the byte
+	 * strings passed by WiredTiger.  If the callback does not encode any
+	 * of the byte strings and compression should not be retried, the
+	 * callback should set \c result_slotsp to 0.
+	 *
+	 * If the callback does not encode any of the byte strings and
+	 * compression should be retried with additional byte strings, the
+	 * callback must return \c EAGAIN.  In that case, WiredTiger will
+	 * accumulate more rows and repeat the call.
+	 *
+	 * If there are no more rows to accumulate or the callback indicates
+	 * that it cannot be retried, WiredTiger writes the remaining rows
+	 * using \c WT_COMPRESSOR::compress.
 	 *
 	 * On entry, \c final is zero if there are more rows to be written as
 	 * part of this page (if there will be additional data provided to the
@@ -2551,58 +2576,54 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SLOT_JOINS			1057
 /*! log: consolidated slot join races */
 #define	WT_STAT_CONN_LOG_SLOT_RACES			1058
-/*! log: log slot ready wait timeouts */
-#define	WT_STAT_CONN_LOG_SLOT_READY_WAIT_TIMEOUT	1059
-/*! log: log slot release wait timeouts */
-#define	WT_STAT_CONN_LOG_SLOT_RELEASE_WAIT_TIMEOUT	1060
 /*! log: slots selected for switching that were unavailable */
-#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1061
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1059
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1062
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1060
 /*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1063
+#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1061
 /*! log: consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1064
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1062
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				1065
+#define	WT_STAT_CONN_LOG_SYNC				1063
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				1066
+#define	WT_STAT_CONN_LOG_WRITES				1064
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1067
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1065
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1068
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1066
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1069
+#define	WT_STAT_CONN_MEMORY_FREE			1067
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1070
+#define	WT_STAT_CONN_MEMORY_GROW			1068
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1071
+#define	WT_STAT_CONN_READ_IO				1069
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1072
+#define	WT_STAT_CONN_REC_PAGES				1070
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1073
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1071
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1074
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1072
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1075
+#define	WT_STAT_CONN_RWLOCK_READ			1073
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1076
+#define	WT_STAT_CONN_RWLOCK_WRITE			1074
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1077
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1075
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1078
+#define	WT_STAT_CONN_TXN_BEGIN				1076
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1079
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1077
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1080
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1078
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1081
+#define	WT_STAT_CONN_TXN_COMMIT				1079
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1082
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1080
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1083
+#define	WT_STAT_CONN_TXN_ROLLBACK			1081
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1084
+#define	WT_STAT_CONN_WRITE_IO				1082
 
 /*!
  * @}

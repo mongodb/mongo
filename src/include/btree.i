@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -36,7 +36,7 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_ADD(page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 		(void)WT_ATOMIC_ADD(page->modify->bytes_dirty, size);
@@ -56,7 +56,7 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_SUB(page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
 		(void)WT_ATOMIC_SUB(page->modify->bytes_dirty, size);
@@ -311,7 +311,7 @@ __wt_off_page(WT_PAGE *page, const void *p)
  * possible.
  */
 static inline void
-__wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
+__wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
 	/*
 	 * An internal page key is in one of two places: if we instantiated the
@@ -333,7 +333,7 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
 	if (ref->key.pkey & 0x01) {
 		*(void **)keyp =
 		    WT_PAGE_REF_OFFSET(page, (ref->key.pkey & 0xFFFFFFFF) >> 1);
-		*sizep = (uint32_t)(ref->key.pkey >> 32);
+		*sizep = ref->key.pkey >> 32;
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
@@ -446,12 +446,42 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
+ * __wt_row_leaf_value --
+ *	Return a pointer to the value cell for a row-store leaf page key, or
+ * NULL if there isn't one.
+ */
+static inline WT_CELL *
+__wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip)
+{
+	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
+
+	cell = WT_ROW_KEY_COPY(rip);
+
+	/*
+	 * Key copied.
+	 *
+	 * Cell now either references a WT_IKEY structure with a cell offset,
+	 * or references the on-page key WT_CELL.  Both can be processed
+	 * regardless of what other threads are doing.  If it's the former,
+	 * use it to get the latter.
+	 */
+	if (__wt_off_page(page, cell))
+		cell = WT_PAGE_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
+
+	/* Unpack the key cell, then return its associated value cell. */
+	__wt_cell_unpack(cell, &unpack);
+	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
+	return (__wt_cell_leaf_value_parse(page, cell));
+}
+
+/*
  * __wt_ref_info --
  *	Return the addr/size and type triplet for a reference.
  */
 static inline int
 __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
-    WT_REF *ref, const uint8_t **addrp, uint32_t *sizep, u_int *typep)
+    WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -498,6 +528,41 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 }
 
 /*
+ * __wt_eviction_force_check --
+ *	Check if a page matches the criteria for forced eviction.
+ */
+static inline int
+__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
+
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR &&
+	    page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off, although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that has
+	 * never been modified, but check to be sure.
+	 */
+	if (page->modify == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
  * __wt_page_release --
  *	Release a reference to a page.
  */
@@ -527,7 +592,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return (ret);
 		}
 
-		ret = __wt_evict_page(session, page);
+		WT_TRET(__wt_evict_page(session, page));
 		if (ret == 0)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -612,43 +677,8 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_eviction_force_check --
- *	Check if a page matches the criteria for forced eviction.
- */
-static inline int
-__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
-	/* Leaf pages only. */
-	if (page->type != WT_PAGE_COL_FIX &&
-	    page->type != WT_PAGE_COL_VAR &&
-	    page->type != WT_PAGE_ROW_LEAF)
-		return (0);
-
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * It's hard to imagine a page with a huge memory footprint that has
-	 * never been modified, but check to be sure.
-	 */
-	if (page->modify == NULL)
-		return (0);
-
-	return (1);
-}
-
-/*
  * __wt_eviction_force --
- *      Check if the current transaction permits forced eviction of a page.
+ *	Check if the current transaction permits forced eviction of a page.
  */
 static inline int
 __wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -672,7 +702,7 @@ __wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_eviction_force --
- *      Forcefully evict a page, if possible.
+ *	Forcefully evict a page, if possible.
  */
 static inline int
 __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -686,6 +716,13 @@ __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    __wt_txn_visible_all(session, page->modify->update_txn)) {
 		page->read_gen = WT_READ_GEN_OLDEST;
 		WT_RET(__wt_page_release(session, page));
+		/*
+		 * Forced eviction can create chains of internal pages before
+		 * the cache is full. Setup the eviction server to look for
+		 * internal page merges after we successfully force evict.
+		 */
+		F_SET(S2C(session)->cache, WT_EVICT_INTERNAL);
+		WT_RET(__wt_evict_server_wake(session));
 	} else {
 		WT_RET(__wt_page_release(session, page));
 		__wt_sleep(0, 10000);
@@ -753,7 +790,7 @@ static inline int
 __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	const uint8_t *userp, *treep;
-	uint32_t len, usz, tsz;
+	size_t len, usz, tsz;
 
 	usz = user_item->size;
 	tsz = tree_item->size;
@@ -788,10 +825,10 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
  */
 static inline int
 __wt_lex_compare_skip(
-    const WT_ITEM *user_item, const WT_ITEM *tree_item, uint32_t *matchp)
+    const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
 	const uint8_t *userp, *treep;
-	uint32_t len, usz, tsz;
+	size_t len, usz, tsz;
 
 	usz = user_item->size;
 	tsz = tree_item->size;
@@ -815,7 +852,7 @@ __wt_lex_compare_skip(
 
 /*
  * __wt_btree_mergeable --
- *      Determines whether the given page is a candidate for merging.
+ *	Determines whether the given page is a candidate for merging.
  */
 static inline int
 __wt_btree_mergeable(WT_PAGE *page)

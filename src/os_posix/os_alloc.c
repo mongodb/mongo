@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -168,10 +168,10 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 
 /*
  * __wt_strndup --
- *	Duplicate a string of a given length (and NUL-terminate).
+ *	Duplicate a byte string of a given length (and NUL-terminate).
  */
 int
-__wt_strndup(WT_SESSION_IMPL *session, const char *str, size_t len, void *retp)
+__wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp)
 {
 	void *p;
 
@@ -199,8 +199,8 @@ __wt_strndup(WT_SESSION_IMPL *session, const char *str, size_t len, void *retp)
 int
 __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
 {
-	return (__wt_strndup(session,
-	    str, (str == NULL) ? 0 : strlen(str), retp));
+	return (__wt_strndup(
+	    session, str, (str == NULL) ? 0 : strlen(str), retp));
 }
 
 /*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -38,8 +38,6 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	size_t offset;
 	int set_data;
-
-	WT_ASSERT(session, size <= UINT32_MAX);
 
 	/* Clear buffers previously used for mapped returns. */
 	if (F_ISSET(buf, WT_ITEM_MAPPED))
@@ -113,7 +111,7 @@ int
 __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	WT_RET(__wt_buf_init(session, buf, size));
-	buf->size = WT_STORE_SIZE(size);	/* Set the data length. */
+	buf->size = size;			/* Set the data length. */
 
 	return (0);
 }
@@ -151,7 +149,7 @@ __wt_buf_set_printable(
  *	Steal a buffer for another purpose.
  */
 void *
-__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
+__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
 	void *retp;
 
@@ -178,8 +176,6 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 
 	/* Second, give our caller the buffer's memory. */
 	retp = buf->mem;
-	if (sizep != NULL)
-		*sizep = buf->size;
 
 	/* Third, discard the buffer's memory. */
 	__wt_buf_clear(buf);
@@ -222,7 +218,7 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		/* Check if there was enough space. */
 		if (len < buf->memsize) {
 			buf->data = buf->mem;
-			buf->size = WT_STORE_SIZE(len);
+			buf->size = len;
 			return (0);
 		}
 
@@ -261,7 +257,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 
 		/* Check if there was enough space. */
 		if (len < space) {
-			buf->size += WT_STORE_SIZE(len);
+			buf->size += len;
 			return (0);
 		}
 
@@ -279,8 +275,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc_func(WT_SESSION_IMPL *session,
-    size_t size, WT_ITEM **scratchp
+__wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -443,8 +438,7 @@ __wt_ext_scr_alloc(
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
 		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
-	return (__wt_scr_alloc(
-	    session, (uint32_t)size, &buf) == 0 ? buf->mem : NULL);
+	return (__wt_scr_alloc(session, size, &buf) == 0 ? buf->mem : NULL);
 }
 
 /*

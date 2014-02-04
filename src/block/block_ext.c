@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -530,7 +530,7 @@ done:	/* Add the newly allocated extent to the list of allocations. */
  */
 int
 __wt_block_free(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
 	WT_DECL_RET;
 	off_t offset;
@@ -1134,9 +1134,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_EXTLIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
 	WT_EXTLIST_WRITE(p, 0);
 
-	dsk->u.datalen =
-	    WT_STORE_SIZE(WT_PTRDIFF32(p, WT_BLOCK_HEADER_BYTE(dsk)));
-	dsk->mem_size = tmp->size = WT_STORE_SIZE(WT_PTRDIFF32(p, dsk));
+	dsk->u.datalen = WT_PTRDIFF32(p, WT_BLOCK_HEADER_BYTE(dsk));
+	tmp->size = dsk->mem_size = WT_PTRDIFF32(p, dsk);
 
 #ifdef HAVE_DIAGNOSTIC
 	/*

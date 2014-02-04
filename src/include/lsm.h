@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -47,25 +47,26 @@ struct __wt_cursor_lsm {
  *	A single chunk (file) in an LSM tree.
  */
 struct __wt_lsm_chunk {
-	uint32_t id;			/* ID used to generate URIs */
-	uint32_t generation;		/* Merge generation */
 	const char *uri;		/* Data source for this chunk */
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
-	uint64_t count;			/* Approximate count of records */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
-	uint32_t refcnt;		/* Number of worker thread references */
-	uint32_t bloom_busy;		/* Number of worker thread references */
+	uint64_t count;			/* Approximate count of records */
 	uint64_t size;			/* Final chunk size */
-
 	uint64_t txnid_max;		/* Newest transactional update */
 
+	uint32_t id;			/* ID used to generate URIs */
+	uint32_t generation;		/* Merge generation */
+	uint32_t refcnt;		/* Number of worker thread references */
+	uint32_t bloom_busy;		/* Number of worker thread references */
+
+	int8_t empty;			/* 1/0: checkpoint missing */
+	int8_t evicted;			/* 1/0: in-memory chunk was evicted */
+
 #define	WT_LSM_CHUNK_BLOOM	0x01
-#define	WT_LSM_CHUNK_EMPTY	0x02
-#define	WT_LSM_CHUNK_EVICTED	0x04
-#define	WT_LSM_CHUNK_MERGING	0x08
-#define	WT_LSM_CHUNK_ONDISK	0x10
-#define	WT_LSM_CHUNK_STABLE	0x20
-	uint32_t flags_atomic;
+#define	WT_LSM_CHUNK_MERGING	0x02
+#define	WT_LSM_CHUNK_ONDISK	0x04
+#define	WT_LSM_CHUNK_STABLE	0x08
+	uint32_t flags;
 } WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 /*
@@ -89,7 +90,8 @@ struct __wt_lsm_tree {
 
 	uint64_t dsk_gen;
 
-	long throttle_sleep;		/* Rate limiting */
+	long ckpt_throttle;		/* Rate limiting due to checkpoints */
+	long merge_throttle;		/* Rate limiting due to merges */
 	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
 	uint64_t merge_progressing;	/* Bumped when merges are active */
 

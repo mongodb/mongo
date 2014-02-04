@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -17,7 +17,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 	WT_BM *bm;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	uint32_t addr_size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	*skipp = 1;					/* Default skip. */
@@ -158,7 +158,7 @@ __wt_compact_page_skip(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int *skipp)
 {
 	WT_BM *bm;
-	uint32_t addr_size;
+	size_t addr_size;
 	u_int type;
 	const uint8_t *addr;
 

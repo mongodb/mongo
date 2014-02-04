@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -84,20 +84,20 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
-	    "%s,%s,"
+	    "%s,%s,%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
-	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
+	    g.c_mmap ? "mmap=true" : "mmap=false",
+	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
-	    (access(RAW_PATH, R_OK) == 0 &&
-	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
@@ -119,18 +119,26 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		g.wt_api = conn->get_extension_api(conn);
 
 	/*
-	 * Load the Memrata shared library: it would be possible to do this as
+	 * Load the Helium shared library: it would be possible to do this as
 	 * part of the extensions configured for wiredtiger_open, there's no
 	 * difference, I am doing it here because it's easier to work with the
 	 * configuration strings.
 	 */
-	if (DATASOURCE("memrata") &&
-	    (ret = conn->load_extension(conn, MEMRATA_PATH,
-	    "entry=wiredtiger_extension_init,config=["
-	    "dev1=[kvs_devices=[/dev/loop0,/dev/loop1],kvs_open_o_truncate=1],"
-	    "dev2=[kvs_devices=[/dev/loop2],kvs_open_o_truncate=1]]")) != 0)
-		die(ret, "WT_CONNECTION.load_extension: %s", MEMRATA_PATH);
-
+	if (DATASOURCE("helium")) {
+		if (g.helium_mount == NULL)
+			die(EINVAL, "no Helium mount point specified");
+		(void)snprintf(config, sizeof(config),
+		    "entry=wiredtiger_extension_init,config=["
+		    "helium_verbose=0,"
+		    "dev1=[helium_devices=\"he://./%s\","
+		    "helium_o_volume_truncate=1]]",
+		    g.helium_mount);
+		if ((ret =
+		    conn->load_extension(conn, HELIUM_PATH, config)) != 0)
+			die(ret,
+			   "WT_CONNECTION.load_extension: %s:%s",
+			   HELIUM_PATH, config);
+	}
 	*connp = conn;
 }
 
@@ -148,12 +156,6 @@ wts_create(void)
 	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
-
-	/*
-	 * Create the underlying store.
-	 */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
 
 	/*
 	 * Ensure that we can service at least one operation per-thread
@@ -194,7 +196,7 @@ wts_create(void)
 	switch (g.type) {
 	case FIX:
 		p += snprintf(p, (size_t)(end - p),
-		    ",value_format=%dt", g.c_bitcnt);
+		    ",value_format=%" PRIu32 "t", g.c_bitcnt);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
@@ -202,7 +204,7 @@ wts_create(void)
 			    ",huffman_key=english");
 		if (g.c_prefix_compression)
 			p += snprintf(p, (size_t)(end - p),
-			    ",prefix_compression_min=%u",
+			    ",prefix_compression_min=%" PRIu32,
 			    g.c_prefix_compression_min);
 		else
 			p += snprintf(p, (size_t)(end - p),
@@ -243,32 +245,42 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2\"");
 		break;
+	case COMPRESS_BZIP_RAW:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"bzip2-raw-test\"");
+		break;
 	case COMPRESS_LZO:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"LZO1B-6\"");
-		break;
-	case COMPRESS_RAW:
-		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"raw\"");
 		break;
 	case COMPRESS_SNAPPY:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"snappy\"");
 		break;
+	case COMPRESS_ZLIB:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"zlib\"");
+		break;
 	}
 
-	/* Configure internal key truncation. */
+	/* Configure Btree internal key truncation. */
 	p += snprintf(
 	    p, (size_t)(end - p), ",internal_key_truncate=%s",
 	    g.c_internal_key_truncation ? "true" : "false");
 
 	/* Configure Btree page key gap. */
-	p += snprintf(p, (size_t)(end - p), ",key_gap=%u", g.c_key_gap);
+	p += snprintf(p, (size_t)(end - p), ",key_gap=%" PRIu32, g.c_key_gap);
 
 	/* Configure Btree split page percentage. */
-	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
+	p += snprintf(p, (size_t)(end - p),
+	    ",split_pct=%" PRIu32, g.c_split_pct);
 
-	/* Configure data types. */
+	/* Configure LSM and data-sources. */
+	if (DATASOURCE("helium"))
+		p += snprintf(p, (size_t)(end - p),
+		    ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
+		    g.c_compression_flag == COMPRESS_NONE ? 0 : 1);
+
 	if (DATASOURCE("kvsbdb"))
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
 
@@ -287,25 +299,25 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    "bloom=%s,", g.c_bloom ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
-		    "bloom_bit_count=%u,", g.c_bloom_bit_count);
+		    "bloom_bit_count=%" PRIu32 ",", g.c_bloom_bit_count);
 		p += snprintf(p, (size_t)(end - p),
-		    "bloom_hash_count=%u,", g.c_bloom_hash_count);
+		    "bloom_hash_count=%" PRIu32 ",", g.c_bloom_hash_count);
 		p += snprintf(p, (size_t)(end - p),
 		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
-		    "merge_max=%u,", g.c_merge_max);
+		    "merge_max=%" PRIu32 ",", g.c_merge_max);
 		p += snprintf(p, (size_t)(end - p),
-		    "merge_threads=%u,", g.c_merge_threads);
+		    "merge_threads=%" PRIu32 ",", g.c_merge_threads);
 		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 
-	if (DATASOURCE("memrata"))
-		p += snprintf(p, (size_t)(end - p),
-		    ",type=memrata,kvs_open_o_truncate=1");
-
+	/*
+	 * Create the underlying store.
+	 */
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die(ret, "connection.open_session");
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
-
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -329,8 +341,8 @@ wts_dump(const char *tag, int dump_bdb)
 	int ret;
 	char *cmd;
 
-	/* Data-sources that don't support dump through the wt utility. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	/* Some data-sources don't support dump through the wt utility. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	track("dump files and compare", 0ULL, NULL);
@@ -359,14 +371,8 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/*
-	 * Data-sources that don't support salvage.
-	 *
-	 * XXX
-	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
-	 * don't do that for now.
-	 */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("lsm") || DATASOURCE("memrata"))
+	/* Some data-sources don't support salvage. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;
@@ -394,16 +400,6 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	/*
-	 * Data-sources that don't support verify.
-	 *
-	 * XXX
-	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
-	 * don't do that for now.
-	 */
-	if (DATASOURCE("lsm") || DATASOURCE("memrata"))
-		return;
-
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
@@ -412,8 +408,12 @@ wts_verify(const char *tag)
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
-	if ((ret = session->verify(session, g.uri, NULL)) != 0)
+
+	/* Session operations for LSM can return EBUSY. */
+	ret = session->verify(session, g.uri, NULL);
+	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
 		die(ret, "session.verify: %s: %s", g.uri, tag);
+
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
@@ -437,12 +437,12 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	/* Data-sources that don't support statistics. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
-		return;
-
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)
+		return;
+
+	/* Some data-sources don't support statistics. */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;

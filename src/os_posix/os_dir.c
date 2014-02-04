@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -21,11 +21,10 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	struct dirent *dp;
 	DIR *dirp;
 	WT_DECL_RET;
-	const char *path;
 	size_t dirallocsz;
 	u_int count, dirsz;
 	int match;
-	char **entries;
+	char **entries, *path;
 
 	*dirlist = NULL;
 	*countp = 0;

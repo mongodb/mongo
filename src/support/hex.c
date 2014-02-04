@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -9,17 +9,28 @@
 
 static const u_char hex[] = "0123456789abcdef";
 
-#define	FILL_HEX(src, src_max, dest, dest_max) do {			\
-	const uint8_t *p;						\
-	size_t __s, __d;						\
-	for (p = (src), t = (dest), __s = src_max, __d = dest_max - 1;	\
-	    __s > 0 && __d > 0;						\
-	    __s-=1, __d-=2, ++p) {					\
-		*t++ = hex[(*p & 0xf0) >> 4];				\
-		*t++ = hex[*p & 0x0f];					\
-	}								\
-	*t++ = '\0';							\
-} while (0)
+/*
+ * __fill_hex --
+ *	In-memory conversion of raw bytes to a hexadecimal representation.
+ */
+static inline void
+__fill_hex(const uint8_t *src, size_t src_max,
+    uint8_t *dest, size_t dest_max, size_t *lenp)
+{
+	uint8_t *dest_orig;
+
+	dest_orig = dest;
+	if (dest_max > 0)		/* save a byte for nul-termination */
+		--dest_max;
+	for (; src_max > 0 && dest_max > 1;
+	    src_max -= 1, dest_max -= 2, ++src) {
+		*dest++ = hex[(*src & 0xf0) >> 4];
+		*dest++ = hex[*src & 0x0f];
+	}
+	*dest++ = '\0';
+	if (lenp != NULL)
+		*lenp = WT_PTRDIFF(dest, dest_orig);
+}
 
 /*
  * __wt_raw_to_hex --
@@ -27,20 +38,17 @@ static const u_char hex[] = "0123456789abcdef";
  */
 int
 __wt_raw_to_hex(
-    WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
+    WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to)
 {
 	size_t len;
-	u_char *t;
 
 	/*
-	 * In the worst case, every character takes up 2 spaces, plus a
-	 * trailing nul byte.
+	 * Every byte takes up 2 spaces, plus a trailing nul byte.
 	 */
-	len = (size_t)size * 2 + 1;
+	len = size * 2 + 1;
 	WT_RET(__wt_buf_init(session, to, len));
 
-	FILL_HEX(from, size, to->mem, len);
-	to->size = WT_PTRDIFF32(t, to->mem);
+	__fill_hex(from, size, to->mem, len, &to->size);
 	return (0);
 }
 
@@ -50,17 +58,13 @@ __wt_raw_to_hex(
  */
 void
 __wt_raw_to_hex_mem(
-    const uint8_t *from, uint32_t size, u_char *dest, uint32_t dest_size)
+    const uint8_t *from, size_t size, uint8_t *dest, size_t dest_size)
 {
-	u_char *t;
-
 	/*
-	 * In the worst case, every character takes up 2 spaces, plus a
-	 * trailing nul byte.  if the user didn't give us enough space,
-	 * fill in what we can.
+	 * Every byte takes up 2 spaces, plus a trailing nul byte.
+	 * The user must provide a large enough destination buffer.
 	 */
-	FILL_HEX(from, size, dest, dest_size);
-	return;
+	__fill_hex(from, size, dest, dest_size, NULL);
 }
 
 /*
@@ -97,7 +101,7 @@ __wt_raw_to_esc_hex(
 			*t++ = hex[*p & 0x0f];
 		}
 	*t++ = '\0';
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }
 
@@ -195,7 +199,7 @@ __wt_nhex_to_raw(
 		if (hex2byte(p, t))
 			return (__hex_fmterr(session));
 
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }
 
@@ -221,6 +225,6 @@ __wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 			++p;
 		}
 	}
-	to->size = WT_PTRDIFF32(t, to->mem);
+	to->size = WT_PTRDIFF(t, to->mem);
 	return (0);
 }

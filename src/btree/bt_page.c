@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -222,7 +222,7 @@ __wt_page_inmem(
 		/*
 		 * Column-store leaf page entries map one-to-one to the number
 		 * of physical entries on the page (each physical entry is a
-		 * data item).
+		 * value item).
 		 */
 		alloc_entries = dsk->u.entries;
 		break;
@@ -236,11 +236,19 @@ __wt_page_inmem(
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
-		 * Row-store leaf page entries map in an indeterminate way to
-		 * the physical entries on the page, we have to walk the page
-		 * to figure it out.
+		 * If the "no empty values" flag is set, row-store leaf page
+		 * entries map one-to-one to the number of physical entries
+		 * on the page (each physical entry is a key or value item).
+		 * If that flag is not set, there are more keys than values,
+		 * we have to walk the page to figure it out.
 		 */
-		WT_RET(__inmem_row_leaf_entries(session, dsk, &alloc_entries));
+		if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
+			alloc_entries = dsk->u.entries;
+		else if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
+			alloc_entries = dsk->u.entries / 2;
+		else
+			WT_RET(__inmem_row_leaf_entries(
+			    session, dsk, &alloc_entries));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -571,14 +579,6 @@ __inmem_row_leaf_entries(
 		WT_ILLEGAL_VALUE(session);
 		}
 	}
-
-	/*
-	 * We use the fact that cells exactly fill a page to detect the case of
-	 * a row-store leaf page where the last cell is a key (that is, there's
-	 * no subsequent value cell).  Assert that to be true, the bug would be
-	 * difficult to find/diagnose in the field.
-	 */
-	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
 
 	*nindxp = nindx;
 	return (0);

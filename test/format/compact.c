@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -42,7 +42,7 @@ compact(void *arg)
 	WT_UNUSED(arg);
 
 	/* Compaction isn't supported for all data sources. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return (NULL);
 
 	/* Open a session. */

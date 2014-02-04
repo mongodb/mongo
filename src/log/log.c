@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -281,7 +281,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	if (direct)
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
-		    logrec->len, (void *)logrec));
+		    (size_t)logrec->len, (void *)logrec));
 	else
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
 		    logrec, logrec->len);
@@ -476,7 +476,9 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	uint32_t write_size;
+	WT_LSN sync_lsn;
+	size_t write_size;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
 	log = conn->log;
@@ -493,7 +495,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
-		write_size = (uint32_t)
+		write_size = (size_t)
 		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
 		WT_ERR(__wt_write(session, slot->slot_fh,
 		    slot->slot_start_offset, write_size, slot->slot_buf.mem));
@@ -503,27 +505,39 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * Wait for earlier groups to finish, otherwise there could be holes
 	 * in the log file.
 	 */
-	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
-		/*
-		 * Workloads with fast commits (no-sync is a reasonable
-		 * approximation) benefit from yielding rather than using the
-		 * more heavy weight condition wait.
-		 */
-		if (S2C(session)->txn_logsync == 0)
-			__wt_yield();
-		else if (__wt_cond_wait(session,
-		    log->log_release_cond, 10000) == ETIMEDOUT)
-			WT_STAT_FAST_CONN_INCR(session,
-			    log_slot_release_wait_timeout);
-	}
-	if (F_ISSET(slot, SLOT_SYNC)) {
-		WT_STAT_FAST_CONN_INCR(session, log_sync);
-		WT_ERR(__wt_fsync(session, log->log_fh));
-		F_CLR(slot, SLOT_SYNC);
-		log->sync_lsn = slot->slot_end_lsn;
-	}
+	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
+		__wt_yield();
 	log->write_lsn = slot->slot_end_lsn;
-	WT_ERR(__wt_cond_signal(session, log->log_release_cond));
+	/*
+	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
+	 * so that threads finishing writing to the log will wait while the
+	 * current fsync completes and advance log->write_lsn.
+	 */
+	while (F_ISSET(slot, SLOT_SYNC) &&
+	    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+		if (__wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
+			(void)__wt_cond_wait(
+			    session, log->log_sync_cond, 10000);
+			continue;
+		}
+		/*
+		 * Record the current end of log after we grabbed the lock.
+		 * That is how far our fsync call with guarantee.
+		 */
+		sync_lsn = log->write_lsn;
+		if (LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+			WT_STAT_FAST_CONN_INCR(session, log_sync);
+			ret = __wt_fsync(session, log->log_fh);
+			if (ret == 0) {
+				F_CLR(slot, SLOT_SYNC);
+				log->sync_lsn = sync_lsn;
+				ret = __wt_cond_signal(
+				    session, log->log_sync_cond);
+			}
+		}
+		__wt_spin_unlock(session, &log->log_sync_lock);
+		WT_ERR(ret);
+	}
 	if (F_ISSET(slot, SLOT_BUF_GROW)) {
 		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
 		F_CLR(slot, SLOT_BUF_GROW);
@@ -656,8 +670,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * Read the minimum allocation size a record could be.
 	 */
 	WT_ERR(__wt_buf_init(session, record, log->allocsize));
-	WT_ERR(__wt_read(
-	    session, log_fh, lsnp->offset, log->allocsize, record->mem));
+	WT_ERR(__wt_read(session,
+	    log_fh, lsnp->offset, (size_t)log->allocsize, record->mem));
 	/*
 	 * First 4 bytes is the real record length.  See if we
 	 * need to read more than the allocation size.  We expect
@@ -672,8 +686,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	if (reclen > log->allocsize) {
 		rdup_len = __wt_rduppo2(reclen, log->allocsize);
 		WT_ERR(__wt_buf_grow(session, record, rdup_len));
-		WT_ERR(__wt_read(
-		    session, log_fh, lsnp->offset, rdup_len, record->mem));
+		WT_ERR(__wt_read(session,
+		    log_fh, lsnp->offset, (size_t)rdup_len, record->mem));
 	}
 	/*
 	 * We read in the record, verify checksum.
@@ -825,8 +839,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * Read the minimum allocation size a record could be.
 		 */
 		WT_ASSERT(session, buf.memsize >= allocsize);
-		WT_ERR(__wt_read(
-		    session, log_fh, rd_lsn.offset, allocsize, buf.mem));
+		WT_ERR(__wt_read(session,
+		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
 		 * First 8 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
@@ -847,9 +861,13 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
 		if (reclen > allocsize) {
+			/*
+			 * We need to round up and read in the full padded
+			 * record, especially for direct I/O.
+			 */
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
-			WT_ERR(__wt_read(
-			    session, log_fh, rd_lsn.offset, reclen, buf.mem));
+			WT_ERR(__wt_read(session,
+			    log_fh, rd_lsn.offset, (size_t)rdup_len, buf.mem));
 			WT_STAT_FAST_CONN_INCR(session, log_scan_rereads);
 		}
 		/*
@@ -913,6 +931,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOGSLOT tmp;
 	WT_MYSLOT myslot;
 	int locked;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	log = S2C(session)->log;
 	myslot.slot = &tmp;
@@ -920,7 +939,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_CLEAR(tmp);
 
 	/* Fast path the contended case. */
-	if (__wt_spin_trylock(session, &log->log_slot_lock) != 0)
+	if (__wt_spin_trylock(session, &log->log_slot_lock, &id) != 0)
 		return (EAGAIN);
 	locked = 1;
 
@@ -949,7 +968,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	WT_LSN tmp_lsn;
+	WT_LSN lsn;
 	WT_MYSLOT myslot;
 	uint32_t rdup_len;
 	int locked;
@@ -957,8 +976,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
+	INIT_LSN(&lsn);
 	myslot.slot = NULL;
-	INIT_LSN(&tmp_lsn);
 	/*
 	 * Assume the WT_ITEM the user passed is a WT_LOG_RECORD, which has
 	 * a header at the beginning for us to fill in.
@@ -969,7 +988,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * direct_io is in use because it makes the reading code cleaner.
 	 */
 	WT_STAT_FAST_CONN_INCRV(session, log_bytes_user, record->size);
-	rdup_len = __wt_rduppo2(record->size, log->allocsize);
+	rdup_len = __wt_rduppo2((uint32_t)record->size, log->allocsize);
 	WT_ERR(__wt_buf_grow(session, record, rdup_len));
 	WT_ASSERT(session, record->data == record->mem);
 	/*
@@ -982,7 +1001,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		record->size = rdup_len;
 	}
 	logrec = (WT_LOG_RECORD *)record->mem;
-	logrec->len = record->size;
+	logrec->len = (uint32_t)record->size;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
 
@@ -1036,22 +1055,22 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ERR(__wt_log_slot_notify(session, myslot.slot));
 	} else
 		WT_ERR(__wt_log_slot_wait(session, myslot.slot));
-	WT_ERR(__log_fill(session, &myslot, 0, record, &tmp_lsn));
-	if (__wt_log_slot_release(myslot.slot, rdup_len) ==
-	    WT_LOG_SLOT_DONE) {
+	WT_ERR(__log_fill(session, &myslot, 0, record, &lsn));
+	if (__wt_log_slot_release(myslot.slot, rdup_len) == WT_LOG_SLOT_DONE) {
 		WT_ERR(__log_release(session, myslot.slot));
 		WT_ERR(__wt_log_slot_free(myslot.slot));
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
-		/* Wait for our slot to be finalized */
-		while (LOG_CMP(&log->sync_lsn, &tmp_lsn) <= 0 &&
+		/* Wait for our writes to reach disk */
+		while (LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
-			__wt_yield();
+			(void)__wt_cond_wait(
+			    session, log->log_sync_cond, 10000);
 	}
 err:
 	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
 	if (ret == 0 && lsnp != NULL)
-		*lsnp = tmp_lsn;
+		*lsnp = lsn;
 	/*
 	 * If we're synchronous and some thread had an error, we don't know
 	 * if our write made it out to the file or not.  The error could be

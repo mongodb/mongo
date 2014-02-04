@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2013 WiredTiger, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -42,7 +42,7 @@ key_len_setup(void)
 	 * Fill in the random key lengths.
 	 */
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-		g.key_rand_len[i] = (uint16_t)MMRAND(g.c_key_min, g.c_key_max);
+		g.key_rand_len[i] = (uint32_t)MMRAND(g.c_key_min, g.c_key_max);
 }
 
 void
@@ -61,7 +61,7 @@ key_gen_setup(uint8_t **keyp)
 }
 
 void
-key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
+key_gen(uint8_t *key, size_t *sizep, uint64_t keyno, int insert)
 {
 	int len, suffix;
 
@@ -79,10 +79,10 @@ key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
 	 */
 	if (g.type == ROW) {
 		key[len] = '/';
-		len = g.key_rand_len[keyno %
+		len = (int)g.key_rand_len[keyno %
 		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 	}
-	*sizep = (uint32_t)len;
+	*sizep = (size_t)len;
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
@@ -114,7 +114,7 @@ val_gen_setup(uint8_t **valp)
 }
 
 void
-value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
+value_gen(uint8_t *val, size_t *sizep, uint64_t keyno)
 {
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of

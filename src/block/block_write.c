@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -28,9 +28,20 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
 {
 	WT_UNUSED(session);
 
+	/*
+	 * We write the page size, in bytes, into the block's header as a 4B
+	 * unsigned value, and it's possible for the engine to accept an item
+	 * we can't write.  For example, a huge key/value where the allocation
+	 * size has been set to something large will overflow 4B when it tries
+	 * to align the write.  We could make this work (for example, writing
+	 * the page size in units of allocation size or something else), but
+	 * it's not worth the effort, writing 4GB objects into a btree makes
+	 * no sense.  Limit the writes to (4GB - 1KB), it gives us potential
+	 * mode bits, and I'm not interested in debugging corner cases anyway.
+	 */
 	*sizep = (size_t)
 	    WT_ALIGN(*sizep + WT_BLOCK_HEADER_BYTE_SIZE, block->allocsize);
-	return (0);
+	return (*sizep > UINT32_MAX - 1024 ? EINVAL : 0);
 }
 
 /*
@@ -39,27 +50,25 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  */
 int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int data_cksum)
+    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum)
 {
 	off_t offset;
 	uint32_t size, cksum;
 	uint8_t *endp;
-
-	WT_UNUSED(addr_size);
 
 	WT_RET(__wt_block_write_off(
 	    session, block, buf, &offset, &size, &cksum, data_cksum, 0));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
-	*addr_size = WT_PTRDIFF32(endp, addr);
+	*addr_sizep = WT_PTRDIFF(endp, addr);
 
 	return (0);
 }
 
 /*
  * __wt_block_write_off --
- *	Write a buffer into a block, returning the block's addr/size and
+ *	Write a buffer into a block, returning the block's offset, size and
  * checksum.
  */
 int
@@ -70,8 +79,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
+	size_t align_size;
 	off_t offset;
-	uint32_t align_size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
@@ -90,11 +99,16 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * boundary, this is one of the reasons the btree layer must find out
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
-	align_size = (uint32_t)WT_ALIGN(buf->size, block->allocsize);
+	align_size = WT_ALIGN(buf->size, block->allocsize);
 	if (align_size > buf->memsize) {
 		WT_ASSERT(session, align_size <= buf->memsize);
 		WT_RET_MSG(session, EINVAL,
 		    "buffer size check: write buffer incorrectly allocated");
+	}
+	if (align_size > UINT32_MAX) {
+		WT_ASSERT(session, align_size <= UINT32_MAX);
+		WT_RET_MSG(session, EINVAL,
+		    "buffer size check: write buffer too large to write");
 	}
 
 	/* Zero out any unused bytes at the end of the buffer. */
@@ -104,7 +118,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * Set the disk size so we don't have to incrementally read blocks
 	 * during salvage.
 	 */
-	blk->disk_size = align_size;
+	blk->disk_size = WT_STORE_SIZE(align_size);
 
 	/*
 	 * Update the block's checksum: if our caller specifies, checksum the
@@ -149,7 +163,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (fh->extend_len != 0 &&
 	    (fh->extend_size <= fh->size ||
 	    (offset + fh->extend_len <= fh->extend_size &&
-	    offset + fh->extend_len + align_size >= fh->extend_size))) {
+	    offset + fh->extend_len + (off_t)align_size >= fh->extend_size))) {
 		fh->extend_size = offset + fh->extend_len * 2;
 		WT_RET(__wt_fallocate(session, fh, offset, fh->extend_len * 2));
 	}
@@ -158,8 +172,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
-		WT_TRET(
-		    __wt_block_off_free(session, block, offset, align_size));
+		WT_TRET(__wt_block_off_free(
+		    session, block, offset, (off_t)align_size));
 		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_RET(ret);
@@ -194,11 +208,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
 
 	WT_VERBOSE_RET(session, write,
-	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    (uintmax_t)offset, align_size, blk->cksum);
+	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
+	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum);
 
 	*offsetp = offset;
-	*sizep = align_size;
+	*sizep = WT_STORE_SIZE(align_size);
 	*cksump = blk->cksum;
 
 	return (ret);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -312,10 +312,10 @@ __curindex_open_colgroups(
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
+	u_long arg;
 	/* Child cursors are opened with dump disabled. */
 	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
 	char *proj;
-	uint32_t arg;
 
 	table = cindex->table;
 	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &cp));
@@ -323,7 +323,7 @@ __curindex_open_colgroups(
 
 	/* Work out which column groups we need. */
 	for (proj = (char *)cindex->value_plan; *proj != '\0'; proj++) {
-		arg = (uint32_t)strtoul(proj, &proj, 10);
+		arg = strtoul(proj, &proj, 10);
 		if ((*proj != WT_PROJ_KEY && *proj != WT_PROJ_VALUE) ||
 		    cp[arg] != NULL)
 			continue;
@@ -424,12 +424,12 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		WT_CLEAR(fmt);
 		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), NULL, 0, &fmt));
-		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
+		cursor->value_format = __wt_buf_steal(session, &fmt);
 
 		WT_CLEAR(plan);
 		WT_ERR(__wt_struct_plan(session, table,
 		    columns, strlen(columns), 0, &plan));
-		cindex->value_plan = __wt_buf_steal(session, &plan, NULL);
+		cindex->value_plan = __wt_buf_steal(session, &plan);
 	}
 
 	/* Open the column groups needed for this index cursor. */

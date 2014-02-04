@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -598,7 +598,7 @@ __conn_config_file(
 	WT_DECL_RET;
 	WT_FH *fh;
 	off_t size;
-	uint32_t len;
+	size_t len;
 	int exist, quoted;
 	uint8_t *p, *t;
 
@@ -627,7 +627,7 @@ __conn_config_file(
 	 */
 	if (size > 100 * 1024)
 		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
-	len = (uint32_t)size;
+	len = (size_t)size;
 
 	/*
 	 * Copy the configuration file into memory, with a little slop, I'm not
@@ -808,7 +808,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
 	off_t size;
-	uint32_t len;
+	size_t len;
 	int created;
 	char buf[256];
 
@@ -856,10 +856,9 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
-		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
+		len = (size_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
 		    WT_SINGLETHREAD, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(
-		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
+		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0, len, buf));
 		created = 1;
 	} else
 		created = 0;

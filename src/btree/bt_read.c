@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -65,7 +65,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_ITEM tmp;
 	WT_PAGE *page;
 	WT_PAGE_STATE previous_state;
-	uint32_t size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	page = NULL;
@@ -94,14 +94,14 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	 * Otherwise, there's an address, read the backing disk page and build
 	 * an in-memory version of the page.
 	 */
-	WT_ERR(__wt_ref_info(session, parent, ref, &addr, &size, NULL));
+	WT_ERR(__wt_ref_info(session, parent, ref, &addr, &addr_size, NULL));
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
 		WT_ERR(__wt_btree_new_leaf_page(session, parent, ref, &page));
 	} else {
 		/* Read the backing disk page. */
-		WT_ERR(__wt_bt_read(session, &tmp, addr, size));
+		WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
 
 		/* Build the in-memory version of the page. */
 		WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem,

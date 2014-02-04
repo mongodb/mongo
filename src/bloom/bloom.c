@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -179,7 +179,7 @@ __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 	h1 = __wt_hash_fnv64(key->data, key->size);
 	h2 = __wt_hash_city64(key->data, key->size);
 	for (i = 0; i < bloom->k; i++, h1 += h2) {
-		__bit_set(bloom->bitstring, (uint32_t)(h1 % bloom->m));
+		__bit_set(bloom->bitstring, h1 % bloom->m);
 	}
 	return (0);
 }
@@ -211,13 +211,14 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 
 	/* Add the entries from the array into the table. */
 	for (i = 0; i < bloom->m; i += values.size) {
+		/* Adjust bits to bytes for string offset */
 		values.data = bloom->bitstring + (i >> 3);
 		/*
 		 * Shave off some bytes for pure paranoia, in case WiredTiger
 		 * reserves some special sizes. Choose a value so that if
 		 * we do multiple inserts, it will be on an byte boundary.
 		 */
-		values.size = (uint32_t)WT_MIN(bloom->m - i, UINT32_MAX - 128);
+		values.size = (uint32_t)WT_MIN(bloom->m - i, UINT32_MAX - 127);
 		c->set_value(c, &values);
 		WT_ERR(c->insert(c));
 	}

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -174,11 +174,16 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
+	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
+	int key_unpacked;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
+	page = cbt->page;
+
 	unpack = &_unpack;
+	key_unpacked = 0;
 
 	kb = &cbt->iface.key;
 	vb = &cbt->iface.value;
@@ -203,7 +208,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
 	 */
-	if (__wt_off_page(cbt->page, ikey)) {
+	if (__wt_off_page(page, ikey)) {
 		kb->data = WT_IKEY_DATA(ikey);
 		kb->size = ikey->size;
 	} else {
@@ -215,7 +220,8 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack((WT_CELL *)ikey, unpack);
+		__wt_cell_unpack_with_value(page, (WT_CELL *)ikey, unpack);
+		key_unpacked = 1;
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			cbt->tmp.data = unpack->data;
 			cbt->tmp.size = unpack->size;
@@ -252,7 +258,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			 * we do __wt_row_leaf_key's fast-path checks inline.
 			 */
 slow:			WT_RET(__wt_row_leaf_key_work(
-			    session, cbt->page, rip, &cbt->tmp, 0));
+			    session, page, rip, &cbt->tmp, 0));
 		}
 		kb->data = cbt->tmp.data;
 		kb->size = cbt->tmp.size;
@@ -269,7 +275,10 @@ slow:			WT_RET(__wt_row_leaf_key_work(
 	if (upd != NULL) {
 		vb->data = WT_UPDATE_DATA(upd);
 		vb->size = upd->size;
-	} else if ((cell = __wt_row_value(cbt->page, rip)) == NULL) {
+		return (0);
+	}
+	cell = key_unpacked ? unpack->value : __wt_row_leaf_value(page, rip);
+	if (cell == NULL) {
 		vb->data = "";
 		vb->size = 0;
 	} else {

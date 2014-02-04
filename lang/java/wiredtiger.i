@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  *
  * wiredtiger.i
  *	The SWIG interface file defining the wiredtiger Java API.
@@ -246,11 +266,13 @@ javaClose(JAVA_CALLBACK *jcb, jfieldID *pfid)
 
 	if (pfid == NULL || *pfid == NULL) {
 		cls = (*env)->GetObjectClass(env, jcb->jobj);
-		*pfid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
+		fid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
 		if (pfid != NULL)
 			*pfid = fid;
+	} else {
+		fid = *pfid;
 	}
-	(*env)->SetLongField(env, jcb->jobj, *pfid, 0L);
+	(*env)->SetLongField(env, jcb->jobj, fid, 0L);
 	(*env)->DeleteGlobalRef(env, jcb->jobj);
 	return (0);
 }
@@ -297,13 +319,11 @@ cursorCloseHandler(WT_CURSOR *cursor)
 	JAVA_CALLBACK *jcb;
 	JAVA_CALLBACK *sess_jcb;
 
-	static jfieldID ccp_fid = NULL;     /* cursor cptr fid, computed once */
-
 	jcb = (JAVA_CALLBACK *)cursor->lang_private;
 	sess_jcb = (JAVA_CALLBACK *)
 	    ((WT_SESSION_IMPL *)cursor->session)->lang_private;
 	cursor->lang_private = NULL;
-	ret = javaClose(jcb, &sess_jcb->fid);
+	ret = javaClose(jcb, sess_jcb ? &sess_jcb->fid : NULL);
 	__wt_free((WT_SESSION_IMPL *)cursor->session, jcb);
 
 	return (ret);

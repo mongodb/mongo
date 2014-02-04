@@ -9,7 +9,7 @@ AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([RELEASE])
 
-AM_INIT_AUTOMAKE([1.10 foreign])
+AM_INIT_AUTOMAKE([1.11 foreign parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 AM_OPTIONS
 
@@ -86,9 +86,14 @@ AC_CHECK_HEADERS([pthread_np.h])
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
+
 AC_CHECK_FUNCS([\
 	clock_gettime fcntl ftruncate gettimeofday posix_fadvise\
 	posix_fallocate posix_madvise posix_memalign strtouq sync_file_range])
+
+# OS X wrongly reports that it has fdatasync
+AS_CASE([$host_os], [darwin*], [], [AC_CHECK_FUNCS([fdatasync])])
+
 AC_SYS_LARGEFILE
 
 AC_MSG_CHECKING([if the adaptive mutex type is available])
@@ -107,32 +112,36 @@ AC_C_BIGENDIAN
 # boundaries for O_DIRECT to work.
 BUFFER_ALIGNMENT=0
 if test "$ac_cv_func_posix_memalign" = "yes" ; then
-	case "`uname -s`" in
-	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
+	case "$host_os" in
+	linux*)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
 		BUFFER_ALIGNMENT=4096
 		;;
 	esac
 fi
 AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
-	[Default alignment of bufffers used for I/O])
+	[Default alignment of buffers used for I/O])
 
 AC_SUBST(AM_CFLAGS)
 
-# test/format requires an installed Berkeley DB release tree.
-bdbdir=`ls -d "$ac_pwd/db" /usr/local/BerkeleyDB* 2>/dev/null | head -1`
-if ! test -d "$bdbdir" ; then
-	bdbdir="NO_BERKELEY_DB_LIBRARY_FOUND"
-fi
-AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $bdbdir])
-AC_SUBST(BERKELEY_DB_PATH, [$bdbdir])
+# test/format requires an installed Oracle Berkeley DB release tree.
+AC_MSG_CHECKING([if --with-berkeleydb=DIR option specified])
+AC_ARG_WITH(berkeleydb,
+    [AS_HELP_STRING([--with-berkeleydb=DIR],
+	[Specify installed library directory of Berkeley DB])],
+    [with_berkeleydb="$withval"], [with_berkeleydb="NO_BERKELEY_DB_LIBRARY"])
+AC_MSG_RESULT($with_berkeleydb)
+AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $with_berkeleydb])
+AC_SUBST(BERKELEY_DB_PATH, [$with_berkeleydb])
 
-# test/format optionally supports the MEMRATA KVS library.
-memrata_dir=`ls -d "$ac_pwd/memrata" 2>/dev/null | head -1`
-if ! test -d "$memrata_dir" ; then
-	memrata_dir="NO_MEMRATA_LIBRARY_FOUND"
-fi
-AM_CONDITIONAL([HAVE_MEMRATA], [test -d $memrata_dir])
-AC_SUBST(MEMRATA_PATH, [$memrata_dir])
+# test/format optionally supports the Levyx/Helium key/value store.
+AC_MSG_CHECKING([if --with-helium=DIR option specified])
+AC_ARG_WITH(helium,
+    [AS_HELP_STRING([--with-helium=DIR],
+	[Specify installed library directory of Helium])],
+    [with_helium="$withval"], [with_helium="NO_HELIUM_LIBRARY"])
+AC_MSG_RESULT($with_helium)
+AM_CONDITIONAL([HAVE_HELIUM], [test -d $with_helium])
+AC_SUBST(HELIUM_PATH, [$with_helium])
 
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then

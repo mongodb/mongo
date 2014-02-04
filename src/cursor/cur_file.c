@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -16,8 +16,8 @@
 	const void *__key_data = (cursor)->key.data;			\
 	const void *__value_data = (cursor)->value.data;		\
 	uint64_t __recno = (cursor)->recno;				\
-	uint32_t __key_size = (cursor)->key.size;			\
-	uint32_t __value_size = (cursor)->value.size;			\
+	size_t __key_size = (cursor)->key.size;				\
+	size_t __value_size = (cursor)->value.size;			\
 	if (((ret) = (f)) == 0) {					\
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);	\
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\

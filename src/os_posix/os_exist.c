@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -14,9 +14,9 @@
 int
 __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp)
 {
-	WT_DECL_RET;
 	struct stat sb;
-	const char *path;
+	WT_DECL_RET;
+	char *path;
 
 	WT_RET(__wt_filename(session, filename, &path));
 

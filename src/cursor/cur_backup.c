@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -40,7 +40,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	}
 
 	cb->iface.key.data = cb->list[cb->next].name;
-	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next].name) + 1);
+	cb->iface.key.size = strlen(cb->list[cb->next].name) + 1;
 	++cb->next;
 
 	F_SET(cursor, WT_CURSTD_KEY_INT);
@@ -402,7 +402,7 @@ static int
 __backup_file_create(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_DECL_RET;
-	const char *path;
+	char *path;
 
 	/* Open the hot backup file. */
 	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -259,7 +259,7 @@ __clsm_open_cursors(
 	 */
 	if (update && (lsm_tree->nchunks == 0 ||
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) == NULL ||
-	    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK))) {
+	    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))) {
 		/* Release our lock because switch will get a write lock. */
 		locked = 0;
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -279,7 +279,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * we're starting at the right offset in the chunk array.
 		 */
 		if (start_chunk >= lsm_tree->nchunks ||
-		    lsm_tree->chunk[start_chunk]->id != start_id)
+		    lsm_tree->chunk[start_chunk]->id != start_id) {
 			for (start_chunk = 0;
 			    start_chunk < lsm_tree->nchunks;
 			    start_chunk++) {
@@ -287,6 +287,9 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 				if (chunk->id == start_id)
 					break;
 			}
+			/* We have to find the start chunk: merge locked it. */
+			WT_ASSERT(session, start_chunk < lsm_tree->nchunks);
+		}
 
 		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 	} else {
@@ -342,13 +345,13 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
 			    btree->dhandle->checkpoint;
 			if (checkpoint == NULL &&
-			    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY))
+			    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !chunk->empty)
 				break;
 
 			/* Make sure the Bloom config matches. */
 			if (clsm->blooms[ngood] == NULL &&
-			    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM))
+			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 				break;
 		}
 
@@ -406,8 +409,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 */
 		WT_ASSERT(session, *cp == NULL);
 		ret = __wt_open_cursor(session, chunk->uri, c,
-		    (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
-		    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY)) ?
+		    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ?
 			ckpt_cfg : NULL, cp);
 
 		/*
@@ -416,15 +418,15 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * chunk instead.
 		 */
 		if (ret == WT_NOTFOUND &&
-		    F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK)) {
+		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 			ret = __wt_open_cursor(
 			    session, chunk->uri, c, NULL, cp);
 			if (ret == 0)
-				F_SET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY);
+				chunk->empty = 1;
 		}
 		WT_ERR(ret);
 
-		if (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM) &&
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_bit_count,
@@ -436,7 +438,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 	}
 
 	/* The last chunk is our new primary. */
-	if (chunk != NULL && !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK)) {
+	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
 		primary = clsm->cursors[clsm->nchunks - 1];
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)(primary))->btree,
@@ -461,13 +463,13 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
 			    btree->dhandle->checkpoint;
 			WT_ASSERT(session,
-			    (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    !F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_EMPTY)) ?
+			    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !chunk->empty) ?
 			    checkpoint != NULL : checkpoint == NULL);
 
 			/* Make sure the Bloom config matches. */
 			WT_ASSERT(session,
-			    (F_ISSET_ATOMIC(chunk, WT_LSM_CHUNK_BLOOM) &&
+			    (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 			    !F_ISSET(clsm, WT_CLSM_MERGE)) ?
 			    clsm->blooms[i] != NULL : clsm->blooms[i] == NULL);
 		}
@@ -1083,7 +1085,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session,
 	    clsm->primary_chunk != NULL &&
-	    !F_ISSET_ATOMIC(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK) &&
+	    !F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK) &&
 	    TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
 
 	/*
@@ -1113,8 +1115,9 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 * don't worry about protecting access.
 	 */
 	if (++clsm->primary_chunk->count % 100 == 0 &&
-	    lsm_tree->throttle_sleep > 0)
-		__wt_sleep(0, lsm_tree->throttle_sleep);
+	    lsm_tree->merge_throttle + lsm_tree->ckpt_throttle > 0)
+		__wt_sleep(0,
+		    lsm_tree->ckpt_throttle + lsm_tree->merge_throttle);
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree

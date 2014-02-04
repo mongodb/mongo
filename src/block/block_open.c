@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -130,7 +130,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
-	block->os_cache_max = cval.val;
+	block->os_cache_max = (size_t)cval.val;
 #ifdef HAVE_POSIX_FADVISE
 	if (conn->direct_io && block->os_cache_max)
 		WT_ERR_MSG(session, EINVAL,
@@ -144,7 +144,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 
 	/* Configuration: optional immediate write scheduling flag. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_dirty_max", &cval));
-	block->os_cache_dirty_max = cval.val;
+	block->os_cache_dirty_max = (size_t)cval.val;
 #ifdef HAVE_SYNC_FILE_RANGE
 	if (conn->direct_io && block->os_cache_dirty_max)
 		WT_ERR_MSG(session, EINVAL,
@@ -235,7 +235,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	desc->cksum = 0;
 	desc->cksum = __wt_cksum(desc, allocsize);
 
-	ret = __wt_write(session, fh, (off_t)0, allocsize, desc);
+	ret = __wt_write(session, fh, (off_t)0, (size_t)allocsize, desc);
 
 	__wt_scr_free(&buf);
 	return (ret);
@@ -258,7 +258,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Read the first allocation-sized block and verify the file format. */
 	WT_ERR(__wt_read(
-	    session, block->fh, (off_t)0, block->allocsize, buf->mem));
+	    session, block->fh, (off_t)0, (size_t)block->allocsize, buf->mem));
 
 	desc = buf->mem;
 	WT_VERBOSE_ERR(session, block,

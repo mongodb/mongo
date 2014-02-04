@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -39,6 +39,8 @@ struct __wt_page_header {
 	uint8_t type;			/* 24: page type */
 
 #define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
+#define	WT_PAGE_EMPTY_V_ALL	0x02	/* Page has all zero-length values */
+#define	WT_PAGE_EMPTY_V_NONE	0x04	/* Page has no zero-length values */
 	uint8_t flags;			/* 25: flags */
 
 	/*
@@ -77,7 +79,7 @@ struct __wt_page_header {
  */
 struct __wt_addr {
 	uint8_t *addr;			/* Block-manager's cookie */
-	uint32_t size;			/* Block-manager's cookie length */
+	uint8_t  size;			/* Block-manager's cookie length */
 
 #define	WT_ADDR_INT	1		/* Internal page */
 #define	WT_ADDR_LEAF	2		/* Leaf page */
@@ -247,8 +249,8 @@ struct __wt_page_modify {
 
 #define	WT_PAGE_LOCK(s, p)						\
 	__wt_spin_lock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
-#define	WT_PAGE_TRYLOCK(s, p)						\
-	__wt_spin_trylock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
+#define	WT_PAGE_TRYLOCK(s, p, idp)					\
+	__wt_spin_trylock((s), &S2C(s)->page_lock[(p)->modify->page_lock], idp)
 #define	WT_PAGE_UNLOCK(s, p)						\
 	__wt_spin_unlock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
 	uint8_t page_lock;    /* Page's spinlock */
@@ -361,13 +363,13 @@ struct __wt_page {
 #define	WT_READ_GEN_STEP	1000
 	uint64_t read_gen;
 
+	uint64_t memory_footprint;	/* Memory attached to the page */
+
 	/*
 	 * In-memory pages optionally reference a number of entries originally
 	 * read from disk and sizes the allocated arrays that describe the page.
 	 */
 	uint32_t entries;
-
-	uint32_t memory_footprint;	/* Memory attached to the page */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
@@ -519,14 +521,9 @@ struct __wt_ref {
  * WT_MERGE_FULL_PAGE --
  * When the result of a merge contains more than this number of keys, it is
  * considered "done" and will not be merged again.
- *
- * WT_MERGE_MAX_REFS --
- * Don't complete merges that contain more than this number of keys, they tend
- * to generate pathological trees.
  */
 #define	WT_MERGE_STACK_MIN	3
 #define	WT_MERGE_FULL_PAGE	100
-#define	WT_MERGE_MAX_REFS	1000
 
 /*
  * WT_ROW --

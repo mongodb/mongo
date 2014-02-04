@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -155,7 +155,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 
 			/* Check if there was enough space. */
 			if (len < space) {
-				msg->size += (uint32_t)len;
+				msg->size += len;
 				break;
 			}
 
@@ -187,7 +187,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
  */
 int
 __wt_debug_addr(WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, const char *ofile)
+    const uint8_t *addr, size_t addr_size, const char *ofile)
 {
 	WT_BM *bm;
 	WT_DECL_ITEM(buf);
@@ -658,8 +658,9 @@ static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
 	WT_REF *ref;
+	size_t len;
 	uint8_t *p;
-	uint32_t i, len;
+	uint32_t i;
 
 	WT_REF_FOREACH(page, ref, i) {
 		__wt_ref_key(page, ref, &p, &len);
@@ -711,7 +712,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			    ds, page, WT_PAGE_ROW_LEAF, "K", unpack));
 		}
 
-		if ((cell = __wt_row_value(page, rip)) == NULL)
+		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, unpack);
@@ -789,7 +790,7 @@ static int
 __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 {
 	WT_SESSION_IMPL *session;
-	uint32_t size;
+	size_t addr_size;
 	const uint8_t *addr;
 
 	session = ds->session;
@@ -817,9 +818,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_RET(__wt_ref_info(session, page, ref, &addr, &size, NULL));
-	__dmsg(ds, " %s\n", addr == NULL ? "[NoAddr]" :
-	    __wt_addr_string(session, ds->tmp, addr, size));
+	WT_RET(__wt_ref_info(session, page, ref, &addr, &addr_size, NULL));
+	__dmsg(ds, " %s\n",
+	    __wt_addr_string(session, ds->tmp, addr, addr_size));
 
 	return (0);
 }

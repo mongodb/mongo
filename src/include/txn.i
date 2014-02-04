@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2013 WiredTiger, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -18,6 +18,8 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	WT_TXN *txn;
 
 	txn = &session->txn;
+	*opp = NULL;
+
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
 	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
 	    txn->mod_count + 1, &txn->mod));
