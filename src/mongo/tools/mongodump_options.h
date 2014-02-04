@@ -43,6 +43,9 @@ namespace mongo {
         bool useOplog;
         bool repair;
         bool snapShotQuery;
+        unsigned int skip;
+        unsigned int limit;
+        std::string sort;
         bool dumpUsersAndRoles;
     };
 

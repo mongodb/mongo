@@ -1263,6 +1263,16 @@ namespace mongo {
         virtual unsigned long long query( boost::function<void(DBClientCursorBatchIterator &)> f,
                                           const string& ns,
                                           Query query,
+                                          int nToReturn,
+                                          int nToSkip,
+                                          const BSONObj *fieldsToReturn,
+                                          int queryOptions );
+
+        virtual unsigned long long query( boost::function<void(const BSONObj&)> f,
+                                          const string& ns,
+                                          Query query,
+                                          int nToReturn,
+                                          int nToSkip,
                                           const BSONObj *fieldsToReturn,
                                           int queryOptions );
 
