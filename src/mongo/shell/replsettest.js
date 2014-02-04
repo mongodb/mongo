@@ -49,7 +49,6 @@ ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
     this.host  = this.useHostName ? (opts.host || getHostName()) : 'localhost';
-    this.numNodes = opts.nodes || 0;
     this.oplogSize = opts.oplogSize || 40;
     this.useSeedList = opts.useSeedList || false;
     this.ports = [];
@@ -59,24 +58,25 @@ ReplSetTest = function( opts ){
     this.startPort = opts.startPort || 31000;
 
     this.nodeOptions = {}    
-    if( isObject( this.numNodes ) ){
+    if( isObject( opts.nodes ) ){
         var len = 0
-        for( var i in this.numNodes ){
+        for( var i in opts.nodes ){
             var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions, 
-                                                                       this.numNodes[i]);
+                                                                       opts.nodes[i]);
             if( i.startsWith( "a" ) ) options.arbiter = true;
             len++
         }
         this.numNodes = len
     }
-    else if( Array.isArray( this.numNodes ) ){
-        for( var i = 0; i < this.numNodes.length; i++ )
-            this.nodeOptions[ "n" + i ] = Object.merge(opts.nodeOptions, this.numNodes[i]);
-        this.numNodes = this.numNodes.length
+    else if( Array.isArray( opts.nodes ) ){
+        for( var i = 0; i < opts.nodes.length; i++ )
+            this.nodeOptions[ "n" + i ] = Object.merge(opts.nodeOptions, opts.nodes[i]);
+        this.numNodes = opts.nodes.length
     }
     else {
-        for ( var i =0; i < this.numNodes; i++ )
+        for ( var i =0; i < opts.nodes; i++ )
             this.nodeOptions[ "n" + i ] = opts.nodeOptions;
+        this.numNodes = opts.nodes;
     }
     
     this.ports = allocatePorts( this.numNodes , this.startPort );
@@ -422,7 +422,7 @@ ReplSetTest.prototype.add = function( config ) {
   var nextId = this.nodes.length;
   printjson(this.nodes);
   print("ReplSetTest nextId:" + nextId);
-  var newNode = this.start( nextId );
+  var newNode = this.start( nextId, config );
   
   return newNode;
 }
