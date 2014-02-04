@@ -92,14 +92,17 @@ namespace mongo {
                  maxTimeMS.getStatus().reason(),
                  maxTimeMS.isOK() );
 
-        if ( _isSystemIndexes( q.ns ) && q.query["ns"].type() == String && r.getConfig()->isSharded( q.query["ns"].String() ) ) {
+        // Extract the ns field from the query, which may be embedded within the "query" or
+        // "$query" field.
+        string indexNSQuery(qSpec.filter()["ns"].str());
+        if ( _isSystemIndexes( q.ns ) && r.getConfig()->isSharded( indexNSQuery )) {
             // if you are querying on system.indexes, we need to make sure we go to a shard that actually has chunks
             // this is not a perfect solution (what if you just look at all indexes)
             // but better than doing nothing
 
             ShardPtr myShard;
             ChunkManagerPtr cm;
-            r.getConfig()->getChunkManagerOrPrimary( q.query["ns"].String(), cm, myShard );
+            r.getConfig()->getChunkManagerOrPrimary( indexNSQuery, cm, myShard );
             if ( cm ) {
                 set<Shard> shards;
                 cm->getAllShards( shards );
