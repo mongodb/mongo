@@ -47,19 +47,4 @@ namespace mongo {
         _checkShouldAllowLocalhost();
     }
 
-    namespace {
-        ScopedDbConnection* getConnectionForUsersCollection(const std::string& ns) {
-            //
-            // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
-            // If the primary for the collection moves, this approach may throw rather than handle
-            // version exceptions.
-            //
-
-            DBConfigPtr config = grid.getDBConfig(ns);
-            Shard s = config->getShard(ns);
-
-            return new ScopedDbConnection(s.getConnString(), 30.0);
-        }
-    }
-
 } // namespace mongo

@@ -314,20 +314,6 @@ namespace mongo {
 
     }
 
-    void ParsedPrivilege::cloneTo(ParsedPrivilege* other) const {
-        other->clear();
-
-        for(std::vector<string>::const_iterator it = _actions.begin();
-            it != _actions.end();
-            ++it) {
-            other->addToActions(*it);
-        }
-        other->_isActionsSet = _isActionsSet;
-
-        _resource.cloneTo(&other->_resource);
-        other->_isResourceSet = _isResourceSet;
-    }
-
     std::string ParsedPrivilege::toString() const {
         return toBSON().toString();
     }

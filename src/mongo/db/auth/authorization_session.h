@@ -85,9 +85,6 @@ namespace mongo {
         // and ownership of the user stays with the AuthorizationManager
         User* lookupUser(const UserName& name);
 
-        // Returns the number of authenticated users in this session.
-        size_t getNumAuthenticatedUsers();
-
         // Gets an iterator over the names of all authenticated users stored in this manager.
         UserNameIterator getAuthenticatedUserNames();
 

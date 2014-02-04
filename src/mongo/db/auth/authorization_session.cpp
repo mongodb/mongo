@@ -96,10 +96,6 @@ namespace {
         return _authenticatedUsers.lookup(name);
     }
 
-    size_t AuthorizationSession::getNumAuthenticatedUsers() {
-        return _authenticatedUsers.size();
-    }
-
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
         clearImpersonatedUserNames();
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);

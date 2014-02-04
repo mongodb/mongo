@@ -85,9 +85,6 @@ namespace mongo {
         // exist.  There should be at most one such user.
         User* lookupByDBName(const StringData& dbname) const;
 
-        // Returns how many users are in the set.
-        size_t size() const { return _users.size(); };
-
         // Gets an iterator over the names of the users stored in the set.  The iterator is
         // valid until the next non-const method is called on the UserSet.
         UserNameIterator getNames() const;

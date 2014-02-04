@@ -154,9 +154,6 @@ namespace mongo {
                                                ParsedPrivilege* result,
                                                std::string* errmsg);
 
-        /** Copies all the fields present in 'this' to 'other'. */
-        void cloneTo(ParsedPrivilege* other) const;
-
         //
         // bson serializable interface implementation
         //
