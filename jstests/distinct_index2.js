@@ -4,12 +4,15 @@ t.drop();
 t.ensureIndex( { a : 1 , b : 1 } )
 t.ensureIndex( { c : 1 } )
 
-function x(){
-    return Math.floor( Math.random() * 10 );
-}
-
-for ( i=0; i<2000; i++ ){
-    t.insert( { a : x() , b : x() , c : x() } )
+// Uniformly distributed dataset.
+// If we use a randomly generated dataset, we might not
+// generate all the distinct values in the range [0, 10).
+for ( var a=0; a<10; a++ ) {
+    for ( var b=0; b<10; b++ ) {
+        for ( var c=0; c<10; c++ ) {
+            t.insert( { a : a , b : b , c : c } );
+        }
+    }
 }
 
 correct = []
@@ -32,4 +35,7 @@ check( "a" )
 check( "b" )
 check( "c" )
 
-
+// hashed index should produce same results.
+t.dropIndexes();
+t.ensureIndex( { a : "hashed" } );
+check( "a" );

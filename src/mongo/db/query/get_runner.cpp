@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/get_runner.h"
 
+#include <limits>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
@@ -44,6 +46,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/d_logic.h"
@@ -607,6 +610,32 @@ namespace mongo {
             return true;
         }
 
+        /**
+         * Returns true if indices contains an index that can be
+         * used with DistinctNode. Sets indexOut to the array index
+         * of PlannerParams::indices.
+         * Look for the index for the fewest fields.
+         * Criteria for suitable index is that the index cannot be special
+         * (geo, hashed, text, ...).
+         */
+        bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices, size_t* indexOut) {
+            invariant(indexOut);
+            int minFields = std::numeric_limits<int>::max();
+            for (size_t i = 0; i < indices.size(); ++i) {
+                // Skip special indices.
+                if (!IndexNames::findPluginName(indices[i].keyPattern).empty()) {
+                    continue;
+                }
+                int nFields = indices[i].keyPattern.nFields();
+                // Pick the index with the lowest number of fields.
+                if (nFields < minFields) {
+                    minFields = nFields;
+                    *indexOut = i;
+                }
+            }
+            return minFields != std::numeric_limits<int>::max();
+        }
+            
     }  // namespace
 
     Status getRunnerCount(Collection* collection,
@@ -751,9 +780,13 @@ namespace mongo {
         // If we're here, we have an index prefixed by the field we're distinct-ing over.
 
         // If there's no query, we can just distinct-scan one of the indices.
-        if (query.isEmpty()) {
+        // Not every index in plannerParams.indices may be suitable. Refer to
+        // getDistinctNodeIndex().
+        size_t distinctNodeIndex = 0;
+        if (query.isEmpty() &&
+            getDistinctNodeIndex(plannerParams.indices, &distinctNodeIndex)) {
             DistinctNode* dn = new DistinctNode();
-            dn->indexKeyPattern = plannerParams.indices[0].keyPattern;
+            dn->indexKeyPattern = plannerParams.indices[distinctNodeIndex].keyPattern;
             dn->direction = 1;
             IndexBoundsBuilder::allValuesBounds(dn->indexKeyPattern, &dn->bounds);
             dn->fieldNo = 0;
