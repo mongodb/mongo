@@ -1,6 +1,7 @@
 // key_string.js
 
 s = new ShardingTest( "keystring" , 2 );
+s.stopBalancer();
 
 db = s.getDB( "test" );
 s.adminCommand( { enablesharding : "test" } )
