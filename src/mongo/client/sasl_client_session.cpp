@@ -233,7 +233,7 @@ namespace {
     bool SaslClientSession::hasParameter(Parameter id) {
         if (id < 0 || id >= numParameters)
             return false;
-        return _parameters[id].data;
+        return static_cast<bool>(_parameters[id].data);
     }
 
     StringData SaslClientSession::getParameter(Parameter id) {
