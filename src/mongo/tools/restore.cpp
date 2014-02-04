@@ -71,10 +71,34 @@ public:
     int _oplogEntryApplies; // oplog entries applied
     int _serverAuthzVersion; // authSchemaVersion of the cluster being restored into.
     int _dumpFileAuthzVersion; // version extracted from admin.system.version file in dump.
+    bool _serverAuthzVersionDocExists; // Whether the remote cluster has an admin.system.version doc
     Restore() : BSONTool() { }
 
     virtual void printHelp(ostream& out) {
         printMongoRestoreHelp(&out);
+    }
+
+    void storeRemoteAuthzVersion() {
+        Status status = auth::getRemoteStoredAuthorizationVersion(&conn(),
+                                                                  &_serverAuthzVersion);
+        uassertStatusOK(status);
+        uassert(17370,
+                mongoutils::str::stream() << "Restoring users and roles is only supported for "
+                        "clusters with auth schema versions " <<
+                        AuthorizationManager::schemaVersion24 << " or " <<
+                        AuthorizationManager::schemaVersion26Final << ", found: " <<
+                        _serverAuthzVersion,
+                _serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+
+        _serverAuthzVersionDocExists = !conn().findOne(
+                AuthorizationManager::versionCollectionNamespace,
+                AuthorizationManager::versionDocumentQuery).isEmpty();
+
+        // Now that we know the schema version of the server we can pick whether to use
+        // "userSource" or "db" to identify users.
+        _userDBFieldName = _serverAuthzVersion == AuthorizationManager::schemaVersion26Final ?
+                "db" : "userSource";
     }
 
     virtual int doRun() {
@@ -92,22 +116,7 @@ public:
         }
 
         if (mongoRestoreGlobalParams.restoreUsersAndRoles) {
-            Status status = auth::getRemoteStoredAuthorizationVersion(&conn(),
-                                                                      &_serverAuthzVersion);
-            uassertStatusOK(status);
-            uassert(17370,
-                    mongoutils::str::stream() << "Restoring users and roles is only supported for "
-                            "clusters with auth schema versions " <<
-                            AuthorizationManager::schemaVersion24 << " or " <<
-                            AuthorizationManager::schemaVersion26Final << ", found: " <<
-                            _serverAuthzVersion,
-                    _serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
-                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
-
-            // Now that we know the schema version of the server we can pick whether to use
-            // "userSource" or "db" to identify users.
-            _userDBFieldName = _serverAuthzVersion == AuthorizationManager::schemaVersion26Final ?
-                    "db" : "userSource";
+            storeRemoteAuthzVersion(); // populate _serverAuthzVersion
 
             if (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty() &&
                     exists(root / "admin" / "system.version.bson")) {
@@ -599,7 +608,8 @@ public:
                 }
             } else {
                 if (_serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
-                        _curdb != "admin") { // Restoring 2.4 schema users to non-admin dbs is OK
+                        _curdb != "admin" || // Restoring 2.4 schema users to non-admin dbs is OK
+                        !_serverAuthzVersionDocExists) { // Clean 2.6 system can have 2.4 users
                     // v1 user, v1 system
                     if (mongoRestoreGlobalParams.drop && _users.count(UserName(obj["user"].String(),
                                                                                userDB))) {
