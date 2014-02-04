@@ -27,12 +27,12 @@ var master = replTest.getMaster();
     var time = replTest.getMaster().getDB("local").getCollection("oplog.rs").find().limit(1).sort({$natural:-1}).next();
     step(time.ts.t);
 }
-
+var maxSecondChunk = 50;
 {
     step("second chunk of data");
     var foo = master.getDB("foo");
-    for (i = 30; i < 50; i++) {
-        foo.bar.insert({ x: i, y: "abc" });
+    for (i = 30; i < maxSecondChunk; i++) {
+        foo.bar.insert({ x: i, y: "abc"});
     }
 }
 {
@@ -54,6 +54,20 @@ var x = 9;
 x = conn.getDB("local").getCollection("oplog.rs").count();
 
 assert.eq(x, 20, "mongorestore should only have the latter 20 entries");
+
+var data2 = MongoRunner.dataDir + "/dumprestore7-dump2/";
+step ("try mongodump with sort, skip, limit")
+var skip=5, limit=15;
+runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--db", "foo", "--collection", "bar", "--sort", "{x:-1,y:1}", "--skip", "5", "--limit", "15", "--out", data2 );
+
+step("remove any previously loaded data");
+foo.bar.drop();
+
+step("try mongorestore from data: sort, skip, limit");
+runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+replTest.ports[0], "--dir", data2 );
+
+assert.eq(maxSecondChunk-skip-1, foo.bar.findOne().x, "reverse sorted order by x");
+assert.eq(limit, foo.bar.count(), "limit value loaded back");
 
 step("stopSet");
 replTest.stopSet();

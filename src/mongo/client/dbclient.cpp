@@ -1080,9 +1080,25 @@ namespace mongo {
     }
 
     unsigned long long DBClientConnection::query(
+            boost::function<void(const BSONObj&)> f,
+            const string& ns,
+            Query query,
+            int nToReturn,
+            int nToSkip,
+            const BSONObj *fieldsToReturn,
+            int queryOptions ) {
+        DBClientFunConvertor fun;
+        fun._f = f;
+        boost::function<void(DBClientCursorBatchIterator &)> ptr( fun );
+    	return this->query(ptr, ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
+    }
+
+    unsigned long long DBClientConnection::query(
             boost::function<void(DBClientCursorBatchIterator &)> f,
             const string& ns,
             Query query,
+            int nToReturn,
+            int nToSkip,
             const BSONObj *fieldsToReturn,
             int queryOptions ) {
 
@@ -1094,7 +1110,7 @@ namespace mongo {
         queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
         queryOptions |= (int)QueryOption_Exhaust;
 
-        auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
+        auto_ptr<DBClientCursor> c( this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions) );
         uassert( 13386, "socket error for mapping query", c.get() );
 
         unsigned long long n = 0;
