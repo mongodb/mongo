@@ -997,6 +997,10 @@ namespace mongo {
         }
 
         virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual bool slaveOverrideOk() const {
             return true;
         }
 
@@ -2284,6 +2288,10 @@ namespace mongo {
         }
 
         virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual bool slaveOverrideOk() const {
             return true;
         }
 

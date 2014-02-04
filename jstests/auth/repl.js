@@ -26,6 +26,7 @@ var AuthReplTest = function(spec) {
     assert(adminPri.auth("super", "super"), "could not authenticate as superuser");
 
     if (secondaryConn != null) {
+        secondaryConn.setSlaveOk(true);
         adminSec = secondaryConn.getDB("admin");
     }
 
@@ -122,6 +123,7 @@ var AuthReplTest = function(spec) {
      */
     that.setSecondary = function(secondary) {
         secondaryConn = secondary;
+        secondaryConn.setSlaveOk(true);
         adminSec = secondaryConn.getDB("admin");
     }
 
