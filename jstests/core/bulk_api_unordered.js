@@ -1,11 +1,11 @@
-var collectionName = "batch_api_unordered";
+var collectionName = "bulk_api_unordered";
 var coll = db.getCollection(collectionName);
 coll.drop();
 
 var request;
 var result;
 
-jsTest.log("Starting batch api unordered tests...");
+jsTest.log("Starting bulk api unordered tests...");
 
 /********************************************************
  *

@@ -1,8 +1,8 @@
-var collectionName = "batch_api_limits";
+var collectionName = "bulk_api_limits";
 var coll = db.getCollection(collectionName);
 coll.drop();
 
-jsTest.log("Starting unordered batch tests...");
+jsTest.log("Starting unordered bulk tests...");
 
 var request;
 var result;

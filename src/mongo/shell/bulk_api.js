@@ -1,7 +1,7 @@
 //
 // Scope for the function
 //
-var _batch_api_module = (function() {
+var _bulk_api_module = (function() {
   // Insert types
   var NONE = 0;
   var INSERT = 1;
