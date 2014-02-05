@@ -221,7 +221,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_DECL_RET;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint64_t recno;
 	uint32_t entry, i;
 	int found;
@@ -297,7 +297,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		vs->record_total += page->entries;
+		vs->record_total += page->pu_fix_entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		recno = 0;
@@ -389,7 +389,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_REF_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH(page, refp, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
@@ -423,7 +423,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_REF_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH(page, refp, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * key should be larger than the largest key previously
@@ -509,7 +509,7 @@ __verify_row_leaf_key_order(
 	 * If a tree is empty (just created), it won't have keys; if there
 	 * are no keys, we're done.
 	 */
-	if (page->entries == 0)
+	if (page->pu_row_entries == 0)
 		return (0);
 
 	/*
@@ -543,8 +543,8 @@ __verify_row_leaf_key_order(
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */
-	WT_RET(__wt_row_leaf_key_copy(session,
-	    page, page->u.row.d + (page->entries - 1), vs->max_key));
+	WT_RET(__wt_row_leaf_key_copy(session, page,
+	    page->u.row.d + (page->pu_row_entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, vs->max_addr, page);
 
 	return (0);

@@ -24,7 +24,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree = S2BT(session);
 
-	if (page->entries == 0) {			/* Just checking... */
+	if (page->pu_row_entries == 0) {		/* Just checking... */
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 		return (0);
 	}
@@ -48,14 +48,14 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * marking up the array.
 	 */
 	WT_RET(__wt_scr_alloc(
-	    session, (uint32_t)__bitstr_size(page->entries), &tmp));
+	    session, (uint32_t)__bitstr_size(page->pu_row_entries), &tmp));
 
 	if ((gap = btree->key_gap) == 0)
 		gap = 1;
-	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, gap);
+	__inmem_row_leaf_slots(tmp->mem, 0, page->pu_row_entries, gap);
 
 	/* Instantiate the keys. */
-	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
+	for (rip = page->u.row.d, i = 0; i < page->pu_row_entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_leaf_key_work(
 			    session, page, rip, NULL, 1));

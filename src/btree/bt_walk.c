@@ -162,7 +162,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_BTREE *btree;
 	WT_PAGE *couple, *page;
 	WT_REF *ref;
-	uint32_t slot;
+	uint32_t page_entries, slot;
 	int cache, compact, discard, eviction, prev, set_read_gen;
 	int skip, skip_intl, skip_leaf;
 
@@ -221,7 +221,8 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	if (page == NULL) {
 		if ((page = btree->root_page) == NULL)
 			return (0);
-		slot = prev ? page->entries - 1 : 0;
+		page_entries = page->pu_intl_entries;
+		slot = prev ? page_entries - 1 : 0;
 		goto descend;
 	}
 
@@ -236,9 +237,10 @@ ascend:	/*
 	 * Figure out the current slot in the parent page's WT_REF array and
 	 * switch to the parent.
 	 */
-	ref = __wt_page_ref(session, page);
-	slot = (uint32_t)(ref - page->parent->u.intl.t);
+	WT_RET(__wt_page_refp(session, page, &slot));
+	ref = page->parent->pu_intl_index[slot];
 	page = page->parent;
+	page_entries = page->pu_intl_entries;
 
 	/* If the eviction thread, clear the page's walk status.
 	 *
@@ -259,7 +261,7 @@ ascend:	/*
 		 * next/prev slot and left/right-most element in its subtree.
 		 */
 		if ((prev && slot == 0) ||
-		    (!prev && slot == page->entries - 1)) {
+		    (!prev && slot == page_entries - 1)) {
 			/* Optionally skip internal pages. */
 			if (skip_intl)
 				goto ascend;
@@ -295,7 +297,7 @@ ascend:	/*
 descend:	for (;;) {
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT)
-				ref = &page->u.intl.t[slot];
+				ref = page->pu_intl_index[slot];
 			else if (skip_leaf)
 				goto ascend;
 			else {
@@ -418,7 +420,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 			}
 
 			couple = page = ref->page;
-			slot = prev ? page->entries - 1 : 0;
+			page_entries = __wt_page_entries(page);
+			slot = prev ? page_entries - 1 : 0;
 		}
 	}
 	/* NOTREACHED */

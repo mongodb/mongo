@@ -253,14 +253,14 @@ __rec_page_dirty_update(
 static void
 __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_REF_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH(page, refp, ref, i) {
 			if (ref->state == WT_REF_DISK ||
 			    ref->state == WT_REF_DELETED)
 				continue;
@@ -294,6 +294,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE *t;
+	WT_REF **refp;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -321,7 +322,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	 * pages after we've written them.
 	 */
 	if (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)
-		WT_REF_FOREACH(page, ref, i)
+		WT_INTL_FOREACH(page, refp, ref, i)
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
 			case WT_REF_DELETED:		/* On-disk, deleted */
@@ -340,6 +341,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);
+			WT_ILLEGAL_VALUE(session);
 			}
 
 	/*
@@ -442,6 +444,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
+#if 0
 		/*
 		 * If the page is larger than the maximum allowed, attempt to
 		 * split the page in memory before evicting it.  The in-memory
@@ -459,6 +462,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 			*inmem_split = 1;
 			return (0);
 		}
+#endif
 
 		ret = __wt_rec_write(session, page,
 		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_QUIT);

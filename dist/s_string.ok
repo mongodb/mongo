@@ -119,6 +119,7 @@ INIT
 INITIALIZER
 INMEM
 INSERT's
+INTL
 INUSE
 ISSET
 ITEMs
@@ -197,6 +198,7 @@ RCS
 READONLY
 RECNO
 REF's
+REFs
 REQ
 RET
 RLE
@@ -734,6 +736,7 @@ recno
 recnos
 recsize
 recurse
+refp
 reinitialization
 req
 rescan

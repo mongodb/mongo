@@ -163,7 +163,7 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		    cbt->recno <= WT_INSERT_RECNO(cbt->ins))
 			WT_RET(__cursor_skip_prev(cbt));
 		if (cbt->ins == NULL &&
-		    (cbt->recno == 1 || __col_last_recno(cbt->page) != 0))
+		    (cbt->recno == 1 || __col_fix_last_recno(cbt->page) != 0))
 			return (WT_NOTFOUND);
 	}
 
@@ -219,7 +219,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_fix_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->last_standard_recno);
@@ -302,7 +302,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_var_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->last_standard_recno);
@@ -396,13 +396,13 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		if (!F_ISSET_ATOMIC(cbt->page, WT_PAGE_BUILD_KEYS))
 			WT_RET(__wt_row_leaf_keys(session, cbt->page));
 
-		if (cbt->page->entries == 0)
+		if (cbt->page->pu_row_entries == 0)
 			cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
 		else
 			cbt->ins_head = WT_ROW_INSERT_SLOT(
-			    cbt->page, cbt->page->entries - 1);
+			    cbt->page, cbt->page->pu_row_entries - 1);
 		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
-		cbt->row_iteration_slot = cbt->page->entries * 2 + 1;
+		cbt->row_iteration_slot = cbt->page->pu_row_entries * 2 + 1;
 		goto new_insert;
 	}
 

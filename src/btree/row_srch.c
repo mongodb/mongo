@@ -153,8 +153,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		base = page->entries;
-		ref = &page->u.intl.t[base - 1];
+		base = page->pu_intl_entries;
+		ref = page->pu_intl_index[base - 1];
 		if (base == 1)
 			goto descend;
 
@@ -173,11 +173,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 */
 		base = 0;
 		ref = NULL;
-		limit = page->entries - 1;
+		limit = page->pu_intl_entries - 1;
 		if (btree->collator == NULL)
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = page->u.intl.t + indx;
+				ref = page->pu_intl_index[indx];
 
 				/*
 				 * If about to compare an application key with
@@ -207,7 +207,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		else
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = page->u.intl.t + indx;
+				ref = page->pu_intl_index[indx];
 				/*
 				 * If about to compare an application key with
 				 * the 0th index on an internal page, pretend
@@ -242,7 +242,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * for descent is the one before base.
 		 */
 		if (cmp != 0)
-			ref = page->u.intl.t + (base - 1);
+			ref = page->pu_intl_index[base - 1];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
@@ -274,7 +274,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 */
 	cmp = -1;
 	base = 0;
-	limit = page->entries;
+	limit = page->pu_row_entries;
 	if (btree->collator == NULL)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -405,7 +405,8 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/* Walk the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
-		ref = page->u.intl.t + __wt_random() % page->entries;
+		ref =
+		    page->pu_intl_index[__wt_random() % page->pu_intl_entries];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
@@ -415,7 +416,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		page = ref->page;
 	}
 
-	if (page->entries != 0) {
+	if (page->pu_row_entries != 0) {
 		/*
 		 * The use case for this call is finding a place to split the
 		 * tree.  Cheat (it's not like this is "random", anyway), and
@@ -427,8 +428,8 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		cbt->page = page;
 		cbt->compare = 0;
 		cbt->slot =
-		    btree->root_page->entries < 2 ?
-		    __wt_random() % page->entries : 0;
+		    btree->root_page->pu_intl_entries < 2 ?
+		    __wt_random() % page->pu_row_entries : 0;
 		return (0);
 	}
 

@@ -94,32 +94,41 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 		/* Do we have a position on the page? */
 		switch (btree->type) {
 		case BTREE_COL_FIX:
-			if (cbt->recno >= page->u.col_fix.recno + page->entries)
+			if (cbt->recno >=
+			    page->u.col_fix.recno + page->pu_fix_entries)
 				return (1);
 			break;
 		case BTREE_COL_VAR:
+			if (cbt->slot > page->pu_var_entries)
+				return (1);
+			break;
 		case BTREE_ROW:
-			if (cbt->slot > page->entries)
+			if (cbt->slot > page->pu_row_entries)
 				return (1);
 			break;
 		}
 	}
 
-	/* The page may be empty, the search routine doesn't check. */
-	if (page->entries == 0)
-		return (1);
-
-	/* Otherwise, check for an update in the page's slots. */
+	/*
+	 * Check for empty pages (the page may be empty, the search routine
+	 * doesn't check), otherwise, check for an update in the page's slots.
+	 */
 	switch (btree->type) {
 	case BTREE_COL_FIX:
+		if (page->pu_fix_entries == 0)
+			return (1);
 		break;
 	case BTREE_COL_VAR:
+		if (page->pu_var_entries == 0)
+			return (1);
 		cip = &page->u.col_var.d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
 		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (1);
 		break;
 	case BTREE_ROW:
+		if (page->pu_row_entries == 0)
+			return (1);
 		if (page->u.row.upd != NULL && (upd = __wt_txn_read(session,
 		    page->u.row.upd[cbt->slot])) != NULL &&
 		    WT_UPDATE_DELETED_ISSET(upd))

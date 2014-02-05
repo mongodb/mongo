@@ -2358,7 +2358,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_KV *val;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *rp;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 	int state;
 
@@ -2368,7 +2368,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	unpack = &_unpack;
 
 	/* For each entry in the page... */
-	WT_REF_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH(page, refp, ref, i) {
 		/* Update the starting record number in case we split. */
 		r->recno = ref->key.recno;
 
@@ -2469,11 +2469,11 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Copy the updated, disk-image bytes into place. */
 	memcpy(r->first_free, page->u.col_fix.bitf,
-	    __bitstr_size((size_t)page->entries * btree->bitcnt));
+	    __bitstr_size((size_t)page->pu_fix_entries * btree->bitcnt));
 
 	/* Calculate the number of entries per page remainder. */
-	entry = page->entries;
-	nrecs = WT_FIX_ENTRIES(btree, r->space_avail) - page->entries;
+	entry = page->pu_fix_entries;
+	nrecs = WT_FIX_ENTRIES(btree, r->space_avail) - page->pu_fix_entries;
 	r->recno += entry;
 
 	/* Walk any append list. */
@@ -2556,7 +2556,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	    page, page->u.col_fix.recno, btree->maxleafpage));
 
 	/* We may not be taking all of the entries on the original page. */
-	page_take = salvage->take == 0 ? page->entries : salvage->take;
+	page_take = salvage->take == 0 ? page->pu_fix_entries : salvage->take;
 	page_start = salvage->skip == 0 ? 0 : salvage->skip;
 	for (;;) {
 		/* Calculate the number of entries per page. */
@@ -3035,7 +3035,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	size_t size;
 	uint32_t i;
 	u_int vtype;
@@ -3072,7 +3072,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->cell_zero = 1;
 
 	/* For each entry in the in-memory page... */
-	WT_REF_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH(page, refp, ref, i) {
 		/*
 		 * There are different paths if the key is an overflow item vs.
 		 * a straight-forward on-page value.   If an overflow item, we
@@ -3261,7 +3261,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_CELL_UNPACK *vpack, _vpack;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	size_t size;
 	uint32_t i;
 	u_int vtype;
@@ -3275,7 +3275,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	vpack = &_vpack;
 
 	/* For each entry in the in-memory page... */
-	WT_REF_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH(page, refp, ref, i) {
 		vtype = 0;
 		addr = ref->addr;
 		rp = ref->page;
@@ -3805,7 +3805,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
@@ -3820,7 +3820,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * root splits.  In the case of root splits, we potentially have to
 	 * cope with the underlying sets of multiple pages.
 	 */
-	WT_REF_FOREACH(page, ref, i)
+	WT_INTL_FOREACH(page, refp, ref, i)
 		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
 		    ((WT_ADDR *)ref->addr)->size));
@@ -4147,14 +4147,11 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 	 * Our caller cleans up, make sure we return a valid page reference,
 	 * even on error.
 	 */
-	WT_RET(__wt_page_alloc(session, type, r->bnd_next, pagep));
+	WT_RET(__wt_page_alloc(session, type,
+	    type == WT_PAGE_COL_INT ? r->bnd[0].recno : 0, r->bnd_next, pagep));
 	page = *pagep;
 	page->parent = orig->parent;
 	page->ref_hint = orig->ref_hint;
-	if (type == WT_PAGE_COL_INT)
-		page->u.intl.recno = r->bnd[0].recno;
-	page->read_gen = WT_READ_GEN_NOTSET;
-	page->entries = r->bnd_next;
 
 	/*
 	 * We don't re-write parent pages when child pages split, which means
@@ -4249,13 +4246,13 @@ __rec_split_row(
 
 	/* Enter each split child page into the new internal page. */
 	size = 0;
-	for (ref = page->u.intl.t,
-	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
+	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		*addr = bnd->addr;
 		bnd->addr.addr = NULL;
 		size += bnd->addr.size;
 
+		ref = page->pu_intl_index[i];
 		ref->page = NULL;
 		WT_ERR(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &ref->key.ikey));
@@ -4296,12 +4293,12 @@ __rec_split_col(
 	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_COL_INT));
 
 	/* Enter each split child page into the new internal page. */
-	for (ref = page->u.intl.t,
-	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
+	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i) {
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		*addr= bnd->addr;
 		bnd->addr.addr = NULL;
 
+		ref = page->pu_intl_index[i];
 		ref->page = NULL;
 		ref->key.recno = bnd->recno;
 		ref->addr = addr;

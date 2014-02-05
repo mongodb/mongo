@@ -51,7 +51,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * append list, not the update list.   In addition, a recno of
 		 * 0 implies an append operation, we're allocating a new row.
 		 */
-		if (recno == 0 || recno > __col_last_recno(page))
+		if (recno == 0 ||
+		    recno > (btree->type == BTREE_COL_VAR ?
+		    __col_var_last_recno(page) : __col_fix_last_recno(page)))
 			append = 1;
 	}
 
@@ -102,8 +104,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			    session, page, page->modify->update, ins_headp, 1);
 			ins_headp = &page->modify->update[0];
 		} else {
-			WT_PAGE_ALLOC_AND_SWAP(session, page,
-			    page->modify->update, ins_headp, page->entries);
+			WT_PAGE_ALLOC_AND_SWAP(
+			    session, page, page->modify->update,
+			    ins_headp, page->pu_var_entries);
 			ins_headp = &page->modify->update[cbt->slot];
 		}
 

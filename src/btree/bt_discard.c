@@ -129,7 +129,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Free the insert/update array. */
 	if (mod->update != NULL)
 		__free_skip_array(session, mod->update,
-		    page->type == WT_PAGE_COL_FIX ? 1 : page->entries);
+		    page->type == WT_PAGE_COL_FIX ? 1 : page->pu_var_entries);
 
 	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
 	__wt_ovfl_onpage_discard(session, page);
@@ -148,14 +148,14 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 
 	/*
 	 * For each referenced addr, see if the addr was an allocation, and if
 	 * so, free it.
 	 */
-	WT_REF_FOREACH(page, ref, i)
+	WT_INTL_FOREACH(page, refp, ref, i)
 		if (ref->addr != NULL &&
 		    __wt_off_page(page, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
@@ -182,20 +182,19 @@ static void
 __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_IKEY *ikey;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 
 	/*
-	 * Free any allocated keys.
-	 *
-	 * For each referenced addr, see if the addr was an allocation, and if
-	 * so, free it.
+	 * For each WT_REF referenced addr, see if the key or address was an
+	 * allocation, and if so, free it.
 	 */
-	WT_REF_FOREACH(page, ref, i) {
+	if (page->pu_intl_index == NULL)
+		return;
+	WT_INTL_FOREACH(page, refp, ref, i) {
 		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
 			__wt_free(session, ikey);
-		if (ref->addr != NULL &&
-		    __wt_off_page(page, ref->addr)) {
+		if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
@@ -234,11 +233,12 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * found on the original page).
 	 */
 	if (page->u.row.ins != NULL)
-		__free_skip_array(session, page->u.row.ins, page->entries + 1);
+		__free_skip_array(
+		    session, page->u.row.ins, page->pu_row_entries + 1);
 
 	/* Free the update array. */
 	if (page->u.row.upd != NULL)
-		__free_update(session, page->u.row.upd, page->entries);
+		__free_update(session, page->u.row.upd, page->pu_row_entries);
 }
 
 /*

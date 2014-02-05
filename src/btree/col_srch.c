@@ -34,20 +34,21 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	/* Search the internal pages of the tree. */
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
-		WT_ASSERT(session, ref == NULL ||
-		    ref->key.recno == page->u.intl.recno);
+		WT_ASSERT(session,
+		    ref == NULL || ref->key.recno == page->u.intl.recno);
 
 		/* Fast path appends. */
-		base = page->entries;
-		ref = &page->u.intl.t[base - 1];
+		base = page->pu_intl_entries;
+		ref = page->pu_intl_index[base - 1];
 		if (recno >= ref->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
 		for (base = 0, ref = NULL,
-		    limit = page->entries - 1; limit != 0; limit >>= 1) {
+		    limit = page->pu_intl_entries - 1;
+		    limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			ref = page->u.intl.t + indx;
+			ref = page->pu_intl_index[indx];
 
 			if (recno == ref->key.recno)
 				break;
@@ -73,7 +74,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			ref = page->u.intl.t + (base - 1);
+			ref = page->pu_intl_index[base - 1];
 		}
 
 		/*
@@ -101,14 +102,15 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * we arrive here with a record that's impossibly large for the page.
 	 */
 	if (page->type == WT_PAGE_COL_FIX) {
-		if (recno >= page->u.col_fix.recno + page->entries) {
-			cbt->recno = page->u.col_fix.recno + page->entries;
+		if (recno >= page->u.col_fix.recno + page->pu_fix_entries) {
+			cbt->recno =
+			    page->u.col_fix.recno + page->pu_fix_entries;
 			goto past_end;
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);
 	} else
 		if ((cip = __col_var_search(page, recno)) == NULL) {
-			cbt->recno = __col_last_recno(page);
+			cbt->recno = __col_var_last_recno(page);
 			goto past_end;
 		} else {
 			cbt->slot = WT_COL_SLOT(page, cip);

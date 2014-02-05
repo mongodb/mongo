@@ -84,7 +84,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_fix_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->page->u.col_fix.recno);
@@ -167,7 +167,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_var_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->page->u.col_var.recno);
@@ -281,7 +281,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->row_iteration_slot >= cbt->page->entries * 2 + 1)
+		if (cbt->row_iteration_slot >=
+		    cbt->page->pu_row_entries * 2 + 1)
 			return (WT_NOTFOUND);
 		++cbt->row_iteration_slot;
 
@@ -357,7 +358,8 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 		 * For column-store pages, calculate the largest record on the
 		 * page.
 		 */
-		cbt->last_standard_recno = __col_last_recno(page);
+		cbt->last_standard_recno = page->type == WT_PAGE_COL_VAR ?
+		    __col_var_last_recno(page) : __col_fix_last_recno(page);
 
 		/* If we're traversing the append list, set the reference. */
 		if (cbt->ins_head != NULL &&

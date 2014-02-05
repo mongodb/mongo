@@ -390,17 +390,20 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, &root));
-		root->u.intl.recno = 1;
-		ref = root->u.intl.t;
+		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, &root));
+		root->parent = NULL;
+
+		ref = root->pu_intl_index[0];
 		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
 		ref->key.recno = 1;
 		break;
 	case BTREE_ROW:
-		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 1, &root));
-		ref = root->u.intl.t;
+		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, &root));
+		root->parent = NULL;
+
+		ref = root->pu_intl_index[0];
 		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -409,8 +412,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
-	root->entries = 1;
-	root->parent = NULL;
 
 	/*
 	 * Mark the leaf page dirty: we didn't create an entirely valid root
@@ -452,36 +453,6 @@ err:	if (leaf != NULL)
 }
 
 /*
- * __wt_btree_new_modified_page --
- *	Create a new in-memory page could be an internal or leaf page. Setup
- *	the page modify structure.
- */
-int
-__wt_btree_new_modified_page(WT_SESSION_IMPL *session,
-    uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
-{
-	WT_DECL_RET;
-	WT_PAGE *newpage;
-
-	/* Allocate a new page and fill it in. */
-	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
-	newpage->read_gen = WT_READ_GEN_NOTSET;
-	newpage->entries = entries;
-
-	WT_ERR(__wt_page_modify_init(session, newpage));
-	if (merge)
-		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
-	else
-		__wt_page_modify_set(session, newpage);
-
-	*pagep = newpage;
-	return (0);
-
-err:	__wt_page_out(session, &newpage);
-	return (ret);
-}
-
-/*
  * __wt_btree_new_leaf_page --
  *	Create an empty leaf page and link it into a reference in its parent.
  */
@@ -496,19 +467,16 @@ __wt_btree_new_leaf_page(
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_FIX, 0, &leaf));
-		leaf->u.col_fix.recno = 1;
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_FIX, 1, 0, &leaf));
 		break;
 	case BTREE_COL_VAR:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_VAR, 0, &leaf));
-		leaf->u.col_var.recno = 1;
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_VAR, 1, 0, &leaf));
 		break;
 	case BTREE_ROW:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, &leaf));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, &leaf));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	leaf->entries = 0;
 	WT_LINK_PAGE(parent, ref, leaf);
 
 	*pagep = leaf;
@@ -537,7 +505,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	size_t addr_size;
 	uint32_t i;
 	const uint8_t *addr;
@@ -546,7 +514,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_REF_FOREACH(btree->root_page, ref, i) {
+	WT_INTL_FOREACH(btree->root_page, refp, ref, i) {
 		WT_RET(__wt_ref_info(session,
 		    btree->root_page, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)
@@ -572,7 +540,9 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
-	btree->last_recno = __col_last_recno(page);
+	btree->last_recno = page->type == WT_PAGE_COL_VAR ?
+	    __col_var_last_recno(page) : __col_fix_last_recno(page);
+
 	return (__wt_page_release(session, page));
 }
 

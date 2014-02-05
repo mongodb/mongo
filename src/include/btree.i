@@ -6,6 +6,24 @@
  */
 
 /*
+ * __wt_page_entries --
+ *	Return the number of entries on a page of any type.
+ */
+static inline uint32_t
+__wt_page_entries(WT_PAGE *page)
+{
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		return (page->pu_fix_entries);
+	case WT_PAGE_COL_VAR:
+		return (page->pu_var_entries);
+	case WT_PAGE_ROW_LEAF:
+		return (page->pu_row_entries);
+	}
+	return (page->pu_intl_entries);
+}
+
+/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
@@ -195,17 +213,22 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
- * __wt_page_ref --
- *      Return the page's WT_REF structure.
+ * __wt_page_refp --
+ *      Return the offset of the parent's index referencing the page's WT_REF
+ * structure.
  */
-static inline WT_REF *
-__wt_page_ref(WT_SESSION_IMPL *session, WT_PAGE *page)
+static inline int
+__wt_page_refp(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *slotp)
 {
+	WT_PAGE *parent;
 	uint32_t i;
 
 	/* The root page has no WT_REF structure. */
+	WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
 	if (WT_PAGE_IS_ROOT(page))
-		return (NULL);
+		return (EINVAL);
+
+	parent = page->parent;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -213,29 +236,47 @@ __wt_page_ref(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * we don't bother initializing it everywhere, it only implies the first
 	 * retrieval is slower.
 	 */
-	if (page->parent->u.intl.t[page->ref_hint].page == page)
-		return (&page->parent->u.intl.t[page->ref_hint]);
+	if (parent->pu_intl_index[page->ref_hint]->page == page) {
+		*slotp = page->ref_hint;
+		return (0);
+	}
 
-	for (i = page->ref_hint + 1; i < page->parent->entries; ++i)
-		if (page->parent->u.intl.t[i].page == page) {
-			page->ref_hint = i;
-			return (&page->parent->u.intl.t[i]);
+	for (i = page->ref_hint + 1; i < parent->pu_intl_entries; ++i)
+		if (parent->pu_intl_index[i]->page == page) {
+			*slotp = page->ref_hint = i;
+			return (0);
 		}
 
 	/*
 	 * If we don't find it, the page must have split, start the search from
 	 * the beginning of the page.
 	 */
-	for (i = 0; i < page->parent->entries; ++i)
-		if (page->parent->u.intl.t[i].page == page) {
-			page->ref_hint = i;
-			return (&page->parent->u.intl.t[i]);
+	for (i = 0; i < parent->pu_intl_entries; ++i)
+		if (parent->pu_intl_index[i]->page == page) {
+			*slotp = page->ref_hint = i;
+			return (i);
 		}
 	/* NOTREACHED */
 
 	/* If we don't find it, there's a serious problem. */
 	WT_ASSERT(session, 0);
-	return (NULL);
+	return (EINVAL);
+}
+
+/*
+ * __wt_page_ref --
+ *      Return a pointer to the page's WT_REF structure.
+ */
+static inline WT_REF *
+__wt_page_ref(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	uint32_t slot;
+
+	if (WT_PAGE_IS_ROOT(page))
+		return (NULL);
+
+	return (__wt_page_refp(session, page, &slot) == 0 ?
+	    page->parent->pu_intl_index[slot] : NULL);
 }
 
 /*
@@ -807,17 +848,22 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
+	WT_REF *first;
 
 	btree = S2BT(session);
 	root = btree->root_page;
 
-	if (root == NULL || (child = root->u.intl.t->page) == NULL)
+	if (root == NULL)
+		return (0);
+
+	first = root->pu_intl_index[0];
+	if ((child = first->page) == NULL)
 		return (0);
 
 	/* Make sure this is a simple tree, or LSM should switch. */
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    root->entries != 1 ||
-	    root->u.intl.t->state != WT_REF_MEM ||
+	    root->pu_intl_entries != 1 ||
+	    first->state != WT_REF_MEM ||
 	    child->type != WT_PAGE_ROW_LEAF)
 		return (1);
 

@@ -443,6 +443,7 @@ static int
 __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_SESSION_IMPL *session;
+	uint32_t entries;
 
 	session = ds->session;
 
@@ -452,15 +453,21 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		__dmsg(ds, " recno %" PRIu64, page->u.intl.recno);
+		entries = page->pu_intl_entries;
 		break;
 	case WT_PAGE_COL_FIX:
 		__dmsg(ds, " recno %" PRIu64, page->u.col_fix.recno);
+		entries = page->pu_fix_entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		__dmsg(ds, " recno %" PRIu64, page->u.col_var.recno);
+		entries = page->pu_var_entries;
 		break;
 	case WT_PAGE_ROW_INT:
+		entries = page->pu_intl_entries;
+		break;
 	case WT_PAGE_ROW_LEAF:
+		entries = page->pu_row_entries;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -486,8 +493,7 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, "\troot");
 	else
 		__dmsg(ds, "\tparent %p", page->parent);
-	__dmsg(ds,
-	    ", disk %p, entries %" PRIu32 "\n", page->dsk, page->entries);
+	__dmsg(ds, ", disk %p, entries %" PRIu32 "\n", page->dsk, entries);
 
 	return (0);
 }
@@ -589,16 +595,16 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 static int
 __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 
-	WT_REF_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH(page, refp, ref, i) {
 		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->key.recno);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_REF_FOREACH(page, ref, i)
+		WT_INTL_FOREACH(page, refp, ref, i)
 			if (ref->state == WT_REF_MEM) {
 				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));
@@ -657,19 +663,19 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	size_t len;
 	uint8_t *p;
 	uint32_t i;
 
-	WT_REF_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH(page, refp, ref, i) {
 		__wt_ref_key(page, ref, &p, &len);
 		__debug_item(ds, "K", p, len);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_REF_FOREACH(page, ref, i)
+		WT_INTL_FOREACH(page, refp, ref, i)
 			if (ref->state == WT_REF_MEM) {
 				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));

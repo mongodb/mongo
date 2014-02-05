@@ -273,19 +273,40 @@ struct __wt_page {
 	/* Per page-type information. */
 	union {
 		/*
-		 * Column- and row-store internal page.  The recno is only used
-		 * by column-store, but having the WT_REF array in the same page
-		 * location makes some things simpler, and it doesn't cost us
-		 * any memory, other structures in this union are still larger.
+		 * Column- and row-store internal pages.
+		 *
+		 * The page record number is only used by column-store, but
+		 * having the WT_REF array in the same page location makes some
+		 * things simpler, and it doesn't cost us any memory, other
+		 * structures in this union are still larger.
+		 *
+		 * The __index field is the child array originally read into
+		 * memory from disk.  The index field is the child array in
+		 * collated order.  The collated order is the same as the
+		 * original array order when a page is first read into memory.
+		 * Once a page splits, they will differ.
 		 */
 		struct {
-			uint64_t    recno;	/* Starting recno */
-			WT_REF     *t;		/* Subtree */
+			uint64_t  recno;		/* Starting recno */
+
+			WT_REF	 *__index;		/* Original children */
+			struct {
+				uint32_t entries;	/* Entries */
+				WT_REF	*index[0];	/* Collated children */
+			} *index;
 		} intl;
+#undef	pu_intl_entries
+#define	pu_intl_entries	u.intl.index->entries
+#undef	pu_intl_index
+#define	pu_intl_index	u.intl.index->index
+#define	WT_INTL_FOREACH(page, refp, ref, i)				\
+	for ((i) = (page)->pu_intl_entries,				\
+	    (refp) = (page)->pu_intl_index,				\
+	    (ref) = *(refp); (i) > 0; ++(refp), (ref) = *(refp), --(i))
 
 		/* Row-store leaf page. */
 		struct {
-			WT_ROW	   *d;		/* K/V object pairs */
+			WT_ROW *d;		/* Key/value pairs */
 
 			/*
 			 * The column-store leaf page modification structures
@@ -299,18 +320,27 @@ struct __wt_page {
 			 */
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
+
+			uint32_t entries;	/* Entries */
 		} row;
+#undef	pu_row_entries
+#define	pu_row_entries	u.row.entries
 
 		/* Fixed-length column-store leaf page. */
 		struct {
-			uint64_t    recno;	/* Starting recno */
-			uint8_t	   *bitf;	/* COL_FIX items */
+			uint64_t recno;		/* Starting recno */
+
+			uint8_t	*bitf;		/* Values */
+			uint32_t entries;	/* Entries */
 		} col_fix;
+#undef	pu_fix_entries
+#define	pu_fix_entries	u.col_fix.entries
 
 		/* Variable-length column-store leaf page. */
 		struct {
-			uint64_t    recno;	/* Starting recno */
-			WT_COL	   *d;		/* COL_VAR items */
+			uint64_t recno;		/* Starting recno */
+
+			WT_COL *d;		/* Values */
 
 			/*
 			 * Variable-length column-store files maintain a list of
@@ -318,8 +348,12 @@ struct __wt_page {
 			 * the page counting records to find a specific entry.
 			 */
 			WT_COL_RLE *repeats;	/* RLE array for lookups */
-			uint32_t    nrepeats;	/* Number of repeat slots. */
+			uint32_t    nrepeats;	/* Number of repeat slots */
+
+			uint32_t    entries;	/* Entries */
 		} col_var;
+#undef	pu_var_entries
+#define	pu_var_entries	u.col_var.entries
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
@@ -364,12 +398,6 @@ struct __wt_page {
 	((page)->parent == NULL)
 	WT_PAGE	*parent;		/* Page's parent */
 	uint32_t ref_hint;		/* Page's WT_REF hint */
-
-	/*
-	 * In-memory pages optionally reference a number of entries originally
-	 * read from disk and sizes the allocated arrays that describe the page.
-	 */
-	uint32_t entries;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
@@ -496,28 +524,13 @@ struct __wt_ref {
 #define	WT_REF_SIZE	40
 
 /*
- * WT_REF_FOREACH --
- * Walk the subtree array of an in-memory internal page.
- */
-#define	WT_REF_FOREACH(page, ref, i)					\
-	for ((i) = (page)->entries,					\
-	    (ref) = (page)->u.intl.t; (i) > 0; ++(ref), --(i))
-
-/*
- * WT_REF_SLOT --
- *	Return the 0-based array offset based on a parent page and WT_REF slot.
- */
-#define	WT_REF_SLOT(page, ref)						\
-	((uint32_t)(((WT_REF *)ref) - (page)->u.intl.t))
-
-/*
  * WT_LINK_PAGE --
  * Link a child page into a reference in its parent.
  */
 #define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
 	(pref)->page = (cpage);						\
 	(cpage)->parent = (ppage);					\
-	(cpage)->ref_hint = WT_REF_SLOT(ppage, pref);			\
+	(cpage)->ref_hint = 0;		/* XXX: do better */		\
 } while (0)
 
 /*
@@ -570,11 +583,11 @@ struct __wt_row {
  *	Walk the entries of an in-memory row-store leaf page.
  */
 #define	WT_ROW_FOREACH(page, rip, i)					\
-	for ((i) = (page)->entries,					\
+	for ((i) = (page)->pu_row_entries,				\
 	    (rip) = (page)->u.row.d; (i) > 0; ++(rip), --(i))
 #define	WT_ROW_FOREACH_REVERSE(page, rip, i)				\
-	for ((i) = (page)->entries,					\
-	    (rip) = (page)->u.row.d + ((page)->entries - 1);		\
+	for ((i) = (page)->pu_row_entries,				\
+	    (rip) = (page)->u.row.d + ((page)->pu_row_entries - 1);	\
 	    (i) > 0; --(rip), --(i))
 
 /*
@@ -631,7 +644,7 @@ struct __wt_col_rle {
  *	Walk the entries of variable-length column-store leaf page.
  */
 #define	WT_COL_FOREACH(page, cip, i)					\
-	for ((i) = (page)->entries,					\
+	for ((i) = (page)->pu_var_entries,				\
 	    (cip) = (page)->u.col_var.d; (i) > 0; ++(cip), --(i))
 
 /*
@@ -801,7 +814,8 @@ struct __wt_insert_head {
  * original page.
  */
 #define	WT_ROW_INSERT_SMALLEST(page)					\
-	((page)->u.row.ins == NULL ? NULL : (page)->u.row.ins[(page)->entries])
+	((page)->u.row.ins == NULL ?					\
+	    NULL : (page)->u.row.ins[(page)->pu_row_entries])
 
 /*
  * The column-store leaf page update lists are arrays of pointers to structures,

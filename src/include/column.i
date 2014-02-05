@@ -110,11 +110,11 @@ __col_insert_search(WT_INSERT_HEAD *inshead,
 }
 
 /*
- * __col_last_recno --
- *	Return the last record number for a column-store page.
+ * __col_var_last_recno --
+ *	Return the last record number for a variable-length column-store page.
  */
 static inline uint64_t
-__col_last_recno(WT_PAGE *page)
+__col_var_last_recno(WT_PAGE *page)
 {
 	WT_COL_RLE *repeat;
 
@@ -122,18 +122,30 @@ __col_last_recno(WT_PAGE *page)
 	 * If there's an append list (the last page), then there may be more
 	 * records on the page.  This function ignores those records, so our
 	 * callers have to handle that explicitly, if they care.
-	 *
-	 * WT_PAGE_COL_FIX pages don't have a repeat array, so this works for
-	 * fixed-length column-stores without any further check.
 	 */
 	if (page->u.col_var.nrepeats == 0)
-		return (page->entries == 0 ? 0 :
-		    page->u.col_var.recno + (page->entries - 1));
+		return (page->pu_var_entries == 0 ? 0 :
+		    page->u.col_var.recno + (page->pu_var_entries - 1));
 
 	repeat = &page->u.col_var.repeats[page->u.col_var.nrepeats - 1];
-	return (
-	    (repeat->recno + repeat->rle) - 1 +
-	    (page->entries - (repeat->indx + 1)));
+	return ((repeat->recno + repeat->rle) - 1 +
+	    (page->pu_var_entries - (repeat->indx + 1)));
+}
+
+/*
+ * __col_fix_last_recno --
+ *	Return the last record number for a fixed-length column-store page.
+ */
+static inline uint64_t
+__col_fix_last_recno(WT_PAGE *page)
+{
+	/*
+	 * If there's an append list (the last page), then there may be more
+	 * records on the page.  This function ignores those records, so our
+	 * callers have to handle that explicitly, if they care.
+	 */
+	return (page->pu_fix_entries == 0 ? 0 :
+	    page->u.col_fix.recno + (page->pu_fix_entries - 1));
 }
 
 /*
@@ -183,7 +195,7 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 		start_recno = repeat->recno + repeat->rle;
 	}
 
-	if (recno >= start_recno + (page->entries - start_indx))
+	if (recno >= start_recno + (page->pu_var_entries - start_indx))
 		return (NULL);
 
 	return (page->u.col_var.d +

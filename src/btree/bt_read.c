@@ -35,11 +35,11 @@ __cache_read_row_deleted(
 	}
 
 	/* Allocate the update array. */
-	WT_RET(__wt_calloc_def(session, page->entries, &upd_array));
+	WT_RET(__wt_calloc_def(session, page->pu_row_entries, &upd_array));
 	page->u.row.upd = upd_array;
 
 	/* Fill in the update array with deleted items. */
-	for (i = 0; i < page->entries; ++i) {
+	for (i = 0; i < page->pu_row_entries; ++i) {
 		WT_RET(__wt_calloc_def(session, 1, &upd));
 		upd->next = upd_array[i];
 		upd_array[i] = upd;
@@ -49,7 +49,7 @@ __cache_read_row_deleted(
 	}
 
 	__wt_cache_page_inmem_incr(session, page,
-	    page->entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
+	    page->pu_row_entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
 
 	return (0);
 }

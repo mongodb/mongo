@@ -9,6 +9,36 @@
 
 #if 0
 /*
+ * __wt_btree_new_modified_page --
+ *	Create a new in-memory page could be an internal or leaf page. Setup
+ *	the page modify structure.
+ */
+int
+__wt_btree_new_modified_page(WT_SESSION_IMPL *session,
+    uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
+{
+	WT_DECL_RET;
+	WT_PAGE *newpage;
+
+	/* Allocate a new page and fill it in. */
+	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
+	newpage->read_gen = WT_READ_GEN_NOTSET;
+	newpage->entries = entries;
+
+	WT_ERR(__wt_page_modify_init(session, newpage));
+	if (merge)
+		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
+	else
+		__wt_page_modify_set(session, newpage);
+
+	*pagep = newpage;
+	return (0);
+
+err:	__wt_page_out(session, &newpage);
+	return (ret);
+}
+
+/*
  * WT_VISIT_STATE --
  *	The state maintained across calls to the "visit" callback functions:
  *	the number of refs visited, the maximum depth, and the current page and
