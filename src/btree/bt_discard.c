@@ -171,7 +171,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the RLE lookup array. */
-	__wt_free(session, page->u.col_var.repeats);
+	__wt_free(session, page->pu_var_repeats);
 }
 
 /*
@@ -232,13 +232,13 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * insert array has an extra slot to hold keys that sort before keys
 	 * found on the original page).
 	 */
-	if (page->u.row.ins != NULL)
+	if (page->pu_row_ins != NULL)
 		__free_skip_array(
-		    session, page->u.row.ins, page->pu_row_entries + 1);
+		    session, page->pu_row_ins, page->pu_row_entries + 1);
 
 	/* Free the update array. */
-	if (page->u.row.upd != NULL)
-		__free_update(session, page->u.row.upd, page->pu_row_entries);
+	if (page->pu_row_upd != NULL)
+		__free_update(session, page->pu_row_upd, page->pu_row_entries);
 }
 
 /*

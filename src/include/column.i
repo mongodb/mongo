@@ -123,11 +123,11 @@ __col_var_last_recno(WT_PAGE *page)
 	 * records on the page.  This function ignores those records, so our
 	 * callers have to handle that explicitly, if they care.
 	 */
-	if (page->u.col_var.nrepeats == 0)
+	if (page->pu_var_nrepeats == 0)
 		return (page->pu_var_entries == 0 ? 0 :
-		    page->u.col_var.recno + (page->pu_var_entries - 1));
+		    page->pu_var_recno + (page->pu_var_entries - 1));
 
-	repeat = &page->u.col_var.repeats[page->u.col_var.nrepeats - 1];
+	repeat = &page->pu_var_repeats[page->pu_var_nrepeats - 1];
 	return ((repeat->recno + repeat->rle) - 1 +
 	    (page->pu_var_entries - (repeat->indx + 1)));
 }
@@ -145,7 +145,7 @@ __col_fix_last_recno(WT_PAGE *page)
 	 * callers have to handle that explicitly, if they care.
 	 */
 	return (page->pu_fix_entries == 0 ? 0 :
-	    page->u.col_fix.recno + (page->pu_fix_entries - 1));
+	    page->pu_fix_recno + (page->pu_fix_entries - 1));
 }
 
 /*
@@ -168,14 +168,13 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	 * slot for this record number, because we know any intervening records
 	 * have repeat counts of 1.
 	 */
-	for (base = 0,
-	    limit = page->u.col_var.nrepeats; limit != 0; limit >>= 1) {
+	for (base = 0, limit = page->pu_var_nrepeats; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 
-		repeat = page->u.col_var.repeats + indx;
+		repeat = page->pu_var_repeats + indx;
 		if (recno >= repeat->recno &&
 		    recno < repeat->recno + repeat->rle)
-			return (page->u.col_var.d + repeat->indx);
+			return (page->pu_var_d + repeat->indx);
 		if (recno < repeat->recno)
 			continue;
 		base = indx + 1;
@@ -188,9 +187,9 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	 */
 	if (base == 0) {
 		start_indx = 0;
-		start_recno = page->u.col_var.recno;
+		start_recno = page->pu_var_recno;
 	} else {
-		repeat = page->u.col_var.repeats + (base - 1);
+		repeat = page->pu_var_repeats + (base - 1);
 		start_indx = repeat->indx + 1;
 		start_recno = repeat->recno + repeat->rle;
 	}
@@ -198,6 +197,5 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	if (recno >= start_recno + (page->pu_var_entries - start_indx))
 		return (NULL);
 
-	return (page->u.col_var.d +
-	    start_indx + (uint32_t)(recno - start_recno));
+	return (page->pu_var_d + start_indx + (uint32_t)(recno - start_recno));
 }

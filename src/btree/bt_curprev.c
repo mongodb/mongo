@@ -227,7 +227,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	}
 
 	/* Move to the previous entry and return the item. */
-	if (cbt->recno == cbt->page->u.col_fix.recno)
+	if (cbt->recno == cbt->page->pu_fix_recno)
 		return (WT_NOTFOUND);
 	__cursor_set_recno(cbt, cbt->recno - 1);
 
@@ -313,7 +313,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	for (;;) {
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
-new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
+new_page:	if (cbt->recno < cbt->page->pu_var_recno)
 			return (WT_NOTFOUND);
 
 		/* Find the matching WT_COL slot. */
@@ -448,7 +448,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins = NULL;
 
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
-		rip = &cbt->page->u.row.d[cbt->slot];
+		rip = &cbt->page->pu_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;

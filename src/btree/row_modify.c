@@ -50,10 +50,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		if (cbt->ins == NULL) {
 			/* Allocate an update array as necessary. */
 			WT_PAGE_ALLOC_AND_SWAP(session, page,
-			    page->u.row.upd, upd_entry, page->pu_row_entries);
+			    page->pu_row_upd, upd_entry, page->pu_row_entries);
 
 			/* Set the WT_UPDATE array reference. */
-			upd_entry = &page->u.row.upd[cbt->slot];
+			upd_entry = &page->pu_row_upd[cbt->slot];
 		} else
 			upd_entry = &cbt->ins->upd;
 
@@ -88,11 +88,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * slot.  That's hard, so we set a flag.
 		 */
 		WT_PAGE_ALLOC_AND_SWAP(session, page,
-		    page->u.row.ins, ins_headp, page->pu_row_entries + 1);
+		    page->pu_row_ins, ins_headp, page->pu_row_entries + 1);
 
 		ins_slot = F_ISSET(cbt, WT_CBT_SEARCH_SMALLEST) ?
 		    page->pu_row_entries: cbt->slot;
-		ins_headp = &page->u.row.ins[ins_slot];
+		ins_headp = &page->pu_row_ins[ins_slot];
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
 		WT_PAGE_ALLOC_AND_SWAP(session, page, *ins_headp, ins_head, 1);

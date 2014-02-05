@@ -35,7 +35,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
 		WT_ASSERT(session,
-		    ref == NULL || ref->key.recno == page->u.intl.recno);
+		    ref == NULL || ref->key.recno == page->pu_intl_recno);
 
 		/* Fast path appends. */
 		base = page->pu_intl_entries;
@@ -102,9 +102,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * we arrive here with a record that's impossibly large for the page.
 	 */
 	if (page->type == WT_PAGE_COL_FIX) {
-		if (recno >= page->u.col_fix.recno + page->pu_fix_entries) {
-			cbt->recno =
-			    page->u.col_fix.recno + page->pu_fix_entries;
+		if (recno >= page->pu_fix_recno + page->pu_fix_entries) {
+			cbt->recno = page->pu_fix_recno + page->pu_fix_entries;
 			goto past_end;
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);

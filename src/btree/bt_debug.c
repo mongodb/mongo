@@ -452,15 +452,15 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		__dmsg(ds, " recno %" PRIu64, page->u.intl.recno);
+		__dmsg(ds, " recno %" PRIu64, page->pu_intl_recno);
 		entries = page->pu_intl_entries;
 		break;
 	case WT_PAGE_COL_FIX:
-		__dmsg(ds, " recno %" PRIu64, page->u.col_fix.recno);
+		__dmsg(ds, " recno %" PRIu64, page->pu_fix_recno);
 		entries = page->pu_fix_entries;
 		break;
 	case WT_PAGE_COL_VAR:
-		__dmsg(ds, " recno %" PRIu64, page->u.col_var.recno);
+		__dmsg(ds, " recno %" PRIu64, page->pu_var_recno);
 		entries = page->pu_var_entries;
 		break;
 	case WT_PAGE_ROW_INT:
@@ -557,7 +557,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	session = ds->session;
 	btree = S2BT(session);
 	dsk = page->dsk;
-	recno = page->u.col_fix.recno;
+	recno = page->pu_fix_recno;
 
 	if (dsk != NULL) {
 		ins = WT_SKIP_FIRST(WT_COL_UPDATE_SINGLE(page));
@@ -629,7 +629,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	char tag[64];
 
 	unpack = &_unpack;
-	recno = page->u.col_var.recno;
+	recno = page->pu_var_recno;
 
 	WT_COL_FOREACH(page, cip, i) {
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {

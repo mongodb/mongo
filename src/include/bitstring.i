@@ -262,8 +262,8 @@ __bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
 static inline uint8_t
 __bit_getv_recno(WT_PAGE *page, uint64_t recno, uint8_t width)
 {
-	return (__bit_getv(page->u.col_fix.bitf,
-	    recno - page->u.col_fix.recno, width));
+	return (__bit_getv(
+	    page->pu_fix_bitf, recno - page->pu_fix_recno, width));
 }
 
 /*
@@ -312,6 +312,5 @@ __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 static inline void
 __bit_setv_recno(WT_PAGE *page, uint64_t recno, uint8_t width, uint8_t value)
 {
-	__bit_setv(page->u.col_fix.bitf,
-	    recno - page->u.col_fix.recno, width, value);
+	__bit_setv(page->pu_fix_bitf, recno - page->pu_fix_recno, width, value);
 }

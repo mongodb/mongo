@@ -173,11 +173,11 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 
 	switch (type) {
 	case WT_PAGE_COL_FIX:
-		page->u.col_fix.recno = recno;
+		page->pu_fix_recno = recno;
 		page->pu_fix_entries = alloc_entries;
 		break;
 	case WT_PAGE_COL_INT:
-		page->u.intl.recno = recno;
+		page->pu_intl_recno = recno;
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
 		page->u.intl.__index = p;
@@ -202,13 +202,13 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 
 		break;
 	case WT_PAGE_COL_VAR:
-		page->u.col_var.recno = recno;
-		page->u.col_var.d = p;
+		page->pu_var_recno = recno;
+		page->pu_var_d = p;
 		page->pu_var_entries = alloc_entries;
 		break;
 	case WT_PAGE_ROW_LEAF:
 		page->pu_row_entries = alloc_entries;
-		page->u.row.d = p;
+		page->pu_row_d = p;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -342,7 +342,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = S2BT(session);
 	dsk = page->dsk;
 
-	page->u.col_fix.bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
+	page->pu_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
 }
 
 /*
@@ -427,7 +427,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	repeats = NULL;
 	repeat_off = 0;
 	bytes_allocated = 0;
-	recno = page->u.col_var.recno;
+	recno = page->pu_var_recno;
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -435,7 +435,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
 	 */
 	indx = 0;
-	cip = page->u.col_var.d;
+	cip = page->pu_var_d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
@@ -454,8 +454,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 				WT_RET(__wt_realloc_def(session,
 				    &bytes_allocated, n + 1, &repeats));
 
-				page->u.col_var.repeats = repeats;
-				page->u.col_var.nrepeats = n;
+				page->pu_var_repeats = repeats;
+				page->pu_var_nrepeats = n;
 				*sizep += bytes_allocated;
 			}
 			repeats[repeat_off].indx = indx;
@@ -626,7 +626,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	unpack = &_unpack;
 
 	/* Walk the page, building indices. */
-	rip = page->u.row.d;
+	rip = page->pu_row_d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {

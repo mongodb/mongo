@@ -278,7 +278,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	if (btree->collator == NULL)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->u.row.d + indx;
+			rip = page->pu_row_d + indx;
 
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			match = WT_MIN(skiplow, skiphigh);
@@ -297,7 +297,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	else
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->u.row.d + indx;
+			rip = page->pu_row_d + indx;
 
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			WT_ERR(WT_LEX_CMP_SKIP(session,
@@ -349,7 +349,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * it means the application is inserting a key before any key found on
 	 * the page).
 	 */
-	rip = page->u.row.d;
+	rip = page->pu_row_d;
 	if (base == 0)
 		cbt->compare = 1;
 	else {

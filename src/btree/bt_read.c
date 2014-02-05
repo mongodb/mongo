@@ -36,7 +36,7 @@ __cache_read_row_deleted(
 
 	/* Allocate the update array. */
 	WT_RET(__wt_calloc_def(session, page->pu_row_entries, &upd_array));
-	page->u.row.upd = upd_array;
+	page->pu_row_upd = upd_array;
 
 	/* Fill in the update array with deleted items. */
 	for (i = 0; i < page->pu_row_entries; ++i) {
