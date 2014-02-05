@@ -74,7 +74,7 @@ Using [Homebrew](http://mxcl.github.com/homebrew/):
 
 Using [MacPorts](http://www.macports.org):
 
-    § sudo port install mongodb
+    $ sudo port install mongodb
 
 FREEBSD
 --------------
