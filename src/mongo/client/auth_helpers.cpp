@@ -86,6 +86,14 @@ namespace auth {
                         oldUserDoc.toString(),
                 !oldUserDoc.hasField("credentials"));
 
+        uassert(17386,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "the 2.4 user data schema to the 2.6 schema, found a user doc "
+                        "that doesn't conform to the 2.4 *or* 2.6 schema.  Doc found: "
+                        << oldUserDoc.toString(),
+                oldUserDoc.hasField("user") &&
+                        (oldUserDoc.hasField("userSource") || oldUserDoc.hasField("pwd")));
+
         std::string oldUserSource;
         uassertStatusOK(bsonExtractStringFieldWithDefault(
                                 oldUserDoc,
