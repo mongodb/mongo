@@ -530,8 +530,7 @@ namespace mongo {
         // Register Runner with ClientCursor
         const ScopedRunnerRegistration safety(runner.get());
 
-        // Custom ("manual") yield policy
-        RunnerYieldPolicy yieldPolicy;
+        // Use automatic yield policy
         runner->setYieldPolicy(Runner::YIELD_AUTO);
 
         // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
