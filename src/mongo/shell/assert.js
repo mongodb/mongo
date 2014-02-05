@@ -318,6 +318,24 @@ assert.close = function(a, b, msg, places){
               " places, diff: " + (a-b) + " : " + msg);
 };
 
+/**
+ * Asserts if the times in millis are not withing delta milliseconds, in either direction.
+ * Default Delta: 1 second
+ */
+assert.closeWithinMS = function(a, b, msg, deltaMS) {
+    "use strict";
+    if (deltaMS === undefined) {
+        deltaMS = 1000;
+    }
+    var aMS = a instanceof Date ? a.getTime() : a;
+    var bMS = b instanceof Date ? b.getTime() : b;
+    var actualDelta = Math.abs(Math.abs(aMS) - Math.abs(bMS));
+    if (actualDelta <= deltaMS) return;
+
+    doassert(a + " is not equal to " + b + " within " + deltaMS +
+              " millis, actual delta: " + actualDelta + " millis : " + msg);
+};
+
 assert.gleSuccess = function(db, msg) {
     var gle = db.getLastErrorObj();
     if (gle.err) {

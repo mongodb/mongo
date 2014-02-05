@@ -72,14 +72,11 @@ var _idUptime = _id.pop();
 var _idHost = _id.join('-');
 var uptimeSinceEpochRounded = Math.floor(_idUptime/1000) * 1000;
 var startTime = new Date(uptimeSinceEpochRounded);  // Expected startTime
-var startTimeLocal = new Date(latestStartUpLog.startTimeLocal); // Setup startTimeLocal so it can be compared to a local version of startTime
-startTimeLocal.setYear(startTime.getFullYear()); // startTimeLocal doesnt have the year
-startTimeLocal.setMilliseconds(0); // Remove any milliseconds
 
 assert.eq(_idHost, latestStartUpLog.hostname, "Hostname doesn't match one from _id");
 assert.eq(serverStatus.host.split(':')[0], latestStartUpLog.hostname, "Hostname doesn't match one in server status");
-assert.eq(startTime, latestStartUpLog.startTime, "StartTime doesn't match one from _id");
-assert.eq(startTimeLocal, new Date(latestStartUpLog.startTime.toLocaleString()), "StartTimeLocal doesn't match startTime converted to Local");
+assert.closeWithinMS(startTime, latestStartUpLog.startTime, 
+                     "StartTime doesn't match one from _id", 2000); // Expect less than 2 sec delta
 assert.eq(cmdLine, latestStartUpLog.cmdLine, "cmdLine doesn't match that from getCmdLineOpts");
 assert.eq(serverStatus.pid, latestStartUpLog.pid, "pid doesn't match that from serverStatus");
 
