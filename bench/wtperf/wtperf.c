@@ -59,7 +59,8 @@ static uint64_t g_insert_key;		/* insert key */
 static volatile int g_ckpt;		/* checkpoint in progress */
 static volatile int g_error;		/* thread error */
 static volatile int g_stop;		/* notify threads to stop */
-static volatile int g_totalsec;		/* total seconds running */
+
+static volatile uint32_t g_totalsec;	/* total seconds running */
 
 /*
  * Atomic update where needed.
