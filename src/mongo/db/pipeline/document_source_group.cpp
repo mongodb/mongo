@@ -122,7 +122,12 @@ namespace mongo {
     }
 
     void DocumentSourceGroup::optimize() {
-        pIdExpression = pIdExpression->optimize();
+        // TODO if all _idExpressions are ExpressionConstants after optimization, then we know there
+        // will only be one group. We should take advantage of that to avoid going through the hash
+        // table.
+        for (size_t i = 0; i < _idExpressions.size(); i++) {
+            _idExpressions[i] = _idExpressions[i]->optimize();
+        }
 
         for (size_t i = 0; i < vFieldName.size(); i++) {
              vpExpression[i] = vpExpression[i]->optimize();
@@ -133,7 +138,19 @@ namespace mongo {
         MutableDocument insides;
 
         // add the _id
-        insides["_id"] = pIdExpression->serialize(explain);
+        if (_idFieldNames.empty()) {
+            invariant(_idExpressions.size() == 1);
+            insides["_id"] = _idExpressions[0]->serialize(explain);
+        }
+        else {
+            // decomposed document case
+            invariant(_idExpressions.size() == _idFieldNames.size());
+            MutableDocument md;
+            for (size_t i = 0; i < _idExpressions.size(); i++) {
+                md[_idFieldNames[i]] = _idExpressions[i]->serialize(explain);
+            }
+            insides["_id"] = md.freezeToValue();
+        }
 
         // add the remaining fields
         const size_t n = vFieldName.size();
@@ -155,7 +172,9 @@ namespace mongo {
 
     DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
         // add the _id
-        pIdExpression->addDependencies(deps);
+        for (size_t i = 0; i < _idExpressions.size(); i++) {
+            _idExpressions[i]->addDependencies(deps);
+        }
 
         // add the rest
         const size_t n = vFieldName.size();
@@ -227,7 +246,6 @@ namespace mongo {
 
         intrusive_ptr<DocumentSourceGroup> pGroup(
             DocumentSourceGroup::create(pExpCtx));
-        bool idSet = false;
 
         BSONObj groupObj(elem.Obj());
         BSONObjIterator groupIterator(groupObj);
@@ -239,32 +257,9 @@ namespace mongo {
 
             if (str::equals(pFieldName, "_id")) {
                 uassert(15948, "a group's _id may only be specified once",
-                        !idSet);
-
-                BSONType groupType = groupField.type();
-
-                if (groupType == Object) {
-                    /*
-                      Use the projection-like set of field paths to create the
-                      group-by key.
-                    */
-                    Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                    pGroup->setIdExpression(Expression::parseObject(groupField.Obj(), &oCtx, vps));
-                    idSet = true;
-                }
-                else if (groupType == String) {
-                    const string groupString = groupField.str();
-                    if (!groupString.empty() && groupString[0] == '$') {
-                        pGroup->setIdExpression(ExpressionFieldPath::parse(groupString, vps));
-                        idSet = true;
-                    }
-                }
-
-                if (!idSet) {
-                    // constant id - single group
-                    pGroup->setIdExpression(ExpressionConstant::create(Value(groupField)));
-                    idSet = true;
-                }
+                        pGroup->_idExpressions.empty());
+                pGroup->parseIdExpression(groupField, vps);
+                invariant(!pGroup->_idExpressions.empty());
             }
             else if (str::equals(pFieldName, "$doingMerge")) {
                 massert(17030, "$doingMerge should be true if present",
@@ -334,7 +329,8 @@ namespace mongo {
             }
         }
 
-        uassert(15955, "a group specification must include an _id", idSet);
+        uassert(15955, "a group specification must include an _id",
+                !pGroup->_idExpressions.empty());
 
         pGroup->_variables.reset(new Variables(idGenerator.getIdCount()));
 
@@ -372,7 +368,7 @@ namespace mongo {
             _variables->setRoot(*input);
 
             /* get the _id value */
-            Value id = pIdExpression->evaluate(_variables.get());
+            Value id = computeId(_variables.get());
 
             /* treat missing values the same as NULL SERVER-4674 */
             if (id.missing())
@@ -500,6 +496,73 @@ namespace mongo {
         return shared_ptr<Sorter<Value, Value>::Iterator>(writer.done());
     }
 
+    void DocumentSourceGroup::parseIdExpression(BSONElement groupField,
+                                                const VariablesParseState& vps) {
+        if (groupField.type() == Object && !groupField.Obj().isEmpty()) {
+            // {_id: {}} is treated as grouping on a constant, not an expression
+
+            const BSONObj idKeyObj = groupField.Obj();
+            if (idKeyObj.firstElementFieldName()[0] == '$') {
+                // grouping on a $op expression
+                Expression::ObjectCtx oCtx(0);
+                _idExpressions.push_back(Expression::parseObject(idKeyObj, &oCtx, vps));
+            }
+            else {
+                // grouping on an "artificial" object. Rather than create the object for each input
+                // in populate(), instead group on the output of the raw expressions. The artificial
+                // object will be created at the end in makeDocument() while outputting results.
+                BSONForEach(field, idKeyObj) {
+                    uassert(17390, "$group does not support inclusion-style expressions",
+                            !field.isNumber() && field.type() != Bool);
+
+                    _idFieldNames.push_back(field.fieldName());
+                    _idExpressions.push_back(Expression::parseOperand(field, vps));
+                }
+            }
+        }
+        else if (groupField.type() == String && groupField.valuestr()[0] == '$') {
+            // grouping on a field path.
+            _idExpressions.push_back(ExpressionFieldPath::parse(groupField.str(), vps));
+        }
+        else {
+            // constant id - single group
+            _idExpressions.push_back(ExpressionConstant::create(Value(groupField)));
+        }
+    }
+
+    Value DocumentSourceGroup::computeId(Variables* vars) {
+        // If only one expression return result directly
+        if (_idExpressions.size() == 1)
+            return _idExpressions[0]->evaluate(vars);
+
+        // Multiple expressions get results wrapped in a vector
+        vector<Value> vals;
+        vals.reserve(_idExpressions.size());
+        for (size_t i = 0; i < _idExpressions.size(); i++) {
+            vals.push_back(_idExpressions[i]->evaluate(vars));
+        }
+        return Value::consume(vals);
+    }
+
+    Value DocumentSourceGroup::expandId(const Value& val) {
+        // _id doesn't get wrapped in a document
+        if (_idFieldNames.empty())
+            return val;
+
+        // _id is a single-field document containing val
+        if (_idFieldNames.size() == 1)
+            return Value(DOC(_idFieldNames[0] << val));
+
+        // _id is a multi-field document containing the elements of val
+        const vector<Value>& vals = val.getArray();
+        invariant(_idFieldNames.size() == vals.size());
+        MutableDocument md(vals.size());
+        for (size_t i = 0; i < vals.size(); i++) {
+            md[_idFieldNames[i]] = vals[i];
+        }
+        return md.freezeToValue();
+    }
+
     Document DocumentSourceGroup::makeDocument(const Value& id,
                                                const Accumulators& accums,
                                                bool mergeableOutput) {
@@ -507,7 +570,7 @@ namespace mongo {
         MutableDocument out (1 + n);
 
         /* add the _id field */
-        out.addField("_id", id);
+        out.addField("_id", expandId(id));
 
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
@@ -535,7 +598,7 @@ namespace mongo {
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
         /* the merger will use the same grouping key */
-        pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id", vps));
+        pMerger->_idExpressions.push_back(ExpressionFieldPath::parse("$$ROOT._id", vps));
 
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {

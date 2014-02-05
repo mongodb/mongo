@@ -9,7 +9,7 @@ c.save({a:{b:{c:{d:{e:{f:{g:19}}}}}}});
 // bad project
 assertErrorCode(c, {$project:{foo:{$add:[{b:1}]}}}, 16420);
 // $group shouldnt allow numeric inclusions
-assertErrorCode(c, {$group:{_id: {a:1}}}, 16420);
+assertErrorCode(c, {$group:{_id: {a:1}}}, 17390);
 
 // but any amount of nesting in a project should work
 assert.eq(c.aggregate({$project:{_id:0, a:{b:{c:{d:{e:{f:{g:1}}}}}}}}).toArray(), [{a:{b:{c:{d:{e:{f:{g:19}}}}}}}]);

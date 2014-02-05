@@ -454,17 +454,6 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
-          Set the Id Expression.
-
-          Documents that pass through the grouping Document are grouped
-          according to this key.  This will generate the id_ field in the
-          result documents.
-
-          @param pExpression the group key
-         */
-        void setIdExpression(const intrusive_ptr<Expression> &pExpression);
-
-        /**
           Add an accumulator.
 
           Accumulators become fields in the Documents that result from
@@ -522,7 +511,22 @@ namespace mongo {
         void populate();
         bool populated;
 
-        intrusive_ptr<Expression> pIdExpression;
+        /**
+         * Parses the raw id expression into _idExpressions and possibly _idFieldNames.
+         */
+        void parseIdExpression(BSONElement groupField, const VariablesParseState& vps);
+
+        /**
+         * Computes the internal representation of the group key.
+         */
+        Value computeId(Variables* vars);
+
+        /**
+         * Converts the internal representation of the group key to the _id shape specified by the
+         * user.
+         */
+        Value expandId(const Value& val);
+
 
         typedef vector<intrusive_ptr<Accumulator> > Accumulators;
         typedef boost::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
@@ -552,6 +556,8 @@ namespace mongo {
         const bool _extSortAllowed;
         const int _maxMemoryUsageBytes;
         boost::scoped_ptr<Variables> _variables;
+        std::vector<std::string> _idFieldNames; // used when id is a document
+        std::vector<intrusive_ptr<Expression> > _idExpressions;
 
         // only used when !_spilled
         GroupsMap::iterator groupsIterator;
@@ -1108,14 +1114,4 @@ namespace mongo {
         BSONObj cmdOutput;
         boost::scoped_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
     };
-}
-
-
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
-
-namespace mongo {
-    inline void DocumentSourceGroup::setIdExpression(
-        const intrusive_ptr<Expression> &pExpression) {
-        pIdExpression = pExpression;
-    }
 }
