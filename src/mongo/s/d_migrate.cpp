@@ -402,9 +402,12 @@ namespace mongo {
             invariant( _dummyRunner.get() == NULL );
             _dummyRunner.reset( new DummyRunner( _ns, collection ) );
 
+            // Allow multiKey based on the invariant that shard keys must be single-valued.
+            // Therefore, any multi-key index prefixed by shard key cannot be multikey over
+            // the shard key fields.
             IndexDescriptor *idx =
                 collection->getIndexCatalog()->findIndexByPrefix( _shardKeyPattern ,
-                                                                  true );  /* require single key */
+                                                                  false );  /* allow multi key */
 
             if ( idx == NULL ) {
                 errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );

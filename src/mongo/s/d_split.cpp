@@ -286,9 +286,12 @@ namespace mongo {
 
                 const NamespaceDetails* d = collection->details();
 
+                // Allow multiKey based on the invariant that shard keys must be single-valued.
+                // Therefore, any multi-key index prefixed by shard key cannot be multikey over
+                // the shard key fields.
                 IndexDescriptor *idx =
                     collection->getIndexCatalog()->findIndexByPrefix( keyPattern,
-                                                                      true ); /* require single key */
+                                                                      false );
                 if ( idx == NULL ) {
                     errmsg = (string)"couldn't find index over splitting key " +
                              keyPattern.clientReadable().toString();
@@ -849,9 +852,12 @@ namespace mongo {
                     Collection* collection = ctx.ctx().db()->getCollection( ns );
                     verify( collection );
 
+                    // Allow multiKey based on the invariant that shard keys must be
+                    // single-valued. Therefore, any multi-key index prefixed by shard
+                    // key cannot be multikey over the shard key fields.
                     IndexDescriptor *idx =
                         collection->getIndexCatalog()->findIndexByPrefix( keyPattern ,
-                                                                          true ); /* exclude multikeys */
+                                                                          false );
                     if ( idx == NULL ) {
                         break;
                     }

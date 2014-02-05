@@ -85,6 +85,29 @@ error = coll.getDB().getLastError()
 assert.eq( error, null )
 assert.eq( coll.find().itcount(), 0 )
 
+coll.ensureIndex({ _id : 1, i : 1, j: 1 });
+// Can insert document that will make index into a multi-key as long as it's not part of shard key.
+coll.remove();
+coll.insert({ i: 1, j: [1, 2] });
+error = coll.getDB().getLastError();
+assert.eq( error, null );
+assert.eq( coll.find().itcount(), 1 );
+
+// Same is true for updates.
+coll.remove();
+coll.insert({ _id: 1, i: 1 });
+coll.update({ _id: 1, i: 1 }, { _id: 1, i:1, j: [1, 2] });
+error = coll.getDB().getLastError();
+assert.eq( error, null );
+assert.eq( coll.find().itcount(), 1 );
+
+// Same for upserts.
+coll.remove();
+coll.update({ _id: 1, i: 1 }, { _id: 1, i:1, j: [1, 2] }, true);
+error = coll.getDB().getLastError();
+assert.eq( error, null );
+assert.eq( coll.find().itcount(), 1 );
+
 printjson( "Sharding-then-inserting-multikey tested, now trying inserting-then-sharding-multikey" )
 
 // Insert a bunch of data then shard over key which is an array

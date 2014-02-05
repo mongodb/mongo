@@ -2,8 +2,7 @@
 //
 // Part 1: Shard new collection on {num : 1} with an index on {num : 1, x : 1}.
 //         Test that you can split and move chunks around.
-// Part 2: Test that adding an array value for x makes it unusuable. Deleting the
-//         array value and re-indexing makes it usable again.
+// Part 2: Test that adding an array value for x doesn't make it unusuable.
 // Part 3: Shard new collection on {skey : 1} but with a longer index.
 //         Insert docs with same val for 'skey' but different vals for 'extra'.
 //         Move chunks around and check that [min,max) chunk boundaries are properly obeyed.
@@ -78,35 +77,56 @@ assert.eq( 1, result3.ok , "moveChunk didn't succeed");
 
 //******************Part 2********************
 
-// Test that inserting array values fails because we don't support multi-key indexes for the shard key
-coll.save({ num : [1,2], x : 1});
-err = db.getLastError();
-print( err );
-assert.neq( null, err, "Inserting document with array value for shard key succeeded");
+// Migrations and splits will still work on a sharded collection that only has multi key
+// index.
+db.user.ensureIndex({ num: 1, x: 1 });
+db.adminCommand({ shardCollection: 'test.user', key: { num: 1 }});
 
-// Because of SERVER-6095, making the index a multi-key index (on a value that *isn't* part of the
-// shard key) makes that index unusable for migrations.  Test that removing the multi-key value and
-// rebuilding the index allows it to be used again
-coll.save({ num : 100, x : [1,2]});
-var result4 = admin.runCommand({ movechunk: coll.getFullName(), find: { num: 70 },
+var indexCount = db.system.indexes.find({ ns: 'test.user' }).count();
+assert.eq(2, indexCount, // indexes for _id_ and num_1_x_1
+          'index count not expected: ' + tojson(db.system.indexes.find().toArray()));
+
+var array = [];
+for (var item = 0; item < 50; item++) {
+    array.push(item);
+}
+
+for (var docs = 0; docs < 1000; docs++) {
+    db.user.insert({ num: docs, x: array });
+}
+
+assert.eq(1000, db.user.find().itcount());
+
+var result4 = admin.runCommand({ movechunk: 'test.user', find: { num: 70 },
     to: s.getOther(s.getServer("test")).name, _waitForDelete: true });
-printjson( result4 );
-assert.eq( 0, result4.ok , "moveChunk succeeded without a usable index");
+assert.commandWorked(result4);
 
-coll.remove({ num : 100 });
-db.getLastError();
-coll.reIndex();
-db.getLastError();
-result4 = admin.runCommand({ movechunk: coll.getFullName(), find : { num : 70 },
-    to: s.getOther(s.getServer("test")).name, _waitForDelete: true });
-printjson( result4 );
-assert.eq( 1, result4.ok , "moveChunk failed after rebuilding index");
+var expectedShardCount = { shard0000: 0, shard0001: 0 };
+config.chunks.find({ ns: 'test.user' }).forEach(function(chunkDoc) {
+    var min = chunkDoc.min.num;
+    var max = chunkDoc.max.num;
 
-// Make sure the previous migrates cleanup doesn't interfere with later tests
-assert.soon( function(){
-    print( "Waiting for migration cleanup to occur..." );
-    return coll.count() == coll.find().itcount();
-})
+    if (min < 0 || min == MinKey) {
+        min = 0;
+    }
+
+    if (max > 1000 || max == MaxKey) {
+        max = 1000;
+    }
+
+    if (max > 0) {
+        expectedShardCount[chunkDoc.shard] += (max - min);
+    }
+});
+
+assert.eq(expectedShardCount['shard0000'], shard0.getDB('test').user.find().count());
+assert.eq(expectedShardCount['shard0001'], shard1.getDB('test').user.find().count());
+
+result4 = admin.runCommand({ split: 'test.user', middle: { num: 70 }});
+assert.commandWorked(result4);
+
+assert.eq(expectedShardCount['shard0000'], shard0.getDB('test').user.find().count());
+assert.eq(expectedShardCount['shard0001'], shard1.getDB('test').user.find().count());
 
 //******************Part 3********************
 
