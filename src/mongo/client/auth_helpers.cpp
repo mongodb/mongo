@@ -76,6 +76,16 @@ namespace auth {
                                 const BSONObj& oldUserDoc,
                                 BSONObj* query,
                                 BSONObj* update) {
+        uassert(17387,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from the 2.4 "
+                        "user data schema to the 2.6 schema, found a user doc with a "
+                        "\"credentials\" field, indicating that the doc already has the new "
+                        "schema. Make sure that all documents in admin.system.users have the same "
+                        "user data schema and that the version document in admin.system.version "
+                        "indicates the correct schema version.  User doc found: " <<
+                        oldUserDoc.toString(),
+                !oldUserDoc.hasField("credentials"));
+
         std::string oldUserSource;
         uassertStatusOK(bsonExtractStringFieldWithDefault(
                                 oldUserDoc,
