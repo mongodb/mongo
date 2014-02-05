@@ -736,6 +736,7 @@ namespace {
                     Timer timer;
                     conn->isMaster(ignoredOutParam, &reply);
                     pingMicros = timer.micros();
+                    conn.done(); // return to pool on success.
                 }
                 catch (...) {
                     reply = BSONObj(); // should be a no-op but want to be sure
