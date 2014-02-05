@@ -91,12 +91,16 @@
           <File Id="f_snmpConfMaster" Name="mongod.conf.master" Source="$(var.EnterpriseBase)\docs\mongod.conf.master"
                 DiskId="1" KeyPath="yes" />
         </Component>
-      <Component Id="c_snmpConfSubagent" Guid="6FB66102-41A7-41BD-BB1F-1987E150FA78">
-        <File Id="f_snmpConfSubagent" Name="mongod.conf.subagent" Source="$(var.EnterpriseBase)\docs\mongod.conf.subagent"
-              DiskId="1" KeyPath="yes" />
-      </Component>
-        <Component Id="c_snmpMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
-          <File Id="f_snmpMib" Name="MONGO-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGO-MIB.txt"
+        <Component Id="c_snmpConfSubagent" Guid="6FB66102-41A7-41BD-BB1F-1987E150FA78">
+          <File Id="f_snmpConfSubagent" Name="mongod.conf.subagent" Source="$(var.EnterpriseBase)\docs\mongod.conf.subagent"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpMongodMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
+          <File Id="f_snmpMongodMib" Name="MONGOD-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGOD-MIB.txt"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpMongodbincMib" Guid="58c6bd8e-a785-48a0-af48-42f6bf9f68b4">
+          <File Id="f_snmpMongodbincMib" Name="MONGODBINC-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGODBINC-MIB.txt"
                 DiskId="1" KeyPath="yes" />
         </Component>
       <?endif ?>
@@ -122,7 +126,8 @@
         <ComponentRef Id="c_snmpPdb" />
         <ComponentRef Id="c_snmpConfMaster" />
         <ComponentRef Id="c_snmpConfSubagent" />
-        <ComponentRef Id="c_snmpMib" />
+        <ComponentRef Id="c_snmpMongodMib" />
+        <ComponentRef Id="c_snmpMongodbincMib" />
       </ComponentGroup>
     <?endif ?>
   </Fragment>
