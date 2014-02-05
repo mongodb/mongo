@@ -97,8 +97,6 @@ namespace mongo {
 
         void process( int attempt = 0 );
 
-        void gotInsert();
-
         void init();
 
         void reset();

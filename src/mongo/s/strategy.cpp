@@ -109,7 +109,7 @@ namespace mongo {
                 verify( shards.size() > 0 );
                 myShard.reset( new Shard( *shards.begin() ) );
             }
-            
+
             doIndexQuery( r, *myShard );
             return;
         }
@@ -554,11 +554,6 @@ namespace mongo {
             lastError.get( false )->reset();
             bool hadError = batchErrorToLastError( *request, response, lastError.get( false ) );
 
-            // Need to specially count inserts
-            if ( op == dbInsert ) {
-                for( int i = 0; i < response.getN(); ++i )
-                    r.gotInsert();
-            }
             // Check if this is an ordered batch and we had an error which should stop processing
             if ( request->getOrdered() && hadError )
                 break;
