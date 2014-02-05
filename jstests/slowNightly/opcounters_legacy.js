@@ -1,5 +1,11 @@
 // Test that opcounters get incremented properly.
 
+// Remember the global 'db' var
+var lastDB = db;
+var mongo = new Mongo(db.getMongo().host);
+mongo.useWriteCommands = function() { return false; }
+db = mongo.getDB(db.toString());
+
 var t = db.opcounters;
 var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
 var opCounters;
@@ -14,10 +20,8 @@ var opCounters;
 // - mongod, bulk insert of N with continueOnError=false:
 //     counted as K ops, where K is number of docs successfully inserted
 //
-// - mongos, single insert:
-//     counted as 1 op, regardless of errors
-// - mongos, bulk insert of N:
-//     counted as N ops, regardless of errors
+// - mongos
+//     count ops attempted like insert commands
 //
 
 t.drop();
@@ -39,21 +43,20 @@ opCounters = db.serverStatus().opcounters;
 t.insert({_id:0})
 print( db.getLastError() )
 assert(db.getLastError());
-assert.eq(opCounters.insert, db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + (isMongos ? 1 : 0), db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, continueOnError=false.
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id:3},{_id:3},{_id:4}])
 assert(db.getLastError());
-assert.eq(opCounters.insert + 1, db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + (isMongos ? 2 : 1), db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, continueOnError=true.
 var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
 assert(db.getLastError());
-// Mongos counts correctly now
-assert.eq(opCounters.insert + (isMongos ? 2 : 3), db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + 3, db.serverStatus().opcounters.insert);
 
 //
 // 2. Update.
@@ -165,3 +168,6 @@ assert.eq(0, res.ok);
 assert.eq(opCounters.command + (isMongos ? 2 : 1), db.serverStatus().opcounters.command);
 
 // Command, recognized, counting suppressed (TODO implement when SERVER-9038 is resolved).
+
+// Restore 'db' var
+db = lastDB;
