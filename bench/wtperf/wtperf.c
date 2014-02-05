@@ -59,6 +59,7 @@ static uint64_t g_insert_key;		/* insert key */
 static volatile int g_ckpt;		/* checkpoint in progress */
 static volatile int g_error;		/* thread error */
 static volatile int g_stop;		/* notify threads to stop */
+static volatile int g_totalsec;		/* total seconds running */
 
 /*
  * Atomic update where needed.
@@ -612,7 +613,7 @@ monitor(void *arg)
 	(void)setvbuf(fp, NULL, _IOLBF, 0);
 #ifdef __WRITE_A_HEADER
 	fprintf(fp,
-	    "#time,"
+	    "#time,totalsec,"
 	    "read operations,insert operations,update operations,"
 	    "checkpoints,"
 	    "read average latency(NS),read minimum latency(NS),"
@@ -661,14 +662,14 @@ monitor(void *arg)
 			cur_inserts = inserts - last_inserts;
 
 		(void)fprintf(fp,
-		    "%s"
+		    "%s,%" PRIu32
 		    ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
 		    ",%c"
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    "\n",
-		    buf,
+		    buf, g_totalsec,
 		    cur_reads / cfg->sample_interval,
 		    cur_inserts / cfg->sample_interval,
 		    cur_updates / cfg->sample_interval,
@@ -769,7 +770,7 @@ execute_populate(CONFIG *cfg)
 	struct timespec start, stop;
 	double secs;
 	uint64_t last_ops;
-	uint32_t interval, total;
+	uint32_t interval;
 	int elapsed, ret;
 
 	session = NULL;
@@ -789,7 +790,7 @@ execute_populate(CONFIG *cfg)
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
 		return (ret);
 	}
-	for (elapsed = 0, interval = 0, last_ops = 0, total = 0;
+	for (elapsed = 0, interval = 0, last_ops = 0;
 	    g_insert_key < cfg->icount && g_error == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
@@ -803,13 +804,13 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
-		total += cfg->report_interval;
+		g_totalsec += cfg->report_interval;
 		g_insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
 		    PRIu32 ") in %" PRIu32 " secs (%" PRIu32 " total secs)",
 		    g_insert_ops - last_ops, g_insert_ops,
-		    cfg->icount, cfg->report_interval, total);
+		    cfg->icount, cfg->report_interval, g_totalsec);
 		last_ops = g_insert_ops;
 	}
 	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
@@ -893,7 +894,7 @@ execute_workload(CONFIG *cfg)
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
-	uint32_t interval, run_ops, run_time, total;
+	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret, t_ret;
 
@@ -930,7 +931,7 @@ execute_workload(CONFIG *cfg)
 		threads += workp->threads;
 	}
 
-	for (interval = cfg->report_interval, total = 0,
+	for (interval = cfg->report_interval, 
 	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
 		/*
 		 * Sleep for one second at a time.
@@ -960,7 +961,7 @@ execute_workload(CONFIG *cfg)
 		if (interval == 0 || --interval > 0)
 			continue;
 		interval = cfg->report_interval;
-		total += cfg->report_interval;
+		g_totalsec += cfg->report_interval;
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
@@ -970,7 +971,7 @@ execute_workload(CONFIG *cfg)
 		    g_insert_ops - last_inserts,
 		    g_update_ops - last_updates,
 		    g_ckpt_ops - last_ckpts,
-		    cfg->report_interval, total);
+		    cfg->report_interval, g_totalsec);
 		last_reads = g_read_ops;
 		last_inserts = g_insert_ops;
 		last_updates = g_update_ops;
