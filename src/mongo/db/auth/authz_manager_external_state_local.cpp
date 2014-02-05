@@ -78,7 +78,7 @@ namespace mongo {
             else {
                 return Status(ErrorCodes::TypeMismatch, mongoutils::str::stream() <<
                               "Bad (non-numeric) type " << versionElement.type() <<
-                              "for " << AuthorizationManager::schemaVersionFieldName <<
+                              " for " << AuthorizationManager::schemaVersionFieldName <<
                               " field in version document");
             }
         }
