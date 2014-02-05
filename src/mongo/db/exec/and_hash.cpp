@@ -31,6 +31,7 @@
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/working_set.h"
 
 namespace mongo {
 
@@ -76,7 +77,13 @@ namespace mongo {
         // result in _lookAheadResults.
         if (_lookAheadResults.empty()) {
             // INVALID_ID means that the child didn't produce a valid result.
-            _lookAheadResults.resize(_children.size(), WorkingSet::INVALID_ID);
+
+            // We specifically are not using .resize(size, value) here because C++11 builds don't
+            // seem to resolve WorkingSet::INVALID_ID during linking.
+            _lookAheadResults.resize(_children.size());
+            for (size_t i = 0; i < _children.size(); ++i) {
+                _lookAheadResults[i] =  WorkingSet::INVALID_ID;
+            }
 
             // Work each child some number of times until it's either EOF or produces
             // a result.  If it's EOF this whole stage will be EOF.  If it produces a
