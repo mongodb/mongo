@@ -81,10 +81,9 @@ set yrange [0:]\n''' % {
             '\', graph 0 ' + ' to first \'' + stop +\
             '\', graph 1 fc rgb "gray" back\n') 
     of.write('set output "' + fname + '.png"\n')
-    of.write('plot "' + fname + '" using 1:($2/1000) title "Reads", "' +\
-        fname + '" using 1:($3/1000) title "Inserts", "' +\
-        fname + '" using 1:($4/1000) title "Updates", "' +\
-        fname + '" using 1:(($2+$3+$4)/1000) title "Total"\n')
+    of.write('plot "' + fname + '" using 1:($3/1000) title "Reads", "' +\
+        fname + '" using 1:($4/1000) title "Inserts", "' +\
+        fname + '" using 1:($5/1000) title "Updates"\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
