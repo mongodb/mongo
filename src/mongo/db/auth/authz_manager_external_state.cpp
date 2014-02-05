@@ -99,10 +99,16 @@ namespace mongo {
 
     bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() {
         BSONObj userBSONObj;
-        return findOne(
+        Status status = findOne(
                 AuthorizationManager::usersCollectionNamespace,
                 BSONObj(),
-                &userBSONObj).isOK();
+                &userBSONObj);
+        // If the status is NoMatchingDocument, there are no privilege documents.
+        // If it's OK, there are.  Otherwise, we were unable to complete the query,
+        // so best to assume that there _are_ privilege documents.  This might happen
+        // if the node contaning the users collection becomes transiently unavailable.
+        // See SERVER-12616, for example.
+        return status != ErrorCodes::NoMatchingDocument;
     }
 
 
