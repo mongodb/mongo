@@ -1002,23 +1002,37 @@ namespace mutablebson {
             }
         }
 
-        // Not all types are currently permitted to be updated in-place.
-        bool canUpdateInPlace(const ElementRep& rep) {
-            const BSONType type = getType(rep);
-            switch(type) {
-            case mongo::NumberDouble:
-            case mongo::String:
-            case mongo::BinData:
-            case mongo::jstOID:
-            case mongo::Bool:
-            case mongo::Date:
-            case mongo::NumberInt:
-            case mongo::Timestamp:
-            case mongo::NumberLong:
-                return true;
-            default:
+        // Check all preconditions on doing an in-place update, except for size match.
+        bool canUpdateInPlace(const ElementRep& sourceRep, const ElementRep& targetRep) {
+
+            // NOTE: CodeWScope might arguably be excluded since it has substructure, but
+            // mutable doesn't permit navigation into its document, so we can handle it.
+
+            // We can only do an in-place update to an element that is serialized and is not in
+            // the leaf heap.
+            //
+            // TODO: In the future, we can replace values in the leaf heap if they are of the
+            // same size as the origin was. For now, we don't support that.
+            if (!hasValue(targetRep) || (targetRep.objIdx == kLeafObjIdx))
                 return false;
+
+            // sourceRep should be newly created, so it must have a value representation.
+            dassert(hasValue(sourceRep));
+
+            // For a target that has substructure, we only permit in-place updates if there
+            // cannot be ElementReps that reference data within the target. We don't need to
+            // worry about ElementReps for source, since it is newly created. The only way
+            // there can be ElementReps referring into substructure is if the Element has
+            // non-empty non-opaque child references.
+            if (!isLeaf(targetRep)) {
+                if (((targetRep.child.left != Element::kOpaqueRepIdx) &&
+                     (targetRep.child.left != Element::kInvalidRepIdx)) ||
+                    ((targetRep.child.right != Element::kOpaqueRepIdx) &&
+                     (targetRep.child.right != Element::kInvalidRepIdx)))
+                    return false;
             }
+
+            return true;
         }
 
         template<typename Builder>
@@ -1983,60 +1997,46 @@ namespace mutablebson {
         ElementRep& thisRep = impl.getElementRep(_repIdx);
         ElementRep& valueRep = impl.getElementRep(newValueIdx);
 
-        bool inPlace = false;
-        if (impl.canUpdateInPlace(valueRep) && impl.isInPlaceModeEnabled()) {
+        if (impl.isInPlaceModeEnabled() && impl.canUpdateInPlace(valueRep, thisRep)) {
 
-            // In place updates are currently enabled. We can do an in-place update to an
-            // element that is serialized and is not in the leaf heap.
-            const bool inLeafHeap = (thisRep.objIdx == kLeafObjIdx);
-            const bool hasValue = impl.hasValue(thisRep);
+            // Get the BSONElement representations of the existing and new value, so we can
+            // check if they are size compatible.
+            BSONElement thisElt = impl.getSerializedElement(thisRep);
+            BSONElement valueElt = impl.getSerializedElement(valueRep);
 
-            // TODO: In the future, we can replace values in the leaf heap if they are of the
-            // same size as the origin was. For now, we don't support that.
-            if (hasValue && !inLeafHeap) {
+            if (thisElt.size() == valueElt.size()) {
 
-                // See if the new Element can be recorded as an in-place update.
-                dassert(impl.hasValue(valueRep));
+                // The old and new elements are size compatible. Compute the base offsets
+                // of each BSONElement in the object in which it resides. We use these to
+                // calculate the source and target offsets in the damage entries we are
+                // going to write.
 
-                // Get the BSONElement representations of the existing and new value, so we can
-                // check if they are size compatible.
-                BSONElement thisElt = impl.getSerializedElement(thisRep);
-                BSONElement valueElt = impl.getSerializedElement(valueRep);
+                const DamageEvent::OffsetSizeType targetBaseOffset =
+                    getElementOffset(impl.getObject(thisRep.objIdx), thisElt);
 
-                if (thisElt.size() == valueElt.size()) {
+                const DamageEvent::OffsetSizeType sourceBaseOffset =
+                    getElementOffset(impl.getObject(valueRep.objIdx), valueElt);
 
-                    // The old and new elements are size compatible. Compute the base offsets
-                    // of each BSONElement in the object in which it resides. We use these to
-                    // calculate the source and target offsets in the damage entries we are
-                    // going to write.
-
-                    const DamageEvent::OffsetSizeType targetBaseOffset =
-                        getElementOffset(impl.getObject(thisRep.objIdx), thisElt);
-
-                    const DamageEvent::OffsetSizeType sourceBaseOffset =
-                        getElementOffset(impl.getObject(valueRep.objIdx), valueElt);
-
-                    // If this is a type change, record a damage event for the new type.
-                    if (thisElt.type() != valueElt.type()) {
-                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
-                    }
-
-                    dassert(thisElt.fieldNameSize() == valueElt.fieldNameSize());
-                    dassert(thisElt.valuesize() == valueElt.valuesize());
-
-                    // Record a damage event for the new value data.
-                    impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize() + 1,
-                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
-                        thisElt.valuesize());
-
-                    inPlace = true;
+                // If this is a type change, record a damage event for the new type.
+                if (thisElt.type() != valueElt.type()) {
+                    impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
                 }
+
+                dassert(thisElt.fieldNameSize() == valueElt.fieldNameSize());
+                dassert(thisElt.valuesize() == valueElt.valuesize());
+
+                // Record a damage event for the new value data.
+                impl.recordDamageEvent(
+                    targetBaseOffset + thisElt.fieldNameSize() + 1,
+                    sourceBaseOffset + thisElt.fieldNameSize() + 1,
+                    thisElt.valuesize());
+            } else {
+
+                // We couldn't do it in place, so disable future in-place updates.
+                impl.disableInPlaceUpdates();
+
             }
         }
-
-        if (!inPlace)
-            getDocument().disableInPlaceUpdates();
 
         // If we are not rootish, then wire in the new value among our relations.
         if (thisRep.parent != kInvalidRepIdx) {
