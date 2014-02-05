@@ -290,8 +290,13 @@ namespace mongo {
         BSONObj operand = BSON( "$lt" << BSON_ARRAY( 5 ) );
         LTMatchExpression lt;
         ASSERT( lt.init( "a", operand[ "$lt" ] ).isOK() );
-        // Arrays are not comparable as inequalities.
-        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( lt.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( 5 ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        // Nested array.
+        ASSERT( lt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 4 ) ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
+        ASSERT( !lt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 6 ) ) ), NULL ) );
     }
 
     TEST( LtOp, MatchesNull ) {
@@ -442,8 +447,13 @@ namespace mongo {
         BSONObj operand = BSON( "$lte" << BSON_ARRAY( 5 ) );
         LTEMatchExpression lte;
         ASSERT( lte.init( "a", operand[ "$lte" ] ).isOK() );
-        // Arrays are not comparable as inequalities.
-        ASSERT( !lte.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSON_ARRAY( 5 ) ), NULL ) );
+        ASSERT( !lte.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        // Nested array.
+        ASSERT( lte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 4 ) ) ), NULL ) );
+        ASSERT( lte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
+        ASSERT( !lte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 6 ) ) ), NULL ) );
     }
 
     TEST( LteOp, MatchesNull ) {
@@ -596,8 +606,15 @@ namespace mongo {
         BSONObj operand = BSON( "$gt" << BSON_ARRAY( 5 ) );
         GTMatchExpression gt;
         ASSERT( gt.init( "a", operand[ "$gt" ] ).isOK() );
-        // Arrays are not comparable as inequalities.
-        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( !gt.matchesBSON( BSON( "a" << BSON_ARRAY( 5 ) ), NULL ) );
+        ASSERT( gt.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        // Nested array.
+        // XXX: The following assertion documents current behavior.
+        ASSERT( gt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 4 ) ) ), NULL ) );
+        // XXX: The following assertion documents current behavior.
+        ASSERT( gt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
+        ASSERT( gt.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 6 ) ) ), NULL ) );
     }
 
     TEST( GtOp, MatchesNull ) {
@@ -749,8 +766,14 @@ namespace mongo {
         BSONObj operand = BSON( "$gte" << BSON_ARRAY( 5 ) );
         GTEMatchExpression gte;
         ASSERT( gte.init( "a", operand[ "$gte" ] ).isOK() );
-        // Arrays are not comparable as inequalities.
-        ASSERT( !gte.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        ASSERT( !gte.matchesBSON( BSON( "a" << BSON_ARRAY( 4 ) ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( 5 ) ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( 6 ) ), NULL ) );
+        // Nested array.
+        // XXX: The following assertion documents current behavior.
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 4 ) ) ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 5 ) ) ), NULL ) );
+        ASSERT( gte.matchesBSON( BSON( "a" << BSON_ARRAY( BSON_ARRAY( 6 ) ) ), NULL ) );
     }
 
     TEST( ComparisonMatchExpression, MatchesNull ) {
