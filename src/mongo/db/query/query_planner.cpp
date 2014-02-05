@@ -682,7 +682,7 @@ namespace mongo {
         }
 
         // Likewise, if there is a TEXT it must have an index it can use directly.
-        MatchExpression* textNode;
+        MatchExpression* textNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
@@ -739,6 +739,20 @@ namespace mongo {
         }
 
         QLOG() << "Planner: outputted " << out->size() << " indexed solutions.\n";
+
+        // Produce legible error message for failed OR planning with a TEXT child.
+        // TODO: support collection scan for non-TEXT children of OR.
+        if (out->size() == 0 && textNode != NULL &&
+            MatchExpression::OR == query.root()->matchType()) {
+            MatchExpression* root = query.root();
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                if (textNode == root->getChild(i)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Failed to produce a solution for TEXT under OR - "
+                                  "other non-TEXT clauses under OR have to be indexed as well.");
+                }
+            }
+        }
 
         // An index was hinted.  If there are any solutions, they use the hinted index.  If not, we
         // scan the entire index to provide results and output that as our plan.  This is the

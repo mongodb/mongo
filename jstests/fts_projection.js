@@ -66,6 +66,30 @@ assert.throws(function() { t.find({$text: {$search: "blah"}}, {'x.y':{$meta: "te
 results = t.find({$or: [{$text: {$search: "textual content -irrelevant"}}, {_id: 1}]},
                  {_idCopy:0, score:{$meta: "textScore"}}).toArray();
 printjson(results);
+assert.eq(2, results.length);
+for (var i = 0; i < results.length; ++i) {
+    assert.close(scores[results[i]._id], results[i].score,
+                 i + ': TEXT under OR invalid score: ' + tojson(results[i], '', true));
+}
+
+// SERVER-12592
+// When $text operator is in $or, all non-$text children must be indexed. Otherwise, we should produce
+// a readable error.
+var errorMessage = '';
+assert.throws( function() {
+    try {
+        t.find({$or: [{$text: {$search: "textual content -irrelevant"}}, {b: 1}]}).itcount();
+    }
+    catch (e) {
+        errorMessage = e;
+        throw e;
+    }
+}, null, 'Expected error from failed TEXT under OR planning');
+assert.neq(-1, errorMessage.indexOf('TEXT'),
+           'message from failed text planning does not mention TEXT: ' + errorMessage);
+assert.neq(-1, errorMessage.indexOf('OR'),
+           'message from failed text planning does not mention OR: ' + errorMessage);
+
 // Scores should exist.
 assert.eq(results.length, 2);
 assert(results[0].score,
