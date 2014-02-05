@@ -38,6 +38,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -193,6 +194,29 @@ namespace mongo {
             batchErrorToLastError( request, response, cmdLastError );
         }
 
+        size_t numAttempts;
+        if ( !response.getOk() ) {
+            numAttempts = 0;
+        } else if ( request.getOrdered() && response.isErrDetailsSet() ) {
+            numAttempts = response.getErrDetailsAt(0)->getIndex() + 1; // Add one failed attempt
+        } else {
+            numAttempts = request.sizeWriteOps();
+        }
+
+        // TODO: increase opcounters by more than one
+        if ( _writeType == BatchedCommandRequest::BatchType_Insert ) {
+            for( size_t i = 0; i < numAttempts; ++i ) {
+                globalOpCounters.gotInsert();
+            }
+        } else if ( _writeType == BatchedCommandRequest::BatchType_Update ) {
+            for( size_t i = 0; i < numAttempts; ++i ) {
+                globalOpCounters.gotUpdate();
+            }
+        } else if ( _writeType == BatchedCommandRequest::BatchType_Delete ) {
+            for( size_t i = 0; i < numAttempts; ++i ) {
+                globalOpCounters.gotDelete();
+            }
+        }
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work
         if ( ClientInfo::exists() && writer.getStats().hasShardStats() ) {

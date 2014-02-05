@@ -127,6 +127,7 @@ namespace mongo {
         bool iscmd = false;
         if ( op == dbKillCursors ) {
             cursorCache.gotKillCursors( _m );
+            globalOpCounters.gotOp( op , iscmd );
         }
         else if ( op == dbQuery ) {
             NamespaceString nss(getns());
@@ -143,12 +144,16 @@ namespace mongo {
             else {
                 STRATEGY->queryOp( *this );
             }
+
+            globalOpCounters.gotOp( op , iscmd );
         }
         else if ( op == dbGetMore ) {
             STRATEGY->getMore( *this );
+            globalOpCounters.gotOp( op , iscmd );
         }
         else {
             STRATEGY->writeOp( op, *this );
+            // globalOpCounters are handled by write commands.
         }
 
         LOG(3) << "Request::process end ns: " << getns()
@@ -157,12 +162,6 @@ namespace mongo {
                << " attempt: " << attempt
                << " " << t.millis() << "ms"
                << endl;
-
-        globalOpCounters.gotOp( op , iscmd );
-    }
-
-    void Request::gotInsert() {
-        globalOpCounters.gotInsert();
     }
 
     void Request::reply( Message & response , const string& fromServer ) {
