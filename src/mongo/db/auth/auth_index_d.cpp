@@ -34,6 +34,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
@@ -43,36 +45,58 @@ namespace mongo {
 namespace authindex {
 
 namespace {
-    BSONObj v2SystemUsersKeyPattern;
-    BSONObj v2SystemRolesKeyPattern;
-    std::string v2SystemUsersIndexName;
-    std::string v2SystemRolesIndexName;
+    BSONObj v1SystemUsersKeyPattern;
+    BSONObj v3SystemUsersKeyPattern;
+    BSONObj v3SystemRolesKeyPattern;
+    std::string v3SystemUsersIndexName;
+    std::string v3SystemRolesIndexName;
 
     MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
-        v2SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
+        v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);
+        v3SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::USER_DB_FIELD_NAME << 1);
-        v2SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
+        v3SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME << 1);
-        v2SystemUsersIndexName = std::string(
+        v3SystemUsersIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::USER_NAME_FIELD_NAME << "_1_" <<
                         AuthorizationManager::USER_DB_FIELD_NAME << "_1");
-        v2SystemRolesIndexName = std::string(
+        v3SystemRolesIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::ROLE_NAME_FIELD_NAME << "_1_" <<
                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << "_1");
+
         return Status::OK();
     }
 
 }  // namespace
 
+    void configureSystemIndexes(const StringData& dbname) {
+        if (dbname == "admin" && getGlobalAuthorizationManager()->getAuthorizationVersion() ==
+                AuthorizationManager::schemaVersion26Final) {
+            NamespaceString systemUsers(dbname, "system.users");
+
+            // Make sure the old unique index from v2.4 on system.users doesn't exist.
+            Client::WriteContext wctx(systemUsers);
+            Collection* collection = wctx.ctx().db()->getCollection(NamespaceString(systemUsers));
+            if (!collection) {
+                return;
+            }
+            IndexCatalog* indexCatalog = collection->getIndexCatalog();
+            IndexDescriptor* oldIndex = NULL;
+            while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
+                indexCatalog->dropIndex(oldIndex);
+            }
+        }
+    }
+
     void createSystemIndexes(const NamespaceString& ns) {
         if (ns == AuthorizationManager::usersCollectionNamespace) {
             try {
                 Helpers::ensureIndex(ns.ns().c_str(),
-                                     v2SystemUsersKeyPattern,
+                                     v3SystemUsersKeyPattern,
                                      true,  // unique
-                                     v2SystemUsersIndexName.c_str());
+                                     v3SystemUsersIndexName.c_str());
             } catch (const DBException& e) {
                 if (e.getCode() == ASSERT_ID_DUPKEY) {
                     log() << "Duplicate key exception while trying to build unique index on " <<
@@ -84,9 +108,9 @@ namespace {
         } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
             try {
                 Helpers::ensureIndex(ns.ns().c_str(),
-                                     v2SystemRolesKeyPattern,
+                                     v3SystemRolesKeyPattern,
                                      true,  // unique
-                                     v2SystemRolesIndexName.c_str());
+                                     v3SystemRolesIndexName.c_str());
             } catch (const DBException& e) {
                 if (e.getCode() == ASSERT_ID_DUPKEY) {
                     log() << "Duplicate key exception while trying to build unique index on " <<

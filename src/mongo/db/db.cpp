@@ -37,6 +37,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -744,6 +745,8 @@ namespace mongo {
             // resolve this.
             Client::WriteContext c("admin", storageGlobalParams.dbpath);
         }
+
+        authindex::configureSystemIndexes("admin");
 
         getDeleter()->startWorkers();
 

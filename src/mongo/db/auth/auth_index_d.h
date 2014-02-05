@@ -39,5 +39,14 @@ namespace authindex {
      */
     void createSystemIndexes(const NamespaceString& ns);
 
+    /**
+     * Ensures that exactly the appropriate indexes to support authentication and authorization
+     * are present for the given database.
+     *
+     * It is appropriate to call this function on new or existing databases, though it is
+     * primarily intended for use on existing databases.
+     */
+    void configureSystemIndexes(const StringData& dbname);
+
 }  // namespace authindex
 }  // namespace mongo
