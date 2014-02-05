@@ -56,6 +56,8 @@ namespace {
 
 namespace mongo {
 
+    using std::vector;
+
     // static
     QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& query,
                                                               bool tailable,

@@ -207,3 +207,20 @@ env.CppUnitTest(
         "query_planner_test_lib",
     ],
 )
+
+# $text pulls in a lot of stuff so we test it here.
+env.CppUnitTest(
+    target="query_planner_text_test",
+    source=[
+        "query_planner_text_test.cpp"
+    ],
+    LIBDEPS=[
+        "query",
+        "query_planner_test_lib",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/mocklib",
+    ],
+    NO_CRUTCH = True,
+)

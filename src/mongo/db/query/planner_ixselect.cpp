@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -47,6 +47,22 @@ namespace mongo {
         if (e.isNumber()) { return e.numberDouble(); }
         return def;
     }
+
+    /**
+     * XXX: we should figure this kind of data out once and put it in
+     * the IndexEntry.
+     */
+    static bool isTextIndex(const BSONObj& pattern) {
+        BSONObjIterator it(pattern);
+        while (it.more()) {
+            BSONElement e = it.next();
+            if (String == e.type() && str::equals("text", e.valuestr())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     /**
      * 2d indices don't handle wrapping so we can't use them for queries that wrap.
@@ -140,13 +156,62 @@ namespace mongo {
 
         // TODO: use indexnames
         if ("" == ixtype) {
-            if (index.sparse && exprtype == MatchExpression::EQ) {
-                // Can't check for null w/a sparse index.
+            // Can't check for null w/a sparse index.
+            if (exprtype == MatchExpression::EQ && index.sparse) {
                 const EqualityMatchExpression* expr
                     = static_cast<const EqualityMatchExpression*>(node);
-                return !expr->getData().isNull();
+                if (expr->getData().isNull()) {
+                    return false;
+                }
             }
-            return exprtype != MatchExpression::GEO && exprtype != MatchExpression::GEO_NEAR;
+
+            // We can't use a btree-indexed field for geo expressions.
+            if (exprtype == MatchExpression::GEO || exprtype == MatchExpression::GEO_NEAR) {
+                return false;
+            }
+
+            // We can only index EQ using text indices.  This is an artificial limitation imposed by
+            // FTSSpec::getIndexPrefix() which will fail if there is not an EQ predicate on each
+            // index prefix field of the text index.
+            //
+            // Example for key pattern {a: 1, b: "text"}:
+            // - Allowed: node = {a: 7}
+            // - Not allowed: node = {a: {$gt: 7}}
+
+            // TODO: Cache isTextIndex somewhere.
+            if (!isTextIndex(index.keyPattern)) {
+                return true;
+            }
+
+            // If we're here we know it's a text index.  Equalities are OK anywhere in a text index.
+            if (MatchExpression::EQ == exprtype) {
+                return true;
+            }
+
+            // Not-equalities can only go in a suffix field of an index kp.  We look through the key
+            // pattern to see if the field we're looking at now appears as a prefix.  If so, we
+            // can't use this index for it.
+            BSONObjIterator specIt(index.keyPattern);
+            while (specIt.more()) {
+                BSONElement elt = specIt.next();
+                // We hit the dividing mark between prefix and suffix, so whatever field we're
+                // looking at is a suffix, since it appears *after* the dividing mark between the
+                // two.  As such, we can use the index.
+                if (String == elt.type()) {
+                    return true;
+                }
+
+                // If we're here, we're still looking at prefix elements.  We know that exprtype
+                // isn't EQ so we can't use this index.
+                if (node->path() == elt.fieldNameStringData()) {
+                    return false;
+                }
+            }
+
+            // NOTE: This shouldn't be reached.  Text index implies there is a separator implies we
+            // will always hit the 'return true' above.
+            invariant(0);
+            return true;
         }
         else if ("hashed" == ixtype) {
             return exprtype == MatchExpression::MATCH_IN || exprtype == MatchExpression::EQ;
@@ -260,6 +325,153 @@ namespace mongo {
         else if (node->isLogical()) {
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 rateIndices(node->getChild(i), prefix, indices);
+            }
+        }
+    }
+
+    /**
+     * Remove 'idx' from the RelevantTag lists for 'node'.  'node' must be a leaf.
+     */
+    static void removeIndexRelevantTag(MatchExpression* node, size_t idx) {
+        RelevantTag* tag = static_cast<RelevantTag*>(node->getTag());
+        verify(tag);
+        vector<size_t>::iterator firstIt = std::find(tag->first.begin(),
+                                                     tag->first.end(),
+                                                     idx);
+        if (firstIt != tag->first.end()) {
+            tag->first.erase(firstIt);
+        }
+
+        vector<size_t>::iterator notFirstIt = std::find(tag->notFirst.begin(),
+                                                        tag->notFirst.end(),
+                                                        idx);
+        if (notFirstIt != tag->notFirst.end()) {
+            tag->notFirst.erase(notFirstIt);
+        }
+    }
+
+    /**
+     * Traverse the subtree rooted at 'node' to remove invalid RelevantTag assignments to text index
+     * 'idx', which has prefix paths 'prefixPaths'.
+     */
+    static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
+                                                   size_t idx,
+            const unordered_set<StringData, StringData::Hasher>& prefixPaths) {
+
+        // If we're here, there are prefixPaths and node is either:
+        // 1. a text pred which we can't use as we have nothing over its prefix, or
+        // 2. a non-text pred which we can't use as we don't have a text pred AND-related.
+        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+            removeIndexRelevantTag(node, idx);
+            return;
+        }
+
+        // Do not traverse tree beyond negation node.
+        if (node->matchType() == MatchExpression::NOT
+            || node->matchType() == MatchExpression::NOR) {
+
+            return;
+        }
+
+        // For anything to use a text index with prefixes, we require that:
+        // 1. The text pred exists in an AND,
+        // 2. The non-text preds that use the text index's prefixes are also in that AND.
+
+        if (node->matchType() != MatchExpression::AND) {
+            // It's an OR or some kind of array operator.
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsToTextIndex(node->getChild(i), idx, prefixPaths);
+            }
+            return;
+        }
+
+        // If we're here, we're an AND.  Determine whether the children satisfy the index prefix for
+        // the text index.
+        invariant(node->matchType() == MatchExpression::AND);
+
+        bool hasText = false;
+
+        // The AND must have an EQ predicate for each prefix path.  When we encounter a child with a
+        // tag we remove it from childrenPrefixPaths.  All children exist if this set is empty at
+        // the end.
+        unordered_set<StringData, StringData::Hasher> childrenPrefixPaths = prefixPaths;
+
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            MatchExpression* child = node->getChild(i);
+            RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
+
+            if (NULL == tag) {
+                // 'child' could be a logical operator.  Maybe there are some assignments hiding
+                // inside.
+                stripInvalidAssignmentsToTextIndex(child, idx, prefixPaths);
+                continue;
+            }
+
+            bool inFirst = tag->first.end() != std::find(tag->first.begin(),
+                                                         tag->first.end(),
+                                                         idx);
+
+            bool inNotFirst = tag->first.end() != std::find(tag->notFirst.begin(),
+                                                            tag->notFirst.end(),
+                                                            idx);
+
+            if (inFirst || inNotFirst) {
+                // Great!  'child' was assigned to our index.
+                if (child->matchType() == MatchExpression::TEXT) {
+                    hasText = true;
+                }
+                else {
+                    childrenPrefixPaths.erase(child->path());
+                    // One fewer prefix we're looking for, possibly.  Note that we could have a
+                    // suffix assignment on the index and wind up here.  In this case the erase
+                    // above won't do anything since a suffix isn't a prefix.
+                }
+            }
+            else {
+                // Recurse on the children to ensure that they're not hiding any assignments
+                // to idx.
+                stripInvalidAssignmentsToTextIndex(child, idx, prefixPaths);
+            }
+        }
+
+        // Our prereqs for using the text index were not satisfied so we remove the assignments from
+        // all children of the AND.
+        if (!hasText || !childrenPrefixPaths.empty()) {
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsToTextIndex(node->getChild(i), idx, prefixPaths);
+            }
+        }
+    }
+
+    // static
+    void QueryPlannerIXSelect::stripInvalidAssignmentsToTextIndexes(
+        MatchExpression* node,
+        const vector<IndexEntry>& indices) {
+
+        for (size_t i = 0; i < indices.size(); ++i) {
+            const IndexEntry& index = indices[i];
+
+            // We only care about text indices.
+            if (!isTextIndex(index.keyPattern)) {
+                continue;
+            }
+
+            // Gather the set of paths that comprise the index prefix for this text index.
+            // Each of those paths must have an equality assignment, otherwise we can't assign
+            // *anything* to this index.
+            unordered_set<StringData, StringData::Hasher> textIndexPrefixPaths;
+            BSONObjIterator it(index.keyPattern);
+
+            // We stop when we see the first string in the key pattern.  We know that
+            // the prefix precedes "text".
+            for (BSONElement elt = it.next(); elt.type() != String; elt = it.next()) {
+                textIndexPrefixPaths.insert(elt.fieldName());
+                verify(it.more());
+            }
+
+            // If the index prefix is non-empty, remove invalid assignments to it.
+            if (!textIndexPrefixPaths.empty()) {
+                stripInvalidAssignmentsToTextIndex(node, i, textIndexPrefixPaths);
             }
         }
     }

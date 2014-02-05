@@ -86,6 +86,22 @@ namespace mongo {
         static void rateIndices(MatchExpression* node,
                                 string prefix,
                                 const vector<IndexEntry>& indices);
+
+        /**
+         * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
+         * invalid assignments to text indexes.
+         *
+         * A predicate on a field from a compound text index with a non-empty index prefix
+         * (e.g. pred {a: 1, b: 1} on index {a: 1, b: 1, c: "text"}) is only considered valid to
+         * assign to the text index if it is a direct child of an AND with the following properties:
+         * - it has a TEXT child
+         * - for every index prefix component, it has an EQ child on that component's path
+         *
+         * Note that compatible() enforces the precondition that only EQ nodes are considered
+         * relevant to text index prefixes.
+         */
+        static void stripInvalidAssignmentsToTextIndexes(MatchExpression* node,
+                                                         const vector<IndexEntry>& indices);
     };
 
 }  // namespace mongo
