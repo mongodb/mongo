@@ -362,6 +362,19 @@ public:
         try {
             ns = getNS();
         }
+        catch (int e) {
+            if (e == -1) {
+                // no collection specified - use name of collection that was dumped from
+                string oldCollName = boost::filesystem::path(filename).leaf().string();
+                oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
+                cerr << "using filename '" << oldCollName << "' as collection." << endl;
+                ns = _db + "." + oldCollName;
+            }
+            else {
+                printHelp(cerr);
+                return -1;
+            }
+        }
         catch (...) {
             // The only time getNS throws is when the collection was not specified.  In that case,
             // check if the user specified a file name and use that as the collection name.
