@@ -356,7 +356,8 @@ namespace optionenvironment {
     Status OptionSection::getBoostOptions(po::options_description* boostOptions,
                                           bool visibleOnly,
                                           bool includeDefaults,
-                                          OptionSources sources) const {
+                                          OptionSources sources,
+                                          bool getEmptySections) const {
 
         std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
@@ -396,8 +397,19 @@ namespace optionenvironment {
             po::options_description subGroup = ositerator->_name.empty()
                                                ? po::options_description()
                                                : po::options_description(ositerator->_name.c_str());
-            Status ret = ositerator->getBoostOptions(&subGroup, visibleOnly, includeDefaults,
-                                                     sources);
+
+            // Do not add empty sections to our option_description unless we specifically requested.
+            int numOptions;
+            Status ret = ositerator->countOptions(&numOptions, visibleOnly, sources);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            if (numOptions == 0 && getEmptySections == false) {
+                continue;
+            }
+
+            ret = ositerator->getBoostOptions(&subGroup, visibleOnly, includeDefaults,
+                                                     sources, getEmptySections);
             if (!ret.isOK()) {
                 return ret;
             }
@@ -557,6 +569,32 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+    Status OptionSection::countOptions(int* numOptions,
+                                       bool visibleOnly,
+                                       OptionSources sources) const {
+
+        *numOptions = 0;
+
+        std::list<OptionDescription>::const_iterator oditerator;
+        for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+            // Only count this option if it matches the sources we specified and the option is
+            // either visible or we are requesting hidden options
+            if ((!visibleOnly || (oditerator->_isVisible)) &&
+                (oditerator->_sources & sources)) {
+                (*numOptions)++;
+            }
+        }
+
+        std::list<OptionSection>::const_iterator ositerator;
+        for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+            int numSubOptions = 0;
+            ositerator->countOptions(&numSubOptions, visibleOnly, sources);
+            *numOptions += numSubOptions;
+        }
+
+        return Status::OK();
+    }
+
     Status OptionSection::getConstraints(
             std::vector<boost::shared_ptr<Constraint > >* constraints) const {
 
@@ -619,7 +657,11 @@ namespace optionenvironment {
         po::options_description boostOptions = _name.empty()
                                              ? po::options_description()
                                              : po::options_description(_name.c_str());
-        Status ret = getBoostOptions(&boostOptions, true, true, SourceAllLegacy);
+        Status ret = getBoostOptions(&boostOptions,
+                                     true, /* visibleOnly */
+                                     true, /* includeDefaults */
+                                     SourceAllLegacy,
+                                     false); /* getEmptySections */
         if (!ret.isOK()) {
             StringBuilder sb;
             sb << "Error constructing help string: " << ret.toString();

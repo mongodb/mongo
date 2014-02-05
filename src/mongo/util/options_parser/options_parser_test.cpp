@@ -3830,4 +3830,22 @@ namespace {
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
+    TEST(OptionCount, Basic) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("basic", "basic", moe::String, "Basic Option");
+        testOpts.addOptionChaining("hidden", "hidden", moe::String, "Hidden Option").hidden();
+
+        moe::OptionSection subSection("Section Name");
+        subSection.addOptionChaining("port", "port", moe::Int, "Port")
+                                    .setSources(moe::SourceYAMLConfig);
+        testOpts.addSection(subSection);
+
+        int numOptions;
+        ASSERT_OK(testOpts.countOptions(&numOptions, true /*visibleOnly*/, moe::SourceCommandLine));
+        ASSERT_EQUALS(numOptions, 1);
+    }
+
 } // unnamed namespace

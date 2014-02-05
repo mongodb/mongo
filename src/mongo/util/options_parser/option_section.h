@@ -109,7 +109,8 @@ namespace optionenvironment {
         Status getBoostOptions(po::options_description* boostOptions,
                                bool visibleOnly = false,
                                bool includeDefaults = false,
-                               OptionSources = SourceAll) const;
+                               OptionSources = SourceAll,
+                               bool getEmptySections = true) const;
         Status getBoostPositionalOptions(
                 po::positional_options_description* boostPositionalOptions) const;
 
@@ -117,6 +118,9 @@ namespace optionenvironment {
         // correct names when populating the Environment, as well as check that a parameter that was
         // found has been registered and has the correct type
         Status getAllOptions(std::vector<OptionDescription>* options) const;
+
+        // Count the number of options in this section and all subsections
+        Status countOptions(int* numOptions, bool visibleOnly, OptionSources sources) const;
 
         /**
          * Populates the given map with all the default values for any options in this option
