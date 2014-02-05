@@ -39,8 +39,15 @@
 namespace mongo {
 
     struct PlanEnumeratorParams {
-        PlanEnumeratorParams() : intersect(false) { }
 
+        // How many choices do we want when computing ixisect solutions in an AND?
+        static const size_t kDefaultMaxIntersectPerAnd = 3;
+
+        PlanEnumeratorParams() : intersect(false),
+                                 maxIntersectPerAnd(3) { }
+
+        // Do we provide solutions that use more indices than the minimum required to provide
+        // an indexed solution?
         bool intersect;
 
         // Not owned here.
@@ -48,6 +55,11 @@ namespace mongo {
 
         // Not owned here.
         const vector<IndexEntry>* indices;
+
+        // How many intersect plans are we willing to output from an AND?  Given that we pursue an
+        // all-pairs approach, we could wind up creating a lot of enumeration possibilities for
+        // certain inputs.
+        size_t maxIntersectPerAnd;
     };
 
     /**
@@ -222,6 +234,31 @@ namespace mongo {
         void allocateAssignment(MatchExpression* expr, NodeAssignment** slot, MemoID* id);
 
         /**
+         * Output index intersection assignments inside of an AND node.
+         */
+        typedef unordered_map<IndexID, vector<MatchExpression*> > IndexToPredMap;
+
+        /**
+         * Generate index intersection assignments given the predicate/index structure in idxToFirst
+         * and idxToNotFirst (and the sub-trees in 'subnodes').  Outputs the assignments in
+         * 'andAssignment'.
+         */
+        void enumerateAndIntersect(const IndexToPredMap& idxToFirst,
+                                   const IndexToPredMap& idxToNotFirst,
+                                   const vector<MemoID>& subnodes,
+                                   AndAssignment* andAssignment);
+
+        /**
+         * Generate one-index-at-once assignments given the predicate/index structure in idxToFirst
+         * and idxToNotFirst (and the sub-trees in 'subnodes').  Outputs the assignments into
+         * 'andAssignment'.
+         */
+        void enumerateOneIndex(const IndexToPredMap& idxToFirst,
+                               const IndexToPredMap& idxToNotFirst,
+                               const vector<MemoID>& subnodes,
+                               AndAssignment* andAssignment);
+
+        /**
          * Try to assign predicates in 'tryCompound' to 'thisIndex' as compound assignments.
          * Output the assignments in 'assign'.
          */
@@ -253,6 +290,9 @@ namespace mongo {
 
         // Do we output >1 index per AND (index intersection)?
         bool _ixisect;
+
+        // How many things do we want from each AND?
+        size_t _intersectLimit;
     };
 
 } // namespace mongo

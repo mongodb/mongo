@@ -39,7 +39,8 @@ namespace mongo {
     PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
         : _root(params.root),
           _indices(params.indices),
-          _ixisect(params.intersect) { }
+          _ixisect(params.intersect),
+          _intersectLimit(params.maxIntersectPerAnd) { }
 
     PlanEnumerator::~PlanEnumerator() {
         typedef unordered_map<MemoID, NodeAssignment*> MemoMap;
@@ -142,6 +143,10 @@ namespace mongo {
         return true;
     }
 
+    //
+    // Structure creation
+    //
+
     void PlanEnumerator::allocateAssignment(MatchExpression* expr, NodeAssignment** assign,
                                             MemoID* id) {
         size_t newID = _memo.size();
@@ -220,7 +225,6 @@ namespace mongo {
             return true;
         }
         else if (MatchExpression::AND == node->matchType()) {
-            typedef unordered_map<IndexID, vector<MatchExpression*> > IndexToPredMap;
             // Map from idx id to children that have a pred over it.
             // XXX: The index intersection logic could be simplified if we could
             // iterate over these maps in a known order. Currently when iterating
@@ -330,302 +334,10 @@ namespace mongo {
                 return true;
             }
 
+            enumerateOneIndex(idxToFirst, idxToNotFirst, subnodes, andAssignment);
+
             if (_ixisect) {
-                // Hardcoded "look at all members of the power set of size 2" search,
-                // a.k.a. "consider all pairs of indices".
-                //
-                // For each unordered pair of indices do the following:
-                //   0. Impose an ordering (idx1, idx2) using the key patterns.
-                //   (*See note below.)
-                //   1. Assign predicates which prefix idx1 to idx1.
-                //   2. Add assigned indices to a set of indices---the "already
-                //   assigned set".
-                //   3. Assign predicates which prefix idx2 to idx2, as long as they
-                //   been assigned to idx1 already. Add newly assigned indices to
-                //   the "already assigned set".
-                //   4. Try to assign predicates to idx1 by compounding.
-                //   5. Add any predicates assigned to idx1 by compounding to the
-                //   "already assigned set",
-                //   6. Try to assign predicates to idx2 by compounding.
-                //
-                // *NOTE on ordering. Suppose we have two indices A and B, and a
-                // predicate P1 which is over the prefix of both indices A and B.
-                // If we order the indices (A, B) then P1 will get assigned to A,
-                // but if we order the indices (B, A) then P1 will get assigned to
-                // B. In order to make sure that we get the same result for the unordered
-                // pair {A, B} we have to begin by imposing an ordering. As a more concrete
-                // example, if we have indices {x: 1, y: 1} and {x: 1, z: 1} with predicate
-                // {x: 3}, we want to make sure that {x: 3} gets assigned to the same index
-                // irrespective of ordering.
-                for (IndexToPredMap::iterator firstIt = idxToFirst.begin();
-                     firstIt != idxToFirst.end(); ++firstIt) {
-
-                    const IndexEntry& oneIndex = (*_indices)[firstIt->first];
-
-                    // 'oneAssign' is used to assign indices and subnodes or to
-                    // make assignments for the first index when it's multikey.
-                    // It is NOT used in the inner loop that considers pairs of
-                    // indices.
-                    OneIndexAssignment oneAssign;
-                    oneAssign.index = firstIt->first;
-                    oneAssign.preds = firstIt->second;
-                    // Since everything in assign.preds prefixes the index, they all go
-                    // at position '0' in the index, the first position.
-                    oneAssign.positions.resize(oneAssign.preds.size(), 0);
-
-                    // We create a scan per predicate so if we have >1 predicate we'll already
-                    // have at least 2 scans (one predicate per scan as the planner can't
-                    // intersect bounds when the index is multikey), so we stop here.
-                    if (oneIndex.multikey && oneAssign.preds.size() > 1) {
-                        AndEnumerableState state;
-                        state.assignments.push_back(oneAssign);
-                        andAssignment->choices.push_back(state);
-                        continue;
-                    }
-
-                    // Output (subnode, firstAssign) pairs.
-                    for (size_t i = 0; i < subnodes.size(); ++i) {
-                        AndEnumerableState indexAndSubnode;
-                        indexAndSubnode.assignments.push_back(oneAssign);
-                        indexAndSubnode.subnodesToIndex.push_back(subnodes[i]);
-                        andAssignment->choices.push_back(indexAndSubnode);
-                    }
-
-                    // Start looking at all other indices to find one that we want to bundle
-                    // with firstAssign.
-                    IndexToPredMap::iterator secondIt = firstIt;
-                    secondIt++;
-                    for (; secondIt != idxToFirst.end(); secondIt++) {
-                        const IndexEntry& firstIndex = (*_indices)[secondIt->first];
-                        const IndexEntry& secondIndex = (*_indices)[secondIt->first];
-
-                        // If the other index we're considering is multikey with >1 pred, we don't
-                        // want to have it as an additional assignment.  Eventually, it1 will be
-                        // equal to the current value of secondIt and we'll assign every pred for
-                        // this mapping to the index.
-                        if (secondIndex.multikey && secondIt->second.size() > 1) {
-                            continue;
-                        }
-
-                        //
-                        // Step #0:
-                        // Impose an ordering (idx1, idx2) using the key patterns.
-                        //
-                        IndexToPredMap::iterator it1, it2;
-                        int ordering = firstIndex.keyPattern.woCompare(secondIndex.keyPattern);
-                        it1 = (ordering > 0) ? firstIt : secondIt;
-                        it2 = (ordering > 0) ? secondIt : firstIt;
-                        const IndexEntry& ie1 = (*_indices)[it1->first];
-                        const IndexEntry& ie2 = (*_indices)[it2->first];
-
-                        //
-                        // Step #1:
-                        // Assign predicates which prefix firstIndex to firstAssign.
-                        //
-                        OneIndexAssignment firstAssign;
-                        firstAssign.index = it1->first;
-                        firstAssign.preds = it1->second;
-                        // Since everything in assign.preds prefixes the index, they all go
-                        // at position '0' in the index, the first position.
-                        firstAssign.positions.resize(firstAssign.preds.size(), 0);
-
-                        // We keep track of what preds are assigned to indices either because they
-                        // prefix the index or have been assigned through compounding. We make sure
-                        // that these predicates DO NOT become additional index assignments.
-                        // Example: what if firstAssign is the index (x, y) and we're trying to
-                        // compound? We want to make sure not to compound if the predicate is
-                        // already assigned to index y.
-                        set<MatchExpression*> predsAssigned;
-
-                        //
-                        // Step #2:
-                        // Add indices assigned in 'firstAssign' to 'predsAssigned'.
-                        //
-                        for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
-                            predsAssigned.insert(firstAssign.preds[i]);
-                        }
-
-                        //
-                        // Step #3:
-                        // Assign predicates which prefix secondIndex to secondAssign and
-                        // have not already been assigned to firstAssign. Any newly
-                        // assigned predicates are added to 'predsAssigned'.
-                        //
-                        OneIndexAssignment secondAssign;
-                        secondAssign.index = it2->first;
-                        const vector<MatchExpression*>& preds = it2->second;
-                        for (size_t i = 0; i < preds.size(); ++i) {
-                            if (predsAssigned.end() == predsAssigned.find(preds[i])) {
-                                secondAssign.preds.push_back(preds[i]);
-                                secondAssign.positions.push_back(0);
-                                predsAssigned.insert(preds[i]);
-                            }
-                        }
-
-                        // Every predicate that would use this index is already assigned in
-                        // firstAssign.
-                        if (0 == secondAssign.preds.size()) { continue; }
-
-                        //
-                        // Step #4:
-                        // Compound on firstAssign, if applicable.
-                        //
-                        IndexToPredMap::iterator firstIndexCompound =
-                            idxToNotFirst.find(firstAssign.index);
-
-                        // Can't compound with multikey indices.
-                        if (!ie1.multikey && firstIndexCompound != idxToNotFirst.end()) {
-                            // We must remove any elements of 'predsAssigned' from consideration.
-                            vector<MatchExpression*> tryCompound;
-                            const vector<MatchExpression*>& couldCompound
-                                = firstIndexCompound->second;
-                            for (size_t i = 0; i < couldCompound.size(); ++i) {
-                                if (predsAssigned.end() == predsAssigned.find(couldCompound[i])) {
-                                    tryCompound.push_back(couldCompound[i]);
-                                }
-                            }
-                            if (tryCompound.size()) {
-                                compound(tryCompound, ie1, &firstAssign);
-                            }
-                        }
-
-                        //
-                        // Step #5:
-                        // Make sure predicates assigned by compounding in step #4 do not get
-                        // assigned again.
-                        //
-                        for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
-                            if (predsAssigned.end() == predsAssigned.find(firstAssign.preds[i])) {
-                                predsAssigned.insert(firstAssign.preds[i]);
-                            }
-                        }
-
-                        //
-                        // Step #6:
-                        // Compound on firstAssign, if applicable.
-                        //
-                        IndexToPredMap::iterator secondIndexCompound =
-                            idxToNotFirst.find(secondAssign.index);
-
-                        if (!ie2.multikey && secondIndexCompound != idxToNotFirst.end()) {
-                            // We must remove any elements of 'predsAssigned' from consideration.
-                            vector<MatchExpression*> tryCompound;
-                            const vector<MatchExpression*>& couldCompound
-                                = secondIndexCompound->second;
-                            for (size_t i = 0; i < couldCompound.size(); ++i) {
-                                if (predsAssigned.end() == predsAssigned.find(couldCompound[i])) {
-                                    tryCompound.push_back(couldCompound[i]);
-                                }
-                            }
-                            if (tryCompound.size()) {
-                                compound(tryCompound, ie2, &secondAssign);
-                            }
-                        }
-
-                        // We're done with this particular pair of indices; output
-                        // the resulting assignments.
-                        AndEnumerableState state;
-                        state.assignments.push_back(firstAssign);
-                        state.assignments.push_back(secondAssign);
-                        andAssignment->choices.push_back(state);
-                    }
-                }
-
-                // XXX: Do we just want one subnode at a time?  We can use far more than 2 indices
-                // at once doing this very easily.  If we want to restrict the # of indices the
-                // children use, when we memoize the subtree above we can restrict it to 1 index at
-                // a time.  This can get tricky if we want both an intersection and a 1-index memo
-                // entry, since our state change is simple and we don't traverse the memo in any
-                // targeted way.  Should also verify that having a one-to-many mapping of
-                // MatchExpression to MemoID doesn't break anything.  This approach errors on the
-                // side of "too much indexing."
-                for (size_t i = 0; i < subnodes.size(); ++i) {
-                    for (size_t j = i + 1; j < subnodes.size(); ++j) {
-                        AndEnumerableState state;
-                        state.subnodesToIndex.push_back(subnodes[i]);
-                        state.subnodesToIndex.push_back(subnodes[j]);
-                        andAssignment->choices.push_back(state);
-                    }
-                }
-            }
-
-            // In the simplest case, an AndAssignment picks indices like a PredicateAssignment.  To
-            // be indexed we must only pick one index
-            //
-            // Complications:
-            //
-            // Some of our child predicates cannot be answered without an index.  As such, the
-            // indices that those predicates require must always be outputted.  We store these
-            // mandatory index assignments in 'mandatoryIndices'.
-            //
-            // Some of our children may not be predicates.  We may have ORs (or array operators) as
-            // children.  If one of these subtrees provides an index, the AND is indexed.  We store
-            // these subtree choices in 'subnodes'.
-            //
-            // With the above two cases out of the way, we can focus on the remaining case: what to
-            // do with our children that are leaf predicates.
-            //
-            // Guiding principles for index assignment to leaf predicates:
-            //
-            // 1. If we assign an index to {x:{$gt: 5}} we should assign the same index to
-            //    {x:{$lt: 50}}.  That is, an index assignment should include all predicates
-            //    over its leading field.
-            //
-            // 2. If we have the index {a:1, b:1} and we assign it to {a: 5} we should assign it
-            //    to {b:7}, since with a predicate over the first field of the compound index,
-            //    the second field can be bounded as well.  We may only assign indices to predicates
-            //    if all fields to the left of the index field are constrained.
-
-            // First, add the state of using each subnode.
-            for (size_t i = 0; i < subnodes.size(); ++i) {
-                AndEnumerableState aes;
-                aes.subnodesToIndex.push_back(subnodes[i]);
-                andAssignment->choices.push_back(aes);
-            }
-
-            // For each FIRST, we assign nodes to it.
-            for (IndexToPredMap::iterator it = idxToFirst.begin();
-                 it != idxToFirst.end(); ++it) {
-
-                // The assignment we're filling out.
-                OneIndexAssignment indexAssign;
-
-                // This is the index we assign to.
-                indexAssign.index = it->first;
-
-                const IndexEntry& thisIndex = (*_indices)[it->first];
-
-                // If the index is multikey, we only assign one pred to it.  We also skip
-                // compounding.  TODO: is this also true for 2d and 2dsphere indices?  can they be
-                // multikey but still compoundable?
-                if (thisIndex.multikey) {
-                    // TODO: could pick better pred than first but not too worried since we should
-                    // really be isecting indices here.  Just take the first pred.  We don't assign
-                    // any other preds to this index.  The planner will intersect the preds and this
-                    // enumeration strategy is just one index at a time.
-                    indexAssign.preds.push_back(it->second[0]);
-                    indexAssign.positions.push_back(0);
-                }
-                else {
-                    // The index isn't multikey.  Assign all preds to it.  The planner will
-                    // intersect the bounds.
-                    indexAssign.preds = it->second;
-
-                    // Since everything in assign.preds prefixes the index, they all go
-                    // at position '0' in the index, the first position.
-                    indexAssign.positions.resize(indexAssign.preds.size(), 0);
-
-                    // Find everything that could use assign.index but isn't a pred over
-                    // the first field of that index.
-                    IndexToPredMap::iterator compIt = idxToNotFirst.find(indexAssign.index);
-                    if (compIt != idxToNotFirst.end()) {
-                        compound(compIt->second, thisIndex, &indexAssign);
-                    }
-                }
-
-                AndEnumerableState state;
-                state.assignments.push_back(indexAssign);
-                andAssignment->choices.push_back(state);
+                enumerateAndIntersect(idxToFirst, idxToNotFirst, subnodes, andAssignment);
             }
 
             return true;
@@ -633,6 +345,322 @@ namespace mongo {
 
         // Don't know what the node is at this point.
         return false;
+    }
+
+    void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
+                                           const IndexToPredMap& idxToNotFirst,
+                                           const vector<MemoID>& subnodes,
+                                           AndAssignment* andAssignment) {
+        // In the simplest case, an AndAssignment picks indices like a PredicateAssignment.  To
+        // be indexed we must only pick one index
+        //
+        // Complications:
+        //
+        // Some of our child predicates cannot be answered without an index.  As such, the
+        // indices that those predicates require must always be outputted.  We store these
+        // mandatory index assignments in 'mandatoryIndices'.
+        //
+        // Some of our children may not be predicates.  We may have ORs (or array operators) as
+        // children.  If one of these subtrees provides an index, the AND is indexed.  We store
+        // these subtree choices in 'subnodes'.
+        //
+        // With the above two cases out of the way, we can focus on the remaining case: what to
+        // do with our children that are leaf predicates.
+        //
+        // Guiding principles for index assignment to leaf predicates:
+        //
+        // 1. If we assign an index to {x:{$gt: 5}} we should assign the same index to
+        //    {x:{$lt: 50}}.  That is, an index assignment should include all predicates
+        //    over its leading field.
+        //
+        // 2. If we have the index {a:1, b:1} and we assign it to {a: 5} we should assign it
+        //    to {b:7}, since with a predicate over the first field of the compound index,
+        //    the second field can be bounded as well.  We may only assign indices to predicates
+        //    if all fields to the left of the index field are constrained.
+
+        // First, add the state of using each subnode.
+        for (size_t i = 0; i < subnodes.size(); ++i) {
+            AndEnumerableState aes;
+            aes.subnodesToIndex.push_back(subnodes[i]);
+            andAssignment->choices.push_back(aes);
+        }
+
+        // For each FIRST, we assign nodes to it.
+        for (IndexToPredMap::const_iterator it = idxToFirst.begin(); it != idxToFirst.end(); ++it) {
+            // The assignment we're filling out.
+            OneIndexAssignment indexAssign;
+
+            // This is the index we assign to.
+            indexAssign.index = it->first;
+
+            const IndexEntry& thisIndex = (*_indices)[it->first];
+
+            // If the index is multikey, we only assign one pred to it.  We also skip
+            // compounding.  TODO: is this also true for 2d and 2dsphere indices?  can they be
+            // multikey but still compoundable?
+            if (thisIndex.multikey) {
+                // TODO: could pick better pred than first but not too worried since we should
+                // really be isecting indices here.  Just take the first pred.  We don't assign
+                // any other preds to this index.  The planner will intersect the preds and this
+                // enumeration strategy is just one index at a time.
+                indexAssign.preds.push_back(it->second[0]);
+                indexAssign.positions.push_back(0);
+            }
+            else {
+                // The index isn't multikey.  Assign all preds to it.  The planner will
+                // intersect the bounds.
+                indexAssign.preds = it->second;
+
+                // Since everything in assign.preds prefixes the index, they all go
+                // at position '0' in the index, the first position.
+                indexAssign.positions.resize(indexAssign.preds.size(), 0);
+
+                // Find everything that could use assign.index but isn't a pred over
+                // the first field of that index.
+                IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    compound(compIt->second, thisIndex, &indexAssign);
+                }
+            }
+
+            AndEnumerableState state;
+            state.assignments.push_back(indexAssign);
+            andAssignment->choices.push_back(state);
+        }
+    }
+
+    void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
+                                               const IndexToPredMap& idxToNotFirst,
+                                               const vector<MemoID>& subnodes,
+                                               AndAssignment* andAssignment) {
+        // Hardcoded "look at all members of the power set of size 2" search,
+        // a.k.a. "consider all pairs of indices".
+        //
+        // For each unordered pair of indices do the following:
+        //   0. Impose an ordering (idx1, idx2) using the key patterns.
+        //   (*See note below.)
+        //   1. Assign predicates which prefix idx1 to idx1.
+        //   2. Add assigned indices to a set of indices---the "already
+        //   assigned set".
+        //   3. Assign predicates which prefix idx2 to idx2, as long as they
+        //   been assigned to idx1 already. Add newly assigned indices to
+        //   the "already assigned set".
+        //   4. Try to assign predicates to idx1 by compounding.
+        //   5. Add any predicates assigned to idx1 by compounding to the
+        //   "already assigned set",
+        //   6. Try to assign predicates to idx2 by compounding.
+        //
+        // *NOTE on ordering. Suppose we have two indices A and B, and a
+        // predicate P1 which is over the prefix of both indices A and B.
+        // If we order the indices (A, B) then P1 will get assigned to A,
+        // but if we order the indices (B, A) then P1 will get assigned to
+        // B. In order to make sure that we get the same result for the unordered
+        // pair {A, B} we have to begin by imposing an ordering. As a more concrete
+        // example, if we have indices {x: 1, y: 1} and {x: 1, z: 1} with predicate
+        // {x: 3}, we want to make sure that {x: 3} gets assigned to the same index
+        // irrespective of ordering.
+
+        size_t sizeBefore = andAssignment->choices.size();
+
+        for (IndexToPredMap::const_iterator firstIt = idxToFirst.begin();
+                firstIt != idxToFirst.end(); ++firstIt) {
+
+            const IndexEntry& oneIndex = (*_indices)[firstIt->first];
+
+            // 'oneAssign' is used to assign indices and subnodes or to
+            // make assignments for the first index when it's multikey.
+            // It is NOT used in the inner loop that considers pairs of
+            // indices.
+            OneIndexAssignment oneAssign;
+            oneAssign.index = firstIt->first;
+            oneAssign.preds = firstIt->second;
+            // Since everything in assign.preds prefixes the index, they all go
+            // at position '0' in the index, the first position.
+            oneAssign.positions.resize(oneAssign.preds.size(), 0);
+
+            // We create a scan per predicate so if we have >1 predicate we'll already
+            // have at least 2 scans (one predicate per scan as the planner can't
+            // intersect bounds when the index is multikey), so we stop here.
+            if (oneIndex.multikey && oneAssign.preds.size() > 1) {
+                AndEnumerableState state;
+                state.assignments.push_back(oneAssign);
+                andAssignment->choices.push_back(state);
+                continue;
+            }
+
+            // Output (subnode, firstAssign) pairs.
+            for (size_t i = 0; i < subnodes.size(); ++i) {
+                AndEnumerableState indexAndSubnode;
+                indexAndSubnode.assignments.push_back(oneAssign);
+                indexAndSubnode.subnodesToIndex.push_back(subnodes[i]);
+                andAssignment->choices.push_back(indexAndSubnode);
+                // Limit n^2.
+                if (andAssignment->choices.size() - sizeBefore > _intersectLimit) {
+                    return;
+                }
+            }
+
+            // Start looking at all other indices to find one that we want to bundle
+            // with firstAssign.
+            IndexToPredMap::const_iterator secondIt = firstIt;
+            secondIt++;
+            for (; secondIt != idxToFirst.end(); secondIt++) {
+                const IndexEntry& firstIndex = (*_indices)[secondIt->first];
+                const IndexEntry& secondIndex = (*_indices)[secondIt->first];
+
+                // Limit n^2.
+                if (andAssignment->choices.size() - sizeBefore > _intersectLimit) {
+                    return;
+                }
+
+                // If the other index we're considering is multikey with >1 pred, we don't
+                // want to have it as an additional assignment.  Eventually, it1 will be
+                // equal to the current value of secondIt and we'll assign every pred for
+                // this mapping to the index.
+                if (secondIndex.multikey && secondIt->second.size() > 1) {
+                    continue;
+                }
+
+                //
+                // Step #0:
+                // Impose an ordering (idx1, idx2) using the key patterns.
+                //
+                IndexToPredMap::const_iterator it1, it2;
+                int ordering = firstIndex.keyPattern.woCompare(secondIndex.keyPattern);
+                it1 = (ordering > 0) ? firstIt : secondIt;
+                it2 = (ordering > 0) ? secondIt : firstIt;
+                const IndexEntry& ie1 = (*_indices)[it1->first];
+                const IndexEntry& ie2 = (*_indices)[it2->first];
+
+                //
+                // Step #1:
+                // Assign predicates which prefix firstIndex to firstAssign.
+                //
+                OneIndexAssignment firstAssign;
+                firstAssign.index = it1->first;
+                firstAssign.preds = it1->second;
+                // Since everything in assign.preds prefixes the index, they all go
+                // at position '0' in the index, the first position.
+                firstAssign.positions.resize(firstAssign.preds.size(), 0);
+
+                // We keep track of what preds are assigned to indices either because they
+                // prefix the index or have been assigned through compounding. We make sure
+                // that these predicates DO NOT become additional index assignments.
+                // Example: what if firstAssign is the index (x, y) and we're trying to
+                // compound? We want to make sure not to compound if the predicate is
+                // already assigned to index y.
+                set<MatchExpression*> predsAssigned;
+
+                //
+                // Step #2:
+                // Add indices assigned in 'firstAssign' to 'predsAssigned'.
+                //
+                for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
+                    predsAssigned.insert(firstAssign.preds[i]);
+                }
+
+                //
+                // Step #3:
+                // Assign predicates which prefix secondIndex to secondAssign and
+                // have not already been assigned to firstAssign. Any newly
+                // assigned predicates are added to 'predsAssigned'.
+                //
+                OneIndexAssignment secondAssign;
+                secondAssign.index = it2->first;
+                const vector<MatchExpression*>& preds = it2->second;
+                for (size_t i = 0; i < preds.size(); ++i) {
+                    if (predsAssigned.end() == predsAssigned.find(preds[i])) {
+                        secondAssign.preds.push_back(preds[i]);
+                        secondAssign.positions.push_back(0);
+                        predsAssigned.insert(preds[i]);
+                    }
+                }
+
+                // Every predicate that would use this index is already assigned in
+                // firstAssign.
+                if (0 == secondAssign.preds.size()) { continue; }
+
+                //
+                // Step #4:
+                // Compound on firstAssign, if applicable.
+                //
+                IndexToPredMap::const_iterator firstIndexCompound =
+                    idxToNotFirst.find(firstAssign.index);
+
+                // Can't compound with multikey indices.
+                if (!ie1.multikey && firstIndexCompound != idxToNotFirst.end()) {
+                    // We must remove any elements of 'predsAssigned' from consideration.
+                    vector<MatchExpression*> tryCompound;
+                    const vector<MatchExpression*>& couldCompound
+                        = firstIndexCompound->second;
+                    for (size_t i = 0; i < couldCompound.size(); ++i) {
+                        if (predsAssigned.end() == predsAssigned.find(couldCompound[i])) {
+                            tryCompound.push_back(couldCompound[i]);
+                        }
+                    }
+                    if (tryCompound.size()) {
+                        compound(tryCompound, ie1, &firstAssign);
+                    }
+                }
+
+                //
+                // Step #5:
+                // Make sure predicates assigned by compounding in step #4 do not get
+                // assigned again.
+                //
+                for (size_t i = 0; i < firstAssign.preds.size(); ++i) {
+                    if (predsAssigned.end() == predsAssigned.find(firstAssign.preds[i])) {
+                        predsAssigned.insert(firstAssign.preds[i]);
+                    }
+                }
+
+                //
+                // Step #6:
+                // Compound on firstAssign, if applicable.
+                //
+                IndexToPredMap::const_iterator secondIndexCompound =
+                    idxToNotFirst.find(secondAssign.index);
+
+                if (!ie2.multikey && secondIndexCompound != idxToNotFirst.end()) {
+                    // We must remove any elements of 'predsAssigned' from consideration.
+                    vector<MatchExpression*> tryCompound;
+                    const vector<MatchExpression*>& couldCompound
+                        = secondIndexCompound->second;
+                    for (size_t i = 0; i < couldCompound.size(); ++i) {
+                        if (predsAssigned.end() == predsAssigned.find(couldCompound[i])) {
+                            tryCompound.push_back(couldCompound[i]);
+                        }
+                    }
+                    if (tryCompound.size()) {
+                        compound(tryCompound, ie2, &secondAssign);
+                    }
+                }
+
+                // We're done with this particular pair of indices; output
+                // the resulting assignments.
+                AndEnumerableState state;
+                state.assignments.push_back(firstAssign);
+                state.assignments.push_back(secondAssign);
+                andAssignment->choices.push_back(state);
+            }
+        }
+
+        // XXX: Do we just want one subnode at a time?  We can use far more than 2 indices
+        // at once doing this very easily.  If we want to restrict the # of indices the
+        // children use, when we memoize the subtree above we can restrict it to 1 index at
+        // a time.  This can get tricky if we want both an intersection and a 1-index memo
+        // entry, since our state change is simple and we don't traverse the memo in any
+        // targeted way.  Should also verify that having a one-to-many mapping of
+        // MatchExpression to MemoID doesn't break anything.  This approach errors on the
+        // side of "too much indexing."
+        for (size_t i = 0; i < subnodes.size(); ++i) {
+            for (size_t j = i + 1; j < subnodes.size(); ++j) {
+                AndEnumerableState state;
+                state.subnodesToIndex.push_back(subnodes[i]);
+                state.subnodesToIndex.push_back(subnodes[j]);
+                andAssignment->choices.push_back(state);
+            }
+        }
     }
 
     void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
@@ -672,6 +700,10 @@ namespace mongo {
             if (!fieldAssigned) { break; }
         }
     }
+
+    //
+    // Structure navigation
+    //
 
     void PlanEnumerator::tagMemo(size_t id) {
         QLOG() << "Tagging memoID " << id << endl;

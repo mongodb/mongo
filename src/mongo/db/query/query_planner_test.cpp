@@ -2065,6 +2065,23 @@ namespace {
                                     "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
     }
 
+    TEST_F(QueryPlannerTest, IntersectCanBeVeryBig) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+        addIndex(BSON("d" << 1));
+        runQuery(fromjson("{$or: [{ 'a' : null, 'b' : 94, 'c' : null, 'd' : null },"
+                                 "{ 'a' : null, 'b' : 98, 'c' : null, 'd' : null },"
+                                 "{ 'a' : null, 'b' : 1, 'c' : null, 'd' : null },"
+                                 "{ 'a' : null, 'b' : 2, 'c' : null, 'd' : null },"
+                                 "{ 'a' : null, 'b' : 7, 'c' : null, 'd' : null },"
+                                 "{ 'a' : null, 'b' : 9, 'c' : null, 'd' : null },"
+                                 "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
+
+        ASSERT_LESS_THAN(getNumSolutions(), 10U);
+    }
+
     //
     // Test that we add a KeepMutations when we should and and we don't add one when we shouldn't.
     //

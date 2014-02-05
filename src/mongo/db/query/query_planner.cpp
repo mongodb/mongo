@@ -682,9 +682,7 @@ namespace mongo {
             isp.init();
 
             MatchExpression* rawTree;
-            // XXX: have limit on # of indexed solns we'll consider.  We could have a perverse
-            // query and index that could make n^2 very unpleasant.
-            while (isp.getNext(&rawTree)) {
+            while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {
                 QLOG() << "about to build solntree from tagged tree:\n" << rawTree->toString()
                        << endl;
 

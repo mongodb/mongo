@@ -36,7 +36,13 @@
 namespace mongo {
 
     struct QueryPlannerParams {
-        QueryPlannerParams() : options(DEFAULT), indexFiltersApplied(false) { }
+
+        // How many indexed solutions are we willing to output?
+        static const size_t kDefaultMaxIndexedSolutions = 5;
+
+        QueryPlannerParams() : options(DEFAULT),
+                               indexFiltersApplied(false),
+                               maxIndexedSolutions(kDefaultMaxIndexedSolutions) { }
 
         enum Options {
             // You probably want to set this.
@@ -87,6 +93,11 @@ namespace mongo {
 
         // Were index filters applied to indices?
         bool indexFiltersApplied;
+
+        // What's the max number of indexed solutions we want to output?  It's expensive to compare
+        // plans via the MultiPlanRunner, and the set of possible plans is very large for certain
+        // index+query combinations.
+        size_t maxIndexedSolutions;
     };
 
 }  // namespace mongo
