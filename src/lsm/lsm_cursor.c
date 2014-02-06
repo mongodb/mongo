@@ -1115,9 +1115,18 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 * don't worry about protecting access.
 	 */
 	if (++clsm->primary_chunk->count % 100 == 0 &&
-	    lsm_tree->merge_throttle + lsm_tree->ckpt_throttle > 0)
+	    lsm_tree->merge_throttle + lsm_tree->ckpt_throttle > 0) {
+		WT_STAT_FAST_INCRV(session, &clsm->lsm_tree->stats,
+		    lsm_checkpoint_throttle, (uint64_t)lsm_tree->ckpt_throttle);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    lsm_checkpoint_throttle, (uint64_t)lsm_tree->ckpt_throttle);
+		WT_STAT_FAST_INCRV(session, &clsm->lsm_tree->stats,
+		    lsm_merge_throttle, (uint64_t)lsm_tree->merge_throttle);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    lsm_merge_throttle, (uint64_t)lsm_tree->merge_throttle);
 		__wt_sleep(0,
 		    lsm_tree->ckpt_throttle + lsm_tree->merge_throttle);
+	}
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree
