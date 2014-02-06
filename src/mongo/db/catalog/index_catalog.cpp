@@ -542,64 +542,12 @@ namespace mongo {
                            str::stream() << "namespace name generated from index name \"" <<
                            indexNamespace << "\" is too long (127 byte max)" );
 
-        BSONObj key = spec.getObjectField("key");
-        if ( key.objsize() > 2048 )
-            return Status( ErrorCodes::CannotCreateIndex, "index key pattern too large" );
-
-        if ( key.isEmpty() )
-            return Status( ErrorCodes::CannotCreateIndex, "index key is empty" );
-
-        if( !validKeyPattern(key) ) {
+        const BSONObj key = spec.getObjectField("key");
+        const Status keyStatus = validateKeyPattern(key);
+        if (!keyStatus.isOK()) {
             return Status( ErrorCodes::CannotCreateIndex,
-                           str::stream() << "bad index key pattern " << key );
-        }
-
-        // Ensures that the fields on which we are building the index are valid: a field must not
-        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
-        // contain an empty field. If a field cannot be created or updated, it should not be
-        // indexable.
-        BSONObjIterator it( key );
-        while ( it.more() ) {
-            BSONElement keyElement = it.next();
-            FieldRef keyField( keyElement.fieldName() );
-
-            const size_t numParts = keyField.numParts();
-            if ( numParts == 0 ) {
-                return Status( ErrorCodes::CannotCreateIndex,
-                               str::stream() << "Index key cannot be an empty field." );
-            }
-            // "$**" is acceptable for a text index.
-            if ( str::equals( keyElement.fieldName(), "$**" ) &&
-                 keyElement.valuestrsafe() == IndexNames::TEXT )
-                continue;
-
-
-            for ( size_t i = 0; i != numParts; ++i ) {
-                const StringData part = keyField.getPart(i);
-
-                // Check if the index key path contains an empty field.
-                if ( part.empty() ) {
-                    return Status( ErrorCodes::CannotCreateIndex,
-                                   str::stream() << "Index key cannot contain an empty field." );
-                }
-
-                if ( part[0] != '$' )
-                    continue;
-
-                // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
-                // necessary context to validate whether this is a proper DBRef, we allow index
-                // creation on '$'-prefixed names that match those used in a DBRef.
-                const bool mightBePartOfDbRef = (i != 0) &&
-                                                (part == "$db" ||
-                                                 part == "$id" ||
-                                                 part == "$ref");
-
-                if ( !mightBePartOfDbRef ) {
-                    return Status( ErrorCodes::CannotCreateIndex,
-                                   str::stream() << "Index key contains an illegal field name: "
-                                                 << "field name starts with '$'." );
-                }
-            }
+                           str::stream() << "bad index key pattern " << key << ": "
+                                         << keyStatus.reason() );
         }
 
         if ( _collection->isCapped() && spec["dropDups"].trueValue() ) {
@@ -668,28 +616,20 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex, s );
         }
 
+        // Refuse to build text index if another text index exists or is in progress.
+        // Collections should only have one text index.
         string pluginName = IndexNames::findPluginName( key );
-        if ( pluginName.size() ) {
-            if ( !IndexNames::isKnownName( pluginName ) )
+        if ( pluginName == IndexNames::TEXT ) {
+            vector<IndexDescriptor*> textIndexes;
+            const bool includeUnfinishedIndexes = true;
+            findIndexByType( IndexNames::TEXT, textIndexes, includeUnfinishedIndexes );
+            if ( textIndexes.size() > 0 ) {
                 return Status( ErrorCodes::CannotCreateIndex,
-                               str::stream() << "Unknown index plugin '" << pluginName << "' "
-                               << "in index "<< key );
-
-            // Refuse to build text index if another text index exists or is in progress.
-            // Collections should only have one text index.
-            if ( pluginName == IndexNames::TEXT ) {
-                vector<IndexDescriptor*> textIndexes;
-                const bool includeUnfinishedIndexes = true;
-                findIndexByType( IndexNames::TEXT, textIndexes, includeUnfinishedIndexes );
-                if ( textIndexes.size() > 0 ) {
-                    return Status( ErrorCodes::CannotCreateIndex,
-                                   str::stream() << "only one text index per collection allowed, "
-                                   << "found existing text index \"" << textIndexes[0]->indexName()
-                                   << "\"");
-                }
+                               str::stream() << "only one text index per collection allowed, "
+                               << "found existing text index \"" << textIndexes[0]->indexName()
+                               << "\"");
             }
         }
-
         return Status::OK();
     }
 
@@ -1250,15 +1190,73 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status IndexCatalog::validateKeyPattern( const BSONObj& key ) {
+        const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 
-    bool IndexCatalog::validKeyPattern( const BSONObj& kp ) {
-        BSONObjIterator i(kp);
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if( e.type() == Object || e.type() == Array )
-                return false;
+        if ( key.objsize() > 2048 )
+            return Status(code, "Index key pattern too large.");
+
+        if ( key.isEmpty() )
+            return Status(code, "Index keys cannot be empty.");
+
+        // Ensures that the fields on which we are building the index are valid: a field must not
+        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
+        // contain an empty field. If a field cannot be created or updated, it should not be
+        // indexable.
+        BSONObjIterator it( key );
+        while ( it.more() ) {
+            BSONElement keyElement = it.next();
+
+            if( keyElement.type() == Object || keyElement.type() == Array )
+                return Status(code, "Index keys cannot be Objects or Arrays.");
+
+            FieldRef keyField( keyElement.fieldName() );
+
+            const size_t numParts = keyField.numParts();
+            if ( numParts == 0 ) {
+                return Status(code, "Index keys cannot be an empty field.");
+            }
+
+            // "$**" is acceptable for a text index.
+            if ( str::equals( keyElement.fieldName(), "$**" ) &&
+                 keyElement.valuestrsafe() == IndexNames::TEXT )
+                continue;
+
+
+            for ( size_t i = 0; i != numParts; ++i ) {
+                const StringData part = keyField.getPart(i);
+
+                // Check if the index key path contains an empty field.
+                if ( part.empty() ) {
+                    return Status(code, "Index keys cannot contain an empty field.");
+                }
+
+                if ( part[0] != '$' )
+                    continue;
+
+                // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
+                // necessary context to validate whether this is a proper DBRef, we allow index
+                // creation on '$'-prefixed names that match those used in a DBRef.
+                const bool mightBePartOfDbRef = (i != 0) &&
+                                                (part == "$db" ||
+                                                 part == "$id" ||
+                                                 part == "$ref");
+
+                if ( !mightBePartOfDbRef ) {
+                    return Status(code, "Index key contains an illegal field name: "
+                                        "field name starts with '$'.");
+                }
+            }
         }
-        return true;
+
+        string pluginName = IndexNames::findPluginName( key );
+        if ( pluginName.size() ) {
+            if ( !IndexNames::isKnownName( pluginName ) )
+                return Status(code,
+                              str::stream() << "Unknown index plugin '" << pluginName << '\'');
+        }
+
+        return Status::OK();
     }
 
     BSONObj IndexCatalog::fixIndexKey( const BSONObj& key ) {
