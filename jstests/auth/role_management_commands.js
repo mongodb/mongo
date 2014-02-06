@@ -9,7 +9,10 @@ function runTest(conn) {
     var userAdminConn = new Mongo(conn.host);
     var testUserAdmin = userAdminConn.getDB('test');
     var adminUserAdmin = userAdminConn.getDB('admin');
-    adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
+    adminUserAdmin.createRole({role: 'myUserAdminRole',
+                               roles: ['userAdminAnyDatabase'],
+                               privileges: []});
+    adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['myUserAdminRole']});
     adminUserAdmin.auth('userAdmin', 'pwd');
     testUserAdmin.createUser({user: 'testUser', pwd: 'pwd', roles:[]});
     var db = conn.getDB('test');
@@ -215,7 +218,7 @@ function runTest(conn) {
                                                   actions: ['insert', 'update', 'find']}]);
          assert.doesNotThrow(function() {db.foo.findOne();});
          db.foo.insert({a:1});
-         assert.gleSuccess(db, authzErrorCode);
+         assert.gleSuccess(db);
          assert.eq(7, db.foo.count());
          db.foo.update({}, {$inc: {a:1}}, false, true);
          assert.gleErrorCode(db, authzErrorCode);
@@ -256,6 +259,38 @@ function runTest(conn) {
 
          res = testUserAdmin.runCommand({rolesInfo: 1, showBuiltinRoles: 1});
          assert.eq(9, res.roles.length);
+     })();
+
+    (function testDropRole() {
+         jsTestLog("Testing dropRole");
+
+         testUserAdmin.grantRolesToUser('testUser', ['testRole4'])
+
+         assert.doesNotThrow(function() {db.foo.findOne();});
+         db.foo.insert({a:1});
+         assert.gleSuccess(db, authzErrorCode);
+         assert.eq(8, db.foo.count());
+
+         assert.commandWorked(testUserAdmin.runCommand({dropRole: 'testRole2'}));
+
+         assert.doesNotThrow(function() {db.foo.findOne();});
+         db.foo.insert({a:1});
+         assert.gleErrorCode(db, authzErrorCode);
+         assert.eq(8, db.foo.count());
+
+         assert.eq(3, testUserAdmin.getRoles().length);
+     })();
+
+    (function testDropAllRolesFromDatabase() {
+         jsTestLog("Testing dropAllRolesFromDatabase");
+
+         assert.doesNotThrow(function() {db.foo.findOne();});
+         assert.eq(3, testUserAdmin.getRoles().length);
+
+         assert.commandWorked(testUserAdmin.runCommand({dropAllRolesFromDatabase: 1}));
+
+         assert.throws(function() {db.foo.findOne();});
+         assert.eq(0, testUserAdmin.getRoles().length);
      })();
 }
 

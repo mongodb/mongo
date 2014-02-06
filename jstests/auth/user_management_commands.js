@@ -184,6 +184,32 @@ function runTest(conn) {
          }
 
      })();
+
+    (function testDropUser() {
+         jsTestLog("Testing dropUser");
+
+         assert(db.auth('spencer', 'password'));
+         assert(db.auth('andy', 'pwd'));
+
+         assert.commandWorked(testUserAdmin.runCommand({dropUser: 'spencer'}));
+
+         assert(!db.auth('spencer', 'password'));
+         assert(db.auth('andy', 'pwd'));
+
+         assert.eq(1, testUserAdmin.getUsers().length);
+     })();
+
+    (function testDropAllUsersFromDatabase() {
+         jsTestLog("Testing dropAllUsersFromDatabase");
+
+         assert.eq(1, testUserAdmin.getUsers().length);
+         assert(db.auth('andy', 'pwd'));
+
+         assert.commandWorked(testUserAdmin.runCommand({dropAllUsersFromDatabase: 1}));
+
+         assert(!db.auth('andy', 'pwd'));
+         assert.eq(0, testUserAdmin.getUsers().length);
+     })();
 }
 
 jsTest.log('Test standalone');
