@@ -496,7 +496,8 @@ def runTest(test, result):
                      'TestData.authMechanism = ' + ternary( authMechanism,
                                                '"' + str(authMechanism) + '"', 'null') + ";" + \
                      'TestData.useSSL = ' + ternary( use_ssl ) + ";" + \
-                     'TestData.useX509 = ' + ternary( use_x509 ) + ";"
+                     'TestData.useX509 = ' + ternary( use_x509 ) + ";" + \
+                     'TestData.useWriteCommands = ' + ternary( use_write_commands ) + ";"
         # this updates the default data directory for mongod processes started through shell (src/mongo/shell/servers.js)
         evalString += 'MongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
         evalString += 'MongoRunner.dataPath = MongoRunner.dataDir + "/";'
@@ -761,6 +762,7 @@ suiteGlobalConfig = {"js": ("[!_]*.js", True),
                      "ssl": ("ssl/*.js", True),
                      "sslSpecial": ("sslSpecial/*.js", True),
                      "jsCore": ("core/[!_]*.js", True),
+                     "gle": ("gle/*.js", True),
                      }
 
 def get_module_suites():
