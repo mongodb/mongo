@@ -181,8 +181,8 @@ Mongo.prototype.useWriteCommands = function() {
 };
 
 //
-// Write Concern can be set at the connection level, and is used for all write operations
-// TODO: (unless overridden)
+// Write Concern can be set at the connection level, and is used for all write operations unless
+// overridden at the collection level.
 //
 
 Mongo.prototype.setWriteConcern = function( wc ) {

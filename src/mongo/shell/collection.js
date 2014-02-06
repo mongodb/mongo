@@ -72,6 +72,8 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
     print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
+    print("\tdb." + shortName + ".setWriteConcern( <write concern doc> ) - sets the write concern for writes to the collection");
+    print("\tdb." + shortName + ".unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the collection");
     // print("\tdb." + shortName + ".getDiskStorageStats({...}) - prints a summary of disk usage statistics");
     // print("\tdb." + shortName + ".getPagesInRAM({...}) - prints a summary of storage pages currently in physical memory");
     return __magicNoPrint;
@@ -211,9 +213,8 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
         }
 
         var writeConcern = null;
-        if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().toJSON();
-        }
+        if (this.getWriteConcern())
+            writeConcern = this.getWriteConcern().toJSON();
 
         result = batch.execute(writeConcern).toSingleResult();
     }
@@ -268,9 +269,8 @@ DBCollection.prototype.remove = function( t , justOne ){
         }
 
         var writeConcern = null;
-        if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().toJSON();
-        }
+        if (this.getWriteConcern())
+            writeConcern = this.getWriteConcern().toJSON();
 
         result = batch.execute(writeConcern).toSingleResult();
     }
@@ -332,9 +332,8 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         }
 
         var writeConcern = null;
-        if (this._mongo.getWriteConcern()) {
-            writeConcern = this._mongo.getWriteConcern().toJSON();
-        }
+        if (this.getWriteConcern())
+            writeConcern = this.getWriteConcern().toJSON();
 
         result = batch.execute(writeConcern).toSingleResult();
     }
@@ -1366,7 +1365,31 @@ DBCollection.prototype.getPlanCache = function() {
     return new PlanCache( this );
 }
 
-// plan cache commands
+// Overrides connection-level settings.
+//
+
+DBCollection.prototype.setWriteConcern = function( wc ) {
+    if ( wc instanceof WriteConcern ) {
+        this._writeConcern = wc;
+    }
+    else {
+        this._writeConcern = new WriteConcern( wc );
+    }
+};
+
+DBCollection.prototype.getWriteConcern = function() {
+    if (this._writeConcern)
+        return this._writeConcern;
+
+    if (this._mongo.getWriteConcern())
+        return this._mongo.getWriteConcern();
+
+    return null;
+};
+
+DBCollection.prototype.unsetWriteConcern = function() {
+    delete this._writeConcern;
+};
 
 /**
  * PlanCache

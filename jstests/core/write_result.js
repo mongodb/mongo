@@ -1,0 +1,178 @@
+//
+// Tests the behavior of single writes using write commands
+//
+
+var coll = db.write_result;
+coll.drop();
+
+assert(coll.getMongo().useWriteCommands());
+
+var result = null;
+
+//
+// Basic insert
+coll.remove({});
+printjson( result = coll.insert({ foo : "bar" }) );
+assert.eq(result.nInserted, 1);
+assert.eq(result.nUpserted, 0);
+assert.eq(result.nUpdated, 0);
+assert.eq(result.nModified, 0);
+assert.eq(result.nRemoved, 0);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert(!result.getUpsertedId());
+assert.eq(coll.count(), 1);
+
+//
+// Basic upsert (using save)
+coll.remove({});
+var id = new ObjectId();
+printjson( result = coll.save({ _id : id, foo : "bar" }) );
+assert.eq(result.nInserted, 0);
+assert.eq(result.nUpserted, 1);
+assert.eq(result.nUpdated, 0);
+assert.eq(result.nModified, 0);
+assert.eq(result.nRemoved, 0);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert.eq(result.getUpsertedId()._id, id);
+assert.eq(coll.count(), 1);
+
+//
+// Basic update
+coll.remove({});
+coll.insert({ foo : "bar" });
+printjson( result = coll.update({ foo : "bar" }, { $set : { foo : "baz" } }) );
+assert.eq(result.nInserted, 0);
+assert.eq(result.nUpserted, 0);
+assert.eq(result.nUpdated, 1);
+assert.eq(result.nModified, 1);
+assert.eq(result.nRemoved, 0);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert(!result.getUpsertedId());
+assert.eq(coll.count(), 1);
+
+//
+// Basic multi-update
+coll.remove({});
+coll.insert({ foo : "bar" });
+coll.insert({ foo : "bar", set : ['value'] });
+printjson( result = coll.update({ foo : "bar" },
+                                { $addToSet : { set : 'value' } },
+                                { multi : true }) );
+assert.eq(result.nInserted, 0);
+assert.eq(result.nUpserted, 0);
+assert.eq(result.nUpdated, 2);
+assert.eq(result.nModified, 1);
+assert.eq(result.nRemoved, 0);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert(!result.getUpsertedId());
+assert.eq(coll.count(), 2);
+
+//
+// Basic remove
+coll.remove({});
+coll.insert({ foo : "bar" });
+printjson( result = coll.remove({}) );
+assert.eq(result.nInserted, 0);
+assert.eq(result.nUpserted, 0);
+assert.eq(result.nUpdated, 0);
+assert.eq(result.nModified, 0);
+assert.eq(result.nRemoved, 1);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert(!result.getUpsertedId());
+assert.eq(coll.count(), 0);
+
+//
+// Insert with error
+coll.remove({});
+var id = new ObjectId();
+coll.insert({ _id : id, foo : "bar" });
+printjson( result = coll.insert({ _id : id, foo : "baz" }) );
+assert.eq(result.nInserted, 0);
+assert(result.getWriteError());
+assert(result.getWriteError().errmsg);
+assert(!result.getWriteConcernError());
+assert.eq(coll.count(), 1);
+
+//
+// Update with error
+coll.remove({});
+coll.insert({ foo : "bar" });
+printjson( result = coll.update({ foo : "bar" }, { $invalid : "expr" }) );
+assert.eq(result.nUpserted, 0);
+assert.eq(result.nUpdated, 0);
+assert.eq(result.nModified, 0);
+assert(result.getWriteError());
+assert(result.getWriteError().errmsg);
+assert(!result.getUpsertedId());
+assert.eq(coll.count(), 1);
+
+//
+// Multi-update with error
+coll.remove({});
+var id = new ObjectId();
+for (var i = 0; i < 10; ++i) coll.insert({ value : NumberInt(i) });
+coll.insert({ value : "not a number" });
+// $bit operator fails when the field is not integer
+// Note that multi-updates do not currently report partial stats if they fail
+printjson( result = coll.update({},
+                                { $bit : { value : { and : NumberInt(0) } } },
+                                { multi : true }) );
+assert.eq(result.nUpserted, 0);
+assert.eq(result.nUpdated, 0);
+assert.eq(result.nModified, 0);
+assert(result.getWriteError());
+assert(result.getWriteError().errmsg);
+assert(!result.getUpsertedId());
+assert.eq(coll.count(), 11);
+
+//
+// Bulk insert
+coll.remove({});
+printjson( result = coll.insert([{ foo : "bar" }, { foo : "baz" }]) );
+assert.eq(result.nInserted, 2);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert.eq(coll.count(), 2);
+
+//
+// Bulk insert with error
+coll.remove({});
+var id = new ObjectId();
+// Second insert fails with duplicate _id
+printjson( result = coll.insert([{ _id : id, foo : "bar" },
+                                 { _id : id, foo : "baz" }]) );
+assert.eq(result.nInserted, 1);
+assert(result.getWriteError());
+assert(!result.getWriteConcernError());
+assert.eq(coll.count(), 1);
+
+//
+// Custom write concern
+// (More detailed write concern tests require custom/replicated servers)
+coll.remove({});
+coll.setWriteConcern({ w : "majority" });
+printjson( result = coll.insert({ foo : "bar" }) );
+assert.eq(result.nInserted, 1);
+assert(!result.getWriteError());
+assert(!result.getWriteConcernError());
+assert.eq(coll.count(), 1);
+coll.unsetWriteConcern();
+
+//
+// Write concern error
+// NOTE: Non-throwing write concern failures require replication to trigger
+coll.remove({});
+coll.setWriteConcern({ w : 2 });
+assert.throws( function() {
+    printjson( coll.insert({ foo : "bar" }) );
+});
+assert.eq(coll.count(), 0);
+coll.unsetWriteConcern();
+
+
+
