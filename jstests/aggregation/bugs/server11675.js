@@ -132,10 +132,8 @@ var server11675 = function() {
     assert.eq(res[0].score, score);
 
     // Make sure the metadata is 'missing()' when it doesn't exist because it was never created
-    /* broken, will be fixed by SERVER-12488 
     var res = t.aggregate([{$project: {_id: 1, score: {$meta: 'textScore'}}}]).toArray();
     assert(!("score" in res[0]));
-    */
 
     // Make sure the metadata is 'missing()' when it doesn't exist because the document changed
     var res = t.aggregate([{$match: {_id: 1, $text: {$search: 'apple banana'}}},
