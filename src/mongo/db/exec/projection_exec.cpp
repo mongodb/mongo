@@ -479,6 +479,14 @@ namespace mongo {
                                   const MatchDetails* details,
                                   const ArrayOpType arrayOpType) const {
 
+
+        // Skip if the field name matches a computed $meta field.
+        // $meta projection fields can exist at the top level of
+        // the result document and the field names cannot be dotted.
+        if (_meta.find(elt.fieldName()) != _meta.end()) {
+            return Status::OK();
+        }
+
         FieldMap::const_iterator field = _fields.find(elt.fieldName());
         if (field == _fields.end()) {
             if (_include) {

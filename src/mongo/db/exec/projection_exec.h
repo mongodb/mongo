@@ -178,10 +178,10 @@ namespace mongo {
 
         ArrayOpType _arrayOpType;
 
-        // Is there an elemMatch or positional operator?
+        // Is there an slice, elemMatch or meta operator?
         bool _hasNonSimple;
 
-        // Is there a projection over a dotted field?
+        // Is there a projection over a dotted field or a $ positional operator?
         bool _hasDottedField;
 
         // The full query expression.  Used when we need MatchDetails.
