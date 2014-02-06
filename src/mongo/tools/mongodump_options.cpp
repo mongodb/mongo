@@ -63,6 +63,16 @@ namespace mongo {
 
         options->addOptionChaining("query", "query,q", moe::String, "json query");
 
+        options->addOptionChaining("skip", "skip", moe::Int, "documents to skip, default 0")
+                                  .setDefault(moe::Value(0));
+
+        options->addOptionChaining("limit", "limit", moe::Int,
+                "limit the numbers of documents returned, default all")
+                                  .setDefault(moe::Value(0));
+
+        options->addOptionChaining("sort", "sort", moe::String,
+                "sort order, as a JSON string, e.g., '{x:1}'");
+
         options->addOptionChaining("oplog", "oplog", moe::Switch,
                 "Use oplog for point-in-time snapshotting");
 
@@ -123,7 +133,7 @@ namespace mongo {
         }
         mongoDumpGlobalParams.outputDirectory = getParam("out");
         mongoDumpGlobalParams.snapShotQuery = false;
-        if (!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) {
+        if ((!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) && !hasParam("sort")) {
             mongoDumpGlobalParams.snapShotQuery = true;
         }
 
@@ -150,6 +160,9 @@ namespace mongo {
             // must happen early to avoid sending junk to stdout
             toolGlobalParams.canUseStdout = false;
         }
+        mongoDumpGlobalParams.limit = getParam("limit", 0);
+        mongoDumpGlobalParams.skip = getParam("skip", 0);
+        mongoDumpGlobalParams.sort = getParam("sort", "");
 
         return Status::OK();
     }

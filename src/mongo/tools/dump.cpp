@@ -90,6 +90,14 @@ public:
     };
 
     void doCollection( const string coll , Query q, FILE* out , ProgressMeter *m ) {
+        if (mongoDumpGlobalParams.sort != "") {
+        	BSONObj sortSpec = mongo::fromjson(mongoDumpGlobalParams.sort);
+        	q.sort(sortSpec);
+        }
+
+        unsigned int limit = mongoDumpGlobalParams.limit;
+        unsigned int skip = mongoDumpGlobalParams.skip;
+
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
@@ -104,11 +112,11 @@ public:
         if (!_usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
             DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
             boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
-            conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
+            conn.query( castedWriter, coll.c_str() , q , limit, skip, NULL, queryOptions | QueryOption_Exhaust);
         }
         else {
             //This branch should only be taken with DBDirectClient or mongos which doesn't support exhaust mode
-            scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , queryOptions ));
+            scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , limit , skip , 0 , queryOptions ));
             while ( cursor->more() ) {
                 writer(cursor->next());
             }
