@@ -351,11 +351,12 @@ namespace BasicTests {
         void run() {
             ThreadSafeString s;
             s = "eliot";
-            ASSERT_EQUALS( s , "eliot" );
-            ASSERT( s != "eliot2" );
+            ASSERT_EQUALS( s.toString() , "eliot" );
+            ASSERT( s.toString() != "eliot2" );
 
-            ThreadSafeString s2 = s;
-            ASSERT_EQUALS( s2 , "eliot" );
+            ThreadSafeString s2;
+            s2 = s.toString().c_str();
+            ASSERT_EQUALS( s2.toString() , "eliot" );
 
 
             {

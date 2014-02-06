@@ -137,14 +137,8 @@ namespace mongo {
             memset( _buf , 0 , _size );
         }
 
-        ThreadSafeString( const ThreadSafeString& other )
-            : _size( other._size ) , _buf( new char[_size] ) {
-            strncpy( _buf , other._buf , _size );
-        }
-
         ~ThreadSafeString() {
             delete[] _buf;
-            _buf = 0;
         }
 
         string toString() const {
@@ -161,25 +155,13 @@ namespace mongo {
             return *this;
         }
 
-        bool operator==( const ThreadSafeString& other ) const {
-            return strcmp( _buf , other._buf ) == 0;
-        }
-
-        bool operator==( const char * str ) const {
-            return strcmp( _buf , str ) == 0;
-        }
-
-        bool operator!=( const char * str ) const {
-            return strcmp( _buf , str ) != 0;
-        }
-
         bool empty() const {
             return _buf == 0 || _buf[0] == 0;
         }
 
     private:
-        size_t _size;
-        char * _buf;
+        const size_t _size;
+        char *const _buf;
     };
 
     std::ostream& operator<<(std::ostream &s, const ThreadSafeString &o);
