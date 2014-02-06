@@ -755,109 +755,98 @@ namespace mongo {
         bool exhaust = false;
         QueryResult* msgdata = 0;
         OpTime last;
-        NotifyAll* waitNotification = 0;        
         Collection* collection = 0;
-        try{
-            while( 1 ) {
-                bool isCursorAuthorized = false;
-                NotifyAll::When lastWaitTime;
-                try {
-                    const NamespaceString nsString( ns );
-                    uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
+        NotifyAll::When lastWaitTime = 0;
+        while( 1 ) {
+            bool isCursorAuthorized = false;
+            try {
+                const NamespaceString nsString( ns );
+                uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                    Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
-                            nsString, cursorid);
-                    audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
-                    uassertStatusOK(status);
+                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
+                        nsString, cursorid);
+                audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
+                uassertStatusOK(status);
 
-                    if (str::startsWith(ns, "local.oplog.")){
-                        while (MONGO_FAIL_POINT(rsStopGetMore)) {
-                            sleepmillis(0);
-                        }
-
-                        if (pass == 0) {
-                            mutex::scoped_lock lk(OpTime::m);
-                            last = OpTime::getLast(lk);
-                        }
-                        else {
-                            last.waitForDifferent(1000/*ms*/);
-                        }
+                if (str::startsWith(ns, "local.oplog.")){
+                    while (MONGO_FAIL_POINT(rsStopGetMore)) {
+                        sleepmillis(0);
                     }
 
-                    msgdata = newGetMore(ns,
-                                             ntoreturn,
-                                             cursorid,
-                                             curop,
-                                             pass,
-                                             exhaust,
-                                             &isCursorAuthorized);
-                }
-                catch ( AssertionException& e ) {
-                    if ( isCursorAuthorized ) {
-                        // If a cursor with id 'cursorid' was authorized, it may have been advanced
-                        // before an exception terminated processGetMore.  Erase the ClientCursor
-                        // because it may now be out of sync with the client's iteration state.
-                        // SERVER-7952
-                        // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                        CollectionCursorCache::eraseCursorGlobal( cursorid );
-                    }
-                    ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
-                    ok = false;
-                    break;
-                }
-                
-                if (msgdata == 0) {
-                    // this should only happen with QueryOption_AwaitData
-                    exhaust = false;
-                    massert(13073, "shutting down", !inShutdown() );
-                    if ( ! timer ) {
-                        timer.reset( new Timer() );
+                    if (pass == 0) {
+                        mutex::scoped_lock lk(OpTime::m);
+                        last = OpTime::getLast(lk);
                     }
                     else {
-                        if ( timer->seconds() >= 4 ) {
-                            // after about 4 seconds, return. pass stops at 1000 normally.
-                            // we want to return occasionally so slave can checkpoint.
-                            pass = 10000;
-                        }
+                        last.waitForDifferent(1000/*ms*/);
                     }
-                    pass++;
-                    if (debug)
-                        sleepmillis(20);
-                    else if( waitNotification == 0 ) {
-                        waitNotification = new NotifyAll();
-                        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
-                        collection = ctx->ctx().db()->getCollection(ns);
-                        /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
-                        uassert( 77383, "collection dropped between newGetMore calls", collection );
-                        lastWaitTime = waitNotification->now();
-                        collection->subscribeToChange( waitNotification );
-                        /* After creating the notification and subscripting we will do one more loop before waiting
-                           because of concurrency, a new item *may* have been inserted in the collection while we were
-                           setting up our notification and subscribing to the event */
-                    } else {
-                        /* TODO: Review this wait.
-                           Bellow we could wait even for the full 4 seconds, but there's something I don't understand
-                           with the call to setExpectedLatencyMs(), so I figure I better break the wait every so often to call
-                           that notification method */          
-                        waitNotification->timedWaitFor( lastWaitTime, 200 );
-                        lastWaitTime = waitNotification->now();
-                    }
+                }
 
-                    // note: the 1100 is because of the waitForDifferent above
-                    // should eventually clean this up a bit
-                    curop.setExpectedLatencyMs( 1100 + timer->millis() );
-                    
-                    continue;
-                }                       
+                msgdata = newGetMore(ns,
+                                         ntoreturn,
+                                         cursorid,
+                                         curop,
+                                         pass,
+                                         exhaust,
+                                         &isCursorAuthorized);
+            }
+            catch ( AssertionException& e ) {
+                if ( isCursorAuthorized ) {
+                    // If a cursor with id 'cursorid' was authorized, it may have been advanced
+                    // before an exception terminated processGetMore.  Erase the ClientCursor
+                    // because it may now be out of sync with the client's iteration state.
+                    // SERVER-7952
+                    // TODO Temporary code, see SERVER-4563 for a cleanup overview.
+                    CollectionCursorCache::eraseCursorGlobal( cursorid );
+                }
+                ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
+                ok = false;
                 break;
-            };
-        } catch(...){
-            /* We don't want to leave a dangling change notification on the collection object. That's why we will catch
-               any exception do cleanup, and re-throw */
-            CLEANUP_COLLECTION_CHANGE_SUBSCRIPTION; 
-            throw;                   
-        }             
-        CLEANUP_COLLECTION_CHANGE_SUBSCRIPTION; 
+            }
+            
+            if (msgdata == 0) {
+                // this should only happen with QueryOption_AwaitData
+                exhaust = false;
+                massert(13073, "shutting down", !inShutdown() );
+                if ( ! timer ) {
+                    timer.reset( new Timer() );
+                }
+                else {
+                    if ( timer->seconds() >= 4 ) {
+                        // after about 4 seconds, return. pass stops at 1000 normally.
+                        // we want to return occasionally so slave can checkpoint.
+                        pass = 10000;
+                    }
+                }
+                pass++;
+                if (debug)
+                    sleepmillis(20);
+                else if( lastWaitTime == 0 ) {
+                    scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
+                    collection = ctx->ctx().db()->getCollection(ns);
+                    /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
+                    uassert( 77383, "collection dropped between newGetMore calls", collection );
+                    lastWaitTime = collection->documentInsertedNotificationNow();
+                    /* After creating the notification and acquiring lastWaitTime we will do one more loop,
+                       a new item *may* have been inserted in the collection while we were
+                       acquiring lastWaitTime */
+                } else {
+                    /* TODO: Review this wait.
+                       Bellow we could wait even for the full 4 seconds, but there's something I don't understand
+                       with the call to setExpectedLatencyMs(), so I figure I better break the wait every so often to call
+                       that notification method */
+                    collection->waitForDocumentInsertedEvent( lastWaitTime, 200 );
+                    lastWaitTime = collection->documentInsertedNotificationNow();
+                }
+
+                // note: the 1100 is because of the waitForDifferent above
+                // should eventually clean this up a bit
+                curop.setExpectedLatencyMs( 1100 + timer->millis() );
+                
+                continue;
+            }
+            break;
+        };        
 
         if (ex) {
             BSONObjBuilder err;

@@ -75,8 +75,8 @@ namespace mongo {
         : _ns( fullNS ),
           _infoCache( this ),
           _indexCatalog( this, details ),
-          _changeSubscribersLock( "collection_subscribers_lock" ),
-          _cursorCache( fullNS ) {
+          _cursorCache( fullNS ),
+          _changeSubscribers() {
         _details = details;
         _database = database;
 
@@ -95,47 +95,23 @@ namespace mongo {
         }
         _magic = 1357924;
         _indexCatalog.init();
-        _changeSubscribers = 0;
     }
 
     Collection::~Collection() {
         verify( ok() );
         _magic = 0;
-        if( _changeSubscribers != 0) {
-            delete _changeSubscribers;
-        }
-    }
-
-    void Collection::checkInitChangeSubscribers()
-    {
-        if( _changeSubscribers == 0 ) {
-            _changeSubscribers = new list<NotifyAll*>;
-        }
-    }
-
-    void Collection::subscribeToChange( NotifyAll* evt ) {    
-        _changeSubscribersLock.lock();
-        checkInitChangeSubscribers();
-        _changeSubscribers->push_back( evt );
-        _changeSubscribersLock.unlock();
-    }
-
-    void Collection::unsubcribeToChange( NotifyAll* evt ) {
-        _changeSubscribersLock.lock();
-        checkInitChangeSubscribers();
-        _changeSubscribers->remove( evt );
-        _changeSubscribersLock.unlock();
     }
 
     void Collection::triggerChangeSubscribersNotification(){
-        if( _changeSubscribers == 0 ) return; 
-        _changeSubscribersLock.lock_shared();
-        list<NotifyAll*>::iterator sigIterator;
-        for( sigIterator = _changeSubscribers->begin(); sigIterator != _changeSubscribers->end(); sigIterator++) {            
-            NotifyAll* sig = *sigIterator;
-            sig->notifyAll( sig->now() );
-        }
-        _changeSubscribersLock.unlock_shared();
+        _changeSubscribers.notifyAll( _changeSubscribers.now() );
+    }
+
+    bool Collection::waitForDocumentInsertedEvent(  NotifyAll::When when, int timeout ) {
+        return _changeSubscribers.timedWaitFor( when, timeout );
+    }
+
+    NotifyAll::When Collection::documentInsertedNotificationNow() {
+        return _changeSubscribers.now();
     }
 
     bool Collection::requiresIdIndex() const {
