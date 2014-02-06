@@ -345,7 +345,8 @@ namespace mongo {
         const char *ns = m.singleData()->_data + 4;
 
         Client& c = cc();
-        c.getAuthorizationSession()->startRequest();
+        if (!c.isGod())
+            c.getAuthorizationSession()->startRequest();
 
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
