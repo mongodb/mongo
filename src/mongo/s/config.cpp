@@ -1137,6 +1137,18 @@ namespace mongo {
                       << result.reason() << endl;
         }
 
+        result = clusterCreateIndex( LocksType::ConfigNS,
+                                     BSON( LocksType::state() << 1 <<
+                                           LocksType::process() << 1 ),
+                                     false, // unique
+                                     WriteConcernOptions::AllConfigs,
+                                     NULL );
+
+        if ( !result.isOK() ) {
+            warning() << "couldn't create state and process id index on config db: "
+                      << result.reason() << endl;
+        }
+
         result = clusterCreateIndex( LockpingsType::ConfigNS,
                                      BSON( LockpingsType::ping() << 1 ),
                                      false, // unique
