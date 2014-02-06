@@ -307,6 +307,11 @@ namespace mongo {
         }
 
         if (_memUsage > kMaxBytes) {
+            mongoutils::str::stream ss;
+            ss << "sort stage buffered data usage of " << _memUsage
+               << " bytes exceeds internal limit of " << kMaxBytes << " bytes";
+            Status status(ErrorCodes::Overflow, ss);
+            *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             return PlanStage::FAILURE;
         }
 
@@ -314,7 +319,7 @@ namespace mongo {
 
         // Still reading in results to sort.
         if (!_sorted) {
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             StageState code = _child->work(&id);
 
             if (PlanStage::ADVANCED == code) {
@@ -353,6 +358,10 @@ namespace mongo {
                 _sorted = true;
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
+            }
+            else if (PlanStage::FAILURE == code) {
+                *out = id;
+                return code;
             }
             else {
                 if (PlanStage::NEED_FETCH == code) {

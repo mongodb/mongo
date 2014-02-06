@@ -127,7 +127,7 @@ namespace QueryStageFetch {
             fetchInMemoryFail->setMode(FailPoint::alwaysOn);
 
             // First call should return a fetch request as it's not in memory.
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state;
             state = fetchStage->work(&id);
             ASSERT_EQUALS(PlanStage::NEED_FETCH, state);
@@ -198,7 +198,7 @@ namespace QueryStageFetch {
             fetchInMemorySucceed->setMode(FailPoint::alwaysOn);
 
             // First call fetches as expected.
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state;
             state = fetchStage->work(&id);
             ASSERT_EQUALS(PlanStage::ADVANCED, state);
@@ -263,7 +263,7 @@ namespace QueryStageFetch {
             fetchInMemoryFail->setMode(FailPoint::alwaysOn);
 
             // First call should return a fetch request as it's not in memory.
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state;
             state = fetchStage->work(&id);
             ASSERT_EQUALS(PlanStage::NEED_FETCH, state);
@@ -339,7 +339,7 @@ namespace QueryStageFetch {
             FailPoint* fetchInMemoryFail = reg->getFailPoint("fetchInMemoryFail");
             fetchInMemoryFail->setMode(FailPoint::alwaysOn);
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state;
 
             // Don't bother doing any fetching if an obj exists already.
@@ -407,7 +407,7 @@ namespace QueryStageFetch {
             fetchInMemoryFail->setMode(FailPoint::alwaysOn);
 
             // First call should return a fetch request as it's not in memory.
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state;
             state = fetchStage->work(&id);
             ASSERT_EQUALS(PlanStage::NEED_FETCH, state);

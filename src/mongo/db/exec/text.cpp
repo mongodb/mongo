@@ -31,6 +31,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
@@ -63,7 +64,7 @@ namespace mongo {
 
         // Fill out our result queue.
         if (!_filledOutResults) {
-            PlanStage::StageState ss = fillOutResults();
+            PlanStage::StageState ss = fillOutResults(out);
             if (ss == PlanStage::IS_EOF || ss == PlanStage::FAILURE) {
                 return ss;
             }
@@ -131,17 +132,25 @@ namespace mongo {
         return ret.release();
     }
 
-    PlanStage::StageState TextStage::fillOutResults() {
+    PlanStage::StageState TextStage::fillOutResults(WorkingSetID* out) {
         Database* db = cc().database();
         Collection* collection = db->getCollection( _params.ns );
         if (NULL == collection) {
-            warning() << "TextStage params namespace error";
+            std::string errmsg = mongoutils::str::stream() << "TextStage params namespace error";
+            warning() << errmsg;
+            Status status(ErrorCodes::NamespaceNotFound, errmsg);
+            *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             return PlanStage::FAILURE;
         }
         vector<IndexDescriptor*> idxMatches;
         collection->getIndexCatalog()->findIndexByType("text", idxMatches);
         if (1 != idxMatches.size()) {
-            warning() << "Expected exactly one text index";
+            std::string errmsg = mongoutils::str::stream() << "Expected exactly one text index";
+            warning() << errmsg;
+            // Using IndexNotFound error code because we are unable to
+            // determine which index to select.
+            Status status(ErrorCodes::IndexNotFound, errmsg);
+            *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             return PlanStage::FAILURE;
         }
 
@@ -171,7 +180,7 @@ namespace mongo {
             BSONObj keyObj;
             DiskLoc loc;
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scanners.vector()[currentIndexScanner]->work(&id);
 
             if (PlanStage::ADVANCED == state) {
@@ -193,7 +202,19 @@ namespace mongo {
             }
             else {
                 verify(PlanStage::FAILURE == state);
-                warning() << "error from index scan during text stage: invalid FAILURE state";
+                std::string errmsg = mongoutils::str::stream() <<
+                    "error from index scan during text stage: invalid FAILURE state";
+                warning() << errmsg;
+                // Propagate error status from underlying index scan if available.
+                // Otherwise, create a new error status.
+                if (WorkingSet::INVALID_ID == id) {
+                    // Using InternalError error code because this is very uncommon.
+                    // Currently, there are no code paths in IndexScan::work() that return
+                    // PlanStage::FAILURE.
+                    Status status(ErrorCodes::InternalError, errmsg);
+                    id = WorkingSetCommon::allocateStatusMember( _ws, status);
+                }
+                *out = id;
                 return PlanStage::FAILURE;
             }
         }

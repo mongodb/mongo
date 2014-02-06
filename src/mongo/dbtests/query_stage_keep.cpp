@@ -81,7 +81,7 @@ namespace QueryStageKeep {
 
         WorkingSetID getNextResult(PlanStage* stage) {
             while (!stage->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = stage->work(&id);
                 if (PlanStage::ADVANCED == status) {
                     return id;

@@ -123,7 +123,13 @@ namespace mongo {
     PlanStage::StageState S2NearStage::work(WorkingSetID* out) {
         if (!_initted) { init(); }
 
-        if (_failed) { return PlanStage::FAILURE; }
+        if (_failed) {
+            mongoutils::str::stream ss;
+            ss << "unable to load geo index " << _params.indexKeyPattern;
+            Status status(ErrorCodes::IndexNotFound, ss);
+            *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            return PlanStage::FAILURE;
+        }
         if (isEOF()) { return PlanStage::IS_EOF; }
         ++_commonStats.works;
 

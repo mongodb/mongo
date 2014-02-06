@@ -106,7 +106,7 @@ namespace OplogStartTests {
 
             setupFromQuery(BSON( "ts" << BSON( "$gte" << 10 )));
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             // collection scan needs to be initialized
             ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
             // finds starting record
@@ -130,7 +130,7 @@ namespace OplogStartTests {
 
             setupFromQuery(BSON( "ts" << BSON( "$gte" << 1 )));
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             // collection scan needs to be initialized
             ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
             // full collection scan back to the first oplog record
@@ -157,7 +157,7 @@ namespace OplogStartTests {
 
             setupFromQuery(BSON( "ts" << BSON( "$gte" << 1 )));
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             // ensure that we go into extent hopping mode immediately
             _stage->setBackwardsScanTime(0);
 
@@ -188,7 +188,7 @@ namespace OplogStartTests {
         void run() {
             buildCollection();
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             setupFromQuery(BSON( "ts" << BSON( "$gte" << tsGte() )));
 
             // ensure that we go into extent hopping mode immediately

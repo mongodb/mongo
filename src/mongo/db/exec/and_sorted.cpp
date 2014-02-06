@@ -75,7 +75,7 @@ namespace mongo {
         verify(DiskLoc() == _targetLoc);
 
         // Pick one, and get a loc to work toward.
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState state = _children[0]->work(&id);
 
         if (PlanStage::ADVANCED == state) {
@@ -103,7 +103,12 @@ namespace mongo {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
-        else if (PlanStage::IS_EOF == state || PlanStage::FAILURE == state) {
+        else if (PlanStage::IS_EOF == state) {
+            _isEOF = true;
+            return state;
+        }
+        else if (PlanStage::FAILURE == state) {
+            *out = id;
             _isEOF = true;
             return state;
         }
@@ -128,7 +133,7 @@ namespace mongo {
         // We have nodes that haven't hit _targetLoc yet.
         size_t workingChildNumber = _workingTowardRep.front();
         PlanStage* next = _children[workingChildNumber];
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState state = next->work(&id);
 
         if (PlanStage::ADVANCED == state) {
@@ -206,7 +211,13 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
         }
-        else if (PlanStage::IS_EOF == state || PlanStage::FAILURE == state) {
+        else if (PlanStage::IS_EOF == state) {
+            _isEOF = true;
+            _ws->free(_targetId);
+            return state;
+        }
+        else if (PlanStage::FAILURE == state) {
+            *out = id;
             _isEOF = true;
             _ws->free(_targetId);
             return state;

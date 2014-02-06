@@ -245,7 +245,7 @@ namespace mongo {
         CommonStats _commonStats;
         SortStats _specificStats;
 
-        // The usage in bytes of all bufered data that we're sorting.
+        // The usage in bytes of all buffered data that we're sorting.
         size_t _memUsage;
     };
 

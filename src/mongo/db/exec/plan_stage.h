@@ -124,8 +124,11 @@ namespace mongo {
             // dropped or state deleted.
             DEAD,
 
-            // Something has gone unrecoverably wrong.  Stop running this query.  There is nothing
-            // output in the out parameter.
+            // Something has gone unrecoverably wrong.  Stop running this query.
+            // If the out parameter does not refer to an invalid working set member,
+            // call WorkingSetCommon::getStatusMemberObject() to get details on the failure.
+            // Any class implementing this interface must set the WSID out parameter to
+            // INVALID_ID or a valid WSM ID if FAILURE is returned.
             FAILURE,
 
             // Something isn't in memory.  Fetch it.

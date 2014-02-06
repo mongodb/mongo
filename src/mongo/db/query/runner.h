@@ -58,6 +58,9 @@ namespace mongo {
 
             // getNext was asked for data it cannot provide, or the underlying PlanStage had an
             // unrecoverable error.
+            // If the underlying PlanStage has any information on the error, it will be available in
+            // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
+            // details from the output BSON object.
             RUNNER_ERROR,
         };
 
@@ -148,6 +151,10 @@ namespace mongo {
          * objOut may be an owned object in certain cases: invalidation of the underlying DiskLoc,
          * the object is created from covered index key data, the object is projected or otherwise
          * the result of a computation.
+         *
+         * objOut will also be owned when the underlying PlanStage has provided error details in the
+         * event of a RUNNER_ERROR. Call WorkingSetCommon::toStatusString() to convert the object
+         * to a loggable format.
          *
          * objOut will be unowned if it's the result of a fetch or a collection scan.
          */

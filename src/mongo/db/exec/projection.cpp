@@ -30,6 +30,7 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/mongoutils/str.h"
@@ -51,7 +52,7 @@ namespace mongo {
     PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
 
         // Note that we don't do the normal if isEOF() return EOF thing here.  Our child might be a
@@ -60,14 +61,17 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(id);
             Status projStatus = _exec->transform(member);
             if (!projStatus.isOK()) {
-                // TODO: should this really fail?
                 warning() << "Couldn't execute projection, status = "
                           << projStatus.toString() << endl;
+                *out = WorkingSetCommon::allocateStatusMember(_ws, projStatus);
                 return PlanStage::FAILURE;
             }
 
             *out = id;
             ++_commonStats.advanced;
+        }
+        else if (PlanStage::FAILURE == status) {
+            *out = id;
         }
         else if (PlanStage::NEED_FETCH == status) {
             *out = id;

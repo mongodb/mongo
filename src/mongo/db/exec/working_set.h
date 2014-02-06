@@ -70,7 +70,7 @@ namespace mongo {
          * Do not delete the returned pointer as the WorkingSet retains ownership. Call free() to
          * release it.
          */
-        WorkingSetMember* get(const WorkingSetID& i) {
+        WorkingSetMember* get(const WorkingSetID& i) const {
             dassert(i < _data.size()); // ID has been allocated.
             dassert(_data[i].nextFreeOrSelf == i); // ID currently in use.
             return _data[i].member;

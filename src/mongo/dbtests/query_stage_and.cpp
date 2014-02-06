@@ -86,7 +86,7 @@ namespace QueryStageAnd {
         int countResults(PlanStage* stage) {
             int count = 0;
             while (!stage->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = stage->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 ++count;
@@ -187,7 +187,7 @@ namespace QueryStageAnd {
             // one because of a mid-plan invalidation, so 10.
             int count = 0;
             while (!ah->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
 
@@ -245,7 +245,7 @@ namespace QueryStageAnd {
             // First call to work reads the first result from the children.
             // The first result is for the first scan over foo is {foo: 20, bar: 20, baz: 20}.
             // The first result is for the second scan over bar is {foo: 19, bar: 19, baz: 19}.
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = ah->work(&id);
             ASSERT_EQUALS(PlanStage::NEED_TIME, status);
 
@@ -271,7 +271,7 @@ namespace QueryStageAnd {
             // And not in our results.
             int count = 0;
             while (!ah->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 WorkingSetMember* wsm = ws.get(id);
@@ -379,7 +379,7 @@ namespace QueryStageAnd {
             int count = 0;
             int works = 0;
             while (!ah->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 ++works;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
@@ -539,7 +539,7 @@ namespace QueryStageAnd {
             // We're making an assumption here that happens to be true because we clear out the
             // collection before running this: increasing inserts have increasing DiskLocs.
             // This isn't true in general if the collection is not dropped beforehand.
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
 
             // Sorted AND looks at the first child, which is an index scan over foo==1.
             ah->work(&id);
@@ -567,7 +567,7 @@ namespace QueryStageAnd {
             // Proceed along, AND-ing results.
             int count = 0;
             while (!ah->isEOF() && count < 10) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
 
@@ -593,7 +593,7 @@ namespace QueryStageAnd {
 
             // Get all results aside from the two we killed.
             while (!ah->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
 
@@ -841,7 +841,7 @@ namespace QueryStageAnd {
 
             int count = 0;
             while (!ah->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 BSONObj thisObj = ws.get(id)->loc.obj();

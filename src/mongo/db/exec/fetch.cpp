@@ -78,7 +78,7 @@ namespace mongo {
 
         // If we're here, we're not waiting for a DiskLoc to be fetched.  Get another to-be-fetched
         // result from our child.
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
 
         if (PlanStage::ADVANCED == status) {
@@ -112,6 +112,10 @@ namespace mongo {
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
                 return returnIfMatches(member, id, out);
             }
+        }
+        else if (PlanStage::FAILURE == status) {
+            *out = id;
+            return status;
         }
         else {
             if (PlanStage::NEED_FETCH == status) {

@@ -64,4 +64,60 @@ namespace mongo {
         }
     }
 
+    // static
+    WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status& status) {
+        invariant(ws);
+
+        BSONObjBuilder bob;
+        bob.append("ok", status.isOK() ? 1.0 : 0.0);
+        bob.append("code", status.code());
+        bob.append("errmsg", status.reason());
+
+        WorkingSetID wsid = ws->allocate();
+        WorkingSetMember* member = ws->get(wsid);
+        member->state = WorkingSetMember::OWNED_OBJ;
+        member->obj = bob.obj();
+
+        return wsid;
+    }
+
+    // static
+    bool WorkingSetCommon::isValidStatusMemberObject(const BSONObj& obj) {
+        return obj.nFields() == 3 &&
+               obj.hasField("ok") &&
+               obj.hasField("code") &&
+               obj.hasField("errmsg");
+    }
+
+    // static
+    void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid,
+                                                 BSONObj* objOut) {
+        invariant(objOut);
+
+        // Validate ID and working set member.
+        if (WorkingSet::INVALID_ID == wsid) {
+            return;
+        }
+        WorkingSetMember* member = ws.get(wsid);
+        if (!member->hasOwnedObj()) {
+            return;
+        }
+        BSONObj obj = member->obj;
+        if (!isValidStatusMemberObject(obj)) {
+            return;
+        }
+        *objOut = member->obj;
+    }
+
+    // static
+    std::string WorkingSetCommon::toStatusString(const BSONObj& obj) {
+        if (!isValidStatusMemberObject(obj)) {
+            Status unknownStatus(ErrorCodes::UnknownError, "no details available");
+            return unknownStatus.toString();
+        }
+        Status status(ErrorCodes::fromInt(obj.getIntField("code")),
+                      obj.getStringField("errmsg"));
+        return status.toString();
+    }
+
 }  // namespace mongo

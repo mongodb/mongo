@@ -103,6 +103,7 @@ namespace mongo {
         // priority_queue to remove the item from the list and quickly.
 
         struct StageWithValue {
+            StageWithValue() : id(WorkingSet::INVALID_ID), stage(NULL) { }
             WorkingSetID id;
             PlanStage* stage;
         };

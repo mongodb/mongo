@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/oplogstart.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/query/find_constants.h"
@@ -232,6 +233,11 @@ namespace mongo {
             bool saveClientCursor = false;
 
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
+                // XXX: Do we need to propagate this error to caller?
+                if (Runner::RUNNER_ERROR == state) {
+                    warning() << "getMore runner error: " << WorkingSetCommon::toStatusString(obj);
+                }
+
                 // If we're dead there's no way to get more results.
                 saveClientCursor = false;
                 // In the old system tailable capped cursors would be killed off at the
@@ -578,10 +584,9 @@ namespace mongo {
         // So, no matter what, deregister the runner.
         safety.reset();
 
-        // Caller expects exceptions thrown in certain cases:
-        // * in-memory sort using too much RAM.
+        // Caller expects exceptions thrown in certain cases.
         if (Runner::RUNNER_ERROR == state) {
-            uasserted(17144, "Runner error, memory limit for sort probably exceeded");
+            uasserted(17144, "Runner error: " + WorkingSetCommon::toStatusString(obj));
         }
 
         // Why save a dead runner?

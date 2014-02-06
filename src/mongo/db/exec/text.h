@@ -95,7 +95,8 @@ namespace mongo {
     private:
         // Helper for buffering results array.  Returns NEED_TIME (if any results were produced),
         // IS_EOF, or FAILURE.
-        StageState fillOutResults();
+        // If the result state is FAILURE, out be set to a valid status member WSID.
+        StageState fillOutResults(WorkingSetID *out);
 
         // Helper to update aggregate score with a new-found (term, score) pair for this document.
         // Also rejects documents that don't match this stage's filter.

@@ -93,8 +93,7 @@ namespace mongo {
                 for (size_t j = 0; j < kLookAheadWorks; ++j) {
                     StageState childStatus = child->work(&_lookAheadResults[i]);
 
-                    if (PlanStage::IS_EOF == childStatus || PlanStage::DEAD == childStatus ||
-                        PlanStage::FAILURE == childStatus) {
+                    if (PlanStage::IS_EOF == childStatus || PlanStage::DEAD == childStatus) {
 
                         // A child went right to EOF.  Bail out.
                         _hashingChildren = false;
@@ -105,6 +104,14 @@ namespace mongo {
                         // We have a result cached in _lookAheadResults[i].  Stop looking at this
                         // child.
                         break;
+                    }
+                    else if (PlanStage::FAILURE == childStatus) {
+                        // Propage error to parent.
+                        *out = _lookAheadResults[i];
+
+                        _hashingChildren = false;
+                        _dataMap.clear();
+                        return PlanStage::FAILURE;
                     }
                     // We ignore NEED_TIME.  TODO: What do we want to do if the child provides
                     // NEED_FETCH?
@@ -206,7 +213,7 @@ namespace mongo {
     PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         verify(_currentChild == 0);
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState childStatus = workChild(0, &id);
 
         if (PlanStage::ADVANCED == childStatus) {
@@ -241,6 +248,10 @@ namespace mongo {
 
             return PlanStage::NEED_TIME;
         }
+        else if (PlanStage::FAILURE == childStatus) {
+            *out = id;
+            return childStatus;
+        }
         else {
             if (PlanStage::NEED_FETCH == childStatus) {
                 *out = id;
@@ -257,7 +268,7 @@ namespace mongo {
     PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         verify(_currentChild > 0);
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState childStatus = workChild(_currentChild, &id);
 
         if (PlanStage::ADVANCED == childStatus) {
@@ -319,6 +330,10 @@ namespace mongo {
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
+        }
+        else if (PlanStage::FAILURE == childStatus) {
+            *out = id;
+            return childStatus;
         }
         else {
             if (PlanStage::NEED_FETCH == childStatus) {

@@ -53,7 +53,7 @@ namespace mongo {
             _specificStats.matchTested = vector<size_t>(_children.size(), 0);
         }
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState childStatus = _children[_currentChild]->work(&id);
 
         if (PlanStage::ADVANCED == childStatus) {
@@ -105,6 +105,10 @@ namespace mongo {
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
+        }
+        else if (PlanStage::FAILURE == childStatus) {
+            *out = id;
+            return childStatus;
         }
         else {
             if (PlanStage::NEED_FETCH == childStatus) {

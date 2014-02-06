@@ -66,7 +66,7 @@ namespace {
     int countResults(PlanStage* stage) {
         int count = 0;
         while (!stage->isEOF()) {
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = stage->work(&id);
             if (PlanStage::ADVANCED != status) { continue; }
             ++count;

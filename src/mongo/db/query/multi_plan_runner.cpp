@@ -438,7 +438,7 @@ namespace mongo {
                 restoreState();
             }
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = candidate.root->work(&id);
 
             if (PlanStage::ADVANCED == state) {

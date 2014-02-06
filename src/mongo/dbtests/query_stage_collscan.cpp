@@ -346,7 +346,7 @@ namespace QueryStageCollectionScan {
 
             scoped_ptr<CollectionScan> scan(new CollectionScan(params, &ws, NULL));
             while (!scan->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
@@ -495,7 +495,7 @@ namespace QueryStageCollectionScan {
 
             int count = 0;
             while (count < 10) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
@@ -516,7 +516,7 @@ namespace QueryStageCollectionScan {
 
             // Expect the rest.
             while (!scan->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
@@ -555,7 +555,7 @@ namespace QueryStageCollectionScan {
 
             int count = 0;
             while (count < 10) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
@@ -576,7 +576,7 @@ namespace QueryStageCollectionScan {
 
             // Expect the rest.
             while (!scan->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);

@@ -514,7 +514,7 @@ namespace QueryStageMergeSortTests {
             // Get 10 results.  Should be getting results in order of 'locs'.
             int count = 0;
             while (!ms->isEOF() && count < 10) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ms->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
 
@@ -539,7 +539,7 @@ namespace QueryStageMergeSortTests {
             {
             // TODO: If we have "return upon invalidation" ever triggerable, do the following test.
             /*
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status;
                 do {
                     status = ms->work(&id);
@@ -562,7 +562,7 @@ namespace QueryStageMergeSortTests {
 
             // And get the rest.
             while (!ms->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ms->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
 

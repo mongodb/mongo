@@ -42,7 +42,7 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
 
         if (PlanStage::ADVANCED == status) {
@@ -58,6 +58,10 @@ namespace mongo {
             *out = id;
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
+        }
+        else if (PlanStage::FAILURE == status) {
+            *out = id;
+            return status;
         }
         else {
             if (PlanStage::NEED_FETCH == status) {

@@ -267,7 +267,7 @@ namespace QueryStageSortTests {
 
             // Have sort read in data from the mock stage.
             for (int i = 0; i < firstRead; ++i) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ss->work(&id);
                 ASSERT_NOT_EQUALS(PlanStage::ADVANCED, status);
             }
@@ -280,7 +280,7 @@ namespace QueryStageSortTests {
 
             // Read the rest of the data from the mock stage.
             while (!ms->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 ss->work(&id);
             }
 
@@ -297,7 +297,7 @@ namespace QueryStageSortTests {
             // Invalidation of data in the sort stage fetches it but passes it through.
             int count = 0;
             while (!ss->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ss->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 WorkingSetMember* member = ws.get(id);

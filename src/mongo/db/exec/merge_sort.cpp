@@ -63,7 +63,7 @@ namespace mongo {
             // We have some child that we don't have a result from.  Each child must have a result
             // in order to pick the minimum result among all our children.  Work a child.
             PlanStage* child = _noResultToMerge.front();
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             StageState code = child->work(&id);
 
             if (PlanStage::ADVANCED == code) {
@@ -119,6 +119,10 @@ namespace mongo {
                 _noResultToMerge.pop();
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
+            }
+            else if (PlanStage::FAILURE == code) {
+                *out = id;
+                return code;
             }
             else {
                 if (PlanStage::NEED_FETCH == code) {

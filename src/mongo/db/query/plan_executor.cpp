@@ -85,7 +85,7 @@ namespace mongo {
                 restoreState();
             }
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState code = _root->work(&id);
 
             if (PlanStage::ADVANCED == code) {
@@ -179,6 +179,7 @@ namespace mongo {
             }
             else {
                 verify(PlanStage::FAILURE == code);
+                WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
                 return Runner::RUNNER_ERROR;
             }
         }
