@@ -90,7 +90,7 @@ for path in possible_paths:
             pass
 
 
-URL_ROOT = 'http://buildlogs.mongodb.org/'
+URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.mongodb.org/')
 TIMEOUT_SECONDS = 10
 socket.setdefaulttimeout(TIMEOUT_SECONDS)
 
