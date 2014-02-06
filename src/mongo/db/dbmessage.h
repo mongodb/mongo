@@ -263,7 +263,10 @@ namespace mongo {
         BSONObj query;
         BSONObj fields;
 
-        /* parses the message into the above fields */
+        /**
+         * parses the message into the above fields
+         * Warning: constructor mutates DbMessage.
+         */
         QueryMessage(DbMessage& d) {
             ns = d.getns();
             ntoskip = d.pullInt();

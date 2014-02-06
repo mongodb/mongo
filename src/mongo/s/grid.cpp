@@ -73,10 +73,18 @@ namespace mongo {
 
             dbConfig.reset(new DBConfig( database ));
 
-            // Protect initial load from connectivity errors
+            // Protect initial load from connectivity errors, otherwise we won't be able
+            // to perform any task.
             bool loaded = false;
             try {
-                loaded = dbConfig->load();
+                try {
+                    loaded = dbConfig->load();
+                }
+                catch ( const DBException& ex ) {
+                    // Retry again, if the config server are now up, the previous call should have
+                    // cleared all the bad connections in the pool and this should succeed.
+                    loaded = dbConfig->load();
+                }
             }
             catch( DBException& e ){
                 e.addContext( "error loading initial database config information" );

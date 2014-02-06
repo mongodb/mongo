@@ -78,8 +78,6 @@ namespace mongo {
 
     protected:
 
-        void doIndexQuery( Request& r , const Shard& shard );
-
         bool handleSpecialNamespaces( Request& r , QueryMessage& q );
 
     };

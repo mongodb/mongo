@@ -64,28 +64,9 @@ namespace mongo {
             return _id;
         }
 
-        DBConfigPtr getConfig() const {
-            verify( _didInit );
-            return _config;
-        }
-        bool isShardingEnabled() const {
-            verify( _didInit );
-            return _config->isShardingEnabled();
-        }
-
-        ChunkManagerPtr getChunkManager() const {
-            verify( _didInit );
-            return _chunkManager;
-        }
-
         ClientInfo * getClientInfo() const {
             return _clientInfo;
         }
-
-        // ---- remote location info -----
-
-
-        Shard primaryShard() const ;
 
         // ---- low level access ----
 
@@ -107,8 +88,6 @@ namespace mongo {
         AbstractMessagingPort* _p;
 
         MSGID _id;
-        DBConfigPtr _config;
-        ChunkManagerPtr _chunkManager;
 
         ClientInfo * _clientInfo;
 
