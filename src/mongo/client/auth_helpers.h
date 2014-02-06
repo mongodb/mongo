@@ -37,15 +37,6 @@ namespace auth {
     Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion);
 
     /**
-     * Given a schemaVersion24 user document and its source database, return the query and update
-     * specifier needed to upsert a schemaVersion26 version of the user.
-     */
-    void getUpdateToUpgradeUser(const StringData& sourceDB,
-                                const BSONObj& oldUserDoc,
-                                BSONObj* query,
-                                BSONObj* update);
-
-    /**
      * Name of the server parameter used to report the auth schema version (via getParameter).
      */
     extern const std::string schemaVersionServerParameter;
