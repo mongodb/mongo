@@ -328,6 +328,8 @@ namespace mongo {
 namespace mongo {
 
     extern DBConnectionPool pool;
+    // This is mainly used by the internal writes using write commands.
+    extern DBConnectionPool shardConnectionPool;
 
     class PoolFlushCmd : public Command {
     public:
@@ -343,6 +345,7 @@ namespace mongo {
         }
 
         virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+            shardConnectionPool.flush();
             pool.flush();
             return true;
         }
