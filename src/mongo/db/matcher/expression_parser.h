@@ -57,13 +57,23 @@ namespace mongo {
 
         /**
          * 5 = false
-         { a : 5 } = false
-         { $lt : 5 } = true
-         { $ref : "s" } = false
+         * { a : 5 } = false
+         * { $lt : 5 } = true
+         * { $ref: "s", $id: "x" } = false
+         * { $ref: "s", $id: "x", $db: "mydb" } = false
+         * { $ref : "s" } = false (if incomplete DBRef is allowed)
+         * { $id : "x" } = false (if incomplete DBRef is allowed)
+         * { $db : "mydb" } = false (if incomplete DBRef is allowed)
          */
-        static bool _isExpressionDocument( const BSONElement& e );
+        static bool _isExpressionDocument( const BSONElement& e, bool allowIncompleteDBRef );
 
-        static bool _isDBRefDocument( const BSONObj& obj );
+        /**
+         * { $ref: "s", $id: "x" } = true
+         * { $ref : "s" } = true (if incomplete DBRef is allowed)
+         * { $id : "x" } = true (if incomplete DBRef is allowed)
+         * { $db : "x" } = true (if incomplete DBRef is allowed)
+         */
+        static bool _isDBRefDocument( const BSONObj& obj, bool allowIncompleteDBRef );
 
         static StatusWithMatchExpression _parse( const BSONObj& obj, bool topLevel );
 
