@@ -728,14 +728,6 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
-    #define CLEANUP_COLLECTION_CHANGE_SUBSCRIPTION \
-        if( waitNotification != 0) {\
-            if ( collection != 0 ) {\
-                collection->unsubcribeToChange( waitNotification );\
-            }\
-            delete waitNotification;\
-        }
-
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
 
@@ -783,12 +775,12 @@ namespace mongo {
                 }
 
                 msgdata = newGetMore(ns,
-                                         ntoreturn,
-                                         cursorid,
-                                         curop,
-                                         pass,
-                                         exhaust,
-                                         &isCursorAuthorized);
+                                     ntoreturn,
+                                     cursorid,
+                                     curop,
+                                     pass,
+                                     exhaust,
+                                     &isCursorAuthorized);
             }
             catch ( AssertionException& e ) {
                 if ( isCursorAuthorized ) {
@@ -846,7 +838,7 @@ namespace mongo {
                 continue;
             }
             break;
-        };        
+        };
 
         if (ex) {
             BSONObjBuilder err;
