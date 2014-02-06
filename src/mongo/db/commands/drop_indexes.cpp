@@ -34,6 +34,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
@@ -226,9 +227,19 @@ namespace mongo {
             auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
             BSONObjBuilder b;
             while ( i->more() ) {
-                BSONObj o = i->next().removeField("v").getOwned();
-                b.append( BSONObjBuilder::numStr( all.size() ) , o );
-                all.push_back( o );
+                const BSONObj spec = i->next().removeField("v").getOwned();
+                const BSONObj key = spec.getObjectField("key");
+                const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                if (!keyStatus.isOK()) {
+                    errmsg = str::stream()
+                        << "Cannot compact collection due to invalid index " << spec << ": "
+                        << keyStatus.reason()
+                        << " For more info see http://dochub.mongodb.org/core/index-validation";
+                    return false;
+                }
+
+                b.append( BSONObjBuilder::numStr( all.size() ) , spec );
+                all.push_back( spec );
             }
             result.appendNumber( "nIndexesWas", collection->getIndexCatalog()->numIndexesTotal() );
 

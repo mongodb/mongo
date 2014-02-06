@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
@@ -414,14 +415,15 @@ namespace mongo {
                 }
             }
             else {
-                if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
-                    const string systemIndexes = cc().database()->name() + ".system.indexes";
-                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
-                    BSONObj index;
-                    Runner::RunnerState state;
-                    while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
-                        const BSONObj key = index.getObjectField("key");
-                        const string plugin = IndexNames::findPluginName(key);
+                const string systemIndexes = cc().database()->name() + ".system.indexes";
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
+                BSONObj index;
+                Runner::RunnerState state;
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
+                    const BSONObj key = index.getObjectField("key");
+                    const string plugin = IndexNames::findPluginName(key);
+
+                    if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
                         if (IndexNames::existedBefore24(plugin))
                             continue;
 
@@ -432,10 +434,20 @@ namespace mongo {
                               << startupWarningsLog;
                     }
 
-                    if (Runner::RUNNER_EOF != state) {
-                        warning() << "Internal error while reading collection " << systemIndexes;
+                    const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                    if (!keyStatus.isOK()) {
+                        log() << "Problem with index " << index << ": " << keyStatus.reason()
+                              << " This index can still be used however it cannot be rebuilt."
+                              << " For more info see"
+                              << " http://dochub.mongodb.org/core/index-validation"
+                              << startupWarningsLog;
                     }
                 }
+
+                if (Runner::RUNNER_EOF != state) {
+                    warning() << "Internal error while reading collection " << systemIndexes;
+                }
+
                 Database::closeDatabase(dbName.c_str(), storageGlobalParams.dbpath);
             }
         }

@@ -252,7 +252,19 @@ namespace mongo {
             IndexCatalog::IndexIterator ii( _indexCatalog.getIndexIterator( false ) );
             while ( ii.more() ) {
                 IndexDescriptor* descriptor = ii.next();
-                indexSpecs.push_back( _compactAdjustIndexSpec( descriptor->infoObj() ) );
+
+                const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
+                const BSONObj key = spec.getObjectField("key");
+                const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                if (!keyStatus.isOK()) {
+                    return StatusWith<CompactStats>(
+                        ErrorCodes::CannotCreateIndex,
+                        str::stream() << "Cannot rebuild index " << spec << ": "
+                                      << keyStatus.reason()
+                                      << " For more info see"
+                                      << " http://dochub.mongodb.org/core/index-validation");
+                }
+                indexSpecs.push_back(spec);
             }
         }
 
