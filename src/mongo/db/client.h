@@ -86,12 +86,6 @@ namespace mongo {
             initThread(desc);
         }
 
-        /**
-         * Allows detaching a thread from a Client object.  Use for testing and for the creation
-         * of non-connection clients.
-         */
-        static void resetThread( const StringData& origThreadName );
-
         /** this has to be called as the client goes away, but before thread termination
          *  @return true if anything was done
          */

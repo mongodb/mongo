@@ -161,19 +161,6 @@ namespace mongo {
         return *c;
     }
 
-    /* resets the client for the current thread */
-    void Client::resetThread( const StringData& origThreadName ) {
-        verify( currentClient.get() != 0 );
-
-        // Detach all client info from thread
-        mongo::lastError.reset(NULL);
-        currentClient.get()->shutdown();
-        currentClient.reset(NULL);
-
-        setThreadName( origThreadName.rawData() );
-    }
-
-
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
         _context(0),

@@ -84,19 +84,6 @@ namespace mongo {
         return *c;
     }
 
-    /* resets the client for the current thread */
-    // Needed here since we may want to use for testing when linked against mongos
-    void Client::resetThread( const StringData& origThreadName ) {
-        verify( currentClient.get() != 0 );
-
-        // Detach all client info from thread
-        mongo::lastError.reset(NULL);
-        currentClient.get()->shutdown();
-        currentClient.reset(NULL);
-
-        setThreadName( origThreadName.rawData() );
-    }
-
     string Client::clientAddress(bool includePort) const {
         ClientInfo * ci = ClientInfo::get();
         if ( ci )
