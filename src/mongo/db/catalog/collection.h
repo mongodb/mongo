@@ -31,7 +31,6 @@
 #pragma once
 
 #include <string>
-#include <list>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_cursor_cache.h"
