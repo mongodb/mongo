@@ -482,8 +482,6 @@ def runTest(test, result):
         raise Bug("fell off in extension case: %s" % path)
 
     mongo_test_filename = os.path.basename(path)
-    if 'sharedclient' in path:
-        mongo_test_filename += "-sharedclient"
 
     # sys.stdout.write() is more atomic than print, so using it prevents
     # lines being interrupted by, e.g., child processes
@@ -865,7 +863,7 @@ def expand_suites(suites,expandUseDB=True):
     module_suites = get_module_suites()
     for suite in suites:
         if suite == 'all':
-            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'],expandUseDB=expandUseDB)
+            return expand_suites(['test', 'perf', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'],expandUseDB=expandUseDB)
         if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'
@@ -878,20 +876,6 @@ def expand_suites(suites,expandUseDB=True):
             else:
                 program = 'perftest'
             (globstr, usedb) = (program, False)
-        elif suite == 'client':
-            paths = ["firstExample", "secondExample", "whereExample", "authTest", "clientTest", "httpClientTest"]
-            if os.sys.platform == "win32":
-                paths = [path + '.exe' for path in paths]
-
-            if not test_path:
-                # If we are testing 'in-tree', then add any files of the same name from the
-                # sharedclient directory. The out of tree client build doesn't have shared clients.
-                scpaths = ["sharedclient/" + path for path in paths]
-                scfiles = glob.glob("sharedclient/*")
-                paths += [scfile for scfile in scfiles if scfile in scpaths]
-
-            # hack
-            tests += [(test_path and path or os.path.join(mongo_repo, path), False) for path in paths]
         elif suite == 'mongosTest':
             if os.sys.platform == "win32":
                 program = 'mongos.exe'
@@ -974,17 +958,9 @@ def set_globals(options, tests):
     set_parameters = options.set_parameters
     set_parameters_mongos = options.set_parameters_mongos
     no_preallocj = options.no_preallocj
-    if options.mode == 'suite' and tests == ['client']:
-        # The client suite doesn't work with authentication
-        if options.auth:
-            print "Not running client suite with auth even though --auth was provided"
-        auth = False;
-        keyFile = False;
-        authMechanism = None
-    else:
-        auth = options.auth
-        authMechanism = options.authMechanism
-        keyFile = options.keyFile
+    auth = options.auth
+    authMechanism = options.authMechanism
+    keyFile = options.keyFile
 
     if auth and not keyFile:
         # if only --auth was given to smoke.py, load the

@@ -69,21 +69,6 @@ def addSmokeSuite( name, suitefile, needMongod=False ):
 addSmoketest( "smoke", [ add_exe( "test" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
 addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
 
-smokeClientDeps = [
-    add_exe('firstExample'),
-    add_exe('rsExample'),
-    add_exe('secondExample'),
-    add_exe('whereExample'),
-    add_exe('authTest'),
-    add_exe('httpClientTest'),
-    add_exe('clientTest'),
-]
-if has_option("sharedclient"):
-    smokeClientDeps += [ "sharedclient/" + name for name in smokeClientDeps ]
-smokeClientDeps += [add_exe('bsondemo')]
-smokeClientDeps += [add_exe('mongod'), add_exe('mongo')]
-smokeClient = addSmoketest( "smokeClient", smokeClientDeps )
-
 addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
 addSmokeSuite( "smokeCppUnittests", "$UNITTEST_LIST" )
 addSmokeSuite( "smokeModuleTests", "$MODULETEST_LIST" )
@@ -118,7 +103,7 @@ smokeEnv.AlwaysBuild( "startMongodSmallOplog" );
 smokeEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
 
 def addMongodReqTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient", "smokeJs" ]
+    mongodReqTargets = [ "smokeJs" ]
     for target in mongodReqTargets:
         smokeEnv.Depends( target, "startMongod" )
         smokeEnv.Depends( "smokeAll", target )
@@ -130,7 +115,7 @@ smokeEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", 
 smokeEnv.AlwaysBuild( "smokeAll" )
 
 def addMongodReqNoJsTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient" ]
+    mongodReqTargets = []
     for target in mongodReqTargets:
         smokeEnv.Depends( target, "startMongod" )
         smokeEnv.Depends( "smokeAllNoJs", target )

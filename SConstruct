@@ -188,8 +188,8 @@ add_option( "extra-variant-dirs", "extra variant dir components, separated by co
 add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
 add_option( "variant-dir", "override variant subdirectory", 1, False )
 
-add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
-add_option( "full", "include client and headers when doing scons install", 0 , False )
+add_option( "sharedclient", "build a libmongoclient.so/.dll [DEPRECATED/IGNORED]" , 0 , False )
+add_option( "full", "include client and headers when doing scons install [DEPRECATED/IGNORED]", 0 , False )
 
 # linking options
 add_option( "release" , "release build" , 0 , True )
@@ -197,7 +197,7 @@ add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
 add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
-add_option( "disable-declspec-thread", "don't use __declspec(thread) on Windows", 0, True)
+add_option( "disable-declspec-thread", "don't use __declspec(thread) on Windows [DEPRECATED/IGNORED]", 0, True)
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -448,8 +448,6 @@ asio = has_option( "asio" )
 
 usePCH = has_option( "usePCH" )
 
-justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
-
 env = Environment( BUILD_DIR=variantDir,
                    DIST_ARCHIVE_SUFFIX='.tgz',
                    EXTRAPATH=get_option("extrapath"),
@@ -602,8 +600,7 @@ if has_option( "durableDefaultOn" ):
 if has_option( "durableDefaultOff" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
-if ( not ( usev8 or justClientLib) ):
-    usev8 = True
+usev8 = True
 
 extraLibPlaces = []
 
@@ -626,25 +623,6 @@ if has_option( "extrapathdyn" ):
 if has_option( "extralib" ):
     for x in GetOption( "extralib" ).split( "," ):
         env.Append( LIBS=[ x ] )
-
-class InstallSetup:
-    binaries = False
-    libraries = False
-    headers = False
-
-    def __init__(self):
-        self.default()
-
-    def default(self):
-        self.binaries = True
-        self.libraries = False
-        self.headers = False
-
-installSetup = InstallSetup()
-
-if has_option( "full" ):
-    installSetup.headers = True
-    installSetup.libraries = True
 
 # ---- other build setup -----
 
@@ -1313,24 +1291,23 @@ def doConfigure(myenv):
     # explicitly not to use it. For other compilers, see if __thread works.
     if using_msvc():
         haveDeclSpecThread = False
-        if not has_option("disable-declspec-thread"):
-            def CheckDeclspecThread(context):
-                test_body = """
-                __declspec( thread ) int tsp_int;
-                int main(int argc, char* argv[]) {
-                    tsp_int = argc;
-                    return 0;
-                }
-                """
-                context.Message('Checking for __declspec(thread)... ')
-                ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
-                context.Result(ret)
-                return ret
-            conf = Configure(myenv, help=False, custom_tests = {
-                'CheckDeclspecThread' : CheckDeclspecThread,
-            })
-            haveDeclSpecThread = conf.CheckDeclspecThread()
-            conf.Finish()
+        def CheckDeclspecThread(context):
+            test_body = """
+            __declspec( thread ) int tsp_int;
+            int main(int argc, char* argv[]) {
+            tsp_int = argc;
+            return 0;
+            }
+            """
+            context.Message('Checking for __declspec(thread)... ')
+            ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckDeclspecThread' : CheckDeclspecThread,
+        })
+        haveDeclSpecThread = conf.CheckDeclspecThread()
+        conf.Finish()
         if haveDeclSpecThread:
             myenv.Append(CPPDEFINES=['MONGO_HAVE___DECLSPEC_THREAD'])
     else:
@@ -1680,7 +1657,7 @@ Export("shellEnv")
 Export("testEnv")
 Export("get_option")
 Export("has_option use_system_version_of_library")
-Export("installSetup mongoCodeVersion")
+Export("mongoCodeVersion")
 Export("usev8")
 Export("darwin windows solaris linux freebsd nix")
 Export('module_sconscripts')
@@ -1708,4 +1685,4 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
-env.Alias('all', ['core', 'tools', 'clientTests', 'test', 'unittests', 'moduletests'])
+env.Alias('all', ['core', 'tools', 'test', 'unittests', 'moduletests'])

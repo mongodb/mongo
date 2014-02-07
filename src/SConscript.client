@@ -1,346 +1,52 @@
 # -*- mode: python -*-
 
-# This SConscript describes build and install rules for the Mongo C++ driver and associated exmaple
-# programs.
+# This SConscript used to describe the build and install rules for the Mongo C++ driver. Now it
+# causes the relevant targets to emit an error message informing users that the client driver
+# is now maintained in a separate repo, and provides a link to the documentation on how to
+# build the driver.
+
 import os
+import textwrap
 
-Import('env has_option installSetup use_system_version_of_library')
+Import('env')
 
-Import('nix linux darwin windows')
+def failClient(target, source, env):
+    failClientMessage = '''
+    PLEASE NOTE: The C++ client driver repository has been moved to
+    http://github.com/mongodb/mongo-cxx-driver
 
-buildShared = False
-if has_option("sharedclient"):
-    buildShared = True
+    As of MongoDB 2.6.0, the C++ client library has been separated from the core database
+    server repository into a separate git repository. The targets specific to the C++ driver
+    can no longer be built from the server codebase.
 
-clientEnv = env.Clone()
-libEnv = env.Clone()
-del env
-clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
-libEnv.Append(CPPDEFINES='LIBMONGOCLIENT_BUILDING')
+    In particular, the following targets are no longer availble in this repository:
+     mongoclient
+     install-mongoclient
+     check-install-mongoclient
+     clientTests
+     smokeClient
 
-libEnv.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
-               ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
-               '$PYTHON $SOURCES $TARGETS')
+    Additionally, the following SCons options no longer have any effect in this repository,
+    though they are accepted without error for backward compatibility:
+     --sharedclient
+     --full
+     --disable-declspec-thread
 
-clientSourceBasic = [
-    'mongo/base/error_codes.cpp',
-    'mongo/base/global_initializer.cpp',
-    'mongo/base/global_initializer_registerer.cpp',
-    'mongo/base/init.cpp',
-    'mongo/base/initializer.cpp',
-    'mongo/base/initializer_context.cpp',
-    'mongo/base/initializer_dependency_graph.cpp',
-    'mongo/base/make_string_vector.cpp',
-    'mongo/base/parse_number.cpp',
-    'mongo/base/status.cpp',
-    'mongo/base/string_data.cpp',
-    'mongo/bson/bson_validate.cpp',
-    'mongo/bson/oid.cpp',
-    'mongo/bson/optime.cpp',
-    'mongo/bson/util/bson_extract.cpp',
-    'mongo/buildinfo.cpp',
-    'mongo/client/clientAndShell.cpp',
-    'mongo/client/clientOnly.cpp',
-    'mongo/client/connpool.cpp',
-    'mongo/client/dbclient.cpp',
-    'mongo/client/dbclient_rs.cpp',
-    'mongo/client/replica_set_monitor.cpp',
-    'mongo/client/dbclientcursor.cpp',
-    'mongo/client/gridfs.cpp',
-    'mongo/client/init.cpp',
-    'mongo/client/sasl_client_authenticate.cpp',
-    'mongo/client/syncclusterconnection.cpp',
-    'mongo/db/jsobj.cpp',
-    'mongo/db/json.cpp',
-    'mongo/db/lasterror.cpp',
-    'mongo/db/dbmessage.cpp',
-    'mongo/db/server_options.cpp',
-    'mongo/logger/console.cpp',
-    'mongo/logger/log_manager.cpp',
-    'mongo/logger/log_severity.cpp',
-    'mongo/logger/logger.cpp',
-    'mongo/logger/logstream_builder.cpp',
-    'mongo/logger/message_event_utf8_encoder.cpp',
-    'mongo/logger/message_log_domain.cpp',
-    'mongo/logger/ramlog.cpp',
-    'mongo/logger/rotatable_file_manager.cpp',
-    'mongo/logger/rotatable_file_writer.cpp',
-    'mongo/pch.cpp',
-    'mongo/platform/backtrace.cpp',
-    'mongo/platform/process_id.cpp',
-    'mongo/platform/random.cpp',
-    'mongo/util/assert_util.cpp',
-    'mongo/util/background.cpp',
-    'mongo/util/base64.cpp',
-    'mongo/util/concurrency/spin_lock.cpp',
-    'mongo/util/concurrency/synchronization.cpp',
-    'mongo/util/concurrency/thread_name.cpp',
-    'mongo/util/concurrency/thread_pool.cpp',
-    'mongo/util/concurrency/mutexdebugger.cpp',
-    'mongo/util/debug_util.cpp',
-    'mongo/util/stacktrace.cpp',
-    'mongo/util/fail_point.cpp',
-    'mongo/util/fail_point_registry.cpp',
-    'mongo/util/fail_point_service.cpp',
-    'mongo/util/hex.cpp',
-    'mongo/util/intrusive_counter.cpp',
-    'mongo/util/log.cpp',
-    'mongo/util/md5.cpp',
-    'mongo/util/password_digest.cpp',
-    'mongo/util/net/httpclient.cpp',
-    'mongo/util/net/listen.cpp',
-    'mongo/util/net/message.cpp',
-    'mongo/util/net/message_port.cpp',
-    'mongo/util/net/sock.cpp',
-    "mongo/util/net/socket_poll.cpp",
-    'mongo/util/net/ssl_manager.cpp',
-    'mongo/util/signal_handlers.cpp',
-    'mongo/util/stringutils.cpp',
-    'mongo/util/text.cpp',
-    'mongo/util/time_support.cpp',
-    'mongo/util/timer.cpp',
-    'mongo/util/util.cpp',
-    'mongo/util/version.cpp',
-    'third_party/murmurhash3/MurmurHash3.cpp',
-    ]
+    For detailed instructions on how to build the C++ driver, please
+    see http://dochub.mongodb.org/core/build-cpp-driver
+    '''
+    print(textwrap.dedent(failClientMessage))
+    Exit(1)
 
-clientSourceSasl = [
-    'mongo/client/sasl_client_authenticate_impl.cpp',
-    'mongo/client/sasl_client_session.cpp',
-    'mongo/client/sasl_sspi.cpp',
+failClientAction = env.Action(failClient, cmdstr=None)
+failClientTargets = [
+    'check-install-mongoclient',
+    'clientTests',
+    'install-mongoclient',
+    'mongoclient',
+    'smokeClient',
 ]
 
-clientSourceAll = clientSourceBasic + clientSourceSasl
-
-usingSasl = libEnv['MONGO_BUILD_SASL_CLIENT']
-
-clientSource = list(clientSourceBasic)
-if usingSasl:
-    clientSource += clientSourceSasl
-
-exampleSourceMap = [
-        ('authTest', 'mongo/client/examples/authTest.cpp'),
-        ('clientTest', 'mongo/client/examples/clientTest.cpp'),
-        ('firstExample', 'mongo/client/examples/first.cpp'),
-        ('httpClientTest', 'mongo/client/examples/httpClientTest.cpp'),
-        ('rsExample', 'mongo/client/examples/rs.cpp'),
-        ('secondExample', 'mongo/client/examples/second.cpp'),
-        ('tutorial', 'mongo/client/examples/tutorial.cpp'),
-        ('whereExample', 'mongo/client/examples/whereExample.cpp'),
-        ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
-        ]
-
-clientHeaderDirectories = [
-    "base/",
-    "bson/",
-    "bson/util/",
-    "client/",
-    "db/",
-    "db/auth/",
-    "db/stats/",
-    "db/repl/",
-    "db/ops/",
-    "logger/",
-    "platform/",
-    "s/",
-    "scripting/",
-    "shell/",
-    "util/",
-    "util/concurrency/",
-    "util/mongoutils/",
-    "util/options_parser/",
-    "util/net/",
-    ""
-    ]
-
-clientHeaders = []
-for path in clientHeaderDirectories:
-    clientHeaders.extend(Glob('mongo/%s/*.h' % path))
-    clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
-
-# This relies on static and shared objects being the same, since we will link these object
-# files twice: once into a .a, and another time into a .so
-clientObjects = [libEnv.Object(source) for source in clientSource]
-
-mongoClientLibs = []
-mongoClientLibDeps = ['$BUILD_DIR/third_party/shim_boost']
-mongoClientSysLibDeps = []
-
-if usingSasl:
-    mongoClientSysLibDeps += ["sasl2"]
-    if windows:
-        mongoClientSysLibDeps += ["secur32"]
-
-mongoClientInstalls = []
-mongoClientPrefixInstalls = []
-
-staticLibEnv = libEnv.Clone()
-staticLibEnv.AppendUnique(
-    LIBDEPS=mongoClientLibDeps,
-    SYSLIBDEPS=mongoClientSysLibDeps)
-
-if windows:
-    # On Windows, we need to have the static library target and the
-    # import library target have different names, so that they aren't
-    # ambiguous to scons.  Boost names the static library libxxxx.lib and
-    # the import library xxxx.lib, so we shall follow their lead.
-    staticLibName = 'libmongoclient'
-else:
-    staticLibName = 'mongoclient'
-
-mongoClientStaticLib = staticLibEnv.StaticLibrary(
-    staticLibName, clientObjects),
-mongoClientInstalls.append(staticLibEnv.Install('#/', mongoClientStaticLib))
-
-if installSetup.libraries:
-    mongoClientPrefixInstalls.append(libEnv.Install("$INSTALL_DIR/lib", mongoClientStaticLib))
-
-mongoClientSharedLib = None
-
-if buildShared:
-
-    # TODO: When we are ready to set a SONAME for mongoclient, set SHLIBVERSION=x.y.z in this
-    # environment to enable SCons versioned shared library support, and then change the two
-    # 'Install' calls in this block to 'InstallVersionedLibrary'. SHLIBVERSION and
-    # InstallVersionedLibrary support is only stable in SCons > 2.3.0, so if you add support
-    # here, be sure to add an EnsuredSconsVersion here as well.
-    sharedLibEnv = libEnv.Clone()
-    sharedLibEnv.AppendUnique(LIBS=mongoClientSysLibDeps)
-
-    # On windows, we always want to attach the shim, since independently of whether we are
-    # using the system or the vendored boost, the DLL must have complete symbols. For unix like
-    # systems, attach the shim only if we are using the external libraries so that we pick up
-    # what configure found for us. Otherwise, produce a dynamic object in which the boost
-    # symbols are undefined, ensuring that we pass any necessary OS flags to produce such a
-    # library.
-    if windows or use_system_version_of_library("boost"):
-        sharedLibEnv.AppendUnique(LIBDEPS=mongoClientLibDeps)
-        if linux:
-            sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
-    elif darwin:
-        sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,-undefined,dynamic_lookup"])
-
-    # On non-windows systems, we want to match the behavior of DLLs
-    # and not export all symbols from the dynamic shared library unless 
-    # they have been explicitly been marked.
-    if not windows:
-        sharedLibEnv.AppendUnique(CCFLAGS="-fvisibility=hidden")
-        sharedLibEnv.AppendUnique(SHLINKFLAGS="-fvisibility=hidden")
-
-    mongoClientSharedLib = sharedLibEnv.SharedLibrary('mongoclient', clientObjects)
-
-    mongoClientSharedLibInstall = sharedLibEnv.Install(
-        '#/sharedclient', mongoClientSharedLib)
-
-    if darwin:
-        # Set up the copy of the client library in #/sharedclient so that things that link
-        # against it record the local directory as the install_name.
-        sharedLibEnv.AddPostAction(
-            mongoClientSharedLibInstall,
-            "install_name_tool -id @executable_path/%s %s" % (
-                mongoClientSharedLibInstall[0].name,
-                mongoClientSharedLibInstall[0]
-            ))
-    mongoClientInstalls.append(mongoClientSharedLibInstall)
-
-    if installSetup.libraries:
-        mongoClientSharedLibPrefixInstall = sharedLibEnv.Install(
-            '$INSTALL_DIR/lib', mongoClientSharedLib)
-        if darwin:
-            sharedLibEnv.AddPostAction(
-                mongoClientSharedLibPrefixInstall,
-                "install_name_tool -id %s %s" % (
-                    mongoClientSharedLibPrefixInstall[0],
-                    mongoClientSharedLibPrefixInstall[0]
-                ))
-        mongoClientPrefixInstalls.append(mongoClientSharedLibPrefixInstall)
-
-libEnv.Alias('mongoclient', mongoClientInstalls)
-
-if installSetup.headers:
-    for x in clientHeaderDirectories:
-        inst = libEnv.Install("$INSTALL_DIR/include/mongo/" + x,
-                              [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
-        libEnv.AddPostAction(inst, Chmod('$TARGET', 0644))
-        mongoClientPrefixInstalls.append(inst)
-
-if installSetup.headers or installSetup.libraries:
-    installAlias = libEnv.Alias('install-mongoclient', mongoClientPrefixInstalls)
-
-    # Build some simple mainlines that include the dbclient.h and bson.h headers
-    # with things set up to include from the installation directory.
-
-    # Remove anything that says $BUILD_DIR from the CPPPATH, except for things in third party,
-    # so we have a source for boost, etc if we aren't getting them from the system.
-    limit_cpppath=[p for p in libEnv['CPPPATH']
-                   if not ('$BUILD_DIR' in p and not 'third_party' in p)]
-
-    # Create an environment where include files and libraries come from the installation directory.
-    installationTestEnv = libEnv.Clone(
-        CPPPATH=["$INSTALL_DIR/include"] + limit_cpppath,
-        LIBPATH=["$INSTALL_DIR/lib"],
-        CPPDEFINES=[],
-    )
-
-    include_dbclienth_test_file = 'mongo/client/include_dbclienth_test.cpp'
-    libEnv.Depends(include_dbclienth_test_file, installAlias)
-    include_dbclienth_test = installationTestEnv.Object(
-        target='include_dbclienth_test',
-        source=[include_dbclienth_test_file])
-    libEnv.AlwaysBuild(include_dbclienth_test)
-    libEnv.NoCache(include_dbclienth_test)
-
-    include_bsonh_test_file = 'mongo/client/include_bsonh_test.cpp'
-    libEnv.Depends(include_bsonh_test_file, installAlias)
-    include_bsonh_test = installationTestEnv.Object(
-        target='include_bsonh_test',
-        source=[include_bsonh_test_file])
-    libEnv.AlwaysBuild(include_bsonh_test)
-    libEnv.NoCache(include_bsonh_test)
-
-    libEnv.Alias('check-install-mongoclient', [
-        include_dbclienth_test,
-        include_bsonh_test,
-    ])
-
-# Compile the example files to .o so that we can link them twice: once statically, once shared.
-exampleObjMap = [(target, clientEnv.Object(source)) for (target, source) in exampleSourceMap]
-
-staticClientEnv = clientEnv.Clone()
-staticClientEnv.PrependUnique(LIBDEPS=[mongoClientStaticLib])
-
-# Build each statically linked client program
-staticClientPrograms = [staticClientEnv.Program(target, obj) for (target, obj) in exampleObjMap]
-
-# Install them to the root, and append the install targets to the list of client tests
-clientTests = staticClientEnv.Install("#/", staticClientPrograms)
-
-# Do the same for the shared library case, if we are doing that.
-if buildShared:
-    sharedClientEnv = clientEnv.Clone()
-
-    # Arrange for the tests to link against the mongoclient in the #/sharedclient directory,
-    # and against boost explicitly rather than picking up the symbols through mongoclient.
-    sharedClientEnv.PrependUnique(
-        LIBS=['mongoclient'],
-        LIBPATH=["#/sharedclient"],
-        LIBDEPS=mongoClientLibDeps,
-    )
-
-    # Deal with the different lookup models between regular UNIX and Darwin. For regular unix,
-    # we set $ORIGIN to pull the copy we run against from the current directory
-    # (#/sharedclient). On Darwin, the staged copy of the mongoclient dylib in #sharedclient
-    # has @executable path set as its install_name, so we pick up the same behavior that way.
-    if nix and not darwin:
-        sharedClientEnv.PrependUnique(
-            LINKFLAGS="-Wl,-z,origin",
-            RPATH=[sharedClientEnv.Literal("\\$$ORIGIN")])
-
-    sharedClientPrograms = [
-        sharedClientEnv.Program("sharedclient/" + target, obj) for (target, obj) in exampleObjMap]
-    libEnv.Depends(sharedClientPrograms, mongoClientInstalls)
-
-    sharedClientProgramInstalls = sharedClientEnv.Install("#/sharedclient", sharedClientPrograms)
-    clientTests.append(sharedClientProgramInstalls)
-
-clientEnv.Alias('clientTests', clientTests, [])
+env.AlwaysBuild(
+    [env.Alias(target, [], failClientAction) for target in failClientTargets]
+)

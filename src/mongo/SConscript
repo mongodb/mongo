@@ -12,7 +12,6 @@ Import("testEnv")
 Import("has_option")
 Import("get_option")
 Import("usev8")
-Import("installSetup")
 Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
 
@@ -1162,10 +1161,6 @@ def installBinary( e, name ):
         e.AddPostAction(name, 'strip $TARGET')
 
     distBinaries.append(name)
-
-    if not installSetup.binaries:
-        return
-
     inst = e.Install( "$INSTALL_DIR/bin", name )
 
     if nix:

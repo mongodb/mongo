@@ -3,7 +3,6 @@
 import os
 
 Import("env")
-Import("installSetup")
 Import("windows")
 Import("mongoCodeVersion")
 Import("s3push")
