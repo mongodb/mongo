@@ -118,7 +118,7 @@ namespace mongo {
         // Load shards from config server
         //
 
-        vector<ConnectionString> shardLocs;
+        vector<HostAndPort> servers;
 
         try {
             ScopedDbConnection& conn = *connPtr;
@@ -146,7 +146,8 @@ namespace mongo {
                                            << " read from the config server" << causedBy(errMsg));
                 }
 
-                shardLocs.push_back(shardLoc);
+                vector<HostAndPort> shardServers = shardLoc.getServers();
+                servers.insert(servers.end(), shardServers.begin(), shardServers.end());
             }
         }
         catch (const DBException& e) {
@@ -155,65 +156,64 @@ namespace mongo {
 
         connPtr->done();
 
+        // Add config servers to list of servers to check version against
+        vector<HostAndPort> configServers = configLoc.getServers();
+        servers.insert(servers.end(), configServers.begin(), configServers.end());
+
         //
         // We've now got all the shard info from the config server, start contacting the shards
-        // and verifying their versions.
+        // and config servers and verifying their versions.
         //
 
-        for (vector<ConnectionString>::iterator it = shardLocs.begin(); it != shardLocs.end(); ++it)
+
+        for (vector<HostAndPort>::iterator serverIt = servers.begin();
+                serverIt != servers.end(); ++serverIt)
         {
-            ConnectionString& shardLoc = *it;
+            // Note: This will *always* be a single-host connection
+            ConnectionString serverLoc(*serverIt);
+            dassert(serverLoc.type() == ConnectionString::MASTER);
 
-            vector<HostAndPort> servers = shardLoc.getServers();
+            log() << "checking that version of host " << serverLoc << " is compatible with "
+                  << minMongoVersion << endl;
 
-            for (vector<HostAndPort>::iterator serverIt = servers.begin();
-                    serverIt != servers.end(); ++serverIt)
-            {
-                // Note: This will *always* be a single-host connection
-                ConnectionString serverLoc(*serverIt);
+            scoped_ptr<ScopedDbConnection> serverConnPtr;
 
-                log() << "checking that version of host " << serverLoc << " is compatible with " 
-                      << minMongoVersion << endl;
+            bool resultOk;
+            BSONObj buildInfo;
 
-                scoped_ptr<ScopedDbConnection> serverConnPtr;
+            try {
+                serverConnPtr.reset(new ScopedDbConnection(serverLoc, 30));
+                ScopedDbConnection& serverConn = *serverConnPtr;
 
-                bool resultOk;
-                BSONObj buildInfo;
+                resultOk = serverConn->runCommand("admin",
+                                                  BSON("buildInfo" << 1),
+                                                  buildInfo);
+            }
+            catch (const DBException& e) {
+                warning() << "could not run buildInfo command on " << serverLoc.toString() << " "
+                          << causedBy(e) << ". Please ensure that this server is up and at a "
+                                  "version >= "
+                          << minMongoVersion;
+                continue;
+            }
 
-                try {
-                    serverConnPtr.reset(new ScopedDbConnection(serverLoc, 30));
-                    ScopedDbConnection& serverConn = *serverConnPtr;
+            // TODO: Make running commands saner such that we can consolidate error handling
+            if (!resultOk) {
+                return Status(ErrorCodes::UnknownError,
+                              stream() << DBClientConnection::getLastErrorString(buildInfo)
+                                       << causedBy(buildInfo.toString()));
+            }
 
-                    resultOk = serverConn->runCommand("admin",
-                                                      BSON("buildInfo" << 1),
-                                                      buildInfo);
-                }
-                catch (const DBException& e) {
-                    warning() << "could not run buildInfo command on " << serverLoc.toString()
-                              << causedBy(e) << ", you must manually verify this mongo server is "
-                              << "offline (for at least 5 minutes) or of a version >= "
-                              << minMongoVersion;
-                    continue;
-                }
+            serverConnPtr->done();
 
-                // TODO: Make running commands saner such that we can consolidate error handling
-                if (!resultOk) {
-                    return Status(ErrorCodes::UnknownError,
-                                  stream() << DBClientConnection::getLastErrorString(buildInfo)
-                                           << causedBy(buildInfo.toString()));
-                }
+            verify(buildInfo["version"].type() == String);
+            string mongoVersion = buildInfo["version"].String();
 
-                serverConnPtr->done();
-
-                verify(buildInfo["version"].type() == String);
-                string mongoVersion = buildInfo["version"].String();
-
-                if (versionCmp(mongoVersion, minMongoVersion) < 0) {
-                    return Status(ErrorCodes::RemoteValidationError,
-                                  stream() << "version " << mongoVersion << " detected on mongo "
-                                  "server at " << serverLoc.toString() <<
-                                  ", but version >= " << minMongoVersion << " required");
-                }
+            if (versionCmp(mongoVersion, minMongoVersion) < 0) {
+                return Status(ErrorCodes::RemoteValidationError,
+                              stream() << "version " << mongoVersion << " detected on mongo "
+                              "server at " << serverLoc.toString() <<
+                              ", but version >= " << minMongoVersion << " required");
             }
         }
 
