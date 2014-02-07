@@ -29,6 +29,8 @@
 #include "mongo/db/commands/write_commands/write_commands.h"
 
 #include "mongo/base/init.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/commands/write_commands/batch_executor.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
@@ -58,6 +60,22 @@ namespace mongo {
 
     WriteCmd::WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
         Command( name ), _writeType( writeType ) {
+    }
+
+    void WriteCmd::redactTooLongLog( mutablebson::Document* cmdObj, const StringData& fieldName ) {
+        namespace mmb = mutablebson;
+        mmb::Element root = cmdObj->root();
+        mmb::Element field = root.findFirstChildNamed( fieldName );
+
+        // If the cmdObj is too large, it will be a "too big" message given by CachedBSONObj.get()
+        if ( !field.ok() ) {
+            return;
+        }
+
+        // Redact the log if there are more than one documents or operations.
+        if ( field.countChildren() > 1 ) {
+            field.setValueInt( field.countChildren() );
+        }
     }
 
     // Write commands are fanned out in oplog as single writes.
@@ -143,6 +161,10 @@ namespace mongo {
         WriteCmd( "insert", BatchedCommandRequest::BatchType_Insert ) {
     }
 
+    void CmdInsert::redactForLogging( mutablebson::Document* cmdObj ) {
+        redactTooLongLog( cmdObj, StringData( "documents", StringData::LiteralTag() ) );
+    }
+
     void CmdInsert::help( stringstream& help ) const {
         help << "insert documents";
     }
@@ -151,12 +173,20 @@ namespace mongo {
         WriteCmd( "update", BatchedCommandRequest::BatchType_Update ) {
     }
 
+    void CmdUpdate::redactForLogging( mutablebson::Document* cmdObj ) {
+        redactTooLongLog( cmdObj, StringData( "updates", StringData::LiteralTag() ) );
+    }
+
     void CmdUpdate::help( stringstream& help ) const {
         help << "update documents";
     }
 
     CmdDelete::CmdDelete() :
         WriteCmd( "delete", BatchedCommandRequest::BatchType_Delete ) {
+    }
+
+    void CmdDelete::redactForLogging( mutablebson::Document* cmdObj ) {
+        redactTooLongLog( cmdObj, StringData( "deletes", StringData::LiteralTag() ) );
     }
 
     void CmdDelete::help( stringstream& help ) const {
