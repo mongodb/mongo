@@ -28,7 +28,6 @@
 
 import fileinput, os, re, shutil, sys, textwrap
 from collections import defaultdict
-from datetime import datetime
 from time import mktime
 from subprocess import call
 
@@ -39,27 +38,16 @@ except ImportError:
     sys.exit(-1)
 
 try:
+    from wt_nvd3_util import multiChart, parsetime
+except ImportError:
+    print >>sys.stderr, "Could not import wt_nvd3_util.py, it should be in the same directory as %s" % sys.argv[0]
+    sys.exit(-1)
+
+try:
     from nvd3 import lineChart, lineWithFocusChart
 except ImportError:
     print >>sys.stderr, "Could not import nvd3.  Please install it *from source* (other versions may be missing features that we rely on).  Run these commands: git clone https://github.com/areski/python-nvd3.git ; cd python-nvd3 ; sudo python setup.py install"
     sys.exit(-1)
-
-
-# Add a multiChart type so we can overlay line graphs
-class multiChart(lineChart):
-    def __init__(self, **kwargs):
-        lineChart.__init__(self, **kwargs)
-
-        # Fix the axes
-        del self.axislist['yAxis']
-        self.create_y_axis('yAxis1', format=kwargs.get('y_axis_format', '.02f'))
-        self.create_y_axis('yAxis2', format=kwargs.get('y_axis_format', '.02f'))
-
-TIMEFMT = "%b %d %H:%M:%S"
-
-thisyear = datetime.today().year
-def parsetime(s):
-    return datetime.strptime(s, TIMEFMT).replace(year=thisyear)
 
 # Plot a set of entries for a title.
 def munge(title, values):
@@ -93,7 +81,7 @@ def munge(title, values):
 # Parse the command line
 import argparse
 
-parser = argparse.ArgumentParser(description='Create graphs from WiredTIger statistics.')
+parser = argparse.ArgumentParser(description='Create graphs from WiredTiger statistics.')
 parser.add_argument('--abstime', action='store_true',
     help='use absolute time on the x axis')
 parser.add_argument('--focus', action='store_true',
@@ -183,7 +171,7 @@ if prefix or suffix:
 # Are we just listing the results?
 if args.list:
     for title, yaxis, ydata in results:
-        print title
+        print title + ydata
     sys.exit(0)
 
 # Figure out the full set of x axis values
@@ -208,6 +196,7 @@ if args.abstime:
 chart = charttype(name='statlog', height=450+10*len(results), resize=True, x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/', **chart_extra)
 
 for title, yaxis, ydata in results:
+    print 'Adding: ' + title + ','.join('"%s"' % x in xdata)
     chart.add_serie(x=xdata, y=(ydata.get(x, 0) for x in xdata), name=title,
                     type="line", yaxis="2" if yaxis else "1")
 
