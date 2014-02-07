@@ -90,6 +90,11 @@ namespace mongo {
         ParsedProjection() : _requiresDocument(true) { }
 
         /**
+         * Returns true if field name refers to a positional projection.
+         */
+        static bool _isPositionalOperator(const char* fieldName);
+
+        /**
          * Returns true if the MatchExpression 'query' queries against
          * the field named by 'matchfield'. This deeply traverses logical
          * nodes in the matchfield and returns true if any of the children

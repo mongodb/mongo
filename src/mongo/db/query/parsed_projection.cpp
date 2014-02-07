@@ -193,7 +193,8 @@ namespace mongo {
                 }
             }
 
-            if (mongoutils::str::contains(e.fieldName(), ".$")) {
+
+            if (_isPositionalOperator(e.fieldName())) {
                 // Validate the positional op.
                 if (!e.trueValue()) {
                     return Status(ErrorCodes::BadValue,
@@ -273,6 +274,15 @@ namespace mongo {
 
         *out = pp.release();
         return Status::OK();
+    }
+
+    // static
+    bool ParsedProjection::_isPositionalOperator(const char* fieldName) {
+        return mongoutils::str::contains(fieldName, ".$") &&
+               !mongoutils::str::contains(fieldName, ".$ref") &&
+               !mongoutils::str::contains(fieldName, ".$id") &&
+               !mongoutils::str::contains(fieldName, ".$db");
+
     }
 
     // static

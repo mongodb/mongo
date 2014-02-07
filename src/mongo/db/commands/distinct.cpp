@@ -100,8 +100,10 @@ namespace mongo {
             }
 
             Runner* rawRunner;
-            if (!getRunnerDistinct(collection, query, key, &rawRunner).isOK()) {
-                uasserted(17216, "Can't get runner for query " + query.toString());
+            Status status = getRunnerDistinct(collection, query, key, &rawRunner);
+            if (!status.isOK()) {
+                uasserted(17216, mongoutils::str::stream() << "Can't get runner for query "
+                              << query << ": " << status.toString());
                 return 0;
             }
 
