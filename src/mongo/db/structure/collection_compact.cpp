@@ -99,7 +99,7 @@ namespace mongo {
             int ms = t.millis();
             if( ms > 1000 )
                 log() << "compact end paging in " << ms << "ms "
-                      << e->length/1000000.0/ms << "MB/sec" << endl;
+                      << e->length/1000000.0/t.seconds() << "MB/sec" << endl;
         }
 
         {
