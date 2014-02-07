@@ -47,13 +47,17 @@ lzo_ext=".libs/lzo_compress.so"
 if test -e $lzo_ext ; then
         ext="$ext,\"$lzo_ext\""
 fi
-raw_ext=".libs/raw_compress.so"
-if test -e $raw_ext ; then
-        ext="$ext,\"$raw_ext\""
+bzip_raw_ext=".libs/bzip_raw_compress.so"
+if test -e $bzip_raw_ext ; then
+        ext="$ext,\"$bzip_raw_ext\""
 fi
 snappy_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
 if test -e $snappy_ext ; then
         ext="$ext,\"$snappy_ext\""
+fi
+zlib_ext="$top/ext/compressors/zlib/.libs/libwiredtiger_zlib.so"
+if test -e $zlib_ext ; then
+        ext="$ext,\"$zlib_ext\""
 fi
 
 config='extensions=['$ext']'

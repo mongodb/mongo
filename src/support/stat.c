@@ -93,11 +93,14 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->cursor_search_near.desc = "cursor search near calls";
 	stats->cursor_update.desc = "cursor update calls";
 	stats->cursor_update_bytes.desc = "cursor-update value bytes updated";
+	stats->lsm_checkpoint_throttle.desc =
+	    "sleep for LSM checkpoint throttle";
 	stats->lsm_chunk_count.desc = "chunks in the LSM tree";
 	stats->lsm_generation_max.desc =
 	    "highest merge generation in the LSM tree";
 	stats->lsm_lookup_no_bloom.desc =
 	    "queries that could have benefited from a Bloom filter that did not exist";
+	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
 	stats->rec_dictionary.desc = "reconciliation dictionary matches";
 	stats->rec_overflow_key_internal.desc =
 	    "reconciliation internal-page overflow keys";
@@ -194,9 +197,11 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
 	stats->cursor_update_bytes.v = 0;
+	stats->lsm_checkpoint_throttle.v = 0;
 	stats->lsm_chunk_count.v = 0;
 	stats->lsm_generation_max.v = 0;
 	stats->lsm_lookup_no_bloom.v = 0;
+	stats->lsm_merge_throttle.v = 0;
 	stats->rec_dictionary.v = 0;
 	stats->rec_overflow_key_internal.v = 0;
 	stats->rec_overflow_key_leaf.v = 0;
@@ -280,9 +285,11 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->cursor_search_near.v += c->cursor_search_near.v;
 	p->cursor_update.v += c->cursor_update.v;
 	p->cursor_update_bytes.v += c->cursor_update_bytes.v;
+	p->lsm_checkpoint_throttle.v += c->lsm_checkpoint_throttle.v;
 	if (c->lsm_generation_max.v > p->lsm_generation_max.v)
 	    p->lsm_generation_max.v = c->lsm_generation_max.v;
 	p->lsm_lookup_no_bloom.v += c->lsm_lookup_no_bloom.v;
+	p->lsm_merge_throttle.v += c->lsm_merge_throttle.v;
 	p->rec_dictionary.v += c->rec_dictionary.v;
 	p->rec_overflow_key_internal.v += c->rec_overflow_key_internal.v;
 	p->rec_overflow_key_leaf.v += c->rec_overflow_key_leaf.v;
@@ -389,6 +396,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "log: consolidated slot join transitions";
 	stats->log_sync.desc = "log: log sync operations";
 	stats->log_writes.desc = "log: log write operations";
+	stats->lsm_checkpoint_throttle.desc =
+	    "sleep for LSM checkpoint throttle";
+	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
 	stats->memory_allocation.desc = "memory allocations";
 	stats->memory_free.desc = "memory frees";
@@ -479,6 +489,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_slot_transitions.v = 0;
 	stats->log_sync.v = 0;
 	stats->log_writes.v = 0;
+	stats->lsm_checkpoint_throttle.v = 0;
+	stats->lsm_merge_throttle.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;

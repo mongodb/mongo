@@ -1,2 +1,2 @@
 dnl WiredTiger product version for AC_INIT.  Maintained by dist/s_version
-2.0.2
+2.1.1

@@ -382,13 +382,13 @@ __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __ovfl_reuse_skip_search --
- *	Return the first matching value in the overflow reuse list.
+ *	Return the first, not in-use, matching value in the overflow reuse list.
  */
 static WT_OVFL_REUSE *
 __ovfl_reuse_skip_search(
     WT_OVFL_REUSE **head, const void *value, size_t value_size)
 {
-	WT_OVFL_REUSE **e;
+	WT_OVFL_REUSE **e, *next;
 	size_t len;
 	int cmp, i;
 
@@ -404,13 +404,29 @@ __ovfl_reuse_skip_search(
 		}
 
 		/*
-		 * Return any exact matches: we don't care in what search level
-		 * we found a match.
+		 * Values are not unique, and it's possible to have long lists
+		 * of identical overflow items.  (We've seen it in benchmarks.)
+		 * Move through a list of identical items at the current level
+		 * as long as the next one is in-use, otherwise, drop down a
+		 * level.   When at the bottom level, return items if reusable,
+		 * else NULL.
 		 */
 		len = WT_MIN((*e)->value_size, value_size);
 		cmp = memcmp(WT_OVFL_REUSE_VALUE(*e), value, len);
-		if (cmp == 0 && (*e)->value_size == value_size)
-			return (*e);
+		if (cmp == 0 && (*e)->value_size == value_size) {
+			if (i == 0)
+				return (F_ISSET(*e,
+				    WT_OVFL_REUSE_INUSE) ? NULL : *e);
+			if ((next = (*e)->next[i]) == NULL ||
+			    !F_ISSET(next, WT_OVFL_REUSE_INUSE) ||
+			    next->value_size != len || memcmp(
+			    WT_OVFL_REUSE_VALUE(next), value, len) != 0) {
+				--i;		/* Drop down a level */
+				--e;
+			} else			/* Keep going at this level */
+				e = &(*e)->next[i];
+			continue;
+		}
 
 		/*
 		 * If the skiplist value is larger than the search value, or
@@ -612,28 +628,19 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
 	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/*
-	 * The search function returns the first matching record in the list,
-	 * which may be the first of many, overflow records may be identical.
-	 * Find one without the in-use flag set and put it back into service.
+	 * The search function returns the first matching record in the list
+	 * which does not have the in-use flag set, or NULL.
 	 */
 	if ((reuse = __ovfl_reuse_skip_search(head, value, value_size)) == NULL)
 		return (0);
-	do {
-		if (!F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
-			*addrp = WT_OVFL_REUSE_ADDR(reuse);
-			*addr_sizep = reuse->addr_size;
-			F_SET(reuse, WT_OVFL_REUSE_INUSE);
 
-			if (WT_VERBOSE_ISSET(session, overflow))
-				WT_RET(__ovfl_reuse_verbose(
-				    session, page, reuse, "reclaim"));
-			return (1);
-		}
-	} while ((reuse = reuse->next[0]) != NULL &&
-	    reuse->value_size == value_size &&
-	    memcmp(WT_OVFL_REUSE_VALUE(reuse), value, value_size) == 0);
+	*addrp = WT_OVFL_REUSE_ADDR(reuse);
+	*addr_sizep = reuse->addr_size;
+	F_SET(reuse, WT_OVFL_REUSE_INUSE);
 
-	return (0);
+	if (WT_VERBOSE_ISSET(session, overflow))
+		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "reclaim"));
+	return (1);
 }
 
 /*

@@ -40,21 +40,14 @@ check_copy(void)
 
 	wts_open(g.home_backup, 0, &conn);
 
-	/*
-	 * Open a session and verify the store; some data-sources don't support
-	 * verify.
-	 */
-	if (!DATASOURCE("memrata")) {
-		if ((ret = conn->open_session(
-		    conn, NULL, NULL, &session)) != 0)
-			die(ret, "connection.open_session: %s", g.home_backup);
+	if ((ret = conn->open_session(
+	    conn, NULL, NULL, &session)) != 0)
+		die(ret, "connection.open_session: %s", g.home_backup);
 
-		/* Session operations for LSM can return EBUSY. */
-		ret = session->verify(session, g.uri, NULL);
-		if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
-			die(ret,
-			    "session.verify: %s: %s", g.home_backup, g.uri);
-	}
+	/* Session operations for LSM can return EBUSY. */
+	ret = session->verify(session, g.uri, NULL);
+	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
+		die(ret, "session.verify: %s: %s", g.home_backup, g.uri);
 
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close: %s", g.home_backup);
@@ -104,7 +97,7 @@ hot_backup(void *arg)
 		return (NULL);
 
 	/* Hot backups aren't supported for non-standard data sources. */
-	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return (NULL);
 
 	/* Open a session. */

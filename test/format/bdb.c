@@ -38,8 +38,8 @@ bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2
 #endif
 )
 {
-	int cmp;
 	size_t len;
+	int cmp;
 
 	WT_UNUSED(dbp);
 #if DB_VERSION_MAJOR >= 6

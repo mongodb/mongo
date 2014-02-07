@@ -1616,10 +1616,10 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * We can't compress the first 64B of the block (it must be
 		 * written without compression), and a possible split point
 		 * may appear in that 64B; keep it simple, ignore the first
-		 * 1KB of data, anybody splitting a smaller than 1KB piece
-		 * (as calculated before compression), is doing us wrong.
+		 * allocation size of data, anybody splitting smaller than
+		 * that (as calculated before compression), is doing it wrong.
 		 */
-		if ((len = WT_PTRDIFF(cell, dsk)) > 1024)
+		if ((len = WT_PTRDIFF(cell, dsk)) > btree->allocsize)
 			r->raw_offsets[++slots] =
 			    WT_STORE_SIZE(len - WT_BLOCK_COMPRESS_SKIP);
 
@@ -1677,12 +1677,19 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 * compression function.
 	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
-	WT_ERR(compressor->compress_raw(compressor, wt_session,
+	ret = compressor->compress_raw(compressor, wt_session,
 	    r->page_size_max, btree->split_pct,
 	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    result_len, final, &result_len, &result_slots));
+	    result_len, final, &result_len, &result_slots);
+	if (ret == EAGAIN) {
+		ret = 0;
+		if (!final)
+			goto more_rows;
+		result_slots = 0;
+	}
+	WT_ERR(ret);
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {
@@ -1701,11 +1708,14 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * There may be a remnant in the working buffer that didn't get
 		 * compressed; copy it down to the start of the working buffer
 		 * and update the starting record number, free space and so on.
+		 * !!!
+		 * Note use of memmove, the source and destination buffers can
+		 * overlap.
 		 */
 		len = WT_PTRDIFF(r->first_free, (uint8_t *)dsk +
 		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP);
 		dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
-		(void)memcpy(dsk_start, (uint8_t *)r->first_free - len, len);
+		(void)memmove(dsk_start, (uint8_t *)r->first_free - len, len);
 
 		r->entries -= r->raw_entries[result_slots - 1];
 		r->first_free = dsk_start + len;

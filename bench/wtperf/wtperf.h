@@ -63,6 +63,7 @@ typedef struct {
 
 struct __config {			/* Configuration struction */
 	const char *home;		/* WiredTiger home */
+	const char *monitor_dir;	/* Monitor output dir */
 	char *uri;			/* Object URI */
 
 	WT_CONNECTION *conn;		/* Database connection */
@@ -98,6 +99,11 @@ typedef struct {
 
 #define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
+/* From include/os.h */
+#define	WT_TIMEDIFF(end, begin)                                         \
+	(1000000000 * (uint64_t)((end).tv_sec - (begin).tv_sec) +       \
+	    (uint64_t)(end).tv_nsec - (uint64_t)(begin).tv_nsec)
+
 #define	THOUSAND	(1000ULL)
 #define	MILLION		(1000000ULL)
 #define	BILLION		(1000000000ULL)
@@ -125,9 +131,10 @@ typedef struct {
 	 * the last_XXX fields.
 	 */
 	uint64_t ops;			/* Total operations */
+	uint64_t latency_ops;		/* Total ops sampled for latency */
 	uint64_t latency;		/* Total latency */
 
-	uint64_t last_ops;		/* Last read by monitor thread */
+	uint64_t last_latency_ops;	/* Last read by monitor thread */
 	uint64_t last_latency;
 
 	/*

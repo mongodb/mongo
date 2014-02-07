@@ -1,15 +1,15 @@
-Memrata README.
+Helium README.
 
-The data structures are "KVS sources" which map to one or more physical
-devices; each KVS source supports any number of "WiredTiger sources",
-where a WiredTiger source will be an object similar to a Btree "file:"
-object.  Each WiredTiger source supports any number of WiredTiger cursors.
+The data structures are "Helium sources" which map to one or more physical
+volumes; each Helium source supports any number of "WiredTiger sources",
+where a WiredTiger source is an object similar to a Btree "file:" object.
+Each WiredTiger source supports any number of WiredTiger cursors.
 
-Each KVS source is given a logical name when the Memrata device is loaded,
-and that logical name is subsequently used when a WiredTiger source is
-created.  For example, a KVS source might be named "dev1", and correspond
-to /dev/sd0 and /dev/sd1; subsequent WT_SESSION.create calls would specify
-a URI like "table:dev1/my_table".
+Each Helium source is given a logical name when first referenced, and that
+logical name is subsequently used when a WiredTiger source is created.  For
+example, the logical name for a Helium source might be "dev1", and it would
+map to the Helium volumes /dev/sd0 and /dev/sd1; subsequent WT_SESSION.create
+calls specify a URI like "table:dev1/my_table".
 
 For each WiredTiger source, we create two namespaces on the underlying device,
 a "cache" and a "primary".
@@ -51,23 +51,23 @@ When a next/prev is done:
 	move to the next/prev visible item in the primary
 	return the one closest to the starting position
 
-Note locks are not acquired for read operations, and no flushes are done for
-any of these operations.
+Locks are not acquired for read operations, and no flushes are done for any of
+these operations.
 
-We also create one additional namespace, the "txn" name space, which serves
-all of the WiredTiger and KVS sources.  Whenever a transaction commits, we
-insert a commit record into the txn name space and flush the device.  When a
-transaction rolls back, we insert an abort record into the txn name space,
-but don't flush the device.
+We also create one additional object, the transaction name space, which serves
+all of the WiredTiger and Helium objects in a WiredTiger connection.  Whenever
+a transaction involving a Helium source commits, we insert a commit record into
+the transaction name space and flush the device.  When a transaction rolls back,
+we insert an abort record into the txn name space, but don't flush the device.
 
 The visibility check is slightly different than the rest of WiredTiger: we do
 not reset anything when a transaction aborts, and so we have to check if the
 transaction has been aborted as well as check the transaction ID for visibility.
 
-We create a "cleanup" thread for every KVS source.  The job of this thread is
-to migrate rows from the cache into the primary.  Any committed, globally
-visible change in the cache can be copied into the primary and removed from
-the cache:
+We create a "cleanup" thread for every underlying Helium source.  The job of
+this thread is to migrate rows from the cache object into the primary.  Any
+committed, globally visible change in the cache can be copied into the primary
+and removed from the cache:
 
 	set BaseTxnID to the oldest transaction ID
 	    not yet visible to a running transaction
@@ -95,24 +95,26 @@ to the primary.
 No lock is required when removing rows from the transaction store, once the
 transaction ID is less than the BaseTxnID, it will never be read.
 
-Memrata recovery is almost identical to the cleanup thread, which migrates
-rows from the cache into the primary.  For every cache/primary name space,
-we migrate every commit to the primary (by definition, at recovery time it
-must be globally visible), and discard everything (by defintion, at recovery
-time anything not committed has been aborted.
+Helium recovery is almost identical to the cleanup thread, which migrates rows
+from the cache into the primary.  For every cache/primary pair, migrate every
+commit to the primary (by definition, at recovery time it must be globally
+visible), and discard everything else (by definition, at recovery time anything
+not committed has been aborted.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 Questions, problems, whatever:
 
-* This implementation is endian-specific, that is, a store created on a
-little-endian machine is not portable to a big-endian machine.
+* The implementation is endian-specific, that is, the WiredTiger metadata
+stored on the Helium device is on not portable to a big-endian machine.
+Helium's metadata is portable between different endian machines, so this
+should probably be fixed.
 
 * There's a problem with transactions in WiredTiger that span more than a
 single data source.   For example, consider a transaction that modifies
-both a KVS object and a Btree object.  If we commit and push the KVS
+both a Helium object and a Btree object.  If we commit and push the Helium
 commit record to stable storage, and then crash before committing the Btree
 change, the enclosing WiredTiger transaction will/should end up aborting,
-and there's no way for us to back out the change in KVS.  I'm leaving
+and there's no way for us to back out the change in Helium.  I'm leaving
 this problem alone until WiredTiger fine-grained durability is complete,
 we're going to need WiredTiger support for some kind of 2PC to solve this.
 

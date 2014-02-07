@@ -124,7 +124,10 @@ lsm_config = [
 	        be larger than chunk_size''',
 	        min='100MB', max='10TB'),
 	    Config('chunk_size', '10MB', r'''
-	        the maximum size of the in-memory chunk of an LSM tree''',
+	        the maximum size of the in-memory chunk of an LSM tree.  This
+	        limit is soft - it is possible for chunks to be temporarily
+	        larger than this value.  This overrides the \c memory_page_max
+	        setting''',
 	        min='512K', max='500MB'),
 	    Config('merge_max', '15', r'''
 	        the maximum number of chunks to include in a merge operation''',
@@ -231,10 +234,10 @@ file_config = format_meta + [
 	    min=0),
 	Config('memory_page_max', '5MB', r'''
 	    the maximum size a page can grow to in memory before being
-	    reconciled to disk.  The specified size will be adjusted to a
-	    lower bound of <code>50 * leaf_page_max</code>.  This limit is
-	    soft - it is possible for pages to be temporarily larger than
-	    this value''',
+	    reconciled to disk.  The specified size will be adjusted to a lower
+	    bound of <code>50 * leaf_page_max</code>.  This limit is soft - it
+	    is possible for pages to be temporarily larger than this value.
+	    This setting is ignored for LSM trees, see \c chunk_size''',
 	    min='512B', max='10TB'),
 	Config('os_cache_max', '0', r'''
 	    maximum system buffer cache usage, in bytes.  If non-zero, evict

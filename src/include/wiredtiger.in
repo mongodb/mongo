@@ -855,7 +855,9 @@ struct __wt_session {
 	 * value can be created.  Must be larger than chunk_size., an integer
 	 * between 100MB and 10TB; default \c 5GB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
-	 * in-memory chunk of an LSM tree., an integer between 512K and 500MB;
+	 * in-memory chunk of an LSM tree.  This limit is soft - it is possible
+	 * for chunks to be temporarily larger than this value.  This overrides
+	 * the \c memory_page_max setting., an integer between 512K and 500MB;
 	 * default \c 10MB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_max, the
 	 * maximum number of chunks to include in a merge operation., an integer
@@ -872,7 +874,8 @@ struct __wt_session {
 	 * memory before being reconciled to disk.  The specified size will be
 	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>. This
 	 * limit is soft - it is possible for pages to be temporarily larger
-	 * than this value., an integer between 512B and 10TB; default \c 5MB.}
+	 * than this value.  This setting is ignored for LSM trees\, see \c
+	 * chunk_size., an integer between 512B and 10TB; default \c 5MB.}
 	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\,
 	 * in bytes.  If non-zero\, schedule writes for dirty blocks belonging
 	 * to this object in the system buffer cache after that many bytes from
@@ -2133,14 +2136,19 @@ struct __wt_compressor {
 	 * set \c result_slotsp to the number of byte strings encoded and
 	 * \c result_lenp to the bytes needed for the encoded representation.
 	 *
-	 * WiredTiger repeatedly calls the callback function until all rows on
-	 * the page have been encoded.  There is no requirement the callback
-	 * encode any or all of the byte strings passed by WiredTiger.  If the
-	 * callback does not encode any of the byte strings, the callback must
-	 * set \c result_slotsp to 0.  In this case, WiredTiger will accumulate
-	 * more rows and repeat the call; if there are no more rows to
-	 * accumulate, WiredTiger writes the remaining rows without further
-	 * calls to the callback.
+	 * There is no requirement the callback encode any or all of the byte
+	 * strings passed by WiredTiger.  If the callback does not encode any
+	 * of the byte strings and compression should not be retried, the
+	 * callback should set \c result_slotsp to 0.
+	 *
+	 * If the callback does not encode any of the byte strings and
+	 * compression should be retried with additional byte strings, the
+	 * callback must return \c EAGAIN.  In that case, WiredTiger will
+	 * accumulate more rows and repeat the call.
+	 *
+	 * If there are no more rows to accumulate or the callback indicates
+	 * that it cannot be retried, WiredTiger writes the remaining rows
+	 * using \c WT_COMPRESSOR::compress.
 	 *
 	 * On entry, \c final is zero if there are more rows to be written as
 	 * part of this page (if there will be additional data provided to the
@@ -2580,42 +2588,46 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SYNC				1063
 /*! log: log write operations */
 #define	WT_STAT_CONN_LOG_WRITES				1064
+/*! sleep for LSM checkpoint throttle */
+#define	WT_STAT_CONN_LSM_CHECKPOINT_THROTTLE		1065
+/*! sleep for LSM merge throttle */
+#define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1066
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1065
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1067
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1066
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1068
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1067
+#define	WT_STAT_CONN_MEMORY_FREE			1069
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1068
+#define	WT_STAT_CONN_MEMORY_GROW			1070
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1069
+#define	WT_STAT_CONN_READ_IO				1071
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1070
+#define	WT_STAT_CONN_REC_PAGES				1072
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1071
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1073
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1072
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1074
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1073
+#define	WT_STAT_CONN_RWLOCK_READ			1075
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1074
+#define	WT_STAT_CONN_RWLOCK_WRITE			1076
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1075
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1077
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1076
+#define	WT_STAT_CONN_TXN_BEGIN				1078
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1077
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1079
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1078
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1080
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1079
+#define	WT_STAT_CONN_TXN_COMMIT				1081
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1080
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1082
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1081
+#define	WT_STAT_CONN_TXN_ROLLBACK			1083
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1082
+#define	WT_STAT_CONN_WRITE_IO				1084
 
 /*!
  * @}
@@ -2759,43 +2771,47 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CURSOR_UPDATE			2066
 /*! cursor-update value bytes updated */
 #define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2067
+/*! sleep for LSM checkpoint throttle */
+#define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2068
 /*! chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2068
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2069
 /*! highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2069
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2070
 /*! queries that could have benefited from a Bloom filter that did not
  * exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2070
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2071
+/*! sleep for LSM merge throttle */
+#define	WT_STAT_DSRC_LSM_MERGE_THROTTLE			2072
 /*! reconciliation dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2071
+#define	WT_STAT_DSRC_REC_DICTIONARY			2073
 /*! reconciliation internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2072
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2074
 /*! reconciliation leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2073
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2075
 /*! reconciliation overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2074
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2076
 /*! reconciliation pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2075
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2077
 /*! reconciliation pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			2076
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			2078
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2077
+#define	WT_STAT_DSRC_REC_PAGES				2079
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2078
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2080
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2079
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2081
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2080
+#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2082
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			2081
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			2083
 /*! reconciliation maximum splits for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			2082
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			2084
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2083
+#define	WT_STAT_DSRC_SESSION_COMPACT			2085
 /*! open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2084
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2086
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2085
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2087
 /*! @} */
 /*
  * Statistics section: END

@@ -307,14 +307,9 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
-	/*
-	 * Don't allow split merges to generate arbitrarily large pages.
-	 * Ideally we would choose a size based on the internal_page_max
-	 * setting for the btree, but we don't have the correct btree handle
-	 * available.
-	 */
-	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
-		return (EBUSY);
+	/* Pages cannot grow larger than 2**32, but that should never happen. */
+	if (visit_state.refcnt > UINT32_MAX)
+		return (ENOMEM);
 
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
@@ -332,17 +327,19 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		 * In the normal case where there are live children spread
 		 * through the subtree, create two child pages.
 		 *
-		 * Handle the case where the only live child is first / last
-		 * specially: put the live child into the top-level page.
+		 * Handle the case where the live children are all near the
+		 * beginning / end specially: put the last live child into the
+		 * top-level page, to avoid getting much deeper during
+		 * append-only workloads.
 		 *
 		 * Set SPLIT_MERGE on the internal pages if there are any live
 		 * children: they can't be evicted, so there is no point
 		 * permanently deepening the tree.
 		 */
-		if (visit_state.first_live == visit_state.last_live &&
-		    (visit_state.first_live == 0 ||
-		    visit_state.first_live == refcnt - 1))
-			split = (visit_state.first_live == 0) ? 1 : refcnt - 1;
+		if (visit_state.last_live <= refcnt / 10)
+			split = 1;
+		else if (visit_state.first_live >= (9 * refcnt) / 10)
+			split = refcnt - 1;
 		else
 			split = (refcnt + 1) / 2;
 
@@ -370,7 +367,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		else {
 			WT_ERR(__wt_btree_new_modified_page(
 			    session, page_type, split,
-			    visit_state.first_live < split, &lchild));
+			    split < WT_MERGE_FULL_PAGE, &lchild));
 			visit_state.first = lchild;
 		}
 
@@ -380,8 +377,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			visit_state.second_ref = &newtop->u.intl.t[1];
 		} else {
 			WT_ERR(__wt_btree_new_modified_page(
-			    session, page_type,
-			    refcnt - split, visit_state.last_live >= split,
+			    session, page_type, refcnt - split,
+			    refcnt - split < WT_MERGE_FULL_PAGE,
 			    &rchild));
 			visit_state.second = rchild;
 			visit_state.second_ref =
@@ -389,17 +386,15 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		}
 	} else {
 		/*
-		 * Create a new split-merge page for small merges, or if the
-		 * page above is a split merge page.  When we do a big enough
-		 * merge, we create a real page at the top and don't consider
-		 * it as a merge candidate again.  Over time with an insert
-		 * workload the tree will grow deeper, but that's inevitable,
-		 * and this keeps individual merges small.
+		 * Create a new split-merge page for small merges.  When we do
+		 * a big enough merge, we create a real page at the top and
+		 * don't consider it as a merge candidate again.  Over time
+		 * with an insert workload the tree will grow deeper, but
+		 * that's inevitable, and this keeps individual merges small.
 		 */
 		WT_ERR(__wt_btree_new_modified_page(
 		    session, page_type, refcnt,
-		    refcnt < WT_MERGE_FULL_PAGE ||
-		    __wt_btree_mergeable(top->parent),
+		    refcnt < WT_MERGE_FULL_PAGE,
 		    &newtop));
 
 		visit_state.first = newtop;

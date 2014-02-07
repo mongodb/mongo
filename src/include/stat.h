@@ -182,6 +182,8 @@ struct __wt_connection_stats {
 	WT_STATS log_slot_transitions;
 	WT_STATS log_sync;
 	WT_STATS log_writes;
+	WT_STATS lsm_checkpoint_throttle;
+	WT_STATS lsm_merge_throttle;
 	WT_STATS lsm_rows_merged;
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;
@@ -275,9 +277,11 @@ struct __wt_dsrc_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS cursor_update_bytes;
+	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_chunk_count;
 	WT_STATS lsm_generation_max;
 	WT_STATS lsm_lookup_no_bloom;
+	WT_STATS lsm_merge_throttle;
 	WT_STATS rec_dictionary;
 	WT_STATS rec_overflow_key_internal;
 	WT_STATS rec_overflow_key_leaf;

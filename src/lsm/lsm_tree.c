@@ -407,6 +407,10 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * Set up the config for each chunk.  If possible, avoid high latencies
 	 * from fsync by flushing the cache every 8MB (will be overridden by
 	 * any application setting).
+	 *
+	 * Also make the memory_page_max double the chunk size, so application
+	 * threads don't immediately try to force evict the chunk when the
+	 * worker thread clears the NO_EVICTION flag.
 	 */
 	tmpconfig = "";
 #ifdef HAVE_SYNC_FILE_RANGE
@@ -415,7 +419,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 #endif
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "%s%s,key_format=u,value_format=u", tmpconfig, config));
+	    "%s%s,key_format=u,value_format=u,memory_page_max=%" PRIu64,
+	    tmpconfig, config, 2 * lsm_tree->chunk_max));
 	lsm_tree->file_config = __wt_buf_steal(session, buf);
 
 	/* Create the first chunk and flush the metadata. */

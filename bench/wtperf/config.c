@@ -491,6 +491,8 @@ config_print(CONFIG *cfg)
 	printf("\tHome: %s\n", cfg->home);
 	printf("\tTable name: %s\n", cfg->table_name);
 	printf("\tConnection configuration: %s\n", cfg->conn_config);
+	if (cfg->sess_config != NULL)
+		printf("\tSession configuration: %s\n", cfg->sess_config);
 
 	printf("\t%s table: %s\n",
 	    cfg->create ? "Creating new" : "Using existing",
@@ -598,13 +600,11 @@ config_opt_usage(void)
 void
 usage(void)
 {
-	printf("wtperf [-LMSv] [-C config] "
-	    "[-h home] [-O file] [-o option] [-T config]\n");
-	printf("\t-L Use a large default configuration\n");
-	printf("\t-M Use a medium default configuration\n");
-	printf("\t-S Use a small default configuration\n");
+	printf("wtperf [-C config] "
+	    "[-H mount] [-h home] [-O file] [-o option] [-T config]\n");
 	printf("\t-C <string> additional connection configuration\n");
 	printf("\t            (added to option conn_config)\n");
+	printf("\t-H <mount> configure Helium volume mount point\n");
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST\n");
 	printf("\t-O <file> file contains options as listed below\n");
 	printf("\t-o option=val[,option=val,...] set options listed below\n");

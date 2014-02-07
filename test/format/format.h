@@ -57,17 +57,18 @@ extern WT_EXTENSION_API *wt_api;
 	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	SNAPPY_PATH							\
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#define	ZLIB_PATH							\
+	EXTPATH "compressors/zlib/.libs/libwiredtiger_zlib.so"
 
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
 
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
-#define	MEMRATA_PATH							\
-	EXTPATH "test/memrata/.libs/libwiredtiger_memrata.so"
+#define	HELIUM_PATH							\
+	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
-#define	RAW_PATH	".libs/raw_compress.so"
 
 #undef	M
 #define	M(v)		((v) * 1000000)		/* Million */
@@ -98,6 +99,8 @@ typedef struct {
 	char *home_run;				/* Run file path */
 	char *home_stats;			/* Statistics file path */
 	char *home_salvage_copy;		/* Salvage copy command */
+
+	char *helium_mount;			/* Helium volume */
 
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
@@ -193,9 +196,10 @@ typedef struct {
 
 #define	COMPRESS_NONE		1
 #define	COMPRESS_BZIP		2
-#define	COMPRESS_LZO		3
-#define	COMPRESS_RAW		4
+#define	COMPRESS_BZIP_RAW	3
+#define	COMPRESS_LZO		4
 #define	COMPRESS_SNAPPY		5
+#define	COMPRESS_ZLIB		6
 	u_int c_compression_flag;		/* Compression flag value */
 
 	uint64_t key_cnt;			/* Keys loaded so far */

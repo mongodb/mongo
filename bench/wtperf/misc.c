@@ -49,11 +49,11 @@ setup_log_file(CONFIG *cfg)
 	if (cfg->verbose < 1)
 		return (0);
 
-	if ((fname = calloc(strlen(cfg->home) +
+	if ((fname = calloc(strlen(cfg->monitor_dir) +
 	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL)
 		return (enomem(cfg));
 
-	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
+	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
 	cfg->logf = fopen(fname, "w");
 	free(fname);
 
