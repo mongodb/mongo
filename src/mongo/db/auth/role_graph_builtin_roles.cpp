@@ -552,6 +552,7 @@ namespace {
                                   AuthorizationManager::rolesCollectionNamespace),
                           actions));
 
+        actions << ActionType::find;
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(
@@ -560,7 +561,7 @@ namespace {
                         actions));
 
         // Need additional actions on system.users.
-        actions << ActionType::find << ActionType::update << ActionType::remove;
+        actions << ActionType::update << ActionType::remove;
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"), actions));
