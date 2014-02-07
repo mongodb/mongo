@@ -1,4 +1,4 @@
-// Index bounds and matching behavior for $elemMatch applied to a top level element.
+// Matching behavior for $elemMatch applied to a top level element.
 // SERVER-1264
 // SERVER-4180
 
@@ -24,13 +24,6 @@ function indexBounds( query ) {
     debug( query );
     debug( t.find( query ).hint( indexSpec ).explain() );
     return t.find( query ).hint( indexSpec ).explain().indexBounds[ indexKey ];
-}
-
-/** Check index bounds for a query. */
-function assertBounds( expectedBounds, query, context ) {
-    bounds = indexBounds( query );
-    debug( bounds );
-    assert.eq( expectedBounds, bounds, 'unexpected bounds in ' + context );
 }
 
 /** Check that the query results match the documents in the 'expected' array. */
@@ -75,24 +68,19 @@ function checkMatch( bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatc
 }
 
 /**
- * Check matching and index bounds for different query types.
+ * Check matching and for different query types.
  * @param subQuery - part of a query, to be provided as is for a standard query and within a
  *     $elemMatch clause for a $elemMatch query
- * @param singleKeyBounds - expected single key index bounds for the elem match query generated from
- *     @param subQuery
  * @param bothMatch - document matched by both standardQuery and elemMatchQuery
  * @param elemMatch - document matched by elemMatchQuery but not standardQuery
  * @param notElemMatch - document matched by standardQuery but not elemMatchQuery
  * @param additionalConstraints - additional query parameters not generated from @param subQuery
- * @param multiKeyBounds - expected multi key index bounds for the elem match query generated from
- *     @param subQuery.  If not provided, singleKeyBounds will be expected.
  */
-function checkBoundsAndMatch( subQuery, singleKeyBounds, bothMatch, elemMatch,
-                              nonElemMatch, additionalConstraints, multiKeyBounds ) {
+function checkQuery( subQuery, bothMatch, elemMatch, nonElemMatch,
+                     additionalConstraints ) {
     t.drop();
-    multiKeyBounds = multiKeyBounds || singleKeyBounds;
     additionalConstraints = additionalConstraints || {};
-    
+ 
     // Construct standard and elemMatch queries from subQuery.
     firstSubQueryKey = Object.keySet( subQuery )[ 0 ];
     if ( firstSubQueryKey[ 0 ] == '$' ) {
@@ -122,17 +110,16 @@ function checkBoundsAndMatch( subQuery, singleKeyBounds, bothMatch, elemMatch,
     checkMatch( bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, 'unindexed' );
 
     // Check matching and index bounds for a single key index.
-    
+
     t.drop();
     maySave( bothMatch );
     maySave( elemMatch );
     // The nonElemMatch document is not tested here, as it will often make the index multikey.
     t.ensureIndex( indexSpec );
     checkMatch( bothMatch, elemMatch, null, standardQuery, elemMatchQuery, 'single key index' );
-    assertBounds( singleKeyBounds, elemMatchQuery, 'single key index' );
 
     // Check matching and index bounds for a multikey index.
-    
+
     // Now the nonElemMatch document is tested.
     maySave( nonElemMatch );
     // Force the index to be multikey.
@@ -140,75 +127,49 @@ function checkBoundsAndMatch( subQuery, singleKeyBounds, bothMatch, elemMatch,
     t.save( { a:{ b:[ -1, -2 ] } } );
     checkMatch( bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery,
                 'multikey index' );
-    assertBounds( multiKeyBounds, elemMatchQuery, 'multikey index' );
 }
 
 maxNumber = Infinity;
 
 // Basic test.
-checkBoundsAndMatch( { $gt:4 }, [[ 4, maxNumber ]], [ 5 ] );
+checkQuery( { $gt:4 }, [ 5 ] );
 
 // Multiple constraints within a $elemMatch clause.
-checkBoundsAndMatch( { $gt:4, $lt:6 }, [[ 4, 6 ]], [ 5 ], null, [ 3, 7 ] );
-// QUERY_MIGRATION: negation
-//checkBoundsAndMatch( { $gt:4, $not:{ $gte:6 } }, [[ 4, 6 ]], [ 5 ] );
-//checkBoundsAndMatch( { $gt:4, $not:{ $ne:6 } }, [[ 6, 6 ]], [ 6 ] );
-checkBoundsAndMatch( { $gte:5, $lte:5 }, [[ 5, 5 ]], [ 5 ], null, [ 4, 6 ] );
-checkBoundsAndMatch( { $in:[ 4, 6 ], $gt:5 }, [[ 6, 6 ]], [ 6 ], null, [ 4, 7 ] );
-checkBoundsAndMatch( { $regex:'^a' }, [[ 'a', 'b' ], [ /^a/, /^a/ ]], [ 'a' ] );
-// QUERY_MIGRATION: We can generate bounds for this.
-// checkBoundsAndMatch( { $regex:'^a', $in:['b'] }, undefined ); // ?? undefined
+checkQuery( { $gt:4, $lt:6 }, [ 5 ], null, [ 3, 7 ] );
+checkQuery( { $gt:4, $not:{ $gte:6 } }, [ 5 ] );
+checkQuery( { $gt:4, $not:{ $ne:6 } }, [ 6 ] );
+checkQuery( { $gte:5, $lte:5 }, [ 5 ], null, [ 4, 6 ] );
+checkQuery( { $in:[ 4, 6 ], $gt:5 }, [ 6 ], null, [ 4, 7 ] );
+checkQuery( { $regex:'^a' }, [ 'a' ] );
 
 // Some constraints within a $elemMatch clause and other constraints outside of it.
-checkBoundsAndMatch( { $gt:4 }, [[ 4, 6 ]], [ 5 ], null, null, { a:{ $lt:6 } },
-                     [[ 4, maxNumber ]] );
-checkBoundsAndMatch( { $gte:5 }, [[ 5, 5 ]], [ 5 ], null, null, { a:{ $lte:5 } },
-                     [[ 5, maxNumber ]] );
-checkBoundsAndMatch( { $in:[ 4, 6 ] }, [[ 6, 6 ]], [ 6 ], null, null, { a:{ $gt:5 } },
-                     [[ 4, 4 ], [ 6, 6 ]] );
+checkQuery( { $gt:4 }, [ 5 ], null, null, { a:{ $lt:6 } } );
+checkQuery( { $gte:5 }, [ 5 ], null, null, { a:{ $lte:5 } } );
+checkQuery( { $in:[ 4, 6 ] }, [ 6 ], null, null, { a:{ $gt:5 } } );
 
 // Constraints in different $elemMatch clauses.
-checkBoundsAndMatch( { $gt:4 }, [[ 4, 6 ]], [ 5 ], null, null, { a:{ $elemMatch:{ $lt:6 } } },
-                     [[ 4, maxNumber ]] );
-checkBoundsAndMatch( { $gt:4 }, [[ 4, maxNumber ]], [ 3, 7 ], null, null,
-                     { a:{ $elemMatch:{ $lt:6 } } }, [[ 4, maxNumber ]] );
-checkBoundsAndMatch( { $gte:5 }, [[ 5, 5 ]], [ 5 ], null, null, { a:{ $elemMatch:{ $lte:5 } } },
-                     [[ 5, maxNumber ]] );
-checkBoundsAndMatch( { $in:[ 4, 6 ] }, [[ 6, 6 ]], [ 6 ], null, null,
-                     { a:{ $elemMatch:{ $gt:5 } } }, [[ 5, maxNumber ]] );
+checkQuery( { $gt:4 }, [ 5 ], null, null, { a:{ $elemMatch:{ $lt:6 } } } );
+checkQuery( { $gt:4 }, [ 3, 7 ], null, null, { a:{ $elemMatch:{ $lt:6 } } } );
+checkQuery( { $gte:5 }, [ 5 ], null, null, { a:{ $elemMatch:{ $lte:5 } } } );
+checkQuery( { $in:[ 4, 6 ] }, [ 6 ], null, null, { a:{ $elemMatch:{ $gt:5 } } } );
 
 // TODO SERVER-1264
 if ( 0 ) {
-checkBoundsAndMatch( { $elemMatch:{ $in:[ 5 ] } }, [[ {$minElement:1}, {$maxElement:1} ]], null,
-                     [[ 5 ]], [ 5 ], null, [[ {$minElement:1}, {$maxElement:1} ]] );
+checkQuery( { $elemMatch:{ $in:[ 5 ] } }, null, [[ 5 ]], [ 5 ], null );
 }
 
-// Index bounds are not computed for $elemMatch nested within a $elemMatch applied to a top level
-// element (descriptive, not normative test).  The reason is that { a:[ [ { b:1 } ] ] } matches a
-// query as in the example, but double nested arrays are not indexed as multikeys.
 setIndexKey( 'a.b' );
-checkBoundsAndMatch( { $elemMatch:{ b:{ $gte:1, $lte:1 } } },
-                     [[ {$minElement:1}, {$maxElement:1} ]], null, [[ { b:1 } ]], [ { b:1 } ],
-                     null, [[ {$minElement:1}, {$maxElement:1} ]] );
-checkBoundsAndMatch( { $elemMatch:{ b:{ $gte:1, $lte:1 } } },
-                     [[ {$minElement:1}, {$maxElement:1} ]], null, [[ { b:[ 0, 2 ] } ]],
-                     [ { b:[ 0, 2 ] } ], null, [[ {$minElement:1}, {$maxElement:1} ]] );
+checkQuery( { $elemMatch:{ b:{ $gte:1, $lte:1 } } }, null, [[ { b:1 } ]],
+            [ { b:1 } ], null );
+checkQuery( { $elemMatch:{ b:{ $gte:1, $lte:1 } } }, null, [[ { b:[ 0, 2 ] } ]],
+            [ { b:[ 0, 2 ] } ], null );
 
 // Constraints for a top level (SERVER-1264 style) $elemMatch nested within a non top level
 // $elemMatch.
-checkBoundsAndMatch( { b:{ $elemMatch:{ $gte:1, $lte:1 } } }, [[ 1, 1 ]], [ { b:[ 1 ] } ] );
-checkBoundsAndMatch( { b:{ $elemMatch:{ $gte:1, $lte:4 } } }, [[ 1, 4 ]], [ { b:[ 1 ] } ] );
+checkQuery( { b:{ $elemMatch:{ $gte:1, $lte:1 } } }, [ { b:[ 1 ] } ] );
+checkQuery( { b:{ $elemMatch:{ $gte:1, $lte:4 } } }, [ { b:[ 1 ] } ] );
 
-// QUERY_MIGRATION: our bounds are looser here.  The query we're messing up is
-// {a: { $elemMatch: { b : {$elemMatch: {$gte:1, $lte: 4}}}}, 'a.b':{$in: [2,5]}}.
-// The enumerator doesn't realize that it can assign both the a.b from the elemmatch and the
-// a.b from the $in to the same predicate, since it doesn't go down elemMatchObj subtrees
-// when analyzing indices.  If we assigned them both to the same pred, we'd intersect their
-// ranges and wind up with [1,4] INTERSECT [2,2],[5,5] == [2,2] which is what the test looks for.
-//
-// 
-//checkBoundsAndMatch( { b:{ $elemMatch:{ $gte:1, $lte:4 } } }, [[ 2, 2 ]], [ { b:[ 2 ] } ], null,
-                      //null, { 'a.b':{ $in:[ 2, 5 ] } }, [[ 1, 4 ]] );
-checkBoundsAndMatch( { b:{ $elemMatch:{ $in:[ 1, 2 ] }, $in:[ 2, 3 ] } }, [[ 2, 2 ]],
-                     [ { b:[ 2 ] } ], null, [ { b:[ 1 ] }, { b:[ 3 ] } ], null,
-                     [[ 1, 1 ], [ 2, 2 ]] );
+checkQuery( { b:{ $elemMatch:{ $gte:1, $lte:4 } } }, [ { b:[ 2 ] } ], null,
+            null, { 'a.b':{ $in:[ 2, 5 ] } } );
+checkQuery( { b:{ $elemMatch:{ $in:[ 1, 2 ] }, $in:[ 2, 3 ] } },
+            [ { b:[ 2 ] } ], null, [ { b:[ 1 ] }, { b:[ 3 ] } ], null );

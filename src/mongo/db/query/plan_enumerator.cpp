@@ -34,6 +34,20 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/qlog.h"
 
+namespace {
+
+    std::string getPathPrefix(std::string path) {
+        if (mongoutils::str::contains(path, '.')) {
+            return mongoutils::str::before(path, '.');
+        }
+        else {
+            return path;
+        }
+    }
+
+} // namespace
+
+
 namespace mongo {
 
     PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
@@ -53,7 +67,7 @@ namespace mongo {
         QLOG() << "enumerator received root:\n" << _root->toString() << endl;
 
         // Fill out our memo structure from the tagged _root.
-        _done = !prepMemo(_root);
+        _done = !prepMemo(_root, PrepMemoContext());
 
         // Dump the tags.  We replace them with IndexTag instances.
         _root->resetTag();
@@ -159,7 +173,9 @@ namespace mongo {
         *id = newID;
     }
 
-    bool PlanEnumerator::prepMemo(MatchExpression* node) {
+    bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
+        PrepMemoContext childContext;
+        childContext.elemMatchExpr = context.elemMatchExpr;
         if (Indexability::nodeCanUseIndexOnOwnField(node)) {
             // We only get here if our parent is an OR, an array operator, or we're the root.
 
@@ -186,7 +202,7 @@ namespace mongo {
         else if (MatchExpression::OR == node->matchType()) {
             // For an OR to be indexed, all its children must be indexed.
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                if (!prepMemo(node->getChild(i))) {
+                if (!prepMemo(node->getChild(i), childContext)) {
                     return false;
                 }
             }
@@ -208,9 +224,13 @@ namespace mongo {
             // time until it's exhausted then we move on.
             auto_ptr<ArrayAssignment> aa(new ArrayAssignment());
 
+            if (MatchExpression::ELEM_MATCH_OBJECT == node->matchType()) {
+                childContext.elemMatchExpr = node;
+            }
+
             // For an OR to be indexed, all its children must be indexed.
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                if (prepMemo(node->getChild(i))) {
+                if (prepMemo(node->getChild(i), childContext)) {
                     aa->subnodes.push_back(_nodeToId[node->getChild(i)]);
                 }
             }
@@ -237,41 +257,43 @@ namespace mongo {
             // Children that aren't predicates.
             vector<MemoID> subnodes;
 
+            // A list of predicates contained in the subtree rooted at 'node'
+            // obtained by traversing deeply through $and and $elemMatch children.
+            vector<MatchExpression*> indexedPreds;
+
+            // Partition the childen into the children that aren't predicates
+            // ('subnodes'), and children that are predicates ('indexedPreds').
+            partitionPreds(node, childContext, &indexedPreds, &subnodes);
+
             // Indices we *must* use.  TEXT or GEO.
             set<IndexID> mandatoryIndices;
 
-            // Go through our children and see if they're preds or logical subtrees.
-            for (size_t i = 0; i < node->numChildren(); ++i) {
-                MatchExpression* child = node->getChild(i);
+            // Go through 'indexedPreds' and add the predicates to the
+            // 'idxToFirst' and 'idxToNotFirst' maps.
+            for (size_t i = 0; i < indexedPreds.size(); ++i) {
+                MatchExpression* child = indexedPreds[i];
 
-                if (Indexability::nodeCanUseIndexOnOwnField(child)) {
-                    bool childRequiresIndex = (child->matchType() == MatchExpression::GEO_NEAR
-                                            || child->matchType() == MatchExpression::TEXT);
+                invariant(Indexability::nodeCanUseIndexOnOwnField(child));
 
-                    RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+                bool childRequiresIndex = (child->matchType() == MatchExpression::GEO_NEAR
+                                        || child->matchType() == MatchExpression::TEXT);
 
-                    for (size_t j = 0; j < rt->first.size(); ++j) {
-                        idxToFirst[rt->first[j]].push_back(child);
-                        if (childRequiresIndex) {
-                            // We could have >1 index that could be used to answer the pred for
-                            // things like geoNear.  Just pick the first and make it mandatory.
-                            mandatoryIndices.insert(rt->first[j]);
-                        }
-                    }
+                RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
 
-                    for (size_t j = 0 ; j< rt->notFirst.size(); ++j) {
-                        idxToNotFirst[rt->notFirst[j]].push_back(child);
-                        if (childRequiresIndex) {
-                            // See comment above about mandatory indices.
-                            mandatoryIndices.insert(rt->notFirst[j]);
-                        }
+                for (size_t j = 0; j < rt->first.size(); ++j) {
+                    idxToFirst[rt->first[j]].push_back(child);
+                    if (childRequiresIndex) {
+                        // We could have >1 index that could be used to answer the pred for
+                        // things like geoNear.  Just pick the first and make it mandatory.
+                        mandatoryIndices.insert(rt->first[j]);
                     }
                 }
-                else {
-                    if (prepMemo(child)) {
-                        verify(_nodeToId.end() != _nodeToId.find(child));
-                        size_t childID = _nodeToId[child];
-                        subnodes.push_back(childID);
+
+                for (size_t j = 0 ; j< rt->notFirst.size(); ++j) {
+                    idxToNotFirst[rt->notFirst[j]].push_back(child);
+                    if (childRequiresIndex) {
+                        // See comment above about mandatory indices.
+                        mandatoryIndices.insert(rt->notFirst[j]);
                     }
                 }
             }
@@ -405,6 +427,21 @@ namespace mongo {
                 // enumeration strategy is just one index at a time.
                 indexAssign.preds.push_back(it->second[0]);
                 indexAssign.positions.push_back(0);
+
+                // If there are any preds that could possibly be compounded with this
+                // index...
+                IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    const vector<MatchExpression*>& couldCompound = compIt->second;
+                    vector<MatchExpression*> tryCompound;
+
+                    // ...select the predicates that are safe to compound and try to
+                    // compound them.
+                    getMultikeyCompoundablePreds(indexAssign.preds[0], couldCompound, &tryCompound);
+                    if (tryCompound.size()) {
+                        compound(tryCompound, thisIndex, &indexAssign);
+                    }
+                }
             }
             else {
                 // The index isn't multikey.  Assign all preds to it.  The planner will
@@ -663,6 +700,131 @@ namespace mongo {
         }
     }
 
+    void PlanEnumerator::partitionPreds(MatchExpression* node,
+                                        PrepMemoContext context,
+                                        vector<MatchExpression*>* indexOut,
+                                        vector<MemoID>* subnodesOut) {
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            MatchExpression* child = node->getChild(i);
+            if (Indexability::nodeCanUseIndexOnOwnField(child)) {
+                RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+                if (NULL != context.elemMatchExpr) {
+                    // If we're in an $elemMatch context, store the
+                    // innermost parent $elemMatch, as well as the
+                    // inner path prefix.
+                    rt->elemMatchExpr = context.elemMatchExpr;
+                    rt->pathPrefix = getPathPrefix(child->path().toString());
+                }
+                else {
+                    // We're not an $elemMatch context, so we should store
+                    // the prefix of the full path.
+                    rt->pathPrefix = getPathPrefix(rt->path);
+                }
+
+                // Output this as a pred that can use the index.
+                indexOut->push_back(child);
+            }
+            else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
+                PrepMemoContext childContext;
+                childContext.elemMatchExpr = child;
+                partitionPreds(child, childContext, indexOut, subnodesOut);
+            }
+            else if (MatchExpression::AND == child->matchType()) {
+                partitionPreds(child, context, indexOut, subnodesOut);
+            }
+            else {
+                // Recursively prepMemo for the subnode. We fall through
+                // to this case for logical nodes other than AND (e.g. OR)
+                // and for array nodes other than ELEM_MATCH_OBJECT or
+                // ELEM_MATCH_VALUE (e.g. ALL).
+                if (prepMemo(child, context)) {
+                    verify(_nodeToId.end() != _nodeToId.find(child));
+                    size_t childID = _nodeToId[child];
+
+                    // Output the subnode.
+                    subnodesOut->push_back(childID);
+                }
+            }
+        }
+    }
+
+    void PlanEnumerator::getMultikeyCompoundablePreds(const MatchExpression* assigned,
+                                                      const vector<MatchExpression*>& couldCompound,
+                                                      vector<MatchExpression*>* out) {
+        // Map from a particular $elemMatch expression to the set of prefixes
+        // used so far by the predicates inside the $elemMatch. For example,
+        // {a: {$elemMatch: {b: 1, c: 2}}} would map to the set {'b', 'c'} at
+        // the end of this function's execution.
+        //
+        // NULL maps to the set of prefixes used so far outside of an $elemMatch
+        // context.
+        //
+        // As we iterate over the available indexed predicates, we keep track
+        // of the used prefixes both inside and outside of an $elemMatch context.
+        unordered_map<MatchExpression*, set<string> > used;
+
+        // Initialize 'used' with the starting predicate, 'assigned'. Begin by
+        // initializing the top-level scope with the prefix of the full path.
+        invariant(NULL != assigned->getTag());
+        RelevantTag* usedRt = static_cast<RelevantTag*>(assigned->getTag());
+        set<string> usedPrefixes;
+        usedPrefixes.insert(getPathPrefix(usedRt->path));
+        used[NULL] = usedPrefixes;
+
+        // If 'assigned' is a predicate inside an $elemMatch, we have to
+        // add the prefix not only to the top-level context, but also to the
+        // the $elemMatch context. For example, if 'assigned' is {a: {$elemMatch: {b: 1}}},
+        // then we will have already added "a" to the set for NULL. We now
+        // also need to add "b" to the set for the $elemMatch.
+        if (NULL != usedRt->elemMatchExpr) {
+            set<string> elemMatchUsed;
+            // Whereas getPathPrefix(usedRt->path) is the prefix of the full path,
+            // usedRt->pathPrefix contains the prefix of the portion of the
+            // path that is inside the $elemMatch. These two prefixes are the same
+            // in the top-level context, but here must be different because 'usedRt'
+            // is in an $elemMatch context.
+            elemMatchUsed.insert(usedRt->pathPrefix);
+            used[usedRt->elemMatchExpr] = elemMatchUsed;
+        }
+
+        for (size_t i = 0; i < couldCompound.size(); ++i) {
+            invariant(Indexability::nodeCanUseIndexOnOwnField(couldCompound[i]));
+            RelevantTag* rt = static_cast<RelevantTag*>(couldCompound[i]->getTag());
+
+            if (used.end() == used.find(rt->elemMatchExpr)) {
+                // This is a new $elemMatch that we haven't seen before.
+                invariant(used.end() != used.find(NULL));
+                set<string>& topLevelUsed = used.find(NULL)->second;
+
+                // If the top-level path prefix of the $elemMatch hasn't been
+                // used yet, couldCompound[i] is safe to compound.
+                if (topLevelUsed.end() == topLevelUsed.find(getPathPrefix(rt->path))) {
+                    topLevelUsed.insert(getPathPrefix(rt->path));
+                    set<string> usedPrefixes;
+                    usedPrefixes.insert(rt->pathPrefix);
+                    used[rt->elemMatchExpr] = usedPrefixes;
+
+                    // Output the predicate.
+                    out->push_back(couldCompound[i]);
+                }
+
+            }
+            else {
+                // We've seen this $elemMatch before, or the predicate is
+                // top-level (not in an $elemMatch context). If the prefix stored
+                // in the tag has not been used yet, then couldCompound[i] is
+                // safe to compound.
+                set<string>& usedPrefixes = used.find(rt->elemMatchExpr)->second;
+                if (usedPrefixes.end() == usedPrefixes.find(rt->pathPrefix)) {
+                    usedPrefixes.insert(rt->pathPrefix);
+
+                    // Output the predicate.
+                    out->push_back(couldCompound[i]);
+                }
+            }
+        }
+    }
+
     void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
                                   const IndexEntry& thisIndex,
                                   OneIndexAssignment* assign) {
@@ -681,8 +843,13 @@ namespace mongo {
         while (kpIt.more()) {
             BSONElement keyElt = kpIt.next();
             ++posInIdx;
-            // We must assign fields contiguously from the left.
-            bool fieldAssigned = false;
+
+            // Go through 'tryCompound' to see if there is a compoundable
+            // predicate for 'keyElt'. If there is nothing to compound, then
+            // simply move on to the next field in the compound index. We
+            // do not enforce that fields are assigned contiguously from
+            // right to left, i.e. for compound index {a: 1, b: 1, c: 1}
+            // it is okay to compound predicates over "a" and "c", skipping "b".
             for (size_t j = 0; j < tryCompound.size(); ++j) {
                 MatchExpression* maybe = tryCompound[j];
                 // Sigh we grab the full path from the relevant tag.
@@ -691,13 +858,8 @@ namespace mongo {
                     // preds and positions are parallel arrays.
                     assign->preds.push_back(maybe);
                     assign->positions.push_back(posInIdx);
-                    // We've assigned this field, so we can try the next one.
-                    fieldAssigned = true;
                 }
             }
-            // If we have (a,b,c) and we can't assign something to 'b' don't try
-            // to assign something to 'c'.
-            if (!fieldAssigned) { break; }
         }
     }
 

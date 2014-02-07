@@ -117,11 +117,16 @@ namespace mongo {
         // The position of a field in a possibly compound index.
         typedef size_t IndexPosition;
 
+        struct PrepMemoContext {
+            PrepMemoContext() : elemMatchExpr(NULL) { }
+            MatchExpression* elemMatchExpr;
+        };
+
         /**
          * Traverses the match expression and generates the memo structure from it.
          * Returns true if the provided node uses an index, false otherwise.
          */
-        bool prepMemo(MatchExpression* node);
+        bool prepMemo(MatchExpression* node, PrepMemoContext context);
 
         /**
          * Traverses the memo structure and annotates the tree with IndexTags for the chosen
@@ -233,6 +238,73 @@ namespace mongo {
          */
         void allocateAssignment(MatchExpression* expr, NodeAssignment** slot, MemoID* id);
 
+        /**
+         * Predicates inside $elemMatch's that are semantically "$and of $and"
+         * predicates are not rewritten to the top-level during normalization.
+         * However, we would like to make predicates inside $elemMatch available
+         * for combining index bounds with the top-level $and predicates.
+         *
+         * This function deeply traverses $and and $elemMatch expressions of
+         * the tree rooted at 'node', adding all preds that can use an index
+         * to the output vector 'indexOut'. At the same time, $elemMatch
+         * context information is stashed in the tags so that we don't lose
+         * information due to flattening.
+         *
+         * Nodes that cannot be deeply traversed are returned via the output
+         * vector 'subnodesOut'.
+         *
+         * Does not take ownership of arguments.
+         */
+        void partitionPreds(MatchExpression* node,
+                            PrepMemoContext context,
+                            vector<MatchExpression*>* indexOut,
+                            vector<MemoID>* subnodesOut);
+
+        /**
+         * Finds a set of predicates that can be safely compounded with 'assigned',
+         * under the assumption that we are assignining predicates to a compound,
+         * multikey index.
+         *
+         * The list of candidate predicates that we could compound is passed
+         * in 'couldCompound'. A subset of these predicates that is safe to
+         * combine by compounding is returned in the out-parameter 'out'.
+         *
+         * Does not take ownership of its arguments.
+         *
+         * The rules for when to compound for multikey indices are reasonably
+         * complex, and are dependent on the structure of $elemMatch's used
+         * in the query. Ignoring $elemMatch for the time being, the rule is this:
+         *
+         *   "Any set of predicates for which no two predicates share a path
+         *    prefix can be compounded."
+         *
+         * Suppose we have predicates over paths 'a.b' and 'a.c'. These cannot
+         * be compounded because they share the prefix 'a'. Similarly, the bounds
+         * for 'a' and 'a.b' cannot be compounded (in the case of multikey index
+         * {a: 1, 'a.b': 1}). You *can* compound predicates over the paths 'a.b.c',
+         * 'd', and 'e.b.c', because there is no shared prefix.
+         *
+         * The rules are different in the presence of $elemMatch. For $elemMatch
+         * {a: {$elemMatch: {<pred1>, ..., <predN>}}}, we are allowed to compound
+         * bounds for pred1 through predN, even though these predicates share the
+         * path prefix 'a'. However, we still cannot compound in the case of
+         * {a: {$elemMatch: {'b.c': {$gt: 1}, 'b.d': 5}}} because 'b.c' and 'b.d'
+         * share a prefix. In other words, what matters inside an $elemMatch is not
+         * the absolute prefix, but rather the "relative prefix" after the shared
+         * $elemMatch part of the path.
+         *
+         * A few more examples:
+         *    1) {'a.b': {$elemMatch: {c: {$gt: 1}, d: 5}}}. In this case, we can
+         *    compound, because the $elemMatch is applied to the shared part of
+         *    the path 'a.b'.
+         *
+         *    2) {'a.b': 1, a: {$elemMatch: {b: {$gt: 0}}}}. We cannot combine the
+         *    bounds here because the prefix 'a' is shared by two predicates which
+         *    are not joined together by an $elemMatch.
+         */
+        void getMultikeyCompoundablePreds(const MatchExpression* assigned,
+                                          const vector<MatchExpression*>& couldCompound,
+                                          vector<MatchExpression*>* out);
         /**
          * Output index intersection assignments inside of an AND node.
          */

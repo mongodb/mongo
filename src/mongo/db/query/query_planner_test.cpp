@@ -870,7 +870,7 @@ namespace {
 
         ASSERT_EQUALS(getNumSolutions(), 2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {filter: {z: 10}, node: "
+        assertSolutionExists("{fetch: {filter: null, node: "
                                 "{ixscan: {filter: null, pattern: {x: 1, y: 1, z: 1}}}}}");
     }
 
@@ -1290,10 +1290,13 @@ namespace {
         // 2 indexed solns and one non-indexed
         ASSERT_EQUALS(getNumSolutions(), 3U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
-        assertSolutionExists("{fetch: {filter: {$and: [{a: 55}, {b: {$in: [1, 5, 8]}}]}, "
-                                      "node: {fetch: {filter: {arr: {$elemMatch: {x: 5, y: 5}}}, "
-                                            "node: {ixscan: {pattern: {'arr.x': 1, a: 1}}}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[55,55,true,true]], b: [[1,1,true,true], "
+                                    "[5,5,true,true], [8,8,true,true]]}}}}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{arr:{$elemMatch:{x:5,y:5}}},"
+                                                      "{b:{$in:[1,5,8]}}]}, "
+                                      "node: {ixscan: {pattern: {'arr.x':1,a:1}, bounds: "
+                                      "{'arr.x': [[5,5,true,true]], 'a':[[55,55,true,true]]}}}}}");
     }
 
     TEST_F(QueryPlannerTest, CompoundAndNonCompoundIndices) {
@@ -1305,9 +1308,9 @@ namespace {
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {filter: {$and:[{b:{$lt:2}},{b:{$gt:2}}]}, node: "
                                 "{ixscan: {pattern: {a:1}, bounds: {a: [[1,1,true,true]]}}}}}");
-        assertSolutionExists("{fetch: {filter: {$and:[{b:{$lt:2}},{b:{$gt:2}}]}, node: "
+        assertSolutionExists("{fetch: {filter: {b:{$gt:2}}, node: "
                                 "{ixscan: {pattern: {a:1,b:1}, bounds: "
-                                "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}");
+                                "{a: [[1,1,true,true]], b: [[-Infinity,2,true,false]]}}}}}");
     }
 
     //
@@ -1427,16 +1430,15 @@ namespace {
                                 "node: {ixscan: {filter: null, pattern: {a: 1}}}}}}}");
     }
 
-    TEST_F(QueryPlannerTest, HintMultipleSolutions) {
-        addIndex(fromjson("{'a.b': 1}"));
+    TEST_F(QueryPlannerTest, HintElemMatch) {
+        // true means multikey
+        addIndex(fromjson("{'a.b': 1}"), true);
         runQueryHint(fromjson("{'a.b': 1, a: {$elemMatch: {b: 2}}}"), fromjson("{'a.b': 1}"));
 
-        assertNumSolutions(2U);
-        assertSolutionExists("{fetch: {filter: {a: {$elemMatch: {b: 2}}}, "
-                                "node: {ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
-        assertSolutionExists("{fetch: {filter: {'a.b': 1},"
-                                "node: {fetch: {filter: {a: {$elemMatch: {b: 2}}}, "
-                                "node: {ixscan: {filter: null, pattern: {'a.b': 1}}}}}}}");
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {$and: [{a:{$elemMatch:{b:2}}}, {'a.b': 1}]}, "
+                                "node: {ixscan: {filter: null, pattern: {'a.b': 1}, bounds: "
+                                "{'a.b': [[2, 2, true, true]]}}}}}");
     }
 
     TEST_F(QueryPlannerTest, HintInvalid) {
@@ -1804,7 +1806,7 @@ namespace {
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: "
                                 "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]], "
-                                " c: [['MinKey','MaxKey',true,true]]}}}}}");
+                                " c: [[-Infinity,3,true,false]]}}}}}");
     }
 
     TEST_F(QueryPlannerTest, CompoundIndexBoundsRangeAndEquality) {
@@ -1884,6 +1886,469 @@ namespace {
         assertSolutionExists("{sort: {pattern: {b:1}, limit: 0, node: {fetch: "
                                 "{filter: null, node: {ixscan: {filter: null, "
                                 "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundIndexBoundsIntersectRanges) {
+        addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+        addIndex(BSON("a" << 1 << "c" << 1));
+        runQuery(fromjson("{a: {$gt: 1, $lt: 10}, c: {$gt: 1, $lt: 10}}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1,b:1,c:1}, "
+                                "bounds: {a: [[1,10,false,false]], "
+                                         "b: [['MinKey','MaxKey',true,true]], "
+                                         "c: [[1,10,false,false]]}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1,c:1}, "
+                                "bounds: {a: [[1,10,false,false]], "
+                                         "c: [[1,10,false,false]]}}}}}");
+    }
+
+    //
+    // Tests related to building index bounds for multikey
+    // indices, combined with compound and $elemMatch
+    //
+
+    // SERVER-12475: make sure that we compound bounds, even
+    // for a multikey index.
+    TEST_F(QueryPlannerTest, CompoundMultikeyBounds) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << 1), true);
+        runQuery(fromjson("{a: 1, b: 3}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {filter: {$and:[{a:1},{b:3}]}, dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {filter: null, "
+                                "pattern: {a:1,b:1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [[3,3,true,true]]}}}}}");
+    }
+
+    // Make sure that we compound bounds but do not intersect bounds
+    // for a compound multikey index.
+    TEST_F(QueryPlannerTest, CompoundMultikeyBoundsNoIntersect) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << 1), true);
+        runQuery(fromjson("{a: 1, b: {$gt: 3, $lte: 5}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b:{$gt:3}}, node: {ixscan: {filter: null, "
+                                "pattern: {a:1,b:1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [[-Infinity,5,true,true]]}}}}}");
+    }
+
+    // The index bounds can be compounded because the index is not multikey.
+    TEST_F(QueryPlannerTest, CompoundBoundsElemMatchNotMultikey) {
+        addIndex(BSON("a.x" << 1 << "a.b.c" << 1));
+        runQuery(fromjson("{'a.x': 1, a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1}}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{b:{$elemMatch:{c:{$gte:1}}}}}}, "
+                                "node: {ixscan: {pattern: {'a.x':1, 'a.b.c':1}, bounds: "
+                                "{'a.x': [[1,1,true,true]], "
+                                " 'a.b.c': [[1,Infinity,true,true]]}}}}}");
+    }
+
+    // The index bounds cannot be compounded because the predicates over 'a.x' and
+    // 'a.b.c' 1) share the prefix "a", and 2) are not conjoined by an $elemMatch
+    // over the prefix "a".
+    TEST_F(QueryPlannerTest, CompoundMultikeyBoundsElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.x" << 1 << "a.b.c" << 1), true);
+        runQuery(fromjson("{'a.x': 1, a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1}}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.x':1, 'a.b.c':1}, bounds: "
+                                "{'a.x': [[1,1,true,true]], "
+                                " 'a.b.c': [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // The index bounds cannot be intersected because the index is multikey.
+    // The bounds could be intersected if there was an $elemMatch applied to path
+    // "a.b.c". However, the $elemMatch is applied to the path "a.b" rather than
+    // the full path of the indexed field.
+    TEST_F(QueryPlannerTest, MultikeyNestedElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $lte: 1}}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, bounds: "
+                                "{'a.b.c': [[-Infinity, 1, true, true]]}}}}}");
+    }
+
+    // The index bounds cannot be intersected because the index is multikey.
+    // The bounds could be intersected if there was an $elemMatch applied to path
+    // "a.b.c". However, the $elemMatch is applied to the path "a.b" rather than
+    // the full path of the indexed field.
+    TEST_F(QueryPlannerTest, MultikeyNestedElemMatchIn) {
+        // true means multikey
+        addIndex(BSON("a.b.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $in:[2]}}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, bounds: "
+                                "{'a.b.c': [[1, Infinity, true, true]]}}}}}");
+    }
+
+    // The bounds can be compounded because the index is not multikey.
+    TEST_F(QueryPlannerTest, TwoNestedElemMatchBounds) {
+        addIndex(BSON("a.d.e" << 1 << "a.b.c" << 1));
+        runQuery(fromjson("{a: {$elemMatch: {d: {$elemMatch: {e: {$lte: 1}}},"
+                                            "b: {$elemMatch: {c: {$gte: 1}}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.d.e': 1, 'a.b.c': 1}, bounds: "
+                                "{'a.d.e': [[-Infinity, 1, true, true]],"
+                                 "'a.b.c': [[1, Infinity, true, true]]}}}}}");
+    }
+
+    // The bounds cannot be compounded. Although there is an $elemMatch over the
+    // shared path prefix 'a', the predicates must be conjoined by the same $elemMatch,
+    // without nested $elemMatch's intervening. The bounds could be compounded if
+    // the query were rewritten as {a: {$elemMatch: {'d.e': {$lte: 1}, 'b.c': {$gte: 1}}}}.
+    TEST_F(QueryPlannerTest, MultikeyTwoNestedElemMatchBounds) {
+        // true means multikey
+        addIndex(BSON("a.d.e" << 1 << "a.b.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {d: {$elemMatch: {e: {$lte: 1}}},"
+                                            "b: {$elemMatch: {c: {$gte: 1}}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.d.e': 1, 'a.b.c': 1}, bounds: "
+                                "{'a.d.e': [[-Infinity, 1, true, true]],"
+                                 "'a.b.c': [['MinKey', 'MaxKey', true, true]]}}}}}");
+    }
+
+    // Bounds can be intersected for a multikey index when the predicates are
+    // joined by an $elemMatch over the full path of the index field.
+    TEST_F(QueryPlannerTest, MultikeyElemMatchValue) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+        runQuery(fromjson("{'a.b': {$elemMatch: {$gte: 1, $lte: 1}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b': 1}, bounds: "
+                                "{'a.b': [[1, 1, true, true]]}}}}}");
+    }
+
+    // We can intersect the bounds for all three predicates because
+    // the index is not multikey.
+    TEST_F(QueryPlannerTest, ElemMatchInterectBoundsNotMultikey) {
+        addIndex(BSON("a.b" << 1));
+        runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {$gte: 1, $lte: 4}}}},"
+                            "'a.b': {$in: [2,5]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b': 1}, bounds: "
+                                "{'a.b': [[2, 2, true, true]]}}}}}");
+    }
+
+    // Bounds can be intersected for a multikey index when the predicates are
+    // joined by an $elemMatch over the full path of the index field. The bounds
+    // from the $in predicate are not intersected with the bounds from the
+    // remaining to predicates because the $in is not joined to the other
+    // predicates with an $elemMatch.
+    TEST_F(QueryPlannerTest, ElemMatchInterectBoundsMultikey) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {$gte: 1, $lte: 4}}}},"
+                            "'a.b': {$in: [2,5]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b': 1}, bounds: "
+                                "{'a.b': [[1, 4, true, true]]}}}}}");
+    }
+
+    // Bounds can be intersected because the predicates are joined by an
+    // $elemMatch over the path "a.b.c", the full path of the multikey
+    // index field.
+    TEST_F(QueryPlannerTest, MultikeyNestedElemMatchValue) {
+        // true means multikey
+        addIndex(BSON("a.b.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {'b.c': {$elemMatch: {$gte: 1, $lte: 1}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, bounds: "
+                                "{'a.b.c': [[1, 1, true, true]]}}}}}");
+    }
+
+    // Bounds cannot be compounded for a multikey compound index when
+    // the predicates share a prefix (and there is no $elemMatch).
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixNoElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{'a.b': 1, 'a.c': 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[1,1,true,true]], "
+                                " 'a.c': [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // Bounds can be compounded because there is an $elemMatch applied to the
+    // shared prefix "a".
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: 1, c: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[1,1,true,true]], 'a.c': [[1,1,true,true]]}}}}}");
+    }
+
+    // Bounds cannot be compounded for the multikey index even though there is an
+    // $elemMatch, because the $elemMatch does not join the two predicates. This
+    // query is semantically indentical to {'a.b': 1, 'a.c': 1}.
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixElemMatchNotShared) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{'a.b': 1, a: {$elemMatch: {c: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[1,1,true,true]], "
+                                " 'a.c': [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // Bounds cannot be compounded for the multikey index even though there are
+    // $elemMatch's, because there is not an $elemMatch which joins the two
+    // predicates. This query is semantically indentical to {'a.b': 1, 'a.c': 1}.
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixTwoElemMatches) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{$and: [{a: {$elemMatch: {b: 1}}}, {a: {$elemMatch: {c: 1}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[1,1,true,true]], "
+                                " 'a.c': [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // Bounds for the predicates joined by the $elemMatch over the shared prefix
+    // "a" can be combined. However, the predicate 'a.b'==1 cannot also be combined
+    // given that it is outside of the $elemMatch.
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixNoIntersectOutsideElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{'a.b': 1, a: {$elemMatch: {b: {$gt: 0}, c: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[0,Infinity,false,true]], "
+                                " 'a.c': [[1,1,true,true]]}}}}}");
+    }
+
+    // Bounds for the predicates joined by the $elemMatch over the shared prefix
+    // "a" can be combined. However, the predicate outside the $elemMatch
+    // cannot also be combined.
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixNoIntersectOutsideElemMatch2) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: 1, c: 1}}, 'a.b': 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[1,1,true,true]], "
+                                " 'a.c': [[1,1,true,true]]}}}}}");
+    }
+
+    // Bounds for the predicates joined by the $elemMatch over the shared prefix
+    // "a" can be combined. However, the predicate outside the $elemMatch
+    // cannot also be combined.
+    TEST_F(QueryPlannerTest, MultikeySharedPrefixNoIntersectOutsideElemMatch3) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{'a.c': 2, a: {$elemMatch: {b: 1, c: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+                                "{'a.b': [[1,1,true,true]], "
+                                " 'a.c': [[1,1,true,true]]}}}}}");
+    }
+
+    // There are two sets of fields that share a prefix: {'a.b', 'a.c'} and
+    // {'d.e', 'd.f'}. Since the index is multikey, we can only use the bounds from
+    // one member of each of these sets.
+    TEST_F(QueryPlannerTest, MultikeyTwoSharedPrefixesBasic) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1 << "d.e" << 1 << "d.f" << 1), true);
+        runQuery(fromjson("{'a.b': 1, 'a.c': 1, 'd.e': 1, 'd.f': 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1,'d.e':1,'d.f':1},"
+                                "bounds: {'a.b':[[1,1,true,true]], "
+                                        " 'a.c':[['MinKey','MaxKey',true,true]], "
+                                        " 'd.e':[[1,1,true,true]], "
+                                        " 'd.f':[['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // All bounds can be combined. Although, 'a.b' and 'a.c' share prefix 'a', the
+    // relevant predicates are joined by an $elemMatch on 'a'. Similarly, predicates
+    // over 'd.e' and 'd.f' are joined by an $elemMatch on 'd'.
+    TEST_F(QueryPlannerTest, MultikeyTwoSharedPrefixesTwoElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1 << "d.e" << 1 << "d.f" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: 1, c: 1}}, d: {$elemMatch: {e: 1, f: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{a: {$elemMatch: {b: 1, c: 1}}},"
+                                                      "{d: {$elemMatch: {e: 1, f: 1}}}]},"
+                                "node: {ixscan: {pattern: {'a.b':1,'a.c':1,'d.e':1,'d.f':1},"
+                                "bounds: {'a.b':[[1,1,true,true]], "
+                                        " 'a.c':[[1,1,true,true]], "
+                                        " 'd.e':[[1,1,true,true]], "
+                                        " 'd.f':[[1,1,true,true]]}}}}}");
+    }
+
+    // Bounds for 'a.b' and 'a.c' can be combined because of the $elemMatch on 'a'.
+    // Since predicates an 'd.e' and 'd.f' have no $elemMatch, we use the bounds
+    // for only one of the two.
+    TEST_F(QueryPlannerTest, MultikeyTwoSharedPrefixesOneElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1 << "d.e" << 1 << "d.f" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: 1, c: 1}}, 'd.e': 1, 'd.f': 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and:[{a:{$elemMatch:{b:1,c:1}}}, {'d.f':1}]},"
+                                "node: {ixscan: {pattern: {'a.b':1,'a.c':1,'d.e':1,'d.f':1},"
+                                "bounds: {'a.b':[[1,1,true,true]], "
+                                        " 'a.c':[[1,1,true,true]], "
+                                        " 'd.e':[[1,1,true,true]], "
+                                        " 'd.f':[['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // Bounds for 'd.e' and 'd.f' can be combined because of the $elemMatch on 'd'.
+    // Since predicates an 'a.b' and 'a.c' have no $elemMatch, we use the bounds
+    // for only one of the two.
+    TEST_F(QueryPlannerTest, MultikeyTwoSharedPrefixesOneElemMatch2) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1 << "d.e" << 1 << "d.f" << 1), true);
+        runQuery(fromjson("{'a.b': 1, 'a.c': 1, d: {$elemMatch: {e: 1, f: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and:[{d:{$elemMatch:{e:1,f:1}}}, {'a.c':1}]},"
+                                "node: {ixscan: {pattern: {'a.b':1,'a.c':1,'d.e':1,'d.f':1},"
+                                "bounds: {'a.b':[[1,1,true,true]], "
+                                        " 'a.c':[['MinKey','MaxKey',true,true]], "
+                                        " 'd.e':[[1,1,true,true]], "
+                                        " 'd.f':[[1,1,true,true]]}}}}}");
+    }
+
+    // The bounds cannot be compounded because 'a.b.x' and 'a.b.y' share prefix
+    // 'a.b' (and there is no $elemMatch).
+    TEST_F(QueryPlannerTest, MultikeyDoubleDottedNoElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b.x" << 1 << "a.b.y" << 1), true);
+        runQuery(fromjson("{'a.b.y': 1, 'a.b.x': 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.x':1,'a.b.y':1}, bounds: "
+                                "{'a.b.x': [[1,1,true,true]], "
+                                " 'a.b.y': [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // The bounds can be compounded because the predicates are joined by an
+    // $elemMatch on the shared prefix "a.b".
+    TEST_F(QueryPlannerTest, MultikeyDoubleDottedElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b.x" << 1 << "a.b.y" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {x: 1, y: 1}}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.x':1,'a.b.y':1}, bounds: "
+                                "{'a.b.x': [[1,1,true,true]], "
+                                " 'a.b.y': [[1,1,true,true]]}}}}}");
+    }
+
+    // The bounds cannot be compounded. Although there is an $elemMatch that appears
+    // to join the predicates, the path to which the $elemMatch is applied is "a".
+    // Therefore, the predicates contained in the $elemMatch are over "b.x" and "b.y".
+    // They cannot be compounded due to shared prefix "b".
+    TEST_F(QueryPlannerTest, MultikeyDoubleDottedUnhelpfulElemMatch) {
+        // true means multikey
+        addIndex(BSON("a.b.x" << 1 << "a.b.y" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {'b.x': 1, 'b.y': 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.x':1,'a.b.y':1}, bounds: "
+                                "{'a.b.x': [[1,1,true,true]], "
+                                " 'a.b.y': [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // The bounds can be compounded because the predicates are joined by an
+    // $elemMatch on the shared prefix "a.b".
+    TEST_F(QueryPlannerTest, MultikeyDoubleDottedElemMatchOnDotted) {
+        // true means multikey
+        addIndex(BSON("a.b.x" << 1 << "a.b.y" << 1), true);
+        runQuery(fromjson("{'a.b': {$elemMatch: {x: 1, y: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.x':1,'a.b.y':1}, bounds: "
+                                "{'a.b.x': [[1,1,true,true]], "
+                                " 'a.b.y': [[1,1,true,true]]}}}}}");
+    }
+
+    // This one is subtle. Say we compound the bounds for predicates over "a.b.c" and
+    // "a.b.d". This is okay because of the predicate over the shared prefix "a.b".
+    // It might seem like we can do the same for the $elemMatch over shared prefix "a.e",
+    // thus combining all bounds. But in fact, we can't combine any more bounds because
+    // we have already used prefix "a". In other words, this query is like having predicates
+    // over "a.b" and "a.e", so we can only use bounds from one of the two.
+    TEST_F(QueryPlannerTest, MultikeyComplexDoubleDotted) {
+        // true means multikey
+        addIndex(BSON("a.b.c" << 1 << "a.e.f" << 1 << "a.b.d" << 1 << "a.e.g" << 1), true);
+        runQuery(fromjson("{'a.b': {$elemMatch: {c: 1, d: 1}}, "
+                           "'a.e': {$elemMatch: {f: 1, g: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c':1,'a.e.f':1,'a.b.d':1,'a.e.g':1},"
+                                "bounds: {'a.b.c':[[1,1,true,true]], "
+                                        " 'a.e.f':[['MinKey','MaxKey',true,true]], "
+                                        " 'a.b.d':[[1,1,true,true]], "
+                                        " 'a.e.g':[['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    // Similar to MultikeyComplexDoubleDotted above.
+    TEST_F(QueryPlannerTest, MultikeyComplexDoubleDotted2) {
+        // true means multikey
+        addIndex(BSON("a.b.c" << 1 << "a.e.c" << 1 << "a.b.d" << 1 << "a.e.d" << 1), true);
+        runQuery(fromjson("{'a.b': {$elemMatch: {c: 1, d: 1}}, "
+                           "'a.e': {$elemMatch: {f: 1, g: 1}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c':1,'a.e.c':1,'a.b.d':1,'a.e.d':1},"
+                                "bounds: {'a.b.c':[[1,1,true,true]], "
+                                        " 'a.e.c':[['MinKey','MaxKey',true,true]], "
+                                        " 'a.b.d':[[1,1,true,true]], "
+                                        " 'a.e.d':[['MinKey','MaxKey',true,true]]}}}}}");
     }
 
     //

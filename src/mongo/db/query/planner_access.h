@@ -36,6 +36,60 @@
 namespace mongo {
 
     /**
+     * MULTIKEY INDEX BOUNDS RULES
+     *
+     * 1. In general for a multikey index, we cannot intersect bounds
+     * even if the index is not compound.
+     *   Example:
+     *   Let's say we have the document {a: [5, 7]}.
+     *   This document satisfies the query {$and: [ {a: 5}, {a: 7} ] }
+     *   For the index {a:1} we have the keys {"": 5} and {"": 7}.
+     *   Each child of the AND is tagged with the index {a: 1}
+     *   The interval for the {a: 5} branch is [5, 5].  It is exact.
+     *   The interval for the {a: 7} branch is [7, 7].  It is exact.
+     *   The intersection of the intervals is {}.
+     *   If we scan over {}, the intersection of the intervals, we will retrieve nothing.
+     *
+     * 2. In general for a multikey compound index, we *can* compound the bounds.
+     * For example, if we have multikey index {a: 1, b: 1} and query {a: 2, b: 3},
+     * we can use the bounds {a: [[2, 2]], b: [[3, 3]]}.
+     *
+     * 3. Despite rule #2, if fields in the compound index share a prefix, then it
+     * is not safe to compound the bounds. We can only specify bounds for the first
+     * field.
+     *   Example:
+     *   Let's say we have the document {a: [ {b: 3}, {c: 4} ] }
+     *   This document satisfies the query {'a.b': 3, 'a.c': 4}.
+     *   For the index {'a.b': 1, 'a.c': 1} we have the keys {"": 3, "": null} and
+     *                                                       {"": null, "": 4}.
+     *   Let's use the aforementioned index to answer the query.
+     *   The bounds for 'a.b' are [3,3], and the bounds for 'a.c' are [4,4].
+     *   If we combine the bounds, we would only look at keys {"": 3, "":4 }.
+     *   Therefore we wouldn't look at the document's keys in the index.
+     *   Therefore we don't combine bounds.
+     *
+     * 4. There is an exception to rule #1, and that is when we're evaluating
+     * an $elemMatch.
+     *   Example:
+     *   Let's say that we have the same document from (1), {a: [5, 7]}.
+     *   This document satisfies {a: {$lte: 5, $gte: 7}}, but it does not
+     *   satisfy {a: {$elemMatch: {$lte: 5, $gte: 7}}}. The $elemMatch indicates
+     *   that we are allowed to intersect the bounds, which means that we will
+     *   scan over the empty interval {} and retrieve nothing. This is the
+     *   expected result because there is no entry in the array "a" that
+     *   simultaneously satisfies the predicates a<=5 and a>=7.
+     *
+     * 5. There is also an exception to rule #3, and that is when we're evaluating
+     * an $elemMatch. The bounds can be compounded for predicates that share a prefix
+     * so long as the shared prefix is the path for which there is an $elemMatch.
+     *   Example:
+     *   Suppose we have the same document from (3), {a: [{b: 3}, {c: 4}]}. As discussed
+     *   above, we cannot compound the index bounds for query {'a.b': 1, 'a.c': 1}.
+     *   However, for the query {a: {$elemMatch: {b: 1, c: 1}} we can compound the
+     *   bounds because the $elemMatch is applied to the shared prefix "a".
+     */
+
+    /**
      * Methods for creating a QuerySolutionNode tree that accesses the data required by the query.
      */
     class QueryPlannerAccess {
@@ -105,6 +159,17 @@ namespace mongo {
                                                  const vector<IndexEntry>& indices);
 
         /**
+         * Traverses the tree rooted at the $elemMatch expression 'node',
+         * finding all predicates that can use an index directly and returning
+         * them in the out-parameter vector 'out'.
+         *
+         * Traverses only through $and and $elemMatch nodes, not through other
+         * logical or array nodes like $or and $all.
+         */
+        static void findElemMatchChildren(const MatchExpression* node,
+                                          vector<MatchExpression*>* out);
+
+        /**
          * Helper used by buildIndexedAnd and buildIndexedOr.
          *
          * The children of AND and OR nodes are sorted by the index that the subtree rooted at
@@ -138,6 +203,7 @@ namespace mongo {
          */
         static QuerySolutionNode* makeLeafNode(const CanonicalQuery& query,
                                                const IndexEntry& index,
+                                               size_t pos,
                                                MatchExpression* expr,
                                                IndexBoundsBuilder::BoundsTightness* tightnessOut);
 
@@ -150,6 +216,23 @@ namespace mongo {
                                       IndexBoundsBuilder::BoundsTightness* tightnessOut,
                                       QuerySolutionNode* node,
                                       MatchExpression::MatchType mergeType);
+
+        /**
+         * Determines whether it is safe to merge the expression 'expr' with
+         * the leaf node of the query solution, 'node'.
+         *
+         * 'index' provides information about the index used by 'node'.
+         * 'pos' gives the position in the index (for compound indices) that
+         * 'expr' needs to use. Finally, 'mergeType' indicates whether we
+         * will try to merge using an AND or OR.
+         *
+         * Does not take ownership of its arguments.
+         */
+        static bool shouldMergeWithLeaf(const MatchExpression* expr,
+                                        const IndexEntry& index,
+                                        size_t pos,
+                                        QuerySolutionNode* node,
+                                        MatchExpression::MatchType mergeType);
 
         /**
          * If index scan (regular or expression index), fill in any bounds that are missing in

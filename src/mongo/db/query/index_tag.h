@@ -64,7 +64,7 @@ namespace mongo {
     // used internally
     class RelevantTag : public MatchExpression::TagData {
     public:
-        RelevantTag() { }
+        RelevantTag() : elemMatchExpr(NULL), pathPrefix("") { }
 
         std::vector<size_t> first;
         std::vector<size_t> notFirst;
@@ -74,6 +74,25 @@ namespace mongo {
         // TODO: Do a FieldRef / StringData pass.
         // TODO: We might want this inside of the MatchExpression.
         string path;
+
+        // Points to the innermost containing $elemMatch. If this tag is
+        // attached to an expression not contained in an $elemMatch, then
+        // 'elemMatchExpr' is NULL. Not owned here.
+        MatchExpression* elemMatchExpr;
+
+        // If not contained inside an elemMatch, 'pathPrefix' contains the
+        // part of 'path' prior to the first dot. For example, if 'path' is
+        // "a.b.c", then 'pathPrefix' is "a". If 'path' is just "a", then
+        // 'pathPrefix' is also "a".
+        //
+        // If tagging a predicate contained in an $elemMatch, 'pathPrefix'
+        // holds the prefix of the path *inside* the $elemMatch. If this
+        // tags predicate {a: {$elemMatch: {"b.c": {$gt: 1}}}}, then
+        // 'pathPrefix' is "b".
+        //
+        // Used by the plan enumerator to make sure that we never
+        // compound two predicates sharing a path prefix.
+        std::string pathPrefix;
 
         virtual void debugString(StringBuilder* builder) const {
             *builder << "First: ";
