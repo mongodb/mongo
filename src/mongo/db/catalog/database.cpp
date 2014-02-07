@@ -559,6 +559,7 @@ namespace mongo {
                                             const BSONObj* options, bool allocateDefaultSpace ) {
         verify( _namespaceIndex.details( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
+        _initForWrites();
 
         if ( serverGlobalParams.configsvr &&
              !( ns.startsWith( "config." ) ||
@@ -654,6 +655,8 @@ namespace mongo {
     }
 
     Status Database::_dropNS( const StringData& ns ) {
+        _initForWrites();
+
         NamespaceDetails* d = _namespaceIndex.details( ns );
         if ( !d )
             return Status( ErrorCodes::NamespaceNotFound,

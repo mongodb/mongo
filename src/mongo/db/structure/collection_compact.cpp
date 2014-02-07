@@ -234,6 +234,8 @@ namespace mongo {
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
                                              "cannot compact when indexes in progress" );
 
+        _database->_initForWrites();
+
         NamespaceDetails* d = details();
 
         // this is a big job, so might as well make things tidy before we start just to be nice.

@@ -83,7 +83,9 @@ namespace mongo {
          * return file n.  if it doesn't exist, create it
          */
         DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
-            _initForWrites();
+            // do not call _initForWrites as it creates a freelist
+            // which may not be allowed
+            _namespaceIndex.init();
             return _extentManager.getFile( n, sizeNeeded, preallocateOnly );
         }
 

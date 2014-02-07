@@ -394,7 +394,7 @@ namespace mongo {
             _freeListDetails = freeListDetails;
         }
         else {
-            verify( _freeListDetails == freeListDetails );
+            invariant( _freeListDetails == freeListDetails );
         }
     }
 
@@ -550,7 +550,7 @@ namespace mongo {
             verify( f==l || !l->xprev.isNull() );
         }
 
-        verify( _freeListDetails );
+        fassert( 17385, _freeListDetails );
 
         if( _freeListDetails->firstExtent().isNull() ) {
             _freeListDetails->setFirstExtent( firstExt );
