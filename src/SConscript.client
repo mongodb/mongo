@@ -97,7 +97,6 @@ clientSourceBasic = [
     'mongo/util/intrusive_counter.cpp',
     'mongo/util/log.cpp',
     'mongo/util/md5.cpp',
-    'mongo/util/md5main.cpp',
     'mongo/util/net/httpclient.cpp',
     'mongo/util/net/listen.cpp',
     'mongo/util/net/message.cpp',
