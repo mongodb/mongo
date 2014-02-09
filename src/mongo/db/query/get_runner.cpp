@@ -30,6 +30,7 @@
 
 #include <limits>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
@@ -617,13 +618,28 @@ namespace mongo {
          * Look for the index for the fewest fields.
          * Criteria for suitable index is that the index cannot be special
          * (geo, hashed, text, ...).
+         *
+         * Multikey indices are not suitable for DistinctNode when the projection
+         * is on an array element. Arrays are flattened in a multikey index which
+         * makes it impossible for the distinct scan stage (plan stage generated from
+         * DistinctNode) to select the requested element by array index.
+         *
+         * XXX: Multikey indices cannot be used for distinct node if the field
+         * is dotted. Currently the solution generated for the distinct hack includes a
+         * projection stage and the projection stage cannot be covered with a dotted field.
          */
-        bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices, size_t* indexOut) {
+        bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
+                                  const std::string& field, size_t* indexOut) {
             invariant(indexOut);
+            bool isDottedField = str::contains(field, '.');
             int minFields = std::numeric_limits<int>::max();
             for (size_t i = 0; i < indices.size(); ++i) {
                 // Skip special indices.
                 if (!IndexNames::findPluginName(indices[i].keyPattern).empty()) {
+                    continue;
+                }
+                // Skip multikey indices if we are projecting on a dotted field.
+                if (indices[i].multikey && isDottedField) {
                     continue;
                 }
                 int nFields = indices[i].keyPattern.nFields();
@@ -635,7 +651,75 @@ namespace mongo {
             }
             return minFields != std::numeric_limits<int>::max();
         }
-            
+
+        /**
+         * Checks dotted field for a projection and truncates the
+         * field name if we could be projecting on an array element.
+         * Sets 'isIDOut' to true if the projection is on a sub document of _id.
+         * For example, _id.a.2, _id.b.c.
+         */
+        std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
+            // Check if field contains an array index.
+            std::vector<std::string> res;
+            mongo::splitStringDelim(field, &res, '.');
+
+            // Since we could exit early from the loop,
+            // we should check _id here and set '*isIDOut' accordingly.
+            *isIDOut = ("_id" == res[0]);
+
+            // Skip the first dotted component. If the field starts
+            // with a number, the number cannot be an array index.
+            int arrayIndex = 0;
+            for (size_t i = 1; i < res.size(); ++i) {
+                if (mongo::parseNumberFromStringWithBase(res[i], 10, &arrayIndex).isOK()) {
+                    // Array indices cannot be negative numbers (this is not $slice).
+                    // Negative numbers are allowed as field names.
+                    if (arrayIndex >= 0) {
+                        // Generate prefix of field up to (but not including) array index.
+                        std::vector<std::string> prefixStrings(res);
+                        prefixStrings.resize(i);
+                        // Reset projectedField. Instead of overwriting, joinStringDelim() appends joined string
+                        // to the end of projectedField.
+                        std::string projectedField;
+                        mongo::joinStringDelim(prefixStrings, &projectedField, '.');
+                        return projectedField;
+                    }
+                }
+            }
+
+            return field;
+        }
+
+        /**
+         * Creates a projection spec for a distinct command from the requested field.
+         * In most cases, the projection spec will be {_id: 0, key: 1}.
+         * The exceptions are:
+         * 1) When the requested field is '_id', the projection spec will {_id: 1}.
+         * 2) When the requested field could be an array element (eg. a.0),
+         *    the projected field will be the prefix of the field up to the array element.
+         *    For example, a.b.2 => {_id: 0, 'a.b': 1}
+         *    Note that we can't use a $slice projection because the distinct command filters
+         *    the results from the runner using the dotted field name. Using $slice will
+         *    re-order the documents in the array in the results.
+         */
+        BSONObj getDistinctProjection(const std::string& field) {
+            std::string projectedField(field);
+
+            bool isID = false;
+            if ("_id" == field) {
+                isID = true;
+            }
+            else if (str::contains(field, '.')) {
+                projectedField = getProjectedDottedField(field, &isID);
+            }
+            BSONObjBuilder bob;
+            if (!isID) {
+                bob.append("_id", 0);
+            }
+            bob.append(projectedField, 1);
+            return bob.obj();
+        }
+
     }  // namespace
 
     Status getRunnerCount(Collection* collection,
@@ -773,13 +857,7 @@ namespace mongo {
         // explicitly because those are .find() semantics.
         //
         // Applying a projection allows the planner to try to give us covered plans.
-        BSONObj projection;
-        if ("_id" == field) {
-            projection = BSON("_id" << 1);
-        }
-        else {
-            projection = BSON("_id" << 0 << field << 1);
-        }
+        BSONObj projection = getDistinctProjection(field);
 
         // Apply a projection of the key.  Empty BSONObj() is for the sort.
         CanonicalQuery* cq;
@@ -801,7 +879,7 @@ namespace mongo {
         // getDistinctNodeIndex().
         size_t distinctNodeIndex = 0;
         if (query.isEmpty() &&
-            getDistinctNodeIndex(plannerParams.indices, &distinctNodeIndex)) {
+            getDistinctNodeIndex(plannerParams.indices, field, &distinctNodeIndex)) {
             DistinctNode* dn = new DistinctNode();
             dn->indexKeyPattern = plannerParams.indices[distinctNodeIndex].keyPattern;
             dn->direction = 1;

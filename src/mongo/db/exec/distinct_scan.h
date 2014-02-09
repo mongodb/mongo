@@ -112,9 +112,6 @@ namespace mongo {
         // Have we hit the end of the index scan?
         bool _hitEnd;
 
-        // Could our index have duplicates?  If so, we use _returned to dedup.
-        unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
-
         // For yielding.
         BSONObj _savedKey;
         DiskLoc _savedLoc;

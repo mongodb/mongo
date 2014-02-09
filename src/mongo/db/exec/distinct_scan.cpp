@@ -115,15 +115,6 @@ namespace mongo {
         // And make sure we're within the bounds.
         checkEnd();
 
-        // De-dup by DiskLoc.
-        if (_returned.end() != _returned.find(loc)) {
-            ++_commonStats.needTime;
-            return PlanStage::NEED_TIME;
-        }
-        else {
-            _returned.insert(loc);
-        }
-
         // Package up the result for the caller.
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
@@ -176,19 +167,6 @@ namespace mongo {
 
     void DistinctScan::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-
-        // The only state we're responsible for holding is what DiskLocs to drop.  If a document
-        // mutates the underlying index cursor will deal with it.
-        if (INVALIDATION_MUTATION == type) {
-            return;
-        }
-
-        // If we see this DiskLoc again, it may not be the same document it was before, so we want
-        // to return it if we see it again.
-        unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _returned.find(dl);
-        if (it != _returned.end()) {
-            _returned.erase(it);
-        }
     }
 
     void DistinctScan::checkEnd() {
