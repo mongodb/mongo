@@ -56,8 +56,8 @@ namespace mongo {
     MONGO_EXPORT_SERVER_PARAMETER(enableIndexIntersection, bool, true);
 
     static bool canUseIDHack(const CanonicalQuery& query) {
-        return !query.getParsed().isExplain()
-            && !query.getParsed().showDiskLoc()
+        return !query.getParsed().showDiskLoc()
+            && query.getParsed().getHint().isEmpty()
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
             && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }

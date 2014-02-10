@@ -40,7 +40,7 @@ assert.eq( t.find({fn: "john"}, {fn: 1, _id: 0}).explain().indexOnly, false, "Fi
 t.dropIndex({ln: 1, fn: 1})
 t.ensureIndex({_id: 1, ln: 1});
 // return 1 field
-assert.eq( t.find({_id: 123}, {_id: 1}).explain().indexOnly, true, "Find is not using covered index");
+assert.eq( t.find({_id: 123, ln: "doe"}, {_id: 1}).explain().indexOnly, true, "Find is not using covered index");
 // match 1 record using both fields
 assert.eq( t.find({_id: 123, ln: "doe"}, {ln: 1}).explain().indexOnly, true, "Find is not using covered index");
 // change ordering
