@@ -752,6 +752,23 @@ namespace mongo {
             }
         }
 
+        // If there are no suitable indices for the distinct hack and the _id index is the only
+        // index in the catalog, a collection scan is the only possible solution. Bail out now
+        // into regular planning with no projection. Projection is unnecessary because there
+        // is no possibility of a covered index scan.
+        if (plannerParams.indices.empty() &&
+            collection->getIndexCatalog()->numIndexesTotal() == 1 &&
+            collection->getIndexCatalog()->haveIdIndex()) {
+            CanonicalQuery* cq;
+            Status status = CanonicalQuery::canonicalize(collection->ns().ns(), query, BSONObj(),
+                                                         BSONObj(), &cq);
+            if (!status.isOK()) {
+                return status;
+            }
+            // Takes ownership of cq.
+            return getRunner(cq, out);
+        }
+
         // We only care about the field that we're projecting over.  Have to drop the _id field
         // explicitly because those are .find() semantics.
         //
