@@ -96,7 +96,9 @@ namespace mongo {
         IndexDescriptor* findIndexByPrefix( const BSONObj &keyPattern,
                                             bool requireSingleKey ) const;
 
-        void findIndexByType( const string& type , vector<IndexDescriptor*>& matches ) const;
+        void findIndexByType( const string& type,
+                              vector<IndexDescriptor*>& matches,
+                              bool includeUnfinishedIndexes = false ) const;
 
         // never returns NULL
         IndexAccessMethod* getIndex( const IndexDescriptor* desc );

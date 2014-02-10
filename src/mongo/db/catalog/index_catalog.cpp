@@ -672,6 +672,19 @@ namespace mongo {
                                str::stream() << "Unknown index plugin '" << pluginName << "' "
                                << "in index "<< key );
 
+            // Refuse to build text index if another text index exists or is in progress.
+            // Collections should only have one text index.
+            if ( pluginName == IndexNames::TEXT ) {
+                vector<IndexDescriptor*> textIndexes;
+                const bool includeUnfinishedIndexes = true;
+                findIndexByType( IndexNames::TEXT, textIndexes, includeUnfinishedIndexes );
+                if ( textIndexes.size() > 0 ) {
+                    return Status( ErrorCodes::CannotCreateIndex,
+                                   str::stream() << "only one text index per collection allowed, "
+                                   << "found existing text index \"" << textIndexes[0]->indexName()
+                                   << "\"");
+                }
+            }
         }
 
         return Status::OK();
@@ -1062,8 +1075,9 @@ namespace mongo {
         return best;
     }
 
-    void IndexCatalog::findIndexByType( const string& type , vector<IndexDescriptor*>& matches ) const {
-        IndexIterator ii = getIndexIterator( false );
+    void IndexCatalog::findIndexByType( const string& type , vector<IndexDescriptor*>& matches,
+                                        bool includeUnfinishedIndexes ) const {
+        IndexIterator ii = getIndexIterator( includeUnfinishedIndexes );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
             if ( IndexNames::findPluginName( desc->keyPattern() ) == type ) {

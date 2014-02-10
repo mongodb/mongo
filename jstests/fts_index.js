@@ -1,6 +1,7 @@
 // Test that:
 // 1. Text indexes properly validate the index spec used to create them.
 // 2. Text indexes properly enforce a schema on the language_override field.
+// 3. Collections may have at most one text index.
 
 var coll = db.fts_index;
 var indexName = "textIndex";
@@ -66,3 +67,35 @@ assert(!db.getLastError());
 coll.insert({a: "", language: "spanglish"});
 assert(db.getLastError());
 coll.drop();
+
+//
+// 3. Collections may have at most one text index.
+//
+
+coll.ensureIndex({a: "text"});
+assert(!db.getLastError());
+
+coll.ensureIndex({a: "text"});
+assert(db.getLastError());
+coll.ensureIndex({b: "text"});
+assert(db.getLastError());
+coll.ensureIndex({b: "text", c: 1});
+assert(db.getLastError());
+coll.ensureIndex({b: 1, c: "text"});
+assert(db.getLastError());
+
+coll.dropIndexes();
+
+coll.ensureIndex({a: 1, b: "text", c: 1});
+assert(!db.getLastError());
+
+coll.ensureIndex({a: 1, b: "text", c: 1});
+assert(db.getLastError());
+coll.ensureIndex({b: "text"});
+assert(db.getLastError());
+coll.ensureIndex({b: "text", c: 1});
+assert(db.getLastError());
+coll.ensureIndex({b: 1, c: "text"});
+assert(db.getLastError());
+
+coll.dropIndexes();
