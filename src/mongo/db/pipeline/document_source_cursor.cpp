@@ -78,8 +78,10 @@ namespace mongo {
             Collection* collection = ctx.db()->getCollection( _ns );
             if ( collection ) {
                 ClientCursor* cc = collection->cursorCache()->find( _cursorId );
-                if ( cc )
+                if ( cc ) {
                     collection->cursorCache()->deregisterCursor( cc );
+                    delete cc;
+                }
             }
             _cursorId = 0;
         }
