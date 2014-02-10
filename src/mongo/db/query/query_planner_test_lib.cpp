@@ -269,6 +269,42 @@ namespace mongo {
             BSONObj geoObj = el.Obj();
             return geoObj == node->indexKeyPattern;
         }
+        else if (STAGE_TEXT == trueSoln->getType()) {
+            // {text: {search: "somestr", language: "something", filter: {blah: 1}}}
+            const TextNode* node = static_cast<const TextNode*>(trueSoln);
+            BSONElement el = testSoln["text"];
+            if (el.eoo() || !el.isABSONObj()) { return false; }
+            BSONObj textObj = el.Obj();
+
+            BSONElement searchElt = textObj["search"];
+            if (!searchElt.eoo()) {
+                if (searchElt.String() != node->_query) {
+                    return false;
+                }
+            }
+
+            BSONElement languageElt = textObj["language"];
+            if (!languageElt.eoo()) {
+                if (languageElt.String() != node->_language) {
+                    return false;
+                }
+            }
+
+            BSONElement filter = textObj["filter"];
+            if (!filter.eoo()) {
+                if (filter.isNull()) {
+                    if (NULL != node->filter) { return false; }
+                }
+                else if (!filter.isABSONObj()) {
+                    return false;
+                }
+                else if (!filterMatches(filter.Obj(), trueSoln)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         //
         // internal nodes

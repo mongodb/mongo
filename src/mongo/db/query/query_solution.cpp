@@ -70,6 +70,10 @@ namespace mongo {
         *ss << "query = " << _query << '\n';
         addIndent(ss, indent + 1);
         *ss << "language = " << _language << '\n';
+        if (NULL != filter) {
+            addIndent(ss, indent + 1);
+            *ss << " filter = " << filter->toString();
+        }
         addCommon(ss, indent);
     }
 
