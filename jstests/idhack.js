@@ -22,6 +22,17 @@ assert.eq( 4 , t.findOne( { _id : 1 } ).z , "C1" )
 assert.eq( 8 , t.findOne( { _id : 2 } ).z , "C2" )
 assert.eq( 8 , t.findOne( { _id : 3 } ).z , "C3" )
 
+// explain output should show that the ID hack was applied.
+var query = { _id : { x : 2 } };
+var explain = t.find( query ).explain( true );
+print( "explain for " + tojson( query , "" , true ) + " = " + tojson( explain ) );
+assert.eq( 1 , explain.n , "D1" );
+assert.eq( 1 , explain.nscanned , "D2" );
+assert.neq( undefined , explain.cursor , "D3" );
+assert.neq( "" , explain.cursor , "D4" );
+assert.neq( undefined , explain.indexBounds , "D5" );
+assert.neq( {} , explain.indexBounds , "D6" );
+
 // ID hack cannot be used with hint().
 var query = { _id : { x : 2 } };
 var explain = t.find( query ).explain();
@@ -29,3 +40,4 @@ t.ensureIndex( { _id : 1 , a : 1 } );
 var hintExplain = t.find( query ).hint( { _id : 1 , a : 1 } ).explain();
 print( "explain for hinted query = " + tojson( hintExplain ) );
 assert.neq( explain.cursor, hintExplain.cursor, "E1" );
+

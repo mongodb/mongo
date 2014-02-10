@@ -183,10 +183,16 @@ namespace mongo {
         // The explain plan simply indicates that the plan is idhack.
         if (NULL != explain) {
             *explain = new TypeExplain();
+            // Explain format does not match 2.4 and is intended
+            // to indicate clearly that the ID hack has been applied.
+            (*explain)->setCursor("IDCursor");
             (*explain)->setIDHack(true);
             (*explain)->setN(_nscanned);
             (*explain)->setNScanned(_nscanned);
             (*explain)->setNScannedObjects(_nscannedObjects);
+            BSONElement keyElt = _key.firstElement();
+            BSONObj indexBounds = BSON("_id" << BSON_ARRAY( BSON_ARRAY( keyElt << keyElt ) ) );
+            (*explain)->setIndexBounds(indexBounds);
         }
         else if (NULL != planInfo) {
             *planInfo = new PlanInfo();
