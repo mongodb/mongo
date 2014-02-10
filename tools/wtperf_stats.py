@@ -56,6 +56,9 @@ def munge_dict(values_dict):
         v['#time'] = int(mktime(parsetime(v['#time']).timetuple())) * 1000
         next_val = {}
         for title, value in v.items():
+            if title.find('NS') != -1:
+                title = title.replace('NS', u'\u03BCs')
+                value = float(value) / 1000
             if title == 'checkpoints' and value == 'N':
                 value = 0
             elif title.find('time') != -1:
@@ -91,12 +94,9 @@ for f in args.files:
 		# Transform the data into something NVD3 can digest
 		graph_data = munge_dict(reader)
 
-chart_extra = {}
-chart_extra['x_axis_format'] = '%H:%M:%S'
 chart = multiChart(name='wtperf',
                   height=450 + 10*len(graph_data[0].keys()),
                   resize=True,
-                  y_axis_format="g",
                   x_axis_format='%H:%M:%S',
                   x_is_date=1,
                   assets_directory='http://source.wiredtiger.com/graphs/')
@@ -106,8 +106,9 @@ times = []
 for v in graph_data:
     times.append(v['time'])
 
-# Add a line to the graph for each field in the CSV file
-for field in graph_data[0].keys():
+# Add a line to the graph for each field in the CSV file in alphabetical
+# order, so the key is sorted.
+for field in sorted(graph_data[0].keys()):
     if field == 'time':
         continue
 	# Split the latency and non-latency measurements onto different scales

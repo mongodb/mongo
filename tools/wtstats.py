@@ -171,7 +171,7 @@ if prefix or suffix:
 # Are we just listing the results?
 if args.list:
     for title, yaxis, ydata in results:
-        print title + ydata
+        print title
     sys.exit(0)
 
 # Figure out the full set of x axis values
@@ -196,7 +196,6 @@ if args.abstime:
 chart = charttype(name='statlog', height=450+10*len(results), resize=True, x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/', **chart_extra)
 
 for title, yaxis, ydata in results:
-    print 'Adding: ' + title + ','.join('"%s"' % x in xdata)
     chart.add_serie(x=xdata, y=(ydata.get(x, 0) for x in xdata), name=title,
                     type="line", yaxis="2" if yaxis else "1")
 
