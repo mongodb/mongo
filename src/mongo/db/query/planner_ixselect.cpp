@@ -411,9 +411,9 @@ namespace mongo {
                                                          tag->first.end(),
                                                          idx);
 
-            bool inNotFirst = tag->first.end() != std::find(tag->notFirst.begin(),
-                                                            tag->notFirst.end(),
-                                                            idx);
+            bool inNotFirst = tag->notFirst.end() != std::find(tag->notFirst.begin(),
+                                                               tag->notFirst.end(),
+                                                               idx);
 
             if (inFirst || inNotFirst) {
                 // Great!  'child' was assigned to our index.
