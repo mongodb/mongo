@@ -68,7 +68,6 @@ namespace mongo {
          *        are a peer to the .ns file, without any layering
          */
         ExtentManager( const StringData& dbname, const StringData& path,
-                       NamespaceDetails* freeListDetails,
                        bool directoryPerDB );
 
         ~ExtentManager();
@@ -77,11 +76,6 @@ namespace mongo {
          * deletes all state and puts back to original state
          */
         void reset();
-
-        /**
-         * can only be called once
-         */
-        void init( NamespaceDetails* freeListDetails );
 
         /**
          * opens all current files
@@ -110,6 +104,7 @@ namespace mongo {
         DiskLoc allocFromFreeList( int approxSize, bool capped );
 
         /**
+         * @param details - this is for the collection we're adding space to
          * @param quotaMax 0 == no limit
          * TODO: this isn't quite in the right spot
          *  really need the concept of a NamespaceStructure in the current paradigm
@@ -126,7 +121,7 @@ namespace mongo {
 
         void printFreeList() const;
 
-        bool hasFreeList() const { return _freeListDetails != NULL; }
+        void freeListStats( int* numExtents, int64_t* totalFreeSize ) const;
 
         /**
          * @param loc - has to be for a specific Record
@@ -172,6 +167,11 @@ namespace mongo {
 
     private:
 
+        DiskLoc _getFreeListStart() const;
+        DiskLoc _getFreeListEnd() const;
+        void _setFreeListStart( DiskLoc loc );
+        void _setFreeListEnd( DiskLoc loc );
+
         const DataFile* _getOpenFile( int n ) const;
 
         DiskLoc _createExtentInFile( int fileNo, DataFile* f,
@@ -183,7 +183,6 @@ namespace mongo {
 
         std::string _dbname; // i.e. "test"
         std::string _path; // i.e. "/data/db"
-        NamespaceDetails* _freeListDetails;
         bool _directoryPerDB;
 
         // must be in the dbLock when touching this (and write locked when writing to of course)

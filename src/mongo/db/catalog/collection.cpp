@@ -110,7 +110,6 @@ namespace mongo {
 
         if ( _ns == _database->_namespacesName ||
              _ns == _database->_indexesName ||
-             _ns == _database->_extentFreelistName ||
              _ns == _database->_profileName ) {
             return false;
         }

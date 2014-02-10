@@ -4,7 +4,6 @@ mydb = db.getSisterDB( "test_extent2" );
 mydb.dropDatabase();
 
 t = mydb.foo;
-e = mydb["$freelist"]
 
 function insert(){
     t.insert( { _id : 1 , x : 1 } )
@@ -16,20 +15,20 @@ function insert(){
 insert();
 t.drop();
 
-start = e.stats();
+start = mydb.stats();
 
 for ( i=0; i<100; i++ ) {
     insert();
     t.drop();
 }
 
-end = e.stats();
+end = mydb.stats();
 
 printjson( start );
 printjson( end )
-assert.eq( start.numExtents, end.numExtents )
+assert.eq( start.extentFreeList.num, end.extentFreeList.num );
 
 // 3: 1 data, 1 _id idx, 1 x idx
-// used to be 4, but we no longer waste an extent for the $freelist collection
-assert.eq( 3, start.numExtents );
-assert.eq( 3, end.numExtents );
+// used to be 4, but we no longer waste an extent for the freelist
+assert.eq( 3, start.extentFreeList.num );
+assert.eq( 3, end.extentFreeList.num );

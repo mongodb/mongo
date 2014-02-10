@@ -113,6 +113,7 @@ namespace mongo {
             }
         }
         data_file_check(_mb);
+        header()->checkUpgrade();
         return Status::OK();
     }
 
@@ -204,6 +205,20 @@ namespace mongo {
             h->unused.set( fileno, HeaderSize );
             verify( (data-(char*)this) == HeaderSize );
             h->unusedLength = fileLength - HeaderSize - 16;
+            h->freeListStart.Null();
+            h->freeListEnd.Null();
+        }
+        else {
+            checkUpgrade();
+        }
+    }
+
+    void DataFileHeader::checkUpgrade() {
+        if ( freeListStart == minDiskLoc ) {
+            // we are upgrading from 2.4 to 2.6
+            invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
+            getDur().writingDiskLoc( freeListStart ).Null();
+            getDur().writingDiskLoc( freeListEnd ).Null();
         }
     }
 

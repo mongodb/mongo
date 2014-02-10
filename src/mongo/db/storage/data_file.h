@@ -59,12 +59,15 @@ namespace mongo {
         int fileLength;
         DiskLoc unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
         int unusedLength;
-        char reserved[8192 - 4*4 - 8];
+        DiskLoc freeListStart;
+        DiskLoc freeListEnd;
+        char reserved[8192 - 4*4 - 8*3];
 
         char data[4]; // first extent starts here
 
         enum { HeaderSize = 8192 };
 
+        // all of this should move up to the database level
         bool isCurrentVersion() const {
             return version == PDFILE_VERSION && ( versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER
                                                || versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER
@@ -74,6 +77,8 @@ namespace mongo {
         bool uninitialized() const { return version == 0; }
 
         void init(int fileno, int filelength, const char* filename);
+
+        void checkUpgrade();
 
         bool isEmpty() const {
             return uninitialized() || ( unusedLength == fileLength - HeaderSize - 16 );
@@ -96,7 +101,9 @@ namespace mongo {
 
         DiskLoc allocExtentArea( int size );
 
-        DataFileHeader *getHeader() { return header(); }
+        DataFileHeader* getHeader() { return header(); }
+        const DataFileHeader* getHeader() const { return header(); }
+
         HANDLE getFd() { return mmf.getFd(); }
         unsigned long long length() const { return mmf.length(); }
 
@@ -114,7 +121,8 @@ namespace mongo {
         void grow(DiskLoc dl, int size);
 
         char* p() const { return (char *) _mb; }
-        DataFileHeader* header() { return (DataFileHeader*) _mb; }
+        DataFileHeader* header() { return static_cast<DataFileHeader*>( _mb ); }
+        const DataFileHeader* header() const { return static_cast<DataFileHeader*>( _mb ); }
 
         DurableMappedFile mmf;
         void *_mb; // the memory mapped view

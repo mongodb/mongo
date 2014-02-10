@@ -415,6 +415,9 @@ namespace mongo {
                 long long indexSize = 0;
                 long long fileSize = 0;
 
+                long long freeListNum = 0;
+                long long freeListSize = 0;
+
                 for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it != end; ++it) {
                     const BSONObj& b = *it;
                     objects     += b["objects"].numberLong();
@@ -425,6 +428,11 @@ namespace mongo {
                     indexes     += b["indexes"].numberLong();
                     indexSize   += b["indexSize"].numberLong();
                     fileSize    += b["fileSize"].numberLong();
+
+                    if ( b["extentFreeList"].isABSONObj() ) {
+                        freeListNum += b["extentFreeList"].Obj()["num"].numberLong();
+                        freeListSize += b["extentFreeList"].Obj()["totalSize"].numberLong();
+                    }
                 }
 
                 //result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to get this
@@ -439,6 +447,13 @@ namespace mongo {
                 output.appendNumber( "indexes" , indexes );
                 output.appendNumber( "indexSize" , indexSize );
                 output.appendNumber( "fileSize" , fileSize );
+
+                {
+                    BSONObjBuilder extentFreeList( output.subobjStart( "extentFreeList" ) );
+                    extentFreeList.appendNumber( "num", freeListNum );
+                    extentFreeList.appendNumber( "totalSize", freeListSize );
+                    extentFreeList.done();
+                }
             }
         } DBStatsCmdObj;
 

@@ -171,6 +171,13 @@ namespace mongo {
                 len = l;
                 verify(len == storageGlobalParams.lenForNewNsFiles);
                 p = _f.getView();
+
+                if ( p ) {
+                    // we do this so the durability system isn't mad at us for
+                    // only initiating file and not doing a write
+                    // grep for 17388
+                    getDur().writingPtr( p, 5 ); // throw away
+                }
             }
         }
 

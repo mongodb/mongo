@@ -79,20 +79,7 @@ namespace mongo {
 
         int numFiles() const { return _extentManager.numFiles(); }
 
-        /**
-         * return file n.  if it doesn't exist, create it
-         */
-        DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
-            // do not call _initForWrites as it creates a freelist
-            // which may not be allowed
-            _namespaceIndex.init();
-            return _extentManager.getFile( n, sizeNeeded, preallocateOnly );
-        }
-
-        DataFile* addAFile( int sizeNeeded, bool preallocateNextFile ) {
-            _initForWrites();
-            return _extentManager.addAFile( sizeNeeded, preallocateNextFile );
-        }
+        void getFileFormat( int* major, int* minor );
 
         /**
          * makes sure we have an extra file at the end that is empty
@@ -178,19 +165,6 @@ namespace mongo {
         Status _dropNS( const StringData& ns );
 
         /**
-         * make sure namespace is initialized and $freelist is allocated before
-         * doing anything that will write
-         */
-        void _initForWrites() {
-            _namespaceIndex.init();
-            if ( !_extentManager.hasFreeList() ) {
-                _initExtentFreeList();
-            }
-        }
-
-        void _initExtentFreeList();
-
-        /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.
          */
@@ -210,7 +184,6 @@ namespace mongo {
         const string _profileName; // "alleyinsider.system.profile"
         const string _namespacesName; // "alleyinsider.system.namespaces"
         const string _indexesName; // "alleyinsider.system.indexes"
-        const string _extentFreelistName;
 
         RecordStats _recordStats;
         int _profile; // 0=off.

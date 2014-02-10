@@ -1215,6 +1215,10 @@ namespace mongo {
 
             list<string> collections;
             Database* d = cc().database();
+
+            if ( d && ( d->isEmpty() || d->getExtentManager().numFiles() == 0 ) )
+                d = NULL;
+
             if ( d )
                 d->namespaceIndex().getNamespaces( collections );
 
@@ -1257,17 +1261,34 @@ namespace mongo {
             result.appendNumber( "numExtents" , numExtents );
             result.appendNumber( "indexes" , indexes );
             result.appendNumber( "indexSize" , indexSize / scale );
-            result.appendNumber( "fileSize" , d->fileSize() / scale );
-            if( d )
+            if ( d ) {
+                result.appendNumber( "fileSize" , d->fileSize() / scale );
                 result.appendNumber( "nsSizeMB", (int) d->namespaceIndex().fileLength() / 1024 / 1024 );
+            }
+            else {
+                result.appendNumber( "fileSize" , 0 );
+            }
 
             BSONObjBuilder dataFileVersion( result.subobjStart( "dataFileVersion" ) );
-            if ( d && !d->isEmpty() ) {
-                DataFileHeader* header = d->getFile( 0 )->getHeader();
-                dataFileVersion.append( "major", header->version );
-                dataFileVersion.append( "minor", header->versionMinor );
+            if ( d ) {
+                int major, minor;
+                d->getFileFormat( &major, &minor );
+                dataFileVersion.append( "major", major );
+                dataFileVersion.append( "minor", minor );
             }
             dataFileVersion.done();
+
+            if ( d ){
+                int freeListSize = 0;
+                int64_t freeListSpace = 0;
+                d->getExtentManager().freeListStats( &freeListSize, &freeListSpace );
+
+                BSONObjBuilder extentFreeList( result.subobjStart( "extentFreeList" ) );
+                extentFreeList.append( "num", freeListSize );
+                extentFreeList.appendNumber( "totalSize",
+                                             static_cast<long long>( freeListSpace / scale ) );
+                extentFreeList.done();
+            }
 
             return true;
         }

@@ -173,9 +173,12 @@ namespace mongo {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
 
-        const DataFileHeader* dfh = _collection->_database->getFile(0)->getHeader();
+        int majorVersion;
+        int minorVersion;
 
-        if (dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER) {
+        _collection->_database->getFileFormat( &majorVersion, &minorVersion );
+            
+        if (minorVersion == PDFILE_VERSION_MINOR_24_AND_NEWER) {
             // RulesFor24
             // This assert will be triggered when downgrading from a future version that
             // supports an index plugin unsupported by this version.
@@ -216,7 +219,7 @@ namespace mongo {
     Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName ) {
         Database* db = _collection->_database;
 
-        DataFileHeader* dfh = db->getFile(0)->getHeader();
+        DataFileHeader* dfh = db->getExtentManager().getFile(0)->getHeader();
         if ( dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER ) {
             return Status::OK(); // these checks have already been done
         }
@@ -514,7 +517,7 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex,
                            "cannot create indexes on the oplog" );
 
-        if ( nss == _collection->_database->_extentFreelistName ) {
+        if ( nss.coll() == "$freelist" ) {
             // this isn't really proper, but we never want it and its not an error per se
             return Status( ErrorCodes::IndexAlreadyExists, "cannot index freelist" );
         }

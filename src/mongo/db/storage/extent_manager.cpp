@@ -32,9 +32,9 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
@@ -45,11 +45,9 @@ namespace mongo {
 
     ExtentManager::ExtentManager( const StringData& dbname,
                                   const StringData& path,
-                                  NamespaceDetails* freeListDetails,
                                   bool directoryPerDB )
         : _dbname( dbname.toString() ),
           _path( path.toString() ),
-          _freeListDetails( freeListDetails ),
           _directoryPerDB( directoryPerDB ) {
     }
 
@@ -143,6 +141,7 @@ namespace mongo {
             p = _files[n];
         }
         if ( p == 0 ) {
+            if ( n == 0 ) audit::logCreateDatabase( currentClient.get(), _dbname );
             DEV Lock::assertWriteLocked( _dbname );
             boost::filesystem::path fullName = fileName( n );
             string fullNameString = fullName.string();
@@ -389,20 +388,7 @@ namespace mongo {
         msgasserted(14810, "couldn't allocate space for a new extent" );
     }
 
-    void ExtentManager::init( NamespaceDetails* freeListDetails ) {
-        if ( !_freeListDetails ) {
-            _freeListDetails = freeListDetails;
-        }
-        else {
-            invariant( _freeListDetails == freeListDetails );
-        }
-    }
-
     DiskLoc ExtentManager::allocFromFreeList( int approxSize, bool capped ) {
-        if ( !_freeListDetails ) {
-            return DiskLoc();
-        }
-
         // setup extent constraints
 
         int low, high;
@@ -432,7 +418,7 @@ namespace mongo {
         int bestDiff = 0x7fffffff;
         {
             Timer t;
-            DiskLoc L = _freeListDetails->firstExtent();
+            DiskLoc L = _getFreeListStart();
             while( !L.isNull() ) {
                 Extent * e = L.ext();
                 if ( e->length >= low && e->length <= high ) {
@@ -477,10 +463,10 @@ namespace mongo {
             getExtent( best->xprev )->xnext.writing() = best->xnext;
         if ( !best->xnext.isNull() )
             getExtent( best->xnext )->xprev.writing() = best->xprev;
-        if ( _freeListDetails->firstExtent() == best->myLoc )
-            _freeListDetails->setFirstExtent( best->xnext );
-        if ( _freeListDetails->lastExtent() == best->myLoc )
-            _freeListDetails->setLastExtent( best->xprev );
+        if ( _getFreeListStart() == best->myLoc )
+            _setFreeListStart( best->xnext );
+        if ( _getFreeListEnd() == best->myLoc )
+            _setFreeListEnd( best->xprev );
 
         return best->myLoc;
     }
@@ -550,32 +536,67 @@ namespace mongo {
             verify( f==l || !l->xprev.isNull() );
         }
 
-        fassert( 17385, _freeListDetails );
-
-        if( _freeListDetails->firstExtent().isNull() ) {
-            _freeListDetails->setFirstExtent( firstExt );
-            _freeListDetails->setLastExtent( lastExt );
+        if( _getFreeListStart().isNull() ) {
+            _setFreeListStart( firstExt );
+            _setFreeListEnd( lastExt );
         }
         else {
-            DiskLoc a = _freeListDetails->firstExtent();
-            verify( getExtent( a )->xprev.isNull() );
+            DiskLoc a = _getFreeListStart();
+            invariant( getExtent( a )->xprev.isNull() );
             getDur().writingDiskLoc( getExtent( a )->xprev ) = lastExt;
             getDur().writingDiskLoc( getExtent( lastExt )->xnext ) = a;
-            _freeListDetails->setFirstExtent( firstExt );
+            _setFreeListStart( firstExt );
         }
 
     }
 
+    DiskLoc ExtentManager::_getFreeListStart() const {
+        if ( _files.empty() )
+            return DiskLoc();
+        const DataFile* file = _getOpenFile(0);
+        return file->header()->freeListStart;
+    }
+
+    DiskLoc ExtentManager::_getFreeListEnd() const {
+        if ( _files.empty() )
+            return DiskLoc();
+        const DataFile* file = _getOpenFile(0);
+        return file->header()->freeListEnd;
+    }
+
+    void ExtentManager::_setFreeListStart( DiskLoc loc ) {
+        invariant( !_files.empty() );
+        DataFile* file = _files[0];
+        getDur().writingDiskLoc( file->header()->freeListStart ) = loc;
+    }
+
+    void ExtentManager::_setFreeListEnd( DiskLoc loc ) {
+        invariant( !_files.empty() );
+        DataFile* file = _files[0];
+        getDur().writingDiskLoc( file->header()->freeListEnd ) = loc;
+    }
+
+    void ExtentManager::freeListStats( int* numExtents, int64_t* totalFreeSize ) const {
+        invariant( numExtents );
+        invariant( totalFreeSize );
+
+        *numExtents = 0;
+        *totalFreeSize = 0;
+
+        DiskLoc a = _getFreeListStart();
+        while( !a.isNull() ) {
+            Extent *e = getExtent( a );
+            (*numExtents)++;
+            (*totalFreeSize) += e->length;
+            a = e->xnext;
+        }
+
+    }
 
     void ExtentManager::printFreeList() const {
         log() << "dump freelist " << _dbname << endl;
 
-        if ( _freeListDetails == NULL ) {
-            log() << "  _freeListDetails is null" << endl;
-            return;
-        }
-
-        DiskLoc a = _freeListDetails->firstExtent();
+        DiskLoc a = _getFreeListStart();
         while( !a.isNull() ) {
             Extent *e = getExtent( a );
             log() << "  extent " << a.toString()

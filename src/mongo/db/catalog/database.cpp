@@ -108,11 +108,10 @@ namespace mongo {
     Database::Database(const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
-          _extentManager(_name, _path, 0, storageGlobalParams.directoryperdb),
+          _extentManager(_name, _path, storageGlobalParams.directoryperdb),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
           _indexesName(_name + ".system.indexes"),
-          _extentFreelistName( _name + ".$freelist" ),
           _collectionLock( "Database::_collectionLock" )
     {
         Status status = validateDBName( _name );
@@ -130,8 +129,18 @@ namespace mongo {
             // there's a write, then open.
             if (!newDb) {
                 _namespaceIndex.init();
-                _extentManager.init( _namespaceIndex.details( _extentFreelistName ) );
                 openAllFiles();
+
+                // upgrade freelist
+                string oldFreeList = _name + ".$freelist";
+                NamespaceDetails* details = _namespaceIndex.details( oldFreeList );
+                if ( details ) {
+                    if ( !details->firstExtent().isNull() ) {
+                        _extentManager.freeExtents(details->firstExtent(),
+                                                   details->lastExtent());
+                    }
+                    _namespaceIndex.kill_ns( oldFreeList );
+                }
             }
             _magic = 781231;
         }
@@ -279,8 +288,6 @@ namespace mongo {
             // collection doesn't exist
             return Status::OK();
         }
-
-        _initForWrites();
 
         {
             NamespaceString s( fullns );
@@ -530,22 +537,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Database::_initExtentFreeList() {
-        NamespaceDetails* details = _namespaceIndex.details( _extentFreelistName );
-        if ( !details ) {
-            _namespaceIndex.add_ns( _extentFreelistName, DiskLoc(), false );
-            details = _namespaceIndex.details( _extentFreelistName );
-            verify( details );
-
-            // TODO: this is an odd place, but because of lazy init,
-            // this is the only place its safe/easy
-            audit::logCreateDatabase( currentClient.get(), _name );
-        }
-        _extentManager.init( details );
-        verify( _extentManager.hasFreeList() );
-        LOG(1) << "have free list for " << _extentFreelistName << endl;
-    }
-
     Collection* Database::getOrCreateCollection( const StringData& ns ) {
         Collection* c = getCollection( ns );
         if ( !c ) {
@@ -559,7 +550,7 @@ namespace mongo {
                                             const BSONObj* options, bool allocateDefaultSpace ) {
         verify( _namespaceIndex.details( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
-        _initForWrites();
+        _namespaceIndex.init();
 
         if ( serverGlobalParams.configsvr &&
              !( ns.startsWith( "config." ) ||
@@ -636,11 +627,6 @@ namespace mongo {
             return;
         }
 
-        if ( ns == _extentFreelistName ) {
-            // this doesn't go in catalog
-            return;
-        }
-
         BSONObjBuilder b;
         b.append("name", ns);
         if ( options )
@@ -655,7 +641,6 @@ namespace mongo {
     }
 
     Status Database::_dropNS( const StringData& ns ) {
-        _initForWrites();
 
         NamespaceDetails* d = _namespaceIndex.details( ns );
         if ( !d )
@@ -681,6 +666,17 @@ namespace mongo {
         _namespaceIndex.kill_ns( ns );
 
         return Status::OK();
+    }
+
+    void Database::getFileFormat( int* major, int* minor ) {
+        if ( _extentManager.numFiles() == 0 ) {
+            *major = 0;
+            *minor = 0;
+            return;
+        }
+        const DataFile* df = _extentManager.getFile( 0 );
+        *major = df->getHeader()->version;
+        *minor = df->getHeader()->versionMinor;
     }
 
 } // namespace mongo

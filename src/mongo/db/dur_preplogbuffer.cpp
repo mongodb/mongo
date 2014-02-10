@@ -141,7 +141,12 @@ namespace mongo {
 
             assertNothingSpooled();
             const vector<WriteIntent>& _intents = commitJob.getIntentsSorted();
-            verify( !_intents.empty() );
+
+            // right now the durability code assumes there is at least one write intent
+            // this does not have to be true in theory as i could just add or delete a file
+            // callers have to ensure they do at least something for now even though its ugly
+            // until this can be addressed
+            fassert( 17388, !_intents.empty() );
 
             WriteIntent last;
             for( vector<WriteIntent>::const_iterator i = _intents.begin(); i != _intents.end(); i++ ) { 
