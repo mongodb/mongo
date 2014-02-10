@@ -33,11 +33,13 @@ from subprocess import call
 
 TIMEFMT = "%b %d %H:%M:%S"
 
-def process_monitor(fname, ckptlist, opdict):
+def process_monitor(fname, sfx, ckptlist, opdict):
     # Read the monitor file and figure out when a checkpoint was running.
     in_ckpt = 'N'
 
     ckptlist=[]
+
+    ofname = 'monitor%s.png' % (sfx)
     # Monitor output format currently is:
     # time,totalsec,read,insert,update,ckpt,...latencies...
     ops = ('read', 'insert', 'update')
@@ -45,6 +47,8 @@ def process_monitor(fname, ckptlist, opdict):
     with open(fname, 'r') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
+            if row[0].lstrip().startswith('#'):
+                continue
             # Look for checkpoints and operations.
             if row[5] != in_ckpt:
                 ckptlist.append(row[0])
@@ -77,13 +81,14 @@ set yrange [0:]\n''' % {
         })
     it = iter(ckptlist)
     for start, stop in zip(it, it):
-        of.write('set object rectangle from first \'' + start +\
-            '\', graph 0 ' + ' to first \'' + stop +\
-            '\', graph 1 fc rgb "gray" back\n') 
-    of.write('set output "' + fname + '.png"\n')
-    of.write('plot "' + fname + '" using 1:($3/1000) title "Reads", "' +\
-        fname + '" using 1:($4/1000) title "Inserts", "' +\
-        fname + '" using 1:($5/1000) title "Updates"\n')
+        of.write("set object rectangle from first '%s',\
+                graph 0 to first '%s',\
+                graph 1 fc rgb \"gray\" back\n" % (start, stop))
+    of.write('set output "%s"\n' % (ofname))
+    of.write("""plot "{name}" using 1:($3/1000) title "Reads", \\
+        "{name}" using 1:($4/1000) title "Inserts",\\
+        "{name}" using 1:($5/1000) title "Updates"
+        """.format(name=fname))
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
@@ -117,10 +122,12 @@ set yrange [1:]\n''' % {
             '\', graph 1 fc rgb "gray" back\n')
     ofname = name + sfx + '.latency1.png'
     of.write('set output "' + ofname + '"\n')
-    of.write('plot "' + fname + '" using 1:($' + repr(col_avg) +\
+    of.write('plot "' +\
+        fname + '" using 1:($' + repr(col_avg) +\
         ') title "Average Latency", "' + fname +'" using 1:($' +\
         repr(col_min) + ') title "Minimum Latency", "' +\
-        fname + '" using 1:($' + repr(col_max) + ') title "Maximum Latency"\n')
+        fname + '" using 1:($' + repr(col_max) +\
+        ') title "Maximum Latency"\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
@@ -192,13 +199,13 @@ def process_file(fname):
     # NOTE: The operations below must be in this exact order to match
     # the operation latency output in the monitor file.
     opdict={'read':0, 'insert':0, 'update':0}
-    process_monitor(fname, ckptlist, opdict)
     
     # This assumes the monitor file has the string "monitor"
     # and any other (optional) characters in the filename are a suffix.
     sfx = os.path.basename(fname).replace('monitor','')
     dirname = os.path.dirname(fname)
 
+    process_monitor(fname, sfx, ckptlist, opdict)
     column = 7              # average, minimum, maximum start in column 7
     for k, v in opdict.items():
         if v != 0:

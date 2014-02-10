@@ -612,7 +612,6 @@ monitor(void *arg)
 	}
 	/* Set line buffering for monitor file. */
 	(void)setvbuf(fp, NULL, _IOLBF, 0);
-#ifdef __WRITE_A_HEADER
 	fprintf(fp,
 	    "#time,totalsec,"
 	    "read operations,insert operations,update operations,"
@@ -624,7 +623,6 @@ monitor(void *arg)
 	    "update average latency(NS),update min latency(NS),"
 	    "update maximum latency(NS)"
 	    "\n");
-#endif
 	last_reads = last_inserts = last_updates = 0;
 	while (!g_stop) {
 		for (i = 0; i < cfg->sample_interval; i++) {
