@@ -167,7 +167,7 @@ coll.unsetWriteConcern();
 // Write concern error
 // NOTE: Non-throwing write concern failures require replication to trigger
 coll.remove({});
-coll.setWriteConcern({ w : 2 });
+coll.setWriteConcern({ w : "invalid" });
 assert.throws( function() {
     printjson( coll.insert({ foo : "bar" }) );
 });
