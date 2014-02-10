@@ -85,6 +85,9 @@ namespace mongo {
             assertFixSuccess("{key: {a: 'text', b: 1.0}}");
             assertFixSuccess("{key: {a: 'text', b: NumberInt(1)}}");
             assertFixSuccess("{key: {a: 'text', b: NumberLong(1)}}");
+            assertFixSuccess("{key: {a: 'text', b: -1.0}}");
+            assertFixSuccess("{key: {a: 'text', b: NumberInt(-1)}}");
+            assertFixSuccess("{key: {a: 'text', b: NumberLong(-1)}}");
             assertFixSuccess("{key: {a: 1.0, b: 'text'}}");
             assertFixSuccess("{key: {a: NumberInt(1), b: 'text'}}");
             assertFixSuccess("{key: {a: NumberLong(1), b: 'text'}}");
@@ -94,18 +97,21 @@ namespace mongo {
             assertFixSuccess("{key: {a: -1, b: 1, c: 'text'}}");
             assertFixSuccess("{key: {a: 1, b: 'text', c: 1}}");
             assertFixSuccess("{key: {a: 'text', b: 1, c: 1}}");
+            assertFixSuccess("{key: {a: 'text', b: 1, c: -1}}");
             assertFixSuccess("{key: {a: 'text', b: 'text', c: 1}}");
             assertFixSuccess("{key: {a: 1, b: 'text', c: 'text'}}");
 
             assertFixFailure("{key: {a: 'text', b: 0}}");
             assertFixFailure("{key: {a: 'text', b: '2d'}}"); // not allowed to mix special indexes
             assertFixFailure("{key: {a: 'text', b: '1'}}");
-            assertFixFailure("{key: {a: 'text', b: -1}}"); // -1 not allowed in suffix
             assertFixFailure("{key: {a: 'text', _fts: 1}}");
             assertFixFailure("{key: {a: 'text', _fts: 'text'}}");
             assertFixFailure("{key: {a: 'text', _ftsx: 1}}");
             assertFixFailure("{key: {a: 'text', _ftsx: 'text'}}");
-            assertFixFailure("{key: {a: 'text', b: 1, c: -1}}");
+            assertFixFailure("{key: {_fts: 1, a: 'text'}}");
+            assertFixFailure("{key: {_fts: 'text', a: 'text'}}");
+            assertFixFailure("{key: {_ftsx: 1, a: 'text'}}");
+            assertFixFailure("{key: {_ftsx: 'text', a: 'text'}}");
             assertFixFailure("{key: {a: 'text', b: 1, c: 'text'}}"); // 'text' must all be adjacent
             assertFixFailure("{key: {a: 'text', b: 1, c: 'text', d: 1}}");
             assertFixFailure("{key: {a: 1, b: 'text', c: 1, d: 'text', e: 1}}");

@@ -257,9 +257,17 @@ namespace mongo {
             return Status::OK();
         }
 
-        void _addFTSStuff( BSONObjBuilder* b ) {
-            b->append( "_fts", INDEX_NAME );
-            b->append( "_ftsx", 1 );
+        namespace {
+            void _addFTSStuff( BSONObjBuilder* b ) {
+                b->append( "_fts", INDEX_NAME );
+                b->append( "_ftsx", 1 );
+            }
+
+            void verifyFieldNameNotReserved( StringData s ) {
+                uassert( 17289,
+                         "text index with reserved fields _fts/_ftsx not allowed",
+                         s != "_fts" && s != "_ftsx" );
+            }
         }
 
         BSONObj FTSSpec::fixSpec( const BSONObj& spec ) {
@@ -314,13 +322,15 @@ namespace mongo {
                 // fields, then extraAfter fields.
                 {
                     BSONObjIterator i( spec["key"].Obj() );
-                    BSONElement e;
+                    verify( i.more() );
+                    BSONElement e = i.next();
 
                     // extraBefore fields
-                    do {
+                    while ( String != e.type() ) {
+                        verifyFieldNameNotReserved( e.fieldNameStringData() );
                         verify( i.more() );
                         e = i.next();
-                    } while ( INDEX_NAME != e.valuestrsafe() );
+                    }
 
                     // text fields
                     bool alreadyFixed = str::equals( e.fieldName(), "_fts" );
@@ -334,19 +344,17 @@ namespace mongo {
                     }
                     else {
                         do {
-                            uassert( 17289,
-                                     "text index with reserved fields _fts/ftsx not allowed",
-                                     !str::equals( e.fieldName(), "_fts" ) &&
-                                         !str::equals( e.fieldName(), "_ftsx" ) );
+                            verifyFieldNameNotReserved( e.fieldNameStringData() );
                             e = i.next();
-                        } while ( !e.eoo() && INDEX_NAME == e.valuestrsafe() );
+                        } while ( !e.eoo() && e.type() == String );
                     }
 
                     // extraAfterFields
                     while ( !e.eoo() ) {
-                        uassert( 17290,
-                                 "compound text index key suffix fields must have value 1",
-                                 e.numberInt() == 1 && !str::equals( "_ftsx", e.fieldName() ) );
+                        uassert( 17389,
+                                 "'text' fields in index must all be adjacent",
+                                 e.type() != String );
+                        verifyFieldNameNotReserved( e.fieldNameStringData() );
                         e = i.next();
                     }
                 }
