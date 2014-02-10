@@ -85,9 +85,9 @@ set yrange [0:]\n''' % {
                 graph 0 to first '%s',\
                 graph 1 fc rgb \"gray\" back\n" % (start, stop))
     of.write('set output "%s"\n' % (ofname))
-    of.write("""plot "{name}" every ::1 using 1:($3/1000) title "Reads", \\
-        "{name}" every ::1 using 1:($4/1000) title "Inserts",\\
-        "{name}" every ::1 using 1:($5/1000) title "Updates"
+    of.write("""plot "{name}" using 1:($3/1000) title "Reads", \\
+        "{name}" using 1:($4/1000) title "Inserts",\\
+        "{name}" using 1:($5/1000) title "Updates"
         """.format(name=fname))
     of.close()
     call(["gnuplot", gcmd])
@@ -123,10 +123,10 @@ set yrange [1:]\n''' % {
     ofname = name + sfx + '.latency1.png'
     of.write('set output "' + ofname + '"\n')
     of.write('plot "' +\
-        fname + '" every ::1 using 1:($' + repr(col_avg) +\
-        ') title "Average Latency", "' + fname +'" every ::1 using 1:($' +\
+        fname + '" using 1:($' + repr(col_avg) +\
+        ') title "Average Latency", "' + fname +'" using 1:($' +\
         repr(col_min) + ') title "Minimum Latency", "' +\
-        fname + '" every ::1 using 1:($' + repr(col_max) +\
+        fname + '" using 1:($' + repr(col_max) +\
         ') title "Maximum Latency"\n')
     of.close()
     call(["gnuplot", gcmd])
@@ -157,7 +157,7 @@ set yrange [0:]\n''')
     ofname = name + sfx + '.latency2.png'
     of.write('set output "' + ofname + '"\n')
     of.write('plot "' + lfile + sfx +\
-        '" every ::1 using (($2 * 100)/$4) title "' + name + '"\n')
+        '" using (($2 * 100)/$4) title "' + name + '"\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
@@ -189,7 +189,7 @@ set yrange [0:]\n''' % {
     ofname = name + sfx + '.latency3.png'
     of.write('set output "' + ofname + '"\n')
     of.write('plot "' + lfile + sfx +\
-        '" every ::1 using 1:(($3 * 100)/$4) title "' + name + '"\n')
+        '" using 1:(($3 * 100)/$4) title "' + name + '"\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
