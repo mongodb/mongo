@@ -859,10 +859,21 @@ execute_populate(CONFIG *cfg)
 		}
 		lprintf(cfg, 0, 1, "Compact after populate");
 		if ((ret = session->compact(session, cfg->uri, NULL)) != 0) {
-			lprintf(cfg, ret, 0,
-			     "execute_populate: WT_SESSION.compact");
-			return (ret);
+			/*
+			 * It is possible the compact didn't finish.  If it
+			 * timed out, just continue.
+			 */
+			if (ret != ETIMEDOUT) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				return (ret);
+			} else {
+				lprintf(cfg, ret, 0,
+     "execute_populate: compact did not complete, continuing anyway");
+				ret = 0;
+			}
 		}
+		
 		if ((ret = session->close(session, NULL)) != 0) {
 			lprintf(cfg, ret, 0,
 			     "execute_populate: WT_SESSION.close");
