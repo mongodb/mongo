@@ -34,19 +34,6 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-static int
-zlib_compress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
-static int
-zlib_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
-    size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
-    size_t *, uint32_t *);
-static int
-zlib_decompress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *);
-static int
-zlib_terminate(WT_COMPRESSOR *, WT_SESSION *);
-
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
@@ -64,34 +51,6 @@ typedef struct {
 	WT_COMPRESSOR *compressor;
 	WT_SESSION *session;
 } ZLIB_OPAQUE;
-
-int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
-{
-	ZLIB_COMPRESSOR *zlib_compressor;
-
-	(void)config;				/* Unused parameters */
-
-	if ((zlib_compressor = calloc(1, sizeof(ZLIB_COMPRESSOR))) == NULL)
-		return (errno);
-
-	zlib_compressor->compressor.compress = zlib_compress;
-	zlib_compressor->compressor.compress_raw = zlib_compress_raw;
-	zlib_compressor->compressor.decompress = zlib_decompress;
-	zlib_compressor->compressor.pre_size = NULL;
-	zlib_compressor->compressor.terminate = zlib_terminate;
-
-	zlib_compressor->wt_api = connection->get_extension_api(connection);
-
-	/*
-	 * between 0-10: level: see zlib manual.
-	 */
-	zlib_compressor->zlib_level = Z_DEFAULT_COMPRESSION;
-
-						/* Load the compressor */
-	return (connection->add_compressor(
-	    connection, "zlib", (WT_COMPRESSOR *)zlib_compressor, NULL));
-}
 
 /*
  * zlib_error --
@@ -359,5 +318,50 @@ zlib_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	(void)session;					/* Unused parameters */
 
 	free(compressor);
+	return (0);
+}
+
+static int
+zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
+{
+	ZLIB_COMPRESSOR *zlib_compressor;
+
+	/*
+	 * There are two almost identical zlib compressors: one supporting raw
+	 * compression, and one without.
+	 */
+	if ((zlib_compressor = calloc(1, sizeof(ZLIB_COMPRESSOR))) == NULL)
+		return (errno);
+
+	zlib_compressor->compressor.compress = zlib_compress;
+	zlib_compressor->compressor.compress_raw = raw ?
+	    zlib_compress_raw : NULL;
+	zlib_compressor->compressor.decompress = zlib_decompress;
+	zlib_compressor->compressor.pre_size = NULL;
+	zlib_compressor->compressor.terminate = zlib_terminate;
+
+	zlib_compressor->wt_api = connection->get_extension_api(connection);
+
+	/*
+	 * between 0-10: level: see zlib manual.
+	 */
+	zlib_compressor->zlib_level = Z_DEFAULT_COMPRESSION;
+
+	/* Load the standard compressor. */
+	return (connection->add_compressor(
+	    connection, name, &zlib_compressor->compressor, NULL));
+}
+
+int
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	int ret;
+
+	(void)config;				/* Unused parameters */
+
+	if ((ret = zlib_add_compressor(connection, 1, "zlib")) != 0)
+		return (ret);
+	if ((ret = zlib_add_compressor(connection, 0, "zlib-noraw")) != 0)
+		return (ret);
 	return (0);
 }

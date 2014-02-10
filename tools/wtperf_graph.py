@@ -41,18 +41,18 @@ def process_monitor(fname, sfx, ckptlist, opdict):
 
     ofname = 'monitor%s.png' % (sfx)
     # Monitor output format currently is:
-    # time,read,insert,update,ckpt,...latencies...
+    # time,totalsec,read,insert,update,ckpt,...latencies...
     ops = ('read', 'insert', 'update')
-    csvcol = (1, 2, 3)
+    csvcol = (2, 3, 4)
     with open(fname, 'r') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             if row[0].lstrip().startswith('#'):
                 continue
             # Look for checkpoints and operations.
-            if row[4] != in_ckpt:
+            if row[5] != in_ckpt:
                 ckptlist.append(row[0])
-                in_ckpt = row[4]
+                in_ckpt = row[5]
             for op, col in zip(ops, csvcol):
                 if row[col] != '0' and opdict[op] == 0:
                     opdict[op] = 1
@@ -85,10 +85,9 @@ set yrange [0:]\n''' % {
                 graph 0 to first '%i',\
                 graph 1 fc rgb \"gray\" back\n" % (start, stop))
     of.write('set output "%s"\n' % (ofname))
-    of.write("""plot "{name}" every ::1 using 1:($2/1000) title "Reads", \\
-        "{name}" every ::1 using 1:($3/1000) title "Inserts",\\
-        "{name}" every ::1 using 1:($4/1000) title "Updates",\\
-        "{name}" every ::1 using 1:(($2+$3+$4)/1000) title "Total"
+    of.write("""plot "{name}" every ::1 using 1:($3/1000) title "Reads", \\
+        "{name}" every ::1 using 1:($4/1000) title "Inserts",\\
+        "{name}" every ::1 using 1:($5/1000) title "Updates"
         """.format(name=fname))
     of.close()
     call(["gnuplot", gcmd])
@@ -136,6 +135,9 @@ set yrange [1:]\n''' % {
 
 # Graph latency vs. % operations
 def plot_latency_percent(name, dirname, sfx, ckptlist):
+    lfile = os.path.join(dirname, 'latency.' + name)
+    if not os.path.exists(lfile):
+        return
     gcmd = "gnuplot." + name + ".l2.cmd"
     of = open(gcmd, "w")
     of.write('''
@@ -154,8 +156,8 @@ set ylabel "%% operations"
 set yrange [0:]\n''')
     ofname = name + sfx + '.latency2.png'
     of.write('set output "' + ofname + '"\n')
-    of.write('plot "' + os.path.join(dirname, 'latency.' + name) + sfx +\
-        '" every :: 1 using (($2 * 100)/$4) title "' + name + '"\n')
+    of.write('plot "' + lfile + sfx +\
+        '" every ::1 using (($2 * 100)/$4) title "' + name + '"\n')
     of.close()
     call(["gnuplot", gcmd])
     os.remove(gcmd)
@@ -163,6 +165,9 @@ set yrange [0:]\n''')
 
 # Graph latency vs. % operations (cumulative)
 def plot_latency_cumulative_percent(name, dirname, sfx, ckptlist):
+    lfile = os.path.join(dirname, 'latency.' + name)
+    if not os.path.exists(lfile):
+        return
     # Latency plot: cumulative operations vs. latency
     gcmd = "gnuplot." + name + ".l3.cmd"
     of = open(gcmd, "w")
@@ -183,7 +188,7 @@ set yrange [0:]\n''' % {
         })
     ofname = name + sfx + '.latency3.png'
     of.write('set output "' + ofname + '"\n')
-    of.write('plot "' + os.path.join(dirname, 'latency.' + name) + sfx +\
+    of.write('plot "' + lfile + sfx +\
         '" every ::1 using 1:(($3 * 100)/$4) title "' + name + '"\n')
     of.close()
     call(["gnuplot", gcmd])
@@ -201,7 +206,7 @@ def process_file(fname):
     dirname = os.path.dirname(fname)
 
     process_monitor(fname, sfx, ckptlist, opdict)
-    column = 6              # average, minimum, maximum start in column 6
+    column = 7              # average, minimum, maximum start in column 7
     for k, v in opdict.items():
         if v != 0:
             plot_latency_operation(

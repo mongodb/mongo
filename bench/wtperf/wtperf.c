@@ -30,6 +30,7 @@
 /* Default values. */
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
+	"WT_TEST",			/* monitor dir */
 	NULL,				/* uri */
 	NULL,				/* conn */
 	NULL,				/* logf */
@@ -45,39 +46,6 @@ static const CONFIG default_cfg = {
 #undef OPT_DEFINE_DEFAULT
 };
 
-static const char * const small_config_str =
-    "conn_config=\"cache_size=500MB\","
-    "table_config=\"lsm=(chunk_size=5MB)\","
-    "icount=500000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=20,"
-    "populate_threads=1,"
-    "threads=((count=8,read=1)),";
-
-static const char * const med_config_str =
-    "conn_config=\"cache_size=1GB\","
-    "table_config=\"lsm=(chunk_size=20MB)\","
-    "icount=50000000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=100,"
-    "populate_threads=1,"
-    "threads=((count=16,read=1)),";
-
-static const char * const large_config_str =
-    "conn_config=\"cache_size=2GB\","
-    "table_config=\"lsm=(chunk_size=50MB)\","
-    "icount=500000000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=600,"
-    "populate_threads=1,"
-    "threads=((count=16,read=1)),";
-
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
 
@@ -91,6 +59,8 @@ static uint64_t g_insert_key;		/* insert key */
 static volatile int g_ckpt;		/* checkpoint in progress */
 static volatile int g_error;		/* thread error */
 static volatile int g_stop;		/* notify threads to stop */
+
+static volatile uint32_t g_totalsec;	/* total seconds running */
 
 /*
  * Atomic update where needed.
@@ -496,14 +466,16 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 static void *
 populate_thread(void *arg)
 {
+	struct timespec start, stop;
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
+	TRACK *trk;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint32_t opcount;
-	uint64_t op;
-	int intxn, ret;
+	uint64_t op, usecs;
+	int intxn, measure_latency, ret;
 	char *value_buf, *key_buf;
 
 	thread = (CONFIG_THREAD *)arg;
@@ -511,6 +483,7 @@ populate_thread(void *arg)
 	conn = cfg->conn;
 	session = NULL;
 	ret = 0;
+	trk = &thread->insert;
 
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
@@ -530,64 +503,65 @@ populate_thread(void *arg)
 	}
 
 	/* Populate the database. */
-	if (cfg->populate_ops_per_txn == 0)
-		for (;;) {
-			op = get_next_incr();
-			if (op > cfg->icount)
-				break;
+	for (intxn = 0, opcount = 0;;) {
+		op = get_next_incr();
+		if (op > cfg->icount)
+			break;
 
-			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-			cursor->set_key(cursor, key_buf);
-			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
-			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Failed inserting");
+		if (cfg->populate_ops_per_txn != 0 && !intxn) {
+			if ((ret = session->begin_transaction(
+			    session, cfg->transaction_config)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Failed starting transaction.");
 				goto err;
 			}
-			++thread->insert.ops;
+			intxn = 1;
 		}
-	else {
-		for (intxn = 0, opcount = 0;;) {
-			op = get_next_incr();
-			if (op > cfg->icount)
-				break;
-
-			if (!intxn) {
-				if ((ret = session->begin_transaction(
-				    session, cfg->transaction_config)) != 0) {
-					lprintf(cfg, ret, 0,
-					    "Failed starting transaction.");
-					goto err;
-				}
-				intxn = 1;
-			}
-			sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-			cursor->set_key(cursor, key_buf);
-			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
-			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Failed inserting");
+		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		measure_latency = cfg->sample_interval != 0 && (
+		    trk->ops % cfg->sample_rate == 0);
+		if (measure_latency &&
+		    (ret = __wt_epoch(NULL, &start)) != 0) {
+			lprintf(cfg, ret, 0, "Get time call failed");
+			goto err;
+		}
+		cursor->set_key(cursor, key_buf);
+		if (cfg->random_value)
+			randomize_value(cfg, value_buf);
+		cursor->set_value(cursor, value_buf);
+		if ((ret = cursor->insert(cursor)) != 0) {
+			lprintf(cfg, ret, 0, "Failed inserting");
+			goto err;
+		}
+		/* Gather statistics */
+		if (measure_latency) {
+			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Get time call failed");
 				goto err;
 			}
-			++thread->insert.ops;
+			++trk->latency_ops;
+			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+			track_operation(trk, usecs);
+		}
+		++thread->insert.ops;	/* Same as trk->ops */
 
+		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
 				continue;
 			opcount = 0;
 
-			if ((ret =
-			    session->commit_transaction(session, NULL)) != 0)
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0)
 				lprintf(cfg, ret, 0,
 				    "Fail committing, transaction was aborted");
 			intxn = 0;
 		}
-		if (intxn &&
-		    (ret = session->commit_transaction(session, NULL)) != 0)
-			lprintf(cfg, ret, 0,
-			    "Fail committing, transaction was aborted");
 	}
+	if (intxn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0)
+		lprintf(cfg, ret, 0,
+		    "Fail committing, transaction was aborted");
 
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session in populate");
@@ -612,6 +586,7 @@ monitor(void *arg)
 	char buf[64], *path;
 	int ret;
 	uint64_t reads, inserts, updates;
+	uint64_t cur_reads, cur_inserts, cur_updates;
 	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
@@ -625,12 +600,12 @@ monitor(void *arg)
 	path = NULL;
 
 	/* Open the logging file. */
-	len = strlen(cfg->home) + 100;
+	len = strlen(cfg->monitor_dir) + 100;
 	if ((path = malloc(len)) == NULL) {
 		(void)enomem(cfg);
 		goto err;
 	}
-	snprintf(path, len, "%s/monitor", cfg->home);
+	snprintf(path, len, "%s/monitor", cfg->monitor_dir);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
 		goto err;
@@ -638,7 +613,7 @@ monitor(void *arg)
 	/* Set line buffering for monitor file. */
 	(void)setvbuf(fp, NULL, _IOLBF, 0);
 	fprintf(fp,
-	    "#time,"
+	    "#time,totalsec,"
 	    "read operations,insert operations,update operations,"
 	    "checkpoints,"
 	    "read average latency(NS),read minimum latency(NS),"
@@ -673,18 +648,30 @@ monitor(void *arg)
 		latency_insert(cfg, &insert_avg, &insert_min, &insert_max);
 		latency_update(cfg, &update_avg, &update_min, &update_max);
 
+		cur_reads = reads - last_reads;
+		cur_updates = updates - last_updates;
+		/*
+		 * For now the only item we need to worry about changing is
+		 * inserts when we transition from the populate phase to
+		 * workload phase.
+		 */
+		if (inserts < last_inserts)
+			cur_inserts = 0;
+		else
+			cur_inserts = inserts - last_inserts;
+
 		(void)fprintf(fp,
-		    "%s"
+		    "%s,%" PRIu32
 		    ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
 		    ",%c"
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    "\n",
-		    buf,
-		    (reads - last_reads) / cfg->sample_interval,
-		    (inserts - last_inserts) / cfg->sample_interval,
-		    (updates - last_updates) / cfg->sample_interval,
+		    buf, g_totalsec,
+		    cur_reads / cfg->sample_interval,
+		    cur_inserts / cfg->sample_interval,
+		    cur_updates / cfg->sample_interval,
 		    g_ckpt ? 'Y' : 'N',
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
@@ -777,11 +764,12 @@ err:		g_error = g_stop = 1;
 static int
 execute_populate(CONFIG *cfg)
 {
+	CONFIG_THREAD *popth;
 	WT_SESSION *session;
 	struct timespec start, stop;
 	double secs;
 	uint64_t last_ops;
-	uint32_t interval, total;
+	uint32_t interval;
 	int elapsed, ret;
 
 	session = NULL;
@@ -801,7 +789,7 @@ execute_populate(CONFIG *cfg)
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
 		return (ret);
 	}
-	for (elapsed = 0, interval = 0, last_ops = 0, total = 0;
+	for (elapsed = 0, interval = 0, last_ops = 0;
 	    g_insert_key < cfg->icount && g_error == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
@@ -815,13 +803,13 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
-		total += cfg->report_interval;
+		g_totalsec += cfg->report_interval;
 		g_insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
 		    PRIu32 ") in %" PRIu32 " secs (%" PRIu32 " total secs)",
 		    g_insert_ops - last_ops, g_insert_ops,
-		    cfg->icount, cfg->report_interval, total);
+		    cfg->icount, cfg->report_interval, g_totalsec);
 		last_ops = g_insert_ops;
 	}
 	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
@@ -829,8 +817,17 @@ execute_populate(CONFIG *cfg)
 		return (ret);
 	}
 
-	if ((ret =
-	    stop_threads(cfg, cfg->populate_threads, cfg->popthreads)) != 0)
+	/*
+	 * Move popthreads aside to narrow possible race with the monitor
+	 * thread. The latency tracking code also requires that popthreads be
+	 * NULL when the populate phase is finished, to know that the workload
+	 * phase has started.
+	 */
+	popth = cfg->popthreads;
+	cfg->popthreads = NULL;
+	ret = stop_threads(cfg, cfg->populate_threads, popth);
+	free(popth);
+	if (ret != 0)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
@@ -860,10 +857,21 @@ execute_populate(CONFIG *cfg)
 		}
 		lprintf(cfg, 0, 1, "Compact after populate");
 		if ((ret = session->compact(session, cfg->uri, NULL)) != 0) {
-			lprintf(cfg, ret, 0,
-			     "execute_populate: WT_SESSION.compact");
-			return (ret);
+			/*
+			 * It is possible the compact didn't finish.  If it
+			 * timed out, just continue.
+			 */
+			if (ret != ETIMEDOUT) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				return (ret);
+			} else {
+				lprintf(cfg, ret, 0,
+     "execute_populate: compact did not complete, continuing anyway");
+				ret = 0;
+			}
 		}
+		
 		if ((ret = session->close(session, NULL)) != 0) {
 			lprintf(cfg, ret, 0,
 			     "execute_populate: WT_SESSION.close");
@@ -896,7 +904,7 @@ execute_workload(CONFIG *cfg)
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
-	uint32_t interval, run_ops, run_time, total;
+	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret, t_ret;
 
@@ -933,7 +941,7 @@ execute_workload(CONFIG *cfg)
 		threads += workp->threads;
 	}
 
-	for (interval = cfg->report_interval, total = 0,
+	for (interval = cfg->report_interval, 
 	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
 		/*
 		 * Sleep for one second at a time.
@@ -963,7 +971,7 @@ execute_workload(CONFIG *cfg)
 		if (interval == 0 || --interval > 0)
 			continue;
 		interval = cfg->report_interval;
-		total += cfg->report_interval;
+		g_totalsec += cfg->report_interval;
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
@@ -973,7 +981,7 @@ execute_workload(CONFIG *cfg)
 		    g_insert_ops - last_inserts,
 		    g_update_ops - last_updates,
 		    g_ckpt_ops - last_ckpts,
-		    cfg->report_interval, total);
+		    cfg->report_interval, g_totalsec);
 		last_reads = g_read_ops;
 		last_inserts = g_insert_ops;
 		last_updates = g_update_ops;
@@ -1053,15 +1061,15 @@ main(int argc, char *argv[])
 	pthread_t monitor_thread;
 	size_t len;
 	uint64_t req_len, total_ops;
-	int ch, monitor_created, ret, t_ret;
+	int ch, monitor_created, monitor_set, ret, t_ret;
 	const char *helium_mount;
-	const char *opts = "C:H:h:LMO:o:ST:";
+	const char *opts = "C:H:h:m:O:o:T:";
 	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
 	session = NULL;
-	monitor_created = ret = 0;
+	monitor_created = monitor_set = ret = 0;
 	helium_mount = user_cconfig = user_tconfig = NULL;
 	cmd = cc_buf = tc_buf = tmphome = NULL;
 
@@ -1077,11 +1085,22 @@ main(int argc, char *argv[])
 		case 'h':
 			cfg->home = optarg;
 			break;
+		case 'm':
+			cfg->monitor_dir = optarg;
+			monitor_set = 1;
+			break;
 		case '?':
 			fprintf(stderr, "Invalid option\n");
 			usage();
 			goto einval;
 		}
+
+	/*
+	 * If the user did not specify a monitor directory
+	 * then set the monitor directory to the home dir.
+	 */
+	if (!monitor_set)
+		cfg->monitor_dir = cfg->home;
 
 	/*
 	 * Create a temporary directory underneath the test directory in which
@@ -1118,18 +1137,6 @@ main(int argc, char *argv[])
 	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
-		case 'S':
-			if (config_opt_line(cfg, small_config_str) != 0)
-				goto einval;
-			break;
-		case 'M':
-			if (config_opt_line(cfg, med_config_str) != 0)
-				goto einval;
-			break;
-		case 'L':
-			if (config_opt_line(cfg, large_config_str) != 0)
-				goto einval;
-			break;
 		case 'O':
 			if (config_opt_file(cfg, optarg) != 0)
 				goto einval;
@@ -1388,7 +1395,7 @@ static int
 start_threads(CONFIG *cfg,
     WORKLOAD *workp, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
 {
-	u_int end, i, j;
+	u_int i;
 	int ret;
 
 	for (i = 0; i < num; ++i, ++thread) {
@@ -1404,12 +1411,12 @@ start_threads(CONFIG *cfg,
 			return (enomem(cfg));
 		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
-		if (cfg->random_value) {
-			end = cfg->value_sz / sizeof(uint32_t);
-			for (j = 0; j < end; j+= sizeof(uint32_t))
-				thread->value_buf[j] = (char)__wt_random();
-		} else
-			memset(thread->value_buf, 'a', cfg->value_sz - 1);
+		/*
+		 * Initialize and then toss in a bit of random values if needed.
+		 */
+		memset(thread->value_buf, 'a', cfg->value_sz - 1);
+		if (cfg->random_value)
+			randomize_value(cfg, thread->value_buf);
 
 		/*
 		 * Every thread gets tracking information and is initialized

@@ -63,6 +63,7 @@ typedef struct {
 
 struct __config {			/* Configuration struction */
 	const char *home;		/* WiredTiger home */
+	const char *monitor_dir;	/* Monitor output dir */
 	char *uri;			/* Object URI */
 
 	WT_CONNECTION *conn;		/* Database connection */
