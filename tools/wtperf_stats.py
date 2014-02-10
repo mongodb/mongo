@@ -46,7 +46,7 @@ except ImportError:
 # Fixup the names and values in a dictionary read in from a csv file. One
 # field must be "#time" - which is used to calculate the interval.
 # Input is a dictionary, output is a list of dictionaries with a single entry.
-def munge_dict(values_dict):
+def munge_dict(values_dict, abstime):
     sorted_values = sorted(values_dict, key=operator.itemgetter('#time'))
     start_time = parsetime(sorted_values[0]['#time'])
     seconds = (parsetime(sorted_values[1]['#time']) - start_time).seconds
@@ -55,7 +55,12 @@ def munge_dict(values_dict):
 
     ret = []
     for v in sorted_values:
-        v['#time'] = int(mktime(parsetime(v['#time']).timetuple())) * 1000
+        if abstime:
+            # Build the time series, milliseconds since the epoch
+            v['#time'] = int(mktime(parsetime(v['#time']).timetuple())) * 1000
+        else:
+            # Build the time series as seconds since the start of the data
+            v['#time'] = (parsetime(v['#time']) - start_time).seconds
         next_val = {}
         for title, value in v.items():
             if title.find('NS') != -1:
@@ -96,13 +101,13 @@ def addPlotsToChart(chart, graph_data, wtstat_chart = False):
 
 # Input parameters are a chart populated with WiredTiger statistics and
 # the directory where the wtperf monitor file can be found.
-def addPlotsToStatsChart(chart, dirname):
+def addPlotsToStatsChart(chart, dirname, abstime):
     fname = os.path.join(dirname, 'monitor')
     try:
         with open(fname, 'rb') as csvfile:
             reader = csv.DictReader(csvfile)
             # Transform the data into something NVD3 can digest
-            graph_data = munge_dict(reader)
+            graph_data = munge_dict(reader, abstime)
     except IOError:
         print >>sys.stderr, "Could not open wtperf monitor file."
         sys.exit(-1)
@@ -113,6 +118,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Create graphs from WiredTiger statistics.')
+    parser.add_argument('--abstime', action='store_true',
+        help='use absolute time on the x axis')
     parser.add_argument('--output', '-o', metavar='file',
         default='wtperf_stats.html', help='HTML output file')
     parser.add_argument('files', metavar='file', nargs='+',
@@ -125,18 +132,23 @@ def main():
         print 'Script currently only supports a single monitor file'
         exit (1)
 
+    chart_extra = {}
+    # Add in the x axis if the user wants time.
+    if args.abstime:
+        chart_extra['x_axis_format'] = '%H:%M:%S'
+
     for f in args.files:
         with open(f, 'rb') as csvfile:
             reader = csv.DictReader(csvfile)
             # Transform the data into something NVD3 can digest
-            graph_data = munge_dict(reader)
+            graph_data = munge_dict(reader, args.abstime)
 
     chart = multiChart(name='wtperf',
                       height=450 + 10*len(graph_data[0].keys()),
                       resize=True,
-                      x_axis_format='%H:%M:%S',
-                      x_is_date=1,
-                      assets_directory='http://source.wiredtiger.com/graphs/')
+                      x_is_date=args.abstime,
+                      assets_directory='http://source.wiredtiger.com/graphs/',
+                      **chart_extra)
 
     addPlotsToChart(chart, graph_data)
 

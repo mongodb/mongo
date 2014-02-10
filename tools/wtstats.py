@@ -211,7 +211,7 @@ for title, yaxis, ydata in results:
                     type="line", yaxis="2" if yaxis else "1")
 
 if args.wtperf:
-    addPlotsToStatsChart(chart, os.path.dirname(args.files[0]))
+    addPlotsToStatsChart(chart, os.path.dirname(args.files[0]), args.abstime)
 
 chart.buildhtml()
 output_file.write(chart.htmlcontent)
