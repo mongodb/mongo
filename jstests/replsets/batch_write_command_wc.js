@@ -113,6 +113,36 @@ assert.eq(result.writeErrors[0].index, 1);
 assert(result.writeConcernError);
 assert.eq(1, coll.count());
 
+//
+// Write error with empty writeConcern object.
+coll.remove({});
+request = { insert: coll.getName(),
+            documents: [{ _id: 1 }, { _id: 1 }],
+            writeConcern: {},
+            ordered: false };
+result = coll.runCommand(request);
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(result.writeErrors.length, 1);
+assert.eq(result.writeErrors[0].index, 1);
+assert.eq(null, result.writeConcernError);
+assert.eq(1, coll.count());
+
+//
+// Write error with unspecified w.
+coll.remove({});
+request = { insert: coll.getName(),
+            documents: [{ _id: 1 }, { _id: 1 }],
+            writeConcern: { wTimeout: 1 },
+            ordered: false };
+result = coll.runCommand(request);
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(result.writeErrors.length, 1);
+assert.eq(result.writeErrors[0].index, 1);
+assert.eq(null, result.writeConcernError);
+assert.eq(1, coll.count());
+
 jsTest.log("DONE no journal/repl tests");
 rst.stopSet();
 

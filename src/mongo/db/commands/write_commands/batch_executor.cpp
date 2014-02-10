@@ -109,11 +109,17 @@ namespace mongo {
         // TODO: Lift write concern parsing out of this entirely.
         WriteConcernOptions writeConcern;
         Status status = Status::OK();
+
+        BSONObj wcDoc;
         if ( request.isWriteConcernSet() ) {
-            status = writeConcern.parse( request.getWriteConcern() );
+            wcDoc = request.getWriteConcern();
+        }
+
+        if ( wcDoc.isEmpty() ) {
+            status = writeConcern.parse( _defaultWriteConcern );
         }
         else {
-            status = writeConcern.parse( _defaultWriteConcern );
+            status = writeConcern.parse( wcDoc );
         }
 
         if ( status.isOK() ) {

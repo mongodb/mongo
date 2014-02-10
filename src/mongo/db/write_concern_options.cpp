@@ -37,6 +37,9 @@ namespace mongo {
     const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 
     Status WriteConcernOptions::parse( const BSONObj& obj ) {
+        if ( obj.isEmpty() ) {
+            return Status( ErrorCodes::BadValue, "write concern object cannot be empty" );
+        }
 
         bool j = obj["j"].trueValue();
         bool fsync = obj["fsync"].trueValue();
@@ -61,6 +64,7 @@ namespace mongo {
         else if ( e.eoo() ||
                   e.type() == jstNULL ||
                   e.type() == Undefined ) {
+            wNumNodes = 1;
         }
         else {
             return Status( ErrorCodes::BadValue, "w has to be a number or a string" );
