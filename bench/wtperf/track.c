@@ -267,10 +267,8 @@ latency_print_single(CONFIG *cfg, TRACK *total, const char *name)
 		return;
 	}
 
-#ifdef __WRITE_A_HEADER
 	fprintf(fp,
-	    "usecs,operations,cumulative-operations,total-operations\n");
-#endif
+	    "#usecs,operations,cumulative-operations,total-operations\n");
 	cumops = 0;
 	for (i = 0; i < ELEMENTS(total->us); ++i) {
 		if (total->us[i] == 0)
