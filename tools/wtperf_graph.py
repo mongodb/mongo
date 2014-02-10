@@ -40,7 +40,6 @@ def process_monitor(fname, sfx, ckptlist, opdict):
     ckptlist=[]
 
     ofname = 'monitor%s.png' % (sfx)
-    print "Setting moniot output to: " + ofname
     # Monitor output format currently is:
     # time,read,insert,update,ckpt,...latencies...
     ops = ('read', 'insert', 'update')
