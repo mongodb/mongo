@@ -81,8 +81,8 @@ set yrange [0:]\n''' % {
         })
     it = iter(ckptlist)
     for start, stop in zip(it, it):
-        of.write("set object rectangle from first '%i',\
-                graph 0 to first '%i',\
+        of.write("set object rectangle from first '%s',\
+                graph 0 to first '%s',\
                 graph 1 fc rgb \"gray\" back\n" % (start, stop))
     of.write('set output "%s"\n' % (ofname))
     of.write("""plot "{name}" every ::1 using 1:($3/1000) title "Reads", \\
