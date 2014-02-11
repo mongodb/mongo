@@ -828,7 +828,7 @@ execute_populate(CONFIG *cfg)
 	double secs;
 	uint64_t last_ops;
 	uint32_t interval;
-	int elapsed, ret;
+	int elapsed, ret, t_ret;
 
 	session = NULL;
 	lprintf(cfg, 0, 1,
@@ -904,7 +904,9 @@ execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f", secs, cfg->icount / secs);
 
 	/*
-	 * If configured, compact to allow LSM merging to complete.
+	 * If configured, compact to allow LSM merging to complete.  We
+	 * set an unlimited timeout because if we close the connection
+	 * then any in-progress compact/merge is aborted.
 	 */
 	if (cfg->compact) {
 		if ((ret = cfg->conn->open_session(
@@ -914,27 +916,29 @@ execute_populate(CONFIG *cfg)
 			return (ret);
 		}
 		lprintf(cfg, 0, 1, "Compact after populate");
-		if ((ret = session->compact(session, cfg->uri, NULL)) != 0) {
-			/*
-			 * It is possible the compact didn't finish.  If it
-			 * timed out, just continue.
-			 */
-			if (ret != ETIMEDOUT) {
-				lprintf(cfg, ret, 0,
-				     "execute_populate: WT_SESSION.compact");
-				return (ret);
-			} else {
-				lprintf(cfg, ret, 0,
-     "execute_populate: compact did not complete, continuing anyway");
-				ret = 0;
-			}
+		if ((ret = __wt_epoch(NULL, &start)) != 0) {
+			lprintf(cfg, ret, 0, "Get time failed in populate.");
+			goto err;
 		}
-		
-		if ((ret = session->close(session, NULL)) != 0) {
+		if ((ret = session->compact(
+		    session, cfg->uri, "timeout=0")) != 0) {
 			lprintf(cfg, ret, 0,
-			     "execute_populate: WT_SESSION.close");
-			return (ret);
+			     "execute_populate: WT_SESSION.compact");
+			goto err;
 		}
+		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+			lprintf(cfg, ret, 0, "Get time failed in populate.");
+			goto err;
+		}
+		secs = stop.tv_sec + stop.tv_nsec / (double)BILLION;
+		secs -= start.tv_sec + start.tv_nsec / (double)BILLION;
+		lprintf(cfg, 0, 1, "Compact completed in %.2f seconds", secs);
+err:
+		if ((t_ret = session->close(session, NULL)) != 0)
+			lprintf(cfg, t_ret, 0,
+			     "execute_populate: WT_SESSION.close");
+		if (ret != 0 || (ret = t_ret) != 0)
+			return (ret);
 	}
 
 	/*
