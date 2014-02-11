@@ -59,7 +59,7 @@ var _bulk_api_module = (function() {
    * singleBatch is passed in on bulk operations consisting of a single batch and
    * are used to filter the SingleWriteResult to only include relevant result fields.
    */
-  var SingleWriteResult = function(bulkResult, singleBatch) {
+  var SingleWriteResult = function(bulkResult, singleBatch, writeConcern) {
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
@@ -137,11 +137,15 @@ var _bulk_api_module = (function() {
     };
 
     this.toString = function() {
-      return this.tojson();
+      // Suppress all output for the write concern w:0, since the client doesn't care.
+      if(writeConcern && writeConcern.w == 0) {
+        return "WriteResult(" + tojson({}) + ")";;
+      }
+      return "WriteResult(" + this.tojson() + ")";
     };
 
     this.shellPrint = function() {
-      return "WriteResult(" + this.toString() + ")";
+      return this.toString();
     };
 
     this.isOK = function() {
@@ -152,7 +156,7 @@ var _bulk_api_module = (function() {
   /**
    * Wraps the result for the commands
    */
-  var BulkWriteResult = function(bulkResult, singleBatch) {
+  var BulkWriteResult = function(bulkResult, singleBatch, writeConcern) {
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
@@ -227,7 +231,11 @@ var _bulk_api_module = (function() {
     }
 
     this.toString = function() {
-      return "BulkWriteResult(" + tojson(bulkResult) + ")";
+      // Suppress all output for the write concern w:0, since the client doesn't care.
+      if(writeConcern && writeConcern.w == 0) {
+        return "BulkWriteResult(" + tojson({}) + ")";;
+      }
+      return "BulkWriteResult(" + this.tojson() + ")";
     }
 
     this.shellPrint = function() {
@@ -244,7 +252,7 @@ var _bulk_api_module = (function() {
     this.toSingleResult = function() {
       if(singleBatch == null) throw Error(
           "Cannot output SingleWriteResult from multiple batch result");
-      return new SingleWriteResult(bulkResult, singleBatch);
+      return new SingleWriteResult(bulkResult, singleBatch, writeConcern);
     }
   };
 
@@ -924,11 +932,11 @@ var _bulk_api_module = (function() {
       executed = true;
 
       if(batches.length == 1) {
-        return new BulkWriteResult(bulkResult, batches[0]);
+        return new BulkWriteResult(bulkResult, batches[0], writeConcern);
       }
 
       // Execute the batch and return the final results
-      return new BulkWriteResult(bulkResult);
+      return new BulkWriteResult(bulkResult, null, writeConcern);
     }
   }
 })();
