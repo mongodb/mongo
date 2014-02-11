@@ -109,6 +109,39 @@ config_free(CONFIG *cfg)
 }
 
 /*
+ * config_compress --
+ *	Parse the compression configuration.
+ */
+int
+config_compress(CONFIG *cfg)
+{
+	int ret;
+	const char *s;
+
+	ret = 0;
+	s = cfg->compression;
+	if (strcmp(s, "none") == 0) {
+		cfg->compress_ext = NULL;
+		cfg->compress_table = NULL;
+	} else if (strcmp(s, "bzip") == 0) {
+		cfg->compress_ext = BZIP_EXT;
+		cfg->compress_table = BZIP_BLK;
+	} else if (strcmp(s, "snappy") == 0) {
+		cfg->compress_ext = SNAPPY_EXT;
+		cfg->compress_table = SNAPPY_BLK;
+	} else if (strcmp(s, "zlib") == 0) {
+		cfg->compress_ext = ZLIB_EXT;
+		cfg->compress_table = ZLIB_BLK;
+	} else {
+		fprintf(stderr,
+	    "invalid compression configuration: %s\n", s);
+		ret = EINVAL;
+	}
+	return (ret);
+
+}
+
+/*
  * config_threads --
  *	Parse the thread configuration.
  */

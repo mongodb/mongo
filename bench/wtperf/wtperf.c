@@ -35,6 +35,7 @@ static const CONFIG default_cfg = {
 	NULL,				/* uris */
 	NULL,				/* conn */
 	NULL,				/* logf */
+	NULL, NULL,			/* compressor ext, blk */
 	NULL, NULL,			/* populate, checkpoint threads */
 
 	NULL,				/* worker threads */
@@ -1306,6 +1307,9 @@ main(int argc, char *argv[])
 			break;
 		}
 
+	if ((ret = config_compress(cfg)) != 0)
+		goto err;
+
 	/* Build the URI from the table name. */
 	req_len = strlen("table:") +
 	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
@@ -1325,36 +1329,49 @@ main(int argc, char *argv[])
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* Concatenate non-default configuration strings. */
-	if (cfg->verbose > 1 || user_cconfig != NULL) {
-		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
+	if (cfg->verbose > 1 || user_cconfig != NULL ||
+	    cfg->compress_ext != NULL) {
+		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 
+		    strlen(cfg->compress_ext) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
 		if ((cc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
 		}
-		snprintf(cc_buf, req_len, "%s%s%s%s%s",
+		/*
+		 * This is getting hard to parse.
+		 */
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s",
 		    cfg->conn_config,
-		    cfg->verbose > 1 ? "," : "",
+		    cfg->compress_ext ? cfg->compress_ext : "",
+		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_cconfig : "",
-		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
+		    user_cconfig ? ",": "",
+		    user_cconfig ? user_cconfig : "");
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg->verbose > 1 || helium_mount != NULL || user_tconfig != NULL) {
-		req_len = strlen(cfg->table_config) +
-		    strlen(HELIUM_CONFIG) + strlen(debug_tconfig) + 3;
+	if (cfg->verbose > 1 || helium_mount != NULL || user_tconfig != NULL ||
+	    cfg->compress_table != NULL) {
+		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
+		    strlen(debug_tconfig) + strlen(cfg->compress_table) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
 		}
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s",
+		/*
+		 * This is getting hard to parse.
+		 */
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
 		    cfg->table_config,
-		    cfg->verbose > 1 ? "," : "",
+		    cfg->compress_table ? cfg->compress_table : "",
+		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_tconfig : "",
-		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "",
+		    user_tconfig ? ",": "",
+		    user_tconfig ? user_tconfig : "",
 		    helium_mount == NULL ? "" : HELIUM_CONFIG);
 		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
 			goto err;
