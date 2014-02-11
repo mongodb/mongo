@@ -222,24 +222,17 @@ namespace mongo {
             params.ns = qsol.ns;
             params.index = index;
             params.spec = fam->getSpec();
-            // XXX change getIndexPrefix to not look at BSONObj
-            Status s = fam->getSpec().getIndexPrefix(qsol.filterData, &params.indexPrefix);
-            if (!s.isOK()) {
-                warning() << "can't get text index prefix??";
-                return NULL;
-            }
+            params.indexPrefix = node->indexPrefix;
 
-            const std::string& language = ("" == node->_language
+            const std::string& language = ("" == node->language
                                            ? fam->getSpec().defaultLanguage().str()
-                                           : node->_language);
+                                           : node->language);
 
-            FTSQuery ftsq;
-            Status parseStatus = ftsq.parse(node->_query, language);
+            Status parseStatus = params.query.parse(node->query, language);
             if (!parseStatus.isOK()) {
                 warning() << "cant parse fts query";
                 return NULL;
             }
-            params.query = ftsq;
 
             return new TextStage(params, ws, node->filter.get());
         }

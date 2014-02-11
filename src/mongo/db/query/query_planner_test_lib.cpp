@@ -278,14 +278,25 @@ namespace mongo {
 
             BSONElement searchElt = textObj["search"];
             if (!searchElt.eoo()) {
-                if (searchElt.String() != node->_query) {
+                if (searchElt.String() != node->query) {
                     return false;
                 }
             }
 
             BSONElement languageElt = textObj["language"];
             if (!languageElt.eoo()) {
-                if (languageElt.String() != node->_language) {
+                if (languageElt.String() != node->language) {
+                    return false;
+                }
+            }
+
+            BSONElement indexPrefix = textObj["prefix"];
+            if (!indexPrefix.eoo()) {
+                if (!indexPrefix.isABSONObj()) {
+                    return false;
+                }
+
+                if (0 != indexPrefix.Obj().woCompare(node->indexPrefix)) {
                     return false;
                 }
             }

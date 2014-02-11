@@ -327,7 +327,7 @@ namespace mongo {
                 // If the index is multikey, we only assign one pred to it.  We also skip
                 // compounding.  TODO: is this also true for 2d and 2dsphere indices?  can they be
                 // multikey but still compoundable?  (How do we get covering for them?)
-                if (thisIndex.multikey) {
+                if (thisIndex.multikey && (INDEX_TEXT != thisIndex.type)) {
                     indexAssign.preds.push_back(it->second[0]);
                     indexAssign.positions.push_back(0);
                 }

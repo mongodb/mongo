@@ -489,7 +489,7 @@ namespace mongo {
                 }
                 else if (STAGE_TEXT == node->getType()) {
                     const TextNode* textNode = static_cast<const TextNode*>(node);
-                    leafInfo << " " << textNode->_indexKeyPattern;
+                    leafInfo << " " << textNode->indexKeyPattern;
                 }
 
                 leaves.push_back(leafInfo);

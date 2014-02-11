@@ -239,8 +239,11 @@ namespace mongo {
          * 'node' with the "all values for this field" interval.
          *
          * If geo, do nothing.
+         * If text, punt to finishTextNode.
          */
         static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
+
+        static void finishTextNode(QuerySolutionNode* node, const IndexEntry& index);
 
     private:
         /**

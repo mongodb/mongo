@@ -22,6 +22,7 @@ env.Library(
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions",
+        "$BUILD_DIR/mongo/index_names",
     ],
 )
 
@@ -74,6 +75,7 @@ env.Library(
         "query_logger",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/mongohasher",
     ],
 )

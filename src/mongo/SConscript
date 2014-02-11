@@ -214,6 +214,8 @@ env.CppUnitTest('curop_test',
                 LIBDEPS=['serveronly', 'coredb', 'coreserver'],
                 NO_CRUTCH=True)
 
+env.Library('index_names',["db/index_names.cpp"])
+
 env.Library( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
@@ -412,7 +414,6 @@ env.Library("coredb", [
         "db/commands/write_commands/write_commands_common.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
-        "db/index_names.cpp",
         "db/keypattern.cpp",
         "db/matcher/matcher.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
@@ -457,6 +458,7 @@ env.Library("coredb", [
                            'expressions_geo',
                            'expressions_where',
                            'expressions_text',
+                           'index_names',
                            'db/exec/working_set',
                            'db/index/key_generator',
                            '$BUILD_DIR/mongo/foundation',

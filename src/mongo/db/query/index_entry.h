@@ -30,9 +30,23 @@
 
 #include <string>
 
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+    /**
+     * We need to know what 'type' an index is in order to plan correctly.
+     * Rather than look this up repeatedly we figure it out once.
+     */
+    enum IndexType {
+        INDEX_BTREE,
+        INDEX_2D,
+        INDEX_HAYSTACK,
+        INDEX_2DSPHERE,
+        INDEX_TEXT,
+        INDEX_HASHED,
+    };
 
     /**
      * This name sucks, but every name involving 'index' is used somewhere.
@@ -47,7 +61,40 @@ namespace mongo {
               multikey(mk),
               sparse(sp),
               name(n),
-              infoObj(io) { }
+              infoObj(io) {
+
+            // XXX: This is the wrong way to set this and this is dangerous.  We need to check in
+            // the catalog to see if we should override the plugin name instead of just grabbing it
+            // directly from the key pattern.  Move this a level higher to wherever IndexEntry is
+            // created.
+            //
+            // An example of the Bad Thing That We Must Avoid:
+            // 1. Create a 2dsphere index in 2.4, insert some docs.
+            // 2. Downgrade to 2.2.  Insert some more docs into the collection w/the 2dsphere
+            //    index.  2.2 treats the index as a normal btree index and creates keys accordingly.
+            // 3. Using the 2dsphere index in 2.4 gives wrong results or assert-fails or crashes as
+            //    the data isn't what we expect.
+            string typeStr = IndexNames::findPluginName(keyPattern);
+
+            if (IndexNames::GEO_2D == typeStr) {
+                type = INDEX_2D;
+            }
+            else if (IndexNames::GEO_HAYSTACK == typeStr) {
+                type = INDEX_HAYSTACK;
+            }
+            else if (IndexNames::GEO_2DSPHERE == typeStr) {
+                type = INDEX_2DSPHERE;
+            }
+            else if (IndexNames::TEXT == typeStr) {
+                type = INDEX_TEXT;
+            }
+            else if (IndexNames::HASHED == typeStr) {
+                type = INDEX_HASHED;
+            }
+            else {
+                type = INDEX_BTREE;
+            }
+        }
 
         BSONObj keyPattern;
 
@@ -59,6 +106,10 @@ namespace mongo {
 
         // Geo indices have extra parameters.  We need those available to plan correctly.
         BSONObj infoObj;
+
+        // What type of index is this?  (What access method can we use on the index described
+        // by the keyPattern?)
+        IndexType type;
 
         std::string toString() const {
             mongoutils::str::stream ss;

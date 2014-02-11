@@ -142,9 +142,9 @@ namespace mongo {
             *tightnessOut = IndexBoundsBuilder::EXACT;
             TextMatchExpression* textExpr = static_cast<TextMatchExpression*>(expr);
             TextNode* ret = new TextNode();
-            ret->_indexKeyPattern = index.keyPattern;
-            ret->_query = textExpr->getQuery();
-            ret->_language = textExpr->getLanguage();
+            ret->indexKeyPattern = index.keyPattern;
+            ret->query = textExpr->getQuery();
+            ret->language = textExpr->getLanguage();
             return ret;
         }
         else {
@@ -218,17 +218,25 @@ namespace mongo {
 
     }
 
-    void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, const IndexEntry& index,
-                                         size_t pos, IndexBoundsBuilder::BoundsTightness* tightnessOut,
-                                         QuerySolutionNode* node, MatchExpression::MatchType mergeType) {
+    void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr,
+                                               const IndexEntry& index,
+                                               size_t pos,
+                                               IndexBoundsBuilder::BoundsTightness* tightnessOut,
+                                               QuerySolutionNode* node,
+                                               MatchExpression::MatchType mergeType) {
 
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type || STAGE_TEXT == type) {
-            // XXX: 'expr' is possibly indexed by 'node'.  Right now we don't take advantage
-            // of covering here (??).
+        if (STAGE_GEO_2D == type) {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            return;
+        }
+
+        // Text data is covered, but not exactly.  Text covering is unlike any other covering
+        // so we deal with it in _addFilterToSolutionNode.
+        if (STAGE_TEXT == type) {
+            *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
             return;
         }
 
@@ -255,12 +263,6 @@ namespace mongo {
         verify(!keyElt.eoo());
         *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
 
-        //QLOG() << "current bounds are " << currentScan->bounds.toString() << endl;
-        //QLOG() << "node merging in " << child->toString() << endl;
-        //QLOG() << "merging with field " << keyElt.toString(true, true) << endl;
-        //QLOG() << "taking advantage of compound index "
-        //<< indices[currentIndexNumber].keyPattern.toString() << endl;
-
         verify(boundsToFillOut->fields.size() > pos);
 
         OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
@@ -280,11 +282,115 @@ namespace mongo {
     }
 
     // static
+    void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
+        TextNode* tn = static_cast<TextNode*>(node);
+
+        // Figure out what positions are prefix positions.  We build an index key prefix from
+        // the predicates over the text index prefix keys.
+        // For example, say keyPattern = { a: 1, _fts: "text", _ftsx: 1, b: 1 }
+        // prefixEnd should be 1.
+        size_t prefixEnd = 0;
+        BSONObjIterator it(tn->indexKeyPattern);
+        // Count how many prefix terms we have.
+        while (it.more()) {
+            // We know that the only key pattern with a type of String is the _fts field
+            // which is immediately after all prefix fields.
+            if (String == it.next().type()) {
+                break;
+            }
+            ++prefixEnd;
+        }
+
+        // If there's no prefix, the filter is already on the node and the index prefix is null.
+        // We can just return.
+        if (!prefixEnd) {
+            return;
+        }
+
+        // We can't create a text stage if there aren't EQ predicates on its prefix terms.  So
+        // if we've made it this far, we should have collected the prefix predicates in the
+        // filter.
+        invariant(NULL != tn->filter.get());
+        MatchExpression* textFilterMe = tn->filter.get();
+
+        BSONObjBuilder prefixBob;
+
+        if (MatchExpression::AND != textFilterMe->matchType()) {
+            // Only one prefix term.
+            invariant(1 == prefixEnd);
+            // Sanity check: must be an EQ.
+            invariant(MatchExpression::EQ == textFilterMe->matchType());
+
+            EqualityMatchExpression* eqExpr = static_cast<EqualityMatchExpression*>(textFilterMe);
+            prefixBob.append(eqExpr->getData());
+            tn->filter.reset();
+        }
+        else {
+            invariant(MatchExpression::AND == textFilterMe->matchType());
+
+            // Indexed by the keyPattern position index assignment.  We want to add
+            // prefixes in order but we must order them first.
+            vector<MatchExpression*> prefixExprs(prefixEnd, NULL);
+
+            AndMatchExpression* amExpr = static_cast<AndMatchExpression*>(textFilterMe);
+            invariant(amExpr->numChildren() >= prefixEnd);
+
+            // Look through the AND children.  The prefix children we want to
+            // stash in prefixExprs.
+            size_t curChild = 0;
+            while (curChild < amExpr->numChildren()) {
+                MatchExpression* child = amExpr->getChild(curChild);
+                IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
+                invariant(NULL != ixtag);
+                // Only want prefixes.
+                if (ixtag->pos >= prefixEnd) {
+                    ++curChild;
+                    continue;
+                }
+                prefixExprs[ixtag->pos] = child;
+                amExpr->getChildVector()->erase(amExpr->getChildVector()->begin() + curChild);
+                // Don't increment curChild.
+            }
+
+            // Go through the prefix equalities in order and create an index prefix out of them.
+            for (size_t i = 0; i < prefixExprs.size(); ++i) {
+                MatchExpression* prefixMe = prefixExprs[i];
+                invariant(NULL != prefixMe);
+                invariant(MatchExpression::EQ == prefixMe->matchType());
+                EqualityMatchExpression* eqExpr = static_cast<EqualityMatchExpression*>(prefixMe);
+                prefixBob.append(eqExpr->getData());
+                // We removed this from the AND expression that owned it, so we must clean it
+                // up ourselves.
+                delete prefixMe;
+            }
+
+            // Clear out an empty $and.
+            if (0 == amExpr->numChildren()) {
+                tn->filter.reset();
+            }
+            else if (1 == amExpr->numChildren()) {
+                // Clear out unsightly only child of $and
+                MatchExpression* child = amExpr->getChild(0);
+                amExpr->getChildVector()->clear();
+                // Deletes current filter which is amExpr.
+                tn->filter.reset(child);
+            }
+        }
+
+        tn->indexPrefix = prefixBob.obj();
+    }
+
+    // static
     void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type || STAGE_TEXT == type) {
+        if (STAGE_GEO_2D == type) {
+            return;
+        }
+
+        if (STAGE_TEXT == type) {
+            finishTextNode(node, index);
             return;
         }
 
@@ -548,7 +654,8 @@ namespace mongo {
                     delete child;
                 }
                 else if (tightness == IndexBoundsBuilder::INEXACT_COVERED
-                         && !indices[currentIndexNumber].multikey) {
+                         && (INDEX_TEXT == indices[currentIndexNumber].type
+                             || !indices[currentIndexNumber].multikey)) {
                     // The bounds are not exact, but the information needed to
                     // evaluate the predicate is in the index key. Remove the
                     // MatchExpression from its parent and attach it to the filter
@@ -1016,25 +1123,23 @@ namespace mongo {
     }
 
     // static
-
     void QueryPlannerAccess::_addFilterToSolutionNode(QuerySolutionNode* node,
                                                       MatchExpression* match,
                                                       MatchExpression::MatchType type) {
         if (NULL == node->filter) {
             node->filter.reset(match);
         }
-        // The 'node' already has either an AND or OR filter that matches
-        // 'type'. Add 'match' as another branch of the filter.
         else if (type == node->filter->matchType()) {
+            // The 'node' already has either an AND or OR filter that matches 'type'. Add 'match' as
+            // another branch of the filter.
             ListOfMatchExpression* listFilter =
                 static_cast<ListOfMatchExpression*>(node->filter.get());
             listFilter->add(match);
         }
-        // The 'node' already has a filter that does not match
-        // 'type'. If 'type' is AND, then combine 'match' with
-        // the existing filter by adding an AND. If 'type' is OR,
-        // combine by adding an OR node.
         else {
+            // The 'node' already has a filter that does not match 'type'. If 'type' is AND, then
+            // combine 'match' with the existing filter by adding an AND. If 'type' is OR, combine
+            // by adding an OR node.
             ListOfMatchExpression* listFilter;
             if (MatchExpression::AND == type) {
                 listFilter = new AndMatchExpression();

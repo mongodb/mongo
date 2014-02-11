@@ -332,7 +332,7 @@ namespace {
 
         runQuery(fromjson("{a:1, $text:{$search: 'blah'}}"));
         assertNumSolutions(1);
-        assertSolutionExists("{fetch: {filter: {a:1}, node: {text: {search: 'blah'}}}}");
+        assertSolutionExists("{text: {prefix: {a:1}, search: 'blah'}}}}");
 
         // TODO: Do we want to $or a collection scan with a text search?
         // runQuery(fromjson("{$or: [{b:1}, {a:1, $text: {$search: 'blah'}}]}"));
@@ -363,8 +363,7 @@ namespace {
 
         // Both points.
         runQuery(fromjson("{a:1, b:1, $text:{$search: 'blah'}}"));
-        // XXX: when text is covered there should be no filter and can check bounds.
-        assertSolutionExists("{fetch: {filter: {a:1, b:1}, node:{text: {search: 'blah'}}}}");
+        assertSolutionExists("{text: {prefix: {a:1, b:1}, search: 'blah'}}");
         assertNumSolutions(1);
 
         // Missing a.
@@ -391,11 +390,10 @@ namespace {
 
         runQuery(fromjson("{a:1, $text:{$search: 'blah'}}"));
         assertNumSolutions(1);
-        // XXX: when text is covered there can check bounds, filter exists but can grab
-        // data from key for suffix 'b'.
-        assertSolutionExists("{fetch: {filter: {a:1}, node: {text: {search: 'blah'}}}}");
+        assertSolutionExists("{text: {prefix: {a:1}, search: 'blah'}}}}");
 
         runQuery(fromjson("{a:1, b:{$gt: 7}, $text:{$search: 'blah'}}"));
+        assertSolutionExists("{text: {prefix: {a:1}, filter: {b: {$gt: 7}}, search: 'blah'}}}}");
         assertNumSolutions(1);
     }
 
@@ -406,14 +404,12 @@ namespace {
         runQuery(fromjson("{a:1, $or: [{a:1}, {b:7}], $text:{$search: 'blah'}}"));
         assertNumSolutions(1);
 
-        // XXX: when text is covered there should be no filter and can check bounds.
-        assertSolutionExists("{fetch: {node: {text: {search: 'blah'}}}}");
+        assertSolutionExists("{fetch: {filter: {$or:[{a:1},{b:7}]},"
+                                      "node: {text: {prefix: {a:1}, search: 'blah'}}}}");
     }
 
     // Text is quite often multikey.  None of the prefixes can be arrays, and suffixes are indexed
     // as-is, so we should compound even if it's multikey.
-    // TODO: Uncomment when SERVER-12144 is done.
-    /*
     TEST_F(QueryPlannerTest, CompoundPrefixEvenIfMultikey) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN;
         addIndex(BSON("a" << 1 << "b" << 1 << "_fts" << "text" << "_ftsx" << 1), true);
@@ -421,12 +417,8 @@ namespace {
         // Both points.
         runQuery(fromjson("{a:1, b:1, $text:{$search: 'blah'}}"));
         assertNumSolutions(1);
-
-        // XXX: we should test the bounds and also assert that there is no filter since it's
-        // covered.
-        assertSolutionExists("{text: {search: 'blah'}}");
+        assertSolutionExists("{text: {prefix: {a:1, b:1}, search: 'blah'}}");
     }
-    */
 
     TEST_F(QueryPlannerTest, IndexOnOwnFieldButNotLeafPrefix) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN;

@@ -204,9 +204,14 @@ namespace mongo {
 
         BSONObjSet _sort;
 
-        BSONObj  _indexKeyPattern;
-        std::string _query;
-        std::string _language;
+        BSONObj  indexKeyPattern;
+        std::string query;
+        std::string language;
+
+        // "Prefix" fields of a text index can handle equality predicates.  We group them with the
+        // text node while creating the text leaf node and convert them into a BSONObj index prefix
+        // when we finish the text leaf node.
+        BSONObj indexPrefix;
     };
 
     struct CollectionScanNode : public QuerySolutionNode {

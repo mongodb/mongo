@@ -49,8 +49,6 @@ namespace {
     double negativeInfinity = -numeric_limits<double>::infinity();
     double positiveInfinity = numeric_limits<double>::infinity();
 
-    IndexEntry testIndex = IndexEntry(BSONObj());
-
     /**
      * Utility function to create MatchExpression
      */
@@ -67,6 +65,9 @@ namespace {
      */
     void testTranslateAndUnion(const vector<BSONObj>& toUnion, OrderedIntervalList* oilOut,
                                IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+
+        IndexEntry testIndex = IndexEntry(BSONObj());
+
         for (vector<BSONObj>::const_iterator it = toUnion.begin();
              it != toUnion.end();
              ++it) {
@@ -87,6 +88,9 @@ namespace {
      */
     void testTranslateAndIntersect(const vector<BSONObj>& toIntersect, OrderedIntervalList* oilOut,
                                    IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+
+        IndexEntry testIndex = IndexEntry(BSONObj());
+
         for (vector<BSONObj>::const_iterator it = toIntersect.begin();
              it != toIntersect.end();
              ++it) {
@@ -111,6 +115,9 @@ namespace {
     void testTranslate(const vector< std::pair<BSONObj, bool> >& constraints,
                        OrderedIntervalList* oilOut,
                        IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+
+        IndexEntry testIndex = IndexEntry(BSONObj());
+
         for (vector< std::pair<BSONObj, bool> >::const_iterator it = constraints.begin();
              it != constraints.end();
              ++it) {
@@ -136,6 +143,7 @@ namespace {
     //
 
     TEST(IndexBoundsBuilderTest, TranslateElemMatchValue) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         // Bounds generated should be the same as the embedded expression
         // except for the tightness.
         BSONObj obj = fromjson("{a: {$elemMatch: {$gt: 2}}}");
@@ -156,6 +164,7 @@ namespace {
     //
 
     TEST(IndexBoundsBuilderTest, TranslateLteNumber) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$lte: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -170,6 +179,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLteNumberMin) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = BSON("a" << BSON("$lte" << numberMin));
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -184,6 +194,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLteNegativeInfinity) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$lte: -Infinity}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -198,6 +209,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNumber) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$lt: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -212,6 +224,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNumberMin) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = BSON("a" << BSON("$lt" << numberMin));
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -226,6 +239,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtNegativeInfinity) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$lt: -Infinity}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -238,6 +252,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateLtDate) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = BSON("a" << LT << Date_t(5000));
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -252,6 +267,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumber) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$gt: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -266,6 +282,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtNumberMax) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = BSON("a" << BSON("$gt" << numberMax));
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -280,6 +297,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtPositiveInfinity) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$gt: Infinity}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -292,6 +310,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumber) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$gte: 1}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -306,6 +325,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGteNumberMax) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = BSON("a" << BSON("$gte" << numberMax));
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -320,6 +340,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtePositiveInfinity) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$gte: Infinity}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -334,6 +355,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateGtString) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$gt: 'abc'}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -348,6 +370,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateEqual) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = BSON("a" << 4);
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -362,6 +385,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateArrayEqualBasic) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: [1, 2, 3]}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -378,6 +402,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateIn) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$in: [8, 44, -1, -3]}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -398,6 +423,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, TranslateInArray) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$in: [[1], 2]}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -420,6 +446,7 @@ namespace {
     //
 
     TEST(IndexBoundsBuilderTest, UnionTwoLt) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toUnion;
         toUnion.push_back(fromjson("{a: {$lt: 1}}"));
         toUnion.push_back(fromjson("{a: {$lt: 5}}"));
@@ -434,6 +461,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, UnionDupEq) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toUnion;
         toUnion.push_back(fromjson("{a: 1}"));
         toUnion.push_back(fromjson("{a: 5}"));
@@ -451,6 +479,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, UnionGtLt) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toUnion;
         toUnion.push_back(fromjson("{a: {$gt: 1}}"));
         toUnion.push_back(fromjson("{a: {$lt: 3}}"));
@@ -465,6 +494,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, UnionTwoEmptyRanges) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector< std::pair<BSONObj, bool> > constraints;
         constraints.push_back(std::make_pair(fromjson("{a: {$gt: 1}}"), true));
         constraints.push_back(std::make_pair(fromjson("{a: {$lte: 0}}"), true));
@@ -481,6 +511,7 @@ namespace {
     //
 
     TEST(IndexBoundsBuilderTest, IntersectTwoLt) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: {$lt: 1}}"));
         toIntersect.push_back(fromjson("{a: {$lt: 5}}"));
@@ -495,6 +526,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, IntersectEqGte) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: 1}}"));
         toIntersect.push_back(fromjson("{a: {$gte: 1}}"));
@@ -509,6 +541,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, IntersectGtLte) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: {$gt: 0}}"));
         toIntersect.push_back(fromjson("{a: {$lte: 10}}"));
@@ -523,6 +556,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, IntersectGtIn) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: {$gt: 4}}"));
         toIntersect.push_back(fromjson("{a: {$in: [1,2,3,4,5,6]}}"));
@@ -539,6 +573,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, IntersectionIsPointInterval) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: {$gte: 1}}"));
         toIntersect.push_back(fromjson("{a: {$lte: 1}}"));
@@ -553,6 +588,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, IntersectFullyContained) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: {$gt: 5}}"));
         toIntersect.push_back(fromjson("{a: {$lt: 15}}"));
@@ -569,6 +605,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, EmptyIntersection) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         vector<BSONObj> toIntersect;
         toIntersect.push_back(fromjson("{a: 1}}"));
         toIntersect.push_back(fromjson("{a: {$gte: 2}}"));
@@ -584,6 +621,7 @@ namespace {
     //
 
     TEST(IndexBoundsBuilderTest, TranslateMod) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: {$mod: [2, 0]}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -719,6 +757,7 @@ namespace {
     //
 
     TEST(IndexBoundsBuilderTest, SimpleNonPrefixRegex) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: /foo/}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
@@ -734,6 +773,7 @@ namespace {
     }
 
     TEST(IndexBoundsBuilderTest, SimplePrefixRegex) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
         BSONObj obj = fromjson("{a: /^foo/}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();

@@ -65,11 +65,13 @@ namespace mongo {
         addIndent(ss, indent);
         *ss << "TEXT\n";
         addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << _indexKeyPattern.toString() << '\n';
+        *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "query = " << _query << '\n';
+        *ss << "query = " << query << '\n';
         addIndent(ss, indent + 1);
-        *ss << "language = " << _language << '\n';
+        *ss << "language = " << language << '\n';
+        addIndent(ss, indent + 1);
+        *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();

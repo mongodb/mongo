@@ -32,6 +32,7 @@
 
 #include "mongo/db/geo/core.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -47,22 +48,6 @@ namespace mongo {
         if (e.isNumber()) { return e.numberDouble(); }
         return def;
     }
-
-    /**
-     * XXX: we should figure this kind of data out once and put it in
-     * the IndexEntry.
-     */
-    static bool isTextIndex(const BSONObj& pattern) {
-        BSONObjIterator it(pattern);
-        while (it.more()) {
-            BSONElement e = it.next();
-            if (String == e.type() && str::equals("text", e.valuestr())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
 
     /**
      * 2d indices don't handle wrapping so we can't use them for queries that wrap.
@@ -142,20 +127,26 @@ namespace mongo {
     bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
                                           const IndexEntry& index,
                                           MatchExpression* node) {
-        // XXX: CatalogHack::getAccessMethodName: do we have to worry about this?  when?
-        string ixtype;
-        if (String != elt.type()) {
-            ixtype = "";
+        // Historically one could create indices with any particular value for the index spec,
+        // including values that now indicate a special index.  As such we have to make sure the
+        // index type wasn't overridden before we pay attention to the string in the index key
+        // pattern element.
+        //
+        // e.g. long ago we could have created an index {a: "2dsphere"} and it would
+        // be treated as a btree index by an ancient version of MongoDB.  To try to run
+        // 2dsphere queries over it would be folly.
+        string indexedFieldType;
+        if (String != elt.type() || (INDEX_BTREE == index.type)) {
+            indexedFieldType = "";
         }
         else {
-            ixtype = elt.String();
+            indexedFieldType = elt.String();
         }
 
         // We know elt.fieldname() == node->path().
         MatchExpression::MatchType exprtype = node->matchType();
 
-        // TODO: use indexnames
-        if ("" == ixtype) {
+        if (indexedFieldType.empty()) {
             // Can't check for null w/a sparse index.
             if (exprtype == MatchExpression::EQ && index.sparse) {
                 const EqualityMatchExpression* expr
@@ -178,8 +169,7 @@ namespace mongo {
             // - Allowed: node = {a: 7}
             // - Not allowed: node = {a: {$gt: 7}}
 
-            // TODO: Cache isTextIndex somewhere.
-            if (!isTextIndex(index.keyPattern)) {
+            if (INDEX_TEXT != index.type) {
                 return true;
             }
 
@@ -213,10 +203,10 @@ namespace mongo {
             invariant(0);
             return true;
         }
-        else if ("hashed" == ixtype) {
+        else if (IndexNames::HASHED == indexedFieldType) {
             return exprtype == MatchExpression::MATCH_IN || exprtype == MatchExpression::EQ;
         }
-        else if ("2dsphere" == ixtype) {
+        else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {
             if (exprtype == MatchExpression::GEO) {
                 // within or intersect.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
@@ -233,7 +223,7 @@ namespace mongo {
             }
             return false;
         }
-        else if ("2d" == ixtype) {
+        else if (IndexNames::GEO_2D == indexedFieldType) {
             if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
                 return gnme->getData().centroid.crs == FLAT;
@@ -266,10 +256,10 @@ namespace mongo {
             }
             return false;
         }
-        else if ("text" == ixtype) {
+        else if (IndexNames::TEXT == indexedFieldType) {
             return (exprtype == MatchExpression::TEXT);
         }
-        else if ("geoHaystack" == ixtype) {
+        else if (IndexNames::GEO_HAYSTACK == indexedFieldType) {
             return false;
         }
         else {
@@ -452,7 +442,7 @@ namespace mongo {
             const IndexEntry& index = indices[i];
 
             // We only care about text indices.
-            if (!isTextIndex(index.keyPattern)) {
+            if (INDEX_TEXT != index.type) {
                 continue;
             }
 
