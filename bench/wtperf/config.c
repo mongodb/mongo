@@ -96,6 +96,11 @@ config_free(CONFIG *cfg)
 				*pstr = NULL;
 			}
 		}
+	if (cfg->uris != NULL) {
+		for (i = 0; i < cfg->table_count; i++)
+			free(cfg->uris[i]);
+		free(cfg->uris);
+	}
 
 	free(cfg->popthreads);
 	free(cfg->uri);
@@ -472,6 +477,10 @@ config_sanity(CONFIG *cfg)
 	    cfg->report_interval > cfg->run_time ||
 	    cfg->sample_interval > cfg->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
+		return (1);
+	}
+	if (cfg->table_count > 99) {
+		fprintf(stderr, "table count greater than 99\n");
 		return (1);
 	}
 	return (0);
