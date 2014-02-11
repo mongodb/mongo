@@ -84,7 +84,9 @@ DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
 DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
-DEF_OPT_AS_UINT32(icount, 5000, "number of records to initially populate")
+DEF_OPT_AS_UINT32(icount, 5000,
+    "number of records to initially populate. If multiple tables are "
+    "configured, each table has this many items inserted.")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
