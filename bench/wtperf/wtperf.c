@@ -675,12 +675,12 @@ monitor(void *arg)
 	    "#time,totalsec,"
 	    "read operations,insert operations,update operations,"
 	    "checkpoints,"
-	    "read average latency(NS),read minimum latency(NS),"
-	    "read maximum latency(NS),"
-	    "insert average latency(NS),insert min latency(NS),"
-	    "insert maximum latency(NS),"
-	    "update average latency(NS),update min latency(NS),"
-	    "update maximum latency(NS)"
+	    "read average latency(uS),read minimum latency(uS),"
+	    "read maximum latency(uS),"
+	    "insert average latency(uS),insert min latency(uS),"
+	    "insert maximum latency(uS),"
+	    "update average latency(uS),update min latency(uS),"
+	    "update maximum latency(uS)"
 	    "\n");
 	last_reads = last_inserts = last_updates = 0;
 	while (!g_stop) {

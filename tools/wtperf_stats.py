@@ -63,8 +63,8 @@ def munge_dict(values_dict, abstime):
             v['#time'] = (parsetime(v['#time']) - start_time).seconds
         next_val = {}
         for title, value in v.items():
-            if title.find('NS') != -1:
-                title = title.replace('NS', u'\u03BCs')
+            if title.find('uS') != -1:
+                title = title.replace('uS', 'ms')
                 value = float(value) / 1000
             if title == 'checkpoints' and value == 'N':
                 value = 0
