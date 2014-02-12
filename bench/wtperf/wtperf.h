@@ -90,7 +90,7 @@ struct __config {			/* Configuration struction */
 
 	FILE *logf;			/* Logging handle */
 
-	const char *compress_ext;	/* Compression extention for conn */
+	const char *compress_ext;	/* Compression extension for conn */
 	const char *compress_table;	/* Compression arg to table create */
 
 	CONFIG_THREAD *ckptthreads, *popthreads;
