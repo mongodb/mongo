@@ -792,16 +792,19 @@ namespace mongo {
             }
         }
 
-        theDataFileMgr.insertWithObjMod(ns,
-                                        // May be modified in the call to add an _id field.
-                                        js,
-                                        // Only permit interrupting an (index build) insert if the
-                                        // insert comes from a socket client request rather than a
-                                        // parent operation using the client interface.  The parent
-                                        // operation might not support interrupts.
-                                        cc().curop()->parent() == NULL,
-                                        false);
-        logOp("i", ns, js);
+        DiskLoc dl = theDataFileMgr.
+            insertWithObjMod(ns,
+                             // May be modified in the call to add an _id field.
+                             js,
+                             // Only permit interrupting an (index build) insert if the
+                             // insert comes from a socket client request rather than a
+                             // parent operation using the client interface.  The parent
+                             // operation might not support interrupts.
+                             cc().curop()->parent() == NULL,
+                             false);
+        if (!dl.isNull()) {
+            logOp("i", ns, js);
+        }
     }
 
     NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs, CurOp& op) {
