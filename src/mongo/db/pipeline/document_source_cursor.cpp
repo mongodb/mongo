@@ -30,9 +30,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/find_constants.h"
@@ -204,9 +201,6 @@ namespace {
         {
             Lock::DBRead lk(_ns);
             Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
-            Collection* collection = ctx.db()->getCollection( _ns );
-            uassert( 17362, "Collection dropped.", collection );
-
             massert(17392, "No _runner. Were we disposed before explained?",
                     _runner);
 
