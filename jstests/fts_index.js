@@ -2,6 +2,7 @@
 // 1. Text indexes properly validate the index spec used to create them.
 // 2. Text indexes properly enforce a schema on the language_override field.
 // 3. Collections may have at most one text index.
+// 4. Text indexes properly handle large documents.
 
 var coll = db.fts_index;
 var indexName = "textIndex";
@@ -99,3 +100,22 @@ coll.ensureIndex({b: 1, c: "text"});
 assert(db.getLastError());
 
 coll.dropIndexes();
+
+//
+// 4. Text indexes properly handle large keys.
+//
+
+coll.ensureIndex({a: "text"});
+assert(!db.getLastError());
+
+var longstring = "";
+var longstring2 = "";
+for(var i = 0; i < 1024 * 1024; ++i) {
+    longstring = longstring + "a";
+    longstring2 = longstring2 + "b";
+}
+coll.insert({a: longstring});
+coll.insert({a: longstring2});
+assert.eq(1, coll.find({$text: {$search: longstring}}).itcount(), "long string not found in index");
+
+coll.drop();

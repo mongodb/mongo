@@ -105,6 +105,11 @@ namespace mongo {
             const Weights& weights() const { return _weights; }
             static BSONObj fixSpec( const BSONObj& spec );
 
+            /**
+             * Returns text index version.
+             */
+            TextIndexVersion getTextIndexVersion() const { return _textIndexVersion; }
+
         private:
             //
             // Helper methods.  Invoked for TEXT_INDEX_VERSION_2 spec objects only.

@@ -129,8 +129,12 @@ namespace mongo {
             IndexScanParams params;
             params.bounds.startKey = FTSIndexFormat::getIndexKey(MAX_WEIGHT,
                                                                  term,
-                                                                 _params.indexPrefix);
-            params.bounds.endKey = FTSIndexFormat::getIndexKey(0, term, _params.indexPrefix);
+                                                                 _params.indexPrefix,
+                                                                 _params.spec.getTextIndexVersion());
+            params.bounds.endKey = FTSIndexFormat::getIndexKey(0,
+                                                               term,
+                                                                _params.indexPrefix,
+                                                               _params.spec.getTextIndexVersion());
             params.bounds.endKeyInclusive = true;
             params.bounds.isSimpleRange = true;
             params.descriptor = _params.index;
