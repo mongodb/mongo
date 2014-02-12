@@ -154,6 +154,7 @@ namespace mongo {
         }
 
         error->setErrInfo( BSON( "causedBy" << errB.arr() ) );
+        error->setIndex( errOps.front()->error->getIndex() );
         error->setErrMessage( msg.str() );
     }
 
