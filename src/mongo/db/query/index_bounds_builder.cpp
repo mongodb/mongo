@@ -254,10 +254,22 @@ namespace mongo {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else if (MatchExpression::NOT == expr->matchType()) {
-            // TODO: We could look at the child of 'expr', compute bounds, and take
-            // the complement.
-            oilOut->intervals.push_back(allValues());
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            if (Indexability::nodeCanUseIndexOnOwnField(expr->getChild(0))) {
+                // We have a NOT of a bounds-generating expression. Get the
+                // bounds of the NOT's child and then complement them.
+                translate(expr->getChild(0), elt, index, oilOut, tightnessOut);
+                oilOut->complement();
+            }
+            else {
+                // XXX: In the future we shouldn't need this. We handle this
+                // case for the time being because we have some deficiencies in
+                // tree normalization (see SERVER-12735).
+                //
+                // For example, we will get here if there is an index {a: 1}
+                // and the query is {a: {$elemMatch: {$not: {$gte: 6}}}}.
+                oilOut->intervals.push_back(allValues());
+                *tightnessOut = INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);

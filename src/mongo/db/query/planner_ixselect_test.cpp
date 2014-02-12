@@ -136,8 +136,8 @@ namespace {
      * $ne, $nin, $nor
      */
     TEST(QueryPlannerIXSelectTest, GetFieldsNegation) {
-        testGetFields("{a: {$ne: 1}}", "", "");
-        testGetFields("{a: {$nin: [1]}}", "", "");
+        testGetFields("{a: {$ne: 1}}", "", "a");
+        testGetFields("{a: {$nin: [1]}}", "", "a");
         testGetFields("{$nor: [{a: 1}, {b: 1}]}", "", "");
         testGetFields("{$and: [{a: 1}, {a: {$ne: 2}}]}", "", "a");
     }
@@ -146,8 +146,8 @@ namespace {
      * Array negation test cases for getFields
      */
     TEST(QueryPlannerIXSelectTest, GetFieldsArrayNegation) {
-        testGetFields("{a: {$elemMatch: {b: {$ne: 1}}}}", "", "");
-        testGetFields("{a: {$all: [{$elemMatch: {b: {$ne: 1}}}]}}", "", "");
+        testGetFields("{a: {$elemMatch: {b: {$ne: 1}}}}", "", "a.b");
+        testGetFields("{a: {$all: [{$elemMatch: {b: {$ne: 1}}}]}}", "", "a.b");
     }
 
     /**
@@ -252,18 +252,18 @@ namespace {
      * Negation test cases for rateIndices().
      */
     TEST(QueryPlannerIXSelectTest, RateIndicesTaggedNodePathsNegation) {
-        testRateIndicesTaggedNodePaths("{a: {$ne: 1}}", "", "");
-        testRateIndicesTaggedNodePaths("{a: {$nin: [1]}}", "", "");
+        testRateIndicesTaggedNodePaths("{a: {$ne: 1}}", "", "a,a");
+        testRateIndicesTaggedNodePaths("{a: {$nin: [1]}}", "", "a,a");
         testRateIndicesTaggedNodePaths("{$nor: [{a: 1}, {b: 1}]}", "", "");
-        testRateIndicesTaggedNodePaths("{$and: [{a: 1}, {a: {$ne: 2}}]}", "", "a");
+        testRateIndicesTaggedNodePaths("{$and: [{a: 1}, {a: {$ne: 2}}]}", "", "a,a,a");
     }
 
     /**
      * Array negation test cases for rateIndices().
      */
     TEST(QueryPlannerIXSelectTest, RateIndicesTaggedNodePathArrayNegation) {
-        testRateIndicesTaggedNodePaths("{a: {$elemMatch: {b: {$ne: 1}}}}", "", "");
-        testRateIndicesTaggedNodePaths("{a: {$all: [{$elemMatch: {b: {$ne: 1}}}]}}", "", "");
+        testRateIndicesTaggedNodePaths("{a: {$elemMatch: {b: {$ne: 1}}}}", "", "a.b,a.b");
+        testRateIndicesTaggedNodePaths("{a: {$all: [{$elemMatch: {b: {$ne: 1}}}]}}", "", "a.b,a.b");
     }
 
 }  // namespace

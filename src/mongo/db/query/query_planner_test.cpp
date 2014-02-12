@@ -1693,15 +1693,20 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{sort: {pattern: {a: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
-        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, "
+                                "bounds: {a: [['MinKey',1,true,false], "
+                                             "[1,'MaxKey',false,true]]}}}}}");
     }
 
     TEST_F(QueryPlannerTest, NegationTopLevel) {
         addIndex(BSON("a" << 1));
         runQuerySortProj(fromjson("{a: {$ne: 1}}"), BSONObj(), BSONObj());
 
-        assertNumSolutions(1U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [['MinKey',1,true,false], "
+                                             "[1,'MaxKey',false,true]]}}}}}");
     }
 
     TEST_F(QueryPlannerTest, NegationOr) {
@@ -1726,7 +1731,8 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1},"
+                                "bounds: {a: [[1,1,true,true]]}}}}}");
     }
 
     TEST_F(QueryPlannerTest, NegationAndIndexOnEqualityAndNegationBranches) {
@@ -1736,16 +1742,169 @@ namespace {
 
         assertNumSolutions(3U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
-        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, "
+                                "bounds: {a: [[1,1,true,true]]}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {b: 1}, "
+                                "bounds: {b: [[2,2,true,true]]}}}}}");
     }
 
-    TEST_F(QueryPlannerTest, NegationAndIndexOnInEquality) {
+    TEST_F(QueryPlannerTest, NegationAndIndexOnInequality) {
         addIndex(BSON("b" << 1));
         runQuerySortProj(fromjson("{$and: [{a: 1}, {b: {$ne: 1}}]}"), BSONObj(), BSONObj());
 
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:1}, node: {ixscan: {pattern: {b:1}, "
+                                "bounds: {b: [['MinKey',1,true,false], "
+                                             "[1,'MaxKey',false,true]]}}}}}");
+    }
+
+    // Negated regexes don't use the index.
+    TEST_F(QueryPlannerTest, NegationRegexPrefix) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: /^a/}}"));
+
         assertNumSolutions(1U);
         assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // Negated mods don't use the index
+    TEST_F(QueryPlannerTest, NegationMod) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$mod: [2, 1]}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // Negated $elemMatch object won't use the index
+    TEST_F(QueryPlannerTest, NegationElemMatchObject) {
+        addIndex(BSON("i.j" << 1));
+        runQuery(fromjson("{i: {$not: {$elemMatch: {j: 1}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // Negated $elemMatch object won't use the index
+    TEST_F(QueryPlannerTest, NegationElemMatchObject2) {
+        addIndex(BSON("i.j" << 1));
+        runQuery(fromjson("{i: {$not: {$elemMatch: {j: {$ne: 1}}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // If there is a negation that can't use the index,
+    // ANDed with a predicate that can use the index, then
+    // we can still use the index for the latter predicate.
+    TEST_F(QueryPlannerTest, NegationRegexWithIndexablePred) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{$and: [{i: {$not: /o/}}, {i: 2}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {i:1}, "
+                                "bounds: {i: [[2,2,true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegationCantUseSparseIndex) {
+        // false means not multikey, true means sparse
+        addIndex(BSON("i" << 1), false, true);
+        runQuery(fromjson("{i: {$ne: 4}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegationCantUseSparseIndex2) {
+        // false means not multikey, true means sparse
+        addIndex(BSON("i" << 1 << "j" << 1), false, true);
+        runQuery(fromjson("{i: 4, j: {$ne: 5}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {i:1,j:1}, bounds: "
+                                "{i: [[4,4,true,true]], j: [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegatedRangeStrGT) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$gt: 'a'}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {i:1}, "
+                                "bounds: {i: [['MinKey','a',true,true], "
+                                             "[{},'MaxKey',true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegatedRangeStrGTE) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$gte: 'a'}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {i:1}, "
+                                "bounds: {i: [['MinKey','a',true,false], "
+                                             "[{},'MaxKey',true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegatedRangeIntGT) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$gt: 5}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {i:1}, "
+                                "bounds: {i: [['MinKey',5,true,true], "
+                                             "[Infinity,'MaxKey',false,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegatedRangeIntGTE) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$gte: 5}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {i:1}, "
+                                "bounds: {i: [['MinKey',5,true,false], "
+                                             "[Infinity,'MaxKey',false,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, TwoNegatedRanges) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{$and: [{i: {$not: {$lte: 'b'}}}, "
+                                  "{i: {$not: {$gte: 'f'}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {i:1}, "
+                                "bounds: {i: [['MinKey','',true,false], "
+                                             "['b','f',false,false], "
+                                             "[{},'MaxKey',true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, AndWithNestedNE) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{a: {$gt: -1, $lt: 1, $ne: 0}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [[-1,0,false,false], "
+                                             "[0,1,false,false]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, NegatePredOnCompoundIndex) {
+        addIndex(BSON("x" << 1 << "a" << 1));
+        runQuery(fromjson("{x: 1, a: {$ne: 1}, b: {$ne: 2}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x:1,a:1}, bounds: "
+                                "{x: [[1,1,true,true]], "
+                                 "a: [['MinKey',1,true,false], [1,'MaxKey',false,true]]}}}}}");
     }
 
     //

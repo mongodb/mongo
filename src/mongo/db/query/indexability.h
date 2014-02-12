@@ -82,7 +82,24 @@ namespace mongo {
         static bool arrayUsesIndexOnChildren(const MatchExpression* me) {
             return me->isArray() && (MatchExpression::ELEM_MATCH_OBJECT == me->matchType()
                                      || MatchExpression::ALL == me->matchType());
-        };
+        }
+
+        /**
+         * Returns true if 'me' is a NOT, and the child of the NOT can use
+         * an index on its own field.
+         */
+        static bool isBoundsGeneratingNot(const MatchExpression* me) {
+            return MatchExpression::NOT == me->matchType() &&
+                   nodeCanUseIndexOnOwnField(me->getChild(0));
+        }
+
+        /**
+         * Returns true if either 'me' is a bounds generating NOT,
+         * or 'me' can use an index on its own field.
+         */
+        static bool isBoundsGenerating(const MatchExpression* me) {
+            return isBoundsGeneratingNot(me) || nodeCanUseIndexOnOwnField(me);
+        }
     };
 
 }  // namespace mongo

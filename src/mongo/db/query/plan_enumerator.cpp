@@ -199,6 +199,9 @@ namespace mongo {
             assign->pred->first.swap(rt->first);
             return true;
         }
+        else if (Indexability::isBoundsGeneratingNot(node)) {
+            return prepMemo(node->getChild(0), childContext);
+        }
         else if (MatchExpression::OR == node->matchType()) {
             // For an OR to be indexed, all its children must be indexed.
             for (size_t i = 0; i < node->numChildren(); ++i) {
@@ -723,6 +726,9 @@ namespace mongo {
 
                 // Output this as a pred that can use the index.
                 indexOut->push_back(child);
+            }
+            else if (Indexability::isBoundsGeneratingNot(child)) {
+                partitionPreds(child, context, indexOut, subnodesOut);
             }
             else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
                 PrepMemoContext childContext;

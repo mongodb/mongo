@@ -119,6 +119,135 @@ namespace {
     }
 
     //
+    // Tests for OrderedIntervalList::complement()
+    //
+
+    /**
+     * Get a BSONObj which represents the interval from
+     * MinKey to 'end'.
+     */
+    BSONObj minKeyIntObj(int end) {
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        bob.appendNumber("", end);
+        return bob.obj();
+    }
+
+    /**
+     * Get a BSONObj which represents the interval from
+     * 'start' to MaxKey.
+     */
+    BSONObj maxKeyIntObj(int start) {
+        BSONObjBuilder bob;
+        bob.appendNumber("", start);
+        bob.appendMaxKey("");
+        return bob.obj();
+    }
+
+    /**
+     * Get a BSONObj which represents the interval
+     * [MinKey, MaxKey].
+     */
+    BSONObj allValues() {
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        bob.appendMaxKey("");
+        return bob.obj();
+    }
+
+    /**
+     * Test that if we complement the OIL twice,
+     * we get back the original OIL.
+     */
+     void testDoubleComplement(const OrderedIntervalList* oil) {
+         OrderedIntervalList clone;
+         for (size_t i = 0; i < oil->intervals.size(); ++i) {
+             clone.intervals.push_back(oil->intervals[i]);
+         }
+
+         clone.complement();
+         clone.complement();
+
+         ASSERT_EQUALS(oil->intervals.size(), clone.intervals.size());
+         for (size_t i = 0; i < oil->intervals.size(); ++i) {
+             ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                oil->intervals[i].compare(clone.intervals[i]));
+         }
+     }
+
+    // Complement of empty is [MinKey, MaxKey]
+    TEST(IndexBoundsTest, ComplementEmptyOil) {
+        OrderedIntervalList oil;
+        testDoubleComplement(&oil);
+        oil.complement();
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(allValues(), true, true)));
+    }
+
+    // Complement of [MinKey, MaxKey] is empty
+    TEST(IndexBoundsTest, ComplementAllValues) {
+        OrderedIntervalList oil;
+        oil.intervals.push_back(Interval(allValues(), true, true));
+        testDoubleComplement(&oil);
+        oil.complement();
+        ASSERT_EQUALS(oil.intervals.size(), 0U);
+    }
+
+    // Complement of [MinKey, 3), [5, MaxKey) is
+    // [3, 5), [MaxKey, MaxKey].
+    TEST(IndexBoundsTest, ComplementRanges) {
+        OrderedIntervalList oil;
+        oil.intervals.push_back(Interval(minKeyIntObj(3), true, false));
+        oil.intervals.push_back(Interval(maxKeyIntObj(5), true, false));
+        testDoubleComplement(&oil);
+        oil.complement();
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(BSON("" << 3 << "" << 5), true, false)));
+
+        // Make the interval [MaxKey, MaxKey].
+        BSONObjBuilder bob;
+        bob.appendMaxKey("");
+        bob.appendMaxKey("");
+        BSONObj maxKeyInt = bob.obj();
+
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(maxKeyInt, true, true)));
+    }
+
+    // Complement of (MinKey, 3), (3, MaxKey) is
+    // [MinKey, MinKey], [3, 3], [MaxKey, MaxKey].
+    TEST(IndexBoundsTest, ComplementRanges2) {
+        OrderedIntervalList oil;
+        oil.intervals.push_back(Interval(minKeyIntObj(3), false, false));
+        oil.intervals.push_back(Interval(maxKeyIntObj(3), false, false));
+        testDoubleComplement(&oil);
+        oil.complement();
+        ASSERT_EQUALS(oil.intervals.size(), 3U);
+
+        // First interval is [MinKey, MinKey]
+        BSONObjBuilder minBob;
+        minBob.appendMinKey("");
+        minBob.appendMinKey("");
+        BSONObj minObj = minBob.obj();
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(minObj, true, true)));
+
+        // Second is [3, 3]
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(BSON("" << 3 << "" << 3), true, true)));
+
+        // Third is [MaxKey, MaxKey]
+        BSONObjBuilder maxBob;
+        maxBob.appendMaxKey("");
+        maxBob.appendMaxKey("");
+        BSONObj maxObj = maxBob.obj();
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[2].compare(
+            Interval(maxObj, true, true)));
+    }
+
+    //
     // Iteration over
     //
 

@@ -175,8 +175,12 @@ namespace mongo {
 
         virtual MatchExpression* getChild( size_t i ) const { return _exp.get(); }
 
+        MatchExpression* releaseChild(void) { return _exp.release(); }
+
+        void resetChild( MatchExpression* newChild) { _exp.reset(newChild); }
+
     private:
-        boost::scoped_ptr<MatchExpression> _exp;
+        std::auto_ptr<MatchExpression> _exp;
     };
 
 }

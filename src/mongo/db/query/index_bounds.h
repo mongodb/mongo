@@ -51,6 +51,19 @@ namespace mongo {
 
         bool isValidFor(int expectedOrientation) const;
         std::string toString() const;
+
+        /**
+         * Complements the OIL. Used by the index bounds builder in order
+         * to create index bounds for $not predicates.
+         *
+         * Assumes the OIL is increasing, and therefore must be called prior to
+         * alignBounds(...).
+         *
+         * Example:
+         *   The complement of [3, 6), [8, 10] is [MinKey, 3), [6, 8), (20, MaxKey],
+         *   where this OIL has direction==1.
+         */
+        void complement();
     };
 
     /**

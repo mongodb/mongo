@@ -75,6 +75,62 @@ namespace mongo {
         return ss;
     }
 
+    // static
+    void OrderedIntervalList::complement() {
+        BSONObjBuilder minBob;
+        minBob.appendMinKey("");
+        BSONObj minObj = minBob.obj();
+
+        // We complement by scanning the entire range of BSON values
+        // from MinKey to MaxKey. The value from which we must begin
+        // the next complemented interval is kept in 'curBoundary'.
+        BSONElement curBoundary = minObj.firstElement();
+
+        // If 'curInclusive' is true, then 'curBoundary' is
+        // included in one of the original intervals, and hence
+        // should not be included in the complement (and vice-versa
+        // if 'curInclusive' is false).
+        bool curInclusive = false;
+
+        // We will build up a list of intervals that represents
+        // the inversion of those in the OIL.
+        vector<Interval> newIntervals;
+        for (size_t j = 0; j < intervals.size(); ++j) {
+            Interval curInt = intervals[j];
+            if (0 != curInt.start.woCompare(curBoundary) ||
+                (!curInclusive && !curInt.startInclusive)) {
+                // Make a new interval from 'curBoundary' to
+                // the start of 'curInterval'.
+                BSONObjBuilder intBob;
+                intBob.append(curBoundary);
+                intBob.append(curInt.start);
+                Interval newInt(intBob.obj(), !curInclusive, !curInt.startInclusive);
+                newIntervals.push_back(newInt);
+            }
+
+            // Reset the boundary for the next iteration.
+            curBoundary = curInt.end;
+            curInclusive = curInt.endInclusive;
+        }
+
+        // We may have to add a final interval which ends in MaxKey.
+        BSONObjBuilder maxBob;
+        maxBob.appendMaxKey("");
+        BSONObj maxObj = maxBob.obj();
+        BSONElement maxKey = maxObj.firstElement();
+        if (0 != maxKey.woCompare(curBoundary) || !curInclusive) {
+            BSONObjBuilder intBob;
+            intBob.append(curBoundary);
+            intBob.append(maxKey);
+            Interval newInt(intBob.obj(), !curInclusive, true);
+            newIntervals.push_back(newInt);
+        }
+
+        // Replace the old list of intervals with the new one.
+        intervals.clear();
+        intervals.insert(intervals.end(), newIntervals.begin(), newIntervals.end());
+    }
+
     string IndexBounds::toString() const {
         mongoutils::str::stream ss;
         if (isSimpleRange) {

@@ -77,9 +77,9 @@ namespace mongo {
     void QueryPlannerIXSelect::getFields(MatchExpression* node,
                                          string prefix,
                                          unordered_set<string>* out) {
-        // Do not traverse tree beyond negation node
+        // Do not traverse tree beyond a NOR negation node
         MatchExpression::MatchType exprtype = node->matchType();
-        if (exprtype == MatchExpression::NOT || exprtype == MatchExpression::NOR) {
+        if (exprtype == MatchExpression::NOR) {
             return;
         }
 
@@ -159,6 +159,31 @@ namespace mongo {
             // We can't use a btree-indexed field for geo expressions.
             if (exprtype == MatchExpression::GEO || exprtype == MatchExpression::GEO_NEAR) {
                 return false;
+            }
+
+            // There are restrictions on when we can use the index if
+            // the expression is a NOT.
+            if (exprtype == MatchExpression::NOT) {
+                // Prevent negated preds from using sparse or
+                // multikey indices. We do so for sparse indices because
+                // we will fail to return the documents which do not contain
+                // the indexed fields.
+                //
+                // We avoid multikey indices because of the semantics of
+                // negations on multikey fields. For example, with multikey
+                // index {a:1}, the document {a: [1,2,3]} does *not* match
+                // the query {a: {$ne: 3}}. We'd mess this up if we used
+                // an index scan over [MinKey, 3) and (3, MaxKey] without
+                // a filter.
+                if (index.sparse || index.multikey) {
+                    return false;
+                }
+                // Can't index negations of MOD or REGEX
+                MatchExpression::MatchType childtype = node->getChild(0)->matchType();
+                if (MatchExpression::REGEX == childtype ||
+                    MatchExpression::MOD == childtype) {
+                    return false;
+                }
             }
 
             // We can only index EQ using text indices.  This is an artificial limitation imposed by
@@ -273,16 +298,23 @@ namespace mongo {
     void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
                                            string prefix,
                                            const vector<IndexEntry>& indices) {
-        // Do not traverse tree beyond negation node
+        // Do not traverse tree beyond logical NOR node
         MatchExpression::MatchType exprtype = node->matchType();
-        if (exprtype == MatchExpression::NOT || exprtype == MatchExpression::NOR) {
+        if (exprtype == MatchExpression::NOR) {
             return;
         }
 
         // Every indexable node is tagged even when no compatible index is
         // available.
-        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
-            string fullPath = prefix + node->path().toString();
+        if (Indexability::isBoundsGenerating(node)) {
+            string fullPath;
+            if (MatchExpression::NOT == node->matchType()) {
+                fullPath = prefix + node->getChild(0)->path().toString();
+            }
+            else {
+                fullPath = prefix + node->path().toString();
+            }
+
             verify(NULL == node->getTag());
             RelevantTag* rt = new RelevantTag();
             node->setTag(rt);
@@ -301,6 +333,14 @@ namespace mongo {
                         rt->notFirst.push_back(i);
                     }
                 }
+            }
+
+            // If this is a NOT, we have to clone the tag and attach
+            // it to the NOT's child.
+            if (MatchExpression::NOT == node->matchType()) {
+                RelevantTag* childRt = static_cast<RelevantTag*>(rt->clone());
+                childRt->path = rt->path;
+                node->getChild(0)->setTag(childRt);
             }
         }
         else if (Indexability::arrayUsesIndexOnChildren(node)) {

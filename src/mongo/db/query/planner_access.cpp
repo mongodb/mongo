@@ -498,7 +498,8 @@ namespace mongo {
             // If there's a tag it must be valid.
             verify(IndexTag::kNoIndex != ixtag->index);
 
-            // If the child can't use an index on its own field, it's indexed by virtue of one of
+            // If the child can't use an index on its own field (and the child is not a negation
+            // of a bounds-generating expression), then it's indexed by virtue of one of
             // its children having an index.
             //
             // If the child is an $elemMatch, we try to merge its child predicates into the
@@ -506,7 +507,11 @@ namespace mongo {
             //
             // NOTE: If the child is logical, it could possibly collapse into a single ixscan.  we
             // ignore this for now.
-            if (!Indexability::nodeCanUseIndexOnOwnField(child)) {
+            if (!Indexability::isBoundsGenerating(child)) {
+                // If we're here, then the child is indexed by virtue of its children.
+                // In most cases this means that we recursively build indexed data
+                // access on 'child'.
+
                 if (MatchExpression::AND == root->matchType() &&
                     MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
                     // We have an AND with an ELEM_MATCH_OBJECT child. The plan enumerator produces
@@ -617,6 +622,13 @@ namespace mongo {
 
             // If we're here, we now know that 'child' can use an index directly and the index is
             // over the child's field.
+
+            // If 'child' is a NOT, then the tag we're interested in is on the NOT's
+            // child node.
+            if (MatchExpression::NOT == child->matchType()) {
+                ixtag = static_cast<IndexTag*>(child->getChild(0)->getTag());
+                invariant(IndexTag::kNoIndex != ixtag->index);
+            }
 
             // If the child we're looking at uses a different index than the current index scan, add
             // the current index scan to the output as we're done with it.  The index scan created
@@ -964,7 +976,7 @@ namespace mongo {
                                                             MatchExpression* root,
                                                             bool inArrayOperator,
                                                             const vector<IndexEntry>& indices) {
-        if (root->isLogical()) {
+        if (root->isLogical() && !Indexability::isBoundsGeneratingNot(root)) {
             if (MatchExpression::AND == root->matchType()) {
                 // Takes ownership of root.
                 return buildIndexedAnd(query, root, inArrayOperator, indices);
@@ -990,7 +1002,7 @@ namespace mongo {
                 // No index to use here, not in the context of logical operator, so we're SOL.
                 return NULL;
             }
-            else if (Indexability::nodeCanUseIndexOnOwnField(root)) {
+            else if (Indexability::isBoundsGenerating(root)) {
                 // Make an index scan over the tagged index #.
                 IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 

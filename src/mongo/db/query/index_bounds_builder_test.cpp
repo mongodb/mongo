@@ -989,4 +989,66 @@ namespace {
         ASSERT(!testSingleInterval(bounds));
     }
 
+    //
+    // Complementing bounds for negations
+    //
+
+    /**
+     * Get a BSONObj which represents the interval from
+     * MinKey to 'end'.
+     */
+    BSONObj minKeyIntObj(int end) {
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        bob.appendNumber("", end);
+        return bob.obj();
+    }
+
+    /**
+     * Get a BSONObj which represents the interval from
+     * 'start' to MaxKey.
+     */
+    BSONObj maxKeyIntObj(int start) {
+        BSONObjBuilder bob;
+        bob.appendNumber("", start);
+        bob.appendMaxKey("");
+        return bob.obj();
+    }
+
+    // Expected oil: [MinKey, 3), (3, MaxKey]
+    TEST(IndexBoundsBuilderTest, SimpleNE) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = BSON("a" << BSON("$ne" << 3));
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(minKeyIntObj(3), true, false)));
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(maxKeyIntObj(3), false, true)));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(IndexBoundsBuilderTest, IntersectWithNE) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        vector<BSONObj> toIntersect;
+        toIntersect.push_back(fromjson("{a: {$gt: 1}}"));
+        toIntersect.push_back(fromjson("{a: {$ne: 2}}}"));
+        toIntersect.push_back(fromjson("{a: {$lte: 6}}"));
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        testTranslateAndIntersect(toIntersect, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(BSON("" << 1 << "" << 2), false, false)));
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(BSON("" << 2 << "" << 6), false, true)));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
 }  // namespace

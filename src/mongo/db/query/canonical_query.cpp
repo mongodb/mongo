@@ -315,7 +315,7 @@ namespace mongo {
 
     // static
     MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
-        // root->isLogical() is true now.  We care about AND and OR.  Negations currently scare us.
+        // root->isLogical() is true now.  We care about AND, OR, and NOT. NOR currently scares us.
         if (MatchExpression::AND == root->matchType() || MatchExpression::OR == root->matchType()) {
             // We could have AND of AND of AND.  Make sure we clean up our children before merging
             // them.
@@ -358,6 +358,14 @@ namespace mongo {
                 delete root;
                 return ret;
             }
+        }
+        else if (MatchExpression::NOT == root->matchType()) {
+            // Normalize the rest of the tree hanging off this NOT node.
+            NotMatchExpression* nme = static_cast<NotMatchExpression*>(root);
+            MatchExpression* child = nme->releaseChild();
+            // normalizeTree(...) takes ownership of 'child', and then
+            // transfers ownership of its return value to 'nme'.
+            nme->resetChild(normalizeTree(child));
         }
 
         return root;

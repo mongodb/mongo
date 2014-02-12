@@ -81,7 +81,7 @@ namespace mongo {
          * The interval's extremities are closed or not depending on whether
          * 'start'/'endIncluded' are true or not.
          */
-        Interval(BSONObj base, bool startIncluded, bool endInclued);
+        Interval(BSONObj base, bool startIncluded, bool endIncluded);
 
         /** Sets the current interval to the given values (see constructor) */
         void init(BSONObj base, bool startIncluded, bool endIncluded);
