@@ -1150,7 +1150,7 @@ create_uris(CONFIG *cfg)
 		uri[base_uri_len] = '0' + (i / 10);
 		uri[base_uri_len + 1] = '0' + (i % 10);
 	}
-err:	if (ret != 0) {
+err:	if (ret != 0 && cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
 			free(cfg->uris[i]);
 		free(cfg->uris);
@@ -1331,10 +1331,11 @@ main(int argc, char *argv[])
 	/* Concatenate non-default configuration strings. */
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
 	    cfg->compress_ext != NULL) {
-		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 
-		    strlen(cfg->compress_ext) + 3;
+		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
+		if (cfg->compress_ext != NULL)
+			req_len += strlen(cfg->compress_ext);
 		if ((cc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
@@ -1355,9 +1356,11 @@ main(int argc, char *argv[])
 	if (cfg->verbose > 1 || helium_mount != NULL || user_tconfig != NULL ||
 	    cfg->compress_table != NULL) {
 		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
-		    strlen(debug_tconfig) + strlen(cfg->compress_table) + 3;
+		    strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
+		if (cfg->compress_table != NULL)
+			req_len += strlen(cfg->compress_table);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
