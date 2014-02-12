@@ -66,6 +66,8 @@ def munge_dict(values_dict, abstime):
             if title.find('uS') != -1:
                 title = title.replace('uS', 'ms')
                 value = float(value) / 1000
+            if title == 'totalsec':
+                value = 0
             if title == 'checkpoints' and value == 'N':
                 value = 0
             elif title.find('time') != -1:
