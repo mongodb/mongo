@@ -1,6 +1,7 @@
 // test that nodes still respond to heartbeats (SERVER-12264) and auth requests (SERVER-12359)
 // during the compact command
 
+if (false) { // disabled until SERVER-12697 is resolved
 // this function will wait until compact has acquired the WriteLock and then return
 awaitCompact = function() {
     print("waiting for compact to acquire lock");
@@ -91,3 +92,4 @@ print("auth worked during compact");
 // wait for the second compact to finish
 print("finished!");
 replTest.stopSet();
+}
