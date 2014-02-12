@@ -527,6 +527,15 @@ function IndexDataGenerator(options) {
         return attributes;
     }
 
+    function GenTextIndexOptions(seed) {
+        var attributes = GenIndexOptions(seed);
+        // When using a text index, the following additional index properties are required when
+        // downgrading from 2.6:
+        // { "textIndexVersion" : 1 }
+        attributes["textIndexVersion"] = 1
+        return attributes;
+    }
+
     testIndexes = [
         // Single Field Indexes
         { "spec" : GenSingleFieldIndex(1), "options" : GenIndexOptions(0) },
@@ -558,8 +567,7 @@ function IndexDataGenerator(options) {
         { "spec" : GenHaystackIndex(9), "options" : GenHaystackIndexOptions(13) },
 
         // Text Indexes
-        // XXX: This doesn't when dumping from 2.4.  See SERVER-12092
-        // { "spec" : GenTextIndex(10), "options" : GenIndexOptions(14) },
+        { "spec" : GenTextIndex(10), "options" : GenTextIndexOptions(14) },
 
         // Hashed Index
         { "spec" : GenHashedIndex(10), "options" : GenIndexOptions(14) },
