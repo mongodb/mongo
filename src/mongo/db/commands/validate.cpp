@@ -63,6 +63,12 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
+            NamespaceString ns_string(ns);
+            if ( !ns_string.isNormal() && cmdObj["full"].trueValue() ) {
+                errmsg = "Can only run full validate on a regular collection";
+                return false;
+            }
+
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: validate " << ns << endl;
             }
