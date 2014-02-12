@@ -157,7 +157,7 @@ namespace mongo {
         long long nscanned;
         bool idhack;         // indicates short circuited code path on an update to make the update faster
         bool scanAndOrder;   // scanandorder query plan aspect was used
-        long long  nupdated; // number of records updated (including no-ops)
+        long long  nMatched; // number of records updated (including no-ops)
         long long  nModified; // number of records written (no no-ops)
         long long  nmoved;   // updates resulted in a move (moves are expensive)
         long long  ninserted;

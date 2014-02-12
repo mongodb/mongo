@@ -94,7 +94,7 @@ namespace mongo {
                               bool upsert,
                               bool multi,
                               const BSONObj& writeConcern,
-                              int* numUpdated);
+                              int* nMatched);
         virtual Status remove(const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& writeConcern,

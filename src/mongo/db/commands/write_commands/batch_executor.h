@@ -177,12 +177,12 @@ namespace mongo {
     public:
 
         WriteBatchStats() :
-            numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numModified( 0 ), numDeleted( 0 ) {
+            numInserted( 0 ), numUpserted( 0 ), numMatched( 0 ), numModified( 0 ), numDeleted( 0 ) {
         }
 
         int numInserted;
         int numUpserted;
-        int numUpdated;
+        int numMatched;
         int numModified;
         int numDeleted;
     };

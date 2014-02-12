@@ -401,14 +401,14 @@ namespace mongo {
                                                       bool upsert,
                                                       bool multi,
                                                       const BSONObj& writeConcern,
-                                                      int* numUpdated) const {
+                                                      int* nMatched) const {
         return _externalState->update(collectionName,
                                       query,
                                       updatePattern,
                                       upsert,
                                       multi,
                                       writeConcern,
-                                      numUpdated);
+                                      nMatched);
     }
 
     Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privileges,

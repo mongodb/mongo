@@ -672,7 +672,7 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            int numUpdated;
+            int nMatched;
 
             audit::logDropUser(ClientBasic::getCurrent(), userName);
 
@@ -680,14 +680,14 @@ namespace mongo {
                     BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
                          AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
 
-            if (numUpdated == 0) {
+            if (nMatched == 0) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::UserNotFound,
@@ -2050,7 +2050,7 @@ namespace mongo {
             }
 
             // Remove this role from all users
-            int numUpdated;
+            int nMatched;
             status = authzManager->updateAuthzDocuments(
                     NamespaceString("admin.system.users"),
                     BSON("roles" << BSON("$elemMatch" <<
@@ -2066,7 +2066,7 @@ namespace mongo {
                     false,
                     true,
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserCache();
             if (!status.isOK()) {
@@ -2095,7 +2095,7 @@ namespace mongo {
                     false,
                     true,
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserCache();
             if (!status.isOK()) {
@@ -2116,7 +2116,7 @@ namespace mongo {
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << roleName.getRole() <<
                          AuthorizationManager::ROLE_SOURCE_FIELD_NAME << roleName.getDB()),
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserCache();
             if (!status.isOK()) {
@@ -2128,8 +2128,8 @@ namespace mongo {
                                " the role itself: " <<  status.reason()));
             }
 
-            dassert(numUpdated == 0 || numUpdated == 1);
-            if (numUpdated == 0) {
+            dassert(nMatched == 0 || nMatched == 1);
+            if (nMatched == 0) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::RoleNotFound,
@@ -2208,7 +2208,7 @@ namespace mongo {
             }
 
             // Remove these roles from all users
-            int numUpdated;
+            int nMatched;
             status = authzManager->updateAuthzDocuments(
                     AuthorizationManager::usersCollectionNamespace,
                     BSON("roles" << BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname)),
@@ -2218,7 +2218,7 @@ namespace mongo {
                     false,
                     true,
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserCache();
             if (!status.isOK()) {
@@ -2243,7 +2243,7 @@ namespace mongo {
                     false,
                     true,
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserCache();
             if (!status.isOK()) {
@@ -2261,7 +2261,7 @@ namespace mongo {
             status = authzManager->removeRoleDocuments(
                     BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname),
                     writeConcern,
-                    &numUpdated);
+                    &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserCache();
             if (!status.isOK()) {
@@ -2273,7 +2273,7 @@ namespace mongo {
                                " those roles themselves: " <<  status.reason()));
             }
 
-            result.append("n", numUpdated);
+            result.append("n", nMatched);
 
             return true;
         }

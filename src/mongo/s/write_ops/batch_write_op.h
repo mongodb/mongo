@@ -192,7 +192,7 @@ namespace mongo {
 
         int numInserted;
         int numUpserted;
-        int numUpdated;
+        int numMatched;
         int numModified;
         int numDeleted;
 

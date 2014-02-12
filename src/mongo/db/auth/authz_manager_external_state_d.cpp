@@ -151,7 +151,7 @@ namespace mongo {
                                                    bool upsert,
                                                    bool multi,
                                                    const BSONObj& writeConcern,
-                                                   int* numUpdated) {
+                                                   int* nMatched) {
         try {
             DBDirectClient client;
             client.update(collectionName, query, updatePattern, upsert, multi);
@@ -167,7 +167,7 @@ namespace mongo {
                 return Status(ErrorCodes::UnknownError, err);
             }
 
-            *numUpdated = res["n"].numberInt();
+            *nMatched = res["n"].numberInt();
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();

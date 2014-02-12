@@ -261,7 +261,7 @@ namespace mongo {
                                                    bool upsert,
                                                    bool multi,
                                                    const BSONObj& writeConcern,
-                                                   int* numUpdated) {
+                                                   int* nMatched) {
         BatchedCommandResponse response;
         Status res = clusterUpdate(collectionName,
                 query,
@@ -272,7 +272,7 @@ namespace mongo {
                 &response);
 
         if (res.isOK()) {
-            *numUpdated = response.getN();
+            *nMatched = response.getN();
         }
 
         return res;

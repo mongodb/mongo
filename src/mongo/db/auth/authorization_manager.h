@@ -237,7 +237,7 @@ namespace mongo {
                                     bool upsert,
                                     bool multi,
                                     const BSONObj& writeConcern,
-                                    int* numUpdated) const;
+                                    int* nMatched) const;
 
         /*
          * Removes roles matching the given query.

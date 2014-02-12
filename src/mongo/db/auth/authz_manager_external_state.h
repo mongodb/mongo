@@ -208,7 +208,7 @@ namespace mongo {
                               bool upsert,
                               bool multi,
                               const BSONObj& writeConcern,
-                              int* numUpdated) = 0;
+                              int* nMatched) = 0;
 
         /**
          * Removes all documents matching "query" from "collectionName".

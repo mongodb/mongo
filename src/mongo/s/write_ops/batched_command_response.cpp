@@ -152,9 +152,9 @@ namespace mongo {
 
         // We're using appendNumber on generation so we'll try a smaller type
         // (int) first and then fall back to the original type (long long).
-        BSONField<int> fieldNUpdated(nModified());
-        int tempNUpdated;
-        fieldState = FieldParser::extract(source, fieldNUpdated, &tempNUpdated, errMsg);
+        BSONField<int> fieldNModified(nModified());
+        int intNModified;
+        fieldState = FieldParser::extract(source, fieldNModified, &intNModified, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) {
             // try falling back to a larger type
             fieldState = FieldParser::extract(source, nModified, &_nModified, errMsg);
@@ -163,7 +163,7 @@ namespace mongo {
         }
         else if (fieldState == FieldParser::FIELD_SET) {
             _isNModifiedSet = true;
-            _nModified = tempNUpdated;
+            _nModified = intNModified;
         }
 
         std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;

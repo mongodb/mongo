@@ -29,7 +29,7 @@ var executeTests = function() {
     var result = batch.execute();
     assert.eq(2, result.nInserted);
     assert.eq(1, result.nUpserted);
-    assert.eq(2, result.nUpdated);
+    assert.eq(2, result.nMatched);
     if (coll.getMongo().useWriteCommands()) {
         assert.eq(1, result.nModified);
     }

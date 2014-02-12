@@ -207,15 +207,15 @@ namespace mongo {
             if ( response.isUpsertDetailsSet() )
                 numUpserted = response.sizeUpsertDetails();
 
-            int numUpdated = response.getN() - numUpserted;
-            dassert( numUpdated >= 0 );
+            int numMatched = response.getN() - numUpserted;
+            dassert( numMatched >= 0 );
 
             // Wrap upserted id in "upserted" field
             BSONObj leUpsertedId;
             if ( !upsertedId.isEmpty() )
                 leUpsertedId = upsertedId.firstElement().wrap( kUpsertedFieldName );
 
-            error->recordUpdate( numUpdated > 0, response.getN(), leUpsertedId );
+            error->recordUpdate( numMatched > 0, response.getN(), leUpsertedId );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Delete ) {
             error->recordDelete( response.getN() );

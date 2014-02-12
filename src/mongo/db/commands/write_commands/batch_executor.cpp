@@ -272,7 +272,7 @@ namespace mongo {
             }
 
             // Set the stats for the response
-            response->setN( _stats->numInserted + _stats->numUpserted + _stats->numUpdated
+            response->setN( _stats->numInserted + _stats->numUpserted + _stats->numMatched
                             + _stats->numDeleted );
             if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update )
                 response->setNModified( _stats->numModified );
@@ -450,7 +450,7 @@ namespace mongo {
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             if ( stats.upsertedID.isEmpty() ) {
-                _stats->numUpdated += stats.n;
+                _stats->numMatched += stats.n;
                 _stats->numModified += stats.nModified;
             }
             else {

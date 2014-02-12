@@ -174,19 +174,19 @@ namespace mongo {
             const BSONObj& updatePattern,
             bool upsert,
             const BSONObj& writeConcern) {
-        int numUpdated;
+        int nMatched;
         Status status = update(collectionName,
                                query,
                                updatePattern,
                                upsert,
                                false,
                                writeConcern,
-                               &numUpdated);
+                               &nMatched);
         if (!status.isOK()) {
             return status;
         }
-        dassert(numUpdated == 1 || numUpdated == 0);
-        if (numUpdated == 0) {
+        dassert(nMatched == 1 || nMatched == 0);
+        if (nMatched == 0) {
             return Status(ErrorCodes::NoMatchingDocument, "No document found");
         }
         return Status::OK();

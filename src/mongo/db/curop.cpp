@@ -361,8 +361,8 @@ namespace mongo {
             returnedCounter.increment( nreturned );
         if ( ninserted > 0 )
             insertedCounter.increment( ninserted );
-        if ( nupdated > 0 )
-            updatedCounter.increment( nupdated );
+        if ( nMatched > 0 )
+            updatedCounter.increment( nMatched );
         if ( ndeleted > 0 )
             deletedCounter.increment( ndeleted );
         if ( nscanned > 0 )

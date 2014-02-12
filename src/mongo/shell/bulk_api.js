@@ -64,7 +64,7 @@ var _bulk_api_module = (function() {
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
     defineReadOnlyProperty(this, "nUpserted", bulkResult.nUpserted);
-    defineReadOnlyProperty(this, "nUpdated", bulkResult.nUpdated);
+    defineReadOnlyProperty(this, "nMatched", bulkResult.nMatched);
     defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
 
@@ -109,7 +109,7 @@ var _bulk_api_module = (function() {
       }
 
       if(singleBatch && singleBatch.batchType == UPDATE) {
-        result.nUpdated = this.nUpdated;
+        result.nMatched = this.nMatched;
         result.nUpserted = this.nUpserted;
         result.nModified = this.nModified;
 
@@ -157,7 +157,7 @@ var _bulk_api_module = (function() {
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
     defineReadOnlyProperty(this, "nUpserted", bulkResult.nUpserted);
-    defineReadOnlyProperty(this, "nUpdated", bulkResult.nUpdated);
+    defineReadOnlyProperty(this, "nMatched", bulkResult.nMatched);
     defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
 
@@ -358,7 +358,7 @@ var _bulk_api_module = (function() {
       , writeConcernErrors: []
       , nInserted: 0
       , nUpserted: 0
-      , nUpdated: 0
+      , nMatched: 0
       , nModified: 0
       , nRemoved: 0
       , upserted: []
@@ -618,7 +618,7 @@ var _bulk_api_module = (function() {
       if(batch.batchType == UPDATE) {
         var nModified = ('nModified' in result)? result.nModified: 0;
         bulkResult.nUpserted = bulkResult.nUpserted + nUpserted;
-        bulkResult.nUpdated = bulkResult.nUpdated + (result.n - nUpserted);
+        bulkResult.nMatched = bulkResult.nMatched + (result.n - nUpserted);
         bulkResult.nModified = bulkResult.nModified + nModified;
       }
 
