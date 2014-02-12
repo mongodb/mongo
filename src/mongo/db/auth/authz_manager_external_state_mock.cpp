@@ -219,7 +219,6 @@ namespace {
 
         namespace mmb = mutablebson;
         UpdateDriver::Options updateOptions;
-        updateOptions.upsert = upsert;
         UpdateDriver driver(updateOptions);
         Status status = driver.parse(updatePattern);
         if (!status.isOK())

@@ -457,13 +457,11 @@ namespace mongo {
         // TODO: Consider some sort of unification between the UpdateDriver, ModifierInterface
         // and UpdateRequest structures.
         UpdateDriver::Options opts;
-        opts.multi = request.isMulti();
-        opts.upsert = request.isUpsert();
         opts.logOp = request.shouldCallLogOp();
         opts.modOptions = ModifierInterface::Options(request.isFromReplication(), shouldValidate);
         UpdateDriver driver(opts);
 
-        Status status = driver.parse(request.getUpdates());
+        Status status = driver.parse(request.getUpdates(), request.isMulti());
         if (!status.isOK()) {
             uasserted(16840, status.reason());
         }
@@ -892,8 +890,6 @@ namespace mongo {
 
     BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {
         UpdateDriver::Options opts;
-        opts.multi = false;
-        opts.upsert = false;
         UpdateDriver driver(opts);
         Status status = driver.parse(operators);
         if (!status.isOK()) {

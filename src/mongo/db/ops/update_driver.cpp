@@ -49,8 +49,6 @@ namespace mongo {
     UpdateDriver::UpdateDriver(const Options& opts)
         : _replacementMode(false)
         , _indexedFields(NULL)
-        , _multi(opts.multi)
-        , _upsert(opts.upsert)
         , _logOp(opts.logOp)
         , _modOptions(opts.modOptions)
         , _affectIndices(false)
@@ -61,12 +59,12 @@ namespace mongo {
         clear();
     }
 
-    Status UpdateDriver::parse(const BSONObj& updateExpr) {
+    Status UpdateDriver::parse(const BSONObj& updateExpr, const bool multi) {
         clear();
 
         // Check if the update expression is a full object replacement.
         if (*updateExpr.firstElementFieldName() != '$') {
-            if (_multi) {
+            if (multi) {
                 return Status(ErrorCodes::FailedToParse,
                               "multi update only works with $ operators");
             }
@@ -205,8 +203,6 @@ namespace mongo {
         // Create a new UpdateDriver to create the base doc from the query
         Options opts;
         opts.logOp = false;
-        opts.multi = false;
-        opts.upsert = true;
         opts.modOptions = modOptions();
 
         UpdateDriver insertDriver(opts);
@@ -394,22 +390,6 @@ namespace mongo {
 
     void UpdateDriver::refreshIndexKeys(const IndexPathSet* indexedFields) {
         _indexedFields = indexedFields;
-    }
-
-    bool UpdateDriver::multi() const {
-        return _multi;
-    }
-
-    void UpdateDriver::setMulti(bool multi) {
-        _multi = multi;
-    }
-
-    bool UpdateDriver::upsert() const {
-        return _upsert;
-    }
-
-    void UpdateDriver::setUpsert(bool upsert) {
-        _upsert = upsert;
     }
 
     bool UpdateDriver::logOp() const {

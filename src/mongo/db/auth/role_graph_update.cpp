@@ -173,7 +173,6 @@ namespace {
             return status;
 
         UpdateDriver::Options updateOptions;
-        updateOptions.upsert = true;
         UpdateDriver driver(updateOptions);
         status = driver.parse(updatePattern);
         if (!status.isOK())

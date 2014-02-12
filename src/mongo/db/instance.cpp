@@ -603,8 +603,6 @@ namespace mongo {
         // the near term.
 
         UpdateDriver::Options options;
-        options.multi = multi;
-        options.upsert = upsert;
 
         // TODO: This is wasteful. We really shouldn't need to generate the oplog entry
         // just to throw it away if we are not generating an oplog.
@@ -620,7 +618,7 @@ namespace mongo {
 
         UpdateDriver driver( options );
 
-        status = driver.parse( toupdate );
+        status = driver.parse( toupdate, multi );
         if ( !status.isOK() ) {
             uasserted( 17009, status.reason() );
         }
