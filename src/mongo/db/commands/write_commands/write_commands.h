@@ -57,9 +57,6 @@ namespace mongo {
          */
         WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType );
 
-        // Full log of write command can be quite large.
-        static void redactTooLongLog( mutablebson::Document* cmdObj, const StringData& fieldName );
-
     private:
         virtual bool logTheOp();
 
@@ -89,7 +86,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(CmdInsert);
     public:
         CmdInsert();
-        void redactForLogging(mutablebson::Document* cmdObj);
 
     private:
         virtual void help(stringstream& help) const;
@@ -99,7 +95,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(CmdUpdate);
     public:
         CmdUpdate();
-        void redactForLogging(mutablebson::Document* cmdObj);
 
     private:
         virtual void help(stringstream& help) const;
@@ -109,7 +104,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(CmdDelete);
     public:
         CmdDelete();
-        void redactForLogging(mutablebson::Document* cmdObj);
 
     private:
         virtual void help(stringstream& help) const;
