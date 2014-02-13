@@ -37,8 +37,8 @@ var _bulk_api_module = (function() {
     options = options || {};
 
     // Add write concern options to the command
-    if(options.w) cmd.w = options.w;
-    if(options.wtimeout) cmd.wtimeout = options.wtimeout;
+    if(typeof(options.w) != 'undefined') cmd.w = options.w;
+    if(typeof(options.wtimeout) != 'undefined') cmd.wtimeout = options.wtimeout;
     if(options.j) cmd.j = options.j;
     if(options.fsync) cmd.fsync = options.fsync;
 
@@ -926,28 +926,48 @@ var _bulk_api_module = (function() {
 if ( ( typeof WriteConcern ) == 'undefined' ){
 
     /**
-     * Shell representation of WriteConcern, includes:
-     *  j: write durably written to journal
-     *  w: write replicated to number of servers
-     *  wtimeout: how long to wait for replication
+     * Shell representation of WriteConcern, possibly includes:
+     *  j: write waits for journal
+     *  w: write waits for replicated to number of servers (including primary), or mode (string)
+     *  wtimeout: how long to wait for "w" replication
+     *  fsync: waits for data flush (either journal, nor database files depending on server conf)
      *
-     * Accepts { w : x, j : x, wtimeout : x } or w, j, wtimeout
+     * Accepts { w : x, j : x, wtimeout : x, fsync: x } or w, wtimeout, j
      */
-    WriteConcern = function( wValue, jValue, wTimeout ){
+    WriteConcern = function(wValue, wTimeout, jValue) {
 
-        if ( typeof wValue == 'object' && !jValue ) {
-            var opts = wValue;
-            wValue = opts.w;
-            jValue = opts.j;
-            wTimeout = opts.wtimeout;
+        var opts = {};
+        if (typeof wValue == 'object') {
+            if (typeof jValue == 'undefined' && typeof wTimeout == 'undefined')
+                opts = Object.merge(wValue);
+            else
+                throw Error("If the first arg is an Object then no additional args are allowed!")
+        } else {
+          if (typeof wValue != 'undefined')
+            opts.w = wValue;
+          if (typeof wTimeout != 'undefined')
+            opts.wtimeout = wTimeout;
+          if (typeof jValue != 'undefined')
+            opts.j = jValue;
         }
 
-        this._w = wValue;
-        if ( this._w === undefined ) this._w = 1;
-        assert( typeof this._w == 'number' || typeof this._w == 'string' );
+        // Do basic validation.
+        if (typeof opts.w != 'undefined' && typeof opts.w != 'number' && typeof opts.w != 'string')
+            throw Error("w value must be a number or string but was found to be a " + typeof opts.w)
+        if (typeof opts.w == 'number' && NumberInt( opts.w ).toNumber() < 0)
+            throw Error("Numeric w value must be equal to or larger than 0, not " + opts.w);
 
-        this._j = jValue ? true : false;
-        this._wTimeout = NumberInt( wTimeout ).toNumber();
+        if (typeof opts.wtimeout != 'undefined') {
+            if (typeof opts.wtimeout != 'number')
+                throw Error("wtimeout must be a number, not " + opts.wtimeout);
+            if (NumberInt( opts.wtimeout ).toNumber() < 0)
+                throw Error("wtimeout must be a number greater than 0, not " + opts.wtimeout);
+        }
+        
+        if (typeof opts.j != 'undefined' && typeof opts.j != 'boolean')
+            throw Error("j value must either true or false if defined, not " + opts.j);
+        
+        this._wc = opts;
     };
 
     /**
@@ -955,7 +975,7 @@ if ( ( typeof WriteConcern ) == 'undefined' ){
      *     the string representation instead.
      */
     WriteConcern.prototype.toJSON = function() {
-        return { w : this._w, j : this._j, wtimeout : this._wTimeout };
+        return this._wc;
     };
 
     /**
@@ -974,4 +994,3 @@ if ( ( typeof WriteConcern ) == 'undefined' ){
         return this.toString();
     };
 }
-
