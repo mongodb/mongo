@@ -16,7 +16,7 @@ specified directly.  More precisely, keys or values that match this regular
 expression do not require quotes:
 
 <pre>
-    [-_0-9A-Za-z/][^\\t\\r\\n :=,\\])}]*
+    [-_0-9A-Za-z./][^\\t\\r\\n :=,\\])}]*
 </pre>
 
 More complex keys and values can be specified by quoting them with double

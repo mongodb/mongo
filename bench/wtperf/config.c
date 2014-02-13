@@ -96,11 +96,49 @@ config_free(CONFIG *cfg)
 				*pstr = NULL;
 			}
 		}
+	if (cfg->uris != NULL) {
+		for (i = 0; i < cfg->table_count; i++)
+			free(cfg->uris[i]);
+		free(cfg->uris);
+	}
 
 	free(cfg->popthreads);
 	free(cfg->uri);
 	free(cfg->workers);
 	free(cfg->workload);
+}
+
+/*
+ * config_compress --
+ *	Parse the compression configuration.
+ */
+int
+config_compress(CONFIG *cfg)
+{
+	int ret;
+	const char *s;
+
+	ret = 0;
+	s = cfg->compression;
+	if (strcmp(s, "none") == 0) {
+		cfg->compress_ext = NULL;
+		cfg->compress_table = NULL;
+	} else if (strcmp(s, "bzip") == 0) {
+		cfg->compress_ext = BZIP_EXT;
+		cfg->compress_table = BZIP_BLK;
+	} else if (strcmp(s, "snappy") == 0) {
+		cfg->compress_ext = SNAPPY_EXT;
+		cfg->compress_table = SNAPPY_BLK;
+	} else if (strcmp(s, "zlib") == 0) {
+		cfg->compress_ext = ZLIB_EXT;
+		cfg->compress_table = ZLIB_BLK;
+	} else {
+		fprintf(stderr,
+	    "invalid compression configuration: %s\n", s);
+		ret = EINVAL;
+	}
+	return (ret);
+
 }
 
 /*
@@ -474,6 +512,10 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (1);
 	}
+	if (cfg->table_count > 99) {
+		fprintf(stderr, "table count greater than 99\n");
+		return (1);
+	}
 	return (0);
 }
 
@@ -600,11 +642,8 @@ config_opt_usage(void)
 void
 usage(void)
 {
-	printf("wtperf [-LMS] [-C config] "
+	printf("wtperf [-C config] "
 	    "[-H mount] [-h home] [-O file] [-o option] [-T config]\n");
-	printf("\t-L Use a large default configuration\n");
-	printf("\t-M Use a medium default configuration\n");
-	printf("\t-S Use a small default configuration\n");
 	printf("\t-C <string> additional connection configuration\n");
 	printf("\t            (added to option conn_config)\n");
 	printf("\t-H <mount> configure Helium volume mount point\n");
