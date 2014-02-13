@@ -151,10 +151,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	WORKLOAD *workp;
 	WT_CONFIG_ITEM groupk, groupv, k, v;
 	WT_CONFIG_SCAN *group, *scan;
-	WT_EXTENSION_API *wt_api;
 	int ret;
-
-	wt_api = cfg->conn->get_extension_api(cfg->conn);
 
 	/* Allocate the workload array. */
 	if ((cfg->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD))) == NULL)
@@ -170,12 +167,12 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	 * returned from the original string.
 	 */
 	if ((ret =
-	    wt_api->config_scan_begin(wt_api, NULL, config, len, &group)) != 0)
+	    wiredtiger_config_scan_begin(NULL, config, len, &group)) != 0)
 		goto err;
 	while ((ret =
-	    wt_api->config_scan_next(wt_api, group, &groupk, &groupv)) == 0) {
-		if ((ret = wt_api-> config_scan_begin(
-		    wt_api, NULL, groupk.str, groupk.len, &scan)) != 0)
+	    wiredtiger_config_scan_next(NULL, group, &groupk, &groupv)) == 0) {
+		if ((ret = wiredtiger_config_scan_begin(
+		    NULL, groupk.str, groupk.len, &scan)) != 0)
 			goto err;
 		
 		/* Move to the next workload slot. */
@@ -189,7 +186,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		workp = &cfg->workload[cfg->workload_cnt++];
 
 		while ((ret =
-		    wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0) {
+		    wiredtiger_config_scan_next(NULL, scan, &k, &v)) == 0) {
 			if (STRING_MATCH("count", k.str, k.len)) {
 				if ((workp->threads = v.val) <= 0)
 					goto err;
@@ -219,7 +216,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			ret = 0;
 		if (ret != 0 )
 			goto err;
-		if ((ret = wt_api->config_scan_end(wt_api, scan)) != 0)
+		if ((ret = wiredtiger_config_scan_end(NULL, scan)) != 0)
 			goto err;
 
 		if (workp->insert == 0 &&
@@ -228,7 +225,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		cfg->workers_cnt += (u_int)workp->threads;
 	}
 
-	if ((ret = wt_api->config_scan_end(wt_api, group)) != 0)
+	if ((ret = wiredtiger_config_scan_end(NULL, group)) != 0)
 		goto err;
 
 	return (0);
@@ -447,20 +444,18 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
-	WT_EXTENSION_API *wt_api;
 	int ret, t_ret;
 
-	wt_api = cfg->conn->get_extension_api(cfg->conn);
 
-	if ((ret = wt_api->config_scan_begin(
-	    wt_api, NULL, optstr, strlen(optstr), &scan)) != 0) {
+	if ((ret = wiredtiger_config_scan_begin(
+	    NULL, optstr, strlen(optstr), &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
 
 	while (ret == 0) {
 		if ((ret =
-		    wt_api->config_scan_next(wt_api, scan, &k, &v)) != 0) {
+		    wiredtiger_config_scan_next(NULL, scan, &k, &v)) != 0) {
 			/* Any parse error has already been reported. */
 			if (ret == WT_NOTFOUND)
 				ret = 0;
@@ -468,7 +463,7 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 		}
 		ret = config_opt(cfg, &k, &v);
 	}
-	if ((t_ret = wt_api->config_scan_end(wt_api, scan)) != 0) {
+	if ((t_ret = wiredtiger_config_scan_end(NULL, scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_end");
 		if (ret == 0)
 			ret = t_ret;

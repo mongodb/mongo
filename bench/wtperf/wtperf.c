@@ -1197,12 +1197,10 @@ main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
 	pthread_t monitor_thread;
-	size_t len;
 	uint64_t req_len, total_ops;
 	int ch, monitor_created, monitor_set, ret, t_ret;
 	const char *helium_mount;
 	const char *opts = "C:H:h:m:O:o:T:";
-	const char *wtperftmp_subdir = "wtperftmp";
 	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
@@ -1240,36 +1238,8 @@ main(int argc, char *argv[])
 		cfg->monitor_dir = cfg->home;
 
 	/*
-	 * Create a temporary directory underneath the test directory in which
-	 * we do an initial WiredTiger open, because we need a connection in
-	 * order to use the extension configuration parser.  We will open the
-	 * real WiredTiger database after parsing the options.
-	 */
-	len = strlen(cfg->home) + strlen(wtperftmp_subdir) + 2;
-	if ((tmphome = malloc(len)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	snprintf(tmphome, len, "%s/%s", cfg->home, wtperftmp_subdir);
-	len = len * 2 + 100;
-	if ((cmd = malloc(len)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	snprintf(cmd, len, "rm -rf %s && mkdir %s", tmphome, tmphome);
-	if (system(cmd) != 0) {
-		fprintf(stderr, "%s: failed\n", cmd);
-		goto einval;
-	}
-	if ((ret = wiredtiger_open(
-	    tmphome, NULL, "create", &cfg->conn)) != 0) {
-		lprintf(cfg, ret, 0, "wiredtiger_open: %s", tmphome);
-		goto err;
-	}
-
-	/*
-	 * Then parse different config structures - other options override
-	 * fields within the structure.
+	 * Parse different config structures - other options override fields
+	 * within the structure.
 	 */
 	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
@@ -1376,12 +1346,6 @@ main(int argc, char *argv[])
 			goto err;
 	}
 
-	ret = cfg->conn->close(cfg->conn, NULL);
-	cfg->conn = NULL;
-	if (ret != 0) {
-		lprintf(cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
-		goto err;
-	}
 					/* Sanity-check the configuration */
 	if (config_sanity(cfg) != 0)
 		goto err;
