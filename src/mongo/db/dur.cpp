@@ -291,15 +291,11 @@ namespace mongo {
                 }
                 case 'w': {
                     if( Lock::atLeastReadLocked("local") ) {
-                        error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
-                        printStackTrace();
-                        dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
+                        LOG(2) << "can't commitNow from commitIfNeeded, as we are in local db lock";
                         return false;
                     }
                     if( Lock::atLeastReadLocked("admin") ) {
-                        error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
-                        printStackTrace();
-                        dassert(false);
+                        LOG(2) << "can't commitNow from commitIfNeeded, as we are in admin db lock";
                         return false;
                     }
 
