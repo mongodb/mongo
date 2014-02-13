@@ -248,6 +248,8 @@ namespace {
         testSortOrder(false, "{a: 1}", "{a: {$meta: \"image\"}}");
         testSortOrder(false, "{a: 1}", "{a: {$world: \"textScore\"}}");
         testSortOrder(false, "{a: 1}", "{a: {$meta: \"textScore\", b: 1}}");
+        testSortOrder(false, "{'': 1}", "{'': 1}");
+        testSortOrder(false, "{'': -1}", "{'': -1}");
     }
 
 }  // namespace

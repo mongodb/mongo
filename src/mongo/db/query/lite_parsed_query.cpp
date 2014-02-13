@@ -160,6 +160,11 @@ namespace mongo {
         BSONObjIterator i(sortObj);
         while (i.more()) {
             BSONElement e = i.next();
+            // fieldNameSize() includes NULL terminator. For empty field name,
+            // we should be checking for 1 instead of 0.
+            if (1 == e.fieldNameSize()) {
+                return false;
+            }
             if (isTextScoreMeta(e)) {
                 continue;
             }
