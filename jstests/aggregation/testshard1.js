@@ -231,6 +231,7 @@ for (var shardName in res.shards) {
 // Call sub-tests designed to work sharded and unsharded.
 // They check for this variable to know to shard their collections.
 RUNNING_IN_SHARDED_AGG_TEST = true; // global
+load("jstests/aggregation/bugs/server9444.js"); // external sort
 load("jstests/aggregation/bugs/server11675.js"); // text support
 
 // shut everything down

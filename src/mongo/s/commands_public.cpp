@@ -2311,7 +2311,7 @@ namespace mongo {
                                          << conn->toString(),
                     cursor && cursor->more());
 
-            BSONObj result = cursor->next().getOwned();
+            BSONObj result = cursor->nextSafe().getOwned();
             storePossibleCursor(cursor->originalHost(), result);
             return result;
         }

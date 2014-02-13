@@ -3,11 +3,16 @@
 var t = db.server9444;
 t.drop();
 
-var memoryLimitMB = 100;
+var sharded = (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined'); // see end of testshard1.js
+if (sharded) {
+    db.adminCommand( { shardcollection : t.getFullName(), key : { "_id" : 'hashed' } } );
+}
+
+var memoryLimitMB = sharded ? 200 : 100;
 
 function loadData() {
     var bigStr = Array(1024*1024 + 1).toString(); // 1MB of ','
-    for (var i = 0; i < 101; i++)
+    for (var i = 0; i < memoryLimitMB + 1; i++)
         t.insert({_id: i, bigStr: i + bigStr, random: Math.random()});
 
     assert.gt(t.stats().size, memoryLimitMB * 1024*1024);

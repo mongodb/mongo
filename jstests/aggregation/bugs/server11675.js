@@ -5,7 +5,7 @@ var server11675 = function() {
     var t = db.server11675;
     t.drop();
 
-    if (typeof(RUNNING_IN_SHARDED_AGG_TEST) != undefined) { // see end of testshard1.js
+    if (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined') { // see end of testshard1.js
         db.adminCommand( { shardcollection : t.getFullName(), key : { "_id" : 1 } } );
     }
 
