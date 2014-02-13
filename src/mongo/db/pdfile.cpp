@@ -1316,10 +1316,8 @@ namespace mongo {
 
     void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god, bool fromMigrate ) {
         BSONObj tmp = o;
-        DiskLoc loc = insertWithObjMod( ns, tmp, false, god );
-        if (!loc.isNull()) {
-            logOp( "i", ns, tmp, 0, 0, fromMigrate );
-        }
+        insertWithObjMod( ns, tmp, false, god );
+        logOp( "i", ns, tmp, 0, 0, fromMigrate );
     }
 
     /** @param o the object to insert. can be modified to add _id and thus be an in/out param
