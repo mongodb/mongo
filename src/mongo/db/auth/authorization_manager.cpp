@@ -898,7 +898,7 @@ namespace {
      * Logs that the auth schema upgrade failed because of "status" and returns "status".
      */
     Status logUpgradeFailed(const Status& status) {
-        log() << "Auth schema upgraded failed with " << status;
+        log() << "Auth schema upgrade failed with " << status;
         return status;
     }
 

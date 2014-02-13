@@ -151,8 +151,10 @@ namespace {
             }
 
             status = checkClusterMongoVersions(configServer.getConnectionString(), "2.5.4");
-            if (!status.isOK())
+            if (!status.isOK()) {
+                log() << "Auth schema upgrade failed: " << status << endl;
                 return appendCommandStatus(result, status);
+            }
 
             status = authzManager->upgradeSchema(maxSteps, writeConcern);
             if (!status.isOK())
