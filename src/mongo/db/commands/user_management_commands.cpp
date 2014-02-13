@@ -229,7 +229,7 @@ namespace mongo {
 
             if (sequenceContains(indirectRoles, role)) {
                 return Status(ErrorCodes::InvalidRoleModification,
-                              mongoutils::str::stream() << "Granting" <<
+                              mongoutils::str::stream() << "Granting " <<
                                       roleToAdd.getFullName() << " to " << role.getFullName()
                                       << " would introduce a cycle in the role graph.");
             }
