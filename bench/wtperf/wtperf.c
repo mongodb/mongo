@@ -42,6 +42,15 @@ static const CONFIG default_cfg = {
 	0,				/* worker thread count */
 	NULL,				/* workloads */
 	0,				/* workload count */
+	0,				/* checkpoint operations */
+	0,				/* insert operations */
+	0,				/* read operations */
+	0,				/* update operations */
+	0,				/* insert key */
+	0,				/* checkpoint in progress */
+	0,				/* thread error */
+	0,				/* notify threads to stop */
+	0,				/* total seconds running */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -50,19 +59,6 @@ static const CONFIG default_cfg = {
 
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
-
-static uint64_t g_ckpt_ops;		/* checkpoint operations */
-static uint64_t g_insert_ops;		/* insert operations */
-static uint64_t g_read_ops;		/* read operations */
-static uint64_t g_update_ops;		/* update operations */
-
-static uint64_t g_insert_key;		/* insert key */
-
-static volatile int g_ckpt;		/* checkpoint in progress */
-static volatile int g_error;		/* thread error */
-static volatile int g_stop;		/* notify threads to stop */
-
-static volatile uint32_t g_totalsec;	/* total seconds running */
 
 /*
  * Atomic update where needed.
@@ -103,9 +99,9 @@ extern uint32_t	__wt_random(void);
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
-get_next_incr(void)
+get_next_incr(CONFIG *cfg)
 {
-	return (ATOMIC_ADD(g_insert_key, 1));
+	return (ATOMIC_ADD(cfg->insert_key, 1));
 }
 
 static void
@@ -242,7 +238,7 @@ worker(void *arg)
 	op = thread->workload->ops;
 	op_end = op + sizeof(thread->workload->ops);
 
-	while (!g_stop) {
+	while (!cfg->stop) {
 		/* Pick a cursor if there are multiple tables. */
 		if (cfg->table_count > 1)
 			cursor = cursors[
@@ -259,7 +255,7 @@ worker(void *arg)
 			if (cfg->random_range)
 				next_val = wtperf_rand(cfg);
 			else
-				next_val = cfg->icount + get_next_incr();
+				next_val = cfg->icount + get_next_incr(cfg);
 			break;
 		case WORKER_READ:
 			trk = &thread->read;
@@ -382,7 +378,7 @@ op_err:			lprintf(cfg, ret, 0,
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
 	if (cursors != NULL)
 		free(cursors);
@@ -557,7 +553,7 @@ populate_thread(void *arg)
 
 	/* Populate the databases. */
 	for (intxn = 0, opcount = 0;;) {
-		op = get_next_incr();
+		op = get_next_incr(cfg);
 		if (op > cfg->icount)
 			break;
 
@@ -627,7 +623,7 @@ populate_thread(void *arg)
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
 	if (cursors != NULL)
 		free(cursors);
@@ -683,14 +679,14 @@ monitor(void *arg)
 	    "update maximum latency(uS)"
 	    "\n");
 	last_reads = last_inserts = last_updates = 0;
-	while (!g_stop) {
+	while (!cfg->stop) {
 		for (i = 0; i < cfg->sample_interval; i++) {
 			sleep(1);
-			if (g_stop)
+			if (cfg->stop)
 				break;
 		}
 		/* If the workers are done, don't bother with a final call. */
-		if (g_stop)
+		if (cfg->stop)
 			break;
 
 		if ((ret = __wt_epoch(NULL, &t)) != 0) {
@@ -727,11 +723,11 @@ monitor(void *arg)
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    "\n",
-		    buf, g_totalsec,
+		    buf, cfg->totalsec,
 		    cur_reads / cfg->sample_interval,
 		    cur_inserts / cfg->sample_interval,
 		    cur_updates / cfg->sample_interval,
-		    g_ckpt ? 'Y' : 'N',
+		    cfg->ckpt ? 'Y' : 'N',
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
 		    update_avg, update_min, update_max);
@@ -743,7 +739,7 @@ monitor(void *arg)
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
 
 	if (fp != NULL)
@@ -776,27 +772,27 @@ checkpoint_worker(void *arg)
 		goto err;
 	}
 
-	while (!g_stop) {
+	while (!cfg->stop) {
 		/* Break the sleep up, so we notice interrupts faster. */
 		for (i = 0; i < cfg->checkpoint_interval; i++) {
 			sleep(1);
-			if (g_stop)
+			if (cfg->stop)
 				break;
 		}
 		/* If the workers are done, don't bother with a final call. */
-		if (g_stop)
+		if (cfg->stop)
 			break;
 
 		if ((ret = __wt_epoch(NULL, &s)) != 0) {
 			lprintf(cfg, ret, 0, "Get time failed in checkpoint.");
 			goto err;
 		}
-		g_ckpt = 1;
+		cfg->ckpt = 1;
 		if ((ret = session->checkpoint(session, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
 			goto err;
 		}
-		g_ckpt = 0;
+		cfg->ckpt = 0;
 		++thread->ckpt.ops;
 
 		if ((ret = __wt_epoch(NULL, &e)) != 0) {
@@ -814,7 +810,7 @@ checkpoint_worker(void *arg)
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
 
 	return (NULL);
@@ -842,14 +838,14 @@ execute_populate(CONFIG *cfg)
 	    cfg->popthreads, cfg->populate_threads, populate_thread)) != 0)
 		return (ret);
 
-	g_insert_key = 0;
+	cfg->insert_key = 0;
 
 	if ((ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
 		return (ret);
 	}
 	for (elapsed = 0, interval = 0, last_ops = 0;
-	    g_insert_key < cfg->icount && g_error == 0;) {
+	    cfg->insert_key < cfg->icount && cfg->error == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
 		 * granularity, each 100th increment of elapsed is a single
@@ -862,14 +858,14 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
-		g_totalsec += cfg->report_interval;
-		g_insert_ops = sum_pop_ops(cfg);
+		cfg->totalsec += cfg->report_interval;
+		cfg->insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
 		    PRIu32 ") in %" PRIu32 " secs (%" PRIu32 " total secs)",
-		    g_insert_ops - last_ops, g_insert_ops,
-		    cfg->icount, cfg->report_interval, g_totalsec);
-		last_ops = g_insert_ops;
+		    cfg->insert_ops - last_ops, cfg->insert_ops,
+		    cfg->icount, cfg->report_interval, cfg->totalsec);
+		last_ops = cfg->insert_ops;
 	}
 	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
@@ -890,7 +886,7 @@ execute_populate(CONFIG *cfg)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
-	if (g_error != 0) {
+	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Populate thread(s) exited without finishing.");
 		return (WT_ERROR);
@@ -971,8 +967,8 @@ execute_workload(CONFIG *cfg)
 	u_int i;
 	int ret, t_ret;
 
-	g_insert_key = 0;
-	g_insert_ops = g_read_ops = g_update_ops = 0;
+	cfg->insert_key = 0;
+	cfg->insert_ops = cfg->read_ops = cfg->update_ops = 0;
 
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
@@ -1004,8 +1000,8 @@ execute_workload(CONFIG *cfg)
 		threads += workp->threads;
 	}
 
-	for (interval = cfg->report_interval, 
-	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
+	for (interval = cfg->report_interval, run_time = cfg->run_time,
+	    run_ops = cfg->run_ops; cfg->error == 0;) {
 		/*
 		 * Sleep for one second at a time.
 		 * If we are tracking run time, check to see if we're done, and
@@ -1020,46 +1016,46 @@ execute_workload(CONFIG *cfg)
 		}
 
 		/* Sum the operations we've done. */
-		g_ckpt_ops = sum_ckpt_ops(cfg);
-		g_insert_ops = sum_insert_ops(cfg);
-		g_read_ops = sum_read_ops(cfg);
-		g_update_ops = sum_update_ops(cfg);
+		cfg->ckpt_ops = sum_ckpt_ops(cfg);
+		cfg->insert_ops = sum_insert_ops(cfg);
+		cfg->read_ops = sum_read_ops(cfg);
+		cfg->update_ops = sum_update_ops(cfg);
 
 		/* If we're checking total operations, see if we're done. */
-		if (run_ops != 0 &&
-		    run_ops <= g_insert_ops + g_read_ops + g_update_ops)
+		if (run_ops != 0 && run_ops <=
+		    cfg->insert_ops + cfg->read_ops + cfg->update_ops)
 			break;
 
 		/* If writing out throughput information, see if it's time. */
 		if (interval == 0 || --interval > 0)
 			continue;
 		interval = cfg->report_interval;
-		g_totalsec += cfg->report_interval;
+		cfg->totalsec += cfg->report_interval;
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
 		    " updates, %" PRIu64 " checkpoints in %" PRIu32
 		    " secs (%" PRIu32 " total secs)",
-		    g_read_ops - last_reads,
-		    g_insert_ops - last_inserts,
-		    g_update_ops - last_updates,
-		    g_ckpt_ops - last_ckpts,
-		    cfg->report_interval, g_totalsec);
-		last_reads = g_read_ops;
-		last_inserts = g_insert_ops;
-		last_updates = g_update_ops;
-		last_ckpts = g_ckpt_ops;
+		    cfg->read_ops - last_reads,
+		    cfg->insert_ops - last_inserts,
+		    cfg->update_ops - last_updates,
+		    cfg->ckpt_ops - last_ckpts,
+		    cfg->report_interval, cfg->totalsec);
+		last_reads = cfg->read_ops;
+		last_inserts = cfg->insert_ops;
+		last_updates = cfg->update_ops;
+		last_ckpts = cfg->ckpt_ops;
 	}
 
 	/* Notify the worker threads they are done. */
-err:	g_stop = 1;
+err:	cfg->stop = 1;
 
 	if ((t_ret = stop_threads(
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
 		ret = t_ret;
 
 	/* Report if any worker threads didn't finish. */
-	if (g_error != 0) {
+	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Worker thread(s) exited without finishing.");
 		if (ret == 0)
@@ -1454,30 +1450,30 @@ main(int argc, char *argv[])
 			goto err;
 
 		/* One final summation of the operations we've completed. */
-		g_read_ops = sum_read_ops(cfg);
-		g_insert_ops = sum_insert_ops(cfg);
-		g_update_ops = sum_update_ops(cfg);
-		g_ckpt_ops = sum_ckpt_ops(cfg);
-		total_ops = g_read_ops + g_insert_ops + g_update_ops;
+		cfg->read_ops = sum_read_ops(cfg);
+		cfg->insert_ops = sum_insert_ops(cfg);
+		cfg->update_ops = sum_update_ops(cfg);
+		cfg->ckpt_ops = sum_ckpt_ops(cfg);
+		total_ops = cfg->read_ops + cfg->insert_ops + cfg->update_ops;
 
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " read operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
-		    g_read_ops, (g_read_ops * 100) / total_ops,
-		    g_read_ops / cfg->run_time);
+		    cfg->read_ops, (cfg->read_ops * 100) / total_ops,
+		    cfg->read_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " insert operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
-		    g_insert_ops, (g_insert_ops * 100) / total_ops,
-		    g_insert_ops / cfg->run_time);
+		    cfg->insert_ops, (cfg->insert_ops * 100) / total_ops,
+		    cfg->insert_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
-		    g_update_ops, (g_update_ops * 100) / total_ops,
-		    g_update_ops / cfg->run_time);
+		    cfg->update_ops, (cfg->update_ops * 100) / total_ops,
+		    cfg->update_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations",
-		    g_ckpt_ops);
+		    cfg->ckpt_ops);
 
 		latency_print(cfg);
 	}
@@ -1489,7 +1485,7 @@ err:		if (ret == 0)
 	}
 
 	/* Notify the worker threads they are done. */
-	g_stop = 1;
+	cfg->stop = 1;
 
 	if ((t_ret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
@@ -1617,7 +1613,7 @@ wtperf_value_range(CONFIG *cfg)
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
 
-	return (cfg->icount + g_insert_key - (u_int)(cfg->workers_cnt + 1));
+	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 
 static uint64_t

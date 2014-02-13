@@ -102,6 +102,21 @@ struct __config {			/* Configuration struction */
 	WORKLOAD	*workload;		/* Workloads */
 	u_int		 workload_cnt;
 
+	/* State tracking variables. */
+
+	uint64_t ckpt_ops;		/* checkpoint operations */
+	uint64_t insert_ops;		/* insert operations */
+	uint64_t read_ops;		/* read operations */
+	uint64_t update_ops;		/* update operations */
+
+	uint64_t insert_key;		/* insert key */
+
+	volatile int ckpt;		/* checkpoint in progress */
+	volatile int error;		/* thread error */
+	volatile int stop;		/* notify threads to stop */
+
+	volatile uint32_t totalsec;	/* total seconds running */
+
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
