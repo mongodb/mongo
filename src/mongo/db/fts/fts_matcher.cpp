@@ -40,8 +40,7 @@ namespace mongo {
 
         FTSMatcher::FTSMatcher( const FTSQuery& query, const FTSSpec& spec )
             : _query( query ),
-              _spec( spec ),
-              _stemmer( query.getLanguage() ){
+              _spec( spec ) {
         }
 
         /*
@@ -61,7 +60,7 @@ namespace mongo {
 
             while ( it.more() ) {
                 FTSIteratorValue val = it.next();
-                if (_hasNegativeTerm_string( val._text )) {
+                if (_hasNegativeTerm_string( val._language, val._text )) {
                     return true;
                 }
             }
@@ -73,14 +72,16 @@ namespace mongo {
          * Checks if any of the negTerms is in the tokenized string
          * @param raw, the raw string to be tokenized
          */
-        bool FTSMatcher::_hasNegativeTerm_string( const string& raw ) const {
+        bool FTSMatcher::_hasNegativeTerm_string( const FTSLanguage* language,
+                                                  const string& raw ) const {
 
-            Tokenizer i( _query.getLanguage(), raw );
+            Tokenizer i( *language, raw );
+            Stemmer stemmer( *language );
             while ( i.more() ) {
                 Token t = i.next();
                 if ( t.type != Token::TEXT )
                     continue;
-                string word = _stemmer.stem( tolowerString( t.data ) );
+                string word = stemmer.stem( tolowerString( t.data ) );
                 if ( _query.getNegatedTerms().count( word ) > 0 )
                     return true;
             }

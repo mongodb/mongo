@@ -62,7 +62,7 @@ namespace mongo {
             /**
              * @return true if raw has a negated term
              */
-            bool _hasNegativeTerm_string( const string& raw ) const;
+            bool _hasNegativeTerm_string( const FTSLanguage* language, const string& raw ) const;
 
             /**
              * @return true if raw has a phrase
@@ -71,7 +71,6 @@ namespace mongo {
 
             FTSQuery _query;
             FTSSpec  _spec;
-            Stemmer  _stemmer;
         };
 
     }
