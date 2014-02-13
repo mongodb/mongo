@@ -32,7 +32,7 @@ s = startParallelShell(
 // Find operations are error free.
 for( i = 0; i < 200; ++i ) {
     t.find( { a:{ $gte:0 } } ).hint( { a:1 } ).itcount();
-    assert( !db.getLastError() );
+    assert.gleSuccess( db );
 }
 
 s();
