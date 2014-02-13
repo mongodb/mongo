@@ -78,6 +78,7 @@ namespace mongo {
         static const BSONField<BSONObj> indexBounds;
         static const BSONField<std::vector<TypeExplain*> > allPlans;
         static const BSONField<TypeExplain*> oldPlan;
+        static const BSONField<bool> indexFilterApplied;
         static const BSONField<std::string> server;
 
         //
@@ -161,6 +162,11 @@ namespace mongo {
         void unsetIDHack();
         bool isIDHackSet() const;
         bool getIDHack() const;
+
+        void setIndexFilterApplied(bool indexFilterApplied);
+        void unsetIndexFilterApplied();
+        bool isIndexFilterAppliedSet() const;
+        bool getIndexFilterApplied() const;
 
         void setNYields(long long nYields);
         void unsetNYields();
@@ -248,6 +254,10 @@ namespace mongo {
         // (O)  whether the idhack was used to answer this query
         bool _idHack;
         bool _isIDHackSet;
+
+        // (O)  whether index filters were used in planning this query
+        bool _indexFilterApplied;
+        bool _isIndexFilterAppliedSet;
 
         // (O)  number times this plan released and reacquired its lock
         long long _nYields;

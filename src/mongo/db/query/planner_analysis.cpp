@@ -424,6 +424,7 @@ namespace mongo {
         soln->filterData = query.getQueryObj();
         verify(soln->filterData.isOwned());
         soln->ns = query.ns();
+        soln->indexFilterApplied = params.indexFiltersApplied;
 
         solnRoot->computeProperties();
 

@@ -159,6 +159,9 @@ namespace mongo {
             }
             (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
             (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+            if (NULL != _solution.get()) {
+                (*explain)->setIndexFilterApplied(_solution->indexFilterApplied);
+            }
         }
         else if (NULL != planInfo) {
             if (NULL == _solution.get()) {

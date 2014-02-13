@@ -576,6 +576,9 @@ namespace mongo {
 
             (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
             (*explain)->setNScannedAllPlans(nScannedAllPlans);
+            if (NULL != _bestSolution.get()) {
+                (*explain)->setIndexFilterApplied(_bestSolution->indexFilterApplied);
+            }
         }
         else if (NULL != planInfo) {
             if (NULL == _bestSolution.get()) {

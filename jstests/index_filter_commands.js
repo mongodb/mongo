@@ -126,3 +126,42 @@ assert(!planCacheContains(shape), 'plan cache for query shape not flushed after 
 
 print('Plan details before setting filter = ' + tojson(planBeforeSetFilter.details, '', true));
 print('Plan details after setting filter = ' + tojson(planAfterSetFilter.details, '', true));
+
+//
+// explain.filterSet
+// cursor.explain() should indicate if index filter has been applied.
+// The following 3 runners should always provide a value for 'filterSet':
+// - SingleSolutionRunner
+// - MultiPlanRunner
+// - CachedPlanRuner
+//
+
+// No filter set.
+
+t.getPlanCache().clear();
+// SingleSolutionRunner
+assert.eq(false, t.find({z: 1}).explain().filterSet,
+          'missing or invalid filterSet field in SingleSolutionRunner explain');
+// MultiPlanRunner
+assert.eq(false, t.find(queryA1, projectionA1).sort(sortA1).explain().filterSet,
+          'missing or invalid filterSet field in MultiPlanRunner explain');
+// CachedPlanRunner
+assert.eq(false, t.find(queryA1, projectionA1).sort(sortA1).explain().filterSet,
+          'missing or invalid filterSet field in CachedPlanRunner explain');
+
+// Add index filter.
+assert.commandWorked(t.runCommand('planCacheSetFilter',
+    {query: queryA1, sort: sortA1, projection: projectionA1, indexes: [indexA1B1, indexA1C1]}));
+// Index filter with non-existent index key pattern to force use of single solution runner.
+assert.commandWorked(t.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
+
+t.getPlanCache().clear();
+// SingleSolutionRunner
+assert.eq(true, t.find({z: 1}).explain().filterSet,
+       'missing or invalid filterSet field in SingleSolutionRunner explain');
+// MultiPlanRunner
+assert.eq(true, t.find(queryA1, projectionA1).sort(sortA1).explain().filterSet,
+       'missing or invalid filterSet field in MultiPlanRunner explain');
+// CachedPlanRunner
+assert.eq(true, t.find(queryA1, projectionA1).sort(sortA1).explain().filterSet,
+       'missing or invalid filterSet field in CachedPlanRunner explain');

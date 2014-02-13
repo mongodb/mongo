@@ -112,6 +112,7 @@ namespace mongo {
             }
             (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
             (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+            (*explain)->setIndexFilterApplied(_solution->indexFilterApplied);
         }
         else if (NULL != planInfo) {
             if (NULL == _solution.get()) {

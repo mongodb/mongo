@@ -155,7 +155,7 @@ namespace mongo {
      * of stages.
      */
     struct QuerySolution {
-        QuerySolution() : hasSortStage(false) { }
+        QuerySolution() : hasSortStage(false), indexFilterApplied(false) { }
 
         // Owned here.
         scoped_ptr<QuerySolutionNode> root;
@@ -168,6 +168,10 @@ namespace mongo {
         // If the solution has a sort stage, the sort wasn't provided by an index, so we might want
         // to scan an index to provide that sort in a non-blocking fashion.
         bool hasSortStage;
+
+        // Runner executing this solution might be interested in knowing
+        // if the planning process for this solution was based on filtered indices.
+        bool indexFilterApplied;
 
         // Owned here. Used by the plan cache.
         boost::scoped_ptr<SolutionCacheData> cacheData;

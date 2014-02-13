@@ -53,6 +53,7 @@ namespace mongo {
     const BSONField<BSONObj> TypeExplain::indexBounds("indexBounds");
     const BSONField<std::vector<TypeExplain*> > TypeExplain::allPlans("allPlans");
     const BSONField<TypeExplain*> TypeExplain::oldPlan("oldPlan");
+    const BSONField<bool> TypeExplain::indexFilterApplied("filterSet");
     const BSONField<std::string> TypeExplain::server("server");
 
     TypeExplain::TypeExplain() {
@@ -159,6 +160,8 @@ namespace mongo {
         if (_oldPlan.get()) builder.append(oldPlan(), _oldPlan->toBSON());
 
         if (_isServerSet) builder.append(server(), _server);
+
+        if (_isIndexFilterAppliedSet) builder.append(indexFilterApplied(), _indexFilterApplied);
 
         // Add this at the end as it can be huge
         if (!stats.isEmpty()) {
@@ -286,6 +289,9 @@ namespace mongo {
         _idHack = false;
         _isIDHackSet = false;
 
+        _indexFilterApplied = false;
+        _isIndexFilterAppliedSet = false;
+
         _nYields = 0;
         _isNYieldsSet = false;
 
@@ -350,6 +356,9 @@ namespace mongo {
 
         other->_idHack = _idHack;
         other->_isIDHackSet = _isIDHackSet;
+
+        other->_indexFilterApplied = _indexFilterApplied;
+        other->_isIndexFilterAppliedSet = _isIndexFilterAppliedSet;
 
         other->_nYields = _nYields;
         other->_isNYieldsSet = _isNYieldsSet;
@@ -616,6 +625,24 @@ namespace mongo {
     bool TypeExplain::getIDHack() const {
         verify(_isIDHackSet);
         return _idHack;
+    }
+
+    void TypeExplain::setIndexFilterApplied(bool indexFilterApplied) {
+        _indexFilterApplied = indexFilterApplied;
+        _isIndexFilterAppliedSet = true;
+    }
+
+    void TypeExplain::unsetIndexFilterApplied() {
+        _isIndexFilterAppliedSet = false;
+    }
+
+    bool TypeExplain::isIndexFilterAppliedSet() const {
+        return _isIndexFilterAppliedSet;
+    }
+
+    bool TypeExplain::getIndexFilterApplied() const {
+        verify(_isIndexFilterAppliedSet);
+        return _indexFilterApplied;
     }
 
     void TypeExplain::setNYields(long long nYields) {
