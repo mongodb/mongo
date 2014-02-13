@@ -315,6 +315,64 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status explainMultiPlan(const PlanStageStats& stats,
+                            const std::vector<PlanStageStats*>& candidateStats,
+                            QuerySolution* solution,
+                            TypeExplain** explain) {
+        invariant(explain);
+
+        Status status = explainPlan(stats, explain, true /* full details */);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // TODO Hook the cached plan if there was one.
+        // (*explain)->setOldPlan(???);
+
+        //
+        // Alternative plans' explains
+        //
+        // We get information about all the plans considered and hook them up the the main
+        // explain structure. If we fail to get any of them, we still return the main explain.
+        // Make sure we initialize the "*AllPlans" fields with the plan that was chose.
+        //
+
+        TypeExplain* chosenPlan = NULL;
+        status = explainPlan(stats, &chosenPlan, false /* no full details */);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        (*explain)->addToAllPlans(chosenPlan); // ownership xfer
+
+        size_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
+        size_t nScannedAllPlans = chosenPlan->getNScanned();
+        for (std::vector<PlanStageStats*>::const_iterator it = candidateStats.begin();
+             it != candidateStats.end();
+             ++it) {
+
+            TypeExplain* candidateExplain = NULL;
+            status = explainPlan(**it, &candidateExplain, false /* no full details */);
+            if (status != Status::OK()) {
+                continue;
+            }
+
+            (*explain)->addToAllPlans(candidateExplain); // ownership xfer
+
+            nScannedObjectsAllPlans += candidateExplain->getNScannedObjects();
+            nScannedAllPlans += candidateExplain->getNScanned();
+        }
+
+        (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
+        (*explain)->setNScannedAllPlans(nScannedAllPlans);
+
+        if (NULL != solution) {
+            (*explain)->setIndexFilterApplied(solution->indexFilterApplied);
+        }
+
+        return Status::OK();
+    }
+
     // TODO: where does this really live?  stage_types.h?
     string stageTypeString(StageType type) {
         switch (type) {

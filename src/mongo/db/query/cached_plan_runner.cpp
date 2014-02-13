@@ -139,34 +139,64 @@ namespace mongo {
     Status CachedPlanRunner::getInfo(TypeExplain** explain,
                                      PlanInfo** planInfo) const {
         if (NULL != explain) {
-            verify(_exec.get());
+            if (NULL == _exec.get()) {
+                return Status(ErrorCodes::InternalError, "No plan available to provide stats");
+            }
+
+            //
+            // Explain for the winner plan
+            //
 
             scoped_ptr<PlanStageStats> stats(_exec->getStats());
             if (NULL == stats.get()) {
                 return Status(ErrorCodes::InternalError, "no stats available to explain plan");
             }
 
-            Status status = explainPlan(*stats, explain, true /* full details */);
-            if (!status.isOK()) {
-                return status;
+            // When we need to explain a cached plan runner, we fetch the candidate
+            // stats from the plan cache. This has the advantage of not cloning the
+            // candidate stats every time we run a cached plan. Downside is that
+            // the plan cache may change on us or the runner may be killed, making the
+            // candidate stats unavaible for explain.
+
+            // If plan cache/collection is not available (due to runner being killed),
+            // leave alternate plans out of explain.
+            if (_collection == NULL) {
+                warning() << "unable to get stats for alternate plans for explain - "
+                          << "collection is not available. killed: " << _killed;
+                std::vector<PlanStageStats*> emptyStats;
+                return explainMultiPlan(*stats, emptyStats, _solution.get(), explain);
             }
 
-            // Fill in explain fields that are accounted by on the runner level.
-            TypeExplain* chosenPlan = NULL;
-            explainPlan(*stats, &chosenPlan, false /* no full details */);
-            if (chosenPlan) {
-                (*explain)->addToAllPlans(chosenPlan);
+            PlanCache* planCache = _collection->infoCache()->getPlanCache();
+            PlanCacheEntry* entryRaw;
+            Status result = planCache->getEntry(*_canonicalQuery, &entryRaw);
+
+            // As long as we have the winning stats, we should always try
+            // to generate the explain report even if the candidate stats are not available.
+            if (!result.isOK()) {
+                warning() << "unable to get stats for alternate plans for explain - "
+                          << "plan cache not available: " << result;
+                std::vector<PlanStageStats*> emptyStats;
+                return explainMultiPlan(*stats, emptyStats, _solution.get(), explain);
             }
-            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
-            (*explain)->setNScannedAllPlans((*explain)->getNScanned());
-            if (NULL != _solution.get()) {
-                (*explain)->setIndexFilterApplied(_solution->indexFilterApplied);
+            scoped_ptr<PlanCacheEntry> entry(entryRaw);
+
+            if (entry->decision->stats.empty()) {
+                warning() << "unable to get stats for alternate plans for explain - "
+                          << "plan cache is missing stats";
+                std::vector<PlanStageStats*> emptyStats;
+                return explainMultiPlan(*stats, emptyStats, _solution.get(), explain);
             }
+
+            // Skip first stats entry in plan entry decision because that is the winner's stats.
+            std::vector<PlanStageStats*> candidateStats(entry->decision->stats.begin() + 1,
+                                                        entry->decision->stats.end());
+            return explainMultiPlan(*stats, candidateStats, _solution.get(), explain);
         }
         else if (NULL != planInfo) {
             if (NULL == _solution.get()) {
                 return Status(ErrorCodes::InternalError,
-                              "no solution available for plan info");
+                              "no best solution available for plan info");
             }
             getPlanInfo(*_solution, planInfo);
         }

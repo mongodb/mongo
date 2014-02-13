@@ -97,7 +97,7 @@ assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1 },
                        t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).sort( { c:1 } ) );
 
 // Document matched by three query plans, with a skip.
-assertUnhintedExplain( { n:0, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:1 },
+assertUnhintedExplain( { n:0, nscanned:1, nscannedObjects:1 },
                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).skip( 1 ) );
 
 // Hybrid ordered and unordered plans.

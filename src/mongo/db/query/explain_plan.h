@@ -55,6 +55,19 @@ namespace mongo {
     Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails);
 
     /**
+     * Returns OK, allocating and filling in '*explain' with details of
+     * the "winner" plan. Caller takes ownership of '*explain'. Otherwise,
+     * return a status describing the error.
+     *
+     * 'bestStats', 'candidateStats' and 'solution' are used to fill in '*explain'.
+     * Used by both MultiPlanRunner and CachedPlanRunner.
+     */
+    Status explainMultiPlan(const PlanStageStats& stats,
+                            const std::vector<PlanStageStats*>& candidateStats,
+                            QuerySolution* solution,
+                            TypeExplain** explain);
+
+    /**
      * If the out-parameter 'info' is non-null, fills in '*infoOut' with information
      * from the query solution tree 'soln' that can be determined before the query is done
      * running. Whereas 'explainPlan(...)' above is for collecting runtime debug information,

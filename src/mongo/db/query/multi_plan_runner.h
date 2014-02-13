@@ -100,8 +100,6 @@ namespace mongo {
          * Returns OK, allocating and filling in '*explain' and '*planInfo' with details of
          * the "winner" plan. Caller takes ownership of '*explain' and '*planInfo'. Otherwise,
          * return a status describing the error.
-         *
-         * TOOD: fill in the explain of all candidate plans
          */
         virtual Status getInfo(TypeExplain** explain,
                                PlanInfo** planInfo) const;

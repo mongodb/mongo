@@ -304,3 +304,34 @@ assert.eq(1, getShapes().length, 'plan cache should not be empty after running c
 // Clear cache.
 planCache.clear();
 assert.eq(0, getShapes().length, 'plan cache not empty after clearing');
+
+
+
+//
+// explain for CachedPlanRunner
+// This tests that the allPlans information in the explain outpout from CachedPlanRunner
+// contains similar information to that of MultiPlanRunner.
+//
+
+planCache.clear();
+
+// MultiPlanRunner explain
+var multiPlanRunnerExplain = t.find(queryB, projectionB).sort(sortB).explain(true);
+
+// CachedPlanRunner explain
+var cachedPlanRunnerExplain = t.find(queryB, projectionB).sort(sortB).explain(true);
+
+print('multi plan runner explain = ' + tojson(multiPlanRunnerExplain));
+print('cached plan runner explain = ' + tojson(cachedPlanRunnerExplain));
+
+assert.eq(multiPlanRunnerExplain.allPlans.length, cachedPlanRunnerExplain.allPlans.length,
+          'explain for multi plan and cached plan runner should have same number of ' +
+          'entries in allPlans');
+
+for (var i = 0; i < multiPlanRunnerExplain.allPlans.length; ++i) {
+    assert.neq(undefined, cachedPlanRunnerExplain.allPlans[i],
+               'cound not find allPlans[' + i + '] in cached plan runner explain');
+    assert.eq(multiPlanRunnerExplain.allPlans[i].cursor, cachedPlanRunnerExplain.allPlans[i].cursor,
+              'explain for multi plan and cached plan runner should have same cursor for ' +
+              'allPlans[' + i + ']');
+}
