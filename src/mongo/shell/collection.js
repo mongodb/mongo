@@ -72,6 +72,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
     print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
+    print("\tdb." + shortName + ".getWriteConcern() - returns the write concern used for any operations on this collection, inherited from server/db if set");
     print("\tdb." + shortName + ".setWriteConcern( <write concern doc> ) - sets the write concern for writes to the collection");
     print("\tdb." + shortName + ".unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the collection");
     // print("\tdb." + shortName + ".getDiskStorageStats({...}) - prints a summary of disk usage statistics");
@@ -1381,8 +1382,9 @@ DBCollection.prototype.getWriteConcern = function() {
     if (this._writeConcern)
         return this._writeConcern;
 
-    if (this._mongo.getWriteConcern())
-        return this._mongo.getWriteConcern();
+
+    if (this._db.getWriteConcern())
+        return this._db.getWriteConcern();
 
     return null;
 };

@@ -341,9 +341,8 @@ var _bulk_api_module = (function() {
    * Wraps the operations done for the batch
    ***********************************************************/
   var Bulk = function(collection, ordered) {
-    // Namespace for the operation
     var self = this;
-    var namespace = collection.getName();
+    var coll = collection;
     var executed = false;
 
     // Set max byte size
@@ -410,6 +409,10 @@ var _bulk_api_module = (function() {
       })
     }
 
+    this.getOperations = function() {
+      return batches;
+    }
+
     // Add to internal list of documents
     var addToOperationsList = function(docType, document) {
       // Get the bsonSize
@@ -467,7 +470,7 @@ var _bulk_api_module = (function() {
      * @param document {Object} the document to insert.
      */
     this.insert = function(document) {
-      if (!IndexCollPattern.test(namespace)) {
+      if (!IndexCollPattern.test(coll.getName())) {
         collection._validateForStorage(document);
       }
 
@@ -649,7 +652,7 @@ var _bulk_api_module = (function() {
 
       // Generate the right update
       if(batch.batchType == UPDATE) {
-        cmd = { update: namespace, updates: batch.operations, ordered: ordered }
+        cmd = { update: coll.getName(), updates: batch.operations, ordered: ordered }
       } else if(batch.batchType == INSERT) {
         var transformedInserts = [];
         batch.operations.forEach(function(insertDoc) {
@@ -657,13 +660,13 @@ var _bulk_api_module = (function() {
         });
         batch.operations = transformedInserts;
 
-        cmd = { insert: namespace, documents: batch.operations, ordered: ordered }
+        cmd = { insert: coll.getName(), documents: batch.operations, ordered: ordered }
       } else if(batch.batchType == REMOVE) {
-        cmd = { delete: namespace, deletes: batch.operations, ordered: ordered }
+        cmd = { delete: coll.getName(), deletes: batch.operations, ordered: ordered }
       }
 
       // If we have a write concern
-      if(writeConcern != null) {
+      if(writeConcern) {
         cmd.writeConcern = writeConcern;
       }
 
@@ -880,8 +883,8 @@ var _bulk_api_module = (function() {
     this.execute = function(_writeConcern) {
       if(executed) throw "operations cannot be re-executed";
 
-      // If writeConcern set
-      if(_writeConcern) writeConcern = _writeConcern;
+      // If writeConcern set, use it, else get from collection (which will inherit from db/mongo)
+      writeConcern = _writeConcern ? _writeConcern : coll.getWriteConcern();
 
       // If we have current batch
       if(currentBatch) batches.push(currentBatch);
