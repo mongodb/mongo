@@ -171,7 +171,8 @@ namespace mongo {
         {
             // Note: This will *always* be a single-host connection
             ConnectionString serverLoc(*serverIt);
-            dassert(serverLoc.type() == ConnectionString::MASTER);
+            dassert(serverLoc.type() == ConnectionString::MASTER || 
+                    serverLoc.type() == ConnectionString::CUSTOM); // for dbtests
 
             log() << "checking that version of host " << serverLoc << " is compatible with "
                   << minMongoVersion << endl;
