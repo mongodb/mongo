@@ -15,31 +15,12 @@
 
 #include "mongo/client/auth_helpers.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/util/md5.hpp"
 
 namespace mongo {
 namespace auth {
 
     const std::string schemaVersionServerParameter = "authSchemaVersion";
-
-    std::string createPasswordDigest(const StringData& username,
-                                     const StringData& clearTextPassword) {
-        md5digest d;
-        {
-            md5_state_t st;
-            md5_init(&st);
-            md5_append(&st, (const md5_byte_t *) username.rawData(), username.size());
-            md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
-            md5_append(&st,
-                       (const md5_byte_t *) clearTextPassword.rawData(),
-                       clearTextPassword.size());
-            md5_finish(&st, d);
-        }
-        return digestToString( d );
-    }
 
     Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion) {
         try {

@@ -27,7 +27,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/auth_helpers.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/platform/cstdint.h"
@@ -35,6 +34,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/password_digest.h"
 
 namespace mongo {
 namespace {
@@ -58,7 +58,7 @@ namespace {
      * Gets the password data from "saslParameters" and stores it to "outPassword".
      *
      * If "digestPassword" indicates that the password needs to be "digested" via
-     * auth::createPasswordDigest(), this method takes care of that.
+     * mongo::createPasswordDigest(), this method takes care of that.
      * On success, the value of "*outPassword" is always the correct value to set
      * as the password on the SaslClientSession.
      *
@@ -84,7 +84,7 @@ namespace {
             if (!status.isOK())
                 return status;
 
-            *outPassword = auth::createPasswordDigest(user, rawPassword);
+            *outPassword = mongo::createPasswordDigest(user, rawPassword);
         }
         else {
             *outPassword = rawPassword;

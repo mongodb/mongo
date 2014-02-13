@@ -38,6 +38,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/util/password_digest.h"
 
 static bool authParamsSet = false;
 
@@ -137,7 +138,7 @@ namespace mongo {
         }
 
         User::CredentialData credentials;
-        credentials.password = DBClientWithCommands::createPasswordDigest(
+        credentials.password = mongo::createPasswordDigest(
                 internalSecurity.user->getName().getUser().toString(), str);
         internalSecurity.user->setCredentials(credentials);
 

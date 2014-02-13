@@ -24,6 +24,7 @@
 
 #include <boost/function.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"

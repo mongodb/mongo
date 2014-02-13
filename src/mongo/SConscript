@@ -68,7 +68,8 @@ env.CppUnitTest('util/time_support_test', 'util/time_support_test.cpp', LIBDEPS=
 env.Library('stringutils', ['util/stringutils.cpp', 'util/base64.cpp', 'util/hex.cpp'])
 
 env.Library('md5', [
-        'util/md5.cpp'
+        'util/md5.cpp',
+        'util/password_digest.cpp',
         ])
 
 env.CppUnitTest( "md5_test", ["util/md5_test.cpp", "util/md5main.cpp" ],
@@ -220,7 +221,7 @@ env.Library( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
-env.Library('auth_helpers', ['client/auth_helpers.cpp'], LIBDEPS=['md5'])
+env.Library('auth_helpers', ['client/auth_helpers.cpp'])
 
 env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],

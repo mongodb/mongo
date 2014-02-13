@@ -19,7 +19,6 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/auth_helpers.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
@@ -30,9 +29,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/password_digest.h"
 
 namespace mongo {
 
@@ -544,7 +543,7 @@ namespace mongo {
     BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
 
     string DBClientWithCommands::createPasswordDigest( const string & username , const string & clearTextPassword ) {
-        return auth::createPasswordDigest(username, clearTextPassword);
+        return mongo::createPasswordDigest(username, clearTextPassword);
     }
 
     void DBClientWithCommands::_auth(const BSONObj& params) {

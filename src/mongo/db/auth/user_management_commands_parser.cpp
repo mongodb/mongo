@@ -43,6 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/password_digest.h"
 
 namespace mongo {
 namespace auth {
@@ -258,7 +259,8 @@ namespace auth {
             }
 
             if (digestPassword) {
-                parsedArgs->hashedPassword = auth::createPasswordDigest(userName, password);
+                parsedArgs->hashedPassword = mongo::createPasswordDigest(
+                    userName, password);
             } else {
                 parsedArgs->hashedPassword = password;
             }
