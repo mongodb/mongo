@@ -1130,7 +1130,7 @@ create_uris(CONFIG *cfg)
 	}
 
 	base_uri_len = strlen(cfg->uri);
-	cfg->uris = (char **)malloc(cfg->table_count * sizeof(char *));
+	cfg->uris = (char **)calloc(cfg->table_count, sizeof(char *));
 	if (cfg->uris == NULL) {
 		ret = ENOMEM;
 		goto err;
