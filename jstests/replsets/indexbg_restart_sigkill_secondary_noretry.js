@@ -68,7 +68,7 @@
 
     // Wait for the secondary to get caught up
     jsTest.log("Waiting for replication");
-    replTest.awaitReplication();
+    replTest.awaitReplication(300000);
 
     // Make sure a journal flush for the oplog occurs, by doing a local journaled write to the
     // secondary
