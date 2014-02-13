@@ -22,10 +22,6 @@ libEnv.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
                ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
                '$PYTHON $SOURCES $TARGETS')
 
-libEnv.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
-               ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
-               '$PYTHON $SOURCES $TARGETS')
-
 clientSourceBasic = [
     'mongo/base/error_codes.cpp',
     'mongo/base/global_initializer.cpp',

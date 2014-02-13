@@ -28,7 +28,6 @@
 
 #include "mongo/util/fail_point_registry.h"
 
-#include "mongo/db/commands.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
