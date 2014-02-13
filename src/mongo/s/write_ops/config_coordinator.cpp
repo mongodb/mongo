@@ -288,11 +288,17 @@ namespace mongo {
             return;
         }
 
+        BSONObjBuilder builder;
+        for ( vector<ConfigResponse*>::const_iterator it = responses.begin(); it != responses.end();
+                ++it ) {
+            builder.append( ( *it )->configHost.toString(), ( *it )->response.toBSON() );
+        }
+
         clientResponse->setOk( false );
         clientResponse->setErrCode( ErrorCodes::ManualInterventionRequired );
         clientResponse->setErrMessage( "config write was not consistent, "
-                                       "manual intervention may be required" );
-
+                                       "manual intervention may be required. "
+                                       "config responses: " + builder.obj().toString() );
     }
 
     static void combineFsyncErrors( const vector<ConfigFsyncResponse*>& responses,
