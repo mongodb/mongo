@@ -171,9 +171,9 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	/* Fast-discard currently only works on row-store trees. */
 	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;
 
+	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
 	compact = LF_ISSET(WT_TREE_COMPACT) ? 1 : 0;
 	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
-	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
 	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
 	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
 	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
