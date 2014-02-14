@@ -83,7 +83,6 @@ clientSourceBasic = [
     'mongo/util/fail_point_registry.cpp',
     'mongo/util/fail_point_service.cpp',
     'mongo/util/hex.cpp',
-    'mongo/util/histogram.cpp',
     'mongo/util/intrusive_counter.cpp',
     'mongo/util/log.cpp',
     'mongo/util/md5.cpp',
