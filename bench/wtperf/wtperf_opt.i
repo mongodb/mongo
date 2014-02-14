@@ -87,6 +87,9 @@ DEF_OPT_AS_STRING(compression, "none",
     "'none' (default), 'bzip', 'snappy', 'zlib'")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
+DEF_OPT_AS_UINT32(database_count, 1,
+    "number of WiredTiger databases to use. Each database will execute the"
+    " workload in parallel.")
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to initially populate. If multiple tables are "
     "configured, each table has this many items inserted.")

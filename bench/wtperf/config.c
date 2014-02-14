@@ -60,6 +60,23 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
 
+	if (src->uris != NULL) {
+		dest->uris = (char **)calloc(src->table_count, sizeof(char *));
+		for (i = 0; i < src->table_count; i++)
+			dest->uris[i] = strdup(src->uris[i]);
+	}
+	dest->ckptthreads = NULL;
+	dest->popthreads = NULL;
+	dest->workers = NULL;
+
+	if (src->uri != NULL)
+		dest->uri = strdup(src->uri);
+	if (src->workload != NULL) {
+		dest->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD));
+		memcpy(dest->workload,
+		    src->workload, WORKLOAD_MAX * sizeof(WORKLOAD));
+	}
+
 	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
 		if (config_opts[i].type == STRING_TYPE ||
 		    config_opts[i].type == CONFIG_STRING_TYPE) {
@@ -102,6 +119,7 @@ config_free(CONFIG *cfg)
 		free(cfg->uris);
 	}
 
+	free(cfg->ckptthreads);
 	free(cfg->popthreads);
 	free(cfg->uri);
 	free(cfg->workers);
@@ -509,6 +527,10 @@ config_sanity(CONFIG *cfg)
 	}
 	if (cfg->table_count > 99) {
 		fprintf(stderr, "table count greater than 99\n");
+		return (1);
+	}
+	if (cfg->database_count > 99) {
+		fprintf(stderr, "database count greater than 99\n");
 		return (1);
 	}
 	return (0);
