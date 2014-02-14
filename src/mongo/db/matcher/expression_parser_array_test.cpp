@@ -366,6 +366,54 @@ namespace mongo {
 
     }
 
+    // $all and $elemMatch on dotted field.
+    // Top level field can be either document or array.
+    TEST( MatchExpressionParserArrayTest, AllElemMatch2 ) {
+        BSONObj internal = BSON( "z" << 1 );
+        BSONObj query = BSON( "x.y" << BSON( "$all" <<
+                                         BSON_ARRAY( BSON( "$elemMatch" << internal ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON( "y" << 1 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON( "y" <<
+                                                                BSON_ARRAY( 1 << 2 ) ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" <<
+                                                   BSON( "y" <<
+                                                     BSON_ARRAY( BSON( "x" << 1 ) ) ) ) ) );
+        // x is a document. Internal document does not contain z.
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" <<
+                                                   BSON( "y" <<
+                                                     BSON_ARRAY(
+                                                       BSON( "x" << 1 << "y" << 1 ) ) ) ) ) );
+        // x is an array. Internal document does not contain z.
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" <<
+                                                   BSON_ARRAY(
+                                                     BSON( "y" <<
+                                                       BSON_ARRAY(
+                                                         BSON( "x" << 1 << "y" << 1 ) ) ) ) ) ) );
+        // x is a document but y is not an array.
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" <<
+                                                   BSON( "y" <<
+                                                     BSON( "x" << 1 << "z" << 1 ) ) ) ) );
+        // x is an array but y is not an array.
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" <<
+                                                   BSON_ARRAY(
+                                                     BSON( "y" <<
+                                                       BSON( "x" << 1 << "z" << 1 ) ) ) ) ) );
+        // x is a document.
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
+                                                  BSON( "y" <<
+                                                    BSON_ARRAY(
+                                                      BSON( "x" << 1 << "z" << 1 ) ) ) ) ) );
+        // x is an array.
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
+                                                  BSON_ARRAY(
+                                                    BSON( "y" <<
+                                                      BSON_ARRAY(
+                                                        BSON( "x" << 1 << "z" << 1 ) ) ) ) ) ) );
+    }
+
     TEST( MatchExpressionParserArrayTest, AllElemMatchBad ) {
         BSONObj internal = BSON( "x" << 1 << "y" << 2 );
 
