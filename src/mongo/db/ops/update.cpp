@@ -42,6 +42,7 @@
 #include "mongo/db/index_set.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
+#include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
@@ -446,35 +447,8 @@ namespace mongo {
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug) {
 
-        // Should the modifiers validate their embedded docs via okForStorage
-        // Only user updates should be checked. Any system or replication stuff should pass through.
-        // Config db docs shouldn't get checked for valid field names since the shard key can have
-        // a dot (".") in it.
-        bool shouldValidate = !(request.isFromReplication() ||
-                                request.getNamespaceString().isConfigDB() ||
-                                request.isFromMigration());
-
-        // TODO: Consider some sort of unification between the UpdateDriver, ModifierInterface
-        // and UpdateRequest structures.
-        UpdateDriver::Options opts;
-        opts.logOp = request.shouldCallLogOp();
-        opts.modOptions = ModifierInterface::Options(request.isFromReplication(), shouldValidate);
-        UpdateDriver driver(opts);
-
-        Status status = driver.parse(request.getUpdates(), request.isMulti());
-        if (!status.isOK()) {
-            uasserted(16840, status.reason());
-        }
-
-        CanonicalQuery* cq;
-        status = CanonicalQuery::canonicalize(request.getNamespaceString(),
-                                              request.getQuery(),
-                                              &cq);
-        if (!status.isOK()) {
-            uasserted(17242, "could not canonicalize query " + request.getQuery().toString() +
-                      "; " + causedBy(status));
-        }
-        return update(request, opDebug, &driver, cq);
+        UpdateExecutor executor(&request, opDebug);
+        return executor.execute();
     }
 
     static bool isQueryIsolated(const BSONObj& query) {
@@ -646,18 +620,7 @@ namespace mongo {
                 MatchDetails matchDetails;
                 matchDetails.requestElemMatchKey();
 
-                if (!cq) {
-                    dassert(!cqHolder.get());
-                    status = CanonicalQuery::canonicalize(request.getNamespaceString(),
-                                                          request.getQuery(),
-                                                          &cq);
-                    if (!status.isOK()) {
-                        uasserted(17353, "could not canonicalize query " +
-                                  request.getQuery().toString() + "; " + causedBy(status));
-                    }
-
-                    cqHolder.reset(cq);
-                }
+                dassert(cq);
                 verify(cq->root()->matchesBSON(oldObj, &matchDetails));
 
                 string matchedField;

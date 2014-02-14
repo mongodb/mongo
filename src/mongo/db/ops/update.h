@@ -40,8 +40,21 @@ namespace mongo {
     class CanonicalQuery;
     class UpdateDriver;
 
+    /**
+     * Utility method to execute an update described by "request".
+     *
+     * Caller must hold the appropriate database locks.
+     */
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug);
 
+    /**
+     * Execute the update described by "request", using the given already-parsed
+     * driver and canonical query.
+     *
+     * NOTE: This function is really a utility method for UpdateExecutor.
+     *
+     * TODO: Move this into a private method of UpdateExecutor.
+     */
     UpdateResult update(const UpdateRequest& request,
                         OpDebug* opDebug,
                         UpdateDriver* driver,

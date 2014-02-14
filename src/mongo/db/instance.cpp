@@ -66,9 +66,10 @@
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
+#include "mongo/db/ops/update_executor.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/is_master.h"
@@ -596,50 +597,17 @@ namespace mongo {
         op.debug().query = query;
         op.setQuery(query);
 
-        // This code should look quite familiar, since it is basically the prelude code in the
-        // other overload of _updateObjectsNEW. We could factor it into a common function, but
-        // that would require that we heap allocate the driver, which doesn't seem worth it
-        // right now, especially considering that we will probably rewrite much of this code in
-        // the near term.
+        UpdateRequest request(ns);
 
-        UpdateDriver::Options options;
-
-        // TODO: This is wasteful. We really shouldn't need to generate the oplog entry
-        // just to throw it away if we are not generating an oplog.
-        options.logOp = true;
-
-        // Select the right modifier options. We aren't in a replication context here, so
-        // the only question is whether this update is against the 'config' database, in
-        // which case we want to disable checks, since config db docs can have field names
-        // containing a dot (".").
-        options.modOptions = ns.isConfigDB() ?
-            ModifierInterface::Options::unchecked() :
-            ModifierInterface::Options::normal();
-
-        UpdateDriver driver( options );
-
-        status = driver.parse( toupdate, multi );
-        if ( !status.isOK() ) {
-            uasserted( 17009, status.reason() );
-        }
-
-        const bool isSimpleIdQuery = CanonicalQuery::isSimpleIdQuery(query);
-        CanonicalQuery* cqRaw;
-        if (isSimpleIdQuery) {
-            cqRaw = NULL;
-        }
-        else {
-            status = CanonicalQuery::canonicalize(ns.ns(), query, &cqRaw);
-            if (status == ErrorCodes::NoClientContext) {
-                cqRaw = NULL;
-            }
-            else if (!status.isOK()) {
-                uasserted(17349,
-                          "could not canonicalize query " + query.toString() + "; " +
-                          causedBy(status));
-            }
-        }
-        std::auto_ptr<CanonicalQuery> cq(cqRaw);
+        request.setUpsert(upsert);
+        request.setMulti(multi);
+        request.setQuery(query);
+        request.setUpdates(toupdate);
+        request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
+        UpdateLifecycleImpl updateLifecycle(broadcast, ns);
+        request.setLifecycle(&updateLifecycle);
+        UpdateExecutor executor(&request, &op.debug());
+        uassertStatusOK(executor.prepare());
 
         Lock::DBWrite lk(ns.ns());
 
@@ -654,26 +622,7 @@ namespace mongo {
 
         Client::Context ctx( ns );
 
-        if (!isSimpleIdQuery && !cq.get()) {
-            status = CanonicalQuery::canonicalize(ns.ns(), query, &cqRaw);
-            if (!status.isOK()) {
-                uasserted(17350,
-                          "could not canonicalize query " + query.toString() + "; " +
-                          causedBy(status));
-            }
-            cq.reset(cqRaw);
-        }
-
-        UpdateRequest request(ns);
-
-        request.setUpsert(upsert);
-        request.setMulti(multi);
-        request.setQuery(query);
-        request.setUpdates(toupdate);
-        request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
-        UpdateLifecycleImpl updateLifecycle(broadcast, ns);
-        request.setLifecycle(&updateLifecycle);
-        UpdateResult res = update(request, &op.debug(), &driver, cq.release());
+        UpdateResult res = executor.execute();
 
         // for getlasterror
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
