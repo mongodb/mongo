@@ -752,4 +752,129 @@ namespace mongo {
         }
     }
 
+    // static
+    bool IndexBoundsBuilder::isSingleInterval(const IndexBounds& bounds,
+                                              BSONObj* startKey,
+                                              bool* startKeyInclusive,
+                                              BSONObj* endKey,
+                                              bool* endKeyInclusive) {
+        // We build our start/end keys as we go.
+        BSONObjBuilder startBob;
+        BSONObjBuilder endBob;
+
+        // The start and end keys are inclusive unless we have a non-point interval, in which case
+        // we take the inclusivity from there.
+        *startKeyInclusive = true;
+        *endKeyInclusive = true;
+
+        size_t fieldNo = 0;
+
+        // First, we skip over point intervals.
+        for (; fieldNo < bounds.fields.size(); ++fieldNo) {
+            const OrderedIntervalList& oil = bounds.fields[fieldNo];
+            // A point interval requires just one interval...
+            if (1 != oil.intervals.size()) {
+                break;
+            }
+            if (!oil.intervals[0].isPoint()) {
+                break;
+            }
+            // Since it's a point, start == end.
+            startBob.append(oil.intervals[0].start);
+            endBob.append(oil.intervals[0].end);
+        }
+
+        if (fieldNo >= bounds.fields.size()) {
+            // All our intervals are points.  We count for all values of one field.
+            *startKey = startBob.obj();
+            *endKey = endBob.obj();
+            return true;
+        }
+
+        // After point intervals we can have exactly one non-point interval.
+        const OrderedIntervalList& nonPoint = bounds.fields[fieldNo];
+        if (1 != nonPoint.intervals.size()) {
+            return false;
+        }
+
+        // Add the non-point interval to our builder and set the inclusivity from it.
+        startBob.append(nonPoint.intervals[0].start);
+        *startKeyInclusive = nonPoint.intervals[0].startInclusive;
+        endBob.append(nonPoint.intervals[0].end);
+        *endKeyInclusive = nonPoint.intervals[0].endInclusive;
+
+        ++fieldNo;
+
+        // Get some "all values" intervals for comparison's sake.
+        // TODO: make static?
+        Interval minMax = IndexBoundsBuilder::allValues();
+        Interval maxMin = minMax;
+        maxMin.reverse();
+
+        // And after the non-point interval we can have any number of "all values" intervals.
+        for (; fieldNo < bounds.fields.size(); ++fieldNo) {
+            const OrderedIntervalList& oil = bounds.fields[fieldNo];
+            // "All Values" is just one point.
+            if (1 != oil.intervals.size()) {
+                break;
+            }
+
+            // Must be min->max or max->min.
+            if (oil.intervals[0].equals(minMax)) {
+                // As an example for the logic below, consider the index {a:1, b:1} and a count for
+                // {a: {$gt: 2}}.  Our start key isn't inclusive (as it's $gt: 2) and looks like
+                // {"":2} so far.  If we move to the key greater than {"":2, "": MaxKey} we will get
+                // the first value of 'a' that is greater than 2.
+                if (!*startKeyInclusive) {
+                    startBob.appendMaxKey("");
+                }
+                else {
+                    // In this case, consider the index {a:1, b:1} and a count for {a:{$gte: 2}}.
+                    // We want to look at all values where a is 2, so our start key is {"":2,
+                    // "":MinKey}.
+                    startBob.appendMinKey("");
+                }
+
+                // Same deal as above.  Consider the index {a:1, b:1} and a count for {a: {$lt: 2}}.
+                // Our end key isn't inclusive as ($lt: 2) and looks like {"":2} so far.  We can't
+                // look at any values where a is 2 so we have to stop at {"":2, "": MinKey} as
+                // that's the smallest key where a is still 2.
+                if (!*endKeyInclusive) {
+                    endBob.appendMinKey("");
+                }
+                else {
+                    endBob.appendMaxKey("");
+                }
+            }
+            else if (oil.intervals[0].equals(maxMin)) {
+                // The reasoning here is the same as above but with the directions reversed.
+                if (!*startKeyInclusive) {
+                    startBob.appendMinKey("");
+                }
+                else {
+                    startBob.appendMaxKey("");
+                }
+                if (!*endKeyInclusive) {
+                    endBob.appendMaxKey("");
+                }
+                else {
+                    endBob.appendMinKey("");
+                }
+            }
+            else {
+                // No dice.
+                break;
+            }
+        }
+
+        if (fieldNo >= bounds.fields.size()) {
+            *startKey = startBob.obj();
+            *endKey = endBob.obj();
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
 }  // namespace mongo

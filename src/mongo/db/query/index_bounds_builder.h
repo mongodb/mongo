@@ -170,6 +170,17 @@ namespace mongo {
          * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
          */
         static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+
+        /**
+         * Returns 'true' if the bounds 'bounds' can be represented as one interval between
+         * 'startKey' and 'endKey'.  Inclusivity of each bound is set through the relevant
+         * (name)KeyInclusive parameter.  Returns 'false' if otherwise.
+         */
+        static bool isSingleInterval(const IndexBounds& bounds,
+                                     BSONObj* startKey,
+                                     bool* startKeyInclusive,
+                                     BSONObj* endKey,
+                                     bool* endKeyInclusive);
     };
 
 }  // namespace mongo
