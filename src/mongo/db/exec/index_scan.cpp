@@ -67,6 +67,7 @@ namespace mongo {
         _specificStats.indexType = "BtreeCursor"; // TODO amName;
         _specificStats.indexName = _descriptor->infoObj()["name"].String();
         _specificStats.indexBounds = _params.bounds.toBSON();
+        _specificStats.indexBoundsVerbose = _params.bounds.toString();
         _specificStats.direction = _params.direction;
         _specificStats.isMultiKey = _descriptor->isMultikey();
         _specificStats.keyPattern = _descriptor->keyPattern();

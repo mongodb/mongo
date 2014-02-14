@@ -410,7 +410,7 @@ namespace mongo {
             // XXX: how much do we really want here?  runtime stats vs. tree structure (soln
             // tostring).
             bob->append("keyPattern", spec->keyPattern.toString());
-            bob->append("bounds", spec->indexBounds);
+            bob->append("boundsVerbose", spec->indexBoundsVerbose);
             bob->appendNumber("isMultiKey", spec->isMultiKey);
 
             bob->appendNumber("yieldMovedCursor", spec->yieldMovedCursor);
