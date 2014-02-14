@@ -29,10 +29,10 @@ s = startParallelShell(
                        '}'
                        );
 
-// Find operations are error free.
+// Find operations are error free. Note that the cursor throws if it detects the $err
+// field in the returned document.
 for( i = 0; i < 200; ++i ) {
     t.find( { a:{ $gte:0 } } ).hint( { a:1 } ).itcount();
-    assert.gleSuccess( db );
 }
 
 s();
