@@ -39,7 +39,7 @@ assert.eq(2, masterDB.system.indexes.count( {ns:"bgIndexSec.jstests_bgsec"} ) );
 // Wait for the secondary to get the index entry
 assert.soon( function() { 
     return 2 == secondDB.system.indexes.count( {ns:"bgIndexSec.jstests_bgsec"} ); }, 
-             "index not created on secondary (prior to restart)", 120000, 50 );
+             "index not created on secondary (prior to restart)", 1000*60*10, 50 );
 
 // restart secondary and reconnect
 jsTest.log("Restarting secondary");
