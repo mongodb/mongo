@@ -347,8 +347,7 @@ __ckpt_process(
 	 */
 	if (block->ckpt_inprogress) {
 		__wt_errx(session,
-		    "%s: checkpointed twice without the checkpoint being "
-		    "resolved",
+		    "%s: checkpointed without the checkpoint being resolved",
 		    block->name);
 
 		WT_RET(__wt_block_checkpoint_resolve(session, block));
