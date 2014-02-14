@@ -37,8 +37,9 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
@@ -472,8 +473,9 @@ namespace mongo {
             currentOp->debug().ndeleted += stats.n;
         }
 
-        // Errors reported in LastError are handled internally in write ops for now
-        // TODO: Move error reporting out of write op internals?
+        if (error && !_le->disabled) {
+            _le->raiseError(error->getErrCode(), error->getErrMessage().c_str());
+        }
     }
 
     static void finishCurrentOp( Client* client, CurOp* currentOp, WriteErrorDetail* opError ) {
@@ -565,7 +567,8 @@ namespace mongo {
                                    Collection* collection,
                                    WriteOpResult* result );
 
-    static void multiUpdate( const BatchItemRef& updateItem, WriteOpResult* result );
+    static void multiUpdate( const BatchItemRef& updateItem,
+                             WriteOpResult* result );
 
     static void multiRemove( const BatchItemRef& removeItem, WriteOpResult* result );
 
@@ -841,40 +844,16 @@ namespace mongo {
                                          BSONObj* upsertedId,
                                          WriteErrorDetail** error ) {
 
-        // Updates currently do a lot of the lock management internally
-
-        const BatchedCommandRequest& request = *updateItem.getRequest();
-        const NamespaceString nss( updateItem.getRequest()->getNS() );
-
         // BEGIN CURRENT OP
         scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, updateItem ) );
         incOpStats( updateItem );
 
         WriteOpResult result;
+        multiUpdate( updateItem, &result );
+        incWriteStats( updateItem, result.stats, result.error, currentOp.get() );
 
-        {
-            ///////////////////////////////////////////
-            Lock::DBWrite writeLock( nss.ns() );
-            ///////////////////////////////////////////
-
-            // Check version once we're locked
-
-            if ( checkShardVersion( &shardingState, request, &result.error ) ) {
-
-                // Context once we're locked, to set more details in currentOp()
-                // TODO: better constructor?
-                Client::Context writeContext( nss.ns(),
-                                              storageGlobalParams.dbpath,
-                                              false /* don't check version */);
-
-                multiUpdate( updateItem, &result );
-
-                incWriteStats( updateItem, result.stats, result.error, currentOp.get() );
-
-                if ( !result.stats.upsertedID.isEmpty() ) {
-                    *upsertedId = result.stats.upsertedID.getOwned();
-                }
-            }
+        if ( !result.stats.upsertedID.isEmpty() ) {
+            *upsertedId = result.stats.upsertedID;
         }
 
         // END CURRENT OP
@@ -1031,57 +1010,53 @@ namespace mongo {
         }
     }
 
-    /**
-     * Perform an update operation, which might update multiple documents in the lock.  Dispatches
-     * to update code currently to do most of this.
-     *
-     * Might error, otherwise populates the result.
-     */
     static void multiUpdate( const BatchItemRef& updateItem,
                              WriteOpResult* result ) {
 
-        Lock::assertWriteLocked( updateItem.getRequest()->getNS() );
+        NamespaceString nsString(updateItem.getRequest()->getNS());
+        UpdateRequest request(nsString);
+        request.setQuery(updateItem.getUpdate()->getQuery());
+        request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
+        request.setMulti(updateItem.getUpdate()->getMulti());
+        request.setUpsert(updateItem.getUpdate()->getUpsert());
+        request.setUpdateOpLog(true);
+        UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
+        request.setLifecycle(&updateLifecycle);
 
-        BSONObj queryObj = updateItem.getUpdate()->getQuery();
-        BSONObj updateObj = updateItem.getUpdate()->getUpdateExpr();
-        bool multi = updateItem.getUpdate()->getMulti();
-        bool upsert = updateItem.getUpdate()->getUpsert();
+        UpdateExecutor executor(&request, &cc().curop()->debug());
+        Status status = executor.prepare();
+        if (!status.isOK()) {
+            result->error = toWriteError(status);
+            return;
+        }
 
-        bool didInsert = false;
-        long long numMatched = 0;
-        long long numDocsModified = 0;
-        BSONObj resUpsertedID;
+        ///////////////////////////////////////////
+        Lock::DBWrite writeLock( nsString.ns() );
+        ///////////////////////////////////////////
+
+        if ( !checkShardVersion( &shardingState, *updateItem.getRequest(), &result->error ) )
+            return;
+
+        Client::Context ctx( nsString.ns(),
+                             storageGlobalParams.dbpath,
+                             false /* don't check version */ );
 
         try {
+            UpdateResult res = executor.execute();
 
-            const NamespaceString requestNs( updateItem.getRequest()->getNS() );
-            UpdateRequest request( requestNs );
-
-            request.setQuery( queryObj );
-            request.setUpdates( updateObj );
-            request.setUpsert( upsert );
-            request.setMulti( multi );
-            request.setUpdateOpLog();
-            // TODO(greg) We need to send if we are ignoring the shard version below,
-            // but for now yes
-            UpdateLifecycleImpl updateLifecycle( true, requestNs );
-            request.setLifecycle( &updateLifecycle );
-
-            UpdateResult res = update( request, &cc().curop()->debug() );
-
-            numDocsModified = res.numDocsModified;
-            numMatched = res.numMatched;
-            resUpsertedID = res.upserted;
+            const long long numDocsModified = res.numDocsModified;
+            const long long numMatched = res.numMatched;
+            const BSONObj resUpsertedID = res.upserted;
 
             // We have an _id from an insert
-            didInsert = !resUpsertedID.isEmpty();
+            const bool didInsert = !resUpsertedID.isEmpty();
 
             result->stats.nModified = didInsert ? 0 : numDocsModified;
             result->stats.n = didInsert ? 1 : numMatched;
             result->stats.upsertedID = resUpsertedID;
         }
-        catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+        catch (const DBException& ex) {
+            result->error = toWriteError(ex.toStatus());
         }
     }
 
