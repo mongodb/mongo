@@ -1,10 +1,16 @@
 doassert = function(msg) {
-    if (msg.indexOf("assert") == 0)
+    // eval if msg is a function
+    if (typeof(msg) == "function")
+        msg = msg();
+
+    if (typeof (msg) == "string" && msg.indexOf("assert") == 0)
         print(msg);
     else
         print("assert: " + msg);
-    printStackTrace();
-    throw msg;
+
+    var ex = Error(msg);
+    print(ex.stack);
+    throw ex;
 }
 
 assert = function(b, msg){
@@ -336,6 +342,69 @@ assert.closeWithinMS = function(a, b, msg, deltaMS) {
               " millis, actual delta: " + actualDelta + " millis : " + msg);
 };
 
+assert.writeOK = function(res, msg) {
+    var errMsg = "";
+
+    if (!res)
+        errMsg = "missing first argument, no response to check"
+    if (!res.getWriteError)
+        assert.gleOK(res, msg)
+    else {
+        if (res.getWriteError()) {
+            errMsg = "write failed with errors: " + tojson(res) 
+        } else if (res.getWriteConcernError()) {
+            errMsg = "write concern failed with errors: " + tojson(res) 
+        }
+
+        if (errMsg != "" && msg)
+            errMsg = errMsg + " : " + msg;
+
+        if (errMsg)
+            doassert(errMsg);
+    }
+
+    return res;
+}
+
+assert.gleOK = function(res, msg) {
+    var errMsg = "";
+
+    if (!res)
+        errMsg = "missing first argument, no response to check"
+
+    if (!res.ok)
+        errMsg = "command failed: " + tojson(res);
+
+    if ('code' in res || 'errMsg' in res || 'errInfo' in res || 'writeErrors' in res)
+        errMsg = "write failed: " + tojson(res);
+
+    if (errMsg != "" && msg)
+        errMsg = errMsg + " : " + msg;
+
+    if (errMsg)
+        doassert(errMsg);
+
+    return res;
+}
+
+
+assert.writeError = function(res, msg) {
+    var errMsg = "";
+
+    if (!res.getWriteConcernError) {
+        if (!res.err)
+            errMsg = "no error" + tojson(res);
+    } else {
+        if (!(res.getWriteError() || res.getWriteConcernError()))
+            errMsg = "no write errors : " + tojson(res);
+    }
+    if (errMsg != "" && msg)
+        errMsg = errMsg + " : " + msg;
+    if (errMsg)
+        doassert(errMsg);
+    return res;
+}
+
 assert.gleSuccess = function(db, msg) {
     var gle = db.getLastErrorObj();
     if (gle.err) {
@@ -343,6 +412,7 @@ assert.gleSuccess = function(db, msg) {
             msg = msg(gle);
         doassert("getLastError not null:" + tojson(gle) + " :" + msg);
     }
+    return gle;
 }
 
 assert.gleError = function(db, msg) {

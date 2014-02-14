@@ -193,7 +193,33 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     if ( ! obj )
         throw "no object passed to insert!";
 
-    if ( typeof( options ) == "undefined" ) options = 0;
+    var flags = 0;
+    
+    var wc = undefined;
+    var allowDottedFields = false;
+    if ( options === undefined ) {
+        // do nothing
+    }
+    else if ( typeof(options) == 'object' ) {
+        if (options.ordered === undefined) {
+            //do nothing, like above
+        } else {
+            flags = options.ordered ? 1 : 0;
+        }
+        
+        if (options.writeConcern)
+            wc = options.writeConcern;
+        if (options.allowdotted)
+            allowDottedFields = true;
+    } else {
+        flags = options;
+    }
+    
+    // 1 = continueOnError, which is synonymous with unordered in the write commands/bulk-api
+    var ordered = ((flags & 1) == 0);
+
+    if (!wc)
+        wc = this.getWriteConcern();
 
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
@@ -201,8 +227,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
 
     if ( this._mongo.useWriteCommands() ) {
         // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
-        var batch = ((options & 1) == 0) ? this.initializeOrderedBulkOp() :
-                this.initializeUnorderedBulkOp();
+        var batch = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
 
         if (Array.isArray(obj)) {
             obj.forEach(function(doc) {
@@ -213,11 +238,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
             batch.insert(obj);
         }
 
-        var writeConcern = null;
-        if (this.getWriteConcern())
-            writeConcern = this.getWriteConcern().toJSON();
-
-        result = batch.execute(writeConcern).toSingleResult();
+        result = batch.execute(wc).toSingleResult();
     }
     else {
         if ( ! _allow_dot ) {
@@ -232,7 +253,11 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
             }
         }
 
-        this._mongo.insert( this._fullName , obj, options );
+        this._mongo.insert( this._fullName , obj, flags );
+
+        // enforce write concern, if required
+        if (wc)
+            result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
     }
 
     this._lastID = obj._id;
@@ -257,6 +282,16 @@ DBCollection.prototype.remove = function( t , justOne ){
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
 
+    var wc = undefined;
+    if ( typeof(justOne) === 'object' ) {
+        var opts = justOne;
+        wc = opts.writeConcern;
+        justOne = opts.justOne;
+    }
+    
+    if (!wc)
+        wc = this.getWriteConcern();
+
     if ( this._mongo.useWriteCommands() ) {
         var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
         var batch = this.initializeOrderedBulkOp();
@@ -269,15 +304,16 @@ DBCollection.prototype.remove = function( t , justOne ){
             removeOp.remove();
         }
 
-        var writeConcern = null;
-        if (this.getWriteConcern())
-            writeConcern = this.getWriteConcern().toJSON();
-
-        result = batch.execute(writeConcern).toSingleResult();
+        result = batch.execute(wc).toSingleResult();
     }
     else {
         this._validateRemoveDoc(t);
         this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
+        
+        // enforce write concern, if required
+        if (wc)
+            result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
+
     }
 
     this._printExtraInfo("Removed", startTime);
@@ -304,12 +340,15 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
     assert( query , "need a query" );
     assert( obj , "need an object" );
 
+    var wc = undefined;
     // can pass options via object for improved readability
     if ( typeof(upsert) === 'object' ) {
-        assert( multi === undefined, "Fourth argument must be empty when specifying upsert and multi with an object." );
+        assert( multi === undefined, 
+                "Fourth argument must be empty when specifying upsert and multi with an object." );
 
-        opts = upsert;
+        var opts = upsert;
         multi = opts.multi;
+        wc = opts.writeConcern;
         upsert = opts.upsert;
     }
 
@@ -317,6 +356,9 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
 
+    if (!wc)
+        wc = this.getWriteConcern();
+    
     if ( this._mongo.useWriteCommands() ) {
         var batch = this.initializeOrderedBulkOp();
         var updateOp = batch.find(query);
@@ -332,23 +374,23 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
             updateOp.updateOne(obj);
         }
 
-        var writeConcern = null;
-        if (this.getWriteConcern())
-            writeConcern = this.getWriteConcern().toJSON();
-
-        result = batch.execute(writeConcern).toSingleResult();
+        result = batch.execute(wc).toSingleResult();
     }
     else {
         this._validateUpdateDoc(obj);
         this._mongo.update(this._fullName, query, obj,
                            upsert ? true : false, multi ? true : false );
+
+        // enforce write concern, if required
+        if (wc)
+            result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
     }
 
     this._printExtraInfo("Updated", startTime);
     return result;
 };
 
-DBCollection.prototype.save = function( obj ){
+DBCollection.prototype.save = function( obj , opts ){
     if ( obj == null )
         throw "can't save a null";
 
@@ -357,10 +399,10 @@ DBCollection.prototype.save = function( obj ){
 
     if ( typeof( obj._id ) == "undefined" ){
         obj._id = new ObjectId();
-        return this.insert( obj );
+        return this.insert( obj , opts );
     }
     else {
-        return this.update( { _id : obj._id } , obj , true );
+        return this.update( { _id : obj._id } , obj , Object.merge({ upsert:true }, opts));
     }
 }
 

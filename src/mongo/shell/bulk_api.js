@@ -885,6 +885,8 @@ var _bulk_api_module = (function() {
 
       // If writeConcern set, use it, else get from collection (which will inherit from db/mongo)
       writeConcern = _writeConcern ? _writeConcern : coll.getWriteConcern();
+      if (writeConcern instanceof WriteConcern)
+          writeConcern = writeConcern.toJSON();
 
       // If we have current batch
       if(currentBatch) batches.push(currentBatch);
@@ -978,7 +980,7 @@ if ( ( typeof WriteConcern ) == 'undefined' ){
      *     the string representation instead.
      */
     WriteConcern.prototype.toJSON = function() {
-        return this._wc;
+        return Object.merge({}, this._wc);
     };
 
     /**
