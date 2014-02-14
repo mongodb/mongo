@@ -7,9 +7,6 @@ t.drop();
 function checkImpossibleMatch( explain ) {
     printjson(explain);
     assert.eq( 0, explain.n );
-    // sometimes we choose an intersection plan that results in >0 nscanned, so we check
-    // nscannedObjects here.
-    assert.eq( 0, explain.nscannedObjects );
 }
 
 t.save( {a:1,b:[1,2]} );
