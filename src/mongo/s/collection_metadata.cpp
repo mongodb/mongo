@@ -337,8 +337,9 @@ namespace mongo {
         for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end();
                 ++it ) {
             BSONObj split = *it;
-            metadata->_chunksMap[chunk.getMin()] = split.getOwned();
-            metadata->_chunksMap.insert( make_pair( split.getOwned(), chunk.getMax().getOwned() ) );
+            dassert(split.woCompare(startKey) > 0);
+            metadata->_chunksMap[startKey] = split.getOwned();
+            metadata->_chunksMap.insert( make_pair( split.getOwned(), chunk.getMax().getOwned() ));
             metadata->_shardVersion.incMinor();
             startKey = split;
         }

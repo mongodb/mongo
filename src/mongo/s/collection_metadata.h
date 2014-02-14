@@ -102,12 +102,14 @@ namespace mongo {
 
         /**
          * Returns a new metadata's instance by splitting an existing 'chunk' at the points
-         * describe by 'splitKeys'. The first resulting chunk will have 'newShardVersion' and
+         * described by 'splitKeys'. The first resulting chunk will have 'newShardVersion' and
          * subsequent one would have that with the minor version incremented at each chunk. The
          * caller owns the metadata.
          *
          * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
+         *
+         * Note: 'splitKeys' must be sorted in ascending order.
          */
         CollectionMetadata* cloneSplit( const ChunkType& chunk,
                                         const vector<BSONObj>& splitKeys,
