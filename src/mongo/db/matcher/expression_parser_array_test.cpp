@@ -378,4 +378,92 @@ namespace mongo {
         ASSERT_FALSE( result.isOK() );
     }
 
+    // $all with empty string.
+    TEST( MatchExpressionParserArrayTest, AllEmptyString ) {
+        BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( "" ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "a" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL << "a" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() << "a" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << "" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL << "" ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() << "" ) ) ) );
+    }
+
+    // $all with ISO date.
+    TEST( MatchExpressionParserArrayTest, AllISODate ) {
+        StatusWith<Date_t> matchResult = dateFromISOString("9999-12-31T00:00:00.000Z");
+        ASSERT_TRUE( matchResult.isOK() );
+        const Date_t& match = matchResult.getValue();
+        StatusWith<Date_t> notMatchResult = dateFromISOString("9999-12-30T00:00:00.000Z");
+        ASSERT_TRUE( notMatchResult.isOK() );
+        const Date_t& notMatch = notMatchResult.getValue();
+
+        BSONObj query = BSON( "x" << BSON( "$all" << BSON_ARRAY( match ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << notMatch ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL <<
+                                                                          notMatch ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() <<
+                                                                          notMatch ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << match ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL <<
+                                                                         match ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() <<
+                                                                         match ) ) ) );
+    }
+
+    // $all on array element with empty string.
+    TEST( MatchExpressionParserArrayTest, AllDottedEmptyString ) {
+        BSONObj query = BSON( "x.1" << BSON( "$all" << BSON_ARRAY( "" ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "a" ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL << "a" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() << "a" ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( "" << BSONNULL ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( "" << BSONObj() ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "" ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL << "" ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() << "" ) ) ) );
+    }
+
+    // $all on array element with ISO date.
+    TEST( MatchExpressionParserArrayTest, AllDottedISODate ) {
+        StatusWith<Date_t> matchResult = dateFromISOString("9999-12-31T00:00:00.000Z");
+        ASSERT_TRUE( matchResult.isOK() );
+        const Date_t& match = matchResult.getValue();
+        StatusWith<Date_t> notMatchResult = dateFromISOString("9999-12-30T00:00:00.000Z");
+        ASSERT_TRUE( notMatchResult.isOK() );
+        const Date_t& notMatch = notMatchResult.getValue();
+
+        BSONObj query = BSON( "x.1" << BSON( "$all" << BSON_ARRAY( match ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << notMatch ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL <<
+                                                                          notMatch ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() <<
+                                                                          notMatch ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match <<
+                                                                          BSONNULL ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match <<
+                                                                          BSONObj() ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL <<
+                                                                         match ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() <<
+                                                                         match ) ) ) );
+    }
+
 }
