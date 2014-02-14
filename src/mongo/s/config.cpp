@@ -34,6 +34,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/chunk.h"
@@ -331,6 +332,10 @@ namespace mongo {
 
 
     ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload, bool forceReload ){
+	
+        // Don't report exceptions here as errors in GetLastError
+        LastError::Disabled ignoreForGLE(lastError.get(false));
+         
         try{
             return getChunkManager( ns, shouldReload, forceReload );
         }
