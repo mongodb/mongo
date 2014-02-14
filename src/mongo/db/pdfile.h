@@ -40,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/storage/extent.h"

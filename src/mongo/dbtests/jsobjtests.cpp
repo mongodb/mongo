@@ -33,7 +33,6 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/structure/btree/key.h"
 #include "mongo/dbtests/dbtests.h"

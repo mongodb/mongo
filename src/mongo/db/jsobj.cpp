@@ -30,7 +30,6 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/atomic_int.h"
-#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/bson/optime.h"
 #include "mongo/platform/float_utils.h"
