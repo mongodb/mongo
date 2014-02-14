@@ -778,15 +778,15 @@ namespace replset {
 
     bool ReplSetImpl::resync(string& errmsg) {
         changeState(MemberState::RS_RECOVERING);
-        {
-            Client::Context ctx("local");
-            cc().database()->dropCollection("local.oplog.rs");
-        }
-        _veto.clear();
+
+        Client::Context ctx("local");
+        cc().database()->dropCollection("local.oplog.rs");
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
             theReplSet->initialSyncRequested = true;
         }
+        lastOpTimeWritten = OpTime();
+        _veto.clear();
         return true;
     }
 
