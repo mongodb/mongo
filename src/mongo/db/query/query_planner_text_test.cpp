@@ -70,14 +70,19 @@ namespace {
         void addIndex(BSONObj keyPattern, bool multikey = false) {
             // The first false means not multikey.
             // The second false means not sparse.
-            // The third arg is the index name and I am egotistical.
-            params.indices.push_back(IndexEntry(keyPattern, multikey, false,
-                                                "hari_king_of_the_stove"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                false,
+                                                "hari_king_of_the_stove",
+                                                BSONObj()));
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse,
-                                                "note_to_self_dont_break_build"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                sparse,
+                                                "note_to_self_dont_break_build",
+                                                BSONObj()));
         }
 
         //

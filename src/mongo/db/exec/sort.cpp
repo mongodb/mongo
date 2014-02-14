@@ -30,6 +30,7 @@
 
 #include <algorithm>
 
+#include "mongo/db/index_names.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_key_generator.h"
@@ -217,7 +218,7 @@ namespace mongo {
         params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
         // We're creating a "virtual index" with key pattern equal to the sort order.
-        IndexEntry sortOrder(sortObj, true, false, "doesnt_matter", BSONObj());
+        IndexEntry sortOrder(sortObj, IndexNames::BTREE, true, false, "doesnt_matter", BSONObj());
         params.indices.push_back(sortOrder);
 
         CanonicalQuery* rawQueryForSort;

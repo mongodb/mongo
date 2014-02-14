@@ -171,6 +171,7 @@ namespace mongo {
         while (ii.more()) {
             const IndexDescriptor* desc = ii.next();
             plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
+                                                       desc->getAccessMethodName(),
                                                        desc->isMultikey(),
                                                        desc->isSparse(),
                                                        desc->indexName(),
@@ -700,6 +701,7 @@ namespace mongo {
             // if it's a win unless it's the first field.
             if (desc->keyPattern().firstElement().fieldName() == field) {
                 plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
+                                                           desc->getAccessMethodName(),
                                                            desc->isMultikey(),
                                                            desc->isSparse(),
                                                            desc->indexName(),

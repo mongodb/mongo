@@ -36,6 +36,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/expression_key_generator.h"
 #include "mongo/db/index_legacy.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/queryutil.h"
@@ -66,7 +67,7 @@ namespace NamespaceTests {
 
                 BSONObj bobj = builder.done();
 
-                _index.reset( new IndexDescriptor( NULL, bobj ) );
+                _index.reset( new IndexDescriptor( NULL, IndexNames::BTREE, bobj ) );
 
                 _keyPattern = key().getOwned();
 

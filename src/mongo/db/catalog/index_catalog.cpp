@@ -99,8 +99,11 @@ namespace mongo {
                 continue;
             }
 
+            BSONObj ownedInfoObj = id.info.obj().getOwned();
+            BSONObj keyPattern = ownedInfoObj.getObjectField("key");
             IndexDescriptor* descriptor = new IndexDescriptor( _collection,
-                                                               id.info.obj().getOwned() );
+                                                               _getAccessMethodName(keyPattern),
+                                                               ownedInfoObj );
             IndexCatalogEntry* entry = _setupInMemoryStructures( descriptor );
 
             fassert( 17340, entry->isReady()  );
@@ -352,7 +355,10 @@ namespace mongo {
         invariant( _inProgress == false );
 
         // need this first for names, etc...
-        IndexDescriptor* descriptor = new IndexDescriptor( _collection, _spec );
+        BSONObj keyPattern = _spec.getObjectField("key");
+        IndexDescriptor* descriptor = new IndexDescriptor( _collection, 
+                                                           IndexNames::findPluginName(keyPattern),
+                                                           _spec );
         auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
 
         _indexName = descriptor->indexName();
@@ -858,7 +864,8 @@ namespace mongo {
         for ( size_t i = 0; i < toReturn.size(); i++ ) {
             BSONObj spec = toReturn[i];
 
-            IndexDescriptor desc( _collection, spec );
+            BSONObj keyPattern = spec.getObjectField("key");
+            IndexDescriptor desc( _collection, _getAccessMethodName(keyPattern), spec );
 
             int idxNo = _details->_catalogFindIndexByName( desc.indexName(), true );
             invariant( idxNo >= 0 );
@@ -1046,7 +1053,7 @@ namespace mongo {
 
     IndexAccessMethod* IndexCatalog::_createAccessMethod( const IndexDescriptor* desc,
                                                           IndexCatalogEntry* entry ) {
-        string type = _getAccessMethodName(desc->keyPattern());
+        const string& type = desc->getAccessMethodName();
 
         if (IndexNames::HASHED == type)
             return new HashAccessMethod( entry );

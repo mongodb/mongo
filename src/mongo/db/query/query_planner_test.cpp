@@ -70,14 +70,19 @@ namespace {
         void addIndex(BSONObj keyPattern, bool multikey = false) {
             // The first false means not multikey.
             // The second false means not sparse.
-            // The third arg is the index name and I am egotistical.
-            params.indices.push_back(IndexEntry(keyPattern, multikey, false,
-                                                "hari_king_of_the_stove"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                false,
+                                                "hari_king_of_the_stove",
+                                                BSONObj()));
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse,
-                                                "note_to_self_dont_break_build"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                sparse,
+                                                "note_to_self_dont_break_build",
+                                                BSONObj()));
         }
 
         //
@@ -2827,7 +2832,7 @@ namespace {
         ASSERT(NULL == indexTree);
 
         // No relevant index matching the index tag.
-        relevantIndices.push_back(IndexEntry(BSON("a" << 1), false, false, "a_1"));
+        relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
 
         CanonicalQuery *cq;
         Status cqStatus = CanonicalQuery::canonicalize(ns, BSON("a" << 3), &cq);
@@ -2847,7 +2852,7 @@ namespace {
         boost::scoped_ptr<CanonicalQuery> scopedCq(cq);
 
         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
-        indexTree->setIndexEntry(IndexEntry(BSON("a" << 1), false, false, "a_1"));
+        indexTree->setIndexEntry(IndexEntry(BSON("a" << 1)));
 
         map<BSONObj, size_t> indexMap;
 
@@ -2875,7 +2880,7 @@ namespace {
 
         // Mismatched tree topology.
         PlanCacheIndexTree* child = new PlanCacheIndexTree();
-        child->setIndexEntry(IndexEntry(BSON("a" << 1), false, false, "a_1"));
+        child->setIndexEntry(IndexEntry(BSON("a" << 1)));
         indexTree->children.push_back(child);
         s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree, indexMap);
         ASSERT_NOT_OK(s);
