@@ -365,6 +365,11 @@ namespace mongo {
             uassert(16688, "finestIndexedLevel must be <= 30", params.finestIndexedLevel <= 30);
             uassert(16689, "finestIndexedLevel must be >= coarsestIndexedLevel",
                     params.finestIndexedLevel >= params.coarsestIndexedLevel);
+            massert(17289,
+                    str::stream() << "unsupported geo index version { 2dsphereIndexVersion : "
+                                  << spec->info["2dsphereIndexVersion"]
+                                  << " }, only support versions: [1]",
+                    configValueWithDefault(spec, "2dsphereIndexVersion", 1) == 1);
 
             // Categorize the fields we're indexing and make sure we have a geo field.
             int geoFields = 0;
@@ -386,6 +391,15 @@ namespace mongo {
                     geoFields >= 1);
 
             return new S2IndexType(SPHERE_2D_NAME, this, spec, params);
+        }
+
+        virtual BSONObj adjustIndexSpec( const BSONObj& spec ) const {
+            BSONElement indexVersionElt = spec["2dsphereIndexVersion"];
+            uassert(17290,
+                    str::stream() << "unsupported geo index version { 2dsphereIndexVersion : "
+                                  << indexVersionElt << " }, only support versions: [1]",
+                    indexVersionElt.eoo() || indexVersionElt.numberInt() == 1);
+            return spec;
         }
 
         int configValueWithDefault(const IndexSpec* spec, const string& name, int def) const {
