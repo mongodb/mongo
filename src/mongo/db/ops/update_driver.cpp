@@ -439,6 +439,7 @@ namespace mongo {
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             delete *it;
         }
+        _mods.clear();
         _indexedFields = NULL;
         _replacementMode = false;
         _positional = false;
