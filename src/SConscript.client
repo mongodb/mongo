@@ -76,7 +76,6 @@ clientSourceBasic = [
     'mongo/util/concurrency/rwlockimpl.cpp',
     'mongo/util/concurrency/spin_lock.cpp',
     'mongo/util/concurrency/synchronization.cpp',
-    'mongo/util/concurrency/task.cpp',
     'mongo/util/concurrency/thread_name.cpp',
     'mongo/util/concurrency/thread_pool.cpp',
     'mongo/util/concurrency/mutexdebugger.cpp',
