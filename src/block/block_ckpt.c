@@ -303,8 +303,7 @@ __ckpt_extlist_fblocks(
  *	Process the list of checkpoints.
  */
 static int
-__ckpt_process(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+__ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	WT_BLOCK_CKPT *a, *b, *ci;
 	WT_CKPT *ckpt, *next_ckpt;
