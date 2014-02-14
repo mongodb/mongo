@@ -68,7 +68,8 @@ namespace mongo {
     int Tool::main( int argc , char ** argv, char ** envp ) {
         static StaticObserver staticObserver;
 
-        setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
+        setGlobalAuthorizationManager(new AuthorizationManager(
+                new AuthzManagerExternalStateMock()));
 
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
 

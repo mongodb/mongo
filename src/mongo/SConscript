@@ -961,7 +961,8 @@ env.Library("alltools",
                      "coreserver",
                      "coredb",
                      "$BUILD_DIR/mongo/util/options_parser/options_parser",
-                     "$BUILD_DIR/mongo/db/auth/authmocks"])
+                     "$BUILD_DIR/mongo/db/auth/authmocks",
+                     "$BUILD_DIR/mongo/db/auth/authmongod"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )

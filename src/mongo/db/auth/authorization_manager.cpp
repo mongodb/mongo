@@ -94,6 +94,10 @@ namespace mongo {
             "admin.system.backup_users");
     const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
+    const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace(
+            "admin.tempusers");
+    const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace(
+            "admin.temproles");
 
     const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id" << "authSchema");
 

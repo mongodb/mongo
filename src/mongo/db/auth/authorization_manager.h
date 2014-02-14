@@ -76,7 +76,7 @@ namespace mongo {
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_DB_FIELD_NAME;
         static const std::string ROLE_NAME_FIELD_NAME;
-        static const std::string ROLE_SOURCE_FIELD_NAME;
+        static const std::string ROLE_SOURCE_FIELD_NAME; // TODO: rename to ROLE_DB_FIELD_NAME
         static const std::string PASSWORD_FIELD_NAME;
         static const std::string V1_USER_NAME_FIELD_NAME;
         static const std::string V1_USER_SOURCE_FIELD_NAME;
@@ -87,6 +87,8 @@ namespace mongo {
         static const NamespaceString usersBackupCollectionNamespace;
         static const NamespaceString usersCollectionNamespace;
         static const NamespaceString versionCollectionNamespace;
+        static const NamespaceString defaultTempUsersCollectionNamespace; // for mongorestore
+        static const NamespaceString defaultTempRolesCollectionNamespace; // for mongorestore
 
         /**
          * Query to match the auth schema version document in the versionCollectionNamespace.
