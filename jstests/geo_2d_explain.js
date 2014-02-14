@@ -20,16 +20,10 @@ for (var i = 0; i < n; i++) {
     t.save({_id: i, a: a, loc: loc}); 
 }
 
-var beginTime = new ISODate();
 var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain();
-var endTime = new ISODate();
-var elapsedMillis = endTime - beginTime;
 
 print('explain = ' + tojson(explain));
-print('explain report took ' + elapsedMillis + ' ms');
 
-assert.gt(explain.millis, 0);
-assert.lte(explain.millis, elapsedMillis);
 assert.eq({}, explain.indexBounds);
 assert.eq(explain.n, explain.nscannedObjects);
 assert.lte(explain.n, explain.nscanned);
