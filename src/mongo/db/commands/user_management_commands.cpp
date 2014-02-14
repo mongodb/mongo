@@ -266,7 +266,12 @@ namespace mongo {
     }
 
     static Status requireAuthSchemaVersion26Final(AuthorizationManager* authzManager) {
-        const int foundSchemaVersion = authzManager->getAuthorizationVersion();
+        int foundSchemaVersion;
+        Status status = authzManager->getAuthorizationVersion(&foundSchemaVersion);
+        if (!status.isOK()) {
+            return status;
+        }
+
         if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final) {
             return Status(
                     ErrorCodes::AuthSchemaIncompatible,
@@ -278,7 +283,12 @@ namespace mongo {
     }
 
     static Status requireAuthSchemaVersion26UpgradeOrFinal(AuthorizationManager* authzManager) {
-        const int foundSchemaVersion = authzManager->getAuthorizationVersion();
+        int foundSchemaVersion;
+        Status status = authzManager->getAuthorizationVersion(&foundSchemaVersion);
+        if (!status.isOK()) {
+            return status;
+        }
+
         if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final &&
             foundSchemaVersion != AuthorizationManager::schemaVersion26Upgrade) {
             return Status(
@@ -1134,7 +1144,11 @@ namespace mongo {
                 }
 
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-                int authzVersion = authzManager->getAuthorizationVersion();
+                int authzVersion;
+                Status status = authzManager->getAuthorizationVersion(&authzVersion);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
+                }
                 NamespaceString usersNamespace =
                         authzVersion== AuthorizationManager::schemaVersion26Final ?
                                 AuthorizationManager::usersCollectionNamespace :

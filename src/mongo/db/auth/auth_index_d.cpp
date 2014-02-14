@@ -29,6 +29,7 @@
 #include "mongo/db/auth/auth_index_d.h"
 
 #include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
@@ -72,8 +73,13 @@ namespace {
 }  // namespace
 
     void configureSystemIndexes(const StringData& dbname) {
-        if (dbname == "admin" && getGlobalAuthorizationManager()->getAuthorizationVersion() ==
-                AuthorizationManager::schemaVersion26Final) {
+        int authzVersion;
+        Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(&authzVersion);
+        if (!status.isOK()) {
+            return;
+        }
+
+        if (dbname == "admin" && authzVersion == AuthorizationManager::schemaVersion26Final) {
             NamespaceString systemUsers(dbname, "system.users");
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.

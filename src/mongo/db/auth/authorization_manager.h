@@ -166,9 +166,13 @@ namespace mongo {
         bool isAuthEnabled() const;
 
         /**
-         * Returns the version number of the authorization system.
+         * Returns via the output parameter "version" the version number of the authorization
+         * system.  Returns Status::OK() if it was able to successfully fetch the current
+         * authorization version.  If it has problems fetching the most up to date version it
+         * returns a non-OK status.  When returning a non-OK status, *version will be set to
+         * schemaVersionInvalid (0).
          */
-        int getAuthorizationVersion();
+        Status getAuthorizationVersion(int* version);
 
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
