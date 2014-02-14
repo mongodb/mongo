@@ -49,9 +49,6 @@ except ImportError:
 def munge_dict(values_dict, abstime):
     sorted_values = sorted(values_dict, key=operator.itemgetter('#time'))
     start_time = parsetime(sorted_values[0]['#time'])
-    seconds = (parsetime(sorted_values[1]['#time']) - start_time).seconds
-    if seconds == 0:
-        seconds = 1
 
     ret = []
     for v in sorted_values:
@@ -74,8 +71,8 @@ def munge_dict(values_dict, abstime):
                 title = 'time'
             elif title.find('latency') == -1 and \
               title.find('checkpoints') == -1:
-                title = title + ' per second'
-                value = float(value) / seconds
+                title = title + ' (thousands)'
+                value = float(value) / 1000
             next_val[title] = value
         ret.append(next_val)
 
