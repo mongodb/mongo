@@ -67,7 +67,6 @@ clientSourceBasic = [
     'mongo/logger/rotatable_file_writer.cpp',
     'mongo/pch.cpp',
     'mongo/platform/backtrace.cpp',
-    'mongo/platform/posix_fadvise.cpp',
     'mongo/platform/process_id.cpp',
     'mongo/platform/random.cpp',
     'mongo/util/assert_util.cpp',
@@ -80,8 +79,6 @@ clientSourceBasic = [
     'mongo/util/concurrency/mutexdebugger.cpp',
     'mongo/util/debug_util.cpp',
     'mongo/util/stacktrace.cpp',
-    'mongo/util/file.cpp',
-    'mongo/util/file_allocator.cpp',
     'mongo/util/fail_point.cpp',
     'mongo/util/fail_point_registry.cpp',
     'mongo/util/fail_point_service.cpp',
@@ -99,8 +96,6 @@ clientSourceBasic = [
     "mongo/util/net/socket_poll.cpp",
     'mongo/util/net/ssl_manager.cpp',
     'mongo/util/password.cpp',
-    'mongo/util/paths.cpp',
-    'mongo/util/processinfo.cpp',
     'mongo/util/signal_handlers.cpp',
     'mongo/util/stringutils.cpp',
     'mongo/util/text.cpp',
@@ -117,28 +112,13 @@ clientSourceSasl = [
     'mongo/client/sasl_sspi.cpp',
 ]
 
-clientSourceProcessInfo = [
-    'mongo/util/processinfo_darwin.cpp',
-    'mongo/util/processinfo_freebsd.cpp',
-    'mongo/util/processinfo_linux2.cpp',
-    'mongo/util/processinfo_none.cpp',
-    'mongo/util/processinfo_sunos5.cpp',
-    'mongo/util/processinfo_win32.cpp'
-]
-
-clientSourceAll = clientSourceBasic + clientSourceSasl + clientSourceProcessInfo
+clientSourceAll = clientSourceBasic + clientSourceSasl
 
 usingSasl = libEnv['MONGO_BUILD_SASL_CLIENT']
 
 clientSource = list(clientSourceBasic)
 if usingSasl:
     clientSource += clientSourceSasl
-
-processInfoPlatformFile = libEnv.File( "mongo/util/processinfo_${PYSYSPLATFORM}.cpp" )
-# NOTE: See comment about similar code in src/mongo/SConscript
-if not os.path.exists( str( processInfoPlatformFile ) ):
-    processInfoPlatformFile = libEnv.File( "mongo/util/processinfo_none.cpp" )
-clientSource += [processInfoPlatformFile]
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),

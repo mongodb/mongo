@@ -20,7 +20,7 @@
 #include <iomanip>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/file_allocator.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
