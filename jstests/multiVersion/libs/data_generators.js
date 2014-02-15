@@ -536,6 +536,15 @@ function IndexDataGenerator(options) {
         return attributes;
     }
 
+    function Gen2dSphereIndexOptions(seed) {
+        var attributes = GenIndexOptions(seed);
+        // When using a 2dsphere index, the following additional index properties are required when
+        // downgrading from 2.6:
+        // { "2dsphereIndexVersion" : 1 }
+        attributes["2dsphereIndexVersion"] = 1
+        return attributes;
+    }
+
     testIndexes = [
         // Single Field Indexes
         { "spec" : GenSingleFieldIndex(1), "options" : GenIndexOptions(0) },
@@ -560,7 +569,7 @@ function IndexDataGenerator(options) {
 
         // Geospatial Indexes
         //   2dsphere
-        { "spec" : Gen2dsphereIndex(7), "options" : GenIndexOptions(12) },
+        { "spec" : Gen2dsphereIndex(7), "options" : Gen2dSphereIndexOptions(12) },
         //   2d
         { "spec" : Gen2dIndex(8), "options" : Gen2dIndexOptions(13) },
         //   Haystack

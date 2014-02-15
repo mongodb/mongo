@@ -38,6 +38,8 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+    static const string kIndexVersionFieldName("2dsphereIndexVersion");
+
     static int configValueWithDefault(const IndexDescriptor *desc, const string& name, int def) {
         BSONElement e = desc->getInfoElement(name);
         if (e.isNumber()) { return e.numberInt(); }
@@ -60,10 +62,21 @@ namespace mongo {
             S2::kAvgEdge.GetClosestLevel(500.0 / _params.radius));
         _params.coarsestIndexedLevel = configValueWithDefault(descriptor, "coarsestIndexedLevel",
             S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / _params.radius));
+        // Determine which version of this index we're using.  If none was set in the descriptor,
+        // assume S2_INDEX_VERSION_1 (alas, the first version predates the existence of the version
+        // field).
+        _params.indexVersion = static_cast<S2IndexVersion>(configValueWithDefault(
+            descriptor, kIndexVersionFieldName, S2_INDEX_VERSION_1));
         uassert(16747, "coarsestIndexedLevel must be >= 0", _params.coarsestIndexedLevel >= 0);
         uassert(16748, "finestIndexedLevel must be <= 30", _params.finestIndexedLevel <= 30);
         uassert(16749, "finestIndexedLevel must be >= coarsestIndexedLevel",
                 _params.finestIndexedLevel >= _params.coarsestIndexedLevel);
+        massert(17395,
+                str::stream() << "unsupported geo index version { " << kIndexVersionFieldName
+                              << " : " << _params.indexVersion << " }, only support versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << "]",
+                _params.indexVersion == S2_INDEX_VERSION_2
+                    || _params.indexVersion == S2_INDEX_VERSION_1);
 
         int geoFields = 0;
 
@@ -83,6 +96,29 @@ namespace mongo {
         }
         uassert(16750, "Expect at least one geo field, spec=" + descriptor->keyPattern().toString(),
                 geoFields >= 1);
+    }
+
+    // static
+    BSONObj S2AccessMethod::fixSpec(const BSONObj& specObj) {
+        // If the spec object has the field "2dsphereIndexVersion", validate it.  If it doesn't, add
+        // {2dsphereIndexVersion: 2}, which is the default for newly-built indexes.
+
+        BSONElement indexVersionElt = specObj[kIndexVersionFieldName];
+        if (indexVersionElt.eoo()) {
+            BSONObjBuilder bob;
+            bob.appendElements(specObj);
+            bob.append(kIndexVersionFieldName, S2_INDEX_VERSION_2);
+            return bob.obj();
+        }
+
+        const int indexVersion = indexVersionElt.numberInt();
+        uassert(17394,
+                str::stream() << "unsupported geo index version { " << kIndexVersionFieldName
+                              << " : " << indexVersionElt << " }, only support versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << "]",
+                indexVersionElt.isNumber() && (indexVersion == S2_INDEX_VERSION_2
+                                               || indexVersion == S2_INDEX_VERSION_1));
+        return specObj;
     }
 
     void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {

@@ -39,6 +39,18 @@
 
 namespace mongo {
 
+    // An enum describing the version of an S2 index.
+    enum S2IndexVersion {
+        // The first version of the S2 index, introduced in MongoDB 2.4.0.  Compatible with MongoDB
+        // 2.4.0 and later.  Supports the following GeoJSON objects: Point, LineString, Polygon.
+        S2_INDEX_VERSION_1 = 1,
+
+        // The current version of the S2 index, introduced in MongoDB 2.6.0.  Compatible with
+        // MongoDB 2.6.0 and later.  Introduced support for the following GeoJSON objects:
+        // MultiPoint, MultiLineString, MultiPolygon, GeometryCollection.
+        S2_INDEX_VERSION_2 = 2
+    };
+
     struct S2IndexingParams {
         // Since we take the cartesian product when we generate keys for an insert,
         // we need a cap.
@@ -52,6 +64,8 @@ namespace mongo {
         // And, what's the coarsest?  When we search in larger coverings we know we
         // can stop here -- we index nothing coarser than this.
         int coarsestIndexedLevel;
+        // Version of this index (specific to the index type).
+        S2IndexVersion indexVersion;
 
         double radius;
 
@@ -61,6 +75,7 @@ namespace mongo {
             ss << "maxCellsInCovering: " << maxCellsInCovering << endl;
             ss << "finestIndexedLevel: " << finestIndexedLevel << endl;
             ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << endl;
+            ss << "indexVersion: " << indexVersion << endl;
             return ss.str();
         }
 

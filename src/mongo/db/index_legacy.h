@@ -49,8 +49,9 @@ namespace mongo {
         /**
          * Adjust the provided index spec BSONObj depending on the type of index obj describes.
          *
-         * This is a no-op unless the object describes a FTS index.  To see what FTS does, look in
-         * FTSSpec::fixSpec in fts/fts_spec.cpp.
+         * This is a no-op unless the object describes a TEXT or a GEO_2DSPHERE index.  TEXT and
+         * GEO_2DSPHERE provide additional validation on the index spec, and tweak the index spec
+         * object to conform to their expected format.
          */
         static BSONObj adjustIndexSpecObject(const BSONObj& obj);
 

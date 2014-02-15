@@ -226,6 +226,10 @@ namespace mongo {
         return geoContainer.hasS2Region();
     }
 
+    bool GeometryContainer::isSimpleContainer() const {
+        return NULL != _point || NULL != _line || NULL != _polygon;
+    }
+
     bool GeometryContainer::supportsContains() const {
         return NULL != _polygon
                || NULL != _cap

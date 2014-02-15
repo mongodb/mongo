@@ -59,6 +59,13 @@ namespace mongo {
 
         GeometryContainer geoContainer;
         if (!geoContainer.parseFrom(obj)) { return false; }
+
+        // Only certain geometries can be indexed in the old index format S2_INDEX_VERSION_1.  See
+        // definition of S2IndexVersion for details.
+        if (params.indexVersion == S2_INDEX_VERSION_1 && !geoContainer.isSimpleContainer()) {
+            return false;
+        }
+
         if (!geoContainer.hasS2Region()) { return false; }
 
         keysFromRegion(&coverer, geoContainer.getRegion(), out);

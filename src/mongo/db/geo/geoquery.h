@@ -40,6 +40,11 @@ namespace mongo {
         bool parseFrom(const BSONObj &obj);
 
         /**
+         * Is the geometry any of {Point, Line, Polygon}?
+         */
+        bool isSimpleContainer() const;
+
+        /**
          * To check intersection, we iterate over the otherContainer's geometries, checking each
          * geometry to see if we intersect it.  If we intersect one geometry, we intersect the
          * entire other container.
