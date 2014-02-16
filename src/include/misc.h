@@ -83,7 +83,7 @@
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.
  */
-#define	__wt_free(session, p)		__wt_free_int(session, &(p))
+#define	__wt_free(session, p)		__wt_free_int(session, (void *)&(p))
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_overwrite_and_free(session, p) do {			\
 	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
