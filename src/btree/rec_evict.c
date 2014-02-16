@@ -250,9 +250,9 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
-	WT_VERBOSE_ERR(session, evict,
-	    "page split %" PRIu32 " -> %" PRIu32 "\n",
-	    parent_entries, (parent_entries - 1) + split_entries);
+	WT_VERBOSE_ERR(session, split,
+	    "page %p split into parent %p %" PRIu32 " -> %" PRIu32,
+	    page, parent, parent_entries, (parent_entries - 1) + split_entries);
 
 err:	WT_PAGE_UNLOCK(session, parent);
 	return (ret);

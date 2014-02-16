@@ -963,6 +963,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "recovery",		WT_VERB_recovery },
 		{ "salvage",		WT_VERB_salvage },
 		{ "shared_cache",	WT_VERB_shared_cache },
+		{ "split",		WT_VERB_split },
 		{ "verify",		WT_VERB_verify },
 		{ "version",		WT_VERB_version },
 		{ "write",		WT_VERB_write },

@@ -69,6 +69,7 @@ flags = {
 		'VERB_recovery',
 		'VERB_salvage',
 		'VERB_shared_cache',
+		'VERB_split',
 		'VERB_verify',
 		'VERB_version',
 		'VERB_write'

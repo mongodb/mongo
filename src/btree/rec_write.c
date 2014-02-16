@@ -428,8 +428,8 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_VERBOSE_RET(session, reconcile,
-	    "root page split -> %" PRIu32 "pages", mod->split_entries);
+	WT_VERBOSE_RET(session, split,
+	    "root page split -> %" PRIu32 " pages", mod->split_entries);
 
 	/*
 	 * Create a new root page, initialize the array of child references,
@@ -3925,9 +3925,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		F_SET(mod, WT_PM_REC_REPLACE);
 		break;
 	default:					/* Page split */
-		WT_VERBOSE_RET(session, reconcile,
-		    "page %p split into %" PRIu32 " pages",
-		    page, r->bnd_next);
+		WT_VERBOSE_RET(session, split,
+		    "page %p split into %" PRIu32 " pages", page, r->bnd_next);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
@@ -3942,7 +3941,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		if (WT_VERBOSE_ISSET(session, reconcile)) {
+		/*
+		 * Display the actual split keys: not turned on because it's a
+		 * lot of output and not generally useful.
+		 */
+		if (0 && WT_VERBOSE_ISSET(session, split)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
 			uint32_t i;
@@ -3957,7 +3960,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					WT_ERR(__wt_buf_set_printable(
 					    session, tkey,
 					    bnd->key.data, bnd->key.size));
-					WT_VERBOSE_ERR(session, reconcile,
+					WT_VERBOSE_ERR(session, split,
 					    "split: starting key "
 					    "%.*s",
 					    (int)tkey->size,
@@ -3966,7 +3969,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				case WT_PAGE_COL_FIX:
 				case WT_PAGE_COL_INT:
 				case WT_PAGE_COL_VAR:
-					WT_VERBOSE_ERR(session, reconcile,
+					WT_VERBOSE_ERR(session, split,
 					    "split: starting recno %" PRIu64,
 					    bnd->recno);
 					break;

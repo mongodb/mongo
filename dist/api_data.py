@@ -371,6 +371,7 @@ connection_runtime_config = [
 	        'recovery',
 	        'salvage',
 	        'shared_cache',
+	        'split',
 	        'verify',
 	        'version',
 	        'write']),
