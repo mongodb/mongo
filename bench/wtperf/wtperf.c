@@ -668,14 +668,20 @@ monitor(void *arg)
 	/* Set line buffering for monitor file. */
 	(void)setvbuf(fp, NULL, _IOLBF, 0);
 	fprintf(fp,
-	    "#time,totalsec,"
-	    "read operations,insert operations,update operations,"
+	    "#time,"
+	    "totalsec,"
+	    "read ops per second,"
+	    "insert ops per second,"
+	    "update ops per second,"
 	    "checkpoints,"
-	    "read average latency(uS),read minimum latency(uS),"
+	    "read average latency(uS),"
+	    "read minimum latency(uS),"
 	    "read maximum latency(uS),"
-	    "insert average latency(uS),insert min latency(uS),"
+	    "insert average latency(uS),"
+	    "insert min latency(uS),"
 	    "insert maximum latency(uS),"
-	    "update average latency(uS),update min latency(uS),"
+	    "update average latency(uS),"
+	    "update min latency(uS),"
 	    "update maximum latency(uS)"
 	    "\n");
 	last_reads = last_inserts = last_updates = 0;
