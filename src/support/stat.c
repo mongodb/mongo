@@ -109,7 +109,6 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->rec_overflow_value.desc =
 	    "reconciliation overflow values written";
 	stats->rec_page_delete.desc = "reconciliation pages deleted";
-	stats->rec_page_merge.desc = "reconciliation pages merged";
 	stats->rec_pages.desc = "page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "page reconciliation calls for eviction";
@@ -207,7 +206,6 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->rec_overflow_key_leaf.v = 0;
 	stats->rec_overflow_value.v = 0;
 	stats->rec_page_delete.v = 0;
-	stats->rec_page_merge.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
 	stats->rec_skipped_update.v = 0;
@@ -295,7 +293,6 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->rec_overflow_key_leaf.v += c->rec_overflow_key_leaf.v;
 	p->rec_overflow_value.v += c->rec_overflow_value.v;
 	p->rec_page_delete.v += c->rec_page_delete.v;
-	p->rec_page_merge.v += c->rec_page_merge.v;
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
 	p->rec_skipped_update.v += c->rec_skipped_update.v;
@@ -348,6 +345,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: internal levels merged";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
+	stats->cache_eviction_split.desc =
+	    "cache: internal pages split during eviction";
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_inmem_split.desc =
 	    "pages split because they were unable to be evicted";
@@ -452,6 +451,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_merge_fail.v = 0;
 	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
+	stats->cache_eviction_split.v = 0;
 	stats->cache_eviction_walk.v = 0;
 	stats->cache_inmem_split.v = 0;
 	stats->cache_pages_dirty.v = 0;

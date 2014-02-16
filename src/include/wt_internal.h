@@ -183,6 +183,8 @@ struct __wt_page;
     typedef struct __wt_page WT_PAGE;
 struct __wt_page_header;
     typedef struct __wt_page_header WT_PAGE_HEADER;
+struct __wt_page_index;
+    typedef struct __wt_page_index WT_PAGE_INDEX;
 struct __wt_page_modify;
     typedef struct __wt_page_modify WT_PAGE_MODIFY;
 struct __wt_process;

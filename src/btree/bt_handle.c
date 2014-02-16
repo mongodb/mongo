@@ -514,7 +514,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	size_t addr_size;
 	uint32_t i;
 	const uint8_t *addr;
@@ -523,7 +523,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_INTL_FOREACH(btree->root_page, refp, ref, i) {
+	WT_INTL_FOREACH(btree->root_page, ref, i) {
 		WT_RET(__wt_ref_info(session,
 		    btree->root_page, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)

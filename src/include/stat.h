@@ -141,6 +141,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_merge_fail;
 	WT_STATS cache_eviction_merge_levels;
 	WT_STATS cache_eviction_slow;
+	WT_STATS cache_eviction_split;
 	WT_STATS cache_eviction_walk;
 	WT_STATS cache_inmem_split;
 	WT_STATS cache_pages_dirty;
@@ -287,7 +288,6 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_overflow_key_leaf;
 	WT_STATS rec_overflow_value;
 	WT_STATS rec_page_delete;
-	WT_STATS rec_page_merge;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
 	WT_STATS rec_skipped_update;

@@ -103,10 +103,11 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_SPLIT:
 		/*
-		 * If the page split, there may one or more pages linked from
+		 * If a root page split, there may one or more pages linked from
 		 * the page; walk the list, discarding pages.
 		 */
-		__wt_page_out(session, &mod->u.split);
+		if (mod->root_split != NULL)
+			__wt_page_out(session, &mod->root_split);
 		break;
 	case WT_PM_REC_REPLACE:
 		/*
@@ -118,6 +119,9 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	default:
 		break;
 	}
+
+	/* Free the split array. */
+	__wt_free(session, mod->split_ref);
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {
@@ -148,14 +152,14 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	uint32_t i;
 
 	/*
 	 * For each referenced addr, see if the addr was an allocation, and if
 	 * so, free it.
 	 */
-	WT_INTL_FOREACH(page, refp, ref, i)
+	WT_INTL_FOREACH(page, ref, i)
 		if (ref->addr != NULL &&
 		    __wt_off_page(page, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
@@ -181,23 +185,31 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_IKEY *ikey;
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	uint32_t i;
 
-	/*
-	 * For each WT_REF referenced addr, see if the key or address was an
-	 * allocation, and if so, free it.
-	 */
-	if (page->pu_intl_index == NULL)
-		return;
-	WT_INTL_FOREACH(page, refp, ref, i) {
-		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
-			__wt_free(session, ikey);
-		if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
+	/* Free the contents of any WT_REF structures. */
+	if (page->u.intl.index != NULL)
+		WT_INTL_FOREACH(page, ref, i)
+			__wt_free_ref(session, page, ref);
+}
+
+/*
+ * __wt_free_ref --
+ *	Discard the contents of a WT_REF structure.
+ */
+void
+__wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
+{
+	WT_IKEY *ikey;
+
+	/* Free any key or address allocations. */
+	if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
+		__wt_free(session, ikey);
+	if (ref->addr != NULL &&
+	    (page == NULL || __wt_off_page(page, ref->addr))) {
+		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+		__wt_free(session, ref->addr);
 	}
 }
 

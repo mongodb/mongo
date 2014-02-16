@@ -51,6 +51,8 @@ __wt_page_in_func(
 			 * wait for that to be resolved.
 			 */
 			break;
+		case WT_REF_SPLIT:
+			return (WT_RESTART);
 		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
@@ -187,9 +189,8 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		 * split.  Allocate and initialize it to point to the first set
 		 * of slots (even though those slots aren't yet initialized).
 		 */
-		if ((ret = __wt_calloc(session, alloc_entries,
-		    sizeof(*page->u.intl.index) +
-		    alloc_entries * sizeof(WT_REF *),
+		if ((ret = __wt_calloc(session, 1,
+		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
 		    &page->u.intl.index)) != 0) {
 			__wt_free(session, page);
 			return (ret);

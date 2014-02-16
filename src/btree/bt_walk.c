@@ -153,6 +153,18 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 }
 
 /*
+ * PAGE_SWAP --
+ *	Macro to swap pages, handling the split restart.
+ */
+#undef	PAGE_SWAP
+#define	PAGE_SWAP(session, couple, page, ref, ret) do {			\
+	if (((ret) = __wt_page_swap(					\
+	    session, couple, page, ref, 0)) == WT_RESTART)		\
+		goto restart;						\
+	WT_RET(ret);							\
+} while (0)
+
+/*
  * __wt_tree_walk --
  *	Move to the next/previous page in the tree.
  */
@@ -160,7 +172,9 @@ int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *couple, *page;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 	uint32_t page_entries, slot;
 	int cache, compact, discard, eviction, prev, set_read_gen;
@@ -221,8 +235,6 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	if (page == NULL) {
 		if ((page = btree->root_page) == NULL)
 			return (0);
-		page_entries = page->pu_intl_entries;
-		slot = prev ? page_entries - 1 : 0;
 		goto descend;
 	}
 
@@ -237,10 +249,10 @@ ascend:	/*
 	 * Figure out the current slot in the parent page's WT_REF array and
 	 * switch to the parent.
 	 */
-	WT_RET(__wt_page_refp(session, page, &slot));
-	ref = page->parent->pu_intl_index[slot];
+	WT_RET(__wt_page_refp(session, page, &pindex, &slot));
+	page_entries = pindex->entries;
+	ref = pindex->index[slot];
 	page = page->parent;
-	page_entries = page->pu_intl_entries;
 
 	/* If the eviction thread, clear the page's walk status.
 	 *
@@ -275,6 +287,11 @@ ascend:	/*
 			 * our page stack, but we have no place to store it and
 			 * it's simpler if callers just know they hold a hazard
 			 * pointer on any page they're using.
+			 *
+			 * XXXKEITH:
+			 * Can this page-swap function return restart because of
+			 * a page split?  I don't think so (this is an internal
+			 * page that's pinned in memory), but I'm not 100% sure.
 			 */
 			if (!eviction) {
 				if (WT_PAGE_IS_ROOT(page))
@@ -283,27 +300,37 @@ ascend:	/*
 				else
 					WT_RET(__wt_page_swap(
 					    session, couple, page,
-					    __wt_page_ref(session, page)));
+					    __wt_page_ref(session, page), 1));
 			}
 
 			*pagep = page;
 			return (0);
 		}
+
+		if (0) {
+restart:		/*
+			 * The page we're moving to might have split, in which
+			 * case use the last page we had to locate the cursor
+			 * in the newly split tree and repeat the last move.
+			 * If we don't have a place to stand, we must have been
+			 * starting a tree walk, begin again.
+			 */
+			if (couple == NULL) {
+				if ((page = btree->root_page) == NULL)
+					return (0);
+				goto descend;
+			}
+			WT_RET(__wt_page_refp(session, couple, &pindex, &slot));
+			page_entries = pindex->entries;
+		}
+
 		if (prev)
 			--slot;
 		else
 			++slot;
 
-descend:	for (;;) {
-			if (page->type == WT_PAGE_ROW_INT ||
-			    page->type == WT_PAGE_COL_INT)
-				ref = page->pu_intl_index[slot];
-			else if (skip_leaf)
-				goto ascend;
-			else {
-				*pagep = page;
-				return (0);
-			}
+		for (;;) {
+			ref = pindex->index[slot];
 
 			/*
 			 * There are several reasons to walk an in-memory tree:
@@ -314,11 +341,11 @@ descend:	for (;;) {
 			 * (4) to close a file, discarding pages;
 			 * (5) to perform cursor scans.
 			 *
-			 * For cases 1 and 2, "eviction" is configured and we
-			 * swap the state to WT_REF_EVICT_WALK temporarily to
-			 * mark the page and to avoid the page being evicted by
-			 * another thread.  The other cases get hazard pointers
-			 * and protect the page from eviction that way.
+			 * For case 1, "eviction" is configured and we swap the
+			 * state to WT_REF_EVICT_WALK temporarily to mark the
+			 * page and to avoid the page being evicted by another
+			 * thread.  All other cases use hazard pointers to make
+			 * sure the page cannot be evicted.
 			 */
 			if (eviction) {
 retry:				if (ref->state != WT_REF_MEM ||
@@ -356,8 +383,7 @@ retry:				if (ref->state != WT_REF_MEM ||
 				    (ref->state == WT_REF_LOCKED &&
 				    !LF_ISSET(WT_TREE_WAIT)))
 					break;
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				PAGE_SWAP(session, couple, page, ref, ret);
 			} else if (discard) {
 				/*
 				 * If deleting a range, try to delete the page
@@ -367,8 +393,7 @@ retry:				if (ref->state != WT_REF_MEM ||
 				    session, page, ref, &skip));
 				if (skip)
 					break;
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				PAGE_SWAP(session, couple, page, ref, ret);
 			} else if (compact) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
@@ -401,8 +426,7 @@ retry:				if (ref->state != WT_REF_MEM ||
 					if (skip)
 						break;
 				}
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				PAGE_SWAP(session, couple, page, ref, ret);
 				if (set_read_gen)
 					ref->page->read_gen =
 					    WT_READ_GEN_OLDEST;
@@ -415,13 +439,22 @@ retry:				if (ref->state != WT_REF_MEM ||
 				if (skip)
 					break;
 
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				PAGE_SWAP(session, couple, page, ref, ret);
 			}
 
 			couple = page = ref->page;
-			page_entries = __wt_page_entries(page);
-			slot = prev ? page_entries - 1 : 0;
+			if (page->type == WT_PAGE_ROW_INT ||
+			    page->type == WT_PAGE_COL_INT) {
+descend:			pindex = page->u.intl.index;
+				page_entries = pindex->entries;
+				slot = prev ? page_entries - 1 : 0;
+			} else {
+				if (skip_leaf)
+					goto ascend;
+
+				*pagep = page;
+				return (0);
+			}
 		}
 	}
 	/* NOTREACHED */

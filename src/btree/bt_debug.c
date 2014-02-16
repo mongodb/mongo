@@ -528,10 +528,10 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		    mod->u.replace.addr, mod->u.replace.size));
 		break;
 	case WT_PM_REC_SPLIT:
-		__dmsg(ds, "\t" "split page %p\n", mod->u.split);
+		__dmsg(ds, "\t" "split page\n");
 		break;
 	case WT_PM_REC_SPLIT_MERGE:
-		__dmsg(ds, "\t" "split-merge page %p\n", mod->u.split);
+		__dmsg(ds, "\t" "split-merge page\n");
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -595,16 +595,16 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 static int
 __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	uint32_t i;
 
-	WT_INTL_FOREACH(page, refp, ref, i) {
+	WT_INTL_FOREACH(page, ref, i) {
 		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->key.recno);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_INTL_FOREACH(page, refp, ref, i)
+		WT_INTL_FOREACH(page, ref, i)
 			if (ref->state == WT_REF_MEM) {
 				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));
@@ -663,19 +663,19 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	size_t len;
 	uint8_t *p;
 	uint32_t i;
 
-	WT_INTL_FOREACH(page, refp, ref, i) {
+	WT_INTL_FOREACH(page, ref, i) {
 		__wt_ref_key(page, ref, &p, &len);
 		__debug_item(ds, "K", p, len);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_INTL_FOREACH(page, refp, ref, i)
+		WT_INTL_FOREACH(page, ref, i)
 			if (ref->state == WT_REF_MEM) {
 				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));
@@ -820,6 +820,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 		break;
 	case WT_REF_READING:
 		__dmsg(ds, "reading");
+		break;
+	case WT_REF_SPLIT:
+		__dmsg(ds, "split");
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

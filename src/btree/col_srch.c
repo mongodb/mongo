@@ -16,6 +16,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
@@ -24,14 +25,14 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	uint32_t base, indx, limit;
 	int depth;
 
-	__cursor_search_clear(cbt);
+	btree = S2BT(session);
 
 	recno = cbt->iface.recno;
+	__cursor_search_clear(cbt);
 
-	btree = S2BT(session);
-	ref = NULL;
-
+restart:
 	/* Search the internal pages of the tree. */
+	ref = NULL;
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
 		WT_ASSERT(session,
@@ -78,11 +79,17 @@ descend:	WT_ASSERT(session, ref != NULL);
 		}
 
 		/*
-		 * Swap the parent page for the child page; return on error,
-		 * the swap function ensures we're holding nothing on failure.
+		 * Swap the parent page for the child page; if the page splits
+		 * while we're waiting for it, restart the search, otherwise
+		 * return on error.
 		 */
-		WT_RET(__wt_page_swap(session, page, page, ref));
-		page = ref->page;
+		if ((ret = __wt_page_swap(session, page, page, ref, 1)) == 0) {
+			page = ref->page;
+			continue;
+		}
+		if (ret == WT_RESTART)
+			goto restart;
+		return (ret);
 	}
 
 	/*

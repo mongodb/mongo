@@ -167,6 +167,98 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *parent_ref)
 }
 
 /*
+ * __rec_page_split --
+ *	Resolve a page split, inserting new information into the parent.
+ */
+static int
+__rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	WT_PAGE_INDEX *alloc_index;
+	WT_PAGE_MODIFY *mod;
+	WT_REF **refp, *split;
+	uint32_t i, j, parent_entries, split_entries;
+
+	parent = page->parent;
+
+	/* If the parent page hasn't yet been modified, now is the time. */
+	WT_RET(__wt_page_modify_init(session, parent));
+	__wt_page_only_modify_set(session, parent);
+
+	/*
+	 * Get a page-level lock on the parent to single-thread splits into the
+	 * page.  It's OK to queue up multiple splits as the child pages split,
+	 * but the actual split into the parent has to be serialized.
+	 */
+	WT_PAGE_LOCK(session, parent);
+
+	/*
+	 * Allocate a new WT_REF splits array as necessary, then append the
+	 * underlying split page's WT_REF array into the list.
+	 */
+	mod = parent->modify;
+	for (i = 0; i < mod->splits_slots; ++i)
+		if (mod->splits[i] == NULL)
+			break;
+	if (i == mod->splits_slots) {
+		WT_ERR(__wt_realloc(session,
+		    NULL, (i + 5) * sizeof(mod->splits[0]), &mod->splits));
+		mod->splits_slots = i + 5;
+	}
+	split = mod->splits[i] = page->modify->split_ref;
+
+	/* Allocate a new WT_REF index array and initialize it. */
+	parent_entries = parent->pu_intl_entries;
+	split_entries = page->modify->split_entries;
+	WT_ERR(__wt_calloc(session, 1,
+	    sizeof(WT_PAGE_INDEX) +
+	    ((parent_entries - 1) + split_entries) * sizeof(WT_REF *),
+	    &alloc_index));
+	alloc_index->entries = (parent_entries - 1) + split_entries;
+	refp = alloc_index->index;
+	for (i = 0; i < parent_entries; ++i)
+		if ((*refp = parent->pu_intl_index[i]) == parent_ref)
+			for (j = 0; j < split_entries; ++j)
+				*refp++ = &split[j];
+		else
+			refp++;
+
+	/* Update the parent page's footprint. */
+	__wt_cache_page_inmem_incr(session, parent, page->modify->split_size);
+
+	/* We've stolen the page's WT_REF structures, clear the references. */
+	page->modify->split_ref = NULL;
+	page->modify->split_entries = 0;
+	page->modify->split_size = 0;
+
+	/*
+	 * Update the parent page's index: this is the update that splits the
+	 * parent page, making the split visible to other threads.
+	 */
+	WT_PUBLISH(parent->u.intl.index, alloc_index);
+
+	/*
+	 * XXXKEITH
+	 * Just leaked the old one.
+	 */
+
+	/*
+	 * Reset the page's original WT_REF field to split, releasing any
+	 * blocked threads.
+	 */
+	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
+
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
+	WT_VERBOSE_ERR(session, evict,
+	    "page split %" PRIu32 " -> %" PRIu32 "\n",
+	    parent_entries, (parent_entries - 1) + split_entries);
+
+err:	WT_PAGE_UNLOCK(session, parent);
+	return (ret);
+}
+
+/*
  * __rec_page_dirty_update --
  *	Update a dirty page's reference on eviction.
  */
@@ -226,18 +318,7 @@ __rec_page_dirty_update(
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
-		/*
-		 * Update the parent to reference new internal page(s).
-		 *
-		 * Publish: a barrier to ensure the structure fields are set
-		 * before the state change makes the page available to readers.
-		 */
-		parent_ref->page = mod->u.split;
-		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
-
-		/* Clear the page else discarding the page will free it. */
-		mod->u.split = NULL;
-		F_CLR(mod, WT_PM_REC_SPLIT);
+		WT_RET(__rec_page_split(session, parent_ref, page));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -253,14 +334,14 @@ __rec_page_dirty_update(
 static void
 __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	uint32_t i;
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_INTL_FOREACH(page, refp, ref, i) {
+		WT_INTL_FOREACH(page, ref, i) {
 			if (ref->state == WT_REF_DISK ||
 			    ref->state == WT_REF_DELETED)
 				continue;
@@ -294,7 +375,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE *t;
-	WT_REF **refp;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -322,7 +402,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	 * pages after we've written them.
 	 */
 	if (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)
-		WT_INTL_FOREACH(page, refp, ref, i)
+		WT_INTL_FOREACH(page, ref, i)
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
 			case WT_REF_DELETED:		/* On-disk, deleted */
@@ -341,6 +421,8 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);
+			case WT_REF_SPLIT:		/* Impossible */
+				/* FALLTHROUGH */
 			WT_ILLEGAL_VALUE(session);
 			}
 

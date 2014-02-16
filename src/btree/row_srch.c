@@ -37,7 +37,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	    WT_LEX_CMP(session, btree->collator, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
 		/*
-		 * XXX We may race with another appending thread.
+		 * !!!
+		 * We may race with another appending thread.
 		 *
 		 * To catch that case, rely on the atomic pointer read above
 		 * and set the next stack to NULL here.  If we have raced with
@@ -124,17 +125,17 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	uint32_t base, indx, limit;
 	int cmp, depth;
 
-	__cursor_search_clear(cbt);
-	srch_key = &cbt->iface.key;
-
 	btree = S2BT(session);
 	rip = NULL;
+	match = 0;				/* -Wuninitialized */
+
+	srch_key = &cbt->iface.key;
+	__cursor_search_clear(cbt);
 
 	item = &_item;
 	WT_CLEAR_INLINE(WT_ITEM, *item);
 
-	match = 0;				/* -Wuninitialized */
-
+restart:
 	/*
 	 * The row-store search routine uses a different comparison API.
 	 * The assumption is we're comparing more than a few keys with
@@ -245,17 +246,18 @@ descend:	WT_ASSERT(session, ref != NULL);
 			ref = page->pu_intl_index[base - 1];
 
 		/*
-		 * Swap the parent page for the child page; return on error,
-		 * the swap function ensures we're holding nothing on failure.
-		 *
-		 * !!!
-		 * Don't use WT_RET, we've already used WT_ERR, and the style
-		 * checking code complains if we use WT_RET after a jump to an
-		 * error label.
+		 * Swap the parent page for the child page; if the page splits
+		 * while we're waiting for it, restart the search, otherwise
+		 * return on error, the swap call ensures we're holding nothing
+		 * on failure.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref)) != 0)
-			return (ret);
-		page = ref->page;
+		if ((ret = __wt_page_swap(session, page, page, ref, 1)) == 0) {
+			page = ref->page;
+			continue;
+		}
+		if (ret == WT_RESTART)
+			goto restart;
+		return (ret);
 	}
 
 	/*
@@ -403,6 +405,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	btree = S2BT(session);
 
+restart:
 	/* Walk the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
 		ref =
@@ -412,8 +415,13 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * Swap the parent page for the child page; return on error,
 		 * the swap function ensures we're holding nothing on failure.
 		 */
-		WT_RET(__wt_page_swap(session, page, page, ref));
-		page = ref->page;
+		if ((ret = __wt_page_swap(session, page, page, ref, 1)) == 0) {
+			page = ref->page;
+			continue;
+		}
+		if (ret == WT_RESTART)
+			goto restart;
+		return (ret);
 	}
 
 	if (page->pu_row_entries != 0) {

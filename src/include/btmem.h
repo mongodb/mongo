@@ -88,6 +88,15 @@ struct __wt_addr {
 };
 
 /*
+ * WT_PAGE_INDEX --
+ *	An in-memory structure to hold a list of WT_REFs in collated order.
+ */
+struct __wt_page_index {
+	uint32_t entries;		/* Entries */
+	WT_REF	*index[0];		/* Collated children */
+};
+
+/*
  * Overflow tracking of on-page key/value items: As pages are reconciled,
  * overflow key/value records referenced from the original page are discarded
  * as they are updated or removed.  We track such overflow items to ensure we
@@ -208,9 +217,32 @@ struct __wt_page_modify {
 	 * split page.
 	 */
 	union {
-		WT_PAGE *split;		/* Resulting split page */
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
+
+	/*
+	 * When pages are split into internal pages, new WT_REF arrays are
+	 * allocated, becoming an entry in the sorted list of WT_REFs.
+	 * XXXKEITH
+	 * Only internal pages have these.
+	 */
+	WT_REF **splits;		/* Split child WT_REFs */
+	uint32_t splits_slots;		/* Split child WT_REFs count */
+
+	/*
+	 * When pages are split, they are represented by a WT_REF array.
+	 * XXXKEITH
+	 * Internal and leaf pages can have these.
+	 */
+	WT_REF	*split_ref;		/* Resulting split WT_REF array */
+	uint32_t split_entries;		/* Resulting split element count */
+	size_t	 split_size;		/* Resulting split memory footprint */
+
+	/*
+	 * XXXKEITH
+	 * Only root pages have these.
+	 */
+	WT_PAGE *root_split;		/* Linked list of root split pages */
 
 	/*
 	 * Appended items to column-stores: there is only a single one of these
@@ -287,13 +319,10 @@ struct __wt_page {
 		 * Once a page splits, they will differ.
 		 */
 		struct {
-			uint64_t  recno;		/* Starting recno */
+			uint64_t recno;		/* Starting recno */
 
-			WT_REF	 *__index;		/* Original children */
-			struct {
-				uint32_t entries;	/* Entries */
-				WT_REF	*index[0];	/* Collated children */
-			} *index;
+			WT_REF *__index;	/* Original children */
+			WT_PAGE_INDEX *index;	/* Collated children */
 		} intl;
 #undef	pu_intl_recno
 #define	pu_intl_recno	u.intl.recno
@@ -301,10 +330,11 @@ struct __wt_page {
 #define	pu_intl_entries	u.intl.index->entries
 #undef	pu_intl_index
 #define	pu_intl_index	u.intl.index->index
-#define	WT_INTL_FOREACH(page, refp, ref, i)				\
-	for ((i) = (page)->pu_intl_entries,				\
-	    (refp) = (page)->pu_intl_index,				\
-	    (ref) = *(refp); (i) > 0; ++(refp), (ref) = *(refp), --(i))
+#define	WT_INTL_FOREACH(page, ref, i)					\
+	for ((i) = 0, ref = (page)->pu_intl_index[0];			\
+	    (i) < (page)->pu_intl_entries;				\
+	    ++(i), (ref) = (i) ==					\
+	    (page)->pu_intl_entries ? NULL : (page)->pu_intl_index[(i)])
 
 		/* Row-store leaf page. */
 		struct {
@@ -484,6 +514,10 @@ struct __wt_page {
  *	other readers of the page wait until the read completes.  Sync can
  *	safely skip over such pages: they are clean by definition.
  *
+ * WT_REF_SPLIT:
+ *	Set when the page is split; the WT_REF is dead and can no longer be
+ *	used.
+ *
  * The life cycle of a typical page goes like this: pages are read into memory
  * from disk and their state set to WT_REF_MEM.  When the page is selected for
  * eviction, the page state is set to WT_REF_LOCKED.  In all cases, evicting
@@ -508,7 +542,8 @@ enum __wt_page_state {
 	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
-	WT_REF_READING			/* Page being read */
+	WT_REF_READING,			/* Page being read */
+	WT_REF_SPLIT			/* Page was split */
 };
 
 /*
@@ -550,7 +585,7 @@ struct __wt_ref {
 #define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
 	(pref)->page = (cpage);						\
 	(cpage)->parent = (ppage);					\
-	(cpage)->ref_hint = 0;		/* XXX: do better */		\
+	(cpage)->ref_hint = 0;		/* XXXKEITH: do better */	\
 } while (0)
 
 /*

@@ -6,24 +6,6 @@
  */
 
 /*
- * __wt_page_entries --
- *	Return the number of entries on a page of any type.
- */
-static inline uint32_t
-__wt_page_entries(WT_PAGE *page)
-{
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		return (page->pu_fix_entries);
-	case WT_PAGE_COL_VAR:
-		return (page->pu_var_entries);
-	case WT_PAGE_ROW_LEAF:
-		return (page->pu_row_entries);
-	}
-	return (page->pu_intl_entries);
-}
-
-/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
@@ -218,7 +200,8 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
  * structure.
  */
 static inline int
-__wt_page_refp(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *slotp)
+__wt_page_refp(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE *parent;
 	uint32_t i;
@@ -228,21 +211,27 @@ __wt_page_refp(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *slotp)
 	if (WT_PAGE_IS_ROOT(page))
 		return (EINVAL);
 
+	/*
+	 * Copy the parent page's index value: the page can split at any time,
+	 * but the index's value is always valid, even if it's not up-to-date.
+	 */
 	parent = page->parent;
+	*pindexp = parent->u.intl.index;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
-	 * to the correct location.  It's not an error for the hint to be zero,
+	 * to the correct location.  It's not an error for the hint to be wrong,
 	 * we don't bother initializing it everywhere, it only implies the first
 	 * retrieval is slower.
 	 */
-	if (parent->pu_intl_index[page->ref_hint]->page == page) {
+	if (page->ref_hint < (*pindexp)->entries &&
+	    (*pindexp)->index[page->ref_hint]->page == page) {
 		*slotp = page->ref_hint;
 		return (0);
 	}
 
-	for (i = page->ref_hint + 1; i < parent->pu_intl_entries; ++i)
-		if (parent->pu_intl_index[i]->page == page) {
+	for (i = page->ref_hint + 1; i < (*pindexp)->entries; ++i)
+		if ((*pindexp)->index[i]->page == page) {
 			*slotp = page->ref_hint = i;
 			return (0);
 		}
@@ -251,10 +240,10 @@ __wt_page_refp(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *slotp)
 	 * If we don't find it, the page must have split, start the search from
 	 * the beginning of the page.
 	 */
-	for (i = 0; i < parent->pu_intl_entries; ++i)
-		if (parent->pu_intl_index[i]->page == page) {
+	for (i = 0; i < (*pindexp)->entries; ++i)
+		if ((*pindexp)->index[i]->page == page) {
 			*slotp = page->ref_hint = i;
-			return (i);
+			return (0);
 		}
 	/* NOTREACHED */
 
@@ -270,13 +259,14 @@ __wt_page_refp(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *slotp)
 static inline WT_REF *
 __wt_page_ref(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_PAGE_INDEX *pindex;
 	uint32_t slot;
 
 	if (WT_PAGE_IS_ROOT(page))
 		return (NULL);
 
-	return (__wt_page_refp(session, page, &slot) == 0 ?
-	    page->parent->pu_intl_index[slot] : NULL);
+	return (__wt_page_refp(
+	    session, page, &pindex, &slot) == 0 ? pindex->index[slot] : NULL);
 }
 
 /*
@@ -703,8 +693,8 @@ skip:
  * coupling up/down the tree.
  */
 static inline int
-__wt_page_swap_func(
-    WT_SESSION_IMPL *session, WT_PAGE *out, WT_PAGE *in, WT_REF *inref
+__wt_page_swap_func(WT_SESSION_IMPL *session,
+    WT_PAGE *held, WT_PAGE *parent, WT_REF *ref, int cleanup
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -716,20 +706,32 @@ __wt_page_swap_func(
 	/*
 	 * This function is here to simplify the error handling during hazard
 	 * pointer coupling so we never leave a hazard pointer dangling.  The
-	 * assumption is we're holding a hazard pointer on "out", and want to
-	 * read page "in", acquiring a hazard pointer on it, then release page
-	 * "out" and its hazard pointer.  If something fails, discard it all.
+	 * assumption is we're holding a hazard pointer on "held", and want to
+	 * acquire a hazard pointer on the page referenced by a parent/ref
+	 * pair, releasing the hazard pointer on page "held" when we're done.
+	 * If we can't get the page we want, optionally discard the original
+	 * hazard pointer.
 	 */
-	ret = __wt_page_in_func(session, in, inref
+	ret = __wt_page_in_func(session, parent, ref
 #ifdef HAVE_DIAGNOSTIC
 	    , file, line
 #endif
 	    );
 	acquired = ret == 0;
-	WT_TRET(__wt_page_release(session, out));
 
-	if (ret != 0 && acquired)
-		WT_TRET(__wt_page_release(session, inref->page));
+	/*
+	 * If we got the page we wanted, or we're discarding all hazard pointers
+	 * on error, discard the original held pointer.
+	 */
+	if (acquired || cleanup)
+		WT_TRET(__wt_page_release(session, held));
+
+	/*
+	 * If there was an error discarding the original held pointer, discard
+	 * the acquired pointer too, keeping it is never useful.
+	 */
+	if (acquired && ret != 0)
+		WT_TRET(__wt_page_release(session, ref->page));
 	return (ret);
 }
 

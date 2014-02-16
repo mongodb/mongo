@@ -221,7 +221,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_DECL_RET;
-	WT_REF **refp, *ref;
+	WT_REF *ref;
 	uint64_t recno;
 	uint32_t entry, i;
 	int found;
@@ -389,7 +389,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_INTL_FOREACH(page, refp, ref, i) {
+		WT_INTL_FOREACH(page, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
@@ -423,7 +423,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_INTL_FOREACH(page, refp, ref, i) {
+		WT_INTL_FOREACH(page, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * key should be larger than the largest key previously
