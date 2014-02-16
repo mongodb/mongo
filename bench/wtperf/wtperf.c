@@ -1121,7 +1121,7 @@ err:	if ((t_ret = session->close(session, NULL)) != 0) {
 /*
  * Populate the uri array if more than one table is being used.
  */
-int
+static int
 create_uris(CONFIG *cfg)
 {
 	char *uri;
@@ -1161,7 +1161,7 @@ err:	if (ret != 0 && cfg->uris != NULL) {
 	return (ret);
 }
 
-int
+static int
 create_tables(CONFIG *cfg)
 {
 	WT_SESSION *session;
