@@ -527,7 +527,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-#if 0
+#ifdef XXXKEITH
 		/*
 		 * If the page is larger than the maximum allowed, attempt to
 		 * split the page in memory before evicting it.  The in-memory
