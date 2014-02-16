@@ -445,7 +445,7 @@ retry:				if (ref->state != WT_REF_MEM ||
 			couple = page = ref->page;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT) {
-descend:			pindex = page->u.intl.index;
+descend:			pindex = page->pu_intl_index;
 				page_entries = pindex->entries;
 				slot = prev ? page_entries - 1 : 0;
 			} else {

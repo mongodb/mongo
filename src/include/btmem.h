@@ -88,15 +88,6 @@ struct __wt_addr {
 };
 
 /*
- * WT_PAGE_INDEX --
- *	An in-memory structure to hold a list of WT_REFs in collated order.
- */
-struct __wt_page_index {
-	uint32_t entries;		/* Entries */
-	WT_REF	*index[0];		/* Collated children */
-};
-
-/*
  * Overflow tracking of on-page key/value items: As pages are reconciled,
  * overflow key/value records referenced from the original page are discarded
  * as they are updated or removed.  We track such overflow items to ensure we
@@ -305,36 +296,58 @@ struct __wt_page {
 	/* Per page-type information. */
 	union {
 		/*
-		 * Column- and row-store internal pages.
+		 * Internal pages (both column- and row-store).
 		 *
-		 * The page record number is only used by column-store, but
-		 * having the WT_REF array in the same page location makes some
-		 * things simpler, and it doesn't cost us any memory, other
-		 * structures in this union are still larger.
+		 * The page record number is only used by column-store, but it
+		 * makes some things simpler and it doesn't cost us any memory,
+		 * other structures in this union are still larger.
 		 *
-		 * The __index field is the child array originally read into
-		 * memory from disk.  The index field is the child array in
-		 * collated order.  The collated order is the same as the
-		 * original array order when a page is first read into memory.
-		 * Once a page splits, they will differ.
+		 * In-memory internal pages have an array of pointers to child
+		 * structures, maintained in collated order.  When a page is
+		 * read into memory, the initial list of children is stored in
+		 * the "oindex" field, and it and the collated order will be
+		 * the same.  After a page splits, the collated order and the
+		 * original order will differ.
+		 *
+		 * Multiple threads of control may be searching the in-memory
+		 * internal page and a child page of the internal page may
+		 * cause a split at any time.  When a page splits, a new array
+		 * is allocated and atomically swapped into place.  Threads in
+		 * the old array continue without interruption (the old array is
+		 * still valid), but have to avoid racing.  No barrier is needed
+		 * because the array reference is updated atomically, but code
+		 * reading the fields multiple times would be a very bad idea.
+		 * Specifically, do not do this:
+		 *	WT_REF **refp = page->pu_intl_index->index;
+		 *	uint32_t entries = page->pu_intl_index->entries;
+		 *
+		 * The field is declared volatile (so the compiler knows not to
+		 * read it multiple times).
 		 */
 		struct {
 			uint64_t recno;		/* Starting recno */
 
-			WT_REF *__index;	/* Original children */
-			WT_PAGE_INDEX *index;	/* Collated children */
+			WT_REF *oindex;		/* Original children */
+			struct __wt_page_index {
+				uint32_t entries;
+				WT_REF	**index;
+			} * volatile index;	/* Collated children */
 		} intl;
 #undef	pu_intl_recno
 #define	pu_intl_recno	u.intl.recno
-#undef	pu_intl_entries
-#define	pu_intl_entries	u.intl.index->entries
+#undef	pu_intl_oindex
+#define	pu_intl_oindex	u.intl.oindex
 #undef	pu_intl_index
-#define	pu_intl_index	u.intl.index->index
-#define	WT_INTL_FOREACH(page, ref, i)					\
-	for ((i) = 0, ref = (page)->pu_intl_index[0];			\
-	    (i) < (page)->pu_intl_entries;				\
-	    ++(i), (ref) = (i) ==					\
-	    (page)->pu_intl_entries ? NULL : (page)->pu_intl_index[(i)])
+#define	pu_intl_index	u.intl.index
+#define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
+	WT_PAGE_INDEX *__pindex;					\
+	WT_REF **__refp;						\
+	uint32_t __entries;						\
+	for (__pindex = (page)->pu_intl_index,				\
+	    __refp = __pindex->index,					\
+	    __entries = __pindex->entries; __entries > 0; --__entries) {\
+		(ref) = *__refp++;
+#define	WT_INTL_FOREACH_END	} } while (0)
 
 		/* Row-store leaf page. */
 		struct {

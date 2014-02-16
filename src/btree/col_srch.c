@@ -20,6 +20,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t base, indx, limit;
@@ -39,17 +40,18 @@ restart:
 		    ref == NULL || ref->key.recno == page->pu_intl_recno);
 
 		/* Fast path appends. */
-		base = page->pu_intl_entries;
-		ref = page->pu_intl_index[base - 1];
+		pindex = page->pu_intl_index;
+		base = pindex->entries;
+		ref = pindex->index[base - 1];
 		if (recno >= ref->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
 		for (base = 0, ref = NULL,
-		    limit = page->pu_intl_entries - 1;
+		    limit = pindex->entries - 1;
 		    limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			ref = page->pu_intl_index[indx];
+			ref = pindex->index[indx];
 
 			if (recno == ref->key.recno)
 				break;
@@ -75,7 +77,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			ref = page->pu_intl_index[base - 1];
+			ref = pindex->index[base - 1];
 		}
 
 		/*

@@ -389,7 +389,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_INTL_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH_BEGIN(page, ref) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
@@ -418,12 +418,12 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			__wt_cell_unpack(ref->addr, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
-		}
+		} WT_INTL_FOREACH_END;
 		break;
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_INTL_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH_BEGIN(page, ref) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * key should be larger than the largest key previously
@@ -446,7 +446,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			__wt_cell_unpack(ref->addr, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
-		}
+		} WT_INTL_FOREACH_END;
 		break;
 	}
 	return (0);

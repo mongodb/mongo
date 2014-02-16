@@ -175,7 +175,7 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
-	WT_PAGE_INDEX *alloc_index;
+	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **refp, *split;
 	uint32_t i, j, parent_entries, split_entries;
@@ -209,16 +209,18 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	split = mod->splits[i] = page->modify->split_ref;
 
 	/* Allocate a new WT_REF index array and initialize it. */
-	parent_entries = parent->pu_intl_entries;
+	pindex = parent->pu_intl_index;
+	parent_entries = pindex->entries;
 	split_entries = page->modify->split_entries;
 	WT_ERR(__wt_calloc(session, 1,
 	    sizeof(WT_PAGE_INDEX) +
 	    ((parent_entries - 1) + split_entries) * sizeof(WT_REF *),
 	    &alloc_index));
+	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = (parent_entries - 1) + split_entries;
 	refp = alloc_index->index;
 	for (i = 0; i < parent_entries; ++i)
-		if ((*refp = parent->pu_intl_index[i]) == parent_ref)
+		if ((*refp = pindex->index[i]) == parent_ref)
 			for (j = 0; j < split_entries; ++j)
 				*refp++ = &split[j];
 		else
@@ -236,7 +238,7 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * Update the parent page's index: this is the update that splits the
 	 * parent page, making the split visible to other threads.
 	 */
-	WT_PUBLISH(parent->u.intl.index, alloc_index);
+	WT_PUBLISH(parent->pu_intl_index, alloc_index);
 
 	/*
 	 * XXXKEITH
@@ -335,20 +337,19 @@ static void
 __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_REF *ref;
-	uint32_t i;
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_INTL_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH_BEGIN(page, ref) {
 			if (ref->state == WT_REF_DISK ||
 			    ref->state == WT_REF_DELETED)
 				continue;
 			WT_ASSERT(session,
 			    exclusive || ref->state == WT_REF_LOCKED);
 			__rec_discard_tree(session, ref->page, exclusive);
-		}
+		} WT_INTL_FOREACH_END;
 		/* FALLTHROUGH */
 	default:
 		__wt_page_out(session, &page);
@@ -375,7 +376,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE *t;
-	uint32_t i;
 
 	btree = S2BT(session);
 
@@ -402,7 +402,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	 * pages after we've written them.
 	 */
 	if (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)
-		WT_INTL_FOREACH(page, ref, i)
+		WT_INTL_FOREACH_BEGIN(page, ref) {
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
 			case WT_REF_DELETED:		/* On-disk, deleted */
@@ -425,6 +425,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 				/* FALLTHROUGH */
 			WT_ILLEGAL_VALUE(session);
 			}
+		} WT_INTL_FOREACH_END;
 
 	/*
 	 * If the file is being checkpointed, we cannot evict dirty pages,

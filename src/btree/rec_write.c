@@ -456,7 +456,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	mod->root_split = next;
 
 	a = mod->split_ref;
-	b = next->pu_intl_index[0];
+	b = next->pu_intl_index->index[0];
 	for (i = 0; i < mod->split_entries; ++i)
 		*b++ = *a++;
 
@@ -2338,7 +2338,6 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *rp;
 	WT_REF *ref;
-	uint32_t i;
 	int state;
 
 	btree = S2BT(session);
@@ -2350,7 +2349,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    session, r, page, page->pu_intl_recno, btree->maxintlpage));
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH_BEGIN(page, ref) {
 		/* Update the starting record number in case we split. */
 		r->recno = ref->key.recno;
 
@@ -2414,7 +2413,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Copy the value onto the page. */
 		__rec_copy_incr(session, r, val);
-	}
+	} WT_INTL_FOREACH_END;
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
@@ -3058,7 +3057,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_PAGE *rp;
 	WT_REF *ref;
 	size_t size;
-	uint32_t i;
 	u_int vtype;
 	int onpage_ovfl, ovfl_key, state;
 	const void *p;
@@ -3093,7 +3091,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->cell_zero = 0;		/* XXXKEITH */
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH(page, ref, i) {
+	WT_INTL_FOREACH_BEGIN(page, ref) {
 		/*
 		 * There are different paths if the key is an overflow item vs.
 		 * a straight-forward on-page value.   If an overflow item, we
@@ -3261,7 +3259,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
-	}
+	} WT_INTL_FOREACH_END;
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));

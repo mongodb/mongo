@@ -119,6 +119,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
@@ -154,8 +155,9 @@ restart:
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		base = page->pu_intl_entries;
-		ref = page->pu_intl_index[base - 1];
+		pindex = page->pu_intl_index;
+		base = pindex->entries;
+		ref = pindex->index[base - 1];
 		if (base == 1)
 			goto descend;
 
@@ -174,11 +176,11 @@ restart:
 		 */
 		base = 0;
 		ref = NULL;
-		limit = page->pu_intl_entries - 1;
+		limit = pindex->entries - 1;
 		if (btree->collator == NULL)
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = page->pu_intl_index[indx];
+				ref = pindex->index[indx];
 
 				/*
 				 * If about to compare an application key with
@@ -208,7 +210,7 @@ restart:
 		else
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = page->pu_intl_index[indx];
+				ref = pindex->index[indx];
 				/*
 				 * If about to compare an application key with
 				 * the 0th index on an internal page, pretend
@@ -243,7 +245,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * for descent is the one before base.
 		 */
 		if (cmp != 0)
-			ref = page->pu_intl_index[base - 1];
+			ref = pindex->index[base - 1];
 
 		/*
 		 * Swap the parent page for the child page; if the page splits
@@ -399,6 +401,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_INSERT *p, *t;
 	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 
 	__cursor_search_clear(cbt);
@@ -408,8 +411,8 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 restart:
 	/* Walk the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
-		ref =
-		    page->pu_intl_index[__wt_random() % page->pu_intl_entries];
+		pindex = page->pu_intl_index;
+		ref = pindex->index[__wt_random() % pindex->entries];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
@@ -436,7 +439,7 @@ restart:
 		cbt->page = page;
 		cbt->compare = 0;
 		cbt->slot =
-		    btree->root_page->pu_intl_entries < 2 ?
+		    btree->root_page->pu_intl_index->entries < 2 ?
 		    __wt_random() % page->pu_row_entries : 0;
 		return (0);
 	}

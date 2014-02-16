@@ -8,9 +8,8 @@
 #include "wt_internal.h"
 
 static void __free_page_modify(WT_SESSION_IMPL *, WT_PAGE *);
-static void __free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
-static void __free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
+static void __free_page_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_skip_array(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *);
@@ -64,13 +63,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	case WT_PAGE_COL_FIX:
 		break;
 	case WT_PAGE_COL_INT:
-		__free_page_col_int(session, page);
+	case WT_PAGE_ROW_INT:
+		__free_page_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
 		__free_page_col_var(session, page);
-		break;
-	case WT_PAGE_ROW_INT:
-		__free_page_row_int(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		__free_page_row_leaf(session, page);
@@ -146,28 +143,6 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __free_page_col_int --
- *	Discard a WT_PAGE_COL_INT page.
- */
-static void
-__free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_REF *ref;
-	uint32_t i;
-
-	/*
-	 * For each referenced addr, see if the addr was an allocation, and if
-	 * so, free it.
-	 */
-	WT_INTL_FOREACH(page, ref, i)
-		if (ref->addr != NULL &&
-		    __wt_off_page(page, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-}
-
-/*
  * __free_page_col_var --
  *	Discard a WT_PAGE_COL_VAR page.
  */
@@ -179,19 +154,21 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __free_page_row_int --
+ * __free_page_int --
  *	Discard a WT_PAGE_ROW_INT page.
  */
 static void
-__free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+__free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_REF *ref;
-	uint32_t i;
 
 	/* Free the contents of any WT_REF structures. */
-	if (page->u.intl.index != NULL)
-		WT_INTL_FOREACH(page, ref, i)
+	if (page->pu_intl_index != NULL) {
+		WT_INTL_FOREACH_BEGIN(page, ref) {
 			__wt_free_ref(session, page, ref);
+		} WT_INTL_FOREACH_END;
+		__wt_free(session, page->pu_intl_index);
+	}
 }
 
 /*
@@ -203,9 +180,16 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 {
 	WT_IKEY *ikey;
 
-	/* Free any key or address allocations. */
-	if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
-		__wt_free(session, ikey);
+	/* Free any key allocation. */
+	switch (page->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
+			__wt_free(session, ikey);
+		break;
+	}
+
+	/* Free any address allocation. */
 	if (ref->addr != NULL &&
 	    (page == NULL || __wt_off_page(page, ref->addr))) {
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);

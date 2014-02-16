@@ -394,7 +394,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, &root));
 		root->parent = NULL;
 
-		ref = root->pu_intl_index[0];
+		ref = root->pu_intl_index->index[0];
 		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -404,7 +404,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, &root));
 		root->parent = NULL;
 
-		ref = root->pu_intl_index[0];
+		ref = root->pu_intl_index->index[0];
 		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -516,19 +516,18 @@ __btree_preload(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_REF *ref;
 	size_t addr_size;
-	uint32_t i;
 	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_INTL_FOREACH(btree->root_page, ref, i) {
+	WT_INTL_FOREACH_BEGIN(btree->root_page, ref) {
 		WT_RET(__wt_ref_info(session,
 		    btree->root_page, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)
 			WT_RET(bm->preload(bm, session, addr, addr_size));
-	}
+	} WT_INTL_FOREACH_END;
 	return (0);
 }
 

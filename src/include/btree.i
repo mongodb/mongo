@@ -216,7 +216,7 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
 	parent = page->parent;
-	*pindexp = parent->u.intl.index;
+	*pindexp = parent->pu_intl_index;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -850,6 +850,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *first;
 
 	btree = S2BT(session);
@@ -858,13 +859,14 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	if (root == NULL)
 		return (0);
 
-	first = root->pu_intl_index[0];
+	pindex = root->pu_intl_index;
+	first = pindex->index[0];
 	if ((child = first->page) == NULL)
 		return (0);
 
 	/* Make sure this is a simple tree, or LSM should switch. */
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    root->pu_intl_entries != 1 ||
+	    pindex->entries != 1 ||
 	    first->state != WT_REF_MEM ||
 	    child->type != WT_PAGE_ROW_LEAF)
 		return (1);
