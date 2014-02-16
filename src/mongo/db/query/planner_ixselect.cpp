@@ -164,6 +164,12 @@ namespace mongo {
             // There are restrictions on when we can use the index if
             // the expression is a NOT.
             if (exprtype == MatchExpression::NOT) {
+                // Don't allow indexed NOT on special index types
+                // such as geo or text indices.
+                if (INDEX_BTREE != index.type) {
+                    return false;
+                }
+
                 // Prevent negated preds from using sparse or
                 // multikey indices. We do so for sparse indices because
                 // we will fail to return the documents which do not contain
