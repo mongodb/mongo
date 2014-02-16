@@ -214,7 +214,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	 * Write the root page: it's possible for there to be a checkpoint of
 	 * an empty tree, in which case, we store an illegal root offset.
 	 *
-	 * XXX
+	 * !!!
 	 * We happen to know that checkpoints are single-threaded above us in
 	 * the btree engine.  That's probably something we want to guarantee
 	 * for any WiredTiger block manager.
@@ -551,7 +551,7 @@ live_update:
 			    session, block, ckpt, ci, ckpt_size, 1));
 
 			/*
-			 * XXX
+			 * !!!
 			 * Our caller wants the final checkpoint size.  Setting
 			 * the size here violates layering, but the alternative
 			 * is a call for the btree layer to crack the checkpoint
@@ -661,7 +661,7 @@ __ckpt_update(
 	/*
 	 * Set the file size for the live system.
 	 *
-	 * XXX
+	 * !!!
 	 * We do NOT set the file size when re-writing checkpoints because we
 	 * want to test the checkpoint's blocks against a reasonable maximum
 	 * file size during verification.  This is bad: imagine a checkpoint
