@@ -707,6 +707,7 @@ elif openbsd:
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__openbsd__" ] )
+    env.Append( LIBS=[ "kvm" ] )
 
 elif windows:
     dynamicCRT = has_option("dynamic-windows")
@@ -1670,7 +1671,7 @@ Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("installSetup mongoCodeVersion")
 Export("usev8")
-Export("darwin windows solaris linux freebsd nix")
+Export("darwin windows solaris linux freebsd nix openbsd")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("enforce_glibc")

@@ -32,7 +32,7 @@ root_dir = dirname(File('SConscript').rfile().abspath)
 sys.path.append(join(root_dir, 'tools'))
 import js2c
 
-Import("env windows linux darwin solaris freebsd debugBuild")
+Import("env windows linux darwin solaris freebsd debugBuild openbsd")
 
 # pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
@@ -241,6 +241,7 @@ SOURCES = {
     x64/stub-cache-x64.cc
     """),
   'os:freebsd': ['platform-freebsd.cc', 'platform-posix.cc'],
+  'os:openbsd': ['platform-openbsd.cc', 'platform-posix.cc'],
   'os:linux':   ['platform-linux.cc', 'platform-posix.cc'],
   'os:macos':   ['platform-macos.cc', 'platform-posix.cc'],
   'os:solaris': ['platform-solaris.cc', 'platform-posix.cc'],
@@ -304,6 +305,8 @@ def get_options():
         os_string = 'os:freebsd'
     elif solaris:
         os_string = 'os:solaris'
+    elif openbsd:
+        os_string = 'os:openbsd'
     else:
         os_string = 'os:nullos'
 
