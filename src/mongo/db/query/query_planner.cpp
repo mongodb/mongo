@@ -685,10 +685,8 @@ namespace mongo {
         MatchExpression* textNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
-            // Error if the text node is tagged with zero indices, or if the text node is tagged
-            // with greater than one index.
-            if (1 != tag->first.size() + tag->notFirst.size()) {
-                return Status(ErrorCodes::BadValue, "need exactly one text index for $text query");
+            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+                return Status::OK();
             }
         }
 

@@ -211,7 +211,7 @@ namespace mongo {
             vector<IndexDescriptor*> idxMatches;
             collection->getIndexCatalog()->findIndexByType("text", idxMatches);
             if (1 != idxMatches.size()) {
-                warning() << "no text idx, or more than one text idx?";
+                warning() << "more than one text idx?";
                 return NULL;
             }
             IndexDescriptor* index = idxMatches[0];
