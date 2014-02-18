@@ -533,7 +533,7 @@ namespace mongo {
         if (explain)
             return false;
 
-        if (dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))
+        if (!sources.empty() && dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))
             return false;
 
         return true;
