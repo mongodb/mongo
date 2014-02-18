@@ -93,8 +93,24 @@ namespace mongo {
         }
 
         if (rs->box.getState().primary()) {
-            log() << "stepping down; another primary seen in replicaset";
-            rs->relinquish();
+            OpTime remoteElectionTime = m->hbinfo().electionTime;
+            LOG(1) << "another primary seen with election time " << remoteElectionTime; 
+            if (remoteElectionTime == OpTime()) {
+                // This primary didn't deliver an electionTime in its heartbeat;
+                // assume it's a pre-2.6 primary and always step down ourselves.
+                log() << "stepping down; another primary seen in replicaset";
+                rs->relinquish();
+            }
+            // 2.6 or greater primary.  Step down whoever has the older election time.
+            else if (remoteElectionTime > rs->getElectionTime()) {
+                log() << "stepping down; another primary was elected more recently";
+                rs->relinquish();
+            }
+            else {
+                // else, stick around
+                log() << "another PRIMARY detected but it should step down"
+                    " since it was elected earlier than me";
+            }
         }
 
         rs->box.noteRemoteIsPrimary(m);

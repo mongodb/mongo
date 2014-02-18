@@ -103,6 +103,9 @@ namespace mongo {
         unsigned int ping; // milliseconds
         static unsigned int numPings;
 
+        // Time node was elected primary
+        OpTime electionTime;
+
         bool up() const { return health > 0; }
 
         /** health is set to -1 on startup.  that means we haven't even checked yet.  0 means we checked and it failed. */

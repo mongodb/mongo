@@ -196,6 +196,8 @@ namespace mongo {
         // This is a unique id that is changed each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;
+        // PRIMARY server's time when the election to primary occurred
+        OpTime _electionTime;
     public:
         Consensus(ReplSetImpl *t) : rs(*t) {
             sleptLast = false;
@@ -216,6 +218,8 @@ namespace mongo {
 
         OID getElectionId() const { return _electionId; }
         void setElectionId(OID oid) { _electionId = oid; }
+        OpTime getElectionTime() const { return _electionTime; }
+        void setElectionTime(OpTime electionTime) { _electionTime = electionTime; }
     };
 
     /**
@@ -393,6 +397,7 @@ namespace mongo {
         void goStale(const Member* m, const BSONObj& o);
 
         OID getElectionId() const { return elect.getElectionId(); }
+        OpTime getElectionTime() const { return elect.getElectionTime(); }
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
