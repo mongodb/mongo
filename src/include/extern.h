@@ -280,7 +280,7 @@ extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
@@ -373,7 +373,7 @@ extern int __wt_col_modify(WT_SESSION_IMPL *session,
 extern void __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
+    WT_PAGE **pagep,
     int exclusive);
 extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
     uint8_t type,

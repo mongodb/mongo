@@ -21,12 +21,15 @@ static void __rec_root_update(WT_SESSION_IMPL *);
  *	Reconciliation plus eviction.
  */
 int
-__wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
+__wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE **pagep, int exclusive)
 {
 	WT_DECL_RET;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
 	int istree;
+
+	page = *pagep;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
@@ -88,7 +91,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	if (istree)
 		__rec_discard_tree(session, page, exclusive);
 	else
-		__wt_page_out(session, &page);
+		__wt_page_out(session, pagep);
 
 	if (0) {
 err:		/*

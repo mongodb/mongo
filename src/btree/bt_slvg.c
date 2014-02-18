@@ -275,9 +275,8 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 */
 	if (ss->root_page != NULL) {
 		btree->ckpt = ckptbase;
-		ret = __wt_rec_evict(session, ss->root_page, 1);
+		ret = __wt_rec_evict(session, &ss->root_page, 1);
 		btree->ckpt = NULL;
-		ss->root_page = NULL;
 	}
 
 	/*
@@ -1215,7 +1214,7 @@ __slvg_col_build_leaf(
 
 	ret = __wt_page_release(session, page);
 	if (ret == 0)
-		ret = __wt_rec_evict(session, page, 1);
+		ret = __wt_rec_evict(session, &page, 1);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, page));
@@ -1874,7 +1873,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 */
 	ret = __wt_page_release(session, page);
 	if (ret == 0)
-		ret = __wt_rec_evict(session, page, 1);
+		ret = __wt_rec_evict(session, &page, 1);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, page));
