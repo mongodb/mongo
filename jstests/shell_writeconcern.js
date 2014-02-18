@@ -5,6 +5,8 @@
 
 var collA = db.shell_wc_a;
 var collB = db.shell_wc_b;
+collA.drop()
+collB.drop()
 
 // test inheritance
 db.setWriteConcern({w:1})
