@@ -1967,6 +1967,8 @@ namespace mongo {
             bool doAnyShardsNotSupportCursors(const vector<Strategy::CommandResult>& shardResults);
             bool wasMergeCursorsSupported(BSONObj cmdResult);
             void uassertCanMergeInMongos(intrusive_ptr<Pipeline> mergePipeline, BSONObj cmdObj);
+            void uassertAllShardsSupportExplain(
+                const vector<Strategy::CommandResult>& shardResults);
 
             void noCursorFallback(intrusive_ptr<Pipeline> shardPipeline,
                                   intrusive_ptr<Pipeline> mergePipeline,
@@ -2060,6 +2062,9 @@ namespace mongo {
             STRATEGY->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
             if (pPipeline->isExplain()) {
+                // This must be checked before we start modifying result.
+                uassertAllShardsSupportExplain(shardResults);
+
                 result << "splitPipeline" << DOC("shardsPart" << pShardPipeline->writeExplainOps()
                                               << "mergerPart" << pPipeline->writeExplainOps());
 
@@ -2228,6 +2233,19 @@ namespace mongo {
             }
 
             return false;
+        }
+
+        void PipelineCommand::uassertAllShardsSupportExplain(
+                const vector<Strategy::CommandResult>& shardResults) {
+            for (size_t i = 0; i < shardResults.size(); i++) {
+                    uassert(17403, str::stream() << "Shard " << shardResults[i].target.toString()
+                                                 << " failed: " << shardResults[i].result,
+                            shardResults[i].result["ok"].trueValue());
+
+                    uassert(17404, str::stream() << "Shard " << shardResults[i].target.toString()
+                                                 << " does not support $explain",
+                            shardResults[i].result.hasField("stages"));
+            }
         }
 
         bool PipelineCommand::wasMergeCursorsSupported(BSONObj cmdResult) {
