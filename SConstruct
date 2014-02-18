@@ -46,6 +46,9 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
+def versiontuple(v):
+    return tuple(map(int, (v.split("."))))
+
 # --- platform identification ---
 #
 # This needs to precede the options section so that we can only offer some options on certain
@@ -1219,6 +1222,8 @@ def doConfigure(myenv):
         if not using_clang():
             print( 'libc++ is currently only supported for clang')
             Exit(1)
+        if darwin and has_option('osx-version-min') and versiontuple(min_version) < versiontuple('10.7'):
+            print("Warning: You passed option 'libc++'. You probably want to also pass 'osx-version-min=10.7' or higher for libc++ support.")
         if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
         else:
