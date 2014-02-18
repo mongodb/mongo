@@ -2,7 +2,7 @@
 // Scope for the function
 //
 var _bulk_api_module = (function() {
-  // Insert types
+  // Batch types
   var NONE = 0;
   var INSERT = 1;
   var UPDATE = 2;
@@ -308,7 +308,7 @@ var _bulk_api_module = (function() {
   }
 
   /**
-   * Keeps the state of a unordered batch so we can rewrite the results
+   * Keeps the state of an unordered batch so we can rewrite the results
    * correctly after command execution
    */
   var Batch = function(batchType, originalZeroIndex) {
@@ -318,7 +318,7 @@ var _bulk_api_module = (function() {
   }
 
   /**
-   * Wraps a legacy operation so we can correctly rewrite it's error
+   * Wraps a legacy operation so we can correctly rewrite its error
    */
   var LegacyOp = function(batchType, operation, index) {
     this.batchType = batchType;
@@ -531,7 +531,7 @@ var _bulk_api_module = (function() {
       removeOne: function() {
         collection._validateRemoveDoc(currentOp.selector);
 
-        // Establish the update command
+        // Establish the removeOne command
         var document = {
             q: currentOp.selector
           , limit: 1
@@ -546,7 +546,7 @@ var _bulk_api_module = (function() {
       remove: function() {
         collection._validateRemoveDoc(currentOp.selector);
 
-        // Establish the update command
+        // Establish the remove command
         var document = {
             q: currentOp.selector
           , limit: 0
@@ -590,7 +590,7 @@ var _bulk_api_module = (function() {
         bulkResult.nInserted = bulkResult.nInserted + result.n;
       }
 
-      // If we have an insert Batch type
+      // If we have a remove batch type
       if(batch.batchType == REMOVE) {
         bulkResult.nRemoved = bulkResult.nRemoved + result.n;
       }
