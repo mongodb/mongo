@@ -45,7 +45,7 @@ namespace mongo {
         return _error ? _error->code : ErrorCodes::OK;
     }
 
-    inline const char* Status::codeString() const {
+    inline std::string Status::codeString() const {
         return ErrorCodes::errorString(code());
     }
 

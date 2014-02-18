@@ -78,15 +78,8 @@ namespace {
     TEST(Parsing, CodeToEnum) {
         ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::fromInt(ErrorCodes::TypeMismatch));
         ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromInt(ErrorCodes::UnknownError));
-        ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromInt(ErrorCodes::MaxError));
+        ASSERT_EQUALS(ErrorCodes::MaxError, ErrorCodes::fromInt(ErrorCodes::MaxError));
         ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::fromInt(0));
-    }
-
-    TEST(Parsing, StringToEnum) {
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, ErrorCodes::fromString("TypeMismatch"));
-        ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromString("UnknownError"));
-        ASSERT_EQUALS(ErrorCodes::UnknownError, ErrorCodes::fromString("Garbage"));
-        ASSERT_EQUALS(ErrorCodes::OK, ErrorCodes::fromString("OK"));
     }
 
 } // unnamed namespace

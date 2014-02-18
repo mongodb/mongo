@@ -89,7 +89,7 @@ namespace mongo {
 
         inline ErrorCodes::Error code() const;
 
-        inline const char* codeString() const;
+        inline std::string codeString() const;
 
         inline std::string reason() const;
 
