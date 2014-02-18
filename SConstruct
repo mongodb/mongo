@@ -747,7 +747,11 @@ elif windows:
     # c4244
     # 'conversion' conversion from 'type1' to 'type2', possible loss of data
     #  An integer type is converted to a smaller integer type.
-    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244"] )
+    # c4290
+    #  C++ exception specification ignored except to indicate a function is not __declspec(nothrow
+    #  A function is declared using exception specification, which Visual C++ accepts but does not
+    #  implement
+    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244", "/wd4290"] )
 
     # some warnings we should treat as errors:
     # c4099
@@ -793,7 +797,10 @@ elif windows:
     if optBuild:
         # /O2:  optimize for speed (as opposed to size)
         # /Oy-: disable frame pointer optimization (overrides /O2, only affects 32-bit)
+        # /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function
+        # calls
         env.Append( CCFLAGS=["/O2", "/Oy-"] )
+        env.Append( LINKFLAGS=["/INCREMENTAL:NO"])
     else:
         env.Append( CCFLAGS=["/Od"] )
 
