@@ -17,3 +17,13 @@ assert( db.things.findOne().o.fetch().n == 1, "dbref broken 2" );
 other.n++;
 db.otherthings.save(other);
 assert( db.things.findOne().o.fetch().n == 2, "dbrefs broken" );
+
+db.getSiblingDB("otherdb").dropDatabase();
+var objid = new ObjectId();
+db.getSiblingDB("otherdb").getCollection("othercoll").insert({_id:objid, field:"value"});
+var subdoc = db.getSiblingDB("otherdb").getCollection("othercoll").findOne({_id:objid})
+
+db.mycoll.drop();
+db.mycoll.insert({_id:"asdf", asdf:new DBRef("othercoll", objid, "otherdb")});
+var doc = db.mycoll.findOne({_id:"asdf"}, {_id:0, asdf:1});
+assert.eq(tojson(doc.asdf.fetch()), tojson(subdoc), "otherdb dbref");

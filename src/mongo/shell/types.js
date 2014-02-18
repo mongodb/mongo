@@ -419,11 +419,16 @@ if (typeof(DBRef) != "undefined"){
     DBRef.prototype.fetch = function(){
         assert(this.$ref, "need a ns");
         assert(this.$id, "need an id");
-        return db[ this.$ref ].findOne({ _id : this.$id });
+        var coll = this.$db ? db.getSiblingDB(this.$db).getCollection(this.$ref) : db[this.$ref];
+        return coll.findOne({ _id : this.$id });
     }
 
     DBRef.prototype.tojson = function(indent){
         return this.toString();
+    }
+
+    DBRef.prototype.getDb = function(){
+        return this.$db || undefined;
     }
 
     DBRef.prototype.getCollection = function(){
@@ -439,7 +444,7 @@ if (typeof(DBRef) != "undefined"){
     }
 
     DBRef.prototype.toString = function(){
-        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + ")";
+        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + (this.$db ? ", " + tojson(this.$db) : "") + ")";
     }
 }
 else {
