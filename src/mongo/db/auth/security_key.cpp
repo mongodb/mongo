@@ -40,24 +40,24 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/util/password_digest.h"
 
-static bool authParamsSet = false;
-
 namespace mongo {
+    // not guarded by the authParams mutex never changed in
+    // multi-threaded operation
+    static bool authParamsSet = false;
+    // guarded by the authParams mutex
+    static BSONObj authParams;
+    static boost::mutex authParamMutex; 
 
     bool isInternalAuthSet() {
        return authParamsSet; 
     }
 
-    bool setInternalUserAuthParams(BSONObj authParams) {
+    void setInternalUserAuthParams(const BSONObj& authParamsIn) {
         if (!isInternalAuthSet()) {
-            internalSecurity.authParams = authParams.copy();
             authParamsSet = true;
-            return true;
         }
-        else {
-            log() << "Internal auth params have already been set" << endl;
-            return false;
-        }
+        boost::mutex::scoped_lock lk(authParamMutex);
+        authParams = authParamsIn.copy();
     }
  
     bool authenticateInternalUser(DBClientWithCommands* conn){
@@ -65,8 +65,13 @@ namespace mongo {
             log() << "ERROR: No authentication params set for internal user" << endl;
             return false;
         }
-        try {
-            conn->auth(internalSecurity.authParams); 
+        try { 
+            BSONObj outgoingAuthParams;
+            {
+                boost::mutex::scoped_lock lk(authParamMutex);
+                outgoingAuthParams = authParams.copy();
+            }                
+            conn->auth(outgoingAuthParams);
             return true;
         } catch(const UserException& ex) {
             log() << "can't authenticate to " << conn->toString() << " as internal user, error: "

@@ -31,11 +31,14 @@
 #include "mongo/pch.h"
 
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 
 namespace mongo {
@@ -338,6 +341,11 @@ namespace mongo {
             }
 
             virtual Status setFromString(const std::string& str) {
+#ifndef MONGO_SSL
+                return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
+                                "Unable to set clusterAuthMode, " <<
+                                "SSL support is not compiled into server");
+#endif
                 if (str != "keyFile" && str != "sendKeyFile" &&
                     str != "sendX509" && str != "x509") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
@@ -350,6 +358,13 @@ namespace mongo {
                     oldMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
                     serverGlobalParams.clusterAuthMode.store
                         (ServerGlobalParams::ClusterAuthMode_sendX509);
+#ifdef MONGO_SSL
+                    setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << 
+                                              "MONGODB-X509" <<
+                                              saslCommandUserDBFieldName << "$external" <<
+                                              saslCommandUserFieldName << 
+                                              getSSLManager()->getClientSubjectName()));
+#endif 
                 }
                 else if (str == "x509" && 
                     oldMode == ServerGlobalParams::ClusterAuthMode_sendX509) {

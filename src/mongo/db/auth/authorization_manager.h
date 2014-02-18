@@ -58,7 +58,6 @@ namespace mongo {
      */
     struct AuthInfo {
         User* user;
-        BSONObj authParams;
     };
     extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
 
