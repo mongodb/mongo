@@ -659,6 +659,8 @@ def run_tests(tests):
 
                     if skipTest(test_path):
                         test_result["status"] = "skip"
+                        # Make sure skipped tests aren't counted as successful
+                        winners.pop()
 
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
