@@ -160,7 +160,10 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
 	 * page.  It's OK to queue up multiple splits as the child pages split,
-	 * but the actual split into the parent has to be serialized.
+	 * but the actual split into the parent has to be serialized.  We do
+	 * memory allocation inside of the lock, but I don't see a reason to
+	 * tighten this down yet, we're only blocking other leaf pages trying
+	 * to split into this parent, they can wait their turn.
 	 */
 	WT_PAGE_LOCK(session, parent);
 
@@ -213,7 +216,7 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 
 	/*
 	 * XXXKEITH
-	 * Just leaked the old one.
+	 * We just leaked the old parent index reference.
 	 */
 
 	/*
