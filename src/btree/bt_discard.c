@@ -94,6 +94,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
 	WT_PAGE_MODIFY *mod;
+	uint32_t i;
 
 	mod = page->modify;
 
@@ -117,7 +118,15 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	}
 
-	/* Free the split array. */
+	/*
+	 * Free the split chunks; we do not have to review the individual WT_REF
+	 * entries in the chunks, they are discarded by walking the "final" list
+	 * of WT_REF entries when each internal page is discarded.
+	 */
+	for (i = 0; i < mod->splits_slots; ++i)
+		__wt_free(session, mod->splits[i]);
+
+	/* Free the reconciliation-created array of split pages. */
 	__wt_free(session, mod->split_ref);
 
 	/* Free the append array. */
