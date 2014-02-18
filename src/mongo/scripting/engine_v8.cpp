@@ -1293,6 +1293,9 @@ namespace mongo {
         _global->Get(strLitToV8("Object"))->ToObject()->ForceSet(
                             strLitToV8("bsonsize"),
                             createV8Function(bsonsize)->GetFunction());
+        _global->Get(strLitToV8("Object"))->ToObject()->ForceSet(
+                            strLitToV8("invalidForStorage"),
+                            createV8Function(v8ObjectInvalidForStorage)->GetFunction());
     }
 
 
