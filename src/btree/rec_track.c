@@ -60,6 +60,8 @@ __ovfl_onpage_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_ONPAGE **head, *onpage;
 
+	if (page->modify == NULL || page->modify->ovfl_track == NULL)
+		return;
 	head = page->modify->ovfl_track->ovfl_onpage;
 
 	for (onpage = head[0]; onpage != NULL; onpage = onpage->next[0])
@@ -373,6 +375,8 @@ __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_REUSE **head, *reuse;
 
+	if (page->modify == NULL || page->modify->ovfl_track == NULL)
+		return;
 	head = page->modify->ovfl_track->ovfl_reuse;
 
 	for (reuse = head[0]; reuse != NULL; reuse = reuse->next[0])
@@ -762,6 +766,8 @@ __ovfl_txnc_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TXNC **head, *txnc;
 
+	if (page->modify == NULL || page->modify->ovfl_track == NULL)
+		return;
 	head = page->modify->ovfl_track->ovfl_txnc;
 
 	for (txnc = head[0]; txnc != NULL; txnc = txnc->next[0])
