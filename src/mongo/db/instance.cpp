@@ -612,10 +612,6 @@ namespace mongo {
 
         Lock::DBWrite lk(ns.ns());
 
-        // void ReplSetImpl::relinquish() uses big write lock so this is thus
-        // synchronized given our lock above.
-        uassert( 17010 ,  "not master", isMasterNs( ns.ns().c_str() ) );
-
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -652,10 +648,7 @@ namespace mongo {
         while ( 1 ) {
             try {
                 Lock::DBWrite lk(ns.ns());
-                
-                // writelock is used to synchronize stepdowns w/ writes
-                uassert( 10056 ,  "not master", isMasterNs( ns.ns().c_str() ) );
-                
+
                 // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
                 if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
                     return;

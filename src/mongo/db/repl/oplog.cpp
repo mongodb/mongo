@@ -214,7 +214,10 @@ namespace mongo {
         const OpTime ts = OpTime::now(lk2);
         long long hashNew;
         if( theReplSet ) {
-            massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
+            if (!theReplSet->box.getState().primary()) {
+                log() << "replSet error : logOp() but not primary";
+                fassertFailed(0);
+            }
             hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
         else {

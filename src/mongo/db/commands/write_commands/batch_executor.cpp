@@ -42,6 +42,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -343,6 +344,17 @@ namespace mongo {
             }
         }
 
+        return true;
+    }
+
+    static bool checkIsMasterForCollection(const NamespaceString& ns, WriteErrorDetail** error) {
+        if (!isMasterNs(ns.ns().c_str())) {
+            WriteErrorDetail* errorDetail = *error = new WriteErrorDetail;
+            errorDetail->setErrCode(ErrorCodes::NotMaster);
+            errorDetail->setErrMessage(std::string(mongoutils::str::stream() <<
+                                                   "Not primary while writing to " << ns.ns()));
+            return false;
+        }
         return true;
     }
 
@@ -712,7 +724,8 @@ namespace mongo {
 
                 // Check version inside of write lock
 
-                if ( checkShardVersion( &shardingState, request, &currResult.error )
+                if ( checkIsMasterForCollection( nss, &currResult.error )
+                     && checkShardVersion( &shardingState, request, &currResult.error )
                      && checkIndexConstraints( &shardingState, request, &currResult.error ) ) {
 
                     //
