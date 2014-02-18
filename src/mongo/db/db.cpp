@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
@@ -432,7 +433,7 @@ namespace mongo {
                               << startupWarningsLog;
                     }
 
-                    const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                    const Status keyStatus = validateKeyPattern(key);
                     if (!keyStatus.isOK()) {
                         log() << "Problem with index " << index << ": " << keyStatus.reason()
                               << " This index can still be used however it cannot be rebuilt."

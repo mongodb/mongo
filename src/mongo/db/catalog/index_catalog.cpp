@@ -35,7 +35,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
@@ -1195,75 +1195,6 @@ namespace mongo {
             Status ret = iam->validateUpdate(BSONObj(), obj, DiskLoc(), options, &ticket);
             if ( !ret.isOK() )
                 return ret;
-        }
-
-        return Status::OK();
-    }
-
-    Status IndexCatalog::validateKeyPattern( const BSONObj& key ) {
-        const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
-
-        if ( key.objsize() > 2048 )
-            return Status(code, "Index key pattern too large.");
-
-        if ( key.isEmpty() )
-            return Status(code, "Index keys cannot be empty.");
-
-        // Ensures that the fields on which we are building the index are valid: a field must not
-        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
-        // contain an empty field. If a field cannot be created or updated, it should not be
-        // indexable.
-        BSONObjIterator it( key );
-        while ( it.more() ) {
-            BSONElement keyElement = it.next();
-
-            if( keyElement.type() == Object || keyElement.type() == Array )
-                return Status(code, "Index keys cannot be Objects or Arrays.");
-
-            FieldRef keyField( keyElement.fieldName() );
-
-            const size_t numParts = keyField.numParts();
-            if ( numParts == 0 ) {
-                return Status(code, "Index keys cannot be an empty field.");
-            }
-
-            // "$**" is acceptable for a text index.
-            if ( str::equals( keyElement.fieldName(), "$**" ) &&
-                 keyElement.valuestrsafe() == IndexNames::TEXT )
-                continue;
-
-
-            for ( size_t i = 0; i != numParts; ++i ) {
-                const StringData part = keyField.getPart(i);
-
-                // Check if the index key path contains an empty field.
-                if ( part.empty() ) {
-                    return Status(code, "Index keys cannot contain an empty field.");
-                }
-
-                if ( part[0] != '$' )
-                    continue;
-
-                // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
-                // necessary context to validate whether this is a proper DBRef, we allow index
-                // creation on '$'-prefixed names that match those used in a DBRef.
-                const bool mightBePartOfDbRef = (i != 0) &&
-                                                (part == "$db" ||
-                                                 part == "$id" ||
-                                                 part == "$ref");
-
-                if ( !mightBePartOfDbRef ) {
-                    return Status(code, "Index key contains an illegal field name: "
-                                        "field name starts with '$'.");
-                }
-            }
-        }
-
-        string pluginName = IndexNames::findPluginName( key );
-        if ( pluginName.size() ) {
-            if ( !IndexNames::isKnownName( pluginName ) )
-                return Status(code,
-                              str::stream() << "Unknown index plugin '" << pluginName << '\'');
         }
 
         return Status::OK();

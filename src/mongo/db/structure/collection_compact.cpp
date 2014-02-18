@@ -37,6 +37,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
@@ -250,7 +251,7 @@ namespace mongo {
 
                 const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
                 const BSONObj key = spec.getObjectField("key");
-                const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                const Status keyStatus = validateKeyPattern(key);
                 if (!keyStatus.isOK()) {
                     return StatusWith<CompactStats>(
                         ErrorCodes::CannotCreateIndex,

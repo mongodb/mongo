@@ -238,11 +238,6 @@ namespace mongo {
 
         // public static helpers
 
-        /**
-         * Checks if the key is valid for building an index.
-         */
-        static Status validateKeyPattern( const BSONObj& key );
-
         static BSONObj fixIndexSpec( const BSONObj& spec );
 
         static BSONObj fixIndexKey( const BSONObj& key );

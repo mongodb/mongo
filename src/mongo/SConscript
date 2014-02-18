@@ -243,6 +243,17 @@ env.Library('network', [
                      'server_options_core',
             ])
 
+env.Library(
+    target='index_key_validate',
+    source=[
+        "db/catalog/index_key_validate.cpp",
+    ],
+    LIBDEPS=[
+        'bson',
+        'db/common',
+        'index_names',
+    ])
+
 env.Library('clientdriver', [
             "client/connpool.cpp",
             "client/dbclient.cpp",
@@ -869,6 +880,7 @@ env.Library("serveronly", serverOnlyFiles,
                      "defaultversion",
                      "geoparser",
                      "geoquery",
+                     "index_key_validate",
                      "index_set",
                      'range_deleter',
                      's/metadata',

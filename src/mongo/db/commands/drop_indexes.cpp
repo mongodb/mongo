@@ -35,6 +35,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
@@ -229,7 +230,7 @@ namespace mongo {
             while ( i->more() ) {
                 const BSONObj spec = i->next().removeField("v").getOwned();
                 const BSONObj key = spec.getObjectField("key");
-                const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                const Status keyStatus = validateKeyPattern(key);
                 if (!keyStatus.isOK()) {
                     errmsg = str::stream()
                         << "Cannot compact collection due to invalid index " << spec << ": "
