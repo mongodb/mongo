@@ -312,13 +312,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, WT_ERROR,
 		    "Attempt to reconcile a clean page.");
 
-	/*
-	 * We can't do anything with a split-merge page, it must be merged into
-	 * its parent.
-	 */
-	if (F_ISSET(mod, WT_PM_REC_SPLIT_MERGE))
-		return (0);
-
 	WT_VERBOSE_RET(
 	    session, reconcile, "%s", __wt_page_type_string(page->type));
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);
@@ -1309,10 +1302,9 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 	 * length byte string, get a copy.
 	 *
 	 * This function is called from the split code at each split boundary,
-	 * but that means we're not called before the first boundary.  It's OK
-	 * we never do the work for the first boundary because that key cannot
-	 * come from the page, it has to come from the parent.  See the comment
-	 * in the code that creates the row-store split-merge page for details.
+	 * but that means we're not called before the first boundary, and we
+	 * will eventually have to get the first key explicitly when splitting
+	 * a page.
 	 *
 	 * For the current slot, take the last key we built, after doing suffix
 	 * compression.  The "last key we built" describes some process: before
@@ -1546,9 +1538,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * try and split, which might be wasted work, but detecting
 		 * repeated key-building is probably more complicated than it's
 		 * worth.  Don't bother doing the work for the first boundary,
-		 * that key cannot come from the page, it has to come from the
-		 * parent.  See the comment in the code that creates the row-
-		 * store split-merge page for details.
+		 * that key is taken from the parent: see the comment in the
+		 * code that splits the row-store page for details.
 		 */
 		if (r->bnd_next == 0)
 			break;
@@ -2376,7 +2367,6 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				addr = &rp->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
-			case WT_PM_REC_SPLIT_MERGE:
 				WT_RET(__rec_col_merge(session, r, rp));
 				continue;
 			WT_ILLEGAL_VALUE(session);
@@ -3164,7 +3154,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				addr = &rp->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
-			case WT_PM_REC_SPLIT_MERGE:
 				/*
 				 * Overflow keys referencing split pages are no
 				 * longer useful (the split page's key is the
@@ -3811,10 +3800,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case 0:	/*
 		 * The page has never been reconciled before, free the original
 		 * address blocks (if any).  The "if any" is for empty trees
-		 * created when a new tree is opened, previously deleted pages
-		 * instantiated in memory, or pages reconciled into split-merge
-		 * pages and then replaced by other pages because the tree grew
-		 * too deep.
+		 * created when a new tree is opened or previously deleted pages
+		 * instantiated in memory.
 		 *
 		 * The exception is root pages are never tracked or free'd, they
 		 * are checkpoints, and must be explicitly dropped.
@@ -3862,13 +3849,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		WT_RET(__rec_split_discard(session, page));
 		break;
-	case WT_PM_REC_SPLIT_MERGE:			/* Page split */
-		/*
-		 * We should never be here with a split-merge page: you cannot
-		 * reconcile split-merge pages, they can only be merged into a
-		 * parent.
-		 */
-		/* FALLTHROUGH */
 	WT_ILLEGAL_VALUE(session);
 	}
 	F_CLR(mod, WT_PM_REC_MASK);

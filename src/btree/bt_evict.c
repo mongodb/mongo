@@ -34,13 +34,10 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	read_gen = page->read_gen + entry->btree->evict_priority;
 
 	/*
-	 * Skew the read generation for internal pages that aren't split merge
-	 * pages.  We want to consider leaf pages in preference to real internal
-	 * pages, but merges are relatively cheap in-memory operations that make
-	 * reads faster, so don't make them too unlikely.
+	 * Skew the read generation for internal pages, we prefer to evict leaf
+	 * pages.
 	 */
-	if ((page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) &&
-	    !__wt_btree_mergeable(page))
+	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
 		read_gen += WT_EVICT_INT_SKEW;
 
 	return (read_gen);
@@ -481,8 +478,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * be written.
 			 */
 			if (WT_PAGE_IS_ROOT(page) || page->modify == NULL ||
-			    !F_ISSET(page->modify, WT_PM_REC_EMPTY |
-			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
+			    !F_ISSET(page->modify,
+			    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT))
 				WT_ERR(__wt_rec_evict(session, page, 1));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
@@ -893,6 +890,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (WT_PAGE_IS_ROOT(page))
 			continue;
 
+#ifdef XXXKEITH
 		/*
 		 * Look for a split-merge (grand)parent page to merge.
 		 *
@@ -910,7 +908,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		else if (page->modify != NULL &&
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
 			continue;
-
+#endif
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
@@ -918,6 +916,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
 
+#ifdef XXXKEITH
 		/*
 		 * !!!
 		 * In normal operation, don't restrict ourselves to only the
@@ -943,7 +942,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 
 			/* The remaining checks don't apply to merges. */
 			goto add;
-		} else if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
+		}
+#endif
+		if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
 			continue;
 
 		/*

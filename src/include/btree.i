@@ -662,9 +662,6 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 		goto skip;
 	if (WT_TXN_ACTIVE(&session->txn))
 		goto skip;
-	if (page->modify != NULL &&
-	    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
-		goto skip;
 	ref = __wt_page_ref(session, page);
 	if (WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
@@ -949,18 +946,3 @@ __wt_lex_compare_skip(
 	((collator) == NULL ?						\
 	(((cmp) = __wt_lex_compare_skip((k1), (k2), matchp)), 0) :	\
 	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
-
-/*
- * __wt_btree_mergeable --
- *	Determines whether the given page is a candidate for merging.
- */
-static inline int
-__wt_btree_mergeable(WT_PAGE *page)
-{
-	if (WT_PAGE_IS_ROOT(page) ||
-	    page->modify == NULL ||
-	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
-		return (0);
-
-	return (!WT_PAGE_IS_ROOT(page->parent));
-}

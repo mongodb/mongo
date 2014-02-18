@@ -73,11 +73,12 @@ __tree_walk_delete(
 		return (0);
 
 	/*
+	 * XXXKEITH: this may no longer be possible, review.
+	 *
 	 * We may be in a reconciliation-built internal page if the page split.
 	 * In that case, the reference address doesn't point to a cell.  While
 	 * we could probably still fast-delete the page, I doubt it's a common
-	 * enough case to make it worth the effort.  Skip fast deletes inside
-	 * split merge pages.
+	 * enough case to make it worth the effort.
 	 */
 	if (__wt_off_page(page, ref->addr))
 		goto err;

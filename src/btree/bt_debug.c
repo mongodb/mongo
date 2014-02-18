@@ -484,8 +484,6 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 			__dmsg(ds, ", replaced");
 		if (F_ISSET(page->modify, WT_PM_REC_SPLIT))
 			__dmsg(ds, ", split");
-		if (F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
-			__dmsg(ds, ", split-merge");
 	}
 	__dmsg(ds, ")\n");
 
@@ -529,9 +527,6 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		break;
 	case WT_PM_REC_SPLIT:
 		__dmsg(ds, "\t" "split page\n");
-		break;
-	case WT_PM_REC_SPLIT_MERGE:
-		__dmsg(ds, "\t" "split-merge page\n");
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
