@@ -242,7 +242,8 @@ var _bulk_api_module = (function() {
      * @return {SingleWriteResult} the simplified results condensed into one.
      */
     this.toSingleResult = function() {
-      if(singleBatch == null) throw "Cannot output SingleWriteResult from multiple batch result";
+      if(singleBatch == null) throw Error(
+          "Cannot output SingleWriteResult from multiple batch result");
       return new SingleWriteResult(bulkResult, singleBatch);
     }
   };
@@ -441,7 +442,7 @@ var _bulk_api_module = (function() {
 
       // We have an array of documents
       if(Array.isArray(document)) {
-        throw new "operation passed in cannot be an Array";
+        throw Error("operation passed in cannot be an Array");
       } else {
         currentBatch.operations.push(document)
         currentIndex = currentIndex + 1;
@@ -562,7 +563,7 @@ var _bulk_api_module = (function() {
     //
     // Start of update and remove operations
     this.find = function(selector) {
-      if (selector == undefined) throw "find() requires query criteria";
+      if (selector == undefined) throw Error("find() requires query criteria");
       // Save a current selector
       currentOp = {
         selector: selector
@@ -582,7 +583,9 @@ var _bulk_api_module = (function() {
       //
       if(ordered && result && result.writeConcernError
         && (result.writeConcernError.code == 2 || result.writeConcernError.code == 75)) {
-        throw "legacy batch failed, cannot aggregate results: " + result.writeConcernError.errmsg;
+        throw Error(
+            "legacy batch failed, cannot aggregate results: "
+                + result.writeConcernError.errmsg);
       }
 
       // If we have an insert Batch type
@@ -682,7 +685,8 @@ var _bulk_api_module = (function() {
                            0 /* flags */).next();
 
       if(result.ok == 0) {
-        throw "batch failed, cannot aggregate results: " + result.errmsg;
+        throw Error(
+            "batch failed, cannot aggregate results: " + result.errmsg);
       }
 
       // Merge the results
@@ -882,7 +886,7 @@ var _bulk_api_module = (function() {
     //
     // Execute the batch
     this.execute = function(_writeConcern) {
-      if(executed) throw "operations cannot be re-executed";
+      if(executed) throw Error("operations cannot be re-executed");
 
       // If writeConcern set, use it, else get from collection (which will inherit from db/mongo)
       writeConcern = _writeConcern ? _writeConcern : coll.getWriteConcern();
