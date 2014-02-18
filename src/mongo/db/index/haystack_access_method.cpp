@@ -30,6 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index/expression_key_generator.h"
 #include "mongo/db/index/haystack_access_method_internal.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
@@ -71,70 +72,7 @@ namespace mongo {
     }
 
     void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        BSONElement loc = obj.getFieldDotted(_geoField);
-
-        if (loc.eoo()) { return; }
-
-        uassert(16775, "latlng not an array", loc.isABSONObj());
-        string root;
-        {
-            BSONObjIterator i(loc.Obj());
-            BSONElement x = i.next();
-            BSONElement y = i.next();
-            root = makeString(hash(x), hash(y));
-        }
-
-        verify(_otherFields.size() == 1);
-
-        BSONElementSet all;
-
-        // This is getFieldsDotted (plural not singular) since the object we're indexing
-        // may be an array.
-        obj.getFieldsDotted(_otherFields[0], all);
-
-        if (all.size() == 0) {
-            // We're indexing a document that doesn't have the secondary non-geo field present.
-            // XXX: do we want to add this even if all.size() > 0?  result:empty search terms
-            // match everything instead of only things w/empty search terms)
-            addKey(root, BSONElement(), keys);
-        } else {
-            // Ex:If our secondary field is type: "foo" or type: {a:"foo", b:"bar"},
-            // all.size()==1.  We can query on the complete field.
-            // Ex: If our secondary field is type: ["A", "B"] all.size()==2 and all has values
-            // "A" and "B".  The query looks for any of the fields in the array.
-            for (BSONElementSet::iterator i = all.begin(); i != all.end(); ++i) {
-                addKey(root, *i, keys);
-            }
-        }
-    }
-
-    int HaystackAccessMethod::hash(const BSONElement& e) const {
-        uassert(16776, "geo field is not a number", e.isNumber());
-        double d = e.numberDouble();
-        d += 180;
-        d /= _bucketSize;
-        return static_cast<int>(d);
-    }
-
-    string HaystackAccessMethod::makeString(int hashedX, int hashedY) const {
-        stringstream ss;
-        ss << hashedX << "_" << hashedY;
-        return ss.str();
-    }
-
-    // Build a new BSONObj with root in it.  If e is non-empty, append that to the key.  Insert
-    // the BSONObj into keys.
-    void HaystackAccessMethod::addKey(const string& root, const BSONElement& e,
-                                      BSONObjSet* keys) const {
-        BSONObjBuilder buf;
-        buf.append("", root);
-
-        if (e.eoo())
-            buf.appendNull("");
-        else
-            buf.appendAs(e, "");
-
-        keys->insert(buf.obj());
+        getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
     }
 
     void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
@@ -147,8 +85,8 @@ namespace mongo {
         int x, y;
         {
             BSONObjIterator i(nearObj);
-            x = hash(i.next());
-            y = hash(i.next());
+            x = hashHaystackElement(i.next(), _bucketSize);
+            y = hashHaystackElement(i.next(), _bucketSize);
         }
         int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
@@ -159,7 +97,7 @@ namespace mongo {
         for (int a = -scale; a <= scale && !hopper.limitReached(); ++a) {
             for (int b = -scale; b <= scale && !hopper.limitReached(); ++b) {
                 BSONObjBuilder bb;
-                bb.append("", makeString(x + a, y + b));
+                bb.append("", makeHaystackString(x + a, y + b));
 
                 for (unsigned i = 0; i < _otherFields.size(); i++) {
                     // See if the non-geo field we're indexing on is in the provided search term.

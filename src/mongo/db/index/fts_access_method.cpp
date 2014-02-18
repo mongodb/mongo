@@ -27,7 +27,7 @@
 */
 
 #include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/fts/fts_index_format.h"
+#include "mongo/db/index/expression_key_generator.h"
 
 namespace mongo {
 
@@ -35,7 +35,7 @@ namespace mongo {
         : BtreeBasedAccessMethod(btreeState), _ftsSpec(btreeState->descriptor()->infoObj()) { }
 
     void FTSAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        fts::FTSIndexFormat::getKeys(_ftsSpec, obj, keys);
+        getFTSKeys(obj, _ftsSpec, keys);
     }
 
 }  // namespace mongo

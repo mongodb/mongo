@@ -103,11 +103,6 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // This is called by the two getKeys above.
-        void getKeys(const BSONObj &obj, BSONObjSet* keys, vector<BSONObj>* locs) const;
-
-        BSONObj _nullObj;
-        BSONElement _nullElt;
         TwoDIndexingParams _params;
     };
 
