@@ -11,6 +11,11 @@ b = DBRef(a.getRef(), a.getId());
 printjson(a);
 assert.eq(tojson(a), tojson(b), "dbref");
 
+a = new DBRef("test", "theid", "testdb");
+b = DBRef(a.getRef(), a.getId(), a.getDb());
+printjson(a);
+assert.eq(tojson(a), tojson(b), "dbref");
+
 a = new DBPointer("test", new ObjectId());
 b = DBPointer(a.getCollection(), a.getId());
 printjson(a);

@@ -386,11 +386,20 @@ if (typeof(DBRef) != "undefined"){
     DBRef.prototype.fetch = function(){
         assert(this.$ref, "need a ns");
         assert(this.$id, "need an id");
+
+        if (this.$db) {
+            return db.getMongo().getDB(this.$db).getCollection(this.$ref).findOne({ _id : this.$id });
+        }
+
         return db[ this.$ref ].findOne({ _id : this.$id });
     }
 
     DBRef.prototype.tojson = function(indent){
         return this.toString();
+    }
+
+    DBRef.prototype.getDb = function(){
+        return this.$db || null;
     }
 
     DBRef.prototype.getCollection = function(){
@@ -406,7 +415,7 @@ if (typeof(DBRef) != "undefined"){
     }
 
     DBRef.prototype.toString = function(){
-        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + ")";
+        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + (this.$db ? ", " + tojson(this.$db) : "") + ")";
     }
 }
 else {

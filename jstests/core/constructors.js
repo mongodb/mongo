@@ -109,14 +109,18 @@ var dbrefConstructors = {
     "valid" : [
             "DBRef(\"namespace\", 0)",
             "DBRef(\"namespace\", \"test\")",
+            "DBRef(\"namespace\", \"test\", \"database\")",
             "DBRef(\"namespace\", ObjectId())",
             "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"))",
+            "DBRef(\"namespace\", ObjectId(\"000000000000000000000000\"), \"database\")",
         ],
     "invalid" : [
             "DBRef()",
             "DBRef(true, ObjectId())",
+            "DBRef(true, ObjectId(), true)",
             "DBRef(\"namespace\")",
             "DBRef(\"namespace\", ObjectId(), true)",
+            "DBRef(\"namespace\", ObjectId(), 123)",
         ]
 }
 
