@@ -382,7 +382,9 @@ namespace mongo {
         }
     }
 
-    size_t countNodes(MatchExpression* root, MatchExpression::MatchType type) {
+    // static
+    size_t CanonicalQuery::countNodes(const MatchExpression* root,
+                                      MatchExpression::MatchType type) {
         size_t sum = 0;
         if (type == root->matchType()) {
             sum = 1;

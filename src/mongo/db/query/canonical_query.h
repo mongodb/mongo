@@ -122,6 +122,11 @@ namespace mongo {
          */
         static void sortTree(MatchExpression* tree);
 
+        /**
+         * Returns a count of 'type' nodes in expression tree.
+         */
+        static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type);
+
     private:
         // You must go through canonicalize to create a CanonicalQuery.
         CanonicalQuery() { }
