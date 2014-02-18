@@ -176,11 +176,13 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_PAGE_MODIFY *mod;
+	WT_PAGE_MODIFY *mod, *parent_mod;
 	WT_REF **refp, *split;
 	uint32_t i, j, parent_entries, split_entries;
 
+	mod = page->modify;
 	parent = page->parent;
+	parent_mod = parent->modify;
 
 	/* If the parent page hasn't yet been modified, now is the time. */
 	WT_RET(__wt_page_modify_init(session, parent));
@@ -197,21 +199,21 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * Allocate a new WT_REF splits array as necessary, then append the
 	 * underlying split page's WT_REF array into the list.
 	 */
-	mod = parent->modify;
-	for (i = 0; i < mod->splits_slots; ++i)
-		if (mod->splits[i] == NULL)
+	for (i = 0; i < parent_mod->splits_slots; ++i)
+		if (parent_mod->splits[i] == NULL)
 			break;
-	if (i == mod->splits_slots) {
-		WT_ERR(__wt_realloc(session,
-		    NULL, (i + 5) * sizeof(mod->splits[0]), &mod->splits));
-		mod->splits_slots = i + 5;
+	if (i == parent_mod->splits_slots) {
+		WT_ERR(__wt_realloc(session, NULL,
+		    (i + 5) * sizeof(parent_mod->splits[0]),
+		    &parent_mod->splits));
+		parent_mod->splits_slots = i + 5;
 	}
-	split = mod->splits[i] = page->modify->split_ref;
+	split = parent_mod->splits[i] = mod->split_ref;
 
 	/* Allocate a new WT_REF index array and initialize it. */
 	pindex = parent->pu_intl_index;
 	parent_entries = pindex->entries;
-	split_entries = page->modify->split_entries;
+	split_entries = mod->split_entries;
 	WT_ERR(__wt_calloc(session, 1,
 	    sizeof(WT_PAGE_INDEX) +
 	    ((parent_entries - 1) + split_entries) * sizeof(WT_REF *),
@@ -227,12 +229,12 @@ __rec_page_split(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 			refp++;
 
 	/* Update the parent page's footprint. */
-	__wt_cache_page_inmem_incr(session, parent, page->modify->split_size);
+	__wt_cache_page_inmem_incr(session, parent, mod->split_size);
 
 	/* We've stolen the page's WT_REF structures, clear the references. */
-	page->modify->split_ref = NULL;
-	page->modify->split_entries = 0;
-	page->modify->split_size = 0;
+	mod->split_ref = NULL;
+	mod->split_entries = 0;
+	mod->split_size = 0;
 
 	/*
 	 * Update the parent page's index: this is the update that splits the
