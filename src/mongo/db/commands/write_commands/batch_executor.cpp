@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/insert.h"
@@ -50,8 +51,8 @@
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -585,6 +586,8 @@ namespace mongo {
 
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
             execInserts( request, errors );
+            // Note: not checking for interrupt in bulk inserts, as we are not yet
+            // handling the curops/profiling properly.
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
@@ -605,6 +608,7 @@ namespace mongo {
                     if ( request.getOrdered() )
                         break;
                 }
+                killCurrentOp.checkForInterrupt(false);
             }
         }
         else {
@@ -619,6 +623,7 @@ namespace mongo {
                     if ( request.getOrdered() )
                         break;
                 }
+                killCurrentOp.checkForInterrupt(false);
             }
         }
 
