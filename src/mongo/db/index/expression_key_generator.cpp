@@ -380,6 +380,10 @@ namespace mongo {
     void getS2Keys(const BSONObj& obj, const BSONObj& keyPattern,
                    const S2IndexingParams& params, BSONObjSet* keys) {
         BSONObjSet keysToAdd;
+
+        // Does one of our documents have a geo field?
+        bool haveGeoField = false;
+
         // We output keys in the same order as the fields we index.
         BSONObjIterator i(keyPattern);
         while (i.more()) {
@@ -393,6 +397,35 @@ namespace mongo {
 
             BSONObjSet keysForThisField;
             if (IndexNames::GEO_2DSPHERE == e.valuestr()) {
+                if (S2_INDEX_VERSION_2 == params.indexVersion) {
+                    // For V2,
+                    // geo: null,
+                    // geo: undefined
+                    // geo: [] 
+                    // should all behave like there is no geo field.  So we look for these cases and
+                    // throw out the field elements if we find them.
+                    if (1 == fieldElements.size()) {
+                        BSONElement elt = *fieldElements.begin();
+                        // Get the :null and :undefined cases.
+                        if (elt.isNull() || Undefined == elt.type()) {
+                            fieldElements.clear();
+                        }
+                        else if (elt.isABSONObj()) {
+                            // And this is the :[] case.
+                            BSONObj obj = elt.Obj();
+                            if (0 == obj.nFields()) {
+                                fieldElements.clear();
+                            }
+                        }
+                    }
+
+                    // V2 2dsphere indices require that at least one geo field to be present in a
+                    // document in order to index it.
+                    if (fieldElements.size() > 0) {
+                        haveGeoField = true;
+                    }
+                }
+
                 getGeoKeys(obj, fieldElements, params, &keysForThisField);
             } else {
                 getLiteralKeys(fieldElements, &keysForThisField);
@@ -422,6 +455,13 @@ namespace mongo {
                 }
             }
             keysToAdd = updatedKeysToAdd;
+        }
+
+        // Make sure that if we're V2 there's at least one geo field present in the doc.
+        if (S2_INDEX_VERSION_2 == params.indexVersion) {
+            if (!haveGeoField) {
+                return;
+            }
         }
 
         if (keysToAdd.size() > params.maxKeysPerInsert) {

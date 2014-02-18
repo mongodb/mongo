@@ -568,31 +568,12 @@ namespace mongo {
         }
 
         // Figure out how useful each index is to each predicate.
-        // query.root() is now annotated with RelevantTag(s).
         QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices);
+        QueryPlannerIXSelect::stripInvalidAssignments(query.root(), relevantIndices);
 
+        // query.root() is now annotated with RelevantTag(s).
         QLOG() << "rated tree" << endl;
         QLOG() << query.root()->toString() << endl;
-
-        // If there is a relevant compound text index with a non-empty "index prefix" (e.g. the
-        // prefix {a: 1, b: 1} for the index {a: 1, b: 1, c: "text"}), amend the RelevantTag(s)
-        // created above to remove assignments to the text index where the query does not have
-        // predicates over each indexed field of the prefix.
-        //
-        // This is necessary because text indices do not obey the normal rules of sparseness, in
-        // that they generate no index keys for documents without indexable text data in at least
-        // one text field (in fact, text indices ignore the sparse option entirely).  For example,
-        // given the text index {a: 1, b: 1, c: "text"}:
-        //
-        // - Document {a: 1, b: 6, c: "hello world"} generates 2 index keys
-        // - Document {a: 1, b: 7, c: {d: 1}} generates 0 index keys
-        // - Document {a: 1, b: 8} generates 0 index keys
-        //
-        // As a result, the query {a: 1} *cannot* be satisfied by the text index {a: 1, b: 1, c:
-        // "text"}, since documents without indexed text data would not be returned by the query.
-        // rateIndices() above will eagerly annotate the pred {a: 1} as relevant to the text index;
-        // those annotations get removed here.
-        QueryPlannerIXSelect::stripInvalidAssignmentsToTextIndexes(query.root(), relevantIndices);
 
         // If there is a GEO_NEAR it must have an index it can use directly.
         // XXX: move into data access?

@@ -1,45 +1,113 @@
-// Test that 2dsphere ignores the sparse option.
+// Test behavior of 2dsphere and sparse.  See SERVER-9639.
+// All V2 2dsphere indices are sparse in the geo fields.
 
 var coll = db.geo_s2sparse;
-coll.drop();
 
-// 2d geo object used in inserted documents
 var point = { type: "Point", coordinates: [5, 5] }
 
-// the index we'll use
-var index = { geo: "2dsphere", nonGeo: 1 };
-var indexName = "geo_2dsphere_nonGeo_1";
+var indexSpec = { geo: "2dsphere", nonGeo: 1 };
 
-// ensure a sparse index
-coll.ensureIndex(index, { sparse: 1 });
+var indexName = 'test.geo_s2sparse.$geo_2dsphere_nonGeo_1';
 
-// note the initial size of the index
-var initialIndexSize = coll.stats().indexSizes[indexName];
-assert.gte(initialIndexSize, 0);
+//
+// V2 indices are "geo sparse" always.
+//
 
-// insert matching docs
-for (var i = 0; i < 1000; i++) {
+// Clean up.
+coll.drop();
+coll.ensureIndex(indexSpec);
+
+// Insert N documents with the geo field.
+var N = 1000;
+for (var i = 0; i < N; i++) {
     coll.insert({ geo: point, nonGeo: "point_"+i });
 }
 
-// the new size of the index
-var indexSizeAfterFirstInsert = coll.stats().indexSizes[indexName];
-assert.gte(indexSizeAfterFirstInsert, initialIndexSize);
+// Expect N keys.
+assert.eq(N, coll.validate().keysPerIndex[indexName]);
 
-// insert docs missing the nonGeo field
-for (var i = 0; i < 1000; i++) {
-    coll.insert({ geo: point, wrongNonGeo: "point_"+i });
+// Insert N documents without the geo field.
+for (var i = 0; i < N; i++) {
+    coll.insert({ wrongGeo: point, nonGeo: i});
 }
 
-// the new size, should be bigger
-var indexSizeAfterSecondInsert = coll.stats().indexSizes[indexName];
-assert.gte(indexSizeAfterSecondInsert, indexSizeAfterFirstInsert);
+// Still expect N keys as we didn't insert any geo stuff.
+assert.eq(N, coll.validate().keysPerIndex[indexName]);
 
-// insert docs missing the geo field, to make sure they're filtered out
-for (var i = 0; i < 1000; i++) {
-    coll.insert({ wrongGeo: point, nonGeo: "point_"+i });
+// Insert N documents with just the geo field.
+for (var i = 0; i < N; i++) {
+    coll.insert({ geo: point});
 }
 
-// the new size, should be unchanged
-var indexSizeAfterThirdInsert = coll.stats().indexSizes[indexName];
-assert.gte(indexSizeAfterThirdInsert, indexSizeAfterSecondInsert);
+// Expect 2N keys.
+assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
+
+// Add some "not geo" stuff.
+for (var i = 0; i < N; i++) {
+    coll.insert({ geo: null});
+    coll.insert({ geo: []});
+    coll.insert({ geo: undefined});
+    coll.insert({ geo: {}});
+}
+
+// Still expect 2N keys.
+assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
+
+//
+// V1 indices are never sparse
+//
+
+coll.drop();
+coll.ensureIndex(indexSpec, {"2dsphereIndexVersion": 1});
+
+// Insert N documents with the geo field.
+for (var i = 0; i < N; i++) {
+    coll.insert({ geo: point, nonGeo: "point_"+i });
+}
+
+// Expect N keys.
+assert.eq(N, coll.validate().keysPerIndex[indexName]);
+
+// Insert N documents without the geo field.
+for (var i = 0; i < N; i++) {
+    coll.insert({ wrongGeo: point, nonGeo: i});
+}
+
+// Expect N keys as it's a V1 index.
+assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
+
+//
+// V2 indices with several 2dsphere-indexed fields are only sparse if all are missing.
+//
+
+// Clean up.
+coll.drop();
+coll.ensureIndex({geo: "2dsphere", otherGeo: "2dsphere"});
+
+indexName = 'test.geo_s2sparse.$geo_2dsphere_otherGeo_2dsphere';
+
+// Insert N documents with the first geo field.
+var N = 1000;
+for (var i = 0; i < N; i++) {
+    coll.insert({ geo: point});
+}
+
+// Expect N keys.
+assert.eq(N, coll.validate().keysPerIndex[indexName]);
+
+// Insert N documents with the second geo field.
+var N = 1000;
+for (var i = 0; i < N; i++) {
+    coll.insert({ otherGeo: point});
+}
+
+// They get inserted too.
+assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
+
+// Insert N documents with neither geo field.
+for (var i = 0; i < N; i++) {
+    coll.insert({ nonGeo: i});
+}
+
+// Still expect 2N keys as the neither geo docs were omitted from the index.
+assert.eq(N + N, coll.validate().keysPerIndex[indexName]);

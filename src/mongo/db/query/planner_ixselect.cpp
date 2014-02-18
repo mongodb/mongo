@@ -365,6 +365,23 @@ namespace mongo {
         }
     }
 
+    // static
+    void QueryPlannerIXSelect::stripInvalidAssignments(MatchExpression* node,
+                                                       const vector<IndexEntry>& indices) {
+
+        stripInvalidAssignmentsToTextIndexes(node, indices);
+
+        if (MatchExpression::GEO != node->matchType() &&
+            MatchExpression::GEO_NEAR != node->matchType()) {
+
+            stripInvalidAssignmentsTo2dsphereIndices(node, indices);
+        }
+    }
+
+    //
+    // Helpers used by stripInvalidAssignments
+    //
+
     /**
      * Remove 'idx' from the RelevantTag lists for 'node'.  'node' must be a leaf.
      */
@@ -385,6 +402,10 @@ namespace mongo {
             tag->notFirst.erase(notFirstIt);
         }
     }
+
+    //
+    // Text index quirks
+    //
 
     /**
      * Traverse the subtree rooted at 'node' to remove invalid RelevantTag assignments to text index
@@ -509,6 +530,130 @@ namespace mongo {
             if (!textIndexPrefixPaths.empty()) {
                 stripInvalidAssignmentsToTextIndex(node, i, textIndexPrefixPaths);
             }
+        }
+    }
+
+    //
+    // 2dsphere V2 sparse quirks
+    //
+
+    static void stripInvalidAssignmentsTo2dsphereIndex(
+            MatchExpression* node,
+            size_t idx,
+            const unordered_set<StringData, StringData::Hasher>& geoFields) {
+
+        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+            removeIndexRelevantTag(node, idx);
+            return;
+        }
+
+        const MatchExpression::MatchType nodeType = node->matchType();
+
+        // Don't bother peeking inside of negations.
+        if (MatchExpression::NOT == nodeType || MatchExpression::NOR == nodeType) {
+            return;
+        }
+
+        if (MatchExpression::AND != nodeType) {
+            // It's an OR or some kind of array operator.
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx, geoFields);
+            }
+            return;
+        }
+
+        bool hasGeoField = false;
+
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            MatchExpression* child = node->getChild(i);
+            RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
+
+            if (NULL == tag) {
+                // 'child' could be a logical operator.  Maybe there are some assignments hiding
+                // inside.
+                stripInvalidAssignmentsTo2dsphereIndex(child, idx, geoFields);
+                continue;
+            }
+
+            bool inFirst = tag->first.end() != std::find(tag->first.begin(),
+                                                         tag->first.end(),
+                                                         idx);
+
+            bool inNotFirst = tag->notFirst.end() != std::find(tag->notFirst.begin(),
+                                                               tag->notFirst.end(),
+                                                               idx);
+
+            // If there is an index assignment...
+            if (inFirst || inNotFirst) {
+                // And it's a geo predicate...
+                if (MatchExpression::GEO == child->matchType() ||
+                    MatchExpression::GEO_NEAR == child->matchType()) {
+
+                    hasGeoField = true;
+                }
+            }
+            else {
+                // Recurse on the children to ensure that they're not hiding any assignments
+                // to idx.
+                stripInvalidAssignmentsTo2dsphereIndex(child, idx, geoFields);
+            }
+        }
+
+        // If there isn't a geo predicate our results aren't a subset of what's in the geo index, so
+        // if we use the index we'll miss results.
+        if (!hasGeoField) {
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx, geoFields);
+            }
+        }
+    }
+
+    // static
+    void QueryPlannerIXSelect::stripInvalidAssignmentsTo2dsphereIndices(
+        MatchExpression* node,
+        const vector<IndexEntry>& indices) {
+
+        for (size_t i = 0; i < indices.size(); ++i) {
+            const IndexEntry& index = indices[i];
+
+            // We only worry about 2dsphere indices.
+            if (INDEX_2DSPHERE != index.type) {
+                continue;
+            }
+
+            // They also have to be V2.  Both ignore the sparse flag but V1 is
+            // never-sparse, V2 geo-sparse.
+            BSONElement elt = index.infoObj["2dsphereIndexVersion"];
+            if (elt.eoo()) {
+                continue;
+            }
+            if (!elt.isNumber()) {
+                continue;
+            }
+            if (2 != elt.numberInt()) {
+                continue;
+            }
+
+            // Gather the set of geo fields in this index.
+            unordered_set<StringData, StringData::Hasher> geoFields;
+            BSONObjIterator it(index.keyPattern);
+            while (it.more()) {
+                BSONElement elt = it.next();
+                if (String == elt.type()) {
+                    geoFields.insert(elt.fieldName());
+                }
+            }
+
+            // If every field is geo don't bother doing anything.
+            if (geoFields.size() == static_cast<size_t>(index.keyPattern.nFields())) {
+                continue;
+            }
+
+            // You can't have a 2dsphere index without a 2dsphere field.
+            invariant(!geoFields.empty());
+
+            // Remove bad assignments from this index.
+            stripInvalidAssignmentsTo2dsphereIndex(node, i, geoFields);
         }
     }
 

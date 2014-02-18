@@ -85,6 +85,10 @@ namespace {
                                                 BSONObj()));
         }
 
+        void addIndex(BSONObj keyPattern, BSONObj infoObj) {
+            params.indices.push_back(IndexEntry(keyPattern, false, false, "foo", infoObj));
+        }
+
         //
         // Execute planner.
         //
@@ -683,7 +687,7 @@ namespace {
         runQueryFull(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 0, BSONObj(),
                      fromjson("{a: 2}"), fromjson("{a: 8}"), false);
 
-        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertNumSolutions(1);
         assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
     }
 
@@ -694,7 +698,7 @@ namespace {
         runQueryFull(BSONObj(), fromjson("{a: -1}"), BSONObj(), 0, 0, BSONObj(),
                      fromjson("{a: 2}"), fromjson("{a: 8}"), false);
 
-        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertNumSolutions(1);
         assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: -1, pattern: {a: 1}}}}}");
     }
 
@@ -2753,6 +2757,74 @@ namespace {
                                  "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
 
         ASSERT_LESS_THAN(getNumSolutions(), 10U);
+    }
+
+    //
+    // 2dsphere V2 sparse indices, SERVER-9639
+    //
+
+    // Basic usage of a sparse 2dsphere index.  V1 ignores the sparse field.  We can use any prefix
+    // of the index as every document is indexed.
+    TEST_F(QueryPlannerTest, TwoDSphereSparseV1) {
+        // Create a V1 index.
+        addIndex(BSON("nonGeo" << 1 << "geo" << "2dsphere"),
+                 BSON("2dsphereIndexVersion" << 1));
+
+        // Can use the index for this.
+        runQuery(fromjson("{nonGeo: 7}"));
+        assertNumSolutions(2);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {nonGeo: 1, geo: '2dsphere'}}}}}");
+    }
+
+    // V2 is "geo sparse" and removes the nonGeo assignment.
+    TEST_F(QueryPlannerTest, TwoDSphereSparseV2CantUse) {
+        // Create a V2 index.
+        addIndex(BSON("nonGeo" << 1 << "geo" << "2dsphere"),
+                 BSON("2dsphereIndexVersion" << 2));
+
+        // Can't use the index prefix here as it's a V2 index and we have no geo pred.
+        runQuery(fromjson("{nonGeo: 7}"));
+        assertNumSolutions(1);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    TEST_F(QueryPlannerTest, TwoDSphereSparseOnePred) {
+        // Create a V2 index.
+        addIndex(BSON("geo" << "2dsphere"), 
+                 BSON("2dsphereIndexVersion" << 2));
+
+        // We can use the index here as we have a geo pred.
+        runQuery(fromjson("{geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}}"));
+        assertNumSolutions(2);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // V2 is geo-sparse and the planner removes the nonGeo assignment when there's no geo pred
+    TEST_F(QueryPlannerTest, TwoDSphereSparseV2TwoPreds) {
+        addIndex(BSON("nonGeo" << 1 << "geo" << "2dsphere" << "geo2" << "2dsphere"),
+                 BSON("2dsphereIndexVersion" << 2));
+
+        // Non-geo preds can only use a collscan.
+        runQuery(fromjson("{nonGeo: 7}"));
+        assertNumSolutions(1);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        // One geo pred so we can use the index.
+        runQuery(fromjson("{nonGeo: 7, geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        // Two geo preds, so we can use the index still.
+        runQuery(fromjson("{nonGeo: 7, geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] }},"
+                                    " geo2 : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] }}}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(QueryPlannerTest, TwoDNearCompound) {
+        addIndex(BSON("geo" << "2dsphere" << "nongeo" << 1),
+                 BSON("2dsphereIndexVersion" << 2));
+        runQuery(fromjson("{geo: {$nearSphere: [-71.34895, 42.46037]}}"));
+        ASSERT_EQUALS(getNumSolutions(), 1U);
     }
 
     //

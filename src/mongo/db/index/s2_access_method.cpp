@@ -97,6 +97,11 @@ namespace mongo {
         }
         uassert(16750, "Expect at least one geo field, spec=" + descriptor->keyPattern().toString(),
                 geoFields >= 1);
+
+        if (descriptor->isSparse()) {
+            warning() << "Sparse option ignored for index spec "
+                      << descriptor->keyPattern().toString() << "\n";
+        }
     }
 
     // static

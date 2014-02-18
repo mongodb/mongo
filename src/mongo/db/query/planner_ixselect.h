@@ -89,6 +89,16 @@ namespace mongo {
 
         /**
          * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
+         * invalid assignments to text and geo indices.
+         *
+         * See the body of this function and the specific stripInvalidAssignments functions for details.
+         */
+        static void stripInvalidAssignments(MatchExpression* node,
+                                            const vector<IndexEntry>& indices);
+
+    private:
+        /**
+         * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
          * invalid assignments to text indexes.
          *
          * A predicate on a field from a compound text index with a non-empty index prefix
@@ -99,9 +109,47 @@ namespace mongo {
          *
          * Note that compatible() enforces the precondition that only EQ nodes are considered
          * relevant to text index prefixes.
+         * If there is a relevant compound text index with a non-empty "index prefix" (e.g. the
+         * prefix {a: 1, b: 1} for the index {a: 1, b: 1, c: "text"}), amend the RelevantTag(s)
+         * created above to remove assignments to the text index where the query does not have
+         * predicates over each indexed field of the prefix.
+         *
+         * This is necessary because text indices do not obey the normal rules of sparseness, in
+         * that they generate no index keys for documents without indexable text data in at least
+         * one text field (in fact, text indices ignore the sparse option entirely).  For example,
+         * given the text index {a: 1, b: 1, c: "text"}:
+         *
+         * - Document {a: 1, b: 6, c: "hello world"} generates 2 index keys
+         * - Document {a: 1, b: 7, c: {d: 1}} generates 0 index keys
+         * - Document {a: 1, b: 8} generates 0 index keys
+         *
+         * As a result, the query {a: 1} *cannot* be satisfied by the text index {a: 1, b: 1, c:
+         * "text"}, since documents without indexed text data would not be returned by the query.
+         * rateIndices() above will eagerly annotate the pred {a: 1} as relevant to the text index;
+         * those annotations get removed here.
          */
         static void stripInvalidAssignmentsToTextIndexes(MatchExpression* node,
                                                          const vector<IndexEntry>& indices);
+
+        /**
+         * For V1 2dsphere indices we ignore the sparse option.  As such we can use an index
+         * like {nongeo: 1, geo: "2dsphere"} to answer queries only involving nongeo.
+         *
+         * For V2 2dsphere indices also ignore the sparse flag but indexing behavior as compared to
+         * V1 is different.  If all of the geo fields are missing from the document we do not index
+         * it.  As such we cannot use V2 sparse indices unless we have a predicate over a geo
+         * field.
+         *
+         * 2dsphere indices V2 are "geo-sparse."  That is, if there aren't any geo-indexed fields in
+         * a document it won't be indexed.  As such we can't use an index like {foo:1, geo:
+         * "2dsphere"} to answer a query on 'foo' if the index is V2 as it will not contain the
+         * document {foo:1}.
+         *
+         * We *can* use it to answer a query on 'foo' if the predicate on 'foo' is AND-related to a
+         * predicate on every geo field in the index.
+         */
+        static void stripInvalidAssignmentsTo2dsphereIndices(MatchExpression* node,
+                                                             const vector<IndexEntry>& indices);
     };
 
 }  // namespace mongo
