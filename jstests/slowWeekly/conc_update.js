@@ -3,14 +3,7 @@ test = new SlowWeeklyMongod( "conc_update" )
 db = test.getDB("concurrency")
 db.dropDatabase();
 
-// QUERY_MIGRATION: This test takes a very, very long time.  As part of the query migration process,
-// the "fast count" optimization was (temporarily) removed.  Until it's reintroduced, we reduce the
-// amount of data used in this test.
-// NRECORDS=3*1024*1024
-
-NRECORDS=1*1024*1024 // this needs to be relatively big so that
-                      // the update() will take a while, but it could
-                      // probably be smaller.
+NRECORDS=3*1024*1024
 
 print("loading "+NRECORDS+" documents (progress msg every 1024*1024 documents)")
 for (i=0; i<(NRECORDS); i++) {

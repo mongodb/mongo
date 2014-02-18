@@ -42,11 +42,3 @@ assert.eq( [[{$maxElement:1},{$minElement:1}]], t.find( { a:{ b:3, c:6 }, 'a.c':
 // Check second field is constrained if first is not.
 assert.eq( 1, t.find( { 'a.c': { $lt:4 } } ).hint( {'a.b':1,'a.c':1} ).itcount() );
 assert.eq( 1, t.find( { 'a.c': { $lt:4 } } ).hint( {a:1,'a.c':1} ).itcount() );
-
-// QUERY MIGRATION
-// It is not clear at all (other than in very syntethic workloads) that there is
-// an advantage in looking at every single key of the index assuming that it may
-// be highly repeated.
-// printjson( t.find( { 'a.c': { $lt:4 } } ).hint( {'a.b':1,'a.c':1} ).explain() )
-// assert.eq( 4, t.find( { 'a.c': { $lt:4 } } ).hint( {'a.b':1,'a.c':1} ).explain().indexBounds['a.c'][0][1] );
-// assert.eq( 4, t.find( { 'a.c': { $lt:4 } } ).hint( {a:1,'a.c':1} ).explain().indexBounds['a.c'][0][1] );

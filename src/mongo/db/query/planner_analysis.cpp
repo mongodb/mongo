@@ -299,7 +299,7 @@ namespace mongo {
 
             // See if it's the order we're looking for.
             BSONObj possibleSort = resultingSortBob.obj();
-            if (0 != possibleSort.woCompare(desiredSort)) {
+            if (!desiredSort.isPrefixOf(possibleSort)) {
                 return false;
             }
 

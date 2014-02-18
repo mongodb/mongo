@@ -20,10 +20,7 @@ checkElemMatchMatches();
 t.ensureIndex( { 'a.b':1 } );
 checkElemMatchMatches();
 
-// Verify index bounds - see comment above for the $ne:2 case.
-// QUERY_MIGRATION negations
-/*
-assert( !friendlyEqual( [ [ 2, 2 ] ],
-                       t.find( { a:{ $not:{ $elemMatch:{ b:{ $ne:2 }, c:3 } } } } ).explain()
-                       .indexBounds[ 'a.b' ] ) );
-*/
+// We currently never use an index for negations of
+// ELEM_MATCH_OBJECT expressions.
+var explain = t.find( { a:{ $not:{ $elemMatch:{ b:{ $ne:2 }, c:3 } } } } ).explain();
+assert.eq( "BasicCursor", explain.cursor );

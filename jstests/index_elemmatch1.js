@@ -32,13 +32,8 @@ function nscannedForCursor( explain, cursor ) {
     return -1;
 }
 
-// QUERY_MIGRATION:
-// Query is {a:55, b:{$in:[1,5,8]}, arr:{$elemMatch:{x:5, y:5}}}.  New system considers indices over
-// {a:1, b:1} and {arr.x:1, a:1}.  For the latter case, the enumerator doesn't look down the
-// elemMatch tree to seek out compounding.
-//
-//assert.eq( t.find(q).itcount(),
-//         nscannedForCursor( t.find(q).explain(true), 'BtreeCursor arr.x_1_a_1' ), "A5" );
+assert.eq( t.find(q).itcount(),
+           nscannedForCursor( t.find(q).explain(true), 'BtreeCursor arr.x_1_a_1' ), "A5" );
 
 printjson(t.find(q).explain());
 print("Num results:");

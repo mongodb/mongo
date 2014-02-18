@@ -28,7 +28,8 @@ t.save( {i:"a"} );
 t.save( {i:"b"} );
 
 fail( {i:{$not:"a"}} );
-// QUERY_MIGRATION: these slip by us.
+// SERVER-12735: We currently do not handle double negatives
+// during query canonicalization.
 //fail( {i:{$not:{$not:"a"}}} );
 //fail( {i:{$not:{$not:{$gt:"a"}}}} );
 fail( {i:{$not:{$ref:"foo"}}} );

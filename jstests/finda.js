@@ -95,8 +95,7 @@ function queryWithPlanTypes( withDups ) {
     checkCursorWithBatchSize( { a:{ $gte:0 } }, null, 150, 150 );
 
     // All plans out of order.
-    // QUERY_MIGRATION: not sure why it expects 200 results in the batch when there's no batchsize.
-    // checkCursorWithBatchSize( { a:{ $gte:0 } }, { c:1 }, null, 200 );
+    checkCursorWithBatchSize( { a:{ $gte:0 } }, { c:1 }, null, 101 );
 
     // Some plans in order, some out of order.
     checkCursorWithBatchSize( { a:{ $gte:0 }, b:0 }, { a:1 }, 150, 150 );

@@ -29,17 +29,12 @@ function find( query ) {
     return t.find( query ).sort( _sort ).limit( _limit ).hint( _hint );
 }
 
-/** Check the expected matches and nscanned values for a query. */
-function checkMatchesAndNscanned( expectedMatch, expectedNscanned, query ) {
+/** Check the expected matches for a query. */
+function checkMatches( expectedMatch, query ) {
     result = find( query ).toArray();
     assertMatches( expectedMatch, result );
     explain = find( query ).explain();
-    // QUERY_MIGRATION: This file checks that limits for $in queries are pushed down so that we
-    // only get 'limit' amount of each possibility for the $in.  We have not implemented this yet.
-    //assert.eq( expectedNscanned, explain.nscanned );
-    //assert.eq( expectedMatch.length || 1, explain.n );
-    // printjson(explain);
-    // assert(explain.scanAndOrder);
+    assert.eq( expectedMatch.length || 1, explain.n );
 }
 
 /** Reset data, index, and _sort and _hint globals. */
@@ -62,50 +57,47 @@ function checkForwardDirection( sort, index ) {
     _limit = -1;
 
     // Lower bound checks.
-    checkMatchesAndNscanned( { a:2, b:0 }, 3 /* = 2 docs + 1 interval skip */,
-                             { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
-    checkMatchesAndNscanned( { a:1, b:1 }, 4 /* = 2 docs + 2 interval skips */,
-                             { a:{ $in:[ 1, 2 ] }, b:{ $gt:0 } } );
-    checkMatchesAndNscanned( { a:1, b:1 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $gte:1 } } );
-    checkMatchesAndNscanned( { a:1, b:2 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $gt:1 } } );
-    checkMatchesAndNscanned( { a:1, b:2 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $gte:2 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gt:2 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gte:3 } } );
-    checkMatchesAndNscanned( { a:2, b:5 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gt:3 } } );
-    checkMatchesAndNscanned( { a:2, b:5 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gte:4 } } );
-    checkMatchesAndNscanned( { a:2, b:5 }, 2 /* = 1 doc + 1 interval skip */,
-                             { a:{ $in:[ 1, 2 ] }, b:{ $gt:4 } } );
-    checkMatchesAndNscanned( { a:2, b:5 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gte:5 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
+    checkMatches( { a:1, b:1 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:0 } } );
+    checkMatches( { a:1, b:1 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:1 } } );
+    checkMatches( { a:1, b:2 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:1 } } );
+    checkMatches( { a:1, b:2 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:2 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:2 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:3 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:3 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:4 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:4 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:5 } } );
 
     // Upper bound checks.
-    checkMatchesAndNscanned( { a:2, b:0 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $lte:0 } } );
-    checkMatchesAndNscanned( { a:2, b:0 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $lt:1 } } );
-    checkMatchesAndNscanned( { a:2, b:0 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $lte:1 } } );
-    checkMatchesAndNscanned( { a:2, b:0 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $lte:0 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:1 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $lte:1 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3 } } );
 
     // Lower and upper bounds checks.
-    checkMatchesAndNscanned( { a:2, b:0 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0, $lte:0 } } );
-    checkMatchesAndNscanned( { a:2, b:0 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0, $lt:1 } } );
-    checkMatchesAndNscanned( { a:2, b:0 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0, $lte:1 } } );
-    checkMatchesAndNscanned( { a:1, b:1 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gt:0, $lte:1 } } );
-    checkMatchesAndNscanned( { a:1, b:2 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gte:2, $lt:3 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gte:2.5, $lte:3 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gt:2.5, $lte:3 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0, $lte:0 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0, $lt:1 } } );
+    checkMatches( { a:2, b:0 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0, $lte:1 } } );
+    checkMatches( { a:1, b:1 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:0, $lte:1 } } );
+    checkMatches( { a:1, b:2 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:2, $lt:3 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:2.5, $lte:3 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:2.5, $lte:3 } } );
 
     // Limit is -2.
     _limit = -2;
-    checkMatchesAndNscanned( [ { a:2, b:0 }, { a:1, b:1 } ], 5,
-                             { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
+    checkMatches( [ { a:2, b:0 }, { a:1, b:1 } ],
+                  { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
     // We omit 'a' here because it's not defined whether or not we will see
     // {a:2, b:3} or {a:1, b:3} first as our sort is over 'b'.
-    checkMatchesAndNscanned( [ { a:1, b:2 }, { b:3 } ], 5,
-                             { a:{ $in:[ 1, 2 ] }, b:{ $gt:1 } } );
-    checkMatchesAndNscanned( { a:2, b:5 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gt:4 } } );
+    checkMatches( [ { a:1, b:2 }, { b:3 } ],
+                  { a:{ $in:[ 1, 2 ] }, b:{ $gt:1 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gt:4 } } );
 
     // With an additional document between the $in values.
     t.save( { a:1.5, b:3 } );
-    checkMatchesAndNscanned( [ { a:2, b:0 }, { a:1, b:1 } ], 6,
-                             { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
+    checkMatches( [ { a:2, b:0 }, { a:1, b:1 } ],
+                  { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
 }
 
 // Basic test with an index suffix order.
@@ -123,21 +115,21 @@ function checkReverseDirection( sort, index ) {
     reset( sort, index );
     _limit = -1;
 
-    checkMatchesAndNscanned( { a:2, b:5 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
-    checkMatchesAndNscanned( { a:2, b:5 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $gte:5 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:0 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $gte:5 } } );
 
-    checkMatchesAndNscanned( { a:2, b:5 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $lte:5 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lt:5 } } );
-    checkMatchesAndNscanned( { a:1, b:2 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3.1 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3.5 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lte:3 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $lte:5 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:5 } } );
+    checkMatches( { a:1, b:2 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3.1 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3.5 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $lte:3 } } );
 
-    checkMatchesAndNscanned( { a:2, b:5 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $lte:5, $gte:5 } } );
-    checkMatchesAndNscanned( { a:1, b:1 }, 2, { a:{ $in:[ 1, 2 ] }, b:{ $lt:2, $gte:1 } } );
-    checkMatchesAndNscanned( { a:1, b:2 }, 3, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3, $gt:1 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3.5, $gte:3 } } );
-    checkMatchesAndNscanned( { a:1, b:3 }, 4, { a:{ $in:[ 1, 2 ] }, b:{ $lte:3, $gt:0 } } );
+    checkMatches( { a:2, b:5 }, { a:{ $in:[ 1, 2 ] }, b:{ $lte:5, $gte:5 } } );
+    checkMatches( { a:1, b:1 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:2, $gte:1 } } );
+    checkMatches( { a:1, b:2 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3, $gt:1 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $lt:3.5, $gte:3 } } );
+    checkMatches( { a:1, b:3 }, { a:{ $in:[ 1, 2 ] }, b:{ $lte:3, $gt:0 } } );
 }
 
 // With a descending order index.

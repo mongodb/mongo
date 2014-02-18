@@ -641,6 +641,154 @@ namespace {
     }
 
     //
+    // Additional $or tests
+    //
+
+    TEST_F(QueryPlannerTest, OrCollapsesToSingleScan) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a:{$gt:2}}, {a:{$gt:0}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [[0,Infinity,false,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, OrCollapsesToSingleScan2) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a:{$lt:2}}, {a:{$lt:4}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [[-Infinity,4,true,false]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, OrCollapsesToSingleScan3) {
+        addIndex(BSON("a" << 1));
+        runQueryHint(fromjson("{$or: [{a:1},{a:3}]}"), fromjson("{a:1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [[1,1,true,true], [3,3,true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, OrOnlyOneBranchCanUseIndex) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a:1}, {b:2}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    TEST_F(QueryPlannerTest, OrOnlyOneBranchCanUseIndexHinted) {
+        addIndex(BSON("a" << 1));
+        runQueryHint(fromjson("{$or: [{a:1}, {b:2}]}"), fromjson("{a:1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {$or:[{a:1},{b:2}]}, node: {ixscan: "
+                                "{pattern: {a:1}, bounds: "
+                                    "{a: [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, OrNaturalHint) {
+        addIndex(BSON("a" << 1));
+        runQueryHint(fromjson("{$or: [{a:1}, {a:3}]}"), fromjson("{$natural:1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
+    TEST_F(QueryPlannerTest, OrOfAnd) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:5}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{ixscan: {pattern: {a:1}, bounds: {a: [[2,10,false,false]]}}}, "
+                                "{ixscan: {pattern: {a:1}, bounds: "
+                                    "{a: [[0,5,false,false]]}}}]}}}}");
+    }
+
+    // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
+    TEST_F(QueryPlannerTest, OrOfAnd2) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:15}}, {a:{$gt:20}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{ixscan: {pattern: {a:1}, bounds: {a: [[2,10,false,false]]}}}, "
+                                "{ixscan: {pattern: {a:1}, bounds: {a: [[0,15,false,false]]}}}, "
+                                "{ixscan: {pattern: {a:1}, bounds: "
+                                    "{a: [[20,Infinity,false,true]]}}}]}}}}");
+    }
+
+    // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
+    TEST_F(QueryPlannerTest, OrOfAnd3) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a:{$gt:1,$lt:5},b:6}, {a:3,b:{$gt:0,$lt:10}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {filter: {b:6}, node: {ixscan: {pattern: {a:1}, "
+                                    "bounds: {a: [[1,5,false,false]]}}}}}, "
+                                "{fetch: {filter: {$and:[{b:{$lt:10}},{b:{$gt:0}}]}, node: "
+                                    "{ixscan: {pattern: {a:1}, bounds: {a:[[3,3,true,true]]}}}}}]}}");
+    }
+
+    // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
+    TEST_F(QueryPlannerTest, OrOfAnd4) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{$or: [{a:{$gt:1,$lt:5}, b:{$gt:0,$lt:3}, c:6}, "
+                                 "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {filter: {c:6}, node: {ixscan: {pattern: {a:1,b:1}, "
+                                    "bounds: {a: [[1,5,false,false]], b: [[0,3,false,false]]}}}}}, "
+                                "{fetch: {filter: {$and:[{c:{$lt:10}},{c:{$gt:0}}]}, node: "
+                                    "{ixscan: {pattern: {a:1,b:1}, "
+                                    " bounds: {a:[[3,3,true,true]], b:[[1,2,false,false]]}}}}}]}}");
+    }
+
+    // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
+    TEST_F(QueryPlannerTest, OrOfAnd5) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{$or: [{a:{$gt:1,$lt:5}, c:6}, "
+                                 "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {filter: {c:6}, node: {ixscan: {pattern: {a:1,b:1}, "
+                                    "bounds: {a: [[1,5,false,false]], "
+                                             "b: [['MinKey','MaxKey',true,true]]}}}}}, "
+                                "{fetch: {filter: {$and:[{c:{$lt:10}},{c:{$gt:0}}]}, node: "
+                                    "{ixscan: {pattern: {a:1,b:1}, "
+                                    " bounds: {a:[[3,3,true,true]], b:[[1,2,false,false]]}}}}}]}}");
+    }
+
+    // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
+    TEST_F(QueryPlannerTest, OrOfAnd6) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{$or: [{a:{$in:[1]},b:{$in:[1]}}, {a:{$in:[1,5]},b:{$in:[1,5]}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{ixscan: {pattern: {a:1,b:1}, bounds: "
+                                    "{a: [[1,1,true,true]], b: [[1,1,true,true]]}}}, "
+                                "{ixscan: {pattern: {a:1,b:1}, bounds: "
+                                    "{a: [[1,1,true,true], [5,5,true,true]], "
+                                    " b: [[1,1,true,true], [5,5,true,true]]}}}]}}}}");
+    }
+
+    //
     // Min/Max
     //
 
@@ -1312,6 +1460,22 @@ namespace {
                              "node: {cscan: {dir: 1}}}}");
         assertSolutionExists("{sort: {pattern: {d: 1}, limit: 1, node: "
                              "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c:1, d:1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
+        addIndex(BSON("a" << 1 << "b" << -1 << "c" << 1));
+        runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}, b: {$gte: 0}}"),
+                                  fromjson("{b: -1}"),
+                                  BSONObj(), // no projection
+                                  0,         // no skip
+                                  -1);       // .limit(1)
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{sort: {pattern: {b:-1}, limit: 1, "
+                             "node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{limit: {n: 1, node: {fetch: {node: {mergeSort: {nodes: "
+                                "[{ixscan: {pattern: {a:1,b:-1,c:1}}}, "
+                                " {ixscan: {pattern: {a:1,b:-1,c:1}}}]}}}}}}");
     }
 
     //
