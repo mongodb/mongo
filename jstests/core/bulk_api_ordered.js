@@ -16,6 +16,12 @@ jsTest.log("Starting batch api ordered tests...");
  *******************************************************/
 var executeTests = function() {
     /**
+     * find() requires selector
+     */
+    var batch = coll.initializeOrderedBulkOp();
+    assert.throws(batch.find, [], 'batch.find()');
+
+    /**
      * Single successful ordered batch operation
      */
     var batch = coll.initializeOrderedBulkOp();

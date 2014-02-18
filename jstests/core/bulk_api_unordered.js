@@ -18,6 +18,12 @@ var executeTests = function() {
     coll.remove({});
 
     /**
+     * find() requires selector
+     */
+    var batch = coll.initializeUnorderedBulkOp();
+    assert.throws(batch.find, [], 'batch.find()');
+
+    /**
      * Single successful unordered batch operation
      */
     var batch = coll.initializeUnorderedBulkOp();

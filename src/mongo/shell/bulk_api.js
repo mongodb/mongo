@@ -562,6 +562,7 @@ var _bulk_api_module = (function() {
     //
     // Start of update and remove operations
     this.find = function(selector) {
+      if (selector == undefined) throw "find() requires query criteria";
       // Save a current selector
       currentOp = {
         selector: selector
