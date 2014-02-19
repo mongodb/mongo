@@ -58,13 +58,11 @@ namespace mongo {
     class Record;
 
     void dropDatabase(const std::string& db);
-    bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 
-    bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
+    bool userCreateNS(const char *ns, BSONObj j, string& err,
+                      bool logForReplication, bool createDefaultIndexes = true );
 
     /*---------------------------------------------------------------------*/
-
-    boost::intmax_t dbSize( const char *database );
 
     inline NamespaceIndex* nsindex(const StringData& ns) {
         Database *database = cc().database();

@@ -372,8 +372,10 @@ namespace IndexUpdateTests {
             // Recreate the collection as capped, without an _id index.
             Database* db = _ctx.ctx().db();
             db->dropCollection( _ns );
-            const BSONObj collOptions = BSON( "size" << (10 * 1024) );
-            Collection* coll = db->createCollection( _ns, true, &collOptions );
+            CollectionOptions options;
+            options.capped = true;
+            options.cappedSize = 10 * 1024;
+            Collection* coll = db->createCollection( _ns, options );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
@@ -402,8 +404,10 @@ namespace IndexUpdateTests {
             // Recreate the collection as capped, without an _id index.
             Database* db = _ctx.ctx().db();
             db->dropCollection( _ns );
-            const BSONObj collOptions = BSON( "size" << (10 * 1024) );
-            Collection* coll = db->createCollection( _ns, true, &collOptions );
+            CollectionOptions options;
+            options.capped = true;
+            options.cappedSize = 10 * 1024;
+            Collection* coll = db->createCollection( _ns, options );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;

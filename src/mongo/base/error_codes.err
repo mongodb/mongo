@@ -87,5 +87,6 @@ error_code("NoProgressMade", 82)
 error_code("DuplicateKey", 11000)
 error_code("NotMaster", 10107) #this comes from assert_util.h
 error_code("Interrupted", 11601)
+error_code("OutOfDiskSpace", 14031 )
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

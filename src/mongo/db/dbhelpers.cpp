@@ -67,9 +67,14 @@ namespace mongo {
         if ( !collection )
             return;
 
+        ensureIndex( collection, keyPattern, unique, name );
+    }
+
+    void Helpers::ensureIndex(Collection* collection,
+                              BSONObj keyPattern, bool unique, const char *name) {
         BSONObjBuilder b;
         b.append("name", name);
-        b.append("ns", ns);
+        b.append("ns", collection->ns());
         b.append("key", keyPattern);
         b.appendBool("unique", unique);
         BSONObj o = b.done();

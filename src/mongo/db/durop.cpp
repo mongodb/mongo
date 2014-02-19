@@ -33,6 +33,7 @@
 #include "mongo/db/durop.h"
 
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/file.h"
@@ -44,8 +45,6 @@ using namespace mongoutils;
 #include <boost/filesystem/operations.hpp>
 
 namespace mongo {
-
-    void _deleteDataFiles(const char *);
 
     namespace dur {
 
@@ -91,7 +90,7 @@ namespace mongo {
         /** throws */
         void DropDbOp::replay() {
             log() << "recover replay drop db " << _db << endl;
-            _deleteDataFiles(_db.c_str());
+            _deleteDataFiles(_db);
         }
 
         FileCreatedOp::FileCreatedOp(const std::string& f, unsigned long long l) :

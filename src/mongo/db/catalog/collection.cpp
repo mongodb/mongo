@@ -36,6 +36,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/repl/rs.h"
@@ -191,15 +192,37 @@ namespace mongo {
         return status;
     }
 
-    StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
+    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& doc,
+                                                    MultiIndexBlock& indexBlock ) {
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( doc.objdata(),
+                                                              doc.objsize(),
+                                                              0 );
+
+        if ( !loc.isOK() )
+            return loc;
+
+        InsertDeleteOptions indexOptions;
+        indexOptions.logIfError = false;
+        indexOptions.dupsAllowed = true; // in repair we should be doing no checking
+
+        Status status = indexBlock.insert( doc, loc.getValue(), indexOptions );
+        if ( !status.isOK() )
+            return StatusWith<DiskLoc>( status );
+
+        return loc;
+    }
+
+
+    StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert,
+                                                     bool enforceQuota ) {
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( docToInsert.objdata(),
-                                                             docToInsert.objsize(),
-                                                            enforceQuota ? largestFileNumberInQuota() : 0 );
+                                                              docToInsert.objsize(),
+                                                              enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
             return loc;
 

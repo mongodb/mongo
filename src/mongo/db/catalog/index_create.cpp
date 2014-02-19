@@ -250,7 +250,12 @@ namespace mongo {
             LOG(1) << "\t bulk commit starting";
             std::set<DiskLoc> dupsToDrop;
 
-            btreeState->accessMethod()->commitBulk( bulk, mayInterrupt, &dupsToDrop );
+            Status status = btreeState->accessMethod()->commitBulk( bulk,
+                                                                    mayInterrupt,
+                                                                    &dupsToDrop );
+            massert( 17398,
+                     str::stream() << "commitBulk failed: " << status.toString(),
+                     status.isOK() );
 
             if ( dupsToDrop.size() )
                 log() << "\t bulk dropping " << dupsToDrop.size() << " dups";
@@ -275,6 +280,69 @@ namespace mongo {
 
         // this one is so people know that the index is finished
         collection->infoCache()->addedIndex();
+    }
+
+    // ----------------------------
+
+    MultiIndexBlock::MultiIndexBlock( Collection* collection )
+        : _collection( collection ) {
+    }
+
+    Status MultiIndexBlock::init( std::vector<BSONObj>& indexSpecs ) {
+        for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
+            BSONObj info = indexSpecs[i];
+            info = _collection->getIndexCatalog()->fixIndexSpec( info );
+
+            IndexState state;
+            state.block.reset( new IndexCatalog::IndexBuildBlock( _collection, info ) );
+            Status status = state.block->init();
+            if ( !status.isOK() )
+                return status;
+
+            state.real = state.block->getEntry()->accessMethod();
+            status = state.real->initializeAsEmpty();
+            if ( !status.isOK() )
+                return status;
+
+            state.bulk = state.real->initiateBulk();
+
+            _states.push_back( state );
+        }
+
+        return Status::OK();
+    }
+
+    Status MultiIndexBlock::insert( const BSONObj& doc,
+                                    const DiskLoc& loc,
+                                    const InsertDeleteOptions& options ) {
+
+        for ( size_t i = 0; i < _states.size(); i++ ) {
+            Status idxStatus = _states[i].forInsert()->insert( doc,
+                                                               loc,
+                                                               options,
+                                                               NULL );
+            if ( !idxStatus.isOK() )
+                return idxStatus;
+        }
+        return Status::OK();
+    }
+
+    Status MultiIndexBlock::commit() {
+        for ( size_t i = 0; i < _states.size(); i++ ) {
+            if ( _states[i].bulk == NULL )
+                continue;
+            Status status = _states[i].real->commitBulk( _states[i].bulk,
+                                                         false,
+                                                         NULL );
+            if ( !status.isOK() )
+                return status;
+        }
+
+        for ( size_t i = 0; i < _states.size(); i++ ) {
+            _states[i].block->success();
+        }
+
+        return Status::OK();
     }
 
 }  // namespace mongo

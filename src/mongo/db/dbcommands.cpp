@@ -65,6 +65,7 @@
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/write_concern.h"
@@ -246,12 +247,12 @@ namespace mongo {
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
-            bool ok =
-                repairDatabase( dbname, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
+            Status status =
+                repairDatabase( dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
-            return ok;
+            return appendCommandStatus( result, status );
         }
     } cmdRepairDatabase;
 

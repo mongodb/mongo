@@ -342,13 +342,15 @@ namespace mongo {
                 Client::WriteContext incCtx( _config.incLong );
                 Collection* incColl = incCtx.ctx().db()->getCollection( _config.incLong );
                 if ( !incColl ) {
-                    const BSONObj options = BSON( "autoIndexId" << false << "temp" << true );
-                    incColl = incCtx.ctx().db()->createCollection( _config.incLong, false,
-                                                                   &options, true );
+                    CollectionOptions options;
+                    options.setNoIdIndex();
+                    options.temp = true;
+                    incColl = incCtx.ctx().db()->createCollection( _config.incLong, options );
+
                     // Log the createCollection operation.
                     BSONObjBuilder b;
                     b.append( "create", nsToCollectionSubstring( _config.incLong ));
-                    b.appendElements( options );
+                    b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.incLong ) + ".$cmd";
                     logOp( "c", logNs.c_str(), b.obj() );
                 }
@@ -400,13 +402,14 @@ namespace mongo {
                 Client::WriteContext tempCtx( _config.tempNamespace );
                 Collection* tempColl = tempCtx.ctx().db()->getCollection( _config.tempNamespace );
                 if ( !tempColl ) {
-                    const BSONObj options = BSON( "temp" << true );
-                    tempColl = tempCtx.ctx().db()->createCollection( _config.tempNamespace, false,
-                                                                     &options, true );
+                    CollectionOptions options;
+                    options.temp = true;
+                    tempColl = tempCtx.ctx().db()->createCollection( _config.tempNamespace, options );
+
                     // Log the createCollection operation.
                     BSONObjBuilder b;
                     b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
-                    b.appendElements( options );
+                    b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
                     logOp( "c", logNs.c_str(), b.obj() );
                 }

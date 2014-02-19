@@ -216,11 +216,10 @@ namespace mongo {
                     targetColl = ctx.db()->getCollection( target );
                 }
                 else {
-                    BSONObjBuilder spec;
-                    spec.appendBool( "autoIndexId", false );
-                    const BSONObj options = spec.obj();
+                    CollectionOptions options;
+                    options.setNoIdIndex();
                     // No logOp necessary because the entire renameCollection command is one logOp.
-                    targetColl = ctx.db()->createCollection( target, false, &options, true );
+                    targetColl = ctx.db()->createCollection( target, options );
                 }
                 if ( !targetColl ) {
                     errmsg = "Failed to create target collection.";

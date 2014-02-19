@@ -163,7 +163,7 @@ namespace mongo {
             Collection* collection = db->getCollection( ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
             if ( !collection ) {
-                collection = db->createCollection( ns.ns(), false, NULL );
+                collection = db->createCollection( ns.ns() );
                 invariant( collection );
             }
 

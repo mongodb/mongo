@@ -1429,6 +1429,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
+                ASSERT( nsd()->isCapped() );
                 ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 DiskLoc loc = nsd()->alloc( collection(), ns(), 300 );
                 ASSERT_EQUALS( 300, loc.rec()->lengthWithHeaders() );

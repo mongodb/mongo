@@ -63,7 +63,7 @@ namespace QueryTests {
             if ( _collection ) {
                 _database->dropCollection( ns() );
             }
-            _collection = _database->createCollection( ns(), false, NULL, true );
+            _collection = _database->createCollection( ns() );
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
@@ -160,8 +160,7 @@ namespace QueryTests {
                 _collection = NULL;
                 db->dropCollection( ns() );
             }
-            BSONObj options = BSON("autoIndexId" << 0 );
-            _collection = db->createCollection( ns(), false, &options );
+            _collection = db->createCollection( ns(), CollectionOptions(), true, false );
             ASSERT( _collection );
 
             DBDirectClient cl;

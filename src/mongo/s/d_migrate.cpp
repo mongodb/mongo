@@ -1642,10 +1642,7 @@ namespace mongo {
                                       << endl;
                     }
                     else {
-                        db->createCollection( ns,
-                                              false /* capped */,
-                                              NULL /* options */,
-                                              true /* allocateDefaultSpace */ );
+                        db->createCollection( ns );
                     }
                 }
             }

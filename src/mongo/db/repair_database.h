@@ -1,5 +1,7 @@
+// repair_database.h
+
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,28 +30,23 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
-    class Collection;
+    // TODO: move
+    intmax_t dbSize( const std::string& database );
 
-namespace authindex {
+    // TODO: move
+    void _deleteDataFiles(const std::string& database);
 
-    /**
-     * Creates the appropriate indexes on _new_ system collections supporting authentication and
-     * authorization.
-     */
-    void createSystemIndexes(Collection* collection);
+    // must have a global lock
+    Status repairDatabase( std::string db,
+                           bool preserveClonedFilesOnFailure = false,
+                           bool backupOriginalFiles = false );
 
-    /**
-     * Ensures that exactly the appropriate indexes to support authentication and authorization
-     * are present for the given database.
-     *
-     * It is appropriate to call this function on new or existing databases, though it is
-     * primarily intended for use on existing databases.
-     */
-    void configureSystemIndexes(const StringData& dbname);
 
-}  // namespace authindex
-}  // namespace mongo
+} // namespace mongo

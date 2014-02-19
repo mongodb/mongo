@@ -51,7 +51,7 @@ namespace CountTests {
             if ( _collection ) {
                 _database->dropCollection( ns() );
             }
-            _collection = _database->createCollection( ns(), false, NULL, true );
+            _collection = _database->createCollection( ns() );
 
             addIndex( fromjson( "{\"a\":1}" ) );
         }

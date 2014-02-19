@@ -90,10 +90,12 @@ namespace {
         }
     }
 
-    void createSystemIndexes(const NamespaceString& ns) {
+    void createSystemIndexes(Collection* collection) {
+        invariant( collection );
+        const NamespaceString& ns = collection->ns();
         if (ns == AuthorizationManager::usersCollectionNamespace) {
             try {
-                Helpers::ensureIndex(ns.ns().c_str(),
+                Helpers::ensureIndex(collection,
                                      v3SystemUsersKeyPattern,
                                      true,  // unique
                                      v3SystemUsersIndexName.c_str());
@@ -107,7 +109,7 @@ namespace {
             }
         } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
             try {
-                Helpers::ensureIndex(ns.ns().c_str(),
+                Helpers::ensureIndex(collection,
                                      v3SystemRolesKeyPattern,
                                      true,  // unique
                                      v3SystemRolesIndexName.c_str());

@@ -44,6 +44,51 @@ namespace mongo {
     class IndexCatalog;
     class IndexDetails;
 
+    struct CollectionOptions {
+        CollectionOptions() {
+            reset();
+        }
+
+        void reset() {
+            capped = false;
+            cappedSize = 0;
+            cappedMaxDocs = 0;
+            initialNumExtents = 0;
+            initialExtentSizes.clear();
+            autoIndexId = DEFAULT;
+            flags = 0;
+            flagsSet = false;
+            temp = false;
+        }
+
+        Status parse( const BSONObj& obj );
+        BSONObj toBSON() const;
+
+        // ----
+
+        bool capped;
+        long long cappedSize;
+        long long cappedMaxDocs;
+
+        // following 2 are mutually exclusive, can only have one set
+        long long initialNumExtents;
+        vector<long long> initialExtentSizes;
+
+        // behavior of _id index creation when collection created
+        void setNoIdIndex() { autoIndexId = NO; }
+        enum {
+            DEFAULT, // currently yes for most collections, NO for some system ones
+            YES, // create _id index
+            NO // do not create _id index
+        } autoIndexId;
+
+        // user flags
+        int flags;
+        bool flagsSet;
+
+        bool temp;
+    };
+
     /**
      * Database represents a database database
      * Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...
@@ -120,9 +165,9 @@ namespace mongo {
         Status dropCollection( const StringData& fullns );
 
         Collection* createCollection( const StringData& ns,
-                                      bool capped = false,
-                                      const BSONObj* options = NULL,
-                                      bool allocateDefaultSpace = true );
+                                      const CollectionOptions& options = CollectionOptions(),
+                                      bool allocateSpace = true,
+                                      bool createDefaultIndexes = true );
 
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???

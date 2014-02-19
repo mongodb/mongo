@@ -33,6 +33,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -461,12 +462,11 @@ namespace mongo {
             verify(p);
             string to_name = todb + p;
 
-            bool wantIdIndex = false;
             {
                 string err;
                 const char *toname = to_name.c_str();
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(toname, options, err, opts.logForRepl, &wantIdIndex);
+                userCreateNS(toname, options, err, opts.logForRepl, false);
             }
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
@@ -475,7 +475,7 @@ namespace mongo {
             copy(context,from_name, to_name.c_str(), false, opts.logForRepl, masterSameProcess,
                  opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, q);
 
-            if( wantIdIndex ) {
+            {
                 /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
                    that occur during the initial sync.  inDBRepair makes dropDups be true.
                    */

@@ -60,9 +60,9 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -296,7 +296,7 @@ namespace mongo {
     }
 
 
-    bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
+    void doDBUpgrade( const string& dbName, DataFileHeader* h ) {
         static DBDirectClient db;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
@@ -310,18 +310,17 @@ namespace mongo {
                 BSONObj out;
                 bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
                 if ( ! ok ) {
-                    errmsg = "reindex failed";
-                    log() << "\t\t reindex failed: " << out << endl;
-                    return false;
+                    log() << "\t\t reindex failed: " << out;
+                    fassertFailed( 17393 );
                 }
             }
 
             getDur().writingInt(h->versionMinor) = 5;
-            return true;
+            return;
         }
 
         // do this in the general case
-        return repairDatabase( dbName.c_str(), errmsg );
+        fassert( 17401, repairDatabase( dbName ) );
     }
 
     void checkForIdIndexes( Database* db ) {
@@ -402,8 +401,7 @@ namespace mongo {
 
                 if (mongodGlobalParams.upgrade) {
                     // QUESTION: Repair even if file format is higher version than code?
-                    string errmsg;
-                    verify( doDBUpgrade( dbName , errmsg , h ) );
+                    doDBUpgrade( dbName, h );
                 }
                 else {
                     log() << "\t Not upgrading, exiting" << endl;

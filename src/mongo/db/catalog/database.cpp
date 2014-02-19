@@ -55,6 +55,93 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(newCollectionsUsePowerOf2Sizes, bool, true);
 
+    Status CollectionOptions::parse( const BSONObj& options ) {
+        reset();
+
+        BSONObjIterator i( options );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            StringData fieldName = e.fieldName();
+
+            if ( fieldName == "capped" ) {
+                capped = e.trueValue();
+            }
+            else if ( fieldName == "size" ) {
+                if ( !e.isNumber() )
+                    return Status( ErrorCodes::BadValue, "size has to be a number" );
+                cappedSize = e.numberLong();
+                if ( cappedSize < 0 )
+                    return Status( ErrorCodes::BadValue, "size has to be >= 0" );
+                cappedSize += 0xff;
+                cappedSize &= 0xffffffffffffff00LL;
+                if ( cappedSize < Extent::minSize() )
+                    cappedSize = Extent::minSize();
+            }
+            else if ( fieldName == "max" ) {
+                if ( !e.isNumber() )
+                    return Status( ErrorCodes::BadValue, "max has to be a number" );
+                cappedMaxDocs = e.numberLong();
+                if ( !NamespaceDetails::validMaxCappedDocs( &cappedMaxDocs ) )
+                    return Status( ErrorCodes::BadValue,
+                                   "max in a capped collection has to be < 2^31 or not set" );
+            }
+            else if ( fieldName == "$nExtents" ) {
+                if ( e.type() == Array ) {
+                    BSONObjIterator j( e.Obj() );
+                    while ( j.more() ) {
+                        BSONElement inner = j.next();
+                        initialExtentSizes.push_back( inner.numberInt() );
+                    }
+                }
+                else {
+                    initialNumExtents = e.numberLong();
+                }
+            }
+            else if ( fieldName == "autoIndexId" ) {
+                if ( e.trueValue() )
+                    autoIndexId = YES;
+                else
+                    autoIndexId = NO;
+            }
+            else if ( fieldName == "flags" ) {
+                flags = e.numberInt();
+                flagsSet = true;
+            }
+            else if ( fieldName == "temp" ) {
+                temp = e.trueValue();
+            }
+        }
+
+        return Status::OK();
+    }
+
+    BSONObj CollectionOptions::toBSON() const {
+        BSONObjBuilder b;
+        if ( capped ) {
+            b.appendBool( "capped", true );
+            if ( cappedSize )
+                b.appendNumber( "size", cappedSize );
+            if ( cappedMaxDocs )
+                b.appendNumber( "max", cappedMaxDocs );
+        }
+
+        if ( initialNumExtents )
+            b.appendNumber( "$nExtents", initialNumExtents );
+        if ( !initialExtentSizes.empty() )
+            b.append( "$nExtents", initialExtentSizes );
+
+        if ( autoIndexId != DEFAULT )
+            b.appendBool( "autoIndexId", autoIndexId == YES );
+
+        if ( flagsSet )
+            b.append( "flags", flags );
+
+        if ( temp )
+            b.appendBool( "temp", true );
+
+        return b.obj();
+    }
+
     void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
         massert( 17320,
                  str::stream() << "cannot do " << caller
@@ -545,10 +632,21 @@ namespace mongo {
         return c;
     }
 
+    namespace {
+        int _massageExtentSize( long long size ) {
+            if ( size < Extent::minSize() )
+                return Extent::minSize();
+            if ( size > Extent::maxSize() )
+                return Extent::maxSize();
+            return static_cast<int>( size );
+        }
+    }
 
-    Collection* Database::createCollection( const StringData& ns, bool capped,
-                                            const BSONObj* options, bool allocateDefaultSpace ) {
-        verify( _namespaceIndex.details( ns ) == NULL );
+    Collection* Database::createCollection( const StringData& ns,
+                                            const CollectionOptions& options,
+                                            bool allocateDefaultSpace,
+                                            bool createIdIndex ) {
+        massert( 17399, "collection already exists", _namespaceIndex.details( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
         _namespaceIndex.init();
 
@@ -566,55 +664,74 @@ namespace mongo {
                     ns.size() <= Namespace::MaxNsColletionLen);
         }
 
+        NamespaceString nss( ns );
+        uassert( 17316, "cannot create a blank collection", nss.coll() > 0 );
+
         audit::logCreateCollection( currentClient.get(), ns );
+
+        _namespaceIndex.add_ns( ns, DiskLoc(), options.capped );
+        BSONObj optionsAsBSON = options.toBSON();
+        _addNamespaceToCatalog( ns, &optionsAsBSON );
+
+        Collection* collection = getCollection( ns );
+        massert( 17400, "_namespaceIndex.add_ns failed?", collection );
+
+        NamespaceDetails* nsd = collection->details();
 
         // allocation strategy set explicitly in flags or by server-wide default
         // need to check validity before creating the collection
-        int userFlags = 0;
-        bool flagSet = false;
-
-        if ( options && options->getField("flags").type() ) {
-            uassert( 17351, "flags must be a number", options->getField("flags").isNumber() );
-            userFlags = options->getField("flags").numberInt();
-            flagSet = true;
+        if ( options.flagsSet ) {
+            nsd->setUserFlag( options.flags );
         }
-        if ( newCollectionsUsePowerOf2Sizes && !flagSet && !capped ) {
-            userFlags = NamespaceDetails::Flag_UsePowerOf2Sizes;
+        else if ( !options.capped ) {
+            nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
         }
 
-        _namespaceIndex.add_ns( ns, DiskLoc(), capped );
-        _addNamespaceToCatalog( ns, options );
-
-        // TODO: option for: allocation, indexes?
-
-        StringData collectionName = nsToCollectionSubstring( ns );
-        uassert( 17316, "cannot create a blank collection", collectionName.size() );
-
-        if ( collectionName.startsWith( "system." ) ) {
-            authindex::createSystemIndexes( ns );
-        }
-
-        Collection* collection = getCollection( ns );
-        verify( collection );
-
-        NamespaceDetails* nsd = collection->details();
-        nsd->setUserFlag( userFlags );
+        if ( options.cappedMaxDocs > 0 )
+            nsd->setMaxCappedDocs( options.cappedMaxDocs );
 
         if ( allocateDefaultSpace ) {
-            collection->increaseStorageSize( Extent::initialSize( 128 ), false );
-        }
-
-        if ( collection->requiresIdIndex() ) {
-            if ( options &&
-                 options->getField("autoIndexId").type() &&
-                 !options->getField("autoIndexId").trueValue() ) {
-                // do not create
+            if ( options.initialNumExtents > 0 ) {
+                int size = _massageExtentSize( options.cappedSize );
+                for ( int i = 0; i < options.initialNumExtents; i++ ) {
+                    collection->increaseStorageSize( size, false );
+                }
+            }
+            else if ( !options.initialExtentSizes.empty() ) {
+                for ( size_t i = 0; i < options.initialExtentSizes.size(); i++ ) {
+                    int size = options.initialExtentSizes[i];
+                    size = _massageExtentSize( size );
+                    collection->increaseStorageSize( size, false );
+                }
+            }
+            else if ( options.capped ) {
+                // normal
+                long long size = options.cappedSize;
+                while ( size > 0 ) {
+                    int mySize = _massageExtentSize( size );
+                    mySize &= 0xffffff00;
+                    Extent* e = collection->increaseStorageSize( mySize, true );
+                    size -= e->length;
+                }
             }
             else {
-                uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
+                collection->increaseStorageSize( Extent::initialSize( 128 ), false );
             }
         }
 
+        if ( createIdIndex ) {
+            if ( collection->requiresIdIndex() ) {
+                if ( options.autoIndexId == CollectionOptions::YES ||
+                     options.autoIndexId == CollectionOptions::DEFAULT ) {
+                    uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
+                }
+            }
+
+            if ( nss.isSystem() ) {
+                authindex::createSystemIndexes( collection );
+            }
+
+        }
 
         return collection;
     }
@@ -629,7 +746,7 @@ namespace mongo {
 
         BSONObjBuilder b;
         b.append("name", ns);
-        if ( options )
+        if ( options && !options->isEmpty() )
             b.append("options", *options);
         BSONObj obj = b.done();
 
