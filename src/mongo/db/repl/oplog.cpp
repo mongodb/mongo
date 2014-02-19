@@ -431,7 +431,7 @@ namespace mongo {
                 sz = (256-64) * 1024 * 1024;
 #else
                 sz = 990.0 * 1024 * 1024;
-                boost::intmax_t free =
+                intmax_t free =
                     File::freeSpace(storageGlobalParams.dbpath); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )

@@ -49,7 +49,7 @@ namespace mongo {
         _handle = INVALID_HANDLE_VALUE;
     }
 
-    boost::intmax_t File::freeSpace(const std::string& path) {
+    intmax_t File::freeSpace(const std::string& path) {
         ULARGE_INTEGER avail;
         if (GetDiskFreeSpaceExW(toWideString(path.c_str()).c_str(),
                                &avail,      // bytes available to caller
@@ -187,10 +187,10 @@ namespace mongo {
         _fd = -1;
     }
 
-    boost::intmax_t File::freeSpace(const std::string& path) {
+    intmax_t File::freeSpace(const std::string& path) {
         struct statvfs info;
         if (statvfs(path.c_str(), &info) == 0) {
-            return static_cast<boost::intmax_t>(info.f_bavail) * info.f_frsize;
+            return static_cast<intmax_t>(info.f_bavail) * info.f_frsize;
         }
         log() << "In File::freeSpace(), statvfs for '" << path
               << "' failed with " << errnoWithDescription() << std::endl;

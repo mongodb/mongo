@@ -599,12 +599,12 @@ namespace mongo {
             vector< BSONObj > dbInfos;
 
             set<string> seen;
-            boost::intmax_t totalSize = 0;
+            intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
                 BSONObjBuilder b;
                 b.append( "name", *i );
 
-                boost::intmax_t size = dbSize( i->c_str() );
+                intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
                 totalSize += size;
                 

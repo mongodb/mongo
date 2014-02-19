@@ -128,11 +128,11 @@ namespace mongo {
         _applyOpToDataFiles( database, renamer, true );
     }
 
-    boost::intmax_t dbSize( const string& database ) {
+    intmax_t dbSize( const string& database ) {
         class SizeAccumulator : public FileOp {
         public:
             SizeAccumulator() : totalSize_( 0 ) {}
-            boost::intmax_t size() const {
+            intmax_t size() const {
                 return totalSize_;
             }
         private:
@@ -145,7 +145,7 @@ namespace mongo {
             virtual const char *op() const {
                 return "checking size";
             }
-            boost::intmax_t totalSize_;
+            intmax_t totalSize_;
         };
         SizeAccumulator sa;
         _applyOpToDataFiles( database, sa );
@@ -287,8 +287,8 @@ namespace mongo {
 
         getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
-        boost::intmax_t totalSize = dbSize( dbName );
-        boost::intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
+        intmax_t totalSize = dbSize( dbName );
+        intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
 
         if ( freeSize > -1 && freeSize < totalSize ) {
             return Status( ErrorCodes::OutOfDiskSpace,
