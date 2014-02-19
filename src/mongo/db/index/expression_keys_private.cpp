@@ -1,40 +1,47 @@
 /**
-*    Copyright (C) 2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
-#include "mongo/db/index/expression_key_generator.h"
+#include "mongo/db/index/expression_keys_private.h"
 
 #include <utility>
+
 #include "mongo/db/fts/fts_index_format.h"
+#include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
+#include "mongo/db/geo/s2.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "third_party/s2/s2cell.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace {
 
@@ -61,17 +68,48 @@ namespace {
         keys->insert(buf.obj());
     }
 
-
-
     //
     // Helper functions for getS2Keys
     //
+
+    static void S2KeysFromRegion(S2RegionCoverer *coverer, const S2Region &region,
+                               vector<string> *out) {
+        vector<S2CellId> covering;
+        coverer->GetCovering(region, &covering);
+        for (size_t i = 0; i < covering.size(); ++i) {
+            out->push_back(covering[i].toString());
+        }
+    }
+
+
+    bool S2GetKeysForObject(const BSONObj& obj,
+                            const S2IndexingParams& params,
+                            vector<string>* out) {
+        S2RegionCoverer coverer;
+        params.configureCoverer(&coverer);
+
+        GeometryContainer geoContainer;
+        if (!geoContainer.parseFrom(obj)) { return false; }
+
+        // Only certain geometries can be indexed in the old index format S2_INDEX_VERSION_1.  See
+        // definition of S2IndexVersion for details.
+        if (params.indexVersion == S2_INDEX_VERSION_1 && !geoContainer.isSimpleContainer()) {
+            return false;
+        }
+
+        if (!geoContainer.hasS2Region()) { return false; }
+
+        S2KeysFromRegion(&coverer, geoContainer.getRegion(), out);
+
+        return true;
+    }
+
 
     /**
      *  Get the index keys for elements that are GeoJSON.
      *  Used by getS2Keys.
      */
-    void getGeoKeys(const BSONObj& document, const BSONElementSet& elements,
+    void getS2GeoKeys(const BSONObj& document, const BSONElementSet& elements,
                                     const S2IndexingParams& params,
                                     BSONObjSet* out) {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
@@ -80,7 +118,7 @@ namespace {
             const BSONObj &geoObj = i->Obj();
 
             vector<string> cells;
-            bool succeeded = S2SearchUtil::getKeysForObject(geoObj, params, &cells);
+            bool succeeded = S2GetKeysForObject(geoObj, params, &cells);
             uassert(16755, "Can't extract geo keys from object, malformed geometry?: "
                            + document.toString(), succeeded);
 
@@ -106,7 +144,7 @@ namespace {
      * Expands array and appends items to 'out'.
      * Used by getOneLiteralKey.
      */
-    void getLiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
+    void getS2LiteralKeysArray(const BSONObj& obj, BSONObjSet* out) {
         BSONObjIterator objIt(obj);
         if (!objIt.more()) {
             // Empty arrays are indexed as undefined.
@@ -128,9 +166,9 @@ namespace {
      * Otherwise, adds 'elt' as a single element.
      * Used by getLiteralKeys.
      */
-    void getOneLiteralKey(const BSONElement& elt, BSONObjSet* out) {
+    void getS2OneLiteralKey(const BSONElement& elt, BSONObjSet* out) {
         if (Array == elt.type()) {
-            getLiteralKeysArray(elt.Obj(), out);
+            getS2LiteralKeysArray(elt.Obj(), out);
         } else {
             // One thing, not an array, index as-is.
             BSONObjBuilder b;
@@ -143,7 +181,7 @@ namespace {
      * elements is a non-geo field.  Add the values literally, expanding arrays.
      * Used by getS2Keys.
      */
-    void getLiteralKeys(const BSONElementSet& elements, BSONObjSet* out) {
+    void getS2LiteralKeys(const BSONElementSet& elements, BSONObjSet* out) {
         if (0 == elements.size()) {
             // Missing fields are indexed as null.
             BSONObjBuilder b;
@@ -151,7 +189,7 @@ namespace {
             out->insert(b.obj());
         } else {
             for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-                getOneLiteralKey(*i, out);
+                getS2OneLiteralKey(*i, out);
             }
         }
     }
@@ -164,15 +202,11 @@ namespace mongo {
     using std::string;
     using std::vector;
 
-
-
-    //
-    // 2D
-    //
-
     // static
-    void get2DKeys(const BSONObj &obj, const TwoDIndexingParams& params,
-                   BSONObjSet* keys, std::vector<BSONObj>* locs) {
+    void ExpressionKeysPrivate::get2DKeys(const BSONObj &obj,
+                                         const TwoDIndexingParams& params,
+                                         BSONObjSet* keys,
+                                         std::vector<BSONObj>* locs) {
         BSONElementMSet bSet;
 
         // Get all the nested location fields, but don't return individual elements from
@@ -266,26 +300,21 @@ namespace mongo {
         }
     }
 
-
-
-    //
-    // FTS
-    //
-
     // static
-    void getFTSKeys(const BSONObj &obj, const fts::FTSSpec& ftsSpec, BSONObjSet* keys) {
+    void ExpressionKeysPrivate::getFTSKeys(const BSONObj &obj,
+                                           const fts::FTSSpec& ftsSpec,
+                                           BSONObjSet* keys) {
         fts::FTSIndexFormat::getKeys(ftsSpec, obj, keys);
     }
 
-
-
-    //
-    // Hash
-    //
-
     // static
-    void getHashKeys(const BSONObj& obj, const string& hashedField, HashSeed seed,
-                     int hashVersion, bool isSparse, BSONObjSet* keys) {
+    void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
+                                            const string& hashedField,
+                                            HashSeed seed,
+                                            int hashVersion,
+                                            bool isSparse,
+                                            BSONObjSet* keys) {
+
         const char* cstr = hashedField.c_str();
         BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
         uassert(16766, "Error: hashed indexes do not currently support array values",
@@ -302,21 +331,20 @@ namespace mongo {
     }
 
     // static
-    long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v) {
+    long long int ExpressionKeysPrivate::makeSingleHashKey(const BSONElement& e,
+                                                           HashSeed seed,
+                                                           int v) {
         massert(16767, "Only HashVersion 0 has been defined" , v == 0 );
         return BSONElementHasher::hash64(e, seed);
     }
 
-
-
-    //
-    // Haystack
-    //
-
     // static
-    void getHaystackKeys(const BSONObj& obj, const std::string& geoField,
-                         const std::vector<std::string>& otherFields,
-                         double bucketSize, BSONObjSet* keys) {
+    void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
+                                                const std::string& geoField,
+                                                const std::vector<std::string>& otherFields,
+                                                double bucketSize,
+                                                BSONObjSet* keys) {
+
         BSONElement loc = obj.getFieldDotted(geoField);
 
         if (loc.eoo()) { return; }
@@ -356,7 +384,7 @@ namespace mongo {
     }
 
     // static
-    int hashHaystackElement(const BSONElement& e, double bucketSize) {
+    int ExpressionKeysPrivate::hashHaystackElement(const BSONElement& e, double bucketSize) {
         uassert(16776, "geo field is not a number", e.isNumber());
         double d = e.numberDouble();
         d += 180;
@@ -365,20 +393,16 @@ namespace mongo {
     }
 
     // static
-    std::string makeHaystackString(int hashedX, int hashedY) {
+    std::string ExpressionKeysPrivate::makeHaystackString(int hashedX, int hashedY) {
         mongoutils::str::stream ss;
         ss << hashedX << "_" << hashedY;
         return ss;
     }
 
-
-
-    //
-    // S2
-    //
-
-    void getS2Keys(const BSONObj& obj, const BSONObj& keyPattern,
-                   const S2IndexingParams& params, BSONObjSet* keys) {
+    void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
+                                          const BSONObj& keyPattern,
+                                          const S2IndexingParams& params,
+                                          BSONObjSet* keys) {
         BSONObjSet keysToAdd;
 
         // Does one of our documents have a geo field?
@@ -426,9 +450,9 @@ namespace mongo {
                     }
                 }
 
-                getGeoKeys(obj, fieldElements, params, &keysForThisField);
+                getS2GeoKeys(obj, fieldElements, params, &keysForThisField);
             } else {
-                getLiteralKeys(fieldElements, &keysForThisField);
+                getS2LiteralKeys(fieldElements, &keysForThisField);
             }
 
             // We expect there to be the missing field element present in the keys if data is

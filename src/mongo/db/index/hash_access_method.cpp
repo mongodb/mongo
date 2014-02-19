@@ -28,7 +28,8 @@
 
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/index/expression_key_generator.h"
+#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/hash_access_method.h"
 
 namespace mongo {
@@ -38,44 +39,21 @@ namespace mongo {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 
-        const string HASHED_INDEX_TYPE_IDENTIFIER = "hashed";
-
-        //change these if single-field limitation lifted later
-        uassert(16763, "Currently only single field hashed index supported." ,
+        // We can change these if the single-field limitation is lifted later.
+        uassert(16763, "Currently only single field hashed index supported.",
                 1 == descriptor->getNumFields());
+
         uassert(16764, "Currently hashed indexes cannot guarantee uniqueness. Use a regular index.",
                 !descriptor->unique());
 
-        // Default _seed to DEFAULT_HASH_SEED if "seed" is not included in the index spec
-        // or if the value of "seed" is not a number
-
-        // *** WARNING ***
-        // Choosing non-default seeds will invalidate hashed sharding
-        // Changing the seed default will break existing indexes and sharded collections
-
-        if ( descriptor->getInfoElement( "seed" ).eoo() ) {
-            _seed = BSONElementHasher::DEFAULT_HASH_SEED;
-        }
-        else {
-            _seed = descriptor->getInfoElement("seed").numberInt();
-        }
-
-        //In case we have hashed indexes based on other hash functions in
-        //the future, we store a hashVersion number. If hashVersion changes,
-        // "makeSingleHashKey" will need to change accordingly.
-        //Defaults to 0 if "hashVersion" is not included in the index spec
-        //or if the value of "hashversion" is not a number
-        _hashVersion = descriptor->getInfoElement("hashVersion").numberInt();
-
-        //Get the hashfield name
-        BSONElement firstElt = descriptor->keyPattern().firstElement();
-        massert(16765, "error: no hashed index field",
-                firstElt.str().compare(HASHED_INDEX_TYPE_IDENTIFIER) == 0);
-        _hashedField = firstElt.fieldName();
+        ExpressionParams::parseHashParams(descriptor->infoObj(),
+                                          &_seed,
+                                          &_hashVersion,
+                                          &_hashedField);
     }
 
     void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        getHashKeys(obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
+        ExpressionKeysPrivate::getHashKeys(obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
     }
 
 }  // namespace mongo

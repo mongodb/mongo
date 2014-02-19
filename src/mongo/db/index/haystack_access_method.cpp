@@ -30,7 +30,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/hash.h"
-#include "mongo/db/index/expression_key_generator.h"
+#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/haystack_access_method_internal.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
@@ -38,41 +39,22 @@
 
 namespace mongo {
 
-    static const string GEOSEARCHNAME = "geoHaystack";
-
     HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState)
         : BtreeBasedAccessMethod(btreeState) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 
-        BSONElement e = descriptor->getInfoElement("bucketSize");
-        uassert(16777, "need bucketSize", e.isNumber());
-        _bucketSize = e.numberDouble();
-        uassert(16769, "bucketSize cannot be zero", _bucketSize != 0.0);
-
-        // Example:
-        // db.foo.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 })
-        BSONObjIterator i(descriptor->keyPattern());
-        while (i.more()) {
-            BSONElement e = i.next();
-            if (e.type() == String && GEOSEARCHNAME == e.valuestr()) {
-                uassert(16770, "can't have more than one geo field", _geoField.size() == 0);
-                uassert(16771, "the geo field has to be first in index",
-                        _otherFields.size() == 0);
-                _geoField = e.fieldName();
-            } else {
-                uassert(16772, "geoSearch can only have 1 non-geo field for now",
-                        _otherFields.size() == 0);
-                _otherFields.push_back(e.fieldName());
-            }
-        }
+        ExpressionParams::parseHaystackParams(descriptor->infoObj(),
+                                              &_geoField,
+                                              &_otherFields,
+                                              &_bucketSize);
 
         uassert(16773, "no geo field specified", _geoField.size());
         uassert(16774, "no non-geo fields specified", _otherFields.size());
     }
 
     void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
+        ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
     }
 
     void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
@@ -85,8 +67,8 @@ namespace mongo {
         int x, y;
         {
             BSONObjIterator i(nearObj);
-            x = hashHaystackElement(i.next(), _bucketSize);
-            y = hashHaystackElement(i.next(), _bucketSize);
+            x = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
+            y = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
         }
         int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
@@ -97,7 +79,7 @@ namespace mongo {
         for (int a = -scale; a <= scale && !hopper.limitReached(); ++a) {
             for (int b = -scale; b <= scale && !hopper.limitReached(); ++b) {
                 BSONObjBuilder bb;
-                bb.append("", makeHaystackString(x + a, y + b));
+                bb.append("", ExpressionKeysPrivate::makeHaystackString(x + a, y + b));
 
                 for (unsigned i = 0; i < _otherFields.size(); i++) {
                     // See if the non-geo field we're indexing on is in the provided search term.
@@ -110,9 +92,6 @@ namespace mongo {
 
                 BSONObj key = bb.obj();
 
-                // TODO(hk): this keeps a set of all DiskLoc seen in this pass so that we don't
-                // consider the element twice.  Do we want to instead store a hash of the set?
-                // Is this often big?
                 unordered_set<DiskLoc, DiskLoc::Hasher> thisPass;
 
 
