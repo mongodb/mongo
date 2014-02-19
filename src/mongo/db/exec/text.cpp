@@ -123,6 +123,8 @@ namespace mongo {
     PlanStage::StageState TextStage::initScans(WorkingSetID* out) {
         invariant(0 == _scanners.size());
 
+        _specificStats.parsedTextQuery = _params.query.toBSON();
+
         // Get all the index scans for each term in our query.
         for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
             const string& term = _params.query.getTerms()[i];

@@ -372,7 +372,7 @@ namespace mongo {
     };
 
     struct TextStats : public SpecificStats {
-        TextStats() : keysExamined(0), fetches(0) { }
+        TextStats() : keysExamined(0), fetches(0), parsedTextQuery() { }
 
         virtual SpecificStats* clone() const {
             TextStats* specific = new TextStats(*this);
@@ -382,6 +382,9 @@ namespace mongo {
         size_t keysExamined;
 
         size_t fetches;
+
+        // Human-readable form of the FTSQuery associated with the text stage.
+        BSONObj parsedTextQuery;
     };
 
 }  // namespace mongo

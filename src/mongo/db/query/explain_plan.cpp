@@ -505,6 +505,7 @@ namespace mongo {
             TextStats* spec = static_cast<TextStats*>(stats.specific.get());
             bob->appendNumber("keysExamined", spec->keysExamined);
             bob->appendNumber("fetches", spec->fetches);
+            bob->append("parsedTextQuery", spec->parsedTextQuery);
         }
 
         BSONArrayBuilder childrenBob(bob->subarrayStart("children"));

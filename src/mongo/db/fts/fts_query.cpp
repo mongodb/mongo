@@ -141,11 +141,6 @@ namespace mongo {
                 _debugHelp( ss, s, sep );
             }
 
-            void _debugHelp( stringstream& ss, const unordered_set<string>& v, const string& sep ) {
-                set<string> s( v.begin(), v.end() );
-                _debugHelp( ss, s, sep );
-            }
-
         }
 
         string FTSQuery::toString() const {
@@ -186,6 +181,15 @@ namespace mongo {
             _debugHelp( ss, getNegatedPhr(), "|" );
 
             return ss.str();
+        }
+
+        BSONObj FTSQuery::toBSON() const {
+            BSONObjBuilder bob;
+            bob.append( "terms", getTerms() );
+            bob.append( "negatedTerms", getNegatedTerms() );
+            bob.append( "phrases", getPhr() );
+            bob.append( "negatedPhrases", getNegatedPhr() );
+            return bob.obj();
         }
     }
 }

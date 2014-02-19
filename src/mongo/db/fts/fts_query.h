@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -53,7 +52,7 @@ namespace mongo {
             Status parse(const string& query, const StringData& language);
 
             const vector<string>& getTerms() const { return _terms; }
-            const unordered_set<string>& getNegatedTerms() const { return _negatedTerms; }
+            const set<string>& getNegatedTerms() const { return _negatedTerms; }
 
             const vector<string>& getPhr() const { return _phrases; }
             const vector<string>& getNegatedPhr() const { return _negatedPhrases; }
@@ -75,11 +74,13 @@ namespace mongo {
 
             string debugString() const;
 
+            BSONObj toBSON() const;
+
         protected:
             string _search;
             const FTSLanguage* _language;
             vector<string> _terms;
-            unordered_set<string> _negatedTerms;
+            set<string> _negatedTerms;
             vector<string> _phrases;
             vector<string> _negatedPhrases;
 
