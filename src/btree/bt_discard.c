@@ -204,6 +204,14 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 		__wt_free(session, ref->addr);
 	}
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * Races sometimes appear as accessing a WT_REF structure that has
+	 * been discarded; make sure nobody uses this information again.
+	 */
+	memset(ref, WT_DEBUG_BYTE, sizeof(*ref));
+#endif
 }
 
 /*

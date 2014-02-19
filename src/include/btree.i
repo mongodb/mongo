@@ -215,7 +215,7 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	 * Copy the parent page's index value: the page can split at any time,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
-	parent = page->parent;
+retry:	parent = page->parent;
 	*pindexp = parent->pu_intl_index;
 
 	/*
@@ -245,11 +245,15 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 			*slotp = page->ref_hint = i;
 			return (0);
 		}
-	/* NOTREACHED */
 
-	/* If we don't find it, there's a serious problem. */
-	WT_ASSERT(session, 0);
-	return (EINVAL);
+	/*
+	 * If we don't find our reference, the parent page split and our parent
+	 * pointer references the wrong page.  After internal page splits, any
+	 * in-memory children are updated with their new parent pointer, so we
+	 * wait on that update.  Yield the processor and try again.
+	 */
+	__wt_yield();
+	goto retry;
 }
 
 /*

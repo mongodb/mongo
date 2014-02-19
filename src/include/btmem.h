@@ -565,7 +565,11 @@ enum __wt_page_state {
 struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
 
-	void	*addr;			/* On-page cell or off_page WT_ADDR */
+	/*
+	 * Address: on-page cell if read from backing block, off-page WT_ADDR
+	 * if instantiated in-memory, or NULL if page created in-memory.
+	 */
+	void	*addr;
 
 	/*
 	 * The child page's key.  Do NOT change this union without reviewing
