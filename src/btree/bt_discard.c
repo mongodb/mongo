@@ -164,6 +164,15 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_REF *ref;
+	uint32_t i;
+
+	/* Free any memory allocated for the original set of WT_REFs. */
+	if ((ref = page->pu_intl_oindex) != NULL)
+		for (i = page->pu_intl_oentries; i > 0; ++ref, --i)
+			__wt_free_ref(session, page, ref);
+
+	/* Free any memory allocated for the child index array. */
 	__wt_free(session, page->pu_intl_index);
 }
 

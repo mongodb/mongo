@@ -328,18 +328,22 @@ struct __wt_page {
 		struct {
 			uint64_t recno;		/* Starting recno */
 
-			WT_REF *oindex;		/* Original children */
+			WT_REF	*oindex;	/* Original children */
+			uint32_t oentries;	/* Original children count */
+
 			struct __wt_page_index {
 				uint32_t entries;
 				WT_REF	**index;
 			} * volatile index;	/* Collated children */
 		} intl;
 #undef	pu_intl_recno
-#define	pu_intl_recno	u.intl.recno
+#define	pu_intl_recno		u.intl.recno
 #undef	pu_intl_oindex
-#define	pu_intl_oindex	u.intl.oindex
+#define	pu_intl_oindex		u.intl.oindex
+#undef	pu_intl_oentries
+#define	pu_intl_oentries	u.intl.oentries
 #undef	pu_intl_index
-#define	pu_intl_index	u.intl.index
+#define	pu_intl_index		u.intl.index
 #define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\

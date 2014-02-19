@@ -183,6 +183,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
 		page->pu_intl_oindex = p;
+		page->pu_intl_oentries = alloc_entries;
 
 		/*
 		 * Internal pages have an array of WT_REF pointers so they can
