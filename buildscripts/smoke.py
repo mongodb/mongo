@@ -201,7 +201,7 @@ class mongod(object):
         if self.kwargs.get('small_oplog_rs'):
             argv += ["--replSet", "foo", "--oplogSize", "511"]
         if self.slave:
-            argv += ['--slave', '--source', 'localhost:' + str(srcport)]
+            argv += ['--slave', '--autoresync', '--source', 'localhost:' + str(srcport)]
         if self.kwargs.get('no_journal'):
             argv += ['--nojournal']
         if self.kwargs.get('no_preallocj'):
