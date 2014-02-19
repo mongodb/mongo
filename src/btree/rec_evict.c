@@ -30,6 +30,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE **pagep, int exclusive)
 	int istree;
 
 	page = *pagep;
+	istree = 0;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
