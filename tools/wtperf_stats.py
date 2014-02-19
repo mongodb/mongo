@@ -77,15 +77,17 @@ def munge_dict(values_dict, abstime):
         ret.append(next_val)
 
     # After building the series, eliminate constants
-    for title, values in sorted(ret.iteritems()):
+    d0 = ret[0]
+    for t0, v0 in d0.items():
         skip = True
-        t0, v0 = values[0]
-        for t, v in values:
+        for d in ret:
+            v = d[t0]
             if v != v0:
                 skip = False
                 break
         if skip:
-            del ret[title]
+            for dicts in ret:
+                del dicts[t0]
 
     return ret
 
