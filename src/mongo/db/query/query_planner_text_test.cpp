@@ -346,14 +346,11 @@ namespace {
     TEST_F(QueryPlannerTest, HaveBadPrefixOnTextIndex) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN;
         addIndex(BSON("a" << 1 << "_fts" << "text" << "_ftsx" << 1));
-        runQuery(fromjson("{a:{$gt: 1}, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:{$gt: 1}, $text:{$search: 'blah'}}"));
 
-        runQuery(fromjson("{$text: {$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{$text: {$search: 'blah'}}"));
 
-        runQuery(fromjson("{$or: [{a:1}, {$text: {$search: 'blah'}}]}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{$or: [{a:1}, {$text: {$search: 'blah'}}]}"));
     }
 
     // There can be more than one prefix, but they all require points.
@@ -367,20 +364,16 @@ namespace {
         assertNumSolutions(1);
 
         // Missing a.
-        runQuery(fromjson("{b:1, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{b:1, $text:{$search: 'blah'}}"));
 
         // Missing b.
-        runQuery(fromjson("{a:1, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:1, $text:{$search: 'blah'}}"));
 
         // a is not a point
-        runQuery(fromjson("{a:{$gt: 1}, b:1, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:{$gt: 1}, b:1, $text:{$search: 'blah'}}"));
 
         // b is not a point
-        runQuery(fromjson("{a:1, b:{$gt: 1}, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:1, b:{$gt: 1}, $text:{$search: 'blah'}}"));
     }
 
     // And, suffixes.  They're optional and don't need to be points.
@@ -426,8 +419,7 @@ namespace {
 
         // 'a' is not an EQ so it doesn't compound w/the text pred.  We also shouldn't use the text
         // index to satisfy it w/o the text query.
-        runQuery(fromjson("{a:{$elemMatch:{$gt: 0, $lt: 2}}, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:{$elemMatch:{$gt: 0, $lt: 2}}, $text:{$search: 'blah'}}"));
     }
 
     TEST_F(QueryPlannerTest, IndexOnOwnFieldButNotLeafSuffixNoPrefix) {
