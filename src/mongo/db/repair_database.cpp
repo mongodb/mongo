@@ -228,24 +228,47 @@ namespace mongo {
 
     class RepairFileDeleter {
     public:
-        RepairFileDeleter( const Path& path )
-            : _path( path ),
-              _succces( false ) {
+        RepairFileDeleter( const string& dbName,
+                           const string& pathString,
+                           const Path& path )
+            : _dbName( dbName ),
+              _pathString( pathString ),
+              _path( path ),
+              _success( false ) {
         }
 
         ~RepairFileDeleter() {
-            if ( !_succces ) {
+            if ( _success )
+                 return;
+
+            log() << "cleaning up failed repair "
+                  << "db: " << _dbName << " path: " << _pathString;
+
+            try {
+                getDur().syncDataAndTruncateJournal();
+                MongoFile::flushAll(true); // need both in case journaling is disabled
+                {
+                    Client::Context tempContext( _dbName, _pathString );
+                    Database::closeDatabase( _dbName, _pathString );
+                }
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( _path ) );
+            }
+            catch ( DBException& e ) {
+                error() << "RepairFileDeleter failed to cleanup: " << e;
+                error() << "aborting";
+                fassertFailed( 17402 );
             }
         }
 
         void success() {
-            _succces = true;
+            _success = true;
         }
 
     private:
+        string _dbName;
+        string _pathString;
         Path _path;
-        bool _succces;
+        bool _success;
     };
 
     Status repairDatabase( string dbName,
@@ -283,7 +306,9 @@ namespace mongo {
         string reservedPathString = reservedPath.string();
 
         if ( !preserveClonedFilesOnFailure )
-            repairFileDeleter.reset( new RepairFileDeleter( reservedPath ) );
+            repairFileDeleter.reset( new RepairFileDeleter( dbName,
+                                                            reservedPathString,
+                                                            reservedPath ) );
 
         {
             Database* originalDatabase = dbHolder().get( dbName, storageGlobalParams.dbpath );
@@ -395,6 +420,9 @@ namespace mongo {
                 }
 
             }
+
+            getDur().syncDataAndTruncateJournal();
+            MongoFile::flushAll(true); // need both in case journaling is disabled
 
             Client::Context tempContext( dbName, reservedPathString );
             Database::closeDatabase( dbName, reservedPathString );
