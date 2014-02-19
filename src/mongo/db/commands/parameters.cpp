@@ -354,8 +354,15 @@ namespace mongo {
                 }
 
                 int oldMode = serverGlobalParams.clusterAuthMode.load();
+                int sslMode = sslGlobalParams.sslMode.load();
                 if (str == "sendX509" && 
                     oldMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
+                    if (sslMode == SSLGlobalParams::SSLMode_disabled ||
+                        sslMode == SSLGlobalParams::SSLMode_allowSSL) {
+                        return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Illegal state transition for clusterAuthMode, " <<
+                                    "need to enable SSL for outgoing connections");
+                    }
                     serverGlobalParams.clusterAuthMode.store
                         (ServerGlobalParams::ClusterAuthMode_sendX509);
 #ifdef MONGO_SSL

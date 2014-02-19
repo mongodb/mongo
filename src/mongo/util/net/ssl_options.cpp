@@ -201,11 +201,17 @@ namespace mongo {
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
-            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_disabled){
+            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_disabled) {
                 return Status(ErrorCodes::BadValue, "need to enable SSL via the sslMode flag");
+            } 
+        }
+        if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_allowSSL) {
+            if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
+                clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+                    return Status(ErrorCodes::BadValue,
+                                  "cannot have x.509 cluster authentication in allowSSL mode");
             }
         }
-
         return Status::OK();
     }
 
