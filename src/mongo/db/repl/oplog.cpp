@@ -216,7 +216,7 @@ namespace mongo {
         if( theReplSet ) {
             if (!theReplSet->box.getState().primary()) {
                 log() << "replSet error : logOp() but not primary";
-                fassertFailed(0);
+                fassertFailed(17405);
             }
             hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
