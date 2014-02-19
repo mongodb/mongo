@@ -82,7 +82,6 @@ scratch
 /mongofiles
 /mongoexport
 
-/mongoadmin
 /mongoimport
 /mongosniff
 /mongobridge
