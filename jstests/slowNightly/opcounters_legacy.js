@@ -3,7 +3,7 @@
 // Remember the global 'db' var
 var lastDB = db;
 var mongo = new Mongo(db.getMongo().host);
-mongo.useWriteCommands = function() { return false; }
+mongo.writeMode = function() { return "legacy"; }
 db = mongo.getDB(db.toString());
 
 var t = db.opcounters;
