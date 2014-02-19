@@ -424,9 +424,6 @@ def runTest(test, result):
 
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
-    if skipTest(path):
-        print "skipping " + path
-        return
     if file_of_commands_mode:
         # smoke.py was invoked like "--mode files --from-file foo",
         # so don't try to interpret the test path too much
@@ -647,20 +644,23 @@ def run_tests(tests):
                     test_result["test_file"] = test_path
 
                 try:
-                    fails.append(test)
-                    runTest(test, test_result)
-                    fails.pop()
-                    winners.append(test)
-
-                    test_result["end"] = time.time()
-                    test_result["elapsed"] = test_result["end"] - test_result["start"]
-                    test_result["status"] = "pass"
-                    test_report["results"].append( test_result )
-
                     if skipTest(test_path):
+                        test_result["end"] = time.time()
+                        test_result["elapsed"] = test_result["end"] - test_result["start"]
                         test_result["status"] = "skip"
-                        # Make sure skipped tests aren't counted as successful
-                        winners.pop()
+
+                        test_report["results"].append( test_result )
+                        print "skipping " + test_path
+                    else:
+                        fails.append(test)
+                        runTest(test, test_result)
+                        fails.pop()
+                        winners.append(test)
+
+                        test_result["end"] = time.time()
+                        test_result["elapsed"] = test_result["end"] - test_result["start"]
+                        test_result["status"] = "pass"
+                        test_report["results"].append( test_result )
 
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
