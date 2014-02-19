@@ -613,9 +613,8 @@ __rec_review(WT_SESSION_IMPL *session,
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
+			case WT_REF_SPLIT:		/* Being split */
 				return (EBUSY);
-			case WT_REF_SPLIT:		/* Impossible */
-				/* FALLTHROUGH */
 			WT_ILLEGAL_VALUE(session);
 			}
 		} WT_INTL_FOREACH_END;
