@@ -36,7 +36,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 
@@ -130,10 +129,6 @@ namespace mongo {
         // collection name.
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
-
-        Status status = userAllowedWriteNS( nss );
-        if ( !status.isOK() )
-            return appendCommandStatus( result, status );
 
         BSONObj defaultWriteConcern;
         // This is really bad - it's only safe because we leak the defaults by overriding them with

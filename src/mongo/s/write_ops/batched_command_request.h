@@ -107,6 +107,7 @@ namespace mongo {
         // Index creation is also an insert, but a weird one.
         bool isInsertIndexRequest() const;
         bool isUniqueIndexRequest() const;
+        bool isValidIndexRequest( std::string* errMsg ) const;
         std::string getTargetingNS() const;
         BSONObj getIndexKeyPattern() const;
 

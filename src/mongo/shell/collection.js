@@ -491,8 +491,12 @@ DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
 
     if ( this._mongo.useWriteCommands() ) {
-        delete o.ns; // ns is passed to the first element in the command.
-        return this._db.runCommand({ createIndexes: this.getName(), indexes: [o] });
+
+        // TODO: Use createIndexes command once fully supported by upgrade process
+        var bulk = this.getDB().system.indexes.initializeOrderedBulkOp();
+        bulk.insert(o);
+
+        return bulk.execute().toSingleResult();
     }
     else {
         this._db.getCollection( "system.indexes" ).insert( o , 0, true );

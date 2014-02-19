@@ -306,45 +306,33 @@ namespace mongo {
         return false;
     }
 
+    static void toBatchError( const Status& status, BatchedCommandResponse* response ) {
+        response->clear();
+        response->setErrCode( status.code() );
+        response->setErrMessage( status.reason() );
+        response->setOk( false );
+        dassert( response->isValid(NULL) );
+    }
+
     void ClusterWriter::write( const BatchedCommandRequest& request,
                                BatchedCommandResponse* response ) {
 
-        // App-level validation of a create index insert
-        if ( request.isInsertIndexRequest() ) {
-            if ( request.sizeWriteOps() != 1 ) {
-
-                // Invalid request to create index
-                response->setOk( false );
-                response->setErrCode( ErrorCodes::InvalidOptions );
-                response->setErrMessage( "invalid batch request for index creation" );
-
-                dassert( response->isValid( NULL ) );
-                return;
-            }
-
-            NamespaceString ns( request.getTargetingNS() );
-            if ( !ns.isValid() ) {
-                response->setOk( false );
-                response->setN( 0 );
-                response->setErrCode( ErrorCodes::InvalidNamespace );
-                string errMsg( str::stream() << ns.ns() << " is not a valid namespace to index" );
-                response->setErrMessage( errMsg );
-                return;
-            }
+        const NamespaceString nss = NamespaceString( request.getNS() );
+        if ( !nss.isValid() ) {
+            toBatchError( Status( ErrorCodes::InvalidNamespace,
+                                  nss.ns() + " is not a valid namespace" ),
+                          response );
+            return;
         }
 
-        NamespaceString ns( request.getNS() );
-        if ( !ns.isValid() ) {
-            response->setOk( false );
-            response->setN( 0 );
-            response->setErrCode( ErrorCodes::InvalidNamespace );
-            string errMsg( str::stream() << ns.ns() << " is not a valid namespace" );
-            response->setErrMessage( errMsg );
+        string errMsg;
+        if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
+            toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );
             return;
         }
 
         // Config writes and shard writes are done differently
-        string dbName = ns.db().toString();
+        string dbName = nss.db().toString();
         if ( dbName == "config" || dbName == "admin" ) {
 
             bool verboseWC = request.isVerboseWC();
@@ -353,12 +341,10 @@ namespace mongo {
             if ( request.sizeWriteOps() != 1 ||
                     ( request.isWriteConcernSet() &&
                             !validConfigWC( request.getWriteConcern() ))) {
-                // Invalid config server write
-                response->setOk( false );
-                response->setErrCode( ErrorCodes::InvalidOptions );
-                response->setErrMessage( "invalid batch request for config write" );
 
-                dassert( response->isValid( NULL ) );
+                toBatchError( Status( ErrorCodes::InvalidOptions,
+                                      "invalid batch request for config write" ),
+                              response );
                 return;
             }
 

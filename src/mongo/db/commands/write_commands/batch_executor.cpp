@@ -98,6 +98,14 @@ namespace mongo {
         return error;
     }
 
+    static void toBatchError( const Status& status, BatchedCommandResponse* response ) {
+        response->clear();
+        response->setErrCode( status.code() );
+        response->setErrMessage( status.reason() );
+        response->setOk( false );
+        dassert( response->isValid(NULL) );
+    }
+
     static void noteInCriticalSection( WriteErrorDetail* staleError ) {
         BSONObjBuilder builder;
         if ( staleError->isErrInfoSet() )
@@ -109,33 +117,59 @@ namespace mongo {
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
                                            BatchedCommandResponse* response ) {
 
-        // TODO: Lift write concern parsing out of this entirely.
+        // Validate namespace
+        const NamespaceString nss = NamespaceString( request.getNS() );
+        if ( !nss.isValid() ) {
+            toBatchError( Status( ErrorCodes::InvalidNamespace,
+                                  nss.ns() + " is not a valid namespace" ),
+                          response );
+            return;
+        }
+
+        // Make sure we can write to the namespace
+        Status allowedStatus = userAllowedWriteNS( nss );
+        if ( !allowedStatus.isOK() ) {
+            toBatchError( allowedStatus, response );
+            return;
+        }
+
+        // Validate insert index requests
+        // TODO: Push insert index requests through createIndex once all upgrade paths support it
+        string errMsg;
+        if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
+            toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );
+            return;
+        }
+
+        // Validate write concern
+        // TODO: Lift write concern parsing out of this entirely
         WriteConcernOptions writeConcern;
-        Status status = Status::OK();
 
         BSONObj wcDoc;
         if ( request.isWriteConcernSet() ) {
             wcDoc = request.getWriteConcern();
         }
 
+        Status wcStatus = Status::OK();
         if ( wcDoc.isEmpty() ) {
-            status = writeConcern.parse( _defaultWriteConcern );
+            wcStatus = writeConcern.parse( _defaultWriteConcern );
         }
         else {
-            status = writeConcern.parse( wcDoc );
+            wcStatus = writeConcern.parse( wcDoc );
         }
 
-        if ( status.isOK() ) {
-            status = validateWriteConcern( writeConcern );
+        if ( wcStatus.isOK() ) {
+            wcStatus = validateWriteConcern( writeConcern );
         }
 
-        if ( !status.isOK() ) {
-            response->setErrCode( status.code() );
-            response->setErrMessage( status.reason() );
-            response->setOk( false );
-            dassert( response->isValid(NULL) );
+        if ( !wcStatus.isOK() ) {
+            toBatchError( wcStatus, response );
             return;
         }
+
+        //
+        // End validation
+        //
 
         bool silentWC = writeConcern.wMode.empty() && writeConcern.wNumNodes == 0
                         && writeConcern.syncMode == WriteConcernOptions::NONE;
@@ -170,7 +204,7 @@ namespace mongo {
             _client->curop()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
+            Status status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -654,32 +688,13 @@ namespace mongo {
         }
     }
 
-    // Does preprocessing of inserts, special casing for indexes
-    // TODO: Simplify this when indexes aren't here anymore
-    static StatusWith<BSONObj> normalizeInsert( const BatchItemRef& insertItem ) {
-
-        if ( insertItem.getRequest()->isInsertIndexRequest() ) {
-
-            StatusWith<BSONObj> normalInsert = fixDocumentForInsert( insertItem.getDocument() );
-            if ( normalInsert.isOK() && insertItem.getDocument()["ns"].type() != String ) {
-                return StatusWith<BSONObj>( ErrorCodes::BadValue, "tried to create an index "
-                                            "without specifying namespace" );
-            }
-            else {
-                return normalInsert;
-            }
-        }
-        else {
-            return fixDocumentForInsert( insertItem.getDocument() );
-        }
-    }
-
     // Goes over the request and preprocesses normalized versions of all the inserts in the request
     static void normalizeInserts( const BatchedCommandRequest& request,
                                   vector<StatusWith<BSONObj> >* normalInserts ) {
 
         for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
-            StatusWith<BSONObj> normalInsert = normalizeInsert( BatchItemRef( &request, i ) );
+            BSONObj insertDoc = request.getInsertRequest()->getDocumentsAt( i );
+            StatusWith<BSONObj> normalInsert = fixDocumentForInsert( insertDoc );
             normalInserts->push_back( normalInsert );
             if ( request.getOrdered() && !normalInsert.isOK() )
                 break;

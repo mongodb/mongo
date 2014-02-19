@@ -93,6 +93,34 @@ namespace mongo {
         return extractUniqueIndex( getInsertRequest()->getDocumentsAt( 0 ) );
     }
 
+    bool BatchedCommandRequest::isValidIndexRequest( string* errMsg ) const {
+
+        string dummy;
+        if ( !errMsg )
+            errMsg = &dummy;
+        dassert( isInsertIndexRequest() );
+
+        if ( sizeWriteOps() != 1 ) {
+            *errMsg = "invalid batch request for index creation";
+            return false;
+        }
+
+        NamespaceString targetNSS( getTargetingNS() );
+        if ( !targetNSS.isValid() ) {
+            *errMsg = targetNSS.ns() + " is not a valid namespace to index";
+            return false;
+        }
+
+        NamespaceString reqNSS( getNS() );
+        if ( reqNSS.db().compare( targetNSS.db() ) != 0 ) {
+            *errMsg = targetNSS.ns() + " namespace is not in the request database "
+                      + reqNSS.db().toString();
+            return false;
+        }
+
+        return true;
+    }
+
     static void extractIndexNSS( const BSONObj& indexDesc, NamespaceString* indexNSS ) {
         *indexNSS = NamespaceString( indexDesc["ns"].str() );
     }
