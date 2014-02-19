@@ -1,0 +1,56 @@
+var res;
+
+t = db.jstests_uniqueness;
+
+t.drop();
+
+// test uniqueness of _id
+
+res = t.save( { _id : 3 } );
+assert.writeOK( res );
+
+// this should yield an error
+res = t.insert( { _id : 3 } );
+assert.writeError( res );
+assert( t.count() == 1, "hmmm");
+
+res = t.insert( { _id : 4, x : 99 } );
+assert.writeOK( res );
+
+// this should yield an error
+res = t.update( { _id : 4 } , { _id : 3, x : 99 } );
+assert.writeError( res );
+assert( t.findOne( {_id:4} ), 5 );
+
+// Check for an error message when we index and there are dups
+db.jstests_uniqueness2.drop();
+db.jstests_uniqueness2.insert({a:3});
+db.jstests_uniqueness2.insert({a:3});
+assert( db.jstests_uniqueness2.count() == 2 , 6) ;
+res = db.jstests_uniqueness2.ensureIndex({a:1}, true);
+assert.writeError( res );
+assert( res.getWriteError().errmsg.match( /E11000/ ) );
+
+// Check for an error message when we index in the background and there are dups
+db.jstests_uniqueness2.drop();
+db.jstests_uniqueness2.insert({a:3});
+db.jstests_uniqueness2.insert({a:3});
+assert( db.jstests_uniqueness2.count() == 2 , 6) ;
+res = db.jstests_uniqueness2.ensureIndex({a:1}, {unique:true,background:true});
+assert.writeError( res );
+assert( res.getWriteError().errmsg.match( /E11000/ ) );
+
+/* Check that if we update and remove _id, it gets added back by the DB */
+
+/* - test when object grows */
+t.drop();
+t.save( { _id : 'Z' } );
+t.update( {}, { k : 2 } );
+assert( t.findOne()._id == 'Z', "uniqueness.js problem with adding back _id" );
+
+/* - test when doesn't grow */
+t.drop();
+t.save( { _id : 'Z', k : 3 } );
+t.update( {}, { k : 2 } );
+assert( t.findOne()._id == 'Z', "uniqueness.js problem with adding back _id (2)" );
+
