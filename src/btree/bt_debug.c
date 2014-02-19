@@ -323,6 +323,48 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 	return (0);
 }
 
+/*
+ * __debug_shape_worker --
+ *	Dump information about the current node and descend.
+ */
+static void
+__debug_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
+{
+	WT_REF *ref;
+
+	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
+		__dmsg(ds, "%*s", level, "I\n");
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			if (ref->state == WT_REF_MEM)
+				__debug_shape_worker(ds, ref->page, level + 5);
+		} WT_INTL_FOREACH_END;
+	} else
+		__dmsg(ds, "%*s", level, "L\n");
+}
+
+/*
+ * __wt_debug_tree_shape --
+ *	Dump the shape of the in-memory tree.
+ */
+int
+__wt_debug_tree_shape(
+    WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
+{
+	WT_DBG *ds, _ds;
+
+	ds = &_ds;
+	WT_RET(__debug_config(session, ds, ofile));
+
+	/* A NULL page starts at the top of the tree -- it's a convenience. */
+	if (page == NULL)
+		page = S2BT(session)->root_page;
+
+	__debug_shape_worker(ds, page, 0);
+
+	__dmsg_wrapup(ds);
+	return (0);
+}
+
 #define	WT_DEBUG_TREE_LEAF	0x01			/* Debug leaf pages */
 #define	WT_DEBUG_TREE_WALK	0x02			/* Descend the tree */
 
