@@ -94,7 +94,8 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
 	WT_PAGE_MODIFY *mod;
-	uint32_t i;
+	WT_REF *ref;
+	uint32_t i, j;
 
 	mod = page->modify;
 
@@ -119,12 +120,17 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/*
-	 * Free the split chunks; we do not have to review the individual WT_REF
-	 * entries in the chunks, they are discarded by walking the "final" list
-	 * of WT_REF entries when each internal page is discarded.
+	 * Free the split chunks created when underlying pages split into this
+	 * page.
 	 */
-	for (i = 0; i < mod->splits_slots; ++i)
-		__wt_free(session, mod->splits[i]);
+	for (i = 0; i < mod->splits_slots; ++i) {
+		if ((ref = mod->splits[i].refs) == NULL)
+			break;
+		for (j = mod->splits[i].entries; j > 0; ++ref, --j)
+			__wt_free_ref(session, page, ref);
+		__wt_free(session, mod->splits[i].refs);
+	}
+	__wt_free(session, mod->splits);
 
 	/* Free the reconciliation-created array of split pages. */
 	__wt_free(session, mod->split_ref);
@@ -152,32 +158,13 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __free_page_col_var --
- *	Discard a WT_PAGE_COL_VAR page.
- */
-static void
-__free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	/* Free the RLE lookup array. */
-	__wt_free(session, page->pu_var_repeats);
-}
-
-/*
  * __free_page_int --
  *	Discard a WT_PAGE_ROW_INT page.
  */
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_REF *ref;
-
-	/* Free the contents of any WT_REF structures. */
-	if (page->pu_intl_index != NULL) {
-		WT_INTL_FOREACH_BEGIN(page, ref) {
-			__wt_free_ref(session, page, ref);
-		} WT_INTL_FOREACH_END;
-		__wt_free(session, page->pu_intl_index);
-	}
+	__wt_free(session, page->pu_intl_index);
 }
 
 /*
@@ -212,6 +199,17 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 	 */
 	memset(ref, WT_DEBUG_BYTE, sizeof(*ref));
 #endif
+}
+
+/*
+ * __free_page_col_var --
+ *	Discard a WT_PAGE_COL_VAR page.
+ */
+static void
+__free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	/* Free the RLE lookup array. */
+	__wt_free(session, page->pu_var_repeats);
 }
 
 /*

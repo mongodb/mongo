@@ -217,7 +217,10 @@ struct __wt_page_modify {
 	 * XXXKEITH
 	 * Only internal pages have these.
 	 */
-	WT_REF **splits;		/* Split child WT_REFs */
+	struct __wt_split_chunk {
+		WT_REF	*refs;		/* Split child WT_REFs */
+		uint32_t entries;	/* Count of entries */
+	} *splits;
 	uint32_t splits_slots;		/* Split child WT_REFs count */
 
 	/*

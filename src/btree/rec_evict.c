@@ -150,7 +150,7 @@ __rec_split_list_alloc(
 	uint32_t i;
 
 	for (i = 0; i < mod->splits_slots; ++i)
-		if (mod->splits[i] == NULL)
+		if (mod->splits[i].refs == NULL)
 			break;
 	if (i == mod->splits_slots) {
 		WT_RET(__wt_realloc(session,
@@ -186,8 +186,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	entries = (uint32_t)btree->split_deepen;
 
 	WT_VERBOSE_ERR(session, split,
-	    "page %p with %" PRIu32
-	    " elements, splitting in-memory into %" PRIu32 " elements",
+	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
 	    page, pindex->entries, entries);
 
 	/* Allocate a new parent child-page index. */
@@ -216,7 +215,13 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* Initialize the parent page reference. */
 		parent_ref->page = child;
 		parent_ref->addr = NULL;
-		parent_ref->key = (*refp)->key;		/* XXXKEITH stolen */
+		parent_ref->key = (*refp)->key;
+		if (page->type == WT_PAGE_ROW_INT) {
+			__wt_ref_key(page, *refp, &p, &size);
+			WT_ERR(__wt_row_ikey_incr(session,
+			    page, 0, p, size, &parent_ref->key.ikey));
+		} else
+			parent_ref->key.recno = (*refp)->key.recno;
 		parent_ref->txnid = 0;			/* XXXKEITH 0? */
 		parent_ref->state = WT_REF_MEM;
 
@@ -273,7 +278,8 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Add the WT_REF array into the page's list. */
 	WT_ERR(__rec_split_list_alloc(session, page->modify, &i));
-	page->modify->splits[i] = alloc_ref;
+	page->modify->splits[i].refs = alloc_ref;
+	page->modify->splits[i].entries = entries;
 	alloc_ref = NULL;
 
 	/*
@@ -363,11 +369,13 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * page's list.
 	 */
 	WT_ERR(__rec_split_list_alloc(session, parent_mod, &i));
-	split = parent_mod->splits[i] = mod->split_ref;
+	parent_mod->splits[i].refs = mod->split_ref;
+	parent_mod->splits[i].entries = mod->split_entries;
 
 	/* Allocate a new WT_REF index array and initialize it. */
 	pindex = parent->pu_intl_index;
 	parent_entries = pindex->entries;
+	split = mod->split_ref;
 	split_entries = mod->split_entries;
 	result_entries = (parent_entries - 1) + split_entries;
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_PAGE_INDEX) +
@@ -406,20 +414,13 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * blocked threads.
 	 */
 	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
-	/*
-	 * XXXKEITH
-	 * We just leaked any memory held by this WT_REF structure, we don't
-	 * find it when we discard the page.  I suspect that the solution is
-	 * that discarding a page walks all of the WT_REF arrays instead of
-	 * walking the higher-level index, but that has problems for the code
-	 * that deepens the split tree, it "steals" keys from one WT_REF array
-	 * to another.
-	 */
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_VERBOSE_ERR(session, split,
-	    "page %p split into parent %p %" PRIu32 " -> %" PRIu32,
-	    page, parent, parent_entries, result_entries);
+	    "%p: %s merged into %p %" PRIu32 " -> %" PRIu32
+	    " (%" PRIu32 ")",
+	    page, __wt_page_type_string(page->type), parent, parent_entries,
+	    result_entries, result_entries - parent_entries);
 
 	/*
 	 * We're already holding the parent page locked, see if the parent needs
