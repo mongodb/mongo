@@ -18,7 +18,6 @@
 
 #define	WT_EVICT_PASS_ALL	0x01
 #define	WT_EVICT_PASS_DIRTY	0x02
-#define	WT_EVICT_PASS_INTERNAL	0x04
 
 /*
  * WT_EVICT_ENTRY --
@@ -95,9 +94,8 @@ struct __wt_cache {
 	 * Flags.
 	 */
 #define	WT_EVICT_ACTIVE		0x01	/* Eviction server is active */
-#define	WT_EVICT_INTERNAL	0x02	/* Check for deep internal trees */
-#define	WT_EVICT_NO_PROGRESS	0x04	/* Check if pages are being evicted */
-#define	WT_EVICT_STUCK		0x08	/* Eviction server is stuck */
+#define	WT_EVICT_NO_PROGRESS	0x02	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x04	/* Eviction server is stuck */
 	uint32_t flags;
 };
 

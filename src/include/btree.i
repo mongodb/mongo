@@ -802,20 +802,14 @@ static inline int
 __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/*
-	 * Check if eviction or splitting has a chance of succeeding, otherwise
-	 * stall to give other transactions a chance to complete.
+	 * Check if eviction has a chance of succeeding, otherwise stall to
+	 * give other transactions a chance to complete.
 	 */
 	__wt_txn_update_oldest(session);
 	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
 	    __wt_txn_visible_all(session, page->modify->update_txn)) {
 		page->read_gen = WT_READ_GEN_OLDEST;
 		WT_RET(__wt_page_release(session, page));
-		/*
-		 * Forced eviction can create chains of internal pages before
-		 * the cache is full. Setup the eviction server to look for
-		 * internal page merges after we successfully force evict.
-		 */
-		F_SET(S2C(session)->cache, WT_EVICT_INTERNAL);
 		WT_RET(__wt_evict_server_wake(session));
 	} else {
 		WT_RET(__wt_page_release(session, page));

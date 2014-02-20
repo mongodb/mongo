@@ -236,19 +236,14 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			/* Ignore clean pages unless the cache is too large */
 			flags = WT_EVICT_PASS_DIRTY;
-		else if (F_ISSET(cache, WT_EVICT_INTERNAL))
-			/* Only consider merging internal pages. */
-			flags = WT_EVICT_PASS_INTERNAL;
 		else
 			break;
-		F_CLR(cache, WT_EVICT_INTERNAL);
 
 		F_SET(cache, WT_EVICT_ACTIVE);
 		WT_VERBOSE_RET(session, evictserver,
 		    "Eviction pass with: Max: %" PRIu64
-		    " In use: %" PRIu64 " Dirty: %" PRIu64 " Internal: %s",
-		    bytes_max, bytes_inuse, dirty_inuse,
-		    LF_ISSET(WT_EVICT_PASS_INTERNAL) ? "yes" : "no");
+		    " In use: %" PRIu64 " Dirty: %" PRIu64,
+		    bytes_max, bytes_inuse, dirty_inuse);
 
 		/*
 		 * When the cache is full, track whether pages are being
@@ -847,7 +842,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
 	int modified, restarts, levels;
-	uint32_t walk_flags;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
@@ -860,15 +854,12 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	    WT_PAGE_IS_ROOT(btree->evict_page) || __wt_page_ref(
 	    session, btree->evict_page)->state == WT_REF_EVICT_WALK);
 
-	walk_flags = WT_TREE_EVICT;
-	if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
-		walk_flags |= WT_TREE_SKIP_LEAF;
 	/*
 	 * Get some more eviction candidate pages.
 	 */
 	for (evict = start, restarts = 0;
 	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
-	    ret = __wt_tree_walk(session, &btree->evict_page, walk_flags)) {
+	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
 			ret = 0;
 			/*
@@ -943,9 +934,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			/* The remaining checks don't apply to merges. */
 			goto add;
 		}
-#endif
 		if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
 			continue;
+#endif
 
 		/*
 		 * If this page has never been considered for eviction,
