@@ -144,34 +144,39 @@ namespace mongo {
         double productivity = static_cast<double>(stats->common.advanced)
                             / static_cast<double>(stats->common.works);
 
-        // double score = baseScore + productivity;
-
-        // Does a plan have a sort?
-        // bool sort = hasSort(stats);
-        // double sortPenalty = sort ? 0.5 : 0;
-        // double score = baseScore + productivity - sortPenalty;
-
-        // How selective do we think an index is?
-        // double selectivity = computeSelectivity(stats);
-        // return baseScore + productivity + selectivity;
-
         // If we have to perform a fetch, that's not great.
         //
         // We only do this when we have a projection stage because we have so many jstests that
         // check bounds even when a collscan plan is just as good as the ixscan'd plan :(
         double noFetchBonus = 1;
+        double epsilon = 0.001;
 
         // We prefer covered projections.
         if (hasStage(STAGE_PROJECTION, stats) && hasStage(STAGE_FETCH, stats)) {
             // Just enough to break a tie.
-            noFetchBonus = 1 - 0.001;
+            noFetchBonus = 1 - epsilon;
         }
 
-        double score = baseScore + productivity + noFetchBonus;
+        // In the case of ties, prefer single index solutions to ixisect. Index
+        // intersection solutions are often slower than single-index solutions
+        // because they require examining a superset of index keys that would be
+        // examined by a single index scan.
+        //
+        // On the other hand, index intersection solutions examine the same
+        // number or fewer of documents. In the case that index intersection
+        // allows us to examine fewer documents, the penalty given to ixisect
+        // can be made up via the no fetch bonus.
+        double noIxisectBonus = epsilon;
+        if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
+            noIxisectBonus = 0;
+        }
 
-        QLOG() << "score (" << score << ") = baseScore (" << baseScore << ")"
+        double score = baseScore + productivity + noFetchBonus + noIxisectBonus;
+
+        QLOG() << "score (" << score << ") = baseScore(" << baseScore << ")"
                                      <<  " + productivity(" << productivity << ")"
                                      <<  " + noFetchBonus(" << noFetchBonus << ")"
+                                     <<  " + noIxisectBonus(" << noIxisectBonus << ")"
                                      << endl;
 
         return score;
