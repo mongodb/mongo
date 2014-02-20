@@ -59,5 +59,19 @@ test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:-1}}], 
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {random:1}}], groupCode);
 test([{$sort: {random:1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
 
+var origDB = db;
+if (sharded) {
+    // Stop balancer first before dropping so there will be no contention on the ns lock.
+    // It's alright to modify the global db variable since sharding tests never run in parallel.
+    db = db.getSiblingDB('config');
+    sh.stopBalancer();
+}
+
 // don't leave large collection laying around
 t.drop();
+
+if (sharded) {
+    sh.startBalancer();
+    db = origDB;
+}
+
