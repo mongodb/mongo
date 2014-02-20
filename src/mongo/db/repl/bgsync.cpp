@@ -152,7 +152,10 @@ namespace replset {
         // It also sets the supportsUpdater flag so we know which method to use.
         // If this function fails, we ignore that situation because it will be taken care of
         // the first time markOplog() is called in the loop below.
-        connectOplogNotifier();
+        {
+            boost::unique_lock<boost::mutex> oplogLockSSF(theReplSet->syncSourceFeedback.oplock);
+            connectOplogNotifier();
+        }
         theReplSet->syncSourceFeedback.go();
 
         while (!inShutdown()) {
@@ -208,7 +211,9 @@ namespace replset {
             theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
         }
         else {
+            boost::unique_lock<boost::mutex> oplogLockSSF(theReplSet->syncSourceFeedback.oplock);
             if (!hasCursor()) {
+                oplogLockSSF.unlock();
                 sleepmillis(500);
                 return;
             }
@@ -563,6 +568,8 @@ namespace replset {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _currentSyncTarget = target;
             }
+
+            boost::unique_lock<boost::mutex> oplogLockSSF(theReplSet->syncSourceFeedback.oplock);
             theReplSet->syncSourceFeedback.connect(target);
 
             return;

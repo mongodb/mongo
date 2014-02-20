@@ -132,6 +132,15 @@ namespace mongo {
             _oplogReader->tailingQueryGTE(ns, t, fields);
         }
 
+        /** 
+        * this mutex protects the _conn field of _oplogReader in that we cannot mix the functions
+        * which check _conn for null (commonConnect() and connect() do this) with the function that
+        * sets the pointer to null (resetConnection()). All other uses of the _oplogReader's _conn
+        * do not need the mutex locked, due to the threading logic that prevents _connect()
+        * from being called concurrently.
+        */
+        boost::mutex oplock;
+
     private:
         /**
          * Authenticates _connection using the server's cluster-membership credentials.
