@@ -645,8 +645,6 @@ def run_tests(tests):
 
                 try:
                     if skipTest(test_path):
-                        test_result["end"] = time.time()
-                        test_result["elapsed"] = test_result["end"] - test_result["start"]
                         test_result["status"] = "skip"
 
                         print "skipping " + test_path
@@ -656,10 +654,10 @@ def run_tests(tests):
                         fails.pop()
                         winners.append(test)
 
-                        test_result["end"] = time.time()
-                        test_result["elapsed"] = test_result["end"] - test_result["start"]
                         test_result["status"] = "pass"
 
+                    test_result["end"] = time.time()
+                    test_result["elapsed"] = test_result["end"] - test_result["start"]
                     test_report["results"].append( test_result )
 
                     if small_oplog or small_oplog_rs:
