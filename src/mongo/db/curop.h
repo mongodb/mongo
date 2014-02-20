@@ -155,6 +155,7 @@ namespace mongo {
 
         // debugging/profile info
         long long nscanned;
+        long long nscannedObjects;
         bool idhack;         // indicates short circuited code path on an update to make the update faster
         bool scanAndOrder;   // scanandorder query plan aspect was used
         long long  nMatched; // number of records that match the query

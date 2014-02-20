@@ -341,12 +341,15 @@ namespace mongo {
     static Counter64 updatedCounter;
     static Counter64 deletedCounter;
     static Counter64 scannedCounter;
+    static Counter64 scannedObjectCounter;
 
     static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
     static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
     static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
     static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
     static ServerStatusMetricField<Counter64> displayScanned( "queryExecutor.scanned", &scannedCounter );
+    static ServerStatusMetricField<Counter64> displayScannedObjects( "queryExecutor.scannedObjects",
+                                                                     &scannedObjectCounter );
 
     static Counter64 idhackCounter;
     static Counter64 scanAndOrderCounter;
@@ -367,6 +370,8 @@ namespace mongo {
             deletedCounter.increment( ndeleted );
         if ( nscanned > 0 )
             scannedCounter.increment( nscanned );
+        if ( nscannedObjects > 0 )
+            scannedObjectCounter.increment( nscannedObjects );
 
         if ( idhack )
             idhackCounter.increment();

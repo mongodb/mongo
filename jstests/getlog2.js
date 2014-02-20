@@ -32,6 +32,7 @@ if(db.isMaster().msg != "isdbgrid") {
    print(v);
    return v.indexOf(" query ") != -1 && v.indexOf("query:") != -1 &&
           v.indexOf("nscanned:") != -1 &&
+          v.indexOf("nscannedObjects:") != -1 &&
           v.indexOf("SENTINEL") != -1;
   }) );
 
@@ -40,6 +41,7 @@ if(db.isMaster().msg != "isdbgrid") {
    print(v);
    return v.indexOf(" update ") != -1 && v.indexOf("query:") != -1 &&
           v.indexOf("nscanned:") != -1 &&
+          v.indexOf("nscannedObjects:") != -1 &&
           v.indexOf("SENTINEL") != -1;
   }) );
 }
