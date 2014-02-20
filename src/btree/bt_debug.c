@@ -357,7 +357,7 @@ __debug_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 		    level, " ", __debug_shape_size(page));
 		WT_INTL_FOREACH_BEGIN(page, ref) {
 			if (ref->state == WT_REF_MEM)
-				__debug_shape_worker(ds, ref->page, level + 5);
+				__debug_shape_worker(ds, ref->page, level + 3);
 		} WT_INTL_FOREACH_END;
 	} else
 		__dmsg(ds, "%*s" "L" "%s\n",
