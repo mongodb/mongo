@@ -868,6 +868,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	walk_flags = WT_TREE_EVICT;
 	if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
 		walk_flags |= WT_TREE_SKIP_LEAF;
+	else if (!LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
+		walk_flags |= WT_TREE_SKIP_INTL;
+
 	/*
 	 * Get some more eviction candidate pages.
 	 */
