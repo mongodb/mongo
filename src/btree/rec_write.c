@@ -3752,6 +3752,8 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
 		    ((WT_ADDR *)ref->addr)->size));
+
+	__wt_cache_page_inmem_decr(session, page, size);
 	__wt_free(session, mod->multi_ref);
 	mod->multi_entries = 0;
 	mod->multi_size = 0;
