@@ -3753,9 +3753,9 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    ((WT_ADDR *)ref->addr)->addr,
 		    ((WT_ADDR *)ref->addr)->size));
 
-	__wt_cache_page_inmem_decr(session, page, size);
 	__wt_free(session, mod->multi_ref);
 	mod->multi_entries = 0;
+	__wt_cache_page_inmem_decr(session, page, mod->multi_size);
 	mod->multi_size = 0;
 
 	/*
@@ -4088,10 +4088,10 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		addr = NULL;
 		ref->state = WT_REF_DISK;
 	}
-	__wt_cache_page_inmem_incr(session, page, size);
 
 	page->modify->multi_ref = split_ref;
 	page->modify->multi_entries = r->bnd_next;
+	__wt_cache_page_inmem_incr(session, page, size);
 	page->modify->multi_size = size;
 
 	return (0);
