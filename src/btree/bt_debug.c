@@ -324,6 +324,26 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 }
 
 /*
+ * __debug_shape_size --
+ *	Pretty-print the size of a node.
+ */
+static char *
+__debug_shape_size(WT_PAGE *page)
+{
+	uint64_t v;
+	static char buf[32];
+
+	v = page->memory_footprint;
+	if (v >= WT_GIGABYTE)
+		snprintf(buf, sizeof(buf), "(%" PRIu64 "G)", v / WT_GIGABYTE);
+	else if (v >= WT_MEGABYTE)
+		snprintf(buf, sizeof(buf), "(%" PRIu64 "M)", v / WT_MEGABYTE);
+	else
+		snprintf(buf, sizeof(buf), "(%" PRIu64 ")", v);
+	return (buf);
+}
+
+/*
  * __debug_shape_worker --
  *	Dump information about the current node and descend.
  */
@@ -333,13 +353,15 @@ __debug_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 	WT_REF *ref;
 
 	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
-		__dmsg(ds, "%*s", level, "I\n");
+		__dmsg(ds, "%*s" "I" "%s\n",
+		    level, " ", __debug_shape_size(page));
 		WT_INTL_FOREACH_BEGIN(page, ref) {
 			if (ref->state == WT_REF_MEM)
 				__debug_shape_worker(ds, ref->page, level + 5);
 		} WT_INTL_FOREACH_END;
 	} else
-		__dmsg(ds, "%*s", level, "L\n");
+		__dmsg(ds, "%*s" "L" "%s\n",
+		    level, " ", __debug_shape_size(page));
 }
 
 /*
