@@ -170,15 +170,17 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_ADDR *addr, *refaddr;
 	WT_BTREE *btree;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc, *alloc_ref, *parent_ref, **refp, *ref;
 	size_t size;
 	uint32_t chunk, entries, i, j, remain, slots;
-	void *p;
+	void *p, *t;
 
 	btree = S2BT(session);
+	unpack = &_unpack;
 	alloc_index = NULL;
 	alloc_ref = NULL;
 
@@ -212,10 +214,9 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		slots = i == entries - 1 ? remain : chunk;
 		WT_ERR(__wt_page_alloc(session, page->type, 0, slots, &child));
 
-		/* Initialize the parent page reference. */
+		/* Initialize the parent page's child reference. */
 		parent_ref->page = child;
 		parent_ref->addr = NULL;
-		parent_ref->key = (*refp)->key;
 		if (page->type == WT_PAGE_ROW_INT) {
 			__wt_ref_key(page, *refp, &p, &size);
 			WT_ERR(__wt_row_ikey_incr(session,
@@ -250,16 +251,23 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 			ref->page = (*refp)->page;
 
 			refaddr = (*refp)->addr;
+			if (__wt_off_page(page, refaddr)) {
+				t = refaddr->addr;
+				size = refaddr->size;
+			} else {
+				__wt_cell_unpack((WT_CELL *)refaddr, unpack);
+				t = refaddr;
+				size = __wt_cell_total_len(unpack);
+			}
 			WT_ERR(__wt_calloc_def(session, 1, &addr));
-			if ((ret =
-			    __wt_calloc(session, 1, refaddr->size, &p)) != 0) {
+			if ((ret = __wt_calloc(session, 1, size, &p)) != 0) {
 				__wt_free(session, addr);
 				WT_ERR(ret);
 			}
+			memcpy(p, t, size);
 			addr->addr = p;
-			addr->size = refaddr->size;
-			addr->type = refaddr->type;
-			memcpy(addr->addr, refaddr->addr, refaddr->size);
+			addr->size = (uint8_t)size;
+			addr->type = WT_ADDR_INT;
 			ref->addr = addr;
 
 			if (page->type == WT_PAGE_ROW_INT) {
