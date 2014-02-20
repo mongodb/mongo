@@ -133,7 +133,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, mod->splits);
 
 	/* Free the reconciliation-created array of split pages. */
-	__wt_free(session, mod->split_ref);
+	__wt_free(session, mod->multi_ref);
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {

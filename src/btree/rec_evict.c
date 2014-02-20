@@ -223,7 +223,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc, *alloc_ref, *parent_ref, **refp, *ref;
-	size_t size;
+	size_t incr, parent_incr, size;
 	uint32_t chunk, entries, i, j, remain, slots;
 	void *p;
 
@@ -279,6 +279,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Allocate new child pages, and insert into the WT_REF array. */
 	chunk = (pindex->entries - SPLIT_CORRECT_2) / entries;
 	remain = (pindex->entries - SPLIT_CORRECT_2) - chunk * (entries - 1);
+	parent_incr = 0;
 	for (refp = pindex->index + SPLIT_CORRECT_1,
 	    parent_ref = alloc_ref, i = 0; i < entries; ++parent_ref, ++i) {
 		slots = i == entries - 1 ? remain : chunk;
@@ -289,8 +290,9 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		parent_ref->addr = NULL;
 		if (page->type == WT_PAGE_ROW_INT) {
 			__wt_ref_key(page, *refp, &p, &size);
-			WT_ERR(__wt_row_ikey_incr(session,
-			    page, 0, p, size, &parent_ref->key.ikey));
+			WT_ERR(__wt_row_ikey(
+			    session, 0, p, size, &parent_ref->key.ikey));
+			parent_incr += sizeof(WT_IKEY) + size;
 		} else
 			parent_ref->key.recno = (*refp)->key.recno;
 		parent_ref->txnid = 0;			/* XXXKEITH 0? */
@@ -316,22 +318,27 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * long as we do it in an order that won't confuse other threads
 		 * of control in the page.  For now, I'm copying everything.)
 		 */
-		for (ref = child->pu_intl_oindex,
+		for (ref = child->pu_intl_oindex, incr = 0,
 		    j = 0; j < slots; ++refp, ++ref, ++j) {
 			ref->page = (*refp)->page;
 			WT_ERR(__rec_split_copy_addr(
 			    session, page, (*refp)->addr, &ref->addr));
 			if (page->type == WT_PAGE_ROW_INT) {
 				__wt_ref_key(page, *refp, &p, &size);
-				WT_ERR(__wt_row_ikey_incr(session,
-				    page, 0, p, size, &ref->key.ikey));
+				WT_ERR(__wt_row_ikey(
+				    session, 0, p, size, &ref->key.ikey));
+				incr += sizeof(WT_IKEY) + size;
 			} else
 				ref->key.recno = (*refp)->key.recno;
 			ref->txnid = (*refp)->txnid;
 			ref->state = (*refp)->state;
 		}
+		if (incr != 0)
+			__wt_cache_page_inmem_incr(session, child, incr);
 		WT_ASSERT(session, ref - child->pu_intl_oindex == slots);
 	}
+	if (parent_incr != 0)
+		__wt_cache_page_inmem_incr(session, page, parent_incr);
 	WT_ASSERT(session, parent_ref - alloc_ref == entries);
 	WT_ASSERT(session,
 	    refp - pindex->index == pindex->entries - SPLIT_CORRECT_1);
@@ -435,14 +442,14 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * page's list.
 	 */
 	WT_ERR(__rec_split_list_alloc(session, parent_mod, &i));
-	parent_mod->splits[i].refs = mod->split_ref;
-	parent_mod->splits[i].entries = mod->split_entries;
+	parent_mod->splits[i].refs = mod->multi_ref;
+	parent_mod->splits[i].entries = mod->multi_entries;
 
 	/* Allocate a new WT_REF index array and initialize it. */
 	pindex = parent->pu_intl_index;
 	parent_entries = pindex->entries;
-	split = mod->split_ref;
-	split_entries = mod->split_entries;
+	split = mod->multi_ref;
+	split_entries = mod->multi_entries;
 	result_entries = (parent_entries - 1) + split_entries;
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_PAGE_INDEX) +
 	    result_entries * sizeof(WT_REF *), &alloc_index));
@@ -457,12 +464,12 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 			refp++;
 
 	/* Update the parent page's footprint. */
-	__wt_cache_page_inmem_incr(session, parent, mod->split_size);
+	__wt_cache_page_inmem_incr(session, parent, mod->multi_size);
 
 	/* We've stolen the page's WT_REF structures, clear the references. */
-	mod->split_ref = NULL;
-	mod->split_entries = 0;
-	mod->split_size = 0;
+	mod->multi_ref = NULL;
+	mod->multi_entries = 0;
+	mod->multi_size = 0;
 
 	/*
 	 * Update the parent page's index: this is the update that splits the

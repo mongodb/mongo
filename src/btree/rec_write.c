@@ -422,7 +422,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	WT_VERBOSE_RET(session, split,
-	    "root page split -> %" PRIu32 " pages", mod->split_entries);
+	    "root page split -> %" PRIu32 " pages", mod->multi_entries);
 
 	/*
 	 * Create a new root page, initialize the array of child references,
@@ -431,11 +431,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_COL_INT, 1, mod->split_entries, &next));
+		    session, WT_PAGE_COL_INT, 1, mod->multi_entries, &next));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_ROW_INT, 0, mod->split_entries, &next));
+		    session, WT_PAGE_ROW_INT, 0, mod->multi_entries, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -448,9 +448,9 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	mod->root_split = next;
 
-	a = mod->split_ref;
+	a = mod->multi_ref;
 	b = next->pu_intl_index->index[0];
-	for (i = 0; i < mod->split_entries; ++i)
+	for (i = 0; i < mod->multi_entries; ++i)
 		*b++ = *a++;
 
 	WT_RET(__wt_page_modify_init(session, next));
@@ -2426,7 +2426,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	mod = page->modify;
 
 	/* For each entry in the split array... */
-	for (ref = mod->split_ref, i = 0; i < mod->split_entries; ++ref, ++i) {
+	for (ref = mod->multi_ref, i = 0; i < mod->multi_entries; ++ref, ++i) {
 		/* Update the starting record number in case we split. */
 		r->recno = ref->key.recno;
 
@@ -3275,7 +3275,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	mod = page->modify;
 
 	/* For each entry in the split array... */
-	for (ref = mod->split_ref, i = 0; i < mod->split_entries; ++ref, ++i) {
+	for (ref = mod->multi_ref, i = 0; i < mod->multi_entries; ++ref, ++i) {
 		/* Build the key and value cells. */
 		__wt_ref_key(NULL, ref, &p, &size);
 		WT_RET(__rec_cell_build_int_key(
@@ -3748,13 +3748,13 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * A page that split is being reconciled for the second, or subsequent
 	 * time; discard underlying block space used in the last reconciliation.
 	 */
-	for (i = 0, ref = mod->split_ref; i < mod->split_entries; ++i, ++ref)
+	for (i = 0, ref = mod->multi_ref; i < mod->multi_entries; ++i, ++ref)
 		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
 		    ((WT_ADDR *)ref->addr)->size));
-	__wt_free(session, mod->split_ref);
-	mod->split_entries = 0;
-	mod->split_size = 0;
+	__wt_free(session, mod->multi_ref);
+	mod->multi_entries = 0;
+	mod->multi_size = 0;
 
 	/*
 	 * This routine would be trivial, and only walk a single page freeing
@@ -4088,9 +4088,9 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 	__wt_cache_page_inmem_incr(session, page, size);
 
-	page->modify->split_ref = split_ref;
-	page->modify->split_entries = r->bnd_next;
-	page->modify->split_size = size;
+	page->modify->multi_ref = split_ref;
+	page->modify->multi_entries = r->bnd_next;
+	page->modify->multi_size = size;
 
 	return (0);
 
@@ -4134,9 +4134,9 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 	__wt_cache_page_inmem_incr(session, page, size);
 
-	page->modify->split_ref = split_ref;
-	page->modify->split_entries = r->bnd_next;
-	page->modify->split_size = size;
+	page->modify->multi_ref = split_ref;
+	page->modify->multi_entries = r->bnd_next;
+	page->modify->multi_size = size;
 
 	return (0);
 

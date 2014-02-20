@@ -224,13 +224,14 @@ struct __wt_page_modify {
 	uint32_t splits_slots;		/* Split child WT_REFs count */
 
 	/*
-	 * When pages are split, they are represented by a WT_REF array.
+	 * When reconciled pages are written as multiple blocks, they are
+	 * represented by a WT_REF array.
 	 * XXXKEITH
 	 * Internal and leaf pages can have these.
 	 */
-	WT_REF	*split_ref;		/* Resulting split WT_REF array */
-	uint32_t split_entries;		/* Resulting split element count */
-	size_t	 split_size;		/* Resulting split memory footprint */
+	WT_REF	*multi_ref;		/* Multi-block WT_REF array */
+	uint32_t multi_entries;		/* Multi-block element count */
+	size_t	 multi_size;		/* Multi-block memory footprint */
 
 	/*
 	 * XXXKEITH
