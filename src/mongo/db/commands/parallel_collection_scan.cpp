@@ -189,18 +189,20 @@ namespace mongo {
             Database* db = cc().database();
             Collection* collection = db->getCollection( ns );
 
-            if ( !collection ) {
-                errmsg = "ns does not exist";
-                return false;
-            }
-
+            if ( !collection )
+                return appendCommandStatus( result,
+                                            Status( ErrorCodes::NamespaceNotFound,
+                                                    str::stream() <<
+                                                    "ns does not exist: " << ns.ns() ) );
 
             size_t numCursors = static_cast<size_t>( cmdObj["numCursors"].numberInt() );
 
-            if ( numCursors == 0 || numCursors > 10000 ) {
-                errmsg = "numCursors has to be between 1 and 10000";
-                return false;
-            }
+            if ( numCursors == 0 || numCursors > 10000 )
+                return appendCommandStatus( result,
+                                            Status( ErrorCodes::BadValue,
+                                                    str::stream() <<
+                                                    "numCursors has to be between 1 and 10000" <<
+                                                    " was: " << numCursors ) );
 
             vector< vector<ExtentInfo> > buckets;
 
