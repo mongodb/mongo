@@ -563,6 +563,7 @@ namespace replset {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _currentSyncTarget = target;
             }
+            theReplSet->syncSourceFeedback.connect(target);
 
             return;
         }
