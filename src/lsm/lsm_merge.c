@@ -82,7 +82,7 @@ __wt_lsm_merge(
 		aggressive = 10;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
-	max_level = (id == 0 ? 0 : id - 1) + aggressive;
+	max_level = (lsm_tree->merge_throttle > 0) ? 0 : id + aggressive;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't

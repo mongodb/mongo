@@ -692,9 +692,9 @@ __wt_lsm_tree_throttle(
 	else if (!decrease_only)
 		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
 
-	/* Put an upper bound of 100ms on both throttle calculations. */
-	lsm_tree->ckpt_throttle = WT_MIN(100000, lsm_tree->ckpt_throttle);
-	lsm_tree->merge_throttle = WT_MIN(100000, lsm_tree->merge_throttle);
+	/* Put an upper bound of 1s on both throttle calculations. */
+	lsm_tree->ckpt_throttle = WT_MIN(1000000, lsm_tree->ckpt_throttle);
+	lsm_tree->merge_throttle = WT_MIN(1000000, lsm_tree->merge_throttle);
 
 	/*
 	 * Update our estimate of how long each in-memory chunk stays active.
