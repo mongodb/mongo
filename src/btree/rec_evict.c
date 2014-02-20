@@ -369,21 +369,21 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/*
 	 * Fix up the children; this is the change that makes the split visible
 	 * to threads already in the tree.
-	 *
-	 * This is really two nested WT_INTL_FOREACH_BEGIN calls, but that won't
-	 * work, hard-code one of them.
 	 */
 	pindex = page->pu_intl_index;
 	for (refp = pindex->index + SPLIT_CORRECT_1,
 	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++refp, --i) {
 		parent_ref = *refp;
-		child = parent_ref->page;
-		if (parent_ref->state != WT_REF_MEM ||
-		    (child->type != WT_PAGE_ROW_INT &&
-		    child->type != WT_PAGE_COL_INT))
+		if (parent_ref->state != WT_REF_MEM)
 			continue;
+		child = parent_ref->page;
+		if (child->type != WT_PAGE_ROW_INT &&
+		    child->type != WT_PAGE_COL_INT)
+			continue;
+		WT_ASSERT(session, child->parent == page);
 		WT_INTL_FOREACH_BEGIN(child, ref) {
 			if (ref->state == WT_REF_MEM) {
+				WT_ASSERT(session, ref->page->parent == page);
 				ref->page->parent = child;
 				ref->page->ref_hint = 0;
 			}
