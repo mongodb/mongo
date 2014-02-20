@@ -7,7 +7,7 @@ testServer.getDB("admin").runCommand( {setParameter:1, ttlMonitorEnabled : false
 var t = db.update_yield1;
 t.drop();
 
-var N = 10000;
+var N = 640000;
 var i = 0;
 
 while ( true ){
