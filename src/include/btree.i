@@ -203,6 +203,7 @@ static inline int
 __wt_page_refp(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
+	WT_PAGE_INDEX *pindex;
 	WT_PAGE *parent;
 	uint32_t i;
 
@@ -216,7 +217,7 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
 retry:	parent = page->parent;
-	*pindexp = parent->pu_intl_index;
+	pindex = *pindexp = parent->pu_intl_index;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -224,14 +225,14 @@ retry:	parent = page->parent;
 	 * we don't bother initializing it everywhere, it only implies the first
 	 * retrieval is slower.
 	 */
-	if (page->ref_hint < (*pindexp)->entries &&
-	    (*pindexp)->index[page->ref_hint]->page == page) {
+	if (page->ref_hint < pindex->entries &&
+	    pindex->index[page->ref_hint]->page == page) {
 		*slotp = page->ref_hint;
 		return (0);
 	}
 
-	for (i = page->ref_hint + 1; i < (*pindexp)->entries; ++i)
-		if ((*pindexp)->index[i]->page == page) {
+	for (i = page->ref_hint + 1; i < pindex->entries; ++i)
+		if (pindex->index[i]->page == page) {
 			*slotp = page->ref_hint = i;
 			return (0);
 		}
@@ -240,8 +241,8 @@ retry:	parent = page->parent;
 	 * If we don't find it, the page must have split, start the search from
 	 * the beginning of the page.
 	 */
-	for (i = 0; i < (*pindexp)->entries; ++i)
-		if ((*pindexp)->index[i]->page == page) {
+	for (i = 0; i < pindex->entries; ++i)
+		if (pindex->index[i]->page == page) {
 			*slotp = page->ref_hint = i;
 			return (0);
 		}
