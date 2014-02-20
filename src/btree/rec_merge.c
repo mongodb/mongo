@@ -532,11 +532,4 @@ err:	WT_VERBOSE_TRET(session, evict,
 		__wt_page_out(session, &rchild);
 	return (ret);
 }
-#else
-	int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
-{
-	(void)session;
-	(void)top;
-	return (EBUSY);
-}
 #endif
