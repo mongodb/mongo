@@ -163,10 +163,14 @@ __wt_lsm_merge(
 
 		/*
 		 * If the size of the chunks selected so far exceeds the
-		 * configured maximum chunk size, stop.
+		 * configured maximum chunk size, stop.  Keep going if we can
+		 * slide the window further into the tree: we don't want to
+		 * leave small chunks in the middle.
 		 */
 		if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
-			break;
+			if (nchunks < merge_min ||
+			    chunk_size - youngest->size > lsm_tree->chunk_max)
+				break;
 
 		/*
 		 * If we have enough chunks for a merge and the next chunk is
@@ -184,7 +188,12 @@ __wt_lsm_merge(
 		record_count += chunk->count;
 		--start_chunk;
 
-		if (nchunks == lsm_tree->merge_max) {
+		/*
+		 * If we have a full window, or the merge would be too big,
+		 * remove the youngest chunk.
+		 */
+		if (nchunks == lsm_tree->merge_max ||
+		    chunk_size > lsm_tree->chunk_max) {
 			WT_ASSERT(session,
 			    F_ISSET(youngest, WT_LSM_CHUNK_MERGING));
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
