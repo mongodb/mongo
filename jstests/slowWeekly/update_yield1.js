@@ -76,13 +76,17 @@ join = startParallelShell( "db.update_yield1.update( { $atomic : true } , { $inc
 assert.soon(haveInProgressUpdate, "never doing update 2");
 
 while ( 1 ) {
-    t.findOne(); // should wait for update to finish
+    t.findOne();
 
     x = db.currentOp();
     if ( x.inprog.length == 0 )
         break;
 
-    assert( x.inprog.length == 1 && x.inprog[0].op == "update" , tojson( x ) );
+    assert.eq( x.inprog.length, 1 );
+    assert( (x.inprog[0].op == "update") ||
+            // If we see the getlasterror running, that is ok.
+            (x.inprog[0].op == "query" && 
+             x.inprog[0].query == { "getlasterror" : 1 }), tojson( x ) );
 
     assert( x.inprog[0].numYields == 0 , tojson( x ) );
 
