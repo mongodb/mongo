@@ -229,7 +229,8 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 		/* Check to see if the eviction server should run. */
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-			flags = WT_EVICT_PASS_ALL;
+			flags = (loop > 10) ?
+			    WT_EVICT_PASS_AGGRESSIVE : WT_EVICT_PASS_ALL;
 		else if (dirty_inuse >
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			/* Ignore clean pages unless the cache is too large */
@@ -751,9 +752,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 
 		/*
 		 * Each time we reenter this function, start at the next handle
-		 * on the list.  We use the address of the handle's name as the
-		 * handle's unique identifier, that should be unique, and is
-		 * unlikely to cause a false positive if freed and reallocated.
+		 * on the list.
 		 */
 		if (cache->evict_file_next != NULL &&
 		    cache->evict_file_next != dhandle)
@@ -769,7 +768,16 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		 */
 		btree = dhandle->handle;
 		if (btree->root_page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->bulk_load_ok)
+		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+		    btree->bulk_load_ok)
+			continue;
+
+		/*
+		 * Also skip files that are configured to stick in cache until
+		 * we get aggressive.
+		 */
+		if (btree->evict_priority != 0 &&
+		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
 			continue;
 
 		__wt_spin_lock(session, &cache->evict_walk_lock);
