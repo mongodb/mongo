@@ -183,6 +183,16 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, ss);
             }
 
+            // Make sure not to cache solutions which use '2d' indices.
+            // A 2d index that doesn't wrap on one query may wrap on another, so we have to
+            // check that the index is OK with the predicate. The only thing we have to do
+            // this for is 2d.  For now it's easier to move ahead if we don't cache 2d.
+            //
+            // TODO: revisit with a post-cached-index-assignment compatibility check
+            if (is2DIndex(relevantIndices[itag->index].keyPattern)) {
+                return Status(ErrorCodes::BadValue, "can't cache '2d' index");
+            }
+
             IndexEntry* ientry = new IndexEntry(relevantIndices[itag->index]);
             indexTree->entry.reset(ientry);
             indexTree->index_pos = itag->pos;

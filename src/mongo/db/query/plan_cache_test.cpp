@@ -256,44 +256,55 @@ namespace {
     }
 
     /**
-     * $geoWithin queries with legacy coordinates are non-cacheable because legacy coordinates
-     * cause issues for the bounds builder.
+     * $geoWithin queries with legacy coordinates are cacheable as long as
+     * the planner is able to come up with a cacheable solution.
      */
-    TEST(PlanCacheTest, ShouldNotCacheQueryWithGeoWithinLegacyCoordinates) {
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyCoordinates) {
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoWithin: "
                                                  "{$box: [[-180, -90], [180, 90]]}}}"));
-        assertShouldNotCacheQuery(*cq);
+        assertShouldCacheQuery(*cq);
     }
 
     /**
-     * XXX: $geoWithin queries with GeoJSON coordinates are also disallowed because they
-     * have the same query shape as queries using legacy coordinates.
+     * $geoWithin queries with GeoJSON coordinates are supported by the index bounds builder.
      */
-    TEST(PlanCacheTest, ShouldNotCacheQueryWithGeoWithinJSONCoordinates) {
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinJSONCoordinates) {
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoWithin: "
                                                  "{$geometry: {type: 'Polygon', coordinates: "
                                                  "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
-        assertShouldNotCacheQuery(*cq);
+        assertShouldCacheQuery(*cq);
     }
 
     /**
-     * $geoIntersects share the same matcher type as $geoWithin.
+     * $geoWithin queries with both legacy and GeoJSON coordinates are cacheable.
      */
-    TEST(PlanCacheTest, ShouldNotCacheQueryWithGeoIntersectsLegacyCoordinates) {
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyAndJSONCoordinates) {
+        auto_ptr<CanonicalQuery> cq(canonicalize(
+            "{$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', "
+                                                 "coordinates: [[[0, 0], [0, 90], "
+                                                                "[90, 0], [0, 0]]]}}}},"
+                   "{a: {$geoWithin: {$box: [[-180, -90], [180, 90]]}}}]}"));
+        assertShouldCacheQuery(*cq);
+    }
+
+    /**
+     * $geoIntersects queries are always cacheable because they support GeoJSON coordinates only.
+     */
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoIntersects) {
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoIntersects: "
                                                  "{$geometry: {type: 'Point', coordinates: "
                                                  "[10.0, 10.0]}}}}"));
-        assertShouldNotCacheQuery(*cq);
+        assertShouldCacheQuery(*cq);
     }
 
     /**
-     * XXX: $geoNear queries are non-cacheable because we are unable to distinguish
+     * $geoNear queries are cacheable because we are able to distinguish
      * between flat and spherical queries.
      */
     TEST(PlanCacheTest, ShouldNotCacheQueryWithGeoNear) {
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoNear: {$geometry: {type: 'Point',"
                                                  "coordinates: [0,0]}, $maxDistance:100}}}"));
-        assertShouldNotCacheQuery(*cq);
+        assertShouldCacheQuery(*cq);
     }
 
     // Adding an empty vector of query solutions should fail.
@@ -691,13 +702,61 @@ namespace {
     // Geo
     //
 
-    // Queries with geo operators are non-cacheable but
-    // queries that rely on geo indexes are fine.
+    TEST_F(CachePlanSelectionTest, Basic2DSphereNonNear) {
+        addIndex(BSON("a" << "2dsphere"));
+        BSONObj query;
+
+        query = fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
+                                                           "coordinates: [10.0, 10.0]}}}}");
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query,
+            "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+
+        query = fromjson("{a : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}");
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query,
+            "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+    }
+
+    TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNear) {
+        addIndex(BSON("a" << "2dsphere"));
+        BSONObj query;
+
+        query = fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query, "{geoNear2dsphere: {a: '2dsphere'}}");
+
+        query = fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
+                                          "$maxDistance:100}}}");
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query, "{geoNear2dsphere: {a: '2dsphere'}}");
+    }
+
+    TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNearReverseCompound) {
+        addIndex(BSON("x" << 1));
+        addIndex(BSON("x" << 1 << "a" << "2dsphere"));
+        BSONObj query = fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query, "{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
+    }
+
     TEST_F(CachePlanSelectionTest, TwoDSphereNoGeoPred) {
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(BSON("x" << 1));
         assertPlanCacheRecoversSolution(BSON("x" << 1),
             "{fetch: {node: {ixscan: {pattern: {x: 1, a: '2dsphere'}}}}}");
+    }
+
+    TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
+        addIndex(BSON("a" << "2dsphere"));
+        addIndex(BSON("b" << "2dsphere"));
+        BSONObj query = fromjson("{$or: [ {a: {$geoIntersects: {$geometry: {type: 'Point', coordinates: [10.0, 10.0]}}}},"
+                                 " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}");
+
+        runQuery(query);
+        assertPlanCacheRecoversSolution(query,
+            "{or: {nodes: [{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
+                          "{fetch: {node: {ixscan: {pattern: {b: '2dsphere'}}}}}]}}");
     }
 
     //
@@ -781,6 +840,19 @@ namespace {
             "{fetch: {filter: null, node: {or: {nodes: ["
                 "{ixscan: {filter: null, pattern: {a: 1, c: 1}}}, "
                 "{ixscan: {filter: null, pattern: {b: 1, c: 1}}}]}}}}");
+    }
+
+    // SERVER-10801
+    TEST_F(CachePlanSelectionTest, SortOnGeoQuery) {
+        addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
+        BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", "
+                                 "coordinates: [[[1, 1], [1, 90], [180, 90], "
+                                 "[180, 1], [1, 1]]]}}}}");
+        BSONObj sort = fromjson("{timestamp: -1}");
+        runQuerySortProj(query, sort, BSONObj());
+
+        assertPlanCacheRecoversSolution(query, sort, BSONObj(),
+            "{fetch: {node: {ixscan: {pattern: {timestamp: -1, position: '2dsphere'}}}}}");
     }
 
     // SERVER-9257
@@ -874,11 +946,7 @@ namespace {
 
     //
     // Queries using '2d' indices are not cached.
-    // XXX: In the query framework, solutions are added to plan cache
-    //      by multi plan runner after calling shouldCacheQuery.
-    //      Since the multi plan runner is not part of the scope of this
-    //      test, 'solns' will still hold the generation solutions. We will
-    //      explicitly check the cacheability of the query using shouldCacheQuery().
+    //
 
     TEST_F(CachePlanSelectionTest, Basic2DNonNearNotCached) {
         addIndex(BSON("a" << "2d"));
@@ -887,26 +955,22 @@ namespace {
         // Polygon
         query = fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}");
         runQuery(query);
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
-        assertShouldNotCacheQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
         // Center
         query = fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}");
         runQuery(query);
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
-        assertShouldNotCacheQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
         // Centersphere
         query = fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}");
         runQuery(query);
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
-        assertShouldNotCacheQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
         // Within box.
         query = fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}");
         runQuery(query);
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
-        assertShouldNotCacheQuery(query);
+        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
     }
 
     TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
@@ -916,9 +980,7 @@ namespace {
                                         " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}");
 
         runQuery(query);
-        assertSolutionExists("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, "
-                                                          "{geo2d: {b: '2d'}}]}}}}");
-        assertShouldNotCacheQuery(query);
+        assertNotCached("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}}");
     }
 
 }  // namespace

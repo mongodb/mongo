@@ -76,20 +76,6 @@ namespace mongo {
             return false;
         }
 
-        // $geoWithin (which replaces the deprecated $within)
-        // This operator supports both GeoJSON and legacy coordinates which
-        // makes it tricky to execute $geoWithin queries using a cached plan.
-        // This also disallows $geoIntersects.
-        if (CanonicalQuery::countNodes(expr, MatchExpression::GEO) > 0) {
-            return false;
-        }
-
-        // XXX: $geoNear is disallowed because we cannot distinguish between flat and spherical
-        // queries at the moment.
-        if (CanonicalQuery::countNodes(expr, MatchExpression::GEO_NEAR) > 0) {
-            return false;
-        }
-
         return true;
     }
 

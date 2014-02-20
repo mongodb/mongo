@@ -475,4 +475,29 @@ namespace {
         testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqap1a.$");
     }
 
+    // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should
+    // not be the same.
+    TEST(PlanCacheTest, GetPlanCacheKeyGeoWithin) {
+        // Legacy coordinates.
+        auto_ptr<CanonicalQuery> cqLegacy(canonicalize("{a: {$geoWithin: "
+                                                       "{$box: [[-180, -90], [180, 90]]}}}"));
+        // GeoJSON coordinates.
+        auto_ptr<CanonicalQuery> cqNew(canonicalize("{a: {$geoWithin: "
+                                                    "{$geometry: {type: 'Polygon', coordinates: "
+                                                    "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
+        ASSERT_NOT_EQUALS(cqLegacy->getPlanCacheKey(), cqNew->getPlanCacheKey());
+    }
+
+    // GEO_NEAR cache keys should include information on geometry and CRS in addition
+    // to the match type and field name.
+    TEST(PlanCacheTest, GetPlanCacheKeyGeoNear) {
+        testGetPlanCacheKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}",
+                            "gnanrfl");
+        testGetPlanCacheKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}",
+                            "gnansfl");
+        testGetPlanCacheKey("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
+                            "$maxDistance:100}}}", "{}", "{}",
+                            "gnanrsp");
+    }
+
 }
