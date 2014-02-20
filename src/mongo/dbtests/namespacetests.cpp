@@ -34,7 +34,7 @@
 
 #include "mongo/db/db.h"
 #include "mongo/db/index/btree_key_generator.h"
-#include "mongo/db/index/expression_key_generator.h"
+#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/json.h"
@@ -987,10 +987,10 @@ namespace NamespaceTests {
 
                 // Call getKeys on the nullObj.
                 BSONObjSet nullFieldKeySet;
-                getHashKeys(nullObj, "a", 0, 0, false, &nullFieldKeySet);
+                ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0, 0, false, &nullFieldKeySet);
                 BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
-                ASSERT_EQUALS( makeSingleHashKey( nullObj.firstElement(), 0, 0 ),
+                ASSERT_EQUALS( ExpressionKeysPrivate::makeSingleHashKey( nullObj.firstElement(), 0, 0 ),
                                nullFieldFromKey.Long() );
 
                 BSONObj missingField = IndexLegacy::getMissingField(NULL,spec);
@@ -1010,10 +1010,10 @@ namespace NamespaceTests {
                 BSONObj nullObj = BSON( "a" << BSONNULL );
 
                 BSONObjSet nullFieldKeySet;
-                getHashKeys(nullObj, "a", 0x5eed, 0, false, &nullFieldKeySet);
+                ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0x5eed, 0, false, &nullFieldKeySet);
                 BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
 
-                ASSERT_EQUALS( makeSingleHashKey( nullObj.firstElement(), 0x5eed, 0 ),
+                ASSERT_EQUALS( ExpressionKeysPrivate::makeSingleHashKey( nullObj.firstElement(), 0x5eed, 0 ),
                                nullFieldFromKey.Long() );
 
                 // Ensure that getMissingField recognizes that the seed is different (and returns
