@@ -1,36 +1,35 @@
 
-load( "jstests/libs/slow_weekly_util.js" )
-testServer = new SlowWeeklyMongod( "update_yield1" )
-db = testServer.getDB( "test" );
+load( "jstests/libs/slow_weekly_util.js" );
+var testServer = new SlowWeeklyMongod( "update_yield1" );
+var db = testServer.getDB( "test" );
 testServer.getDB("admin").runCommand( {setParameter:1, ttlMonitorEnabled : false} );
 
-t = db.update_yield1;
-t.drop()
+var t = db.update_yield1;
+t.drop();
 
-N = 10000;
-i = 0;
+var N = 10000;
+var i = 0;
 
 while ( true ){
-    function fill(){
+    var fill = function() {
         for ( ; i<N; i++ ){
-            t.insert( { _id : i , n : 1 } )
+            t.insert( { _id : i , n : 1 } );
         }
-    }
+    };
 
-     function timeUpdate(){
+    var timeUpdate = function() {
         return Date.timeFunc(
             function(){
                 t.update( {} , { $inc : { n : 1 } } , false , true );
                 var r = db.getLastErrorObj();
             }
         );
-
-    }
+    };
 
     fill();
     timeUpdate();
     timeUpdate();
-    time = timeUpdate();
+    var time = timeUpdate();
     print( N + "\t" + time );
     if ( time > 8000 )
         break;
@@ -39,7 +38,7 @@ while ( true ){
 }
 
 function haveInProgressUpdate() {
-    ops = db.currentOp();
+    var ops = db.currentOp();
     printjson(ops);
     return ops.inprog.some(
         function(elt) {
@@ -49,17 +48,17 @@ function haveInProgressUpdate() {
 
 // --- test 1
 
-join = startParallelShell( "db.update_yield1.update( {} , { $inc : { n : 1 } } , false , true ); db.getLastError()" );
+var join = startParallelShell( "db.update_yield1.update( {} , { $inc : { n : 1 } } , false , true ); db.getLastError()" );
 assert.soon(haveInProgressUpdate, "never doing update");
 
-num = 0;
-start = new Date();
+var num = 0;
+var start = new Date();
 while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
     var me = Date.timeFunc( function(){ t.findOne(); } );
     if (me > 50) print("time: " + me);
 
     if ( num++ == 0 ){
-        var x = db.currentOp()
+        var x = db.currentOp();
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
     }
 
@@ -68,7 +67,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
 
 join();
 
-var x = db.currentOp()
+x = db.currentOp();
 assert.eq( 0 , x.inprog.length , "weird 2" );
 
 // --- test 2
@@ -79,7 +78,7 @@ assert.soon(haveInProgressUpdate, "never doing update 2");
 while ( 1 ) {
     t.findOne(); // should wait for update to finish
 
-    var x = db.currentOp()
+    x = db.currentOp();
     if ( x.inprog.length == 0 )
         break;
 
