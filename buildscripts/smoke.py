@@ -649,7 +649,6 @@ def run_tests(tests):
                         test_result["elapsed"] = test_result["end"] - test_result["start"]
                         test_result["status"] = "skip"
 
-                        test_report["results"].append( test_result )
                         print "skipping " + test_path
                     else:
                         fails.append(test)
@@ -660,7 +659,8 @@ def run_tests(tests):
                         test_result["end"] = time.time()
                         test_result["elapsed"] = test_result["end"] - test_result["start"]
                         test_result["status"] = "pass"
-                        test_report["results"].append( test_result )
+
+                    test_report["results"].append( test_result )
 
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
