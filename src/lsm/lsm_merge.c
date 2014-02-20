@@ -104,21 +104,17 @@ __wt_lsm_merge(
 	 * Only include chunks that already have a Bloom filter and not
 	 * involved in a merge.
 	 */
-	end_chunk = lsm_tree->nchunks - 1;
-	while (end_chunk > 0 &&
-	    ((chunk = lsm_tree->chunk[end_chunk]) == NULL ||
-	    !F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
-	    F_ISSET(chunk, WT_LSM_CHUNK_MERGING))) {
-		--end_chunk;
-
-		/*
-		 * If we find a chunk on disk without a Bloom filter, give up.
-		 * We may have waited a while to lock the tree, and new chunks
-		 * may have been created in the meantime.
-		 */
-		if (chunk != NULL &&
+	for (end_chunk = lsm_tree->nchunks - 1; end_chunk > 0; --end_chunk) {
+		chunk = lsm_tree->chunk[end_chunk];
+		WT_ASSERT(session, chunk != NULL);
+		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
+			continue;
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+			break;
+		else if ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
+		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-			end_chunk = 0;
+			break;
 	}
 
 	/*
