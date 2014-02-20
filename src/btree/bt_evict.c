@@ -841,7 +841,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int modified, restarts, levels;
+	int modified, restarts;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
@@ -993,7 +993,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		    page->modify->update_txn)))
 			continue;
 
-add:		WT_ASSERT(session, evict->page == NULL);
+		WT_ASSERT(session, evict->page == NULL);
 		__evict_init_candidate(session, evict, page);
 		++evict;
 
