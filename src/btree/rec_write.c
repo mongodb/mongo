@@ -3903,8 +3903,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		F_SET(mod, WT_PM_REC_REPLACE);
 		break;
 	default:					/* Page split */
-		WT_VERBOSE_RET(session, split,
-		    "page %p split into %" PRIu32 " pages", page, r->bnd_next);
+		WT_VERBOSE_RET(session, reconcile,
+		    "page %p reconciled into %" PRIu32 " pages",
+		    page, r->bnd_next);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
