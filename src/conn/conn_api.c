@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 
 static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
-static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
  * ext_collate --
@@ -547,7 +546,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
 
 	WT_ERR(__conn_statistics_config(session, raw_cfg));
-	WT_ERR(__conn_verbose_config(session, raw_cfg));
+	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
@@ -934,11 +933,11 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __conn_verbose_config --
+ * __wt_conn_verbose_config --
  *	Set verbose configuration.
  */
-static int
-__conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
+int
+__wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
@@ -1109,7 +1108,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
 
-	WT_ERR(__conn_verbose_config(session, cfg));
+	WT_ERR(__wt_conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 

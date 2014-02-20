@@ -12,6 +12,7 @@ __wt_config_getone
 __wt_cursor_get_raw_value
 __wt_debug_addr
 __wt_debug_offset
+__wt_debug_set_verbose
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_debug_tree_shape

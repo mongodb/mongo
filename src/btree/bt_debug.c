@@ -53,6 +53,21 @@ static void __dmsg(WT_DBG *, const char *, ...)
 static void __dmsg_wrapup(WT_DBG *);
 
 /*
+ * __wt_debug_set_verbose --
+ *	Set verbose flags from the debugger.
+ */
+int
+__wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v)
+{
+	const char *cfg[2] = { NULL, NULL };
+	char buf[256];
+
+	snprintf(buf, sizeof(buf), "verbose=[%s]", v);
+	cfg[0] = buf;
+	return (__wt_conn_verbose_config(session, cfg));
+}
+
+/*
  * __debug_hex_byte --
  *	Output a single byte in hex.
  */
@@ -324,11 +339,11 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 }
 
 /*
- * __debug_shape_size --
- *	Pretty-print the size of a node.
+ * __debug_shape_info --
+ *	Pretty-print information about a node.
  */
 static char *
-__debug_shape_size(WT_PAGE *page)
+__debug_shape_info(WT_PAGE *page)
 {
 	uint64_t v;
 	static char buf[32];
@@ -354,14 +369,14 @@ __debug_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 
 	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
 		__dmsg(ds, "%*s" "I" "%s\n",
-		    level, " ", __debug_shape_size(page));
+		    level, " ", __debug_shape_info(page));
 		WT_INTL_FOREACH_BEGIN(page, ref) {
 			if (ref->state == WT_REF_MEM)
 				__debug_shape_worker(ds, ref->page, level + 3);
 		} WT_INTL_FOREACH_END;
 	} else
 		__dmsg(ds, "%*s" "L" "%s\n",
-		    level, " ", __debug_shape_size(page));
+		    level, " ", __debug_shape_info(page));
 }
 
 /*
