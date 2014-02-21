@@ -393,8 +393,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 
 /*
  * __wt_multi_to_ref --
- *	Copy a list of blocks into an optionally allocated array of WT_REF
- * structures.
+ *	Copy a list of blocks into an array of WT_REF structures.
  */
 int
 __wt_multi_to_ref(WT_SESSION_IMPL *session,
