@@ -103,7 +103,7 @@ WT_SESSION *session;
 
 /* Create and truncate the access table. */
 ret = session->create(session, "table:dev1/access",
-    "key_format=S,value_format=S,type=helium,helium_open_o_truncate=1");
+    "key_format=S,value_format=S,type=helium,helium_o_truncate=1");
 @endcode
 
 @section helium_notes Helium notes
