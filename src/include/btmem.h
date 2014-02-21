@@ -329,13 +329,13 @@ struct __wt_page {
 		struct {
 			uint64_t recno;		/* Starting recno */
 
-			WT_REF	*oindex;	/* Original children */
-			uint32_t oentries;	/* Original children count */
-
 			struct __wt_page_index {
 				uint32_t entries;
 				WT_REF	**index;
 			} * volatile index;	/* Collated children */
+
+			WT_REF	*oindex;	/* Original children */
+			uint32_t oentries;	/* Original children count */
 		} intl;
 #undef	pu_intl_recno
 #define	pu_intl_recno		u.intl.recno
