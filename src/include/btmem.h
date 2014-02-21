@@ -218,10 +218,10 @@ struct __wt_page_modify {
 	 * Only internal pages have these.
 	 */
 	struct __wt_split_chunk {
-		WT_REF	*refs;		/* Split child WT_REFs */
-		uint32_t entries;	/* Count of entries */
+		WT_REF	*refs;		/* Split child WT_REF arrays */
+		uint32_t entries;	/* Array element count */
 	} *splits;
-	uint32_t splits_slots;		/* Split child WT_REFs count */
+	uint32_t splits_entries;	/* Split child WT_REFs element count */
 
 	/*
 	 * When reconciled pages are written as multiple blocks, they are
@@ -229,7 +229,13 @@ struct __wt_page_modify {
 	 * XXXKEITH
 	 * Internal and leaf pages can have these.
 	 */
-	WT_REF	*multi_ref;		/* Multi-block WT_REF array */
+	struct __wt_multi {
+		WT_ADDR addr;		/* Address */
+		union {
+			uint64_t recno;	/* Column-store: starting recno */
+			WT_IKEY *ikey;	/* Row-store: key */
+		} key;
+	} *multi;
 	uint32_t multi_entries;		/* Multi-block element count */
 	size_t	 multi_size;		/* Multi-block memory footprint */
 

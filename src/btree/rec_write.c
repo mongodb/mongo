@@ -392,16 +392,63 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_multi_to_ref --
+ *	Copy a list of blocks into an optionally allocated array of WT_REF
+ * structures.
+ */
+int
+__wt_multi_to_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_MULTI *multi, WT_REF *refarg, uint32_t entries)
+{
+	WT_ADDR *addr;
+	WT_DECL_RET;
+	WT_REF *ref;
+	uint32_t i;
+
+	addr = NULL;
+	for (ref = refarg, i = 0; i < entries; ++multi, ++ref, ++i) {
+		ref->page = NULL;
+
+		WT_ERR(__wt_calloc_def(session, 1, &addr));
+		ref->addr = addr;
+		addr->size = multi->addr.size;
+		addr->type = multi->addr.type;
+		WT_ERR(__wt_strndup(session,
+		    multi->addr.addr, addr->size = multi->addr.size,
+		    &addr->addr));
+
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			WT_ERR(__wt_strndup(session,
+			    multi->key.ikey,
+			    multi->key.ikey->size + sizeof(WT_IKEY),
+			    &ref->key.ikey));
+			break;
+		default:
+			ref->key.recno = multi->key.recno;
+			break;
+		}
+
+		ref->txnid = 0;
+		ref->state = WT_REF_DISK;
+	}
+	return (0);
+
+err:	__wt_free_ref_array(session, page, refarg, entries);
+	return (ret);
+}
+
+/*
  * __rec_root_write --
  *	Handle the write of a root page.
  */
 static int
 __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
+	WT_DECL_RET;
 	WT_PAGE *next;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *a, *b;
-	uint32_t i;
 
 	mod = page->modify;
 
@@ -426,7 +473,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/*
 	 * Create a new root page, initialize the array of child references,
-	 * mark it dirty, and then write it.
+	 * mark it dirty, then write it.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
@@ -440,6 +487,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
+	WT_ERR(__wt_page_modify_init(session, next));
+	__wt_page_only_modify_set(session, next);
+
+	WT_ERR(__wt_multi_to_ref(session,
+	    next, mod->multi, next->pu_intl_oindex, mod->multi_entries));
+
 	/*
 	 * We maintain a list of pages written for the root in order to free the
 	 * backing blocks the next time the root is written.  We could allocate
@@ -448,16 +501,10 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	mod->root_split = next;
 
-	a = mod->multi_ref;
-	b = next->pu_intl_index->index[0];
-	for (i = 0; i < mod->multi_entries; ++i)
-		*b++ = *a++;
+	return (__wt_rec_write(session, next, NULL, flags));
 
-	WT_RET(__wt_page_modify_init(session, next));
-	__wt_page_only_modify_set(session, next);
-	WT_RET(__wt_rec_write(session, next, NULL, flags));
-
-	return (0);
+err:	__wt_page_out(session, &next);
+	return (ret);
 }
 
 /*
@@ -2418,22 +2465,22 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_KV *val;
+	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *ref;
 	uint32_t i;
 
 	val = &r->v;
 	mod = page->modify;
 
 	/* For each entry in the split array... */
-	for (ref = mod->multi_ref, i = 0; i < mod->multi_entries; ++ref, ++i) {
+	for (multi = mod->multi, i = 0; i < mod->multi_entries; ++multi, ++i) {
 		/* Update the starting record number in case we split. */
-		r->recno = ref->key.recno;
+		r->recno = multi->key.recno;
 
 		/* Build the value cell. */
-		addr = ref->addr;
+		addr = &multi->addr;
 		__rec_cell_build_addr(r,
-		    addr->addr, addr->size, __rec_vtype(addr), ref->key.recno);
+		    addr->addr, addr->size, __rec_vtype(addr), r->recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -3263,25 +3310,23 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_KV *key, *val;
+	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *ref;
-	size_t size;
 	uint32_t i;
 	int ovfl_key;
-	const void *p;
 
 	key = &r->k;
 	val = &r->v;
 	mod = page->modify;
 
 	/* For each entry in the split array... */
-	for (ref = mod->multi_ref, i = 0; i < mod->multi_entries; ++ref, ++i) {
+	for (multi = mod->multi, i = 0; i < mod->multi_entries; ++multi, ++i) {
 		/* Build the key and value cells. */
-		__wt_ref_key(NULL, ref, &p, &size);
-		WT_RET(__rec_cell_build_int_key(
-		    session, r, p, size, &ovfl_key));
+		WT_RET(__rec_cell_build_int_key(session, r,
+		    WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size,
+		    &ovfl_key));
 
-		addr = ref->addr;
+		addr = &multi->addr;
 		__rec_cell_build_addr(
 		    r, addr->addr, addr->size, __rec_vtype(addr), 0);
 
@@ -3738,7 +3783,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BM *bm;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *ref;
+	WT_MULTI *multi;
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
@@ -3748,12 +3793,18 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * A page that split is being reconciled for the second, or subsequent
 	 * time; discard underlying block space used in the last reconciliation.
 	 */
-	for (i = 0, ref = mod->multi_ref; i < mod->multi_entries; ++i, ++ref)
-		WT_RET(bm->free(bm, session,
-		    ((WT_ADDR *)ref->addr)->addr,
-		    ((WT_ADDR *)ref->addr)->size));
-
-	__wt_free(session, mod->multi_ref);
+	for (multi = mod->multi, i = 0; i < mod->multi_entries; ++multi, ++i) {
+		WT_RET(
+		    bm->free(bm, session, multi->addr.addr, multi->addr.size));
+		__wt_free(session, multi->addr.addr);
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			__wt_free(session, mod->multi[i].key.ikey);
+			break;
+		}
+	}
+	__wt_free(session, mod->multi);
 	mod->multi_entries = 0;
 	__wt_cache_page_inmem_decr(session, page, mod->multi_size);
 	mod->multi_size = 0;
@@ -4049,59 +4100,46 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 static int
 __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
-	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
-	WT_DECL_RET;
-	WT_REF *ref, *split_ref;
+	WT_MULTI *multi;
+	WT_PAGE_MODIFY *mod;
+	WT_REF *ref;
 	uint32_t i;
-	size_t size;
+	size_t incr, size;
 	void *p;
 
-	addr = NULL;
-	split_ref = NULL;
+	mod = page->modify;
 
 	/* We never set the first page's key, grab it from the original page. */
 	if (WT_PAGE_IS_ROOT(page))
-		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
+		WT_RET(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
 		ref = __wt_page_ref(session, page);
 		__wt_ref_key(page->parent, ref, &p, &size);
-		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, p, size));
+		WT_RET(__wt_buf_set(session, &r->bnd[0].key, p, size));
 	}
 
-	/* Allocate, then initialize the array of WT_REFs for the split. */
-	WT_ERR(__wt_calloc(session, r->bnd_next, sizeof(WT_REF), &split_ref));
-	size = r->bnd_next * sizeof(WT_REF);
+	/* Allocate, then initialize the array of replacement blocks. */
+	WT_RET(
+	    __wt_calloc(session, r->bnd_next, sizeof(WT_MULTI), &mod->multi));
+	incr = r->bnd_next * sizeof(WT_MULTI);
 
-	for (ref = split_ref,
-	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
-		*addr = bnd->addr;
+	for (multi = mod->multi,
+	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
+		multi->addr = bnd->addr;
 		bnd->addr.addr = NULL;
-		size += sizeof(WT_ADDR) + bnd->addr.size;
+		incr += sizeof(WT_ADDR) + multi->addr.size;
 
-		ref->page = NULL;
-		WT_ERR(__wt_row_ikey(session, 0,
-		    bnd->key.data, bnd->key.size, &ref->key.ikey));
-		size += sizeof(WT_IKEY) + bnd->key.size;
-		ref->addr = addr;
-		addr = NULL;
-		ref->state = WT_REF_DISK;
+		WT_RET(__wt_row_ikey(session, 0,
+		    bnd->key.data, bnd->key.size, &multi->key.ikey));
+		incr += sizeof(WT_IKEY) + bnd->key.size;
 	}
 
-	page->modify->multi_ref = split_ref;
-	page->modify->multi_entries = r->bnd_next;
-	__wt_cache_page_inmem_incr(session, page, size);
-	page->modify->multi_size = size;
+	__wt_cache_page_inmem_incr(session, page, incr);
+	mod->multi_entries = r->bnd_next;
+	mod->multi_size = incr;
 
 	return (0);
-
-err:	if (addr != NULL)
-		__wt_free(session, addr);
-	if (split_ref != NULL)
-		for (ref = split_ref, i = 0; i < r->bnd_next; ++i, ++ref)
-			__wt_free_ref(session, NULL, ref);
-	return (ret);
 }
 
 /*
@@ -4111,40 +4149,33 @@ err:	if (addr != NULL)
 static int
 __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
-	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
-	WT_DECL_RET;
-	WT_REF *ref, *split_ref;
-	size_t size;
+	WT_MULTI *multi;
+	WT_PAGE_MODIFY *mod;
+	size_t incr;
 	uint32_t i;
 
-	/* Allocate, then initialize the array of WT_REFs for the split. */
-	WT_RET(__wt_calloc(session, r->bnd_next, sizeof(WT_REF), &split_ref));
-	size = r->bnd_next * sizeof(WT_REF);
+	mod = page->modify;
 
-	for (ref = split_ref,
-	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
-		*addr= bnd->addr;
+	/* Allocate, then initialize the array of replacement blocks. */
+	WT_RET(
+	    __wt_calloc(session, r->bnd_next, sizeof(WT_MULTI), &mod->multi));
+	incr = r->bnd_next * sizeof(WT_MULTI);
+
+	for (multi = mod->multi,
+	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
+		multi->addr = bnd->addr;
 		bnd->addr.addr = NULL;
-		size += sizeof(WT_ADDR) + bnd->addr.size;
+		incr += sizeof(WT_ADDR) + multi->addr.size;
 
-		ref->page = NULL;
-		ref->key.recno = bnd->recno;
-		ref->addr = addr;
-		ref->state = WT_REF_DISK;
+		multi->key.recno = bnd->recno;
 	}
-	__wt_cache_page_inmem_incr(session, page, size);
 
-	page->modify->multi_ref = split_ref;
-	page->modify->multi_entries = r->bnd_next;
-	page->modify->multi_size = size;
+	__wt_cache_page_inmem_incr(session, page, incr);
+	mod->multi_entries = r->bnd_next;
+	mod->multi_size = incr;
 
 	return (0);
-
-err:	for (ref = split_ref, i = 0; i < r->bnd_next; ++i, ++ref)
-		__wt_free_ref(session, NULL, ref);
-	return (ret);
 }
 
 /*

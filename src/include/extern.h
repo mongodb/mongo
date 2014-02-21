@@ -279,7 +279,10 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
-extern void __wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref);
+extern void __wt_free_ref_array( WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_REF *ref,
+    uint32_t entries);
 extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
@@ -424,6 +427,11 @@ extern int __wt_rec_write(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage,
     uint32_t flags);
+extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_MULTI *multi,
+    WT_REF *refarg,
+    uint32_t entries);
 extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);

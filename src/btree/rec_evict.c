@@ -149,13 +149,13 @@ __rec_split_list_alloc(
 {
 	uint32_t i;
 
-	for (i = 0; i < mod->splits_slots; ++i)
+	for (i = 0; i < mod->splits_entries; ++i)
 		if (mod->splits[i].refs == NULL)
 			break;
-	if (i == mod->splits_slots) {
+	if (i == mod->splits_entries) {
 		WT_RET(__wt_realloc(session,
 		    NULL, (i + 5) * sizeof(mod->splits[0]), &mod->splits));
-		mod->splits_slots = i + 5;
+		mod->splits_entries = i + 5;
 	}
 	*ip = i;
 	return (0);
@@ -261,7 +261,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	alloc_index->entries = entries + SPLIT_CORRECT_2;
 
 	/* Allocate a new parent WT_REF array.  */
-	WT_ERR(__wt_calloc(session, 1, entries * sizeof(WT_REF), &alloc_ref));
+	WT_ERR(__wt_calloc_def(session, entries, &alloc_ref));
 
 	/*
 	 * Initialize the first/last slots of the WT_PAGE_INDEX to point to the
@@ -392,10 +392,9 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_FULL_BARRIER();
 
 	if (0) {
-err:		if (alloc_index != NULL)
-			__wt_free(session, alloc_index);
-		if (alloc_ref != NULL)
-			__wt_free(session, alloc_ref);
+err:		__wt_free(session, alloc_index);
+		__wt_free_ref_array(session, page, alloc_ref, entries);
+		__wt_free(session, alloc_ref);
 	}
 	return (ret);
 }
@@ -412,12 +411,15 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod, *parent_mod;
-	WT_REF **refp, *split;
+	WT_REF *alloc_ref, **refp, *split;
 	uint64_t bytes;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
+	int locked;
 
 	btree = S2BT(session);
 	alloc_index = NULL;
+	alloc_ref = NULL;
+	locked = 0;
 
 	mod = page->modify;
 	parent = page->parent;
@@ -428,6 +430,14 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	__wt_page_only_modify_set(session, parent);
 
 	/*
+	 * Allocate an array of WT_REF structures, and copy the page's multiple
+	 * block reconciliation information into it.
+	 */
+	WT_RET(__wt_calloc_def(session, mod->multi_entries, &alloc_ref));
+	WT_ERR(__wt_multi_to_ref(
+	    session, page, mod->multi, alloc_ref, mod->multi_entries));
+
+	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
 	 * page.  It's OK to queue up multiple splits as the child pages split,
 	 * but the actual split into the parent has to be serialized.  We do
@@ -436,20 +446,22 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * to split into this parent, they can wait their turn.
 	 */
 	WT_PAGE_LOCK(session, parent);
+	locked = 1;
 
 	/*
 	 * Append the underlying split page's WT_REF array into the parent
 	 * page's list.
 	 */
 	WT_ERR(__rec_split_list_alloc(session, parent_mod, &i));
-	parent_mod->splits[i].refs = mod->multi_ref;
+	parent_mod->splits[i].refs = alloc_ref;
+	alloc_ref = NULL;
 	parent_mod->splits[i].entries = mod->multi_entries;
 
 	/* Allocate a new WT_REF index array and initialize it. */
 	pindex = parent->pu_intl_index;
 	parent_entries = pindex->entries;
-	split = mod->multi_ref;
-	split_entries = mod->multi_entries;
+	split = parent_mod->splits[i].refs;
+	split_entries = parent_mod->splits[i].entries;
 	result_entries = (parent_entries - 1) + split_entries;
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_PAGE_INDEX) +
 	    result_entries * sizeof(WT_REF *), &alloc_index));
@@ -465,11 +477,6 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 
 	/* Update the parent page's footprint. */
 	__wt_cache_page_inmem_incr(session, parent, mod->multi_size);
-
-	/* We've stolen the page's WT_REF structures, clear the references. */
-	mod->multi_ref = NULL;
-	mod->multi_entries = 0;
-	mod->multi_size = 0;
 
 	/*
 	 * Update the parent page's index: this is the update that splits the
@@ -521,10 +528,13 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	    btree->maxintlpage > (uint64_t)btree->split_deepen)
 		ret = __rec_split_deepen(session, parent);
 
-err:	if (alloc_index != NULL)
-		__wt_free(session, alloc_index);
+err:	if (locked)
+		WT_PAGE_UNLOCK(session, parent);
 
-	WT_PAGE_UNLOCK(session, parent);
+	__wt_free(session, alloc_index);
+	__wt_free_ref_array(session, page, alloc_ref, mod->multi_entries);
+	__wt_free(session, alloc_ref);
+
 	return (ret);
 }
 

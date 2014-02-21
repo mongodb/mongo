@@ -94,8 +94,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *ref;
-	uint32_t i, j;
+	uint32_t i;
 
 	mod = page->modify;
 
@@ -120,20 +119,27 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/*
-	 * Free the split chunks created when underlying pages split into this
+	 * Free any split chunks created when underlying pages split into this
 	 * page.
 	 */
-	for (i = 0; i < mod->splits_slots; ++i) {
-		if ((ref = mod->splits[i].refs) == NULL)
-			break;
-		for (j = mod->splits[i].entries; j > 0; ++ref, --j)
-			__wt_free_ref(session, page, ref);
+	for (i = 0; i < mod->splits_entries; ++i) {
+		__wt_free_ref_array(
+		    session, page, mod->splits[i].refs, mod->splits[i].entries);
 		__wt_free(session, mod->splits[i].refs);
 	}
 	__wt_free(session, mod->splits);
 
-	/* Free the reconciliation-created array of split pages. */
-	__wt_free(session, mod->multi_ref);
+	/* Free any reconciliation-created list of replacement blocks. */
+	for (i = 0; i < mod->multi_entries; ++i) {
+		__wt_free(session, mod->multi[i].addr);
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			__wt_free(session, mod->multi[i].key.ikey);
+			break;
+		}
+	}
+	__wt_free(session, mod->multi);
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {
@@ -164,24 +170,20 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_REF *ref;
-	uint32_t i;
-
 	/* Free any memory allocated for the original set of WT_REFs. */
-	if ((ref = page->pu_intl_oindex) != NULL)
-		for (i = page->pu_intl_oentries; i > 0; ++ref, --i)
-			__wt_free_ref(session, page, ref);
+	__wt_free_ref_array(
+	    session, page, page->pu_intl_oindex, page->pu_intl_oentries);
 
 	/* Free any memory allocated for the child index array. */
 	__wt_free(session, page->pu_intl_index);
 }
 
 /*
- * __wt_free_ref --
+ * __free_ref --
  *	Discard the contents of a WT_REF structure.
  */
-void
-__wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
+static void
+__free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 {
 	WT_IKEY *ikey;
 
@@ -208,6 +210,22 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 	 */
 	memset(ref, WT_DEBUG_BYTE, sizeof(*ref));
 #endif
+}
+
+/*
+ * __wt_free_ref_array --
+ *	Discard an array of WT_REFs.
+ */
+void
+__wt_free_ref_array(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, uint32_t entries)
+{
+	uint32_t i;
+
+	if (ref == NULL)
+		return;
+	for (i = 0; i < entries; ++i, ++ref)
+		__free_ref(session, page, ref);
 }
 
 /*
