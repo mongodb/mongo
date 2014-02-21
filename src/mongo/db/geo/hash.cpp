@@ -566,6 +566,14 @@ namespace mongo {
         *y = convertFromHashScale(b);
     }
 
+    Box GeoHashConverter::unhashToBox(const GeoHash &h) const {
+        double sizeEdgeBox = sizeEdge(h);
+        Point min(unhashToPoint(h));
+        Point max(min.x + sizeEdgeBox, min.y + sizeEdgeBox);
+        Box box(min, max);
+        return box;
+    }
+
     double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {
         GeoHash b = a;
         b.move(1, 1);

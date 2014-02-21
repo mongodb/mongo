@@ -75,13 +75,22 @@ namespace mongo {
                 verify(NULL != _params.gq.getGeometry()._box.get());
                 _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am));
             }
+
+            // Fill out static portion of plan stats.
+            // We will retrieve the geo hashes used by the geo browser
+            // when the search is complete.
             _specificStats.type = _browse->_type;
+            _specificStats.field = _params.gq.getField();
+            _specificStats.converterParams = _browse->_converter->getParams();
+
             return PlanStage::NEED_TIME;
         }
 
         verify(NULL != _browse.get());
 
         if (!_browse->ok()) {
+            // Grab geo hashes before disposing geo browser.
+            _specificStats.expPrefixes.swap(_browse->_expPrefixes);
             _browse.reset();
             return PlanStage::IS_EOF;
         }

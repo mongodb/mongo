@@ -384,13 +384,6 @@ namespace twod_exec {
     // Are we finished getting points?
     bool GeoBrowse::moreToDo() { return _state != DONE; }
 
-    Box GeoBrowse::makeBox(const GeoHash &hash) const {
-        double sizeEdge = _converter->sizeEdge(hash);
-        Point min(_converter->unhashToPoint(hash));
-        Point max(min.x + sizeEdge, min.y + sizeEdge);
-        return Box(min, max);
-    }
-
     bool GeoBrowse::checkAndAdvance(BtreeLocation* bl, const GeoHash& hash, int& totalFound) {
         if (bl->eof()) { return false; }
 
@@ -493,7 +486,7 @@ namespace twod_exec {
 
                 if(! isNeighbor) {
                     _centerPrefix = _prefix;
-                    _centerBox = makeBox(_centerPrefix);
+                    _centerBox = _converter->unhashToBox(_centerPrefix);
                     isNeighbor = true;
                 }
 
@@ -519,7 +512,7 @@ namespace twod_exec {
 
                 while(_fringe.size() > 0) {
                     _prefix = _neighborPrefix + _fringe.back();
-                    Box cur(makeBox(_prefix));
+                    Box cur(_converter->unhashToBox(_prefix));
 
                     double intAmt = intersectsBox(cur);
 
