@@ -18,4 +18,11 @@ assert.eq( 1, t.count() );
 assert.eq( doc, t.findOne() );
 
 assert.eq( 2, t.getIndexes().length, tojson( t.getIndexes() ) );
-assert.eq( ex, t.find( { i : 1 } ).explain() );
+var explainAfterRepair = t.find( { i : 1 } ).explain();
+
+// Remove "millis" field. We're interested in the other fields.
+// It's not relevant for both explain() operations to have
+// the same execution time.
+delete ex[ "millis" ];
+delete explainAfterRepair[ "millis" ];
+assert.eq( ex, explainAfterRepair );
