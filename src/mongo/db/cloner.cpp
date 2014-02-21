@@ -665,9 +665,13 @@ namespace mongo {
 
 
     // SERVER-4328 todo review for concurrency
-    thread_specific_ptr< DBClientConnection > authConn_;
+    thread_specific_ptr< DBClientBase > authConn_;
     /* Usage:
-     admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <hostname> } );
+     * admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <connection string> } );
+     *
+     * Run against the mongod that is the intended target for the "copydb" command.  Used to get a
+     * nonce from the source of a "copydb" operation for authentication purposes.  See the
+     * description of the "copydb" command below.
      */
     class CmdCopyDbGetNonce : public Command {
     public:
@@ -678,7 +682,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual LockType locktype() const { return NONE; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -694,16 +698,18 @@ namespace mongo {
                 ss << "localhost:" << serverGlobalParams.port;
                 fromhost = ss.str();
             }
-            authConn_.reset( new DBClientConnection() );
             BSONObj ret;
-            {
-                dbtemprelease t;
-                if ( !authConn_->connect( fromhost, errmsg ) )
-                    return false;
-                if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
-                    errmsg = "couldn't get nonce " + ret.toString();
-                    return false;
-                }
+            ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
+            if (!cs.isValid()) {
+                return false;
+            }
+            authConn_.reset(cs.connect(errmsg));
+            if (!authConn_.get()) {
+                return false;
+            }
+            if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
+                errmsg = "couldn't get nonce " + ret.toString();
+                return false;
             }
             result.appendElements( ret );
             return true;
@@ -711,8 +717,43 @@ namespace mongo {
     } cmdCopyDBGetNonce;
 
     /* Usage:
-       admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
-    */
+     * admindb.$cmd.findOne( { copydb: 1, fromhost: <connection string>, fromdb: <db>,
+     *                         todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
+     *
+     * The "copydb" command is used to copy a database.  Note that this is a very broad definition.
+     * This means that the "copydb" command can be used in the following ways:
+     *
+     * 1. To copy a database within a single node
+     * 2. To copy a database within a sharded cluster, possibly to another shard
+     * 3. To copy a database from one cluster to another
+     *
+     * Note that in all cases both the target and source database must be unsharded.
+     *
+     * The "copydb" command gets sent by the client or the mongos to the destination of the copy
+     * operation.  The node, cluster, or shard that recieves the "copydb" command must then query
+     * the source of the database to be copied for all the contents and metadata of the database.
+     *
+     *
+     *
+     * When used with auth, there are two different considerations.
+     *
+     * The first is authentication with the target.  The only entity that needs to authenticate with
+     * the target node is the client, so authentication works there the same as it would with any
+     * other command.
+     *
+     * The second is the authentication of the target with the source, which is needed because the
+     * target must query the source directly for the contents of the database.  To do this, the
+     * client must use the "copydbgetnonce" command, in which the target will get a nonce from the
+     * source and send it back to the client.  The client can then hash its password with the nonce,
+     * send it to the target when it runs the "copydb" command, which can then use that information
+     * to authenticate with the source.
+     *
+     * NOTE: mongos doesn't know how to call or handle the "copydbgetnonce" command.  See
+     * SERVER-6427.
+     *
+     * NOTE: Since internal cluster auth works differently, "copydb" currently doesn't work between
+     * shards in a cluster when auth is enabled.  See SERVER-13080.
+     */
     class CmdCopyDb : public Command {
     public:
         CmdCopyDb() : Command("copydb") { }
@@ -730,7 +771,8 @@ namespace mongo {
         }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";
-            help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
+            help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
+                 << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
@@ -753,7 +795,8 @@ namespace mongo {
 
             string todb = cmdObj.getStringField("todb");
             if ( fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty() ) {
-                errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
+                errmsg = "parms missing - {copydb: 1, fromhost: <connection string>, "
+                         "fromdb: <db>, todb: <db>}";
                 return false;
             }
 
@@ -783,11 +826,15 @@ namespace mongo {
             else if (!fromSelf) {
                 // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
 
-                DBClientConnection* conn = new DBClientConnection();
-                cloner.setConnection(conn);
-                if (!conn->connect(fromhost, errmsg)) {
+                ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
+                if (!cs.isValid()) {
                     return false;
                 }
+                DBClientBase* conn = cs.connect(errmsg);
+                if (!conn) {
+                    return false;
+                }
+                cloner.setConnection(conn);
             }
             Client::Context ctx(todb);
             return cloner.go(ctx, fromhost, cloneOptions, NULL, errmsg );
