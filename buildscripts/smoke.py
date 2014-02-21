@@ -326,7 +326,7 @@ def check_db_hashes(master, slave):
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
-    print "waiting for slave to catch up"
+    print "waiting for slave (%s) to catch up to master (%s)" % (slave.port, master.port)
     master.wait_for_repl()
     print "caught up!"
 
@@ -360,8 +360,8 @@ def check_db_hashes(master, slave):
             screwy_in_slave[coll] = stats
             if mhash == "no _id _index":
                 msg = "collection with no _id index:" + \
-                      " {} -- slave has these indexes: {}"
-                print msg.format(coll, sTestDB[coll].index_information())
+                      " %s -- slave has these indexes: %s"
+                print msg % (coll, sTestDB[coll].index_information())
 
     for db in slave.dict.keys():
         if db not in master.dict:
@@ -759,7 +759,7 @@ def report():
     if check_and_report_replication_dbhashes():
         test_result["end"] = time.time()
         test_result["elapsed"] = test_result["end"] - test_result["start"]
-        test_result["error"] = "#dbhash#"
+        test_result["test_file"] = "/#dbhash#"
         test_result["error"] = "dbhash mismatch"
         test_result["status"] = "fail"
         test_report["results"].append( test_result )
