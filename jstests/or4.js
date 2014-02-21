@@ -79,9 +79,6 @@ assert.eq.automsg( "[{a:2},{a:null},{a:1}]", "t.group( {key:{a:1}, cond:{$or:[{a
 assert.eq.automsg( "5", "t.mapReduce( function() { emit( 'a', this.a ); }, function( key, vals ) { return vals.length; }, {out:{inline:true},query:{$or:[{a:2},{b:3}]}} ).counts.input" );
 
 explain = t.find( {$or:[{a:2},{b:3}]} ).explain();
-assert.eq.automsg( "2", "explain.clauses.length" );
-assert.eq.automsg( "5", "explain.n" );
-assert.eq.automsg( "6", "explain.nscanned" );
 
 t.remove( {} );
 
@@ -93,7 +90,7 @@ assert.eq.automsg( "1", "t.count( {$or:[{a:2},{a:1}]} )" );
 
 t.remove({});
 
-assert.eq.automsg( "'BtreeCursor a_1'", "t.find( {$or:[{a:1}]} ).sort( {b:1} ).explain().cursor" );
+assert.eq.automsg( "'BtreeCursor b_1'", "t.find( {$or:[{a:1}]} ).sort( {b:1} ).explain().cursor" );
 assert.eq.automsg( "'BtreeCursor b_1'", "t.find( {$or:[{}]} ).sort( {b:1} ).explain().cursor" );
 assert.eq.automsg( "'BtreeCursor b_1'", "t.find( {$or:[{b:1}]} ).sort( {b:1} ).explain().cursor" );
 

@@ -356,8 +356,15 @@ namespace mongo {
             }
         }
 
-        // Store the choice we just made in the cache.
-        if (PlanCache::shouldCacheQuery(*_query)) {
+        // Store the choice we just made in the cache. We do
+        // not cache the query if:
+        //   1) The query is of a type that is not safe to cache, or
+        //   2) the winning plan did not actually produce any results,
+        //   without hitting EOF. In this case, we have no information to
+        //   suggest that this plan is good.
+        const PlanStageStats* bestStats = ranking->stats.vector()[0];
+        if (PlanCache::shouldCacheQuery(*_query)
+            && (!_alreadyProduced.empty() || bestStats->common.isEOF)) {
             Database* db = cc().database();
             verify(NULL != db);
             Collection* collection = db->getCollection(_query->ns());

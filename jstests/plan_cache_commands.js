@@ -13,6 +13,7 @@ var t = db.jstests_plan_cache_commands;
 t.drop();
 
 t.save({a: 1});
+t.save({a: 2, b: 2});
 
 t.ensureIndex({a: 1});
 
@@ -60,7 +61,7 @@ assert.eq({query: queryA1, sort: sortA1, projection: projectionA1}, shapes[0],
 assert.commandFailed(t.runCommand('planCacheClear', {query: {unknownfield: 1}}));
 
 // Run a new query shape and drop it from the cache
-assert.eq(0, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
+assert.eq(1, t.find({a: 2, b: 2}).itcount(), 'unexpected document count');
 assert.eq(2, getShapes().length, 'unexpected cache size after running 2nd query');
 assert.commandWorked(t.runCommand('planCacheClear', {query: {a: 1, b: 1}}));
 assert.eq(1, getShapes().length, 'unexpected cache size after dropping 2nd query from cache');
@@ -309,7 +310,7 @@ assert.eq(0, getShapes().length, 'plan cache not empty after clearing');
 
 //
 // explain for CachedPlanRunner
-// This tests that the allPlans information in the explain outpout from CachedPlanRunner
+// This tests that the allPlans information in the explain output from CachedPlanRunner
 // contains similar information to that of MultiPlanRunner.
 //
 
@@ -335,3 +336,30 @@ for (var i = 0; i < multiPlanRunnerExplain.allPlans.length; ++i) {
               'explain for multi plan and cached plan runner should have same cursor for ' +
               'allPlans[' + i + ']');
 }
+
+
+//
+// SERVER-12796: Plans for queries that return zero
+// results should not be cached.
+//
+
+t.drop();
+
+t.ensureIndex({a: 1});
+
+for (var i = 0; i < 200; i++) {
+    t.save({a: 1, b: 1});
+}
+t.save({a: 2, b: 2});
+
+// A query with zero results that does not hit EOF should not be cached...
+assert.eq(0, t.find({c: 0}).itcount(), 'unexpected count');
+assert.eq(0, getShapes().length, 'unexpected number of query shapes in plan cache');
+
+// ...but a query with zero results that hits EOF will be cached.
+assert.eq(1, t.find({a: 2, b: 2}).itcount(), 'unexpected count');
+assert.eq(1, getShapes().length, 'unexpected number of query shapes in plan cache');
+
+// A query that returns results but does not hit EOF will also be cached.
+assert.eq(200, t.find({a: 1}).itcount(), 'unexpected count');
+assert.eq(2, getShapes().length, 'unexpected number of query shapes in plan cache');

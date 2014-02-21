@@ -62,6 +62,12 @@ namespace mongo {
         invariant(!candidates.empty());
         invariant(why);
 
+        // A plan that hits EOF is automatically scored above
+        // its peers. If multiple plans hit EOF during the same
+        // set of round-robin calls to work(), then all such plans
+        // receive the bonus.
+        double eofBonus = 1.0;
+
         // Each plan will have a stat tree.
         vector<PlanStageStats*> statTrees;
 
@@ -83,6 +89,10 @@ namespace mongo {
                    << statsToBSON(*statTrees[i]).jsonString(Strict, true);
             double score = scoreTree(statTrees[i]);
             QLOG() << "score = " << score << endl;
+            if (statTrees[i]->common.isEOF) {
+                QLOG() << "adding +" << eofBonus << " EOF bonus to score" << endl;
+                score += 1;
+            }
             scoresAndCandidateindices.push_back(std::make_pair(score, i));
         }
 
@@ -98,6 +108,30 @@ namespace mongo {
         for (size_t i = 0; i < scoresAndCandidateindices.size(); ++i) {
             double score = scoresAndCandidateindices[i].first;
             size_t candidateIndex = scoresAndCandidateindices[i].second;
+
+            // We shouldn't cache the scores with the EOF bonus included,
+            // as this is just a tie-breaking measure for plan selection.
+            // Plans not run through the multi plan runner will not receive
+            // the bonus.
+            //
+            // An example of a bad thing that could happen if we stored scores
+            // with the EOF bonus included:
+            //
+            //   Let's say Plan A hits EOF, is the highest ranking plan, and gets
+            //   cached as such. On subsequent runs it will not receive the bonus.
+            //   Eventually the plan cache feedback mechanism will evict the cache
+            //   entry---the scores will appear to have fallen due to the missing
+            //   EOF bonus.
+            //
+            // This begs the question, why don't we include the EOF bonus in
+            // scoring of cached plans as well? The problem here is that the cached
+            // plan runner always runs plans to completion before scoring. Queries
+            // that don't get the bonus in the multi plan runner might get the bonus
+            // after being run from the plan cache.
+            if (statTrees[candidateIndex]->common.isEOF) {
+                score -= eofBonus;
+            }
+
             why->stats.mutableVector().push_back(statTrees[candidateIndex]);
             why->scores.push_back(score);
             why->candidateOrder.push_back(candidateIndex);
