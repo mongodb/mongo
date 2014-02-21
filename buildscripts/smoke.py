@@ -296,7 +296,7 @@ class mongod(object):
         sys.stdout.flush()
 
     def wait_for_repl(self):
-        Connection(port=self.port).test.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+        Connection(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
 
 class Bug(Exception):
     def __str__(self):
@@ -326,9 +326,10 @@ def check_db_hashes(master, slave):
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
-    print "waiting for slave to catch up"
+    print "waiting for slave ({}) to catch up to master ({})".format(slave.port, master.port)
     master.wait_for_repl()
     print "caught up!"
+
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
@@ -356,7 +357,13 @@ def check_db_hashes(master, slave):
                                   'slave':list(sTestDB[coll].find(limit=10))}
             except Exception, e:
                 stats["error-docs"] = e;
+
             screwy_in_slave[coll] = stats
+            if mhash == "no _id _index":
+                msg = "collection with no _id index:" + \
+                      " {} -- slave has these indexes: {}"
+                print msg.format(coll, sTestDB[coll].index_information())
+
     for db in slave.dict.keys():
         if db not in master.dict:
             lost_in_master.append(db)
@@ -376,7 +383,7 @@ def skipTest(path):
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "connections_opened.js", "opcounters.js"]:
             return True
-    if use_ssl: 
+    if use_ssl:
         # Skip tests using mongobridge since it does not support SSL
         # TODO: Remove when SERVER-10910 has been resolved.  
         if basename in ["gridfs.js", "initial_sync3.js", "majority.js", "no_chaining.js",
@@ -446,7 +453,7 @@ def runTest(test, result):
             argv += ["--nodb"]
         if small_oplog or small_oplog_rs:
             argv += ["--eval", 'testingReplication = true;']
-        if use_ssl:
+        if use_ssl: 
             argv += ["--ssl",
                      "--sslPEMKeyFile", "jstests/libs/client.pem",
                      "--sslCAFile", "jstests/libs/ca.pem",
@@ -662,6 +669,11 @@ def run_tests(tests):
 
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
+                        # check the db_hashes
+                        if isinstance(slave, mongod):
+                            check_db_hashes(master, slave)
+                            check_and_report_replication_dbhashes()
+
                     elif use_db: # reach inside test and see if "usedb" is true
                         if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
@@ -702,22 +714,14 @@ def run_tests(tests):
     return 0
 
 
-def report():
-    print "%d tests succeeded" % len(winners)
-    num_missed = len(tests) - (len(winners) + len(losers.keys()))
-    if num_missed:
-        print "%d tests didn't get run" % num_missed
-    if losers:
-        print "The following tests failed (with exit code):"
-        for loser in losers:
-            print "%s\t%d" % (loser, losers[loser])
-
+def check_and_report_replication_dbhashes():
     def missing(lst, src, dst):
         if lst:
             print """The following collections were present in the %s but not the %s
 at the end of testing:""" % (src, dst)
             for db in lst:
                 print db
+
     missing(lost_in_slave, "master", "slave")
     missing(lost_in_master, "slave", "master")
     if screwy_in_slave:
@@ -734,9 +738,38 @@ at the end of testing:"""
             if "error-docs" in stats:
                 print "Error getting docs to diff:"
                 pprint.pprint(stats["error-docs"])
+        return False
 
     if (small_oplog or small_oplog_rs) and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d collections" % (len(replicated_collections))
+
+    return True
+
+
+def report():
+    print "%d tests succeeded" % len(winners)
+    num_missed = len(tests) - (len(winners) + len(losers.keys()))
+    if num_missed:
+        print "%d tests didn't get run" % num_missed
+    if losers:
+        print "The following tests failed (with exit code):"
+        for loser in losers:
+            print "%s\t%d" % (loser, losers[loser])
+
+    test_result = { "start": time.time() }
+    if check_and_report_replication_dbhashes():
+        test_result["end"] = time.time()
+        test_result["elapsed"] = test_result["end"] - test_result["start"]
+        test_result["error"] = "#dbhash#"
+        test_result["error"] = "dbhash mismatch"
+        test_result["status"] = "fail"
+        test_report["results"].append( test_result )
+
+    if report_file:
+        f = open( report_file, "wb" )
+        f.write( json.dumps( test_report ) )
+        f.close()
+
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
         raise Exception("Test failures")
 
@@ -1207,10 +1240,6 @@ def main():
         test_report["end"] = time.time()
         test_report["elapsed"] = test_report["end"] - test_report["start"]
         test_report["failures"] = len(losers.keys())
-        if report_file:
-            f = open( report_file, "wb" )
-            f.write( json.dumps( test_report ) )
-            f.close()
 
         report()
 

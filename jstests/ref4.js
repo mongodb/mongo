@@ -5,9 +5,6 @@ b = db.ref4b;
 a.drop();
 b.drop();
 
-db.otherthings.drop();
-db.things.drop();
-
 var other = { s : "other thing", n : 17 };
 b.save(other);
 

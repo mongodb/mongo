@@ -1,5 +1,5 @@
 // tests to make sure no dup fields are created when using query to do upsert
-t = db.upsert1;
+t = db.upsert3;
 t.drop();
 
 // make sure the new _id is not duplicated
