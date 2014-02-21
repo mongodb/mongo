@@ -169,45 +169,41 @@ static int
 __rec_split_copy_addr(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ADDR *addr, void *addrp)
 {
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_ADDR *alloc_addr;
+	WT_CELL_UNPACK unpack;
 	WT_DECL_RET;
-	size_t size;
-	void *p;
 
-	unpack = &_unpack;
-
-	/* If there's no address set, there's nothing to copy. */
+	/*
+	 * If there's no address set, this page has never been written, there's
+	 * nothing to copy.
+	 */
 	if (addr == NULL) {
 		*(void **)addrp = NULL;
 		return (0);
 	}
 
 	/*
-	 * If the address is in allocated memory, copy it from there, otherwise
-	 * copy it from the page.
+	 * If the address has been instantiated, everything we need is there,
+	 * copy it.  Otherwise, we have to get the address from the on-page
+	 * cell.
 	 */
+	WT_RET(__wt_calloc_def(session, 1, &alloc_addr));
 	if (__wt_off_page(page, addr)) {
-		p = addr->addr;
-		size = addr->size;
+		WT_ERR(__wt_strndup(session, addr->addr,
+		    alloc_addr->size = addr->size, &alloc_addr->addr));
+		alloc_addr->type = addr->type;
 	} else {
-		__wt_cell_unpack((WT_CELL *)addr, unpack);
-		p = addr;
-		size = __wt_cell_total_len(unpack);
+		__wt_cell_unpack((WT_CELL *)addr, &unpack);
+		WT_ERR(__wt_strndup(session, unpack.data,
+		    alloc_addr->size = unpack.size, &alloc_addr->addr));
+		alloc_addr->type =
+		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
 	}
 
-	/* Allocate memory and initialize it. */
-	addr = NULL;
-	WT_RET(__wt_calloc_def(session, 1, &addr));
-	WT_ERR(__wt_calloc(session, 1, size, &addr->addr));
-
-	memcpy(addr->addr, p, size);
-	addr->size = (uint8_t)size;
-	addr->type = WT_ADDR_INT;
-
-	*(void **)addrp = addr;
+	*(void **)addrp = alloc_addr;
 	return (0);
 
-err:	__wt_free(session, addr);
+err:	__wt_free(session, alloc_addr);
 	return (ret);
 }
 
@@ -313,10 +309,11 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * information.  (The key may or may not reference block image
 		 * information, but even if the key is instantiated, the parent
 		 * needs some of its keys, it uses them to find the new child
-		 * pages.   The parent doesn't need any of its address image
-		 * information, we could steal them if they're instantiated, as
-		 * long as we do it in an order that won't confuse other threads
-		 * of control in the page.  For now, I'm copying everything.)
+		 * pages, we'd have to copy in some cases.   The parent doesn't
+		 * need any previous address image information, we could steal
+		 * them if they're instantiated, as long as we do it in an order
+		 * that won't confuse other threads of control in the page.  For
+		 * now, I'm just copying everything.)
 		 */
 		for (ref = child->pu_intl_oindex, incr = 0,
 		    j = 0; j < slots; ++refp, ++ref, ++j) {
