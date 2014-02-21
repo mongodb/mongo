@@ -348,8 +348,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    // XXX: Figure out what the right policy is here for determining if
-    // the cached solution is bad.
+    // TODO: Figure out what the right policy is here for determining if the cached solution is bad.
+    // This is a solution but may not be the right one, if there even is a right one...
     static bool hasCachedPlanPerformanceDegraded(PlanCacheEntry* entry,
                                                  PlanCacheEntryFeedback* latestFeedback) {
 

@@ -173,7 +173,7 @@ namespace twod_exec {
         GeoHash _start;
         int _numWanted;
         double _scanDistance;
-        long long _nscanned; // XXX: unused?
+        long long _nscanned;
         int _found;
         GeoDistType _type;
         Box _want;

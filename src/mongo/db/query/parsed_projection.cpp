@@ -126,7 +126,7 @@ namespace mongo {
                     BSONObj elemMatchObj = e.wrap();
                     verify(elemMatchObj.isOwned());
 
-                    // XXX this is wasteful and slow.
+                    // TODO: Is there a faster way of validating the elemMatchObj?
                     StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj);
                     if (!swme.isOK()) {
                         return swme.getStatus();

@@ -496,9 +496,9 @@ namespace mongo {
          * makes it impossible for the distinct scan stage (plan stage generated from
          * DistinctNode) to select the requested element by array index.
          *
-         * XXX: Multikey indices cannot be used for distinct node if the field
-         * is dotted. Currently the solution generated for the distinct hack includes a
-         * projection stage and the projection stage cannot be covered with a dotted field.
+         * Multikey indices cannot be used for the fast distinct hack if the field is dotted.
+         * Currently the solution generated for the distinct hack includes a projection stage and
+         * the projection stage cannot be covered with a dotted field.
          */
         bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                                   const std::string& field, size_t* indexOut) {
@@ -778,9 +778,6 @@ namespace mongo {
         if (!status.isOK()) {
             return getRunner(cq, out);
         }
-
-        // XXX: why do we need to do this?  planner should prob do this internally
-        cq->root()->resetTag();
 
         // We look for a solution that has an ixscan we can turn into a distinctixscan
         for (size_t i = 0; i < solutions.size(); ++i) {

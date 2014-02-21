@@ -586,7 +586,6 @@ namespace mongo {
         QLOG() << query.root()->toString() << endl;
 
         // If there is a GEO_NEAR it must have an index it can use directly.
-        // XXX: move into data access?
         MatchExpression* gnNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
             // No index for GEO_NEAR?  No query.
@@ -658,6 +657,8 @@ namespace mongo {
             tag->first.swap(newFirst);
 
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
                 return Status::OK();
             }
         }
@@ -669,6 +670,8 @@ namespace mongo {
             // Error if the text node is tagged with zero indices, or if the text node is tagged
             // with greater than one index.
             if (1 != tag->first.size() + tag->notFirst.size()) {
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
                 return Status(ErrorCodes::BadValue, "need exactly one text index for $text query");
             }
         }
@@ -720,6 +723,9 @@ namespace mongo {
                 }
             }
         }
+
+        // Don't leave tags on query tree.
+        query.root()->resetTag();
 
         QLOG() << "Planner: outputted " << out->size() << " indexed solutions.\n";
 

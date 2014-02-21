@@ -406,9 +406,6 @@ namespace mongo {
             bounds = &scan->bounds;
         }
 
-        // XXX: this currently fills out minkey/maxkey bounds for near queries, fix that.  just
-        // set the field name of the near query field when starting a near scan.
-
         // Find the first field in the scan's bounds that was not filled out.
         // TODO: could cache this.
         size_t firstEmptyField = 0;
@@ -943,7 +940,8 @@ namespace mongo {
                     }
                 }
 
-                // XXX: consider reversing?
+                // TODO: If we're looking for the reverse of one of these sort orders we could
+                // possibly reverse the ixscan nodes.
                 shouldMergeSort = (sharedSortOrders.end() != sharedSortOrders.find(desiredSort));
             }
 
@@ -1118,7 +1116,6 @@ namespace mongo {
 
         // If it's find({}) remove the no-op root.
         if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-            // XXX wasteful fix
             delete filter;
             solnRoot = isn;
         }
@@ -1190,7 +1187,6 @@ namespace mongo {
 
         // If it's find({}) remove the no-op root.
         if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-            // XXX wasteful fix
             delete filter;
             solnRoot = isn;
         }

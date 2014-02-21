@@ -212,7 +212,7 @@ namespace mongo {
                     nScannedObjects += childExplain->getNScanned();
                 }
             }
-            // XXX: Pick cursor name for backwards compatibility with 2.4.
+            // We set the cursor name for backwards compatibility with 2.4.
             res->setCursor("QueryOptimizerCursor");
             res->setNScanned(nScanned);
             res->setNScannedObjects(nScannedObjects);
@@ -232,7 +232,7 @@ namespace mongo {
             res->setCursor("GeoBrowse-" + nStats->type);
             res->setNScanned(leaf->common.works);
             res->setNScannedObjects(leaf->common.works);
-            // XXX: adding empty index bounds for backwards compatibility.
+            // TODO: only adding empty index bounds for backwards compatibility.
             res->setIndexBounds(BSONObj());
             // TODO: Could be multikey.
             res->setIsMultiKey(false);
@@ -244,7 +244,7 @@ namespace mongo {
             // The first work() is an init.  Every subsequent work examines a document.
             res->setNScanned(leaf->common.works);
             res->setNScannedObjects(leaf->common.works);
-            // XXX: adding empty index bounds for backwards compatibility.
+            // TODO: only adding empty index bounds for backwards compatibility.
             res->setIndexBounds(BSONObj());
             // TODO: Could be multikey.
             res->setIsMultiKey(false);
@@ -256,7 +256,7 @@ namespace mongo {
             // The first work() is an init.  Every subsequent work examines a document.
             res->setNScanned(nStats->nscanned);
             res->setNScannedObjects(nStats->objectsLoaded);
-            // XXX: adding empty index bounds for backwards compatibility.
+            // TODO: only adding empty index bounds for backwards compatibility.
             res->setIndexBounds(BSONObj());
             // TODO: Could be multikey.
             res->setIsMultiKey(false);
@@ -465,8 +465,8 @@ namespace mongo {
         }
         else if (STAGE_IXSCAN == stats.stageType) {
             IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
-            // XXX: how much do we really want here?  runtime stats vs. tree structure (soln
-            // tostring).
+            // TODO: how much do we really want here?  we should separate runtime stats vs. tree
+            // structure (soln tostring).
             bob->append("keyPattern", spec->keyPattern.toString());
             bob->append("boundsVerbose", spec->indexBoundsVerbose);
             bob->appendNumber("isMultiKey", spec->isMultiKey);

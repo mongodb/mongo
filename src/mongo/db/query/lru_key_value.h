@@ -54,8 +54,8 @@ namespace mongo {
      * The keys of generic type K map to values of type V*. The V*
      * pointers are owned by the kv-store.
      *
-     * XXX: Move this into the util/ directory and do any cleanup necessary
-     * to make if fully general.
+     * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
+     * fully general.
      */
     template<class K, class V>
     class LRUKeyValue {
@@ -195,7 +195,7 @@ namespace mongo {
         size_t size() const { return _currentSize; }
 
         /**
-         * XXX: The kv-store should implement its own iterator. Calling through to the underlying
+         * TODO: The kv-store should implement its own iterator. Calling through to the underlying
          * iterator exposes the internals, and forces the caller to make a horrible type
          * declaration.
          */

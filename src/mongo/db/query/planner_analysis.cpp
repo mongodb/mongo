@@ -387,8 +387,9 @@ namespace mongo {
             return NULL;
         }
 
-        // Add a fetch stage so we have the full object when we hit the sort stage.  XXX TODO: Can
-        // we pull values out of the key and if so in what cases?  (covered_index_sort_3.js)
+        // Add a fetch stage so we have the full object when we hit the sort stage.  TODO: Can we
+        // pull the values that we sort by out of the key and if so in what cases?  Perhaps we can
+        // avoid a fetch.
         if (!solnRoot->fetched()) {
             FetchNode* fetch = new FetchNode();
             fetch->children.push_back(solnRoot);
@@ -432,9 +433,9 @@ namespace mongo {
         // data.
 
         // If we're answering a query on a sharded system, we need to drop documents that aren't
-        // logically part of our shard (XXX GREG elaborate more precisely)
+        // logically part of our shard.
         if (params.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            // XXX TODO: use params.shardKey to do fetch analysis instead of always fetching.
+            // TODO: We could use params.shardKey to do fetch analysis instead of always fetching.
             if (!solnRoot->fetched()) {
                 FetchNode* fetch = new FetchNode();
                 fetch->children.push_back(solnRoot);
@@ -461,8 +462,10 @@ namespace mongo {
         // the document at the right place.
         //
         // 3. There is an index-provided sort.  Ditto above comment about merging.
-        // XXX; do we want some kind of static init for a set of stages we care about & pass that
-        // set into hasNode?
+        //
+        // TODO: do we want some kind of pre-planning step where we look for certain nodes and cache
+        // them?  We do lookups in the tree a few times.  This may not matter as most trees are
+        // shallow in terms of query nodes.
         bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT)
                               || hasNode(solnRoot, STAGE_GEO_NEAR_2D)
                               || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE)

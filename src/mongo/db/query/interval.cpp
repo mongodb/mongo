@@ -30,87 +30,6 @@
 
 namespace mongo {
 
-    namespace {
-
-        /** Returns true if lhs and rhs intersection is not empty */
-        bool intersects(const Interval& lhs, const Interval& rhs) {
-            int res = lhs.start.woCompare(rhs.end, false);
-            if (res > 0) {
-                return false;
-            }
-            else if (res == 0 && (!lhs.startInclusive || !rhs.endInclusive)) {
-                return false;
-            }
-
-            res = rhs.start.woCompare(lhs.end, false);
-            if (res > 0) {
-                return false;
-            }
-            else if (res == 0 && (!rhs.startInclusive || !lhs.endInclusive)) {
-                return false;
-            }
-
-            return true;
-        }
-
-        /** Returns true if lhs and rhs represent the same interval */
-        bool exact(const Interval& lhs, const Interval& rhs) {
-            if (lhs.startInclusive != rhs.startInclusive) {
-                return false;
-            }
-
-            if (lhs.endInclusive != rhs.endInclusive) {
-                return false;
-            }
-
-            int res = lhs.start.woCompare(rhs.start, false);
-            if (res != 0) {
-                return false;
-            }
-
-            res = lhs.end.woCompare(rhs.end, false);
-            if (res != 0) {
-                return false;
-            }
-
-            return true;
-        }
-
-        /** Returns true if lhs is fully withing rhs */
-        bool within(const Interval& lhs, const Interval& rhs) {
-            int res = lhs.start.woCompare(rhs.start, false);
-            if (res < 0) {
-                return false;
-            }
-            else if (res == 0 && lhs.startInclusive && !rhs.startInclusive) {
-                return false;
-            }
-
-            res = lhs.end.woCompare(rhs.end, false);
-            if (res > 0) {
-                return false;
-            }
-            else if (res == 0 && lhs.endInclusive && !rhs.endInclusive) {
-                return false;
-            }
-
-            return true;
-        }
-
-        /** Returns true if the start of lhs comes before the start of rhs */
-        bool precedes(const Interval& lhs, const Interval& rhs) {
-            int res = lhs.start.woCompare(rhs.start, false);
-            if (res < 0) {
-                return true;
-            }
-            else if (res == 0 && lhs.startInclusive && !rhs.startInclusive) {
-                return true;
-            }
-            return false;
-        }
-
-    } // unnamed namespace
-
     Interval::Interval()
         : _intervalData(BSONObj()), start(BSONElement()), startInclusive(false), end(BSONElement()),
           endInclusive(false) { }
@@ -134,29 +53,109 @@ namespace mongo {
         return _intervalData.nFields() == 0;
     }
 
-    // XXX: move the stuff in the anonymous namespace into 'this' and clean this file up in general.
-    bool Interval::equals(const Interval& other) const {
-        return exact(*this, other);
+    bool Interval::isPoint() const {
+        return startInclusive && endInclusive && 0 == start.woCompare(end, false);
     }
 
-    // TODO: shortcut number of comparisons
+    bool Interval::isNull() const {
+        return (!startInclusive || !endInclusive) && 0 == start.woCompare(end, false);
+    }
+
+    //
+    // Comparison
+    //
+
+    bool Interval::equals(const Interval& other) const {
+        if (this->startInclusive != other.startInclusive) {
+            return false;
+        }
+
+        if (this->endInclusive != other.endInclusive) {
+            return false;
+        }
+
+        int res = this->start.woCompare(other.start, false);
+        if (res != 0) {
+            return false;
+        }
+
+        res = this->end.woCompare(other.end, false);
+        if (res != 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Interval::intersects(const Interval& other) const {
+        int res = this->start.woCompare(other.end, false);
+        if (res > 0) {
+            return false;
+        }
+        else if (res == 0 && (!this->startInclusive || !other.endInclusive)) {
+            return false;
+        }
+
+        res = other.start.woCompare(this->end, false);
+        if (res > 0) {
+            return false;
+        }
+        else if (res == 0 && (!other.startInclusive || !this->endInclusive)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Interval::within(const Interval& other) const {
+        int res = this->start.woCompare(other.start, false);
+        if (res < 0) {
+            return false;
+        }
+        else if (res == 0 && this->startInclusive && !other.startInclusive) {
+            return false;
+        }
+
+        res = this->end.woCompare(other.end, false);
+        if (res > 0) {
+            return false;
+        }
+        else if (res == 0 && this->endInclusive && !other.endInclusive) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Returns true if the start of comes before the start of other */
+    bool Interval::precedes(const Interval& other) const {
+        int res = this->start.woCompare(other.start, false);
+        if (res < 0) {
+            return true;
+        }
+        else if (res == 0 && this->startInclusive && !other.startInclusive) {
+            return true;
+        }
+        return false;
+    }
+
+
     Interval::IntervalComparison Interval::compare(const Interval& other) const {
         //
         // Intersect cases
         //
 
-        // TODO: rewrite this to be member functions so semantics are clearer.
-        if (intersects(*this, other)) {
-            if (exact(*this, other)) {
+        if (this->intersects(other)) {
+            if (this->equals(other)) {
                 return INTERVAL_EQUALS;
             }
-            if (within(*this, other)) {
+            if (this->within(other)) {
                 return INTERVAL_WITHIN;
             }
-            if (within(other, *this)) {
+            if (other.within(*this)) {
                 return INTERVAL_CONTAINS;
             }
-            if (precedes(*this, other)) {
+            if (this->precedes(other)) {
                 return INTERVAL_OVERLAPS_BEFORE;
             }
             return INTERVAL_OVERLAPS_AFTER;
@@ -166,7 +165,7 @@ namespace mongo {
         // Non-intersect cases
         //
 
-        if (precedes(*this, other)) {
+        if (this->precedes(other)) {
             // It's not possible for both endInclusive and other.startInclusive to be true because
             // the bounds would intersect. Refer to section on "Intersect cases" above.
             if ((endInclusive || other.startInclusive) && 0 == end.woCompare(other.start, false)) {
@@ -177,6 +176,10 @@ namespace mongo {
 
         return INTERVAL_SUCCEEDS;
     }
+
+    //
+    // Mutation: Union and Intersection
+    //
 
     void Interval::intersect(const Interval& other, IntervalComparison cmp) {
         if (cmp == INTERVAL_UNKNOWN) {
@@ -255,6 +258,15 @@ namespace mongo {
         }
     }
 
+    void Interval::reverse() {
+        std::swap(start, end);
+        std::swap(startInclusive, endInclusive);
+    }
+
+    //
+    // Debug info
+    //
+
     // static
     string Interval::cmpstr(IntervalComparison c) {
         if (c == INTERVAL_EQUALS) {
@@ -299,11 +311,6 @@ namespace mongo {
         }
 
         return "NO IDEA DUDE";
-    }
-
-    void Interval::reverse() {
-        std::swap(start, end);
-        std::swap(startInclusive, endInclusive);
     }
 
 } // namespace mongo

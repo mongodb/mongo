@@ -261,9 +261,8 @@ namespace mongo {
                 oilOut->complement();
             }
             else {
-                // XXX: In the future we shouldn't need this. We handle this
-                // case for the time being because we have some deficiencies in
-                // tree normalization (see SERVER-12735).
+                // TODO: In the future we shouldn't need this. We handle this case for the time
+                // being because we have some deficiencies in tree normalization (see SERVER-12735).
                 //
                 // For example, we will get here if there is an index {a: 1}
                 // and the query is {a: {$elemMatch: {$not: {$gte: 6}}}}.
@@ -298,8 +297,13 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::LT == expr->matchType()) {
             const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
@@ -331,8 +335,12 @@ namespace mongo {
                 oilOut->intervals.push_back(interval);
             }
 
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::GT == expr->matchType()) {
             const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
@@ -363,8 +371,12 @@ namespace mongo {
                 oilOut->intervals.push_back(interval);
             }
 
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::GTE == expr->matchType()) {
             const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
@@ -389,8 +401,12 @@ namespace mongo {
             verify(dataObj.isOwned());
 
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, typeMatch(dataObj)));
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::REGEX == expr->matchType()) {
             const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);
@@ -439,10 +455,20 @@ namespace mongo {
                 }
             }
 
-            // XXX: what happens here?
-            if (afr.hasNull()) { }
-            // XXX: what happens here as well?
-            if (afr.hasEmptyArray()) { }
+            if (afr.hasNull()) {
+                // A null index key does not always match a null query value so we must fetch the
+                // doc and run a full comparison.  See SERVER-4529.
+                // TODO: Do we already set the tightnessOut by calling translateEquality?
+                *tightnessOut = INEXACT_FETCH;
+            }
+
+            if (afr.hasEmptyArray()) {
+                // Empty arrays are indexed as undefined.
+                BSONObjBuilder undefinedBob;
+                undefinedBob.appendUndefined("");
+                oilOut->intervals.push_back(makePointInterval(undefinedBob.obj()));
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
 
             unionize(oilOut);
         }
@@ -496,11 +522,6 @@ namespace mongo {
 
         while (argidx < argiv.size() && ividx < iv.size()) {
             Interval::IntervalComparison cmp = argiv[argidx].compare(iv[ividx]);
-            /*
-            QLOG() << "comparing " << argiv[argidx].toString()
-                 << " with " << iv[ividx].toString()
-                 << " cmp is " << Interval::cmpstr(cmp) << endl;
-                 */
 
             verify(Interval::INTERVAL_UNKNOWN != cmp);
 
@@ -540,8 +561,8 @@ namespace mongo {
                 }
             }
         }
-        // XXX swap
-        oilOut->intervals = result;
+
+        oilOut->intervals.swap(result);
     }
 
     // static
@@ -559,8 +580,6 @@ namespace mongo {
         while (i < iv.size() - 1) {
             // Compare i with i + 1.
             Interval::IntervalComparison cmp = iv[i].compare(iv[i + 1]);
-            // QLOG() << "comparing " << iv[i].toString() << " with " << iv[i+1].toString()
-                 // << " cmp is " << Interval::cmpstr(cmp) << endl;
 
             // This means our sort didn't work.
             verify(Interval::INTERVAL_SUCCEEDS != cmp);
@@ -684,41 +703,52 @@ namespace mongo {
 
             verify(dataObj.isOwned());
             oil->intervals.push_back(makePointInterval(dataObj));
-            // XXX: it's exact if the index isn't sparse?
+
             if (dataObj.firstElement().isNull() || isHashed) {
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
             else {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
+            return;
         }
-        // In the following cases, 'data' is an array. Using
-        // arrays with hashed indices is currently not supported,
-        // so we don't have to worry about that case.
-        else if (data.Obj().isEmpty()) { // Array == data.type()
-            // XXX: tighten bounds in empty case
-            oil->intervals.push_back(allValues());
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+
+        // If we're here, Array == data.type().
+        //
+        // Using arrays with hashed indices is currently not supported, so we don't have to worry
+        // about that case.
+        //
+        // Arrays are indexed by either:
+        //
+        // 1. the first element if there is one.  Note that using the first is arbitrary; we could
+        // just as well use any array element.). If the query is {a: [1, 2, 3]}, for example, then
+        // using the bounds [1, 1] for the multikey index will pick up every document containing the
+        // array [1, 2, 3].
+        //
+        // 2. undefined if the array is empty.
+        //
+        // Also, arrays are indexed by:
+        //
+        // 3. the full array if it's inside of another array.  We check for this so that the query
+        // {a: [1, 2, 3]} will match documents like {a: [[1, 2, 3], 4, 5]}.
+
+        // Case 3.
+        oil->intervals.push_back(makePointInterval(objFromElement(data)));
+
+        if (data.Obj().isEmpty()) {
+            // Case 2.
+            BSONObjBuilder undefinedBob;
+            undefinedBob.appendUndefined("");
+            oil->intervals.push_back(makePointInterval(undefinedBob.obj()));
         }
-        else { // Array == data.type() && !data.Obj().isEmpty()
-            BSONObj dataObj = objFromElement(data);
+        else {
+            // Case 1.
             BSONElement firstEl = data.Obj().firstElement();
-
-            // Use the first element in the array to construct the
-            // first interval. (Using the first is arbitrary; we could
-            // just as well use any array element.). If the query is
-            // {a: [1, 2, 3]}, for example, then using the bounds [1, 1]
-            // for the multikey index will pick up every document containing
-            // the array [1, 2, 3].
             oil->intervals.push_back(makePointInterval(objFromElement(firstEl)));
-
-            // The second point interval uses the entire array. This is
-            // necessary so that the query {a: [1, 2, 3]} will match
-            // documents like {a: [[1, 2, 3], 4, 5]}.
-            oil->intervals.push_back(makePointInterval(dataObj));
-
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
+
+        std::sort(oil->intervals.begin(), oil->intervals.end(), IntervalComparison);
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
     }
 
     // static

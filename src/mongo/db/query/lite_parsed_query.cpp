@@ -364,7 +364,8 @@ namespace mongo {
                         _returnKey = true;
                         BSONObjBuilder projBob;
                         projBob.appendElements(_proj);
-                        // XXX: what's the syntax here?
+                        // We use $$ because it's never going to show up in a user's projection.
+                        // The exact text doesn't matter.
                         BSONObj indexKey = BSON("$$" <<
                                                 BSON("$meta" << LiteParsedQuery::metaIndexKey));
                         projBob.append(indexKey.firstElement());

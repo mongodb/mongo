@@ -106,7 +106,7 @@ namespace mongo {
         static bool _hasPositionalOperatorMatch(const MatchExpression* const query,
                                                 const std::string& matchfield);
 
-        // XXX stringdata?
+        // TODO: stringdata?
         vector<string> _requiredFields;
 
         bool _requiresDocument;

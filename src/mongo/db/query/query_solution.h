@@ -392,8 +392,11 @@ namespace mongo {
         bool fetched() const { return true; }
 
         bool hasField(const string& field) const {
-            // XXX XXX: perhaps have the QueryProjection pre-allocated and defer to it?  we don't
-            // know what we're dropping.  Until we push projection down this doesn't matter.
+            // TODO: Returning false isn't always the right answer -- we may either be including
+            // certain fields, or we may be dropping fields (in which case hasField returns true).
+            //
+            // Given that projection sits on top of everything else in .find() it doesn't matter
+            // what we do here.
             return false;
         }
 

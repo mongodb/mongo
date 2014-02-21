@@ -249,11 +249,11 @@ namespace mongo {
         }
         else if (MatchExpression::AND == node->matchType()) {
             // Map from idx id to children that have a pred over it.
-            // XXX: The index intersection logic could be simplified if we could
-            // iterate over these maps in a known order. Currently when iterating
-            // over these maps we have to impose an ordering on each individual
-            // pair of indices in order to make sure that the enumeration results
-            // are order-independent. See SERVER-12196.
+
+            // TODO: The index intersection logic could be simplified if we could iterate over these
+            // maps in a known order. Currently when iterating over these maps we have to impose an
+            // ordering on each individual pair of indices in order to make sure that the
+            // enumeration results are order-independent. See SERVER-12196.
             IndexToPredMap idxToFirst;
             IndexToPredMap idxToNotFirst;
 
@@ -685,14 +685,13 @@ namespace mongo {
             }
         }
 
-        // XXX: Do we just want one subnode at a time?  We can use far more than 2 indices
-        // at once doing this very easily.  If we want to restrict the # of indices the
-        // children use, when we memoize the subtree above we can restrict it to 1 index at
-        // a time.  This can get tricky if we want both an intersection and a 1-index memo
-        // entry, since our state change is simple and we don't traverse the memo in any
-        // targeted way.  Should also verify that having a one-to-many mapping of
-        // MatchExpression to MemoID doesn't break anything.  This approach errors on the
-        // side of "too much indexing."
+        // TODO: Do we just want one subnode at a time?  We can use far more than 2 indices at once
+        // doing this very easily.  If we want to restrict the # of indices the children use, when
+        // we memoize the subtree above we can restrict it to 1 index at a time.  This can get
+        // tricky if we want both an intersection and a 1-index memo entry, since our state change
+        // is simple and we don't traverse the memo in any targeted way.  Should also verify that
+        // having a one-to-many mapping of MatchExpression to MemoID doesn't break anything.  This
+        // approach errors on the side of "too much indexing."
         for (size_t i = 0; i < subnodes.size(); ++i) {
             for (size_t j = i + 1; j < subnodes.size(); ++j) {
                 AndEnumerableState state;

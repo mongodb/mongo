@@ -446,7 +446,7 @@ namespace mongo {
         BSONObjBuilder prefixBob;
         while (it.more()) {
             BSONElement elt = it.next();
-            // XXX string slowness.  fix when bounds are stringdata not string.
+            // TODO: string slowness.  fix when bounds are stringdata not string.
             if (equalityFields.end() == equalityFields.find(string(elt.fieldName()))) {
                 prefixBob.append(elt);
                 // This field isn't a point interval, can't drop.

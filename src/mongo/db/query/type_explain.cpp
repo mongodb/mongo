@@ -33,7 +33,8 @@
 
 namespace mongo {
 
-    // XXX: this doesn't need to be so complicated or serializable...
+    // TODO: This doesn't need to be so complicated or serializable.  Let's throw this out when we
+    // move to explain V2
 
     using mongoutils::str::stream;
 

@@ -46,14 +46,6 @@ namespace mongo {
     struct QuerySolutionNode;
 
     /**
-     * TODO HK notes
-
-     * cache should be LRU with some cap on size
-
-     * {x:1} and {x:{$gt:7}} not same shape for now -- operator matters
-     */
-
-    /**
      * When the CachedPlanRunner runs a cached query, it can provide feedback to the cache.  This
      * feedback is available to anyone who retrieves that query in the future.
      */
@@ -244,7 +236,9 @@ namespace mongo {
         // used to produce a backup solution in the case of a blocking sort.
         boost::optional<size_t> backupSoln;
 
-        // XXX: Replace with copy of canonical query?
+        // TODO: Do we really want to just hold a copy of the CanonicalQuery?  For now we just
+        // extract the data we need.
+        //
         // Used by the plan cache commands to display an example query
         // of the appropriate shape.
         BSONObj query;

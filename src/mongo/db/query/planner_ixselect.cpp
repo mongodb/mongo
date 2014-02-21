@@ -53,7 +53,6 @@ namespace mongo {
      * 2d indices don't handle wrapping so we can't use them for queries that wrap.
      */
     static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
-        // XXX: where does this really belong
         GeoHashConverter::Parameters params;
         params.bits = static_cast<unsigned>(fieldWithDefault(index.infoObj, "bits", 26));
         params.max = fieldWithDefault(index.infoObj, "max", 180.0);

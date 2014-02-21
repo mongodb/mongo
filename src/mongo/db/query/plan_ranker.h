@@ -59,9 +59,6 @@ namespace mongo {
         /**
          * Assign the stats tree a 'goodness' score. The higher the score, the better
          * the plan. The exact value isn't meaningful except for imposing a ranking.
-         *
-         * XXX: consider moving out of PlanRanker so that the plan
-         * cache can use directly.
          */
         static double scoreTree(const PlanStageStats* stats);
     };
