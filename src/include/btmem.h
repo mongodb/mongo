@@ -235,6 +235,9 @@ struct __wt_page_modify {
 			uint64_t recno;	/* Column-store: starting recno */
 			WT_IKEY *ikey;	/* Row-store: key */
 		} key;
+		uint32_t cksum;		/* Checksum */
+		uint32_t size;		/* Size */
+		uint8_t reuse;		/* Being reused */
 	} *multi;
 	uint32_t multi_entries;		/* Multi-block element count */
 	size_t	 multi_size;		/* Multi-block memory footprint */

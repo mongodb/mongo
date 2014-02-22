@@ -2794,24 +2794,26 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2076
 /*! reconciliation pages deleted */
 #define	WT_STAT_DSRC_REC_PAGE_DELETE			2077
+/*! reconciliation page checksum matches */
+#define	WT_STAT_DSRC_REC_PAGE_MATCH			2078
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2078
+#define	WT_STAT_DSRC_REC_PAGES				2079
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2079
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2080
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2080
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2081
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2081
+#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2082
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			2082
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			2083
 /*! reconciliation maximum splits for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			2083
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			2084
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2084
+#define	WT_STAT_DSRC_SESSION_COMPACT			2085
 /*! open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2085
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2086
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2086
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2087
 /*! @} */
 /*
  * Statistics section: END

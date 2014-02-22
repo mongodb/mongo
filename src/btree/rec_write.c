@@ -137,6 +137,8 @@ typedef struct {
 		uint32_t entries;	/* Split's entries */
 
 		WT_ADDR addr;		/* Split's written location */
+		uint32_t size;		/* Split's size */
+		uint32_t cksum;		/* Split's checksum */
 
 		/*
 		 * The key for a row-store page; no column-store key is needed
@@ -549,6 +551,8 @@ __rec_write_init(
 			WT_ASSERT(session, bnd->addr.addr == NULL);
 			bnd->addr.size = 0;
 			bnd->addr.type = 0;
+
+			bnd->size = bnd->cksum = 0;
 
 			/* Leave the key alone, it's space we re-use. */
 
@@ -1188,11 +1192,12 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	WT_RET(__wt_buf_init(session, &r->dsk, corrected_page_size));
 
 	/*
-	 * Clear the header and set the page type (the type doesn't change, and
-	 * setting it later requires additional code in a few different places).
+	 * Clear the disk page's header and block-manager space, set the page
+	 * type (the type doesn't change, and setting it later would require
+	 * additional code in a few different places).
 	 */
 	dsk = r->dsk.mem;
-	memset(dsk, 0, WT_PAGE_HEADER_SIZE);
+	memset(dsk, 0, WT_PAGE_HEADER_BYTE_SIZE(btree));
 	dsk->type = page->type;
 
 	/*
@@ -1890,8 +1895,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		break;
 	case SPLIT_TRACKING_OFF:
 		/*
-		 * If we have already split, or were never going to split,
-		 * put the remaining data in the next boundary slot.
+		 * If we have already split, or aren't tracking boundaries, put
+		 * the remaining data in the next boundary slot.
 		 */
 		WT_RET(__rec_split_bnd_grow(session, r));
 		break;
@@ -1929,7 +1934,7 @@ __rec_split_finish_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 /*
  * __rec_split_finish --
- *	Finish processing a split page.
+ *	Finish processing a page.
  */
 static inline int
 __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
@@ -2037,11 +2042,16 @@ static int
 __rec_split_write(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf)
 {
+	WT_BTREE *btree;
+	WT_MULTI *multi;
 	WT_PAGE_HEADER *dsk;
+	WT_PAGE_MODIFY *mod;
 	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
+	btree = S2BT(session);
 	dsk = buf->mem;
+	mod = r->page->modify;
 
 	/* Set the zero-length value flag in the page header. */
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
@@ -2051,12 +2061,6 @@ __rec_split_write(
 		if (!r->any_empty_value)
 			F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
 	}
-
-	/* Write the chunk and save the resulting address for the parent. */
-	WT_RET(__wt_bt_write(
-	    session, buf, addr, &addr_size, 0, bnd->already_compressed));
-	WT_RET(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
-	bnd->addr.size = (uint8_t)addr_size;
 
 	/* Set the page type for the parent. */
 	switch (dsk->type) {
@@ -2073,6 +2077,50 @@ __rec_split_write(
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
+
+	/*
+	 * If we wrote this block before, re-use it.  Pages get written in the
+	 * same block order every time, only check the appropriate slot.  The
+	 * expensive part of this test is the checksum, only do that work when
+	 * there has been or will be a reconciliation of this page involving
+	 * split pages.  This test isn't perfect: we're doing a checksum if a
+	 * previous reconciliation of the page split or if we will split this
+	 * time, but that test won't calculate a checksum on the first block
+	 * the first time the page splits.
+	 */
+	bnd->size = (uint32_t)buf->size;
+	bnd->cksum = 0;
+	if (mod->multi != NULL || r->bnd_next > 1) {
+		/*
+		 * There are page header fields which need to be cleared to get
+		 * consistent checksums: specifically, the write generation and
+		 * the memory owned by the block manager.  We are reusing the
+		 * same buffer space each time, clear it before calculating the
+		 * checksum.
+		 */
+		dsk->write_gen = 0;
+		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
+		bnd->cksum = __wt_cksum(buf->data, buf->size);
+
+		if (mod->multi_entries > r->bnd_next) {
+			multi = &mod->multi[r->bnd_next - 1];
+			if (multi->size == bnd->size &&
+			    multi->cksum == bnd->cksum) {
+				WT_RET(__wt_strndup(session,
+				    multi->addr.addr, multi->addr.size,
+				    &bnd->addr.addr));
+				bnd->addr.size = (uint8_t)multi->addr.size;
+				multi->reuse = 1;
+				WT_STAT_FAST_DATA_INCR(session, rec_page_match);
+				return (0);
+			}
+		}
+	}
+
+	WT_RET(__wt_bt_write(session,
+	    buf, addr, &addr_size, 0, bnd->already_compressed));
+	WT_RET(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
+	bnd->addr.size = (uint8_t)addr_size;
 	return (0);
 }
 
@@ -3793,8 +3841,9 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * time; discard underlying block space used in the last reconciliation.
 	 */
 	for (multi = mod->multi, i = 0; i < mod->multi_entries; ++multi, ++i) {
-		WT_RET(
-		    bm->free(bm, session, multi->addr.addr, multi->addr.size));
+		if (!multi->reuse)
+			WT_RET(bm->free(
+			    bm, session, multi->addr.addr, multi->addr.size));
 		__wt_free(session, multi->addr.addr);
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
@@ -4132,6 +4181,10 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 		incr += sizeof(WT_IKEY) + bnd->key.size;
+
+		multi->size = bnd->size;
+		multi->cksum = bnd->cksum;
+		multi->reuse = 0;
 	}
 
 	__wt_cache_page_inmem_incr(session, page, incr);
@@ -4168,6 +4221,10 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		incr += sizeof(WT_ADDR) + multi->addr.size;
 
 		multi->key.recno = bnd->recno;
+
+		multi->size = bnd->size;
+		multi->cksum = bnd->cksum;
+		multi->reuse = 0;
 	}
 
 	__wt_cache_page_inmem_incr(session, page, incr);

@@ -288,6 +288,7 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_overflow_key_leaf;
 	WT_STATS rec_overflow_value;
 	WT_STATS rec_page_delete;
+	WT_STATS rec_page_match;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
 	WT_STATS rec_skipped_update;

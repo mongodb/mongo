@@ -332,6 +332,7 @@ dsrc_stats = [
 	    'reconciliation internal-page overflow keys'),
 	Stat('rec_overflow_key_leaf', 'reconciliation leaf-page overflow keys'),
 	Stat('rec_overflow_value', 'reconciliation overflow values written'),
+	Stat('rec_page_match', 'reconciliation page checksum matches'),
 	Stat('rec_page_delete', 'reconciliation pages deleted'),
 	Stat('rec_pages', 'page reconciliation calls'),
 	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
