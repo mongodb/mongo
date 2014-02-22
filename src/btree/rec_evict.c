@@ -194,8 +194,9 @@ __rec_split_copy_addr(
 		alloc_addr->type = addr->type;
 	} else {
 		__wt_cell_unpack((WT_CELL *)addr, &unpack);
-		WT_ERR(__wt_strndup(session, unpack.data,
-		    alloc_addr->size = unpack.size, &alloc_addr->addr));
+		WT_ERR(__wt_strndup(
+		    session, unpack.data, unpack.size, &alloc_addr->addr));
+		alloc_addr->size = (uint8_t)unpack.size;
 		alloc_addr->type =
 		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
 	}
