@@ -605,6 +605,31 @@ namespace QueryTests {
         }
     };
 
+    class OplogReplayExplain : public ClientBase {
+    public:
+        ~OplogReplayExplain() {
+            client().dropCollection( "unittests.querytests.OplogReplayExplain" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.OplogReplayExplain";
+            insert( ns, BSON( "ts" << 0 ) );
+            insert( ns, BSON( "ts" << 1 ) );
+            insert( ns, BSON( "ts" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query(
+                ns, QUERY( "ts" << GT << 1 ).hint( BSON( "$natural" << 1 ) ).explain(),
+                0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( c->more() );
+
+            // Check number of results and filterSet flag in explain.
+            // filterSet is not available in oplog replay mode.
+            BSONObj explainObj = c->next();
+            ASSERT_EQUALS( 1, explainObj.getIntField( "n" ) );
+            ASSERT_FALSE( explainObj.hasField( "filterSet" ) );
+
+            ASSERT( !c->more() );
+        }
+    };
+
     class BasicCount : public ClientBase {
     public:
         ~BasicCount() {
@@ -1538,6 +1563,7 @@ namespace QueryTests {
             add< TailableQueryOnId >();
             add< OplogReplayMode >();
             add< OplogReplaySlaveReadTill >();
+            add< OplogReplayExplain >();
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();
