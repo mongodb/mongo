@@ -211,9 +211,9 @@ testUpdate({
 
 testUpdate({
     msg: "upsert that just inserts",
-    update: {_id:ObjectId("lolololOID"), a:3},
+    update: {_id:ObjectId("52dfe31fc7db7feec4c6c485"), a:3},
     doUpsert: true,
-    results: [{_id:ObjectId("lolololOID"), a:3}],
+    results: [{_id:ObjectId("52dfe31fc7db7feec4c6c485"), a:3}],
 });
 
 testUpdate({
