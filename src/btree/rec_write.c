@@ -488,9 +488,6 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_ERR(__wt_page_modify_init(session, next));
-	__wt_page_only_modify_set(session, next);
-
 	WT_ERR(__wt_multi_to_ref(session,
 	    next, mod->multi, next->pu_intl_oindex, mod->multi_entries));
 
@@ -502,6 +499,8 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	mod->root_split = next;
 
+	WT_ERR(__wt_page_modify_init(session, next));
+	__wt_page_only_modify_set(session, next);
 	return (__wt_rec_write(session, next, NULL, flags));
 
 err:	__wt_page_out(session, &next);
@@ -3865,8 +3864,8 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * for the page.
 	 */
 	if (mod->root_split != NULL) {
-		WT_RET(__wt_ovfl_track_wrapup(session, mod->root_split));
 		WT_RET(__rec_split_discard(session, mod->root_split));
+		WT_RET(__wt_ovfl_track_wrapup(session, mod->root_split));
 		__wt_page_out(session, &mod->root_split);
 	}
 	return (ret);
