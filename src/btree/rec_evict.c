@@ -405,7 +405,10 @@ static int
 __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 {
 	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK kpack;
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod, *parent_mod;
@@ -486,6 +489,20 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * XXXKEITH
 	 * We just leaked the old parent index reference.
 	 */
+
+	/*
+	 * The key for the split WT_REF may be an onpage overflow key, and we're
+	 * about to lose track of it.  Add it to the tracking list so it will be
+	 * discarded the next time this page is reconciled.
+	 */
+	ikey = __wt_ref_key_instantiated(parent_ref);
+	if (ikey != NULL && ikey->cell_offset != 0) {
+		cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
+		__wt_cell_unpack(cell, &kpack);
+		if (kpack.ovfl)
+			WT_ERR(__wt_ovfl_onpage_add(
+			    session, parent, kpack.data, kpack.size));
+	}
 
 	/*
 	 * Reset the page's original WT_REF field to split, releasing any
