@@ -1010,13 +1010,13 @@ __debug_cell_data(WT_DBG *ds,
 		__debug_item(ds, tag, "addr/del", strlen("addr/del"));
 		break;
 	case WT_CELL_ADDR_INT:
-		__debug_item(ds, tag, "addr", strlen("addr/int"));
+		__debug_item(ds, tag, "addr/int", strlen("addr/int"));
 		break;
 	case WT_CELL_ADDR_LEAF:
-		__debug_item(ds, tag, "addr/lno", strlen("addr/leaf"));
+		__debug_item(ds, tag, "addr/leaf", strlen("addr/leaf"));
 		break;
 	case WT_CELL_ADDR_LEAF_NO:
-		__debug_item(ds, tag, "addr/lno", strlen("addr/leaf-no"));
+		__debug_item(ds, tag, "addr/leaf-no", strlen("addr/leaf-no"));
 		break;
 	case WT_CELL_DEL:
 deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
@@ -1064,11 +1064,12 @@ __debug_ikey(WT_DBG *ds, WT_IKEY *ikey)
 static void
 __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 {
-	const uint8_t *data;
+	size_t i;
 	int ch;
+	const uint8_t *data;
 
 	__dmsg(ds, "\t%s%s{", tag == NULL ? "" : tag, tag == NULL ? "" : " ");
-	for (data = data_arg; size > 0; --size, ++data) {
+	for (data = data_arg, i = 0; i < size; ++i, ++data) {
 		ch = data[0];
 		if (isprint(ch))
 			__dmsg(ds, "%c", ch);
