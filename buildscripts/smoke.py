@@ -737,12 +737,12 @@ at the end of testing:"""
             if "error-docs" in stats:
                 print "Error getting docs to diff:"
                 pprint.pprint(stats["error-docs"])
-        return False
+        return True
 
     if (small_oplog or small_oplog_rs) and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d collections" % (len(replicated_collections))
 
-    return True
+    return False
 
 
 def report():
