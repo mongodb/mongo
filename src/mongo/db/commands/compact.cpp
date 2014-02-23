@@ -65,7 +65,7 @@ namespace mongo {
         }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
-                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
+                "warning: this operation locks the database and is slow. you can cancel with killOp()\n"
                 "{ compact : <collection_name>, [force:<bool>], [validate:<bool>],\n"
                 "  [paddingFactor:<num>], [paddingBytes:<num>] }\n"
                 "  force - allows to run on a replica set primary\n"
