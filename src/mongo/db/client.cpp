@@ -169,7 +169,8 @@ namespace mongo {
         _god(0),
         _lastOp(0)
     {
-        _hasWrittenThisPass = false;
+        _hasWrittenThisOperation = false;
+        _hasWrittenSinceCheckpoint = false;
         _pageFaultRetryableSection = 0;
         _connectionId = p ? p->connectionId() : 0;
         _curOp = new CurOp( this );
@@ -520,9 +521,9 @@ namespace mongo {
     }
 
     bool Client::allowedToThrowPageFaultException() const {
-        if ( _hasWrittenThisPass )
+        if ( _hasWrittenThisOperation )
             return false;
-        
+
         if ( ! _pageFaultRetryableSection )
             return false;
 

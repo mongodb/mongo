@@ -137,12 +137,12 @@ namespace mongo {
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
-                killCurrentOp.checkForInterrupt( !mayInterrupt );
 
                 if ( getDur().commitIfNeeded() ) {
                     b = _getModifiableBucket( cur );
                     up = _getModifiableBucket( upLoc );
                 }
+                RARELY if ( mayInterrupt ) killCurrentOp.checkForInterrupt();
 
                 BtreeBucket<V> *x = _getModifiableBucket( xloc );
                 Key k;

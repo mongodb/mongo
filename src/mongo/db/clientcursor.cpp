@@ -167,7 +167,7 @@ namespace mongo {
     void ClientCursor::staticYield(int micros, const StringData& ns, const Record* rec) {
         bool haveReadLock = Lock::isReadLocked();
 
-        killCurrentOp.checkForInterrupt( false );
+        killCurrentOp.checkForInterrupt();
         {
             auto_ptr<LockMongoFilesShared> lk;
             if ( rec ) {

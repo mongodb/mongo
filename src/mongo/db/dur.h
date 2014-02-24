@@ -200,8 +200,8 @@ namespace mongo {
             void declareWriteIntent(void *, unsigned);
             void createdFile(const std::string& filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
-            bool commitNow() { return false; }
-            bool commitIfNeeded(bool) { return false; }
+            bool commitNow();
+            bool commitIfNeeded(bool);
             bool aCommitIsNeeded() const { return false; }
             void syncDataAndTruncateJournal() {}
             bool isDurable() const { return false; }

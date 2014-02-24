@@ -173,7 +173,7 @@ namespace mongo {
                         Record *r = L.rec();
                         getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;
                         getDur().commitIfNeeded();
-                        killCurrentOp.checkForInterrupt(false);
+                        killCurrentOp.checkForInterrupt();
                     }
                 }
             } // if !L.isNull()
@@ -284,8 +284,7 @@ namespace mongo {
         }
 
         getDur().commitIfNeeded();
-
-        killCurrentOp.checkForInterrupt(false);
+        killCurrentOp.checkForInterrupt();
 
         CompactStats stats;
 

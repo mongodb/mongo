@@ -90,7 +90,7 @@ namespace mongo {
         for ( std::vector< touch_location >::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
             touch_pages( it->root, it->length );
             pm.hit();
-            killCurrentOp.checkForInterrupt(false);
+            killCurrentOp.checkForInterrupt();
         }
         pm.finished();
 

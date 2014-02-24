@@ -654,7 +654,7 @@ namespace mongo {
                     if ( request.getOrdered() )
                         break;
                 }
-                killCurrentOp.checkForInterrupt(false);
+                killCurrentOp.checkForInterrupt();
             }
         }
         else {
@@ -669,7 +669,7 @@ namespace mongo {
                     if ( request.getOrdered() )
                         break;
                 }
-                killCurrentOp.checkForInterrupt(false);
+                killCurrentOp.checkForInterrupt();
             }
         }
 

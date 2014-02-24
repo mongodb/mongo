@@ -77,7 +77,7 @@ namespace mongo {
         }
         else {
             cc()._pageFaultRetryableSection = this;
-            cc()._hasWrittenThisPass = false;
+            cc()._hasWrittenThisOperation = false;
         }
     }
 

@@ -329,7 +329,7 @@ namespace mongo {
         size = ExtentManager::quantizeExtentSize( size );
 
         if ( maxFileNoForQuota > 0 && fileNo - 1 >= maxFileNoForQuota ) {
-            if ( cc().hasWrittenThisPass() ) {
+            if ( cc().hasWrittenSinceCheckpoint() ) {
                 warning() << "quota exceeded, but can't assert" << endl;
             }
             else {
@@ -368,7 +368,7 @@ namespace mongo {
 
         if ( maxFileNoForQuota > 0 &&
              static_cast<int>( numFiles() ) >= maxFileNoForQuota &&
-             !cc().hasWrittenThisPass() ) {
+             !cc().hasWrittenSinceCheckpoint() ) {
             _quotaExceeded();
         }
 

@@ -116,11 +116,16 @@ namespace mongo {
 
         bool inPageFaultRetryableSection() const { return _pageFaultRetryableSection != 0; }
         PageFaultRetryableSection* getPageFaultRetryableSection() const { return _pageFaultRetryableSection; }
-        
-        bool hasWrittenThisPass() const { return _hasWrittenThisPass; }
-        void writeHappened() { _hasWrittenThisPass = true; }
-        void newTopLevelRequest() { _hasWrittenThisPass = false; }
-        
+
+        void writeHappened() { _hasWrittenSinceCheckpoint = true; _hasWrittenThisOperation = true; }
+        bool hasWrittenSinceCheckpoint() const { return _hasWrittenSinceCheckpoint; }
+        void checkpointHappened() { _hasWrittenSinceCheckpoint = false; }
+        bool hasWrittenThisOperation() const { return _hasWrittenThisOperation; }
+        void newTopLevelRequest() {
+            _hasWrittenThisOperation = false;
+            _hasWrittenSinceCheckpoint = false;
+        }
+
         bool allowedToThrowPageFaultException() const;
 
         LockState& lockState() { return _ls; }
@@ -139,7 +144,8 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
 
-        bool _hasWrittenThisPass;
+        bool _hasWrittenThisOperation;
+        bool _hasWrittenSinceCheckpoint;
         PageFaultRetryableSection *_pageFaultRetryableSection;
 
         LockState _ls;

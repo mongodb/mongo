@@ -261,7 +261,6 @@ namespace mongo {
                 log() << "\t bulk dropping " << dupsToDrop.size() << " dups";
 
             for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
-                RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
                 BSONObj toDelete;
                 collection->deleteDocument( *i,
                                             false /* cappedOk */,
@@ -270,7 +269,12 @@ namespace mongo {
                 if ( isMaster( ns.c_str() ) ) {
                     logOp( "d", ns.c_str(), toDelete );
                 }
+                
                 getDur().commitIfNeeded();
+
+                RARELY if ( mayInterrupt ) {
+                    killCurrentOp.checkForInterrupt();
+                }
             }
         }
 

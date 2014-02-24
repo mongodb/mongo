@@ -401,7 +401,7 @@ namespace mongo {
                                                10);
 
             while( i->more() ) {
-                RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
+                RARELY if ( mayInterrupt ) killCurrentOp.checkForInterrupt();
                 ExternalSortDatum d = i->next();
 
                 try {

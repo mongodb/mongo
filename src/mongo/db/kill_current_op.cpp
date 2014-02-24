@@ -166,13 +166,12 @@ namespace {
     void KillCurrentOp::checkForInterrupt(bool heedMutex) {
         Client& c = cc();
 
-        if (heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass()) {
+        if (heedMutex && Lock::somethingWriteLocked() && c.hasWrittenSinceCheckpoint()) {
             return;
         }
 
-        if (_globalKill) {
-            uasserted(InterruptedAtShutdown, "interrupted at shutdown");
-        }
+        uassert(InterruptedAtShutdown, "interrupted at shutdown", !_globalKill);
+
         if (c.curop()->maxTimeHasExpired()) {
             c.curop()->kill();
             notifyAllWaiters();
