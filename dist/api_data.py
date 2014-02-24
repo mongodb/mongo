@@ -258,8 +258,9 @@ file_config = format_meta + [
 	    leaf pages''',
 	    min=0),
 	Config('split_deepen', '250', r'''
-	    maximum pages an internal page requires to write before it will
-	    be split in memory, deepening the tree''',
+	    threshold for deepening the tree; internal pages needing more than
+	    the set number of blocks in order to be written to disk are split,
+	    deepening the tree''',
 	    min='50', undoc=True),
 	Config('split_pct', '75', r'''
 	    the Btree page split size as a percentage of the maximum Btree
