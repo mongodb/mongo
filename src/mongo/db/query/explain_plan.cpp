@@ -516,6 +516,12 @@ namespace mongo {
         childrenBob.doneFast();
     }
 
+    BSONObj statsToBSON(const PlanStageStats& stats) {
+        BSONObjBuilder bob;
+        statsToBSON(stats, &bob);
+        return bob.obj();
+    }
+
     namespace {
 
         /**

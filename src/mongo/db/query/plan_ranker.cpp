@@ -34,6 +34,7 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
 
@@ -78,7 +79,8 @@ namespace mongo {
 
         // Compute score for each tree.  Record the best.
         for (size_t i = 0; i < statTrees.size(); ++i) {
-            QLOG() << "scoring plan " << i << ":\n" << candidates[i].solution->toString();
+            QLOG() << "scoring plan " << i << ":\n"
+                   << statsToBSON(*statTrees[i]).jsonString(Strict, true);
             double score = scoreTree(statTrees[i]);
             QLOG() << "score = " << score << endl;
             scoresAndCandidateindices.push_back(std::make_pair(score, i));

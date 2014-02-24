@@ -80,4 +80,6 @@ namespace mongo {
 
     void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob);
 
+    BSONObj statsToBSON(const PlanStageStats& stats);
+
 } // namespace mongo
