@@ -795,6 +795,9 @@ namespace mongo {
         // creates the base of the update for the inserterd doc (because upsert was true)
         if (cq) {
             uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
+            // Validate the base doc, as taken from the query -- no fields means validate all.
+            FieldRefSet noFields;
+            uassertStatusOK(validate(BSONObj(), noFields, doc, NULL, driver->modOptions()));
             if (!driver->isDocReplacement()) {
                 opDebug->fastmodinsert = true;
                 // We need all the fields from the query to compare against for validation below.
@@ -828,6 +831,7 @@ namespace mongo {
             if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
 
+            // This will only validate the modified fields if not a replacement.
             uassertStatusOK(validate(original,
                                      updatedFields,
                                      doc,

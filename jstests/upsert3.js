@@ -2,6 +2,15 @@
 t = db.upsert3;
 t.drop();
 
+//make sure we validate query
+t.update( {a: {"a.a": 1}} , {$inc: {y: 1}} , true );
+assert.gleError(db, function(gle) {
+    return "a.a.a-1 - " + tojson(gle) + " doc:" + tojson(t.findOne()) });
+
+t.update( {a: {$a: 1}} , {$inc: {y: 1}} , true );
+assert.gleError(db, function(gle) {
+    return "a.$a-1 - " + tojson(gle) + " doc:" + tojson(t.findOne()) });
+
 // make sure the new _id is not duplicated
 t.update( {"a.b": 1, a: {a: 1, b: 1}} , {$inc: {y: 1}} , true );
 assert.gleError(db, function(gle) {
