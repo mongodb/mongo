@@ -233,9 +233,10 @@ namespace mongo {
             bool saveClientCursor = false;
 
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
-                // XXX: Do we need to propagate this error to caller?
+                // Propagate this error to caller.
                 if (Runner::RUNNER_ERROR == state) {
-                    warning() << "getMore runner error: " << WorkingSetCommon::toStatusString(obj);
+                    uasserted(17406, "getMore runner error: " +
+                              WorkingSetCommon::toStatusString(obj));
                 }
 
                 // If we're dead there's no way to get more results.
