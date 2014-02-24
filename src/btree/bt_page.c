@@ -81,8 +81,7 @@ __wt_page_in_func(
 			 * the running transaction.
 			 */
 			if (force_attempts < 10 &&
-			    __wt_eviction_force_check(session, page) &&
-			    __wt_eviction_force_txn_check(session, page)) {
+			    __wt_eviction_force_check(session, page)) {
 				++force_attempts;
 				WT_RET(__wt_eviction_force(session, page));
 				break;

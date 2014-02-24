@@ -811,26 +811,6 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 * know the final state.
 	 */
 	if (__wt_page_is_modified(page)) {
-#ifdef XXXKEITH
-		/*
-		 * If the page is larger than the maximum allowed, attempt to
-		 * split the page in memory before evicting it.  The in-memory
-		 * split checks for left and right splits, and prevents the
-		 * tree deepening unnecessarily.
-		 *
-		 * Note, we won't be here if recursively descending a tree of
-		 * pages: dirty row-store leaf pages can't be merged into their
-		 * parents, which means if top wasn't true in this test, we'd
-		 * have returned busy before attempting reconciliation.
-		 */
-		if (page->type == WT_PAGE_ROW_LEAF &&
-		    !F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) &&
-		    __wt_eviction_force_check(session, page)) {
-			*inmem_split = 1;
-			return (0);
-		}
-#endif
-
 		ret = __wt_rec_write(session, page,
 		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_QUIT);
 

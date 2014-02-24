@@ -634,6 +634,7 @@ mnt
 msg
 msgv
 mtx
+multi
 multicore
 multiprocess
 multisocket

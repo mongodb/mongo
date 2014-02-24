@@ -488,7 +488,6 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_WAS_SPLIT	0x10	/* Page has been split in memory */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -615,18 +614,6 @@ struct __wt_ref {
 	(cpage)->parent = (ppage);					\
 	(pref)->page = (cpage);						\
 } while (0)
-
-/*
- * WT_MERGE_STACK_MIN --
- * When stacks of in-memory pages become this deep, they are considered for
- * merging.
- *
- * WT_MERGE_FULL_PAGE --
- * When the result of a merge contains more than this number of keys, it is
- * considered "done" and will not be merged again.
- */
-#define	WT_MERGE_STACK_MIN	3
-#define	WT_MERGE_FULL_PAGE	100
 
 /*
  * WT_ROW --

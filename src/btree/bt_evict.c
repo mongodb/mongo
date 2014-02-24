@@ -884,62 +884,12 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (WT_PAGE_IS_ROOT(page))
 			continue;
 
-#ifdef XXXKEITH
-		/*
-		 * Look for a split-merge (grand)parent page to merge.
-		 *
-		 * Only look for a parent at exactly the right height above: if
-		 * the stack is deep enough, we'll find it eventually, and we
-		 * don't want to do too much work on every level.
-		 */
-		levels = 0;
-		if (__wt_btree_mergeable(page))
-			for (levels = 1;
-			    levels < WT_MERGE_STACK_MIN &&
-			    __wt_btree_mergeable(page->parent);
-			    page = page->parent, levels++)
-				;
-		else if (page->modify != NULL &&
-		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
-			continue;
-#endif
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
-
-#ifdef XXXKEITH
-		/*
-		 * !!!
-		 * In normal operation, don't restrict ourselves to only the
-		 * top-most page (that is, don't require that page->parent is
-		 * not mergeable).  If there is a big, busy enough split-merge
-		 * tree, the top-level merge will only happen if we can lock
-		 * the whole subtree exclusively.  Consider smaller merges in
-		 * case locking the whole tree fails.
-		 */
-		if (levels != 0) {
-			if (levels < WT_MERGE_STACK_MIN)
-				continue;
-
-			/*
-			 * Concentrate near the top of a stack -- with forced
-			 * eviction, stacks of split-merge pages can get very
-			 * deep, and merging near the bottom isn't helpful.
-			 */
-			if (LF_ISSET(WT_EVICT_PASS_INTERNAL) &&
-			    __wt_btree_mergeable(page->parent) &&
-			    __wt_btree_mergeable(page->parent->parent))
-				continue;
-
-			/* The remaining checks don't apply to merges. */
-			goto add;
-		}
-		if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
-			continue;
-#endif
 
 		/*
 		 * If this page has never been considered for eviction,
