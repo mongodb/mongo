@@ -124,9 +124,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
 
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(2, numCounted);
         }
     };
@@ -156,9 +156,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
 
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(5, numCounted);
         }
     };
@@ -188,61 +188,12 @@ namespace QueryStageCount {
             params.endKeyInclusive = false;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
 
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(3, numCounted);
         }
     };
-
-    //
-    // Check that killOp will interrupt cursor iteration
-    //
-    // SERVER-12791 - test is currently failing.
-    //
-    /*    class QueryStageCountInterrupt : public CountBase {
-    public:
-        ~QueryStageCountInterrupt() {
-            // Reset the current op's kill flag
-            cc().curop()->reset();
-        }
-
-        void run() {
-            Client::WriteContext ctx(ns());
-
-            // Insert docs, add index
-            for (int i = 0; i < 2000; ++i) {
-                insert(BSON("a" << i));
-            }
-
-            addIndex(BSON("a" << 1));
-
-            // Set up the count stage
-            CountParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
-            params.startKey = BSON("" << 0);
-            params.startKeyInclusive = true;
-            params.endKey = BSON("" << 2000);
-            params.endKeyInclusive = true;
-
-            WorkingSet ws;
-            Count* count = new Count(params, &ws);
-            WorkingSetID wsid;
-
-            // Register a request to kill the current operation
-            cc().curop()->kill();
-
-            // Check that the cursor is killed before it hits IS_EOF
-            PlanStage::StageState countState = count->work(&wsid);
-
-            while (PlanStage::DEAD != countState && 
-                    PlanStage::IS_EOF != countState &&
-                    PlanStage::FAILURE != countState) { 
-                countState = count->work(&wsid);
-            }
-            ASSERT_NOT_EQUALS(PlanStage::IS_EOF, countState);
-        }
-    };*/
 
     //
     // Check that cursor returns no results if all docs are below lower bound
@@ -265,9 +216,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = false;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(0, numCounted);
         }
     };
@@ -294,9 +245,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = false;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(0, numCounted);
         }
     };
@@ -324,9 +275,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(0, numCounted);
         }
     };
@@ -355,7 +306,7 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             WorkingSetID wsid;
 
             int numCounted = 0;
@@ -363,19 +314,19 @@ namespace QueryStageCount {
 
             // Begin running the count
             while (numCounted < 2) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
 
             // Prepare the cursor to yield
-            count->prepareToYield();
+            count.prepareToYield();
 
             // Recover from yield
-            count->recoverFromYield();
+            count.recoverFromYield();
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
             ASSERT_EQUALS(4, numCounted);
@@ -406,7 +357,7 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             WorkingSetID wsid;
 
             int numCounted = 0;
@@ -414,22 +365,22 @@ namespace QueryStageCount {
 
             // Begin running the count
             while (numCounted < 2) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
 
             // Prepare the cursor to yield
-            count->prepareToYield();
+            count.prepareToYield();
 
             // Remove remaining objects
             remove(BSON("a" << GTE << 5));
 
             // Recover from yield
-            count->recoverFromYield();
+            count.recoverFromYield();
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
             ASSERT_EQUALS(2, numCounted);
@@ -460,7 +411,7 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             WorkingSetID wsid;
 
             int numCounted = 0;
@@ -468,12 +419,12 @@ namespace QueryStageCount {
 
             // Begin running the count
             while (numCounted < 2) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
 
             // Prepare the cursor to yield
-            count->prepareToYield();
+            count.prepareToYield();
 
             // Insert one document before the end
             insert(BSON("a" << 5.5));
@@ -482,11 +433,11 @@ namespace QueryStageCount {
             insert(BSON("a" << 6.5));
 
             // Recover from yield
-            count->recoverFromYield();
+            count.recoverFromYield();
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
             ASSERT_EQUALS(5, numCounted);
@@ -517,7 +468,7 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             WorkingSetID wsid;
 
             int numCounted = 0;
@@ -525,22 +476,22 @@ namespace QueryStageCount {
 
             // Begin running the count
             while (numCounted < 2) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
 
             // Prepare the cursor to yield
-            count->prepareToYield();
+            count.prepareToYield();
 
             // Insert a document with two values for 'a'
             insert(BSON("a" << BSON_ARRAY(10 << 11)));
 
             // Recover from yield
-            count->recoverFromYield();
+            count.recoverFromYield();
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
             ASSERT_EQUALS(8, numCounted);
@@ -575,9 +526,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
 
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(7, numCounted);
         }
     };
@@ -608,9 +559,9 @@ namespace QueryStageCount {
             params.endKeyInclusive = true; // yes?
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
 
-            int numCounted = runCount(count);
+            int numCounted = runCount(&count);
             ASSERT_EQUALS(9, numCounted);
         }
     };
@@ -638,7 +589,7 @@ namespace QueryStageCount {
             params.endKeyInclusive = true;
 
             WorkingSet ws;
-            Count* count = new Count(params, &ws);
+            Count count(params, &ws);
             WorkingSetID wsid;
 
             int numCounted = 0;
@@ -646,22 +597,22 @@ namespace QueryStageCount {
 
             // Begin running the count
             while (numCounted < 2) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
 
             // Prepare the cursor to yield
-            count->prepareToYield();
+            count.prepareToYield();
 
             // Mark the key at position 5 as 'unused'
             remove(BSON("a" << 1 << "b" << 5));
 
             // Recover from yield
-            count->recoverFromYield();
+            count.recoverFromYield();
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
-                countState = count->work(&wsid);
+                countState = count.work(&wsid);
                 if (PlanStage::ADVANCED == countState) numCounted++;
             }
             ASSERT_EQUALS(8, numCounted);
@@ -676,8 +627,6 @@ namespace QueryStageCount {
             add<QueryStageCountDups>();
             add<QueryStageCountInclusiveBounds>();
             add<QueryStageCountExclusiveBounds>();
-            // SERVER-12791:
-            // add<QueryStageCountInterrupt>();
             add<QueryStageCountLowerBound>();
             add<QueryStageCountNothingInInterval>();
             add<QueryStageCountNothingInIntervalFirstMatchTooHigh>();
