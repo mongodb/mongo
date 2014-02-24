@@ -534,22 +534,6 @@ extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api,
     WT_CONFIG_ARG *cfg_arg,
     const char *key,
     WT_CONFIG_ITEM *cval);
-extern int __wt_ext_config_strget(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session,
-    const char *config,
-    const char *key,
-    WT_CONFIG_ITEM *cval);
-extern int __wt_ext_config_scan_begin( WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session,
-    const char *str,
-    size_t len,
-    WT_CONFIG_SCAN **scanp);
-extern int __wt_ext_config_scan_end(WT_EXTENSION_API *wt_api,
-    WT_CONFIG_SCAN *scan);
-extern int __wt_ext_config_scan_next( WT_EXTENSION_API *wt_api,
-    WT_CONFIG_SCAN *scan,
-    WT_CONFIG_ITEM *key,
-    WT_CONFIG_ITEM *value);
 extern int __wt_collator_config( WT_SESSION_IMPL *session,
     const char **cfg,
     WT_COLLATOR **collatorp);

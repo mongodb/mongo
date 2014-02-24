@@ -106,10 +106,6 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.collator_config = ext_collator_config;
 	conn->extension_api.collate = ext_collate;
 	conn->extension_api.config_get = __wt_ext_config_get;
-	conn->extension_api.config_strget = __wt_ext_config_strget;
-	conn->extension_api.config_scan_begin = __wt_ext_config_scan_begin;
-	conn->extension_api.config_scan_end = __wt_ext_config_scan_end;
-	conn->extension_api.config_scan_next = __wt_ext_config_scan_next;
 	conn->extension_api.metadata_insert = __wt_ext_metadata_insert;
 	conn->extension_api.metadata_remove = __wt_ext_metadata_remove;
 	conn->extension_api.metadata_search = __wt_ext_metadata_search;

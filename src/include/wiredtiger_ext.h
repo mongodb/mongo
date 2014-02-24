@@ -199,69 +199,6 @@ struct __wt_extension_api {
 	    WT_CONFIG_ARG *config, const char *key, WT_CONFIG_ITEM *value);
 
 	/*!
-	 * Return the value of a configuration string.
-	 *
-	 * @param wt_api the extension handle
-	 * @param session the session handle (or NULL if none available)
-	 * @param config a configuration string
-	 * @param key configuration key string
-	 * @param value the returned value
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION config_strget
-	 */
-	int (*config_strget)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    const char *config, const char *key, WT_CONFIG_ITEM *value);
-
-	/*!
-	 * Return the list entries of a configuration string value.
-	 * This method steps through the entries found in the last returned
-	 * value from WT_EXTENSION_API::config_get.  The last returned value
-	 * should be of type "list".
-	 *
-	 * @param wt_api the extension handle
-	 * @param session the session handle (or NULL if none available)
-	 * @param str the configuration string to scan
-	 * @param len the number of valid bytes in \c str
-	 * @param[out] scanp a handle used to scan the config string
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION config scan
-	 */
-	int (*config_scan_begin)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    const char *str, size_t len, WT_CONFIG_SCAN **scanp);
-
-	/*!
-	 * Release any resources allocated by
-	 * WT_EXTENSION_API::config_scan_begin.
-	 *
-	 * @param wt_api the extension handle
-	 * @param scan the configuration scanner, invalid after this call
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION config scan
-	 */
-	int (*config_scan_end)(WT_EXTENSION_API *wt_api, WT_CONFIG_SCAN *scan);
-
-	/*!
-	 * Return the next key/value pair from a config string scan.
-	 *
-	 * If the string contains a list of items with no assigned value, the
-	 * items will be returned in \c key and the \c value will be set to the
-	 * boolean \c "true" value.
-	 *
-	 * @param wt_api the extension handle
-	 * @param scan the configuration scanner
-	 * @param key the returned key
-	 * @param value the returned value
-	 * @errors
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION config scan
-	 */
-	int (*config_scan_next)(WT_EXTENSION_API *wt_api,
-	    WT_CONFIG_SCAN *scan, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
-
-	/*!
 	 * Insert a row into the metadata if it does not already exist.
 	 *
 	 * @param wt_api the extension handle
@@ -429,6 +366,14 @@ struct __wt_extension_api {
 	int (*transaction_visible)(WT_EXTENSION_API *wt_api,
 	    WT_SESSION *session, uint64_t transaction_id);
 };
+
+/*!
+ * @typedef WT_CONFIG_ARG
+ *
+ * A configuration object passed to some extension interfaces.  This is an
+ * opaque type: configuration values can be queried using
+ * WT_EXTENSION_API::config_get
+ */
 
 /*! @} */
 #endif /* SWIG */
