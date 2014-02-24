@@ -278,7 +278,12 @@ worker(void *arg)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
-		measure_latency = cfg->sample_interval != 0 && (
+		/*
+		 * Skip the first time we do an operation, when trk->ops
+		 * is 0, to avoid first time latency spikes.
+		 */
+		measure_latency =
+		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
 		    (ret = __wt_epoch(NULL, &start)) != 0) {
